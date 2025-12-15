@@ -592,6 +592,12 @@ export default function MealBuilderClient() {
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
                             <span className="font-semibold text-gray-900">{round3(totals.fat)}</span> g fat
                           </div>
+                          <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
+                            <span className="font-semibold text-gray-900">{round3(totals.fiber)}</span> g fibre
+                          </div>
+                          <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
+                            <span className="font-semibold text-gray-900">{round3(totals.sugar)}</span> g sugar
+                          </div>
                         </div>
                       </div>
                     )}
@@ -620,6 +626,14 @@ export default function MealBuilderClient() {
             <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
               <span className="text-gray-700">Fat</span>
               <span className="font-semibold text-gray-900">{round3(mealTotals.fat)} g</span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
+              <span className="text-gray-700">Fibre</span>
+              <span className="font-semibold text-gray-900">{round3(mealTotals.fiber)} g</span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
+              <span className="text-gray-700">Sugar</span>
+              <span className="font-semibold text-gray-900">{round3(mealTotals.sugar)} g</span>
             </div>
           </div>
         </div>
