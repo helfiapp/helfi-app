@@ -37,6 +37,7 @@ type BuilderItem = {
   __baseAmount: number | null
   __baseUnit: BuilderUnit | null
   __amount: number
+  __amountInput: string
   __unit: BuilderUnit | null
 }
 
@@ -190,6 +191,7 @@ export default function MealBuilderClient() {
 
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoritesSearch, setFavoritesSearch] = useState('')
+  const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>('all')
 
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading
 
@@ -293,6 +295,7 @@ export default function MealBuilderClient() {
       __baseAmount: baseAmount,
       __baseUnit: baseUnit,
       __amount: defaultAmount,
+      __amountInput: String(defaultAmount),
       __unit: baseUnit,
     }
 
@@ -333,6 +336,7 @@ export default function MealBuilderClient() {
         __baseAmount: baseAmount,
         __baseUnit: baseUnit,
         __amount: baseAmount && baseUnit ? round3(baseAmount * (Number.isFinite(servings) ? servings : 1)) : round3(Number.isFinite(servings) ? servings : 1),
+        __amountInput: String(baseAmount && baseUnit ? round3(baseAmount * (Number.isFinite(servings) ? servings : 1)) : round3(Number.isFinite(servings) ? servings : 1)),
         __unit: baseUnit,
       }
       addBuilderItem(next)
@@ -377,6 +381,133 @@ export default function MealBuilderClient() {
         sugar_g: total?.sugar ?? total?.sugar_g ?? null,
       },
     ])
+  }
+
+  const HISTORY_RESET_EPOCH_MS = 1765532876309 // Dec 12, 2025 09:47:56 UTC
+
+  const normalizeMealLabel = (raw: any) => {
+    const s = String(raw || '').trim()
+    if (!s) return ''
+    const firstLine = s.split('\n')[0] || s
+    return firstLine.split('Calories:')[0].trim()
+  }
+
+  const buildSourceTag = (entry: any) => {
+    if (!entry) return 'Custom'
+    if (entry?.sourceTag) return String(entry.sourceTag)
+    if ((entry as any)?.source) return String((entry as any).source).toUpperCase()
+    if ((entry as any)?.method === 'photo') return 'CRDB'
+    if ((entry as any)?.method === 'text') return 'Custom Food'
+    return 'CRDB'
+  }
+
+  const extractCalories = (entry: any) => {
+    const n = (entry?.total || entry?.nutrition || null) as any
+    const c = n?.calories
+    return typeof c === 'number' && Number.isFinite(c) ? Math.round(c) : null
+  }
+
+  const readWarmDiaryState = (): any | null => {
+    try {
+      const raw = sessionStorage.getItem('foodDiary:warmState')
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      return parsed && typeof parsed === 'object' ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
+  const readPersistentDiarySnapshot = (): any | null => {
+    try {
+      const raw = localStorage.getItem('foodDiary:persistentSnapshot')
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      return parsed && typeof parsed === 'object' ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
+  const buildFavoritesDatasets = () => {
+    const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+    const pool: any[] = []
+
+    const todays = Array.isArray((userData as any)?.todaysFoods) ? ((userData as any).todaysFoods as any[]) : []
+    pool.push(...todays)
+
+    const warm = readWarmDiaryState()
+    const historyByDate = warm?.historyByDate
+    if (historyByDate && typeof historyByDate === 'object') {
+      Object.values(historyByDate).forEach((entries: any) => {
+        if (Array.isArray(entries)) pool.push(...entries)
+      })
+    }
+
+    const snap = readPersistentDiarySnapshot()
+    if (snap?.byDate && typeof snap.byDate === 'object') {
+      Object.values(snap.byDate).forEach((d: any) => {
+        if (Array.isArray(d?.entries)) pool.push(...d.entries)
+      })
+    }
+
+    const meetsShape = (entry: any) => {
+      if (!entry) return false
+      const desc = String(entry?.description || entry?.label || '').trim()
+      if (!desc) return false
+      const hasNutrition = Boolean(entry?.nutrition) || Boolean(entry?.total) || (Array.isArray(entry?.items) && entry.items.length > 0)
+      if (!hasNutrition) return false
+      const ts =
+        typeof entry?.createdAt === 'string'
+          ? new Date(entry.createdAt).getTime()
+          : typeof entry?.createdAt === 'number'
+          ? entry.createdAt
+          : typeof entry?.id === 'number'
+          ? entry.id
+          : Number(entry?.id)
+      return Number.isFinite(ts) ? ts >= HISTORY_RESET_EPOCH_MS : true
+    }
+
+    const allByKey = new Map<string, any>()
+    pool.filter(meetsShape).forEach((entry) => {
+      const key = normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()
+      if (!key) return
+      const existing = allByKey.get(key)
+      const created = Number(entry?.createdAt ? new Date(entry.createdAt).getTime() : entry?.id || 0)
+      const existingCreated = Number(existing?.createdAt ? new Date(existing.createdAt).getTime() : existing?.id || 0)
+      if (!existing || created > existingCreated) allByKey.set(key, entry)
+    })
+
+    favorites.forEach((fav: any) => {
+      const key = normalizeMealLabel(fav?.description || fav?.label || '').toLowerCase()
+      if (!key) return
+      if (!allByKey.has(key)) allByKey.set(key, { ...fav, sourceTag: 'Favorite' })
+    })
+
+    const allMeals = Array.from(allByKey.values()).map((entry) => ({
+      id: entry?.id || `all-${Math.random()}`,
+      label: normalizeMealLabel(entry?.description || entry?.label || 'Meal') || 'Meal',
+      entry,
+      favorite: (entry as any)?.sourceTag === 'Favorite' ? entry : null,
+      createdAt: entry?.createdAt || entry?.id || Date.now(),
+      sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
+      calories: extractCalories(entry),
+      serving: entry?.items?.[0]?.serving_size || entry?.serving || '',
+    }))
+
+    const favoriteMeals = favorites.map((fav: any) => ({
+      id: fav?.id || `fav-${Math.random()}`,
+      label: normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal') || 'Favorite meal',
+      favorite: fav,
+      createdAt: fav?.createdAt || fav?.id || Date.now(),
+      sourceTag: 'Favorite',
+      calories: extractCalories(fav),
+      serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
+    }))
+
+    const customMeals = favoriteMeals.filter((f: any) => !f.favorite?.sourceId && !f.favorite?.photo)
+
+    return { allMeals, favoriteMeals, customMeals }
   }
 
   const analyzePhotoAndAdd = async (file: File) => {
@@ -561,11 +692,11 @@ export default function MealBuilderClient() {
   }
 
   const setAmount = (id: string, raw: string) => {
-    const v = raw === '' ? '' : raw
+    const v = String(raw ?? '').replace(',', '.')
     setItems((prev) =>
       prev.map((it) => {
         if (it.id !== id) return it
-        const num = v === '' ? NaN : Number(v)
+        const num = v.trim() === '' ? NaN : Number(v)
         const amount = Number.isFinite(num) && num >= 0 ? num : 0
         const baseAmount = it.__baseAmount
         const baseUnit = it.__baseUnit
@@ -580,7 +711,7 @@ export default function MealBuilderClient() {
           servings = amount
         }
 
-        return { ...it, __amount: amount, servings: round3(Math.max(0, servings)) }
+        return { ...it, __amountInput: v, __amount: amount, servings: round3(Math.max(0, servings)) }
       }),
     )
   }
@@ -598,7 +729,8 @@ export default function MealBuilderClient() {
         const converted = convertAmount(it.__amount, currentUnit, unit)
         const inBase = convertAmount(converted, unit, baseUnit)
         const servings = baseAmount > 0 ? inBase / baseAmount : 0
-        return { ...it, __unit: unit, __amount: round3(Math.max(0, converted)), servings: round3(Math.max(0, servings)) }
+        const nextAmount = round3(Math.max(0, converted))
+        return { ...it, __unit: unit, __amount: nextAmount, __amountInput: String(nextAmount), servings: round3(Math.max(0, servings)) }
       }),
     )
   }
@@ -615,7 +747,7 @@ export default function MealBuilderClient() {
     const description = title
 
     const cleanedItems = items.map((it) => {
-      const { __baseAmount, __baseUnit, __amount, __unit, ...rest } = it
+      const { __baseAmount, __baseUnit, __amount, __amountInput, __unit, ...rest } = it
       return rest
     })
 
@@ -702,8 +834,8 @@ export default function MealBuilderClient() {
                   <span aria-hidden>←</span>
                 </button>
                 <div className="flex-1 text-center">
-                  <div className="text-lg font-semibold text-gray-900">Favorites</div>
-                  <div className="text-xs text-gray-500">Add a saved food into this meal</div>
+                  <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
+                  <div className="text-xs text-gray-500">Pick from All / Favorites / Custom</div>
                 </div>
                 <button
                   type="button"
@@ -719,53 +851,82 @@ export default function MealBuilderClient() {
                 <input
                   value={favoritesSearch}
                   onChange={(e) => setFavoritesSearch(e.target.value)}
-                  placeholder="Search favorites..."
+                  placeholder="Search all foods..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
 
+              <div className="px-4 py-3 border-b border-gray-200">
+                <div className="grid grid-cols-3 gap-2">
+                  {(['all', 'favorites', 'custom'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setFavoritesActiveTab(tab)}
+                      className={`py-2 text-sm font-semibold border rounded-lg ${
+                        favoritesActiveTab === tab ? 'bg-gray-200 text-gray-900 border-gray-300' : 'bg-white text-gray-700 border-gray-300'
+                      }`}
+                    >
+                      {tab === 'all' ? 'All' : tab === 'favorites' ? 'Favorites' : 'Custom'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex-1 overflow-y-auto px-4 py-3">
                 {(() => {
-                  const list = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
                   const search = favoritesSearch.trim().toLowerCase()
-                  const filtered = !search
-                    ? list
-                    : list.filter((f) => {
-                        const label = String((f as any)?.label || (f as any)?.description || '').toLowerCase()
-                        return label.includes(search)
-                      })
-
-                  if (filtered.length === 0) {
-                    return <div className="text-sm text-gray-500 py-8 text-center">No favorites found.</div>
+                  const { allMeals, favoriteMeals, customMeals } = buildFavoritesDatasets()
+                  const filterBySearch = (item: any) => {
+                    if (!search) return true
+                    return (
+                      String(item?.label || '').toLowerCase().includes(search) ||
+                      String(item?.serving || '').toLowerCase().includes(search) ||
+                      String(item?.sourceTag || '').toLowerCase().includes(search)
+                    )
                   }
+                  const sortList = (list: any[]) => [...list].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
 
-                  const sorted = [...filtered].sort((a, b) => (Number((b as any)?.createdAt) || 0) - (Number((a as any)?.createdAt) || 0))
+                  let data: any[] = []
+                  if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
+                  if (favoritesActiveTab === 'favorites') data = sortList(favoriteMeals.filter(filterBySearch))
+                  if (favoritesActiveTab === 'custom') data = sortList(customMeals.filter(filterBySearch))
+
+                  if (data.length === 0) {
+                    return (
+                      <div className="text-sm text-gray-500 py-8 text-center">
+                        {favoritesActiveTab === 'all'
+                          ? 'No meals yet. Add some entries to see them here.'
+                          : favoritesActiveTab === 'favorites'
+                          ? 'No favorites yet.'
+                          : 'No custom meals yet.'}
+                      </div>
+                    )
+                  }
 
                   return (
                     <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
-                      {sorted.map((fav, idx) => {
-                        const label = String((fav as any)?.label || (fav as any)?.description || 'Favorite').trim()
-                        const total = (fav as any)?.total || (fav as any)?.nutrition || null
-                        const calories =
-                          total && typeof total?.calories === 'number' && Number.isFinite(total.calories)
-                            ? Math.round(total.calories)
-                            : null
+                      {data.map((item, idx) => {
+                        const label = String(item?.label || 'Meal').trim() || 'Meal'
+                        const calories = typeof item?.calories === 'number' && Number.isFinite(item.calories) ? item.calories : null
+                        const tag = String(item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom'))
+                        const serving = String(item?.serving || '1 serving')
                         return (
                           <button
-                            key={String((fav as any)?.id || idx)}
+                            key={String(item?.id || idx)}
                             type="button"
                             onClick={() => {
-                              addFromFavorite(fav)
+                              if (item?.favorite) addFromFavorite(item.favorite)
+                              else if (item?.entry) addFromFavorite(item.entry)
+                              else addFromFavorite(item)
                               setShowFavoritesPicker(false)
                               setFavoritesSearch('')
                             }}
                             className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50"
                           >
                             <div className="min-w-0">
-                              <div className="text-sm font-semibold text-gray-900 truncate">{label || 'Favorite'}</div>
-                              <div className="text-xs text-gray-500 truncate">
-                                {Array.isArray((fav as any)?.items) ? `${(fav as any).items.length} ingredients` : 'Saved meal'}
-                              </div>
+                              <div className="text-sm font-semibold text-gray-900 truncate">{label}</div>
+                              <div className="text-xs text-gray-500 truncate">{serving} • {tag}</div>
                             </div>
                             {calories !== null && <div className="text-sm font-semibold text-gray-900">{calories} kcal</div>}
                           </button>
@@ -916,7 +1077,11 @@ export default function MealBuilderClient() {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => setShowFavoritesPicker(true)}
+                onClick={() => {
+                  setFavoritesActiveTab('all')
+                  setFavoritesSearch('')
+                  setShowFavoritesPicker(true)
+                }}
                 className="col-span-2 sm:col-span-1 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
               >
                 Add from favorites
@@ -1028,9 +1193,11 @@ export default function MealBuilderClient() {
                           <div className="space-y-1">
                             <div className="text-xs font-semibold text-gray-700">Amount</div>
                             <input
-                              value={String(it.__amount)}
-                              onChange={(e) => setAmount(it.id, e.target.value)}
+                              type="text"
                               inputMode="decimal"
+                              value={it.__amountInput}
+                              onChange={(e) => setAmount(it.id, e.target.value)}
+                              onFocus={() => setAmount(it.id, '')}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                             />
                           </div>
