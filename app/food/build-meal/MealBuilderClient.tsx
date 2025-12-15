@@ -157,7 +157,7 @@ const buildDefaultMealName = (items: BuilderItem[]) => {
 export default function MealBuilderClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { userData } = useUserData()
+  const { userData, updateUserData } = useUserData()
 
   const initialDate = searchParams.get('date') || buildTodayIso()
   const initialCategory = normalizeCategory(searchParams.get('category'))
@@ -192,6 +192,7 @@ export default function MealBuilderClient() {
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoritesSearch, setFavoritesSearch] = useState('')
   const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>('all')
+  const [favoritesToast, setFavoritesToast] = useState<string | null>(null)
 
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading
 
@@ -508,6 +509,66 @@ export default function MealBuilderClient() {
     const customMeals = favoriteMeals.filter((f: any) => !f.favorite?.sourceId && !f.favorite?.photo)
 
     return { allMeals, favoriteMeals, customMeals }
+  }
+
+  const favoritesKeySet = useMemo(() => {
+    const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+    const set = new Set<string>()
+    favorites.forEach((fav: any) => {
+      const key = normalizeMealLabel(fav?.description || fav?.label || '').toLowerCase()
+      if (key) set.add(key)
+    })
+    return set
+  }, [userData])
+
+  const persistFavorites = (nextFavorites: any[]) => {
+    updateUserData({ favorites: nextFavorites })
+    try {
+      fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorites: nextFavorites }),
+      }).catch(() => {})
+    } catch {}
+  }
+
+  const saveToFavorites = (entryLike: any) => {
+    const source = entryLike
+    if (!source) return
+    const labelRaw = source?.description || source?.label || 'Favorite meal'
+    const cleanLabel = normalizeMealLabel(labelRaw) || 'Favorite meal'
+
+    const clonedItems =
+      source?.items && Array.isArray(source.items) && source.items.length > 0 ? JSON.parse(JSON.stringify(source.items)) : null
+
+    const favoritePayload = {
+      id: `fav-${Date.now()}`,
+      sourceId: (source as any)?.id || (source as any)?.dbId || null,
+      label: cleanLabel,
+      description: String(source?.description || cleanLabel),
+      nutrition: source?.nutrition || source?.total || null,
+      total: source?.total || source?.nutrition || null,
+      items: clonedItems,
+      photo: source?.photo || null,
+      method: source?.method || 'text',
+      meal: normalizeCategory(source?.meal || source?.category || source?.mealType),
+      createdAt: Date.now(),
+    }
+
+    const prev = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+    const existingIndex = prev.findIndex(
+      (fav: any) =>
+        (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
+        (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
+    )
+    const next =
+      existingIndex >= 0
+        ? prev.map((fav: any, idx: number) => (idx === existingIndex ? { ...favoritePayload, id: fav.id || favoritePayload.id } : fav))
+        : [...prev, favoritePayload]
+
+    persistFavorites(next)
+    setFavoritesToast('Saved to Favorites')
+    setTimeout(() => setFavoritesToast(null), 1400)
   }
 
   const analyzePhotoAndAdd = async (file: File) => {
@@ -911,31 +972,72 @@ export default function MealBuilderClient() {
                         const calories = typeof item?.calories === 'number' && Number.isFinite(item.calories) ? item.calories : null
                         const tag = String(item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom'))
                         const serving = String(item?.serving || '1 serving')
+                        const key = normalizeMealLabel(label).toLowerCase()
+                        const isSaved = Boolean(item?.favorite) || (key ? favoritesKeySet.has(key) : false)
+                        const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item?.entry)
                         return (
-                          <button
+                          <div
                             key={String(item?.id || idx)}
-                            type="button"
-                            onClick={() => {
-                              if (item?.favorite) addFromFavorite(item.favorite)
-                              else if (item?.entry) addFromFavorite(item.entry)
-                              else addFromFavorite(item)
-                              setShowFavoritesPicker(false)
-                              setFavoritesSearch('')
-                            }}
-                            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                            className="w-full flex items-stretch gap-2"
                           >
-                            <div className="min-w-0">
-                              <div className="text-sm font-semibold text-gray-900 truncate">{label}</div>
-                              <div className="text-xs text-gray-500 truncate">{serving} • {tag}</div>
-                            </div>
-                            {calories !== null && <div className="text-sm font-semibold text-gray-900">{calories} kcal</div>}
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (item?.favorite) addFromFavorite(item.favorite)
+                                else if (item?.entry) addFromFavorite(item.entry)
+                                else addFromFavorite(item)
+                                setShowFavoritesPicker(false)
+                                setFavoritesSearch('')
+                              }}
+                              className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                            >
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold text-gray-900 truncate">{label}</div>
+                                <div className="text-xs text-gray-500 truncate">
+                                  {serving} • {tag}
+                                </div>
+                              </div>
+                              {calories !== null && <div className="text-sm font-semibold text-gray-900">{calories} kcal</div>}
+                            </button>
+
+                            {favoritesActiveTab === 'all' && (
+                              <div className="flex items-center pr-2">
+                                {isSaved ? (
+                                  <div className="px-2 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                    Saved
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={!canSaveFromAll}
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      if (item?.entry) {
+                                        saveToFavorites(item.entry)
+                                      }
+                                    }}
+                                    className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                                    aria-label="Save to favorites"
+                                  >
+                                    Save
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )
                       })}
                     </div>
                   )
                 })()}
               </div>
+
+              {favoritesToast && (
+                <div className="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold shadow-lg">
+                  {favoritesToast}
+                </div>
+              )}
             </div>
           )}
 

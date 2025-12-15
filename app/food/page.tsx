@@ -12023,6 +12023,12 @@ Please add nutritional information manually if needed.`);
               if (favoritesActiveTab === 'favorites') data = sortList(favoriteMeals.filter(filterBySearch))
               if (favoritesActiveTab === 'custom') data = sortList(customMeals.filter(filterBySearch))
 
+              const favoriteKeySet = new Set<string>()
+              ;(favorites || []).forEach((fav: any) => {
+                const key = normalizeMealLabel(fav?.description || fav?.label || '').toLowerCase()
+                if (key) favoriteKeySet.add(key)
+              })
+
               if (data.length === 0) {
                 return (
                   <div className="px-4 py-8 text-center text-sm text-gray-500 border-t border-b border-gray-200">
@@ -12053,6 +12059,9 @@ Please add nutritional information manually if needed.`);
                     const favoriteId =
                       item?.favorite?.id || (typeof item?.id === 'string' && item.id.startsWith('fav-') ? item.id : null)
                     const canDeleteFavorite = Boolean(favoriteId && item.favorite)
+                    const key = normalizeMealLabel(item?.label || '').toLowerCase()
+                    const isSaved = Boolean(item.favorite) || (key ? favoriteKeySet.has(key) : false)
+                    const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item.entry)
                     return (
                       <div
                         key={item.id}
@@ -12077,6 +12086,29 @@ Please add nutritional information manually if needed.`);
                             </div>
                           </div>
                         </button>
+                        {favoritesActiveTab === 'all' && (
+                          <button
+                            type="button"
+                            disabled={!canSaveFromAll}
+                            onClick={() => {
+                              if (!item?.entry) return
+                              handleAddToFavorites(item.entry)
+                              showQuickToast('Saved to Favorites')
+                            }}
+                            className="px-3 flex items-center justify-center hover:bg-emerald-50 text-emerald-700 disabled:opacity-50"
+                            title={isSaved ? 'Already in favorites' : 'Save to favorites'}
+                            aria-label="Save to favorites"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.618 4.98a1 1 0 00.95.69h5.236c.969 0 1.371 1.24.588 1.81l-4.236 3.078a1 1 0 00-.364 1.118l1.618 4.98c.3.921-.755 1.688-1.539 1.118l-4.236-3.078a1 1 0 00-1.176 0l-4.236 3.078c-.783.57-1.838-.197-1.539-1.118l1.618-4.98a1 1 0 00-.364-1.118L2.98 10.407c-.783-.57-.38-1.81.588-1.81h5.236a1 1 0 00.95-.69l1.618-4.98z"
+                              />
+                            </svg>
+                          </button>
+                        )}
                         {canDeleteFavorite && (
                           <button
                             type="button"
