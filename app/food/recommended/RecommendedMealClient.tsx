@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import RecommendedIngredientCard from '@/components/food/RecommendedIngredientCard'
 import {
   AI_MEAL_RECOMMENDATION_CREDITS,
   CATEGORY_LABELS,
@@ -41,6 +42,12 @@ type RecommendedMealRecord = {
   mealName: string
   tags: string[]
   why: string
+  recipe?: {
+    servings?: number | null
+    prepMinutes?: number | null
+    cookMinutes?: number | null
+    steps: string[]
+  } | null
   items: RecommendedItem[]
   totals: MacroTotals
 }
@@ -328,6 +335,7 @@ export default function RecommendedMealClient() {
       nutrition: normalizeTotalsForFoodLog(totals),
       total: normalizeTotalsForFoodLog(totals),
       items: currentItems,
+      recipe: active.recipe || null,
       photo: null,
       method: 'ai-recommended',
       meal: category,
@@ -380,6 +388,16 @@ export default function RecommendedMealClient() {
 
   const pageTitle = `AI Recommended ${categoryLabel}`
 
+  const recipeMeta = useMemo(() => {
+    const recipe = active?.recipe
+    if (!recipe) return null
+    const parts: string[] = []
+    if (typeof recipe.prepMinutes === 'number' && Number.isFinite(recipe.prepMinutes)) parts.push(`Prep ${Math.round(recipe.prepMinutes)} min`)
+    if (typeof recipe.cookMinutes === 'number' && Number.isFinite(recipe.cookMinutes)) parts.push(`Cook ${Math.round(recipe.cookMinutes)} min`)
+    if (typeof recipe.servings === 'number' && Number.isFinite(recipe.servings)) parts.push(`${Math.round(recipe.servings)} serving${Math.round(recipe.servings) === 1 ? '' : 's'}`)
+    return parts.length > 0 ? parts.join(' • ') : null
+  }, [active?.recipe])
+
   return (
     <div className="min-h-screen bg-white">
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
@@ -399,7 +417,7 @@ export default function RecommendedMealClient() {
               className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
               aria-label="Generate another recommendation"
             >
-              {generating ? 'Generating…' : 'New recommendation'}
+              {generating ? 'Generating…' : `Generate another (${costCredits} credits)`}
             </button>
           ) : null}
         </div>
@@ -479,7 +497,7 @@ export default function RecommendedMealClient() {
                         <div className="text-xl font-semibold text-gray-900 truncate">{active.mealName || pageTitle}</div>
                         <div className="mt-2 text-sm text-gray-700">
                           <span className="font-semibold">{formatNumber(draftTotals.calories)}</span> kcal •{' '}
-                          P {formatNumber(draftTotals.protein_g, 1)}g • C {formatNumber(draftTotals.carbs_g, 1)}g • F {formatNumber(draftTotals.fat_g, 1)}g
+                          Protein {formatNumber(draftTotals.protein_g, 1)}g • Carbs {formatNumber(draftTotals.carbs_g, 1)}g • Fat {formatNumber(draftTotals.fat_g, 1)}g
                         </div>
                         <div className="mt-1 text-xs text-gray-500">
                           Fiber {formatNumber(draftTotals.fiber_g, 1)}g • Sugar {formatNumber(draftTotals.sugar_g, 1)}g
@@ -523,31 +541,35 @@ export default function RecommendedMealClient() {
                         <div className="text-sm text-gray-600">No ingredients returned.</div>
                       ) : (
                         currentItems.map((item, idx) => (
-                          <div key={`${item.name}-${idx}`} className="rounded-xl border border-gray-200 p-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold text-gray-900 truncate">{item.name}</div>
-                                <div className="text-xs text-gray-500">
-                                  {item.serving_size ? item.serving_size : '1 serving'} • {formatNumber(item.calories)} kcal per serving
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500">Servings</span>
-                                <input
-                                  value={String(item.servings)}
-                                  onChange={(e) => updateServings(idx, Number(e.target.value))}
-                                  inputMode="decimal"
-                                  className="w-20 px-2 py-1 rounded-lg border border-gray-200 text-sm text-gray-900"
-                                />
-                              </div>
-                            </div>
-                            <div className="mt-2 text-xs text-gray-600">
-                              P {formatNumber(item.protein_g, 1)}g • C {formatNumber(item.carbs_g, 1)}g • F {formatNumber(item.fat_g, 1)}g • Fiber {formatNumber(item.fiber_g, 1)}g • Sugar {formatNumber(item.sugar_g, 1)}g
-                            </div>
-                          </div>
+                          <RecommendedIngredientCard
+                            key={`${item.name}-${idx}`}
+                            item={item}
+                            index={idx}
+                            onServingsChange={updateServings}
+                          />
                         ))
                       )}
                     </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">Recipe</div>
+                        {recipeMeta && <div className="text-xs text-gray-500 mt-1">{recipeMeta}</div>}
+                      </div>
+                    </div>
+                    {active.recipe?.steps?.length ? (
+                      <ol className="mt-3 space-y-2 text-sm text-gray-700 list-decimal pl-5">
+                        {active.recipe.steps.slice(0, 12).map((step, i) => (
+                          <li key={i} className="leading-relaxed">
+                            {step}
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <div className="mt-2 text-sm text-gray-600">No recipe steps returned.</div>
+                    )}
                   </div>
 
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">

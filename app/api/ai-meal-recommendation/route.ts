@@ -50,6 +50,12 @@ type RecommendedMealRecord = {
   mealName: string
   tags: string[]
   why: string
+  recipe?: {
+    servings?: number | null
+    prepMinutes?: number | null
+    cookMinutes?: number | null
+    steps: string[]
+  } | null
   items: RecommendedItem[]
   totals: MacroTotals
 }
@@ -104,6 +110,256 @@ function parseJsonRelaxed(raw: string): any | null {
       return null
     }
   }
+}
+
+const MEAL_NAME_STOPWORDS = new Set(
+  [
+    'ai',
+    'recommended',
+    'meal',
+    'breakfast',
+    'lunch',
+    'dinner',
+    'snack',
+    'snacks',
+    'other',
+    'with',
+    'and',
+    'or',
+    'the',
+    'a',
+    'an',
+    'of',
+    'in',
+    'on',
+    'over',
+    'to',
+    'for',
+    'style',
+    'bowl',
+    'salad',
+    'plate',
+    'wrap',
+    'sandwich',
+    'stir',
+    'fry',
+    'stirfry',
+    'stir-fry',
+    'grilled',
+    'baked',
+    'roasted',
+    'steamed',
+    'sauteed',
+    'sautéed',
+    'seared',
+    'poached',
+    'boiled',
+    'broiled',
+    'pan',
+    'air',
+    'fryer',
+    'slow',
+    'cooked',
+    'quick',
+    'easy',
+    'simple',
+    'healthy',
+    'high',
+    'low',
+    'protein',
+    'carb',
+    'carbs',
+    'fat',
+    'fiber',
+    'fibre',
+    'sugar',
+    'heart',
+    'friendly',
+    'gut',
+    'hormone',
+    'supportive',
+    'support',
+    'anti',
+    'inflammatory',
+    'mediterranean',
+    'italian',
+    'mexican',
+    'asian',
+    'thai',
+    'indian',
+    'greek',
+    'korean',
+    'japanese',
+    'vietnamese',
+  ].map((v) => v.toLowerCase()),
+)
+
+const MEAL_NAME_FLAVOR_TOKEN_TO_ITEM: Record<
+  string,
+  { name: string; serving_size: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; fiber_g: number; sugar_g: number }
+> = {
+  lemon: { name: 'Lemon juice', serving_size: '1 tsp', calories: 1, protein_g: 0, carbs_g: 0.3, fat_g: 0, fiber_g: 0, sugar_g: 0 },
+  lime: { name: 'Lime juice', serving_size: '1 tsp', calories: 1, protein_g: 0, carbs_g: 0.3, fat_g: 0, fiber_g: 0, sugar_g: 0 },
+  garlic: { name: 'Garlic, raw', serving_size: '1 clove', calories: 4, protein_g: 0.2, carbs_g: 1, fat_g: 0, fiber_g: 0.1, sugar_g: 0 },
+  ginger: { name: 'Ginger, raw', serving_size: '1 tsp', calories: 2, protein_g: 0, carbs_g: 0.4, fat_g: 0, fiber_g: 0, sugar_g: 0 },
+  onion: { name: 'Onion, raw', serving_size: '2 tbsp', calories: 8, protein_g: 0.2, carbs_g: 1.9, fat_g: 0, fiber_g: 0.3, sugar_g: 0.8 },
+  parsley: { name: 'Parsley', serving_size: '1 tbsp', calories: 1, protein_g: 0.1, carbs_g: 0.2, fat_g: 0, fiber_g: 0.1, sugar_g: 0 },
+  basil: { name: 'Basil', serving_size: '1 tbsp', calories: 1, protein_g: 0.1, carbs_g: 0.1, fat_g: 0, fiber_g: 0.1, sugar_g: 0 },
+  oregano: { name: 'Oregano', serving_size: '1 tsp', calories: 3, protein_g: 0.1, carbs_g: 0.7, fat_g: 0.1, fiber_g: 0.4, sugar_g: 0 },
+  cilantro: { name: 'Cilantro', serving_size: '1 tbsp', calories: 1, protein_g: 0.1, carbs_g: 0.1, fat_g: 0, fiber_g: 0.1, sugar_g: 0 },
+  coriander: { name: 'Coriander', serving_size: '1 tsp', calories: 3, protein_g: 0.1, carbs_g: 0.6, fat_g: 0.2, fiber_g: 0.4, sugar_g: 0 },
+  cumin: { name: 'Cumin', serving_size: '1 tsp', calories: 8, protein_g: 0.4, carbs_g: 0.9, fat_g: 0.5, fiber_g: 0.2, sugar_g: 0 },
+  paprika: { name: 'Paprika', serving_size: '1 tsp', calories: 6, protein_g: 0.3, carbs_g: 1.2, fat_g: 0.3, fiber_g: 0.7, sugar_g: 0.4 },
+  turmeric: { name: 'Turmeric', serving_size: '1 tsp', calories: 8, protein_g: 0.2, carbs_g: 1.4, fat_g: 0.2, fiber_g: 0.5, sugar_g: 0.1 },
+  chili: { name: 'Chili flakes', serving_size: '1 tsp', calories: 6, protein_g: 0.2, carbs_g: 1.1, fat_g: 0.3, fiber_g: 0.7, sugar_g: 0.5 },
+  chilli: { name: 'Chili flakes', serving_size: '1 tsp', calories: 6, protein_g: 0.2, carbs_g: 1.1, fat_g: 0.3, fiber_g: 0.7, sugar_g: 0.5 },
+  vinegar: { name: 'Vinegar', serving_size: '1 tbsp', calories: 3, protein_g: 0, carbs_g: 0.1, fat_g: 0, fiber_g: 0, sugar_g: 0 },
+  olive: { name: 'Olive oil', serving_size: '1 tsp', calories: 40, protein_g: 0, carbs_g: 0, fat_g: 4.5, fiber_g: 0, sugar_g: 0 },
+  oil: { name: 'Olive oil', serving_size: '1 tsp', calories: 40, protein_g: 0, carbs_g: 0, fat_g: 4.5, fiber_g: 0, sugar_g: 0 },
+}
+
+const tokenize = (raw: string) =>
+  String(raw || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((t) => (t.endsWith('s') && t.length > 3 ? t.slice(0, -1) : t))
+
+const buildTokenSetFromItems = (items: RecommendedItem[]) => {
+  const set = new Set<string>()
+  for (const item of items) {
+    for (const t of tokenize(item?.name || '')) set.add(t)
+  }
+  return set
+}
+
+const inferMealNameFromItems = (category: MealCategory, items: RecommendedItem[]) => {
+  const cleaned = items
+    .map((it) => String(it?.name || '').replace(/\([^)]*\)/g, '').trim())
+    .filter(Boolean)
+    .map((name) => name.split(',')[0].trim())
+  if (cleaned.length === 0) return `AI Recommended ${category}`
+
+  const scored = items
+    .map((it, idx) => {
+      const cals = Number(it?.calories || 0)
+      const servings = Number(it?.servings || 0)
+      const score = (Number.isFinite(cals) ? cals : 0) * (Number.isFinite(servings) ? servings : 1)
+      return { idx, score }
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((s) => cleaned[s.idx] || cleaned[0])
+    .filter(Boolean)
+
+  const primary = scored[0] || cleaned[0]
+  const sides = scored.slice(1, 3).filter((v) => v && v.toLowerCase() !== primary.toLowerCase())
+  if (sides.length === 0) return primary
+  if (sides.length === 1) return `${primary} with ${sides[0]}`
+  return `${primary} with ${sides[0]} & ${sides[1]}`
+}
+
+const applyMealNameConsistency = (category: MealCategory, mealNameRaw: string, itemsRaw: RecommendedItem[]) => {
+  let mealName = String(mealNameRaw || '').trim()
+  let items = Array.isArray(itemsRaw) ? [...itemsRaw] : []
+  const itemTokens = buildTokenSetFromItems(items)
+
+  const unmatchedMeaningful: string[] = []
+  for (const token of tokenize(mealName)) {
+    if (MEAL_NAME_STOPWORDS.has(token)) continue
+    if (itemTokens.has(token)) continue
+    const flavor = MEAL_NAME_FLAVOR_TOKEN_TO_ITEM[token]
+    if (flavor) {
+      // Avoid duplicates (e.g. "oil" + "olive" both map to Olive oil).
+      const exists = items.some((it) => String(it?.name || '').toLowerCase().includes(flavor.name.toLowerCase()))
+      if (!exists) {
+        items.push({
+          name: flavor.name,
+          serving_size: flavor.serving_size,
+          servings: 1,
+          calories: flavor.calories,
+          protein_g: flavor.protein_g,
+          carbs_g: flavor.carbs_g,
+          fat_g: flavor.fat_g,
+          fiber_g: flavor.fiber_g,
+          sugar_g: flavor.sugar_g,
+        })
+      }
+      continue
+    }
+    // Might be a cooking/style word we missed; track but don’t immediately reject.
+    if (token.length >= 4) unmatchedMeaningful.push(token)
+  }
+
+  if (!mealName) {
+    mealName = inferMealNameFromItems(category, items)
+  } else if (unmatchedMeaningful.length >= 3) {
+    // If too many meaningful tokens don't map to ingredients, fall back to a deterministic name
+    // derived from the ingredient list to avoid misleading titles.
+    mealName = inferMealNameFromItems(category, items)
+  }
+
+  return { mealName, items }
+}
+
+const normalizeRecipe = (raw: any) => {
+  if (!raw || typeof raw !== 'object') return null
+  const steps = Array.isArray((raw as any).steps)
+    ? (raw as any).steps
+        .map((s: any) => String(s || '').trim())
+        .filter(Boolean)
+        .slice(0, 12)
+    : []
+  if (steps.length === 0) return null
+  const prepMinutes = Number((raw as any).prepMinutes ?? (raw as any).prep_minutes)
+  const cookMinutes = Number((raw as any).cookMinutes ?? (raw as any).cook_minutes)
+  const servings = Number((raw as any).servings ?? null)
+  return {
+    servings: Number.isFinite(servings) && servings > 0 ? Math.round(servings) : null,
+    prepMinutes: Number.isFinite(prepMinutes) && prepMinutes >= 0 ? Math.round(prepMinutes) : null,
+    cookMinutes: Number.isFinite(cookMinutes) && cookMinutes >= 0 ? Math.round(cookMinutes) : null,
+    steps,
+  }
+}
+
+const buildFallbackRecipe = (category: MealCategory, items: RecommendedItem[]) => {
+  const names = items.map((it) => String(it?.name || '').trim()).filter(Boolean)
+  const has = (re: RegExp) => names.some((n) => re.test(n.toLowerCase()))
+
+  const mainCooking = (() => {
+    if (has(/\b(egg|eggs|egg whites)\b/)) return 'Cook the eggs in a non-stick pan until set.'
+    if (has(/\b(cod|salmon|tuna|fish|prawn|shrimp)\b/)) return 'Cook the fish gently (bake, steam, or pan-sear) until it flakes.'
+    if (has(/\b(chicken|beef|pork|lamb|turkey)\b/)) return 'Cook the protein through in a pan or oven until done.'
+    if (has(/\b(tofu|tempeh|edamame)\b/)) return 'Sear the tofu/tempeh until golden.'
+    return 'Cook the main ingredient using your preferred method until ready.'
+  })()
+
+  const carbCooking = (() => {
+    if (has(/\b(lentil|lentils|bean|beans|chickpea|chickpeas)\b/)) return 'Warm the legumes (or cook if needed) and season lightly.'
+    if (has(/\b(rice|quinoa|oats|pasta|barley)\b/)) return 'Cook the grains according to the package directions.'
+    return null
+  })()
+
+  const vegCooking = has(/\b(broccoli|spinach|kale|lettuce|carrot|tomato|cucumber|zucchini|capsicum|pepper|onion|mushroom)\b/)
+    ? 'Steam or sauté the vegetables until tender-crisp.'
+    : null
+
+  const seasoning = has(/\b(lemon|lime|garlic|ginger|turmeric|cumin|paprika|chili|chilli|parsley|basil|oregano|coriander|cilantro|vinegar|oil)\b/)
+    ? 'Finish with your listed herbs/spices (and lemon/lime if included) to taste.'
+    : 'Season to taste.'
+
+  const steps = [
+    `Prep your ingredients: measure the servings and chop/trim anything that needs it.`,
+    mainCooking,
+    carbCooking,
+    vegCooking,
+    `Combine everything in a bowl/plate and mix gently.`,
+    seasoning,
+  ].filter(Boolean) as string[]
+
+  const base = category === 'breakfast' ? { prepMinutes: 8, cookMinutes: 10 } : category === 'snacks' ? { prepMinutes: 6, cookMinutes: 6 } : { prepMinutes: 10, cookMinutes: 15 }
+  return { servings: 1, ...base, steps: steps.slice(0, 10) }
 }
 
 // Revenue per credit (in USD cents) used to guarantee profit margins.
@@ -545,12 +801,14 @@ export async function POST(req: NextRequest) {
     'Respect allergies/intolerances and avoid excluded foods.',
     'Respect remaining calories/macros: stay within remaining if possible; if very tight, recommend a smaller/snack-style meal.',
     'Avoid repeating meals; rotate away from recent names/ingredients when possible.',
+    'The meal name must not mention ingredients that are missing from the items list (including herbs/spices). If you mention it, include it as an item even if calories are tiny.',
     '',
     'Output schema:',
     '{',
     '  "mealName": string,',
     '  "tags": string[],',
     '  "why": string,',
+    '  "recipe": { "prepMinutes": number, "cookMinutes": number, "steps": string[] },',
     '  "items": Array<{',
     '    "name": string,',
     '    "serving_size": string,',
@@ -730,12 +988,15 @@ export async function POST(req: NextRequest) {
   const mealName = typeof parsed?.mealName === 'string' ? parsed.mealName.trim() : ''
   const tags = Array.isArray(parsed?.tags) ? parsed.tags.map((t: any) => String(t || '').trim()).filter(Boolean).slice(0, 12) : []
   const why = typeof parsed?.why === 'string' ? parsed.why.trim() : ''
-  const items = normalizeAndValidateItems(parsed?.items)
-  if (!items || items.length === 0) {
+  const itemsInitial = normalizeAndValidateItems(parsed?.items)
+  if (!itemsInitial || itemsInitial.length === 0) {
     return NextResponse.json({ error: 'Invalid AI response' }, { status: 502 })
   }
 
-  const fitItems = scaleToFitCalories(items, caloriesCap)
+  const { mealName: safeMealName, items: itemsWithNameFixes } = applyMealNameConsistency(category, mealName, itemsInitial)
+  const recipe = normalizeRecipe(parsed?.recipe) || buildFallbackRecipe(category, itemsWithNameFixes)
+
+  const fitItems = scaleToFitCalories(itemsWithNameFixes, caloriesCap)
   const totals = computeTotalsFromItems(fitItems)
 
   // Charge credits only after we have a usable recommendation.
@@ -749,9 +1010,10 @@ export async function POST(req: NextRequest) {
     createdAt: new Date().toISOString(),
     date,
     category,
-    mealName: mealName || `AI Recommended ${category}`,
+    mealName: safeMealName || `AI Recommended ${category}`,
     tags,
     why,
+    recipe,
     items: fitItems,
     totals,
   }
