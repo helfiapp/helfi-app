@@ -709,6 +709,80 @@ export async function PUT(req: NextRequest) {
   })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
+  // Optional: persist a recommendation into history after the user explicitly saves it.
+  // (Generated meals are otherwise treated as drafts and are not stored in history.)
+  const body = await req.json().catch(() => null)
+  if (body && typeof body === 'object' && (body as any).action === 'commit') {
+    const rawRec = (body as any).recommendation
+    if (!rawRec || typeof rawRec !== 'object') {
+      return NextResponse.json({ error: 'Missing recommendation' }, { status: 400 })
+    }
+
+    const category = normalizeMealCategory((rawRec as any).category)
+    const date = typeof (rawRec as any).date === 'string' ? String((rawRec as any).date).trim() : buildTodayIso()
+    if (!DATE_RE.test(date)) {
+      return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+    }
+
+    const state = await loadStoredState(user.id)
+    const historyAll = (state.history || [])
+      .filter((h) => h && typeof h === 'object')
+      .sort((a: any, b: any) => Number(new Date(b.createdAt).getTime()) - Number(new Date(a.createdAt).getTime()))
+
+    const itemsInitial = normalizeAndValidateItems((rawRec as any).items)
+    if (!itemsInitial || itemsInitial.length === 0) {
+      return NextResponse.json({ error: 'Invalid items' }, { status: 400 })
+    }
+
+    const mealNameRaw = typeof (rawRec as any).mealName === 'string' ? String((rawRec as any).mealName).trim() : ''
+    const { mealName: safeMealName, items: itemsWithNameFixes } = applyMealNameConsistency(category, mealNameRaw, itemsInitial)
+    const recipe = normalizeRecipe((rawRec as any).recipe) || buildFallbackRecipe(category, itemsWithNameFixes)
+    const totals = computeTotalsFromItems(itemsWithNameFixes)
+
+    const id =
+      typeof (rawRec as any).id === 'string' && String((rawRec as any).id).trim()
+        ? String((rawRec as any).id).trim()
+        : `air-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    const createdAt =
+      typeof (rawRec as any).createdAt === 'string' && !Number.isNaN(new Date((rawRec as any).createdAt).getTime())
+        ? String((rawRec as any).createdAt)
+        : new Date().toISOString()
+
+    const tags = Array.isArray((rawRec as any).tags)
+      ? (rawRec as any).tags.map((t: any) => String(t || '').trim()).filter(Boolean).slice(0, 12)
+      : []
+    const why = typeof (rawRec as any).why === 'string' ? String((rawRec as any).why).trim() : ''
+
+    const record: RecommendedMealRecord = {
+      id,
+      createdAt,
+      date,
+      category,
+      mealName: safeMealName || `AI Recommended ${category}`,
+      tags,
+      why,
+      recipe,
+      items: itemsWithNameFixes,
+      totals,
+    }
+
+    const nextHistory = [record, ...historyAll.filter((h: any) => String(h?.id || '') !== id)].slice(
+      0,
+      AI_MEAL_RECOMMENDATION_HISTORY_LIMIT,
+    )
+    try {
+      await saveStoredState(user.id, {
+        ...state,
+        history: nextHistory,
+        seenExplainAt: state.seenExplainAt || new Date().toISOString(),
+      })
+    } catch (e) {
+      console.warn('[ai-meal-recommendation] failed to persist committed history (non-fatal)', e)
+    }
+
+    return NextResponse.json({ ok: true, history: nextHistory })
+  }
+
   const state = await loadStoredState(user.id)
   if (state.seenExplainAt) {
     return NextResponse.json({ ok: true, seenExplainAt: state.seenExplainAt })
@@ -1018,15 +1092,13 @@ export async function POST(req: NextRequest) {
     totals,
   }
 
-  const nextHistory = [record, ...historyAll].slice(0, AI_MEAL_RECOMMENDATION_HISTORY_LIMIT)
-  try {
-    await saveStoredState(user.id, {
-      ...storedState,
-      history: nextHistory,
-      seenExplainAt: storedState.seenExplainAt || new Date().toISOString(),
-    })
-  } catch (e) {
-    console.warn('[ai-meal-recommendation] failed to persist history (non-fatal)', e)
+  // Draft-only generation: do not persist into history unless the user explicitly saves.
+  if (!storedState.seenExplainAt) {
+    try {
+      await saveStoredState(user.id, { ...storedState, seenExplainAt: new Date().toISOString() })
+    } catch (e) {
+      console.warn('[ai-meal-recommendation] failed to mark explain as seen (non-fatal)', e)
+    }
   }
 
   const remainingAfter = subtractTotals(targets, used)
@@ -1034,7 +1106,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     costCredits: AI_MEAL_RECOMMENDATION_CREDITS,
     context: { targets, used, remaining: remainingAfter },
-    history: nextHistory,
+    history: historyAll,
     seenExplain: true,
     recommendation: record,
   })
