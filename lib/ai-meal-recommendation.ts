@@ -8,7 +8,9 @@ export const AI_MEAL_RECOMMENDATION_GOAL_NAME = '__AI_MEAL_RECOMMENDATIONS__'
 
 export const AI_MEAL_RECOMMENDATION_HISTORY_LIMIT = 50
 
-export const AI_MEAL_RECOMMENDATION_STORAGE_VERSION = 1
+// Storage version for the server-persisted AI meal recommendation state.
+// v2 introduces "committed" history (only saved recommendations appear).
+export const AI_MEAL_RECOMMENDATION_STORAGE_VERSION = 2
 
 export const CATEGORY_LABELS: Record<MealCategory, string> = {
   breakfast: 'Breakfast',

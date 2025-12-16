@@ -64,6 +64,7 @@ type StoredState = {
   version: number
   history: RecommendedMealRecord[]
   seenExplainAt?: string | null
+  committedIds?: string[] | null
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -464,7 +465,7 @@ const loadStoredState = async (userId: string): Promise<StoredState> => {
     select: { category: true },
   })
   if (!stored?.category) {
-    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null }
+    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null, committedIds: [] }
   }
   try {
     const parsed = JSON.parse(stored.category)
@@ -472,27 +473,39 @@ const loadStoredState = async (userId: string): Promise<StoredState> => {
       const history = Array.isArray((parsed as any).history) ? (parsed as any).history.filter(Boolean) : []
       const seenExplainAt =
         typeof (parsed as any).seenExplainAt === 'string' ? (parsed as any).seenExplainAt : null
+      const committedIds = Array.isArray((parsed as any).committedIds)
+        ? (parsed as any).committedIds.map((v: any) => String(v || '').trim()).filter(Boolean)
+        : []
       return {
         version: Number((parsed as any).version) || AI_MEAL_RECOMMENDATION_STORAGE_VERSION,
         history,
         seenExplainAt,
+        committedIds,
       }
     }
     const history = Array.isArray(parsed) ? parsed.filter(Boolean) : []
-    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history, seenExplainAt: null }
+    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history, seenExplainAt: null, committedIds: [] }
   } catch {
-    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null }
+    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null, committedIds: [] }
   }
 }
 
 const saveStoredState = async (userId: string, state: StoredState) => {
+  const committedIdSet = new Set(
+    Array.isArray(state.committedIds) ? state.committedIds.map((v) => String(v || '').trim()).filter(Boolean) : [],
+  )
   const trimmedHistory = Array.isArray(state.history)
-    ? state.history.filter(Boolean).slice(0, AI_MEAL_RECOMMENDATION_HISTORY_LIMIT)
+    ? state.history
+        .filter(Boolean)
+        // Only persist committed records into the saved history.
+        .filter((h: any) => committedIdSet.has(String(h?.id || '')))
+        .slice(0, AI_MEAL_RECOMMENDATION_HISTORY_LIMIT)
     : []
   const payload = JSON.stringify({
     version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION,
     history: trimmedHistory,
     seenExplainAt: state.seenExplainAt || null,
+    committedIds: Array.from(committedIdSet).slice(0, AI_MEAL_RECOMMENDATION_HISTORY_LIMIT),
   })
   const existing = await prisma.healthGoal.findFirst({
     where: { userId, name: AI_MEAL_RECOMMENDATION_GOAL_NAME },
@@ -660,6 +673,14 @@ const scaleToFitCalories = (items: RecommendedItem[], caloriesCap: number | null
   return items.map((it) => ({ ...it, servings: round3(clamp((Number(it.servings) || 0) * factor, 0, 20)) }))
 }
 
+const filterCommittedHistory = (state: StoredState) => {
+  const committedIdSet = new Set(
+    Array.isArray(state.committedIds) ? state.committedIds.map((v) => String(v || '').trim()).filter(Boolean) : [],
+  )
+  if (committedIdSet.size === 0) return []
+  return (state.history || []).filter((h: any) => h && committedIdSet.has(String(h?.id || '')))
+}
+
 export async function GET(req: NextRequest) {
   const userEmail = await getAuthedEmail(req)
   if (!userEmail) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -680,7 +701,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const storedState = await loadStoredState(user.id)
-  const historyAll = (storedState.history || [])
+  const historyAll = filterCommittedHistory(storedState)
     .filter((h) => h && typeof h === 'object')
     .sort((a: any, b: any) => Number(new Date(b.createdAt).getTime()) - Number(new Date(a.createdAt).getTime()))
 
@@ -725,7 +746,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const state = await loadStoredState(user.id)
-    const historyAll = (state.history || [])
+    const historyAll = filterCommittedHistory(state)
       .filter((h) => h && typeof h === 'object')
       .sort((a: any, b: any) => Number(new Date(b.createdAt).getTime()) - Number(new Date(a.createdAt).getTime()))
 
@@ -770,11 +791,15 @@ export async function PUT(req: NextRequest) {
       0,
       AI_MEAL_RECOMMENDATION_HISTORY_LIMIT,
     )
+    const committedIds = Array.from(
+      new Set([id, ...(Array.isArray(state.committedIds) ? state.committedIds : [])].map((v) => String(v || '').trim()).filter(Boolean)),
+    ).slice(0, AI_MEAL_RECOMMENDATION_HISTORY_LIMIT)
     try {
       await saveStoredState(user.id, {
         ...state,
         history: nextHistory,
         seenExplainAt: state.seenExplainAt || new Date().toISOString(),
+        committedIds,
       })
     } catch (e) {
       console.warn('[ai-meal-recommendation] failed to persist committed history (non-fatal)', e)
@@ -843,7 +868,7 @@ export async function POST(req: NextRequest) {
   const remaining = subtractTotals(targets, used)
 
   const storedState = await loadStoredState(user.id)
-  const historyAll = (storedState.history || [])
+  const historyAll = filterCommittedHistory(storedState)
     .filter((h) => h && typeof h === 'object')
     .sort((a: any, b: any) => Number(new Date(b.createdAt).getTime()) - Number(new Date(a.createdAt).getTime()))
 

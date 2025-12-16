@@ -223,6 +223,14 @@ export default function RecommendedMealClient() {
         return
       }
       if (!res.ok) {
+        const payload = await res.json().catch(() => null)
+        const msg =
+          typeof payload?.error === 'string'
+            ? payload.error
+            : typeof payload?.message === 'string'
+              ? payload.message
+              : null
+        if (msg) throw new Error(msg)
         const txt = await res.text().catch(() => '')
         throw new Error(txt || `Generate failed (${res.status})`)
       }
@@ -474,6 +482,11 @@ export default function RecommendedMealClient() {
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               <div className="font-semibold">Couldn’t generate</div>
               <div className="mt-1">{error}</div>
+              {active && (
+                <div className="mt-2 text-xs text-red-700">
+                  Showing your last saved recommendation below.
+                </div>
+              )}
               {error.toLowerCase().includes('credits') && (
                 <div className="mt-2">
                   <Link href="/billing" className="text-red-800 underline font-semibold">
