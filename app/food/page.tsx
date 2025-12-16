@@ -4352,7 +4352,14 @@ const applyStructuredItems = (
   // Save food entries to database and update context (OPTIMIZED + RELIABLE HISTORY)
 	  const saveFoodEntries = async (
 	    updatedFoods: any[],
-	    options?: { appendHistory?: boolean; suppressToast?: boolean; snapshotDateOverride?: string },
+    options?: {
+      appendHistory?: boolean
+      suppressToast?: boolean
+      snapshotDateOverride?: string
+      // When deletes use the atomic server delete endpoint, we already updated the server
+      // snapshot as part of that request. Keep local caching behavior but skip duplicate POSTs.
+      skipServerSnapshot?: boolean
+    },
 	  ) => {
 	    try {
       // When the user intentionally saves, clear any tombstones for matching entries so
@@ -4450,8 +4457,11 @@ const applyStructuredItems = (
 
 	      const snapshotFoods = mergedSnapshotFoods
 
-	      // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
-	      await syncSnapshotToServer(snapshotFoods, options?.snapshotDateOverride ?? selectedDate)
+      // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
+      // Some flows (atomic delete) already updated the server snapshot in the same request.
+      if (options?.skipServerSnapshot !== true) {
+        await syncSnapshotToServer(snapshotFoods, options?.snapshotDateOverride ?? selectedDate)
+      }
 
       // 3) For brand new entries, write directly into the permanent FoodLog history table.
       //    If the write fails, enqueue the payload locally and surface a retry button.
@@ -7300,16 +7310,40 @@ Please add nutritional information manually if needed.`);
     }
 
 	    try {
-	      await ensureRemoteDelete()
+        // Single request: delete (with server sweep) + update server snapshot in one go
+        try {
+          const sweepDates: string[] = []
+          autoDates.forEach((d) => sweepDates.push(d))
+          const base = autoDates[0] ? new Date(autoDates[0]) : new Date()
+          ;[1, -1, 2, -2].forEach((delta) => {
+            const d = new Date(base)
+            d.setDate(d.getDate() + delta)
+            sweepDates.push(d.toISOString().slice(0, 10))
+          })
+
+          const snapshotFoods = limitSnapshotFoods(updatedFoods, selectedDate)
+          const payloadStr = JSON.stringify({
+            id: dbId || null,
+            description: (entry?.description || entry?.name || '').toString().trim().slice(0, 220),
+            category: entryCategory,
+            dates: Array.from(new Set(sweepDates)).slice(0, 12),
+            snapshotDate: selectedDate,
+            snapshotFoods,
+          })
+          const keepalive = payloadStr.length < 60_000
+          await fetch('/api/food-log/delete-atomic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payloadStr,
+            keepalive,
+          }).catch((err) => console.warn('Atomic delete request failed (best-effort)', err))
+        } catch (err) {
+          console.warn('Atomic delete failed (best-effort)', err)
+        }
+
 	      try {
-	        await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true })
+	        await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true, skipServerSnapshot: true })
 	        await refreshEntriesFromServer()
-	        // Keep server snapshot in sync so stale cards don't reappear
-	        try {
-	          await syncSnapshotToServer(updatedFoods, selectedDate)
-	        } catch (syncErr) {
-	          console.warn('Failed to sync todaysFoods snapshot after delete', syncErr)
-	        }
 	      } catch (err) {
 	        console.warn('Delete sync failed', err)
 	      }
@@ -7346,27 +7380,32 @@ Please add nutritional information manually if needed.`);
 	      // Call API to delete from DB
 	      triggerHaptic(10)
 	      try {
-	        const res = await fetch('/api/food-log/delete', {
+          const entryCategory = normalizeCategory(deletedEntry?.meal || deletedEntry?.category || deletedEntry?.mealType)
+          const payloadStr = JSON.stringify({
+            id: dbId,
+            description: (deletedEntry?.description || deletedEntry?.name || '').toString().trim().slice(0, 220),
+            category: entryCategory,
+            dates: [selectedDate].filter(Boolean),
+            snapshotDate: selectedDate,
+            snapshotFoods: limitSnapshotFoods(nextList, selectedDate),
+          })
+          const keepalive = payloadStr.length < 60_000
+	        const res = await fetch('/api/food-log/delete-atomic', {
 	          method: 'POST',
 	          headers: { 'Content-Type': 'application/json' },
-	          body: JSON.stringify({ id: dbId }),
-	          keepalive: true,
+	          body: payloadStr,
+	          keepalive,
 	        })
 	        if (!res.ok) {
-	          console.error('Failed to delete history entry from database:', { status: res.status, statusText: res.statusText })
+	          console.error('Failed to atomic-delete history entry from database:', { status: res.status, statusText: res.statusText })
 	        }
 	      } catch (error) {
-	        console.error('Failed to delete history entry from database:', error);
+	        console.error('Failed to atomic-delete history entry from database:', error);
 	      }
 	      try {
-	        await saveFoodEntries(nextList, { appendHistory: false, suppressToast: true, snapshotDateOverride: selectedDate })
+	        await saveFoodEntries(nextList, { appendHistory: false, suppressToast: true, snapshotDateOverride: selectedDate, skipServerSnapshot: true })
 	      } catch (err) {
 	        console.warn('Failed to update local snapshot after history delete', err)
-	      }
-	      try {
-	        await syncSnapshotToServer(nextList, selectedDate)
-	      } catch (syncErr) {
-	        console.warn('Failed to sync server snapshot after history delete', syncErr)
 	      }
 	      await refreshEntriesFromServer()
 	    } catch {
