@@ -11942,37 +11942,10 @@ Please add nutritional information manually if needed.`);
 	                                        </svg>
 	                                      </button>
 
-	                                      <button
-	                                        type="button"
-	                                        onClick={() => {
-	                                          setShowPhotoOptions(false)
-	                                          setPhotoOptionsAnchor(null)
-	                                          router.push(
-	                                            `/food/recommended/explain?date=${encodeURIComponent(
-	                                              selectedDate,
-	                                            )}&category=${encodeURIComponent(cat.key)}`,
-	                                          )
-	                                        }}
-	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-	                                      >
-	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mr-3 text-purple-700">
-	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 19.5L6 21l1.5-3.75m7.5 2.25H5.25A2.25 2.25 0 013 17.25V6.75A2.25 2.25 0 015.25 4.5h9.75A2.25 2.25 0 0117.25 6.75v5.25" />
-	                                          </svg>
-	                                        </div>
-	                                        <div className="flex-1">
-	                                          <div className="text-base font-semibold text-gray-900">Recommended</div>
-	                                          <div className="text-xs text-gray-500">AI meal suggestion • {AI_MEAL_RECOMMENDATION_CREDITS} credits</div>
-	                                        </div>
-	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-	                                        </svg>
-	                                      </button>
-
-	                                      {(() => {
-	                                        const entriesForCopy = entriesByCategory[cat.key] || []
-	                                        return selectedDate !== todayIso && entriesForCopy.length > 0 ? (
-	                                          <button
+		                                      {(() => {
+		                                        const entriesForCopy = entriesByCategory[cat.key] || []
+		                                        return selectedDate !== todayIso && entriesForCopy.length > 0 ? (
+		                                          <button
                                             type="button"
                                             onClick={() => {
                                               setShowPhotoOptions(false);
@@ -12241,19 +12214,46 @@ Please add nutritional information manually if needed.`);
                                             <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                                           </svg>
                                         </div>
-                                        <div className="flex-1">
-                                          <div className="text-base font-semibold text-gray-900">Favorites</div>
-                                          <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(cat.key)}</div>
-                                        </div>
-                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                      </button>
+	                                        <div className="flex-1">
+	                                          <div className="text-base font-semibold text-gray-900">Favorites</div>
+	                                          <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(cat.key)}</div>
+	                                        </div>
+	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+	                                        </svg>
+	                                      </button>
 
-                                      {(() => {
-                                        const entriesForCopy = entriesByCategory[cat.key] || []
-                                        return selectedDate !== todayIso && entriesForCopy.length > 0 ? (
-                                          <button
+	                                      <button
+	                                        type="button"
+	                                        onClick={() => {
+	                                          setShowPhotoOptions(false)
+	                                          setPhotoOptionsAnchor(null)
+	                                          router.push(
+	                                            `/food/recommended/explain?date=${encodeURIComponent(
+	                                              selectedDate,
+	                                            )}&category=${encodeURIComponent(cat.key)}`,
+	                                          )
+	                                        }}
+	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+	                                      >
+	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mr-3 text-purple-700">
+	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 19.5L6 21l1.5-3.75m7.5 2.25H5.25A2.25 2.25 0 013 17.25V6.75A2.25 2.25 0 015.25 4.5h9.75A2.25 2.25 0 0117.25 6.75v5.25" />
+	                                          </svg>
+	                                        </div>
+	                                        <div className="flex-1">
+	                                          <div className="text-base font-semibold text-gray-900">Recommended</div>
+	                                          <div className="text-xs text-gray-500">AI meal suggestion • {AI_MEAL_RECOMMENDATION_CREDITS} credits</div>
+	                                        </div>
+	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+	                                        </svg>
+	                                      </button>
+
+	                                      {(() => {
+	                                        const entriesForCopy = entriesByCategory[cat.key] || []
+	                                        return selectedDate !== todayIso && entriesForCopy.length > 0 ? (
+	                                          <button
                                             type="button"
                                             onClick={() => {
                                               setShowPhotoOptions(false);
