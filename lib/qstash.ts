@@ -266,6 +266,44 @@ export async function scheduleHealthTipWithQStash(
   })
 }
 
+export async function publishWithQStash(
+  callbackPath: string,
+  payload: unknown
+): Promise<{ ok: boolean; reason?: string; status?: number; responseBody?: string; callbackUrl?: string }> {
+  const token = process.env.QSTASH_TOKEN || ''
+  if (!token) return { ok: false, reason: 'missing_qstash_token' }
+
+  let base =
+    process.env.PUBLIC_BASE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
+  if (base) {
+    base = base.trim()
+    if (base && !/^https?:\/\//i.test(base)) base = `https://${base}`
+    base = base.replace(/\/+$/, '')
+  }
+  if (!base) return { ok: false, reason: 'missing_base_url' }
+
+  const normalizedPath = callbackPath.startsWith('/') ? callbackPath : `/${callbackPath}`
+  const callbackUrl = `${base}${normalizedPath}`
+  const url = `https://qstash.upstash.io/v2/publish/${callbackUrl}`
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload ?? {}),
+    })
+    const responseBody = await res.text()
+    if (!res.ok) return { ok: false, status: res.status, responseBody, callbackUrl, reason: `qstash_http_${res.status}` }
+    return { ok: true, status: res.status, responseBody, callbackUrl }
+  } catch (error: any) {
+    return { ok: false, reason: error?.message || 'fetch_error', responseBody: (error?.stack || String(error)).slice(0, 500), callbackUrl }
+  }
+}
+
 /**
  * Schedule all active reminders for a user based on frequency (1-3).
  */
