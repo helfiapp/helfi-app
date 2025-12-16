@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { calculateDailyTargets } from '@/lib/daily-targets'
+import { estimateTokensFromText, openaiCostCentsForTokens } from '@/lib/cost-meter'
 import {
   AI_MEAL_RECOMMENDATION_CREDITS,
   AI_MEAL_RECOMMENDATION_GOAL_NAME,
@@ -105,6 +106,22 @@ function parseJsonRelaxed(raw: string): any | null {
   }
 }
 
+// Revenue per credit (in USD cents) used to guarantee profit margins.
+// Subscriptions: $20 -> 1400 credits == 1.4286 cents/credit (same across tiers).
+// Top-ups: $5 -> 250 credits == 2.0 cents/credit.
+const SUB_REVENUE_CENTS_PER_CREDIT = Number(process.env.HELFI_SUB_REVENUE_CENTS_PER_CREDIT || '1.4286') || 1.4286
+// Target margins (profit/revenue):
+// - subscriptions: 60% profit => allow cost <= 40% of revenue
+// - top-ups: 70% profit => allow cost <= 30% of revenue
+const SUB_TARGET_MARGIN = 0.6
+
+// For a fixed credit price, use the subscription rule as the "worst case"
+// (lowest revenue/credit). Meeting subscription margin guarantees top-up margin
+// given top-up revenue/credit is higher than subscription revenue/credit.
+const MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS = Math.floor(
+  AI_MEAL_RECOMMENDATION_CREDITS * SUB_REVENUE_CENTS_PER_CREDIT * (1 - SUB_TARGET_MARGIN),
+)
+
 const buildTodayIso = () => {
   const d = new Date()
   const y = d.getFullYear()
@@ -112,6 +129,14 @@ const buildTodayIso = () => {
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
+
+const truncate = (value: string, maxChars: number) => {
+  const s = String(value || '')
+  if (s.length <= maxChars) return s
+  return `${s.slice(0, Math.max(0, maxChars - 1))}…`
+}
+
+const safeJsonCompact = (value: any, maxChars: number) => truncate(JSON.stringify(value ?? null), maxChars)
 
 const extractTotalsFromNutrients = (nutrients: any): MacroTotals => {
   if (!nutrients || typeof nutrients !== 'object') {
@@ -498,12 +523,12 @@ export async function POST(req: NextRequest) {
     .flatMap((h: any) => (Array.isArray(h?.items) ? h.items.slice(0, 6) : []))
     .map((it: any) => String(it?.name || '').trim())
     .filter(Boolean)
-    .slice(0, 40)
+    .slice(0, 24)
 
   const todaysDescriptions = logs
     .map((l) => String(l.description || '').split('\n')[0].trim())
     .filter(Boolean)
-    .slice(0, 12)
+    .slice(0, 8)
 
   const supplements = Array.isArray((user as any)?.supplements) ? (user as any).supplements : []
   const medications = Array.isArray((user as any)?.medications) ? (user as any).medications : []
@@ -540,11 +565,37 @@ export async function POST(req: NextRequest) {
     '}',
   ].join('\n')
 
-  const userPrompt = [
-    `Meal type: ${category}`,
-    `Date: ${date}`,
-    '',
-    'User profile (may be partial):',
+  const buildUserPrompt = (opts: {
+    supplementsLimit: number
+    medicationsLimit: number
+    healthSituationsMaxChars: number
+    todaysFoodsLimit: number
+    recentNamesLimit: number
+    recentIngredientsLimit: number
+  }) => {
+    const supplementsForPrompt = supplements
+      .slice(0, opts.supplementsLimit)
+      .map((s: any) => ({
+        name: truncate(String(s?.name || ''), 64),
+        dosage: truncate(String(s?.dosage || ''), 64),
+        timing: truncate(String(s?.timing || ''), 64),
+        scheduleInfo: truncate(String(s?.scheduleInfo || ''), 64),
+      }))
+
+    const medicationsForPrompt = medications
+      .slice(0, opts.medicationsLimit)
+      .map((m: any) => ({
+        name: truncate(String(m?.name || ''), 64),
+        dosage: truncate(String(m?.dosage || ''), 64),
+        timing: truncate(String(m?.timing || ''), 64),
+        scheduleInfo: truncate(String(m?.scheduleInfo || ''), 64),
+      }))
+
+    const userPrompt = [
+      `Meal type: ${category}`,
+      `Date: ${date}`,
+      '',
+      'User profile (may be partial):',
     `- gender: ${user.gender ? String(user.gender).toLowerCase() : ''}`,
     `- weightKg: ${typeof user.weight === 'number' ? user.weight : ''}`,
     `- heightCm: ${typeof user.height === 'number' ? user.height : ''}`,
@@ -554,48 +605,97 @@ export async function POST(req: NextRequest) {
     `- goalChoice: ${typeof primaryGoal?.goalChoice === 'string' ? primaryGoal.goalChoice : ''}`,
     `- goalIntensity: ${typeof primaryGoal?.goalIntensity === 'string' ? primaryGoal.goalIntensity : ''}`,
     `- selected goals/concerns: ${Array.isArray(selectedIssues) ? selectedIssues.join(', ') : ''}`,
-    '',
-    'Health situations (free-text):',
-    JSON.stringify(healthSituations || {}),
-    '',
-    'Allergies/intolerances to avoid:',
-    JSON.stringify(allergies || []),
-    diabetesType ? `Diabetes: ${diabetesType}` : '',
-    '',
-    'Supplements logged:',
-    JSON.stringify(
-      supplements.slice(0, 30).map((s: any) => ({ name: s?.name, dosage: s?.dosage, timing: s?.timing, scheduleInfo: s?.scheduleInfo })),
-    ),
-    '',
-    'Medications logged:',
-    JSON.stringify(
-      medications.slice(0, 30).map((m: any) => ({ name: m?.name, dosage: m?.dosage, timing: m?.timing, scheduleInfo: m?.scheduleInfo })),
-    ),
-    '',
-    'Daily targets:',
-    JSON.stringify(targets),
-    'Used so far today:',
-    JSON.stringify(used),
-    'Remaining for today:',
-    JSON.stringify(remaining),
-    caloriesCap !== null ? `Hard cap calories for this meal: <= ${Math.max(0, Math.floor(caloriesCap))}` : '',
-    '',
-    'Foods already logged today (avoid repeating):',
-    JSON.stringify(todaysDescriptions),
-    '',
-    'Recent AI recommended meal names (avoid repeating):',
-    JSON.stringify(recentNames),
-    'Recent AI recommended ingredient hints (avoid repeating):',
-    JSON.stringify(recentIngredientHints),
-    '',
-    'Constraints:',
-    '- Provide 2–6 ingredients.',
-    '- Use common, realistic foods and portions; keep ingredient list concise.',
+      '',
+      'Health situations (free-text):',
+    safeJsonCompact(healthSituations || {}, opts.healthSituationsMaxChars),
+      '',
+      'Allergies/intolerances to avoid:',
+      safeJsonCompact(allergies || [], 240),
+      diabetesType ? `Diabetes: ${diabetesType}` : '',
+      '',
+      'Supplements logged:',
+      safeJsonCompact(supplementsForPrompt, 1400),
+      '',
+      'Medications logged:',
+      safeJsonCompact(medicationsForPrompt, 1400),
+      '',
+      'Daily targets:',
+      safeJsonCompact(targets, 260),
+      'Used so far today:',
+      safeJsonCompact(used, 260),
+      'Remaining for today:',
+      safeJsonCompact(remaining, 260),
+      caloriesCap !== null ? `Hard cap calories for this meal: <= ${Math.max(0, Math.floor(caloriesCap))}` : '',
+      '',
+      'Foods already logged today (avoid repeating):',
+    safeJsonCompact(todaysDescriptions.map((d) => truncate(d, 90)).slice(0, opts.todaysFoodsLimit), 900),
+      '',
+      'Recent AI recommended meal names (avoid repeating):',
+    safeJsonCompact(recentNames.map((n) => truncate(n, 70)).slice(0, opts.recentNamesLimit), 600),
+      'Recent AI recommended ingredient hints (avoid repeating):',
+    safeJsonCompact(recentIngredientHints.map((n) => truncate(n, 48)).slice(0, opts.recentIngredientsLimit), 900),
+      '',
+      'Constraints:',
+      '- Provide 2–6 ingredients.',
+      '- Use common, realistic foods and portions; keep ingredient list concise.',
     '- Tags must be short (1–3 words), informational (e.g., "Low sugar", "High protein", "Gut-friendly").',
     '- The "why" must be 2–5 sentences in plain English referencing goals and remaining macros.',
-  ]
+    ]
     .filter(Boolean)
     .join('\n')
+    return userPrompt
+  }
+
+  let userPrompt = buildUserPrompt({
+    supplementsLimit: 18,
+    medicationsLimit: 18,
+    healthSituationsMaxChars: 900,
+    todaysFoodsLimit: 8,
+    recentNamesLimit: 8,
+    recentIngredientsLimit: 24,
+  })
+
+  // Guard rail: keep the prompt within a cost envelope so the fixed credit price
+  // maintains required profit margins. We compute a conservative upper-bound cost
+  // based on prompt length + max output tokens.
+  let maxOutputTokens = 650
+  const estimateVendorCost = () => {
+    const estPromptTokens = estimateTokensFromText(`${system}\n${userPrompt}`)
+    const estVendorCostCents = openaiCostCentsForTokens(model, {
+      promptTokens: estPromptTokens,
+      completionTokens: maxOutputTokens,
+    })
+    return { estPromptTokens, estVendorCostCents }
+  }
+
+  let estimate = estimateVendorCost()
+  if (MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS > 0 && estimate.estVendorCostCents > MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS) {
+    // First trim pass: cut verbose fields further.
+    userPrompt = buildUserPrompt({
+      supplementsLimit: 10,
+      medicationsLimit: 10,
+      healthSituationsMaxChars: 500,
+      todaysFoodsLimit: 5,
+      recentNamesLimit: 6,
+      recentIngredientsLimit: 16,
+    })
+    estimate = estimateVendorCost()
+  }
+
+  if (MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS > 0 && estimate.estVendorCostCents > MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS) {
+    // Second trim pass: reduce output cap (most expensive part for these models).
+    maxOutputTokens = 500
+    estimate = estimateVendorCost()
+  }
+
+  if (MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS > 0 && estimate.estVendorCostCents > MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS) {
+    console.warn('[ai-meal-recommendation] prompt still too large for fixed credit price; proceeding with strict caps', {
+      estPromptTokens: estimate.estPromptTokens,
+      estVendorCostCents: estimate.estVendorCostCents,
+      maxVendorCostCents: MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS,
+      maxOutputTokens,
+    })
+  }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -606,7 +706,7 @@ export async function POST(req: NextRequest) {
       {
         model,
         temperature: 0.5,
-        ...(model.toLowerCase().includes('gpt-5') ? { max_completion_tokens: 650 } : { max_tokens: 650 }),
+        ...(model.toLowerCase().includes('gpt-5') ? { max_completion_tokens: maxOutputTokens } : { max_tokens: maxOutputTokens }),
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: userPrompt },
