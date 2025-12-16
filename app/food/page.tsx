@@ -5706,31 +5706,42 @@ Please add nutritional information manually if needed.`);
         const anchorRect = addButton.getBoundingClientRect()
         const viewportHeight = window.innerHeight || 0
         const margin = 12
-        const menuHeight = menuEl.getBoundingClientRect().height || 0
-        if (!menuHeight || !Number.isFinite(menuHeight)) return
+        // Use the full content height (not the currently constrained height),
+        // so we can decide whether we can fully display without an internal scroll.
+        const fullHeight = Math.max(0, Number(menuEl.scrollHeight || 0))
+        if (!fullHeight || !Number.isFinite(fullHeight)) return
+
+        const availableFull = Math.max(0, viewportHeight - margin * 2)
+        const desiredHeight = Math.min(fullHeight, availableFull)
 
         const belowTop = anchorRect.bottom + 8
-        const aboveTop = anchorRect.top - 8 - menuHeight
+        const aboveTop = anchorRect.top - 8 - desiredHeight
 
-        // Prefer below when it fits; otherwise place above; if neither fits, fall back to below + internal scroll.
-        const fitsBelow = belowTop + menuHeight <= viewportHeight - margin
-        const fitsAbove = aboveTop >= margin
+        const canShowBelowFully = belowTop + desiredHeight <= viewportHeight - margin
+        const canShowAboveFully = aboveTop >= margin
 
-        if (fitsBelow) {
-          setPhotoOptionsPosition((prev) => (prev ? { ...prev, top: Math.max(margin, belowTop), maxHeight: undefined } : prev))
+        // Prefer below if it fully fits; otherwise prefer above if it fully fits.
+        if (canShowBelowFully) {
+          setPhotoOptionsPosition((prev) =>
+            prev ? { ...prev, top: Math.max(margin, belowTop), maxHeight: fullHeight <= availableFull ? undefined : availableFull } : prev,
+          )
           return
         }
 
-        if (fitsAbove) {
-          setPhotoOptionsPosition((prev) => (prev ? { ...prev, top: Math.max(margin, aboveTop), maxHeight: undefined } : prev))
+        if (canShowAboveFully) {
+          setPhotoOptionsPosition((prev) =>
+            prev ? { ...prev, top: Math.max(margin, aboveTop), maxHeight: fullHeight <= availableFull ? undefined : availableFull } : prev,
+          )
           return
         }
 
-        // Extreme case: not enough room either way (very short viewport).
-        // Keep it below so the + stays visible/clickable, and enable internal scroll.
-        const top = Math.max(margin, belowTop)
-        const maxHeight = Math.max(260, viewportHeight - top - margin)
-        setPhotoOptionsPosition((prev) => (prev ? { ...prev, top, maxHeight } : prev))
+        // If neither fully fits, clamp to viewport and keep it reachable with internal scroll.
+        // Choose the side with more space so fewer scrolls are needed.
+        const spaceBelow = viewportHeight - belowTop - margin
+        const spaceAbove = anchorRect.top - 8 - margin
+        const useAbove = spaceAbove > spaceBelow
+        const top = useAbove ? Math.max(margin, anchorRect.top - 8 - availableFull) : Math.max(margin, belowTop)
+        setPhotoOptionsPosition((prev) => (prev ? { ...prev, top, maxHeight: Math.max(260, availableFull) } : prev))
       } catch {}
     })
 
@@ -12097,7 +12108,7 @@ Please add nutritional information manually if needed.`);
                                 ) : (
                                 <div
                                   ref={desktopAddMenuRef}
-                                  className="food-options-dropdown fixed z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
+                                  className="food-options-dropdown fixed z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain md:max-h-none"
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => e.stopPropagation()}
                                   style={{
