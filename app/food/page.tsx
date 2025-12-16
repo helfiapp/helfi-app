@@ -1696,6 +1696,7 @@ export default function FoodDiary() {
   const selectPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const summaryCarouselRef = useRef<HTMLDivElement | null>(null)
   const pageTopRef = useRef<HTMLDivElement | null>(null)
+  const desktopAddMenuRef = useRef<HTMLDivElement | null>(null)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -5678,25 +5679,65 @@ Please add nutritional information manually if needed.`);
     const width = Math.min(360, Math.max(260, viewportWidth - 24))
     const left = Math.max(12, Math.min(anchorRect.left, viewportWidth - width - 12))
 
-    // Estimate full menu height so we can choose above/below without forcing a scrollbar.
-    const ESTIMATED_MENU_HEIGHT = 560
-    const belowTop = anchorRect.bottom + 8
-    const aboveTop = anchorRect.top - 8 - ESTIMATED_MENU_HEIGHT
-
-    let top = belowTop
-    let maxHeight: number | undefined = undefined
-
-    const spaceBelow = viewportHeight - belowTop - 12
-    if (spaceBelow < ESTIMATED_MENU_HEIGHT && aboveTop >= 12) {
-      top = aboveTop
-    } else if (spaceBelow < 260) {
-      // If we truly can't fit, clamp and allow scroll (rare on desktop).
-      top = Math.max(12, belowTop)
-      maxHeight = Math.max(260, viewportHeight - top - 12)
-    }
-
-    setPhotoOptionsPosition(maxHeight ? { top, left, width, maxHeight } : { top, left, width })
+    // Initial placement (below button). We'll refine after render using the real menu height.
+    const top = Math.max(12, anchorRect.bottom + 8)
+    const maxHeight = Math.max(260, viewportHeight - top - 12)
+    setPhotoOptionsPosition({ top, left, width, maxHeight })
   }
+
+  // Desktop add-menu must remain fully reachable: if the menu would be cut off,
+  // reposition it above/below based on the *actual* rendered height.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (isMobile) return
+    if (!showPhotoOptions) return
+    if (!photoOptionsAnchor) return
+
+    const key = photoOptionsAnchor as any
+    const row = categoryRowRefs.current[key]
+    const menuEl = desktopAddMenuRef.current
+    if (!row || !menuEl) return
+
+    const addButton = row.querySelector?.('.category-add-button') as HTMLElement | null
+    if (!addButton) return
+
+    const raf = window.requestAnimationFrame(() => {
+      try {
+        const anchorRect = addButton.getBoundingClientRect()
+        const viewportHeight = window.innerHeight || 0
+        const margin = 12
+        const menuHeight = menuEl.getBoundingClientRect().height || 0
+        if (!menuHeight || !Number.isFinite(menuHeight)) return
+
+        const belowTop = anchorRect.bottom + 8
+        const aboveTop = anchorRect.top - 8 - menuHeight
+
+        // Prefer below when it fits; otherwise place above; if neither fits, fall back to below + internal scroll.
+        const fitsBelow = belowTop + menuHeight <= viewportHeight - margin
+        const fitsAbove = aboveTop >= margin
+
+        if (fitsBelow) {
+          setPhotoOptionsPosition((prev) => (prev ? { ...prev, top: Math.max(margin, belowTop), maxHeight: undefined } : prev))
+          return
+        }
+
+        if (fitsAbove) {
+          setPhotoOptionsPosition((prev) => (prev ? { ...prev, top: Math.max(margin, aboveTop), maxHeight: undefined } : prev))
+          return
+        }
+
+        // Extreme case: not enough room either way (very short viewport).
+        // Keep it below so the + stays visible/clickable, and enable internal scroll.
+        const top = Math.max(margin, belowTop)
+        const maxHeight = Math.max(260, viewportHeight - top - margin)
+        setPhotoOptionsPosition((prev) => (prev ? { ...prev, top, maxHeight } : prev))
+      } catch {}
+    })
+
+    return () => {
+      window.cancelAnimationFrame(raf)
+    }
+  }, [showPhotoOptions, photoOptionsAnchor, isMobile])
 
   // Initialize entry time when editing starts
   useEffect(() => {
@@ -12055,7 +12096,8 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 ) : (
                                 <div
-                                  className="food-options-dropdown fixed z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain md:max-h-none md:overflow-visible"
+                                  ref={desktopAddMenuRef}
+                                  className="food-options-dropdown fixed z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => e.stopPropagation()}
                                   style={{
