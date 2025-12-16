@@ -5668,28 +5668,34 @@ Please add nutritional information manually if needed.`);
       return
     }
     const rect = row.getBoundingClientRect()
+    const addButton = row.querySelector?.('.category-add-button') as HTMLElement | null
+    const anchorRect = addButton ? addButton.getBoundingClientRect() : rect
     const viewportHeight = window.innerHeight || 0
     const viewportWidth = window.innerWidth || 0
 
-    // Keep the menu anchored just above the "+" button so the button stays visible to toggle off.
-    const maxHeight = Math.max(300, Math.min(420, viewportHeight - 40))
-    const width = Math.min(rect.width, 360)
-    const left = Math.max(
-      12,
-      Math.min(rect.left + rect.width / 2 - width / 2, viewportWidth - width - 12),
-    )
+    // Desktop UX: keep the menu visually attached to the "+" button (not centered in the row).
+    // Only use an internal scrollbar when the viewport is genuinely too short to show the menu.
+    const width = Math.min(360, Math.max(260, viewportWidth - 24))
+    const left = Math.max(12, Math.min(anchorRect.left, viewportWidth - width - 12))
 
-    // Prefer above; if not enough space, place below without covering the button.
-    let top = rect.top - 8 - maxHeight
-    if (top < 12) {
-      top = rect.bottom + 8
-      const overflowBottom = top + maxHeight - (viewportHeight - 12)
-      if (overflowBottom > 0) {
-        top = Math.max(12, top - overflowBottom)
-      }
+    // Estimate full menu height so we can choose above/below without forcing a scrollbar.
+    const ESTIMATED_MENU_HEIGHT = 560
+    const belowTop = anchorRect.bottom + 8
+    const aboveTop = anchorRect.top - 8 - ESTIMATED_MENU_HEIGHT
+
+    let top = belowTop
+    let maxHeight: number | undefined = undefined
+
+    const spaceBelow = viewportHeight - belowTop - 12
+    if (spaceBelow < ESTIMATED_MENU_HEIGHT && aboveTop >= 12) {
+      top = aboveTop
+    } else if (spaceBelow < 260) {
+      // If we truly can't fit, clamp and allow scroll (rare on desktop).
+      top = Math.max(12, belowTop)
+      maxHeight = Math.max(260, viewportHeight - top - 12)
     }
 
-    setPhotoOptionsPosition({ top, left, width, maxHeight })
+    setPhotoOptionsPosition(maxHeight ? { top, left, width, maxHeight } : { top, left, width })
   }
 
   // Initialize entry time when editing starts
@@ -12049,7 +12055,7 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 ) : (
                                 <div
-                                  className="food-options-dropdown fixed z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
+                                  className="food-options-dropdown fixed z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain md:max-h-none md:overflow-visible"
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => e.stopPropagation()}
                                   style={{
