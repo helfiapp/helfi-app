@@ -11,6 +11,7 @@ import {
   AI_MEAL_RECOMMENDATION_CREDITS,
   AI_MEAL_RECOMMENDATION_GOAL_NAME,
   AI_MEAL_RECOMMENDATION_HISTORY_LIMIT,
+  AI_MEAL_RECOMMENDATION_STORAGE_VERSION,
   MealCategory,
   normalizeMealCategory,
 } from '@/lib/ai-meal-recommendation'
@@ -50,6 +51,12 @@ type RecommendedMealRecord = {
   why: string
   items: RecommendedItem[]
   totals: MacroTotals
+}
+
+type StoredState = {
+  version: number
+  history: RecommendedMealRecord[]
+  seenExplainAt?: string | null
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -170,28 +177,46 @@ const getAuthedEmail = async (req: NextRequest): Promise<string | null> => {
   return userEmail
 }
 
-const getOrInitHistory = async (userId: string): Promise<RecommendedMealRecord[]> => {
+const loadStoredState = async (userId: string): Promise<StoredState> => {
   const stored = await prisma.healthGoal.findFirst({
     where: { userId, name: AI_MEAL_RECOMMENDATION_GOAL_NAME },
-    select: { id: true, category: true },
+    select: { category: true },
   })
-  if (!stored?.category) return []
+  if (!stored?.category) {
+    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null }
+  }
   try {
     const parsed = JSON.parse(stored.category)
-    const history = Array.isArray(parsed?.history) ? parsed.history : Array.isArray(parsed) ? parsed : []
-    return history.filter(Boolean)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const history = Array.isArray((parsed as any).history) ? (parsed as any).history.filter(Boolean) : []
+      const seenExplainAt =
+        typeof (parsed as any).seenExplainAt === 'string' ? (parsed as any).seenExplainAt : null
+      return {
+        version: Number((parsed as any).version) || AI_MEAL_RECOMMENDATION_STORAGE_VERSION,
+        history,
+        seenExplainAt,
+      }
+    }
+    const history = Array.isArray(parsed) ? parsed.filter(Boolean) : []
+    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history, seenExplainAt: null }
   } catch {
-    return []
+    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null }
   }
 }
 
-const saveHistory = async (userId: string, history: RecommendedMealRecord[]) => {
-  const trimmed = Array.isArray(history) ? history.filter(Boolean).slice(0, AI_MEAL_RECOMMENDATION_HISTORY_LIMIT) : []
+const saveStoredState = async (userId: string, state: StoredState) => {
+  const trimmedHistory = Array.isArray(state.history)
+    ? state.history.filter(Boolean).slice(0, AI_MEAL_RECOMMENDATION_HISTORY_LIMIT)
+    : []
+  const payload = JSON.stringify({
+    version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION,
+    history: trimmedHistory,
+    seenExplainAt: state.seenExplainAt || null,
+  })
   const existing = await prisma.healthGoal.findFirst({
     where: { userId, name: AI_MEAL_RECOMMENDATION_GOAL_NAME },
     select: { id: true },
   })
-  const payload = JSON.stringify({ version: 1, history: trimmed })
   if (existing?.id) {
     await prisma.healthGoal.update({ where: { id: existing.id }, data: { category: payload } })
     return
@@ -373,7 +398,8 @@ export async function GET(req: NextRequest) {
   })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  const historyAll = (await getOrInitHistory(user.id))
+  const storedState = await loadStoredState(user.id)
+  const historyAll = (storedState.history || [])
     .filter((h) => h && typeof h === 'object')
     .sort((a: any, b: any) => Number(new Date(b.createdAt).getTime()) - Number(new Date(a.createdAt).getTime()))
 
@@ -387,8 +413,32 @@ export async function GET(req: NextRequest) {
     costCredits: AI_MEAL_RECOMMENDATION_CREDITS,
     context: { targets, used, remaining },
     history: historyAll,
+    seenExplain: Boolean(storedState.seenExplainAt) || historyAll.length > 0,
     category,
   })
+}
+
+export async function PUT(req: NextRequest) {
+  const userEmail = await getAuthedEmail(req)
+  if (!userEmail) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const user = await prisma.user.findUnique({
+    where: { email: userEmail },
+    select: { id: true },
+  })
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  const state = await loadStoredState(user.id)
+  if (state.seenExplainAt) {
+    return NextResponse.json({ ok: true, seenExplainAt: state.seenExplainAt })
+  }
+  const nowIso = new Date().toISOString()
+  try {
+    await saveStoredState(user.id, { ...state, seenExplainAt: nowIso })
+  } catch (e) {
+    console.warn('[ai-meal-recommendation] failed to mark explain as seen (non-fatal)', e)
+  }
+  return NextResponse.json({ ok: true, seenExplainAt: nowIso })
 }
 
 export async function POST(req: NextRequest) {
@@ -437,7 +487,8 @@ export async function POST(req: NextRequest) {
   const used = sumTotals(logs.map((l) => extractTotalsFromNutrients(l.nutrients)))
   const remaining = subtractTotals(targets, used)
 
-  const historyAll = (await getOrInitHistory(user.id))
+  const storedState = await loadStoredState(user.id)
+  const historyAll = (storedState.history || [])
     .filter((h) => h && typeof h === 'object')
     .sort((a: any, b: any) => Number(new Date(b.createdAt).getTime()) - Number(new Date(a.createdAt).getTime()))
 
@@ -607,7 +658,11 @@ export async function POST(req: NextRequest) {
 
   const nextHistory = [record, ...historyAll].slice(0, AI_MEAL_RECOMMENDATION_HISTORY_LIMIT)
   try {
-    await saveHistory(user.id, nextHistory)
+    await saveStoredState(user.id, {
+      ...storedState,
+      history: nextHistory,
+      seenExplainAt: storedState.seenExplainAt || new Date().toISOString(),
+    })
   } catch (e) {
     console.warn('[ai-meal-recommendation] failed to persist history (non-fatal)', e)
   }
@@ -618,7 +673,7 @@ export async function POST(req: NextRequest) {
     costCredits: AI_MEAL_RECOMMENDATION_CREDITS,
     context: { targets, used, remaining: remainingAfter },
     history: nextHistory,
+    seenExplain: true,
     recommendation: record,
   })
 }
-

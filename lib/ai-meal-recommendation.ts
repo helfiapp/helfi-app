@@ -8,6 +8,8 @@ export const AI_MEAL_RECOMMENDATION_GOAL_NAME = '__AI_MEAL_RECOMMENDATIONS__'
 
 export const AI_MEAL_RECOMMENDATION_HISTORY_LIMIT = 50
 
+export const AI_MEAL_RECOMMENDATION_STORAGE_VERSION = 1
+
 export const CATEGORY_LABELS: Record<MealCategory, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
@@ -25,4 +27,3 @@ export const normalizeMealCategory = (raw: any): MealCategory => {
   if (/uncat/.test(value) || /other/.test(value)) return 'uncategorized'
   return 'uncategorized'
 }
-

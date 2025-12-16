@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AI_MEAL_RECOMMENDATION_CREDITS, CATEGORY_LABELS, normalizeMealCategory } from '@/lib/ai-meal-recommendation'
 
@@ -19,14 +19,23 @@ export default function RecommendedExplainClient() {
   const date = searchParams.get('date') || buildTodayIso()
   const category = normalizeMealCategory(searchParams.get('category'))
   const categoryLabel = CATEGORY_LABELS[category]
+  const returnTo = searchParams.get('returnTo') || ''
 
   const continueHref = useMemo(() => {
+    if (returnTo) return returnTo
     const qs = new URLSearchParams()
     qs.set('date', date)
     qs.set('category', category)
     qs.set('generate', '1')
     return `/food/recommended?${qs.toString()}`
-  }, [date, category])
+  }, [date, category, returnTo])
+
+  // Mark as seen immediately so it never shows again for this user (server-persisted).
+  useEffect(() => {
+    try {
+      fetch('/api/ai-meal-recommendation', { method: 'PUT' }).catch(() => {})
+    } catch {}
+  }, [])
 
   return (
     <div className="min-h-screen bg-white">
@@ -48,42 +57,23 @@ export default function RecommendedExplainClient() {
       </div>
 
       <div className="px-4 py-5">
-        <div className="w-full max-w-3xl mx-auto space-y-5">
+        <div className="w-full max-w-3xl mx-auto space-y-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <div className="text-base font-semibold text-gray-900">What this does</div>
-            <p className="mt-2 text-sm text-gray-700 leading-relaxed">
-              This feature uses AI to analyze your health setup, goals, conditions, supplements, medications, daily calorie limits, and remaining macros to recommend the most suitable meal for you right now.
+            <p className="text-sm text-gray-700 leading-relaxed">
+              AI will recommend a {categoryLabel.toLowerCase()} based on your health profile and your remaining calories/macros for today.
             </p>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <div className="text-base font-semibold text-gray-900">What’s considered</div>
-            <ul className="mt-3 space-y-2 text-sm text-gray-700 list-disc pl-5">
-              <li>Your weight, height, age, and activity level</li>
-              <li>Your health goals and health concerns</li>
-              <li>Any medical conditions, allergies, or intolerances you’ve logged</li>
-              <li>Supplements and medications you’ve logged</li>
-              <li>Your remaining calories and macro limits for today</li>
-              <li>The meal type you selected (e.g. {categoryLabel.toLowerCase()})</li>
+            <ul className="mt-3 space-y-1.5 text-sm text-gray-700 list-disc pl-5">
+              <li>Meal + calories + macros</li>
+              <li>Ingredient list (adjustable)</li>
+              <li>Short “why this fits you” explanation</li>
             </ul>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <div className="text-base font-semibold text-gray-900">What you’ll get</div>
-            <ul className="mt-3 space-y-2 text-sm text-gray-700 list-disc pl-5">
-              <li>A complete meal suggestion</li>
-              <li>Full calorie and macro breakdown</li>
-              <li>Clearly listed ingredients (you can adjust quantities before adding)</li>
-              <li>A short explanation of why this meal was chosen for you</li>
-            </ul>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-            <div className="text-base font-semibold text-emerald-900">AI credit usage</div>
-            <p className="mt-2 text-sm text-emerald-900">
-              This recommendation will use <span className="font-semibold">{AI_MEAL_RECOMMENDATION_CREDITS}</span> AI credits.
-            </p>
-            <p className="mt-1 text-xs text-emerald-800">Credits are only spent when a recommendation is generated.</p>
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div className="text-sm font-semibold text-emerald-900">
+                Cost: {AI_MEAL_RECOMMENDATION_CREDITS} credits per recommendation
+              </div>
+              <div className="text-xs text-emerald-800 mt-1">Credits are only spent when a recommendation is generated.</div>
+              <div className="text-[11px] text-emerald-800 mt-2">You’ll only see this screen once.</div>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
@@ -107,4 +97,3 @@ export default function RecommendedExplainClient() {
     </div>
   )
 }
-
