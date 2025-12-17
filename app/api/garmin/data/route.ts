@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ensureGarminSchema } from '@/lib/garmin-db'
 
 type DataType = 'steps' | 'heartrate' | 'sleep' | 'weight'
 
@@ -183,6 +184,12 @@ function extractMetricsFromRecord(baseType: string, record: any) {
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Defensive: this repo doesn’t automatically run migrations on deploy.
+  // Ensure Garmin tables exist before we query them.
+  try {
+    await ensureGarminSchema()
+  } catch {}
 
   const account = await prisma.account.findFirst({
     where: { userId: session.user.id, provider: 'garmin' },
