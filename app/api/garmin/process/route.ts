@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { assertGarminConfigured } from '@/lib/garmin-oauth'
 import { extractGarminWorkouts } from '@/lib/exercise/garmin-workouts'
 import { ingestExerciseEntry } from '@/lib/exercise/ingest'
+import { ensureGarminSchema } from '@/lib/garmin-db'
 
 function collectGarminUserIdsAndCallbacks(payload: unknown) {
   const userIds = new Set<string>()
@@ -68,6 +69,10 @@ async function pullGarminCallbackUrl(callbackUrl: string, garminClientId: string
 
 export async function POST(req: NextRequest) {
   try {
+    try {
+      await ensureGarminSchema()
+    } catch {}
+
     // Optional simple verification: require Upstash signature header if configured
     const requireSignature = !!process.env.QSTASH_REQUIRE_SIGNATURE
     if (requireSignature) {
@@ -178,4 +183,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'process_error', message: error?.message || String(error) }, { status: 500 })
   }
 }
-

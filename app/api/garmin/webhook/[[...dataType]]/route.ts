@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertGarminConfigured, parseBearerToken, parseOAuthHeader } from '@/lib/garmin-oauth'
 import { publishWithQStash } from '@/lib/qstash'
+import { ensureGarminSchema } from '@/lib/garmin-db'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -65,6 +66,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error('Garmin webhook received but credentials missing:', error)
     return NextResponse.json({ error: 'Garmin not configured' }, { status: 500 })
   }
+
+  // Defensive: ensure tables exist before we start receiving live Garmin deliveries.
+  // (This repo doesn’t automatically run migrations on deploy.)
+  try {
+    await ensureGarminSchema()
+  } catch {}
 
   const oauthToken = oauthParams?.oauth_token || null
   const tokenToMatch = bearerToken || oauthToken || null
