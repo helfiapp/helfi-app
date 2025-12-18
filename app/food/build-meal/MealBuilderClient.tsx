@@ -532,17 +532,19 @@ export default function MealBuilderClient() {
     return normalizeMealLabel(raw)
   }
 
-  const looksLikeMealBuilderItemId = (rawId: any) => {
+  const looksLikeMealBuilderCreatedItemId = (rawId: any) => {
     const id = typeof rawId === 'string' ? rawId : ''
     if (!id) return false
-    return /^(openfoodfacts|usda|fatsecret|ai):/i.test(id)
+    if (/^(openfoodfacts|usda|fatsecret):[^:]+:\d{9,}$/i.test(id)) return true
+    if (/^ai:\d{9,}:[0-9a-f]+$/i.test(id)) return true
+    return false
   }
 
   const isLegacyMealBuilderFavorite = (fav: any) => {
     if (!fav) return false
     const items = parseFavoriteItems(fav)
     if (!items || items.length === 0) return false
-    return items.some((it: any) => looksLikeMealBuilderItemId(it?.id))
+    return items.some((it: any) => looksLikeMealBuilderCreatedItemId(it?.id))
   }
 
   const isCustomMealFavorite = (fav: any) => {
@@ -552,25 +554,6 @@ export default function MealBuilderClient() {
     if (method === 'meal-builder' || method === 'combined') return true
     if (isLegacyMealBuilderFavorite(fav)) return true
     return false
-  }
-
-  const migrateFavoritesForCustomMeals = (list: any[]) => {
-    let changed = false
-    const next = (Array.isArray(list) ? list : []).map((fav: any) => {
-      if (!fav || typeof fav !== 'object') return fav
-      if ((fav as any)?.customMeal === true) return fav
-      const method = String((fav as any)?.method || '').toLowerCase()
-      if (method === 'meal-builder' || method === 'combined') {
-        changed = true
-        return { ...(fav as any), customMeal: true }
-      }
-      if (isLegacyMealBuilderFavorite(fav)) {
-        changed = true
-        return { ...(fav as any), customMeal: true, method: 'meal-builder' }
-      }
-      return fav
-    })
-    return { next, changed }
   }
 
   const buildSourceTag = (entry: any) => {
@@ -712,15 +695,6 @@ export default function MealBuilderClient() {
       }).catch(() => {})
     } catch {}
   }
-
-  useEffect(() => {
-    const raw = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : null
-    if (!raw) return
-    const migrated = migrateFavoritesForCustomMeals(raw)
-    if (!migrated.changed) return
-    persistFavorites(migrated.next)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData?.favorites])
 
   const saveToFavorites = (entryLike: any) => {
     const source = entryLike
@@ -1106,10 +1080,9 @@ export default function MealBuilderClient() {
         const nextFavorites = prev.map((f: any) => (String(f?.id || '') === editFavoriteId ? updatedFavorite : f))
         persistFavorites(nextFavorites)
 
-        // If this favorite is linked to a saved diary entry (or we were opened from a diary entry),
-        // update that entry too.
-        const linkedId = existing?.sourceId ? String(existing.sourceId) : ''
-        const targetLogId = linkedId || (sourceLogId ? String(sourceLogId) : '')
+        // If we were opened from a diary entry, update that FoodLog row too.
+        // Do NOT use favorite.sourceId here: favorites are reusable templates and may point to an older log.
+        const targetLogId = sourceLogId ? String(sourceLogId) : ''
         if (targetLogId) {
           try {
             await fetch('/api/food-log', {
@@ -1319,7 +1292,8 @@ export default function MealBuilderClient() {
 
                   let data: any[] = []
                   if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
-                  if (favoritesActiveTab === 'favorites') data = sortList(favoriteMeals.filter(filterBySearch))
+                  if (favoritesActiveTab === 'favorites')
+                    data = sortList(favoriteMeals.filter((m: any) => !isCustomMealFavorite(m?.favorite)).filter(filterBySearch))
                   if (favoritesActiveTab === 'custom') data = sortList(customMeals.filter(filterBySearch))
 
                   if (data.length === 0) {

@@ -2353,12 +2353,9 @@ export default function FoodDiary() {
     try {
       if (Array.isArray((userData as any)?.favorites)) {
         const raw = (userData as any).favorites as any[]
-        const migrated = migrateFavoritesForCustomMeals(raw)
-        setFavorites(migrated.next)
-        if (migrated.changed) {
-          // Persist backfill so Custom tab and edit routing work reliably on future loads.
-          persistFavorites(migrated.next)
-        }
+        const repaired = repairAndDedupeFavorites(raw)
+        setFavorites(repaired.next)
+        if (repaired.changed) persistFavorites(repaired.next)
         return
       }
       if (typeof window !== 'undefined') {
@@ -2366,9 +2363,9 @@ export default function FoodDiary() {
         if (cached) {
           const parsed = JSON.parse(cached)
           if (Array.isArray(parsed)) {
-            const migrated = migrateFavoritesForCustomMeals(parsed)
-            setFavorites(migrated.next)
-            if (migrated.changed) persistFavorites(migrated.next)
+            const repaired = repairAndDedupeFavorites(parsed)
+            setFavorites(repaired.next)
+            if (repaired.changed) persistFavorites(repaired.next)
           }
         }
       }
@@ -5982,10 +5979,18 @@ Please add nutritional information manually if needed.`);
     return null
   }
 
-  const looksLikeMealBuilderItemId = (rawId: any) => {
+  // Build-a-meal generates ingredient ids that include a trailing timestamp segment.
+  // This is more specific than general "source:id" formats used elsewhere.
+  const looksLikeMealBuilderCreatedItemId = (rawId: any) => {
     const id = typeof rawId === 'string' ? rawId : ''
     if (!id) return false
-    return /^(openfoodfacts|usda|fatsecret|ai):/i.test(id)
+    // Examples:
+    // - usda:12345:1734567890123
+    // - openfoodfacts:0123456789:1734567890123
+    // - ai:1734567890123:deadbeef
+    if (/^(openfoodfacts|usda|fatsecret):[^:]+:\d{9,}$/i.test(id)) return true
+    if (/^ai:\d{9,}:[0-9a-f]+$/i.test(id)) return true
+    return false
   }
 
   // Backfill helper: legacy Build-a-meal favorites were saved as method "text".
@@ -5995,14 +6000,33 @@ Please add nutritional information manually if needed.`);
     if (!fav) return false
     const items = parseFavoriteItems(fav)
     if (!items || items.length === 0) return false
-    return items.some((it: any) => looksLikeMealBuilderItemId(it?.id))
+    return items.some((it: any) => looksLikeMealBuilderCreatedItemId(it?.id))
   }
 
   const isMealBuilderDiaryEntry = (entry: any) => {
     if (!entry) return false
     const items = Array.isArray(entry?.items) ? entry.items : null
     if (!items || items.length === 0) return false
-    return items.some((it: any) => looksLikeMealBuilderItemId(it?.id))
+    return items.some((it: any) => looksLikeMealBuilderCreatedItemId(it?.id))
+  }
+
+  const normalizeFavoriteId = (raw: any) => {
+    const s = typeof raw === 'string' ? raw.trim() : ''
+    return s ? s : null
+  }
+
+  const generateFavoriteId = () => `fav-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  const stableItemsSignature = (items: any[] | null) => {
+    if (!Array.isArray(items) || items.length === 0) return ''
+    const parts = items.map((it: any) => {
+      const id = typeof it?.id === 'string' ? it.id : ''
+      const name = String(it?.name || '').trim().toLowerCase()
+      const serving = String(it?.serving_size || '').trim().toLowerCase()
+      const cals = Number.isFinite(Number(it?.calories)) ? Math.round(Number(it.calories)) : ''
+      return [id, name, serving, cals].filter(Boolean).join('~')
+    })
+    return parts.filter(Boolean).sort().join('|')
   }
 
   const buildMealBuilderFavoriteFromEntry = (entry: any, opts?: { idOverride?: string }) => {
@@ -6012,7 +6036,7 @@ Please add nutritional information manually if needed.`);
     const items = Array.isArray(entry?.items) ? entry.items : null
     const meal = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     return {
-      id: (opts?.idOverride || `fav-${Date.now()}`) as string,
+      id: (opts?.idOverride || generateFavoriteId()) as string,
       sourceId: dbId || null,
       label,
       description: label,
@@ -6030,17 +6054,25 @@ Please add nutritional information manually if needed.`);
   const ensureMealBuilderFavoriteForEntry = (entry: any) => {
     const base = Array.isArray(favorites) ? favorites : []
     const dbId = entry?.dbId ? String(entry.dbId) : ''
-    const key = normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()
+    const entryItemsSig = stableItemsSignature(Array.isArray(entry?.items) ? entry.items : null)
     const existing = base.find((fav: any) => {
       if (!fav) return false
       if (dbId && fav?.sourceId && String(fav.sourceId) === dbId) return true
-      return key ? favoriteDisplayLabel(fav).toLowerCase() === key : false
+      if (!entryItemsSig) return false
+      const favItems = parseFavoriteItems(fav)
+      return stableItemsSignature(favItems) === entryItemsSig
     })
     if (existing) {
-      if (isCustomMealFavorite(existing)) return { favorite: existing, nextFavorites: base, changed: false }
-      const updated = { ...(existing as any), customMeal: true, method: String((existing as any)?.method || 'meal-builder') || 'meal-builder' }
+      const updated = {
+        ...(existing as any),
+        id: normalizeFavoriteId((existing as any)?.id) || (existing as any)?.id || generateFavoriteId(),
+        ...(dbId ? { sourceId: dbId } : {}),
+        customMeal: true,
+        method: String((existing as any)?.method || 'meal-builder') || 'meal-builder',
+      }
       const nextFavorites = base.map((f: any) => (String(f?.id || '') === String(existing?.id || '') ? updated : f))
-      return { favorite: updated, nextFavorites, changed: true }
+      const changed = JSON.stringify(existing) !== JSON.stringify(updated)
+      return { favorite: updated, nextFavorites, changed }
     }
     const created = buildMealBuilderFavoriteFromEntry(entry)
     const nextFavorites = [...base, created]
@@ -6056,23 +6088,90 @@ Please add nutritional information manually if needed.`);
     return false
   }
 
-  const migrateFavoritesForCustomMeals = (list: any[]) => {
+  const repairAndDedupeFavorites = (list: any[]) => {
+    const input = Array.isArray(list) ? list : []
     let changed = false
-    const next = (Array.isArray(list) ? list : []).map((fav: any) => {
-      if (!fav || typeof fav !== 'object') return fav
-      if ((fav as any)?.customMeal === true) return fav
-      const method = String((fav as any)?.method || '').toLowerCase()
-      if (method === 'meal-builder' || method === 'combined') {
-        changed = true
-        return { ...(fav as any), customMeal: true }
+
+    // 1) Normalize records (ids, flags)
+    const normalized = input
+      .filter((fav) => fav && typeof fav === 'object')
+      .map((fav: any) => {
+        const next: any = { ...fav }
+        const id = normalizeFavoriteId(next.id) || generateFavoriteId()
+        if (id !== next.id) {
+          next.id = id
+          changed = true
+        }
+        const method = String(next?.method || '').toLowerCase()
+        const legacyBuilder = isLegacyMealBuilderFavorite(next)
+        const shouldBeCustom = method === 'meal-builder' || method === 'combined' || legacyBuilder
+
+        // Correct any bad migrations: only builder/combined should be customMeal.
+        if (shouldBeCustom) {
+          if (next.customMeal !== true) {
+            next.customMeal = true
+            changed = true
+          }
+          if (legacyBuilder && method === 'text') {
+            next.method = 'meal-builder'
+            changed = true
+          }
+        } else if (next.customMeal === true) {
+          delete next.customMeal
+          changed = true
+        }
+        return next
+      })
+
+    // 2) Dedupe
+    const byKey = new Map<string, any>()
+    const pickWinner = (a: any, b: any) => {
+      const aTs = Number(a?.createdAt) || 0
+      const bTs = Number(b?.createdAt) || 0
+      if (aTs !== bTs) return aTs > bTs ? a : b
+      // Prefer custom meals when tie
+      const aCustom = a?.customMeal === true || ['meal-builder', 'combined'].includes(String(a?.method || '').toLowerCase())
+      const bCustom = b?.customMeal === true || ['meal-builder', 'combined'].includes(String(b?.method || '').toLowerCase())
+      if (aCustom !== bCustom) return aCustom ? a : b
+      return a
+    }
+
+    const deduped: any[] = []
+    for (const fav of normalized) {
+      const method = String(fav?.method || '').toLowerCase()
+      const isCustom = fav?.customMeal === true || method === 'meal-builder' || method === 'combined'
+      const sourceId = fav?.sourceId ? String(fav.sourceId) : ''
+      const itemsSig = stableItemsSignature(parseFavoriteItems(fav))
+      // For Custom meals, de-dupe by ingredient signature (rename-safe) rather than by sourceId.
+      // Favorites are intended to be reusable templates, not one-per-diary-entry.
+      const key =
+        isCustom && itemsSig
+          ? `customItems:${itemsSig}`
+          : sourceId
+          ? `source:${sourceId}`
+          : `label:${favoriteDisplayLabel(fav).toLowerCase()}|method:${method}`
+
+      const existing = byKey.get(key)
+      if (!existing) {
+        byKey.set(key, fav)
+        deduped.push(fav)
+        continue
       }
-      if (isLegacyMealBuilderFavorite(fav)) {
-        changed = true
-        return { ...(fav as any), customMeal: true, method: 'meal-builder' }
+      const winner = pickWinner(existing, fav)
+      if (winner !== existing) {
+        const merged = {
+          ...(winner as any),
+          // Preserve a usable sourceId if one exists (helps route edits from diary)
+          sourceId: (winner as any)?.sourceId ?? (existing as any)?.sourceId ?? (fav as any)?.sourceId ?? null,
+        }
+        byKey.set(key, merged)
+        const idx = deduped.findIndex((x) => String(x?.id || '') === String(existing?.id || ''))
+        if (idx >= 0) deduped[idx] = merged
       }
-      return fav
-    })
-    return { next, changed }
+      changed = true
+    }
+
+    return { next: deduped, changed }
   }
 
   const buildSourceTag = (entry: any) => {
@@ -6170,56 +6269,77 @@ Please add nutritional information manually if needed.`);
     return { allMeals, favoriteMeals, customMeals }
   }
 
-  const mealBuilderBackfillSigRef = useRef<string>('')
+  const mealBuilderDiaryBackfillSigRef = useRef<string>('')
   useEffect(() => {
     try {
       const history = collectHistoryMeals()
       if (!Array.isArray(history) || history.length === 0) return
 
-      const candidates = history.filter((e: any) => isMealBuilderDiaryEntry(e))
+      const candidates = history.filter((e: any) => Boolean(e?.dbId) && isMealBuilderDiaryEntry(e))
       if (candidates.length === 0) return
 
-      const signature = candidates
-        .map((e: any) => `${String(e?.dbId || e?.id || '')}:${normalizeMealLabel(e?.description || '').toLowerCase()}`)
+      const existingSourceIds = new Set<string>()
+      ;(Array.isArray(favorites) ? favorites : []).forEach((fav: any) => {
+        const sid = fav?.sourceId ? String(fav.sourceId) : ''
+        if (sid) existingSourceIds.add(sid)
+      })
+
+      const missing = candidates.filter((e: any) => {
+        const dbId = e?.dbId ? String(e.dbId) : ''
+        return dbId ? !existingSourceIds.has(dbId) : false
+      })
+      if (missing.length === 0) return
+
+      const sig = missing
+        .map((e: any) => String(e?.dbId || '').trim())
+        .filter(Boolean)
         .sort()
         .join('|')
-      const favCount = Array.isArray(favorites) ? favorites.length : 0
-      const sig = `${favCount}|${signature}`
-      if (mealBuilderBackfillSigRef.current === sig) return
+      if (!sig) return
+      if (mealBuilderDiaryBackfillSigRef.current === sig) return
+      mealBuilderDiaryBackfillSigRef.current = sig
 
-      let nextFavorites = Array.isArray(favorites) ? favorites : []
+      let nextFavorites = Array.isArray(favorites) ? [...favorites] : []
       let changed = false
-      for (const entry of candidates) {
-        const ensured = (() => {
-          // Inline to ensure we use the incremental `nextFavorites` list
-          const dbId = entry?.dbId ? String(entry.dbId) : ''
-          const key = normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()
-          const existing = nextFavorites.find((fav: any) => {
+
+      for (const entry of missing) {
+        const dbId = entry?.dbId ? String(entry.dbId) : ''
+        if (!dbId) continue
+        const entrySig = stableItemsSignature(Array.isArray(entry?.items) ? entry.items : null)
+
+        // Prefer updating an existing custom meal with identical ingredients (rename-safe),
+        // rather than creating a duplicate record.
+        if (entrySig) {
+          const idx = nextFavorites.findIndex((fav: any) => {
             if (!fav) return false
-            if (dbId && fav?.sourceId && String(fav.sourceId) === dbId) return true
-            return key ? favoriteDisplayLabel(fav).toLowerCase() === key : false
+            const method = String(fav?.method || '').toLowerCase()
+            const isCustom = fav?.customMeal === true || method === 'meal-builder' || method === 'combined'
+            if (!isCustom) return false
+            const favItemsSig = stableItemsSignature(parseFavoriteItems(fav))
+            return favItemsSig && favItemsSig === entrySig
           })
-          if (existing) {
-            if (isCustomMealFavorite(existing)) return null
-            const updated = { ...(existing as any), customMeal: true, method: String((existing as any)?.method || 'meal-builder') || 'meal-builder' }
-            nextFavorites = nextFavorites.map((f: any) =>
-              String(f?.id || '') === String(existing?.id || '') ? updated : f,
-            )
+          if (idx >= 0) {
+            const existing = nextFavorites[idx]
+            nextFavorites[idx] = {
+              ...(existing as any),
+              id: normalizeFavoriteId((existing as any)?.id) || (existing as any)?.id || generateFavoriteId(),
+              sourceId: dbId,
+              customMeal: true,
+              method: String((existing as any)?.method || 'meal-builder') || 'meal-builder',
+            }
             changed = true
-            return null
+            continue
           }
-          const created = buildMealBuilderFavoriteFromEntry(entry)
-          nextFavorites = [...nextFavorites, created]
-          changed = true
-          return null
-        })()
-        void ensured
+        }
+
+        nextFavorites.push(buildMealBuilderFavoriteFromEntry(entry))
+        changed = true
       }
 
-      mealBuilderBackfillSigRef.current = sig
       if (changed) {
-        setFavorites(nextFavorites)
-        persistFavorites(nextFavorites)
+        const repaired = repairAndDedupeFavorites(nextFavorites)
+        setFavorites(repaired.next)
+        persistFavorites(repaired.next)
       }
     } catch {
       // non-blocking
@@ -12954,7 +13074,8 @@ Please add nutritional information manually if needed.`);
                 [...list].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
               let data: any[] = []
               if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
-              if (favoritesActiveTab === 'favorites') data = sortList(favoriteMeals.filter(filterBySearch))
+              if (favoritesActiveTab === 'favorites')
+                data = sortList(favoriteMeals.filter((m: any) => !isCustomMealFavorite(m?.favorite)).filter(filterBySearch))
               if (favoritesActiveTab === 'custom') data = sortList(customMeals.filter(filterBySearch))
 
               const favoriteKeySet = new Set<string>()
