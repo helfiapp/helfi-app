@@ -68,6 +68,16 @@ const buildDefaultMealName = (names: string[]) => {
   return cleaned.length > 3 ? `${head}…` : head
 }
 
+const triggerHaptic = (duration = 10) => {
+  try {
+    if (typeof window === 'undefined') return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches
+    const pref = localStorage.getItem('hapticsEnabled')
+    const enabled = pref === null ? true : pref === 'true'
+    if (enabled && !reduced && 'vibrate' in navigator) (navigator as any).vibrate(duration)
+  } catch {}
+}
+
 export default function AddIngredientClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -169,6 +179,7 @@ export default function AddIngredientClient() {
   const addFromSearchResult = async (r: NormalizedFoodItem) => {
     if (!r) return
     setError(null)
+    triggerHaptic(10)
     setAddingId(`${r.source}:${r.id}`)
     try {
       const item = {
@@ -206,7 +217,16 @@ export default function AddIngredientClient() {
         createdAt: createdAtIso,
       }
 
-      await addFoodEntry(payload)
+      const created = await addFoodEntry(payload)
+      try {
+        const createdId = typeof created?.id === 'string' ? created.id : null
+        if (createdId) {
+          sessionStorage.setItem(
+            'foodDiary:scrollToEntry',
+            JSON.stringify({ dbId: createdId, localDate: selectedDate, category }),
+          )
+        }
+      } catch {}
       router.push('/food')
     } catch (e: any) {
       setError(e?.message || 'Could not add that ingredient. Please try again.')
@@ -218,6 +238,7 @@ export default function AddIngredientClient() {
   const addByPhoto = async (file: File) => {
     if (!file) return
     setError(null)
+    triggerHaptic(10)
     setPhotoLoading(true)
     try {
       const fd = new FormData()
@@ -267,7 +288,16 @@ export default function AddIngredientClient() {
         createdAt: createdAtIso,
       }
 
-      await addFoodEntry(payload)
+      const created = await addFoodEntry(payload)
+      try {
+        const createdId = typeof created?.id === 'string' ? created.id : null
+        if (createdId) {
+          sessionStorage.setItem(
+            'foodDiary:scrollToEntry',
+            JSON.stringify({ dbId: createdId, localDate: selectedDate, category }),
+          )
+        }
+      } catch {}
       router.push('/food')
     } catch (e: any) {
       setError(e?.message || 'Photo analysis failed. Please try again.')
@@ -444,4 +474,3 @@ export default function AddIngredientClient() {
     </div>
   )
 }
-

@@ -2778,6 +2778,7 @@ export default function FoodDiary() {
       return
     }
 
+    triggerHaptic(10)
     const next = [...analyzedItems, newItem]
     setAnalyzedItems(next)
     applyRecalculatedNutrition(next)
@@ -2805,6 +2806,23 @@ export default function FoodDiary() {
       setOfficialError(null)
       showQuickToast(`Added ${newItem.name}`)
     }
+
+    // Scroll to the newly added ingredient card so the user sees it immediately.
+    try {
+      if (typeof window !== 'undefined') {
+        const start = Date.now()
+        const tick = () => {
+          const cards = document.querySelectorAll('[data-analysis-ingredient-card=\"1\"]')
+          const last = cards && cards.length ? (cards[cards.length - 1] as HTMLElement) : null
+          if (last) {
+            last.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+          }
+          if (Date.now() - start < 1200) window.requestAnimationFrame(tick)
+        }
+        window.requestAnimationFrame(tick)
+      }
+    } catch {}
   }
 
   const handleOfficialSearch = async (mode: 'packaged' | 'single', queryOverride?: string) => {
@@ -5830,6 +5848,97 @@ Please add nutritional information manually if needed.`);
     setTimeout(() => setQuickToast(null), 1400)
   }
 
+  const pendingEntryScrollRef = useRef<{
+    startedAt: number
+    entryKey?: string | null
+    dbId?: string | null
+    category?: typeof MEAL_CATEGORY_ORDER[number] | null
+    expanded?: boolean
+  } | null>(null)
+  const pendingEntryScrollRafRef = useRef<number | null>(null)
+
+  const queueScrollToDiaryEntry = (opts: { entryKey?: any; dbId?: any; category?: any }) => {
+    if (typeof window === 'undefined') return
+    const entryKey = opts.entryKey !== null && opts.entryKey !== undefined ? String(opts.entryKey) : null
+    const dbId = opts.dbId !== null && opts.dbId !== undefined ? String(opts.dbId) : null
+    const category = normalizeCategory(opts.category)
+    pendingEntryScrollRef.current = { startedAt: Date.now(), entryKey, dbId, category, expanded: false }
+
+    try {
+      if (pendingEntryScrollRafRef.current) cancelAnimationFrame(pendingEntryScrollRafRef.current)
+    } catch {}
+    pendingEntryScrollRafRef.current = null
+
+    const tick = () => {
+      const pending = pendingEntryScrollRef.current
+      if (!pending) return
+      if (Date.now() - pending.startedAt > 8000) {
+        pendingEntryScrollRef.current = null
+        return
+      }
+
+      try {
+        if (!pending.expanded && pending.category) {
+          setExpandedCategories((prev) => ({ ...prev, [pending.category as any]: true }))
+          pending.expanded = true
+        }
+      } catch {}
+
+      const escape = (v: string) => {
+        try {
+          return (window as any).CSS?.escape ? (window as any).CSS.escape(v) : v.replace(/["\\]/g, '\\$&')
+        } catch {
+          return v.replace(/["\\]/g, '\\$&')
+        }
+      }
+
+      const selector = pending.dbId
+        ? `[data-food-entry-db-id="${escape(pending.dbId)}"]`
+        : pending.entryKey
+          ? `[data-food-entry-key="${escape(pending.entryKey)}"]`
+          : null
+
+      const el = selector ? (document.querySelector(selector) as HTMLElement | null) : null
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        try {
+          const prevOutline = el.style.outline
+          const prevOutlineOffset = el.style.outlineOffset
+          el.style.outline = '2px solid rgb(16, 185, 129)'
+          el.style.outlineOffset = '6px'
+          setTimeout(() => {
+            try {
+              el.style.outline = prevOutline
+              el.style.outlineOffset = prevOutlineOffset
+            } catch {}
+          }, 900)
+        } catch {}
+        pendingEntryScrollRef.current = null
+        try {
+          sessionStorage.removeItem('foodDiary:scrollToEntry')
+        } catch {}
+        return
+      }
+
+      pendingEntryScrollRafRef.current = requestAnimationFrame(tick)
+    }
+
+    pendingEntryScrollRafRef.current = requestAnimationFrame(tick)
+  }
+
+  useEffect(() => {
+    // If another page (e.g. /food/add-ingredient) added a meal, scroll to it when returning.
+    try {
+      const raw = sessionStorage.getItem('foodDiary:scrollToEntry')
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        queueScrollToDiaryEntry({ dbId: parsed.dbId, category: parsed.category })
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const showCameraSettingsHelp = () => {
     if (typeof window === 'undefined') return
     const ua = navigator.userAgent || ''
@@ -5934,7 +6043,9 @@ Please add nutritional information manually if needed.`);
       serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
     }))
 
-    const customMeals = favoriteMeals.filter((f) => !f.favorite?.sourceId && !f.favorite?.photo)
+    // Product request: newly saved meals should always be visible under the "Custom" tab.
+    // Treat Custom as "all saved favorites" (photos + source-linked entries included).
+    const customMeals = favoriteMeals
 
     return { allMeals, favoriteMeals, customMeals }
   }
@@ -6148,6 +6259,8 @@ Please add nutritional information manually if needed.`);
       ...prev,
       [category]: true,
     }))
+    triggerHaptic(10)
+    queueScrollToDiaryEntry({ entryKey: entry.id, category })
     try {
       await saveFoodEntries(updated)
       await refreshEntriesFromServer()
@@ -6544,6 +6657,7 @@ Please add nutritional information manually if needed.`);
       })
     }
     setExpandedCategories((prev) => ({ ...prev, [category]: true }))
+    queueScrollToDiaryEntry({ entryKey: newEntry.id, category })
     try {
       await saveFoodEntries(updated)
       await refreshEntriesFromServer()
@@ -6655,6 +6769,7 @@ Please add nutritional information manually if needed.`);
     const updatedFoods = dedupeEntries([entry, ...todaysFoods], { fallbackDate: selectedDate })
     setTodaysFoods(updatedFoods)
     triggerHaptic(10)
+    queueScrollToDiaryEntry({ entryKey: entry.id, category })
     setShowFavoritesPicker(false)
     setShowPhotoOptions(false)
     setShowAddFood(false)
@@ -9900,6 +10015,7 @@ Please add nutritional information manually if needed.`);
                         return (
                           <div
                             key={index}
+                            data-analysis-ingredient-card="1"
                             className={`bg-white rounded-xl border border-gray-200 shadow-sm ${cardPaddingClass}`}
                           >
                             {/* Header row with basic info and actions */}
@@ -11612,7 +11728,12 @@ Please add nutritional information manually if needed.`);
                         : `relative bg-white border border-gray-200 rounded-none shadow-none transition-transform duration-150 ease-out w-full overflow-visible ${isDesktopMenuOpen ? 'z-30' : 'z-10'}`
 
                       return (
-                        <div key={food.id} className="relative w-full overflow-visible">
+                        <div
+                          key={food.id}
+                          data-food-entry-key={entryKey}
+                          data-food-entry-db-id={(food as any)?.dbId || (typeof (food as any)?.id === 'string' ? (food as any).id : '')}
+                          className="relative w-full overflow-visible"
+                        >
                           {isMobile && (
                             <div className="absolute inset-0 flex items-stretch pointer-events-none">
                               <div className="flex items-center">

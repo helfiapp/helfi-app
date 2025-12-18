@@ -88,6 +88,16 @@ const toNumber = (v: any): number | null => {
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
+const triggerHaptic = (duration = 10) => {
+  try {
+    if (typeof window === 'undefined') return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches
+    const pref = localStorage.getItem('hapticsEnabled')
+    const enabled = pref === null ? true : pref === 'true'
+    if (enabled && !reduced && 'vibrate' in navigator) (navigator as any).vibrate(duration)
+  } catch {}
+}
+
 const parseServingBase = (servingSize: any): { amount: number | null; unit: BuilderUnit | null } => {
   const raw = String(servingSize || '').trim()
   if (!raw) return { amount: null, unit: null }
@@ -230,6 +240,28 @@ export default function MealBuilderClient() {
   const addBuilderItem = (next: BuilderItem) => {
     setItems((prev) => [...prev, next])
     setExpandedId(next.id)
+    try {
+      if (typeof window !== 'undefined') {
+        const id = String(next.id || '')
+        const start = Date.now()
+        const escape = (v: string) => {
+          try {
+            return (window as any).CSS?.escape ? (window as any).CSS.escape(v) : v.replace(/["\\]/g, '\\$&')
+          } catch {
+            return v.replace(/["\\]/g, '\\$&')
+          }
+        }
+        const tick = () => {
+          const el = document.querySelector(`[data-builder-item-id="${escape(id)}"]`) as HTMLElement | null
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+          }
+          if (Date.now() - start < 1500) window.requestAnimationFrame(tick)
+        }
+        window.requestAnimationFrame(tick)
+      }
+    } catch {}
   }
 
   const runSearch = async () => {
@@ -277,6 +309,7 @@ export default function MealBuilderClient() {
   }
 
   const addItem = (r: NormalizedFoodItem) => {
+    triggerHaptic(10)
     const base = parseServingBase(r?.serving_size)
     const baseAmount = base.amount
     const baseUnit = base.unit
@@ -513,7 +546,9 @@ export default function MealBuilderClient() {
       serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
     }))
 
-    const customMeals = favoriteMeals.filter((f: any) => !f.favorite?.sourceId && !f.favorite?.photo)
+    // Product request: newly saved meals should always be visible under the "Custom" tab.
+    // Treat Custom as "all saved favorites" (photos + source-linked entries included).
+    const customMeals = favoriteMeals
 
     return { allMeals, favoriteMeals, customMeals }
   }
@@ -1305,7 +1340,11 @@ export default function MealBuilderClient() {
                 const baseUnits = allowedUnitsForBase(it.__baseUnit)
                 const totals = computeItemTotals(it)
                 return (
-                  <div key={it.id} className="rounded-2xl border border-gray-200 overflow-hidden">
+                  <div
+                    key={it.id}
+                    data-builder-item-id={it.id}
+                    className="rounded-2xl border border-gray-200 overflow-hidden"
+                  >
                     <button
                       type="button"
                       onClick={() => setExpandedId(expanded ? null : it.id)}
@@ -1448,4 +1487,3 @@ export default function MealBuilderClient() {
     </div>
   )
 }
-
