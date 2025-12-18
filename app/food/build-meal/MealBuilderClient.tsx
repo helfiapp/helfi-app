@@ -532,12 +532,45 @@ export default function MealBuilderClient() {
     return normalizeMealLabel(raw)
   }
 
+  const looksLikeMealBuilderItemId = (rawId: any) => {
+    const id = typeof rawId === 'string' ? rawId : ''
+    if (!id) return false
+    return /^(openfoodfacts|usda|fatsecret|ai):/i.test(id)
+  }
+
+  const isLegacyMealBuilderFavorite = (fav: any) => {
+    if (!fav) return false
+    const items = parseFavoriteItems(fav)
+    if (!items || items.length === 0) return false
+    return items.some((it: any) => looksLikeMealBuilderItemId(it?.id))
+  }
+
   const isCustomMealFavorite = (fav: any) => {
     if (!fav) return false
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
+    if (isLegacyMealBuilderFavorite(fav)) return true
     return false
+  }
+
+  const migrateFavoritesForCustomMeals = (list: any[]) => {
+    let changed = false
+    const next = (Array.isArray(list) ? list : []).map((fav: any) => {
+      if (!fav || typeof fav !== 'object') return fav
+      if ((fav as any)?.customMeal === true) return fav
+      const method = String((fav as any)?.method || '').toLowerCase()
+      if (method === 'meal-builder' || method === 'combined') {
+        changed = true
+        return { ...(fav as any), customMeal: true }
+      }
+      if (isLegacyMealBuilderFavorite(fav)) {
+        changed = true
+        return { ...(fav as any), customMeal: true, method: 'meal-builder' }
+      }
+      return fav
+    })
+    return { next, changed }
   }
 
   const buildSourceTag = (entry: any) => {
@@ -679,6 +712,15 @@ export default function MealBuilderClient() {
       }).catch(() => {})
     } catch {}
   }
+
+  useEffect(() => {
+    const raw = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : null
+    if (!raw) return
+    const migrated = migrateFavoritesForCustomMeals(raw)
+    if (!migrated.changed) return
+    persistFavorites(migrated.next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userData?.favorites])
 
   const saveToFavorites = (entryLike: any) => {
     const source = entryLike

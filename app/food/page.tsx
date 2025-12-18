@@ -2352,7 +2352,13 @@ export default function FoodDiary() {
   useEffect(() => {
     try {
       if (Array.isArray((userData as any)?.favorites)) {
-        setFavorites((userData as any).favorites)
+        const raw = (userData as any).favorites as any[]
+        const migrated = migrateFavoritesForCustomMeals(raw)
+        setFavorites(migrated.next)
+        if (migrated.changed) {
+          // Persist backfill so Custom tab and edit routing work reliably on future loads.
+          persistFavorites(migrated.next)
+        }
         return
       }
       if (typeof window !== 'undefined') {
@@ -2360,13 +2366,16 @@ export default function FoodDiary() {
         if (cached) {
           const parsed = JSON.parse(cached)
           if (Array.isArray(parsed)) {
-            setFavorites(parsed)
+            const migrated = migrateFavoritesForCustomMeals(parsed)
+            setFavorites(migrated.next)
+            if (migrated.changed) persistFavorites(migrated.next)
           }
         }
       }
     } catch (error) {
       console.warn('Could not load favorites', error)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData?.favorites])
 
   useEffect(() => {
@@ -5959,12 +5968,62 @@ Please add nutritional information manually if needed.`);
     return normalizeMealLabel(raw)
   }
 
+  const parseFavoriteItems = (fav: any): any[] | null => {
+    const candidate = fav?.items
+    if (Array.isArray(candidate)) return candidate
+    if (typeof candidate === 'string') {
+      try {
+        const parsed = JSON.parse(candidate)
+        return Array.isArray(parsed) ? parsed : null
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+
+  const looksLikeMealBuilderItemId = (rawId: any) => {
+    const id = typeof rawId === 'string' ? rawId : ''
+    if (!id) return false
+    return /^(openfoodfacts|usda|fatsecret|ai):/i.test(id)
+  }
+
+  // Backfill helper: legacy Build-a-meal favorites were saved as method "text".
+  // Builder ingredients emit stable `id` prefixes (openfoodfacts/usda/fatsecret/ai) that
+  // normal analyzer meals and single-ingredient favorites do not.
+  const isLegacyMealBuilderFavorite = (fav: any) => {
+    if (!fav) return false
+    const items = parseFavoriteItems(fav)
+    if (!items || items.length === 0) return false
+    return items.some((it: any) => looksLikeMealBuilderItemId(it?.id))
+  }
+
   const isCustomMealFavorite = (fav: any) => {
     if (!fav) return false
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
+    if (isLegacyMealBuilderFavorite(fav)) return true
     return false
+  }
+
+  const migrateFavoritesForCustomMeals = (list: any[]) => {
+    let changed = false
+    const next = (Array.isArray(list) ? list : []).map((fav: any) => {
+      if (!fav || typeof fav !== 'object') return fav
+      if ((fav as any)?.customMeal === true) return fav
+      const method = String((fav as any)?.method || '').toLowerCase()
+      if (method === 'meal-builder' || method === 'combined') {
+        changed = true
+        return { ...(fav as any), customMeal: true }
+      }
+      if (isLegacyMealBuilderFavorite(fav)) {
+        changed = true
+        return { ...(fav as any), customMeal: true, method: 'meal-builder' }
+      }
+      return fav
+    })
+    return { next, changed }
   }
 
   const buildSourceTag = (entry: any) => {
@@ -6697,16 +6756,20 @@ Please add nutritional information manually if needed.`);
       source.items && Array.isArray(source.items) && source.items.length > 0
         ? JSON.parse(JSON.stringify(source.items))
         : null
+    const sourceMethod = String(source?.method || 'text').toLowerCase()
+    const inferredCustomMeal = sourceMethod === 'combined' || sourceMethod === 'meal-builder' || isLegacyMealBuilderFavorite(source)
     const favoritePayload = {
       id: `fav-${Date.now()}`,
-      sourceId: (source as any)?.id || (source as any)?.dbId || null,
+      // Prefer the real DB id when present; mapped history entries use `id` as a timestamp UI key.
+      sourceId: (source as any)?.dbId || (source as any)?.id || null,
       label: cleanLabel || 'Favorite meal',
       description: source.description || cleanLabel || 'Favorite meal',
       nutrition: source.nutrition || source.total || null,
       total: source.total || source.nutrition || null,
       items: clonedItems,
       photo: source.photo || null,
-      method: source.method || 'text',
+      method: inferredCustomMeal && sourceMethod === 'text' ? 'meal-builder' : (source.method || 'text'),
+      ...(inferredCustomMeal ? { customMeal: true } : {}),
       meal: normalizeCategory(source.meal || source.category || source.mealType),
       createdAt: Date.now(),
     }
