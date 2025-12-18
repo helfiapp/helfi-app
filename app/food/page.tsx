@@ -12734,6 +12734,7 @@ Please add nutritional information manually if needed.`);
                     const favoriteId =
                       item?.favorite?.id || (typeof item?.id === 'string' && item.id.startsWith('fav-') ? item.id : null)
                     const canDeleteFavorite = Boolean(favoriteId && item.favorite)
+                    const canEditFavorite = Boolean(favoriteId && item.favorite)
                     const key = normalizeMealLabel(item?.label || '').toLowerCase()
                     const isSaved = Boolean(item.favorite) || (key ? favoriteKeySet.has(key) : false)
                     const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item.entry)
@@ -12799,6 +12800,38 @@ Please add nutritional information manually if needed.`);
                                 strokeWidth={2}
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                               />
+                            </svg>
+                          </button>
+                        )}
+                        {canEditFavorite && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              try {
+                                const fav = item.favorite
+                                const favId = String(favoriteId)
+                                const favCategory =
+                                  (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
+                                setShowFavoritesPicker(false)
+                                router.push(
+                                  `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
+                                    favCategory,
+                                  )}&editFavoriteId=${encodeURIComponent(favId)}`,
+                                )
+                              } catch {}
+                            }}
+                            className="px-3 flex items-center justify-center hover:bg-gray-50 text-gray-700"
+                            title="Edit meal"
+                            aria-label="Edit meal"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z"
+                              />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20h9" />
                             </svg>
                           </button>
                         )}

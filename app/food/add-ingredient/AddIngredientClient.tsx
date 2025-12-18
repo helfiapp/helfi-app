@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import UsageMeter from '@/components/UsageMeter'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 type SearchKind = 'packaged' | 'single'
@@ -92,10 +93,19 @@ export default function AddIngredientClient() {
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<NormalizedFoodItem[]>([])
   const [photoLoading, setPhotoLoading] = useState(false)
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
   const seqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    return () => {
+      try {
+        if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+      } catch {}
+    }
+  }, [photoPreviewUrl])
 
   useEffect(() => {
     // Keep /food on the same date when the user returns.
@@ -241,6 +251,14 @@ export default function AddIngredientClient() {
     triggerHaptic(10)
     setPhotoLoading(true)
     try {
+      try {
+        if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+      } catch {}
+      try {
+        setPhotoPreviewUrl(URL.createObjectURL(file))
+      } catch {}
+    } catch {}
+    try {
       const fd = new FormData()
       fd.append('image', file)
       fd.append('analysisMode', 'meal')
@@ -297,6 +315,9 @@ export default function AddIngredientClient() {
             JSON.stringify({ dbId: createdId, localDate: selectedDate, category }),
           )
         }
+      } catch {}
+      try {
+        window.dispatchEvent(new Event('credits:refresh'))
       } catch {}
       router.push('/food')
     } catch (e: any) {
@@ -435,6 +456,17 @@ export default function AddIngredientClient() {
           <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-2">
             <div className="text-sm font-semibold text-gray-900">Or use AI photo analysis</div>
             <div className="text-sm text-gray-600">Take a clear photo of the food or package.</div>
+
+            <div>
+              <UsageMeter inline={true} />
+            </div>
+
+            {photoPreviewUrl && (
+              <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoPreviewUrl} alt="Selected food photo" className="w-full max-h-64 object-cover" />
+              </div>
+            )}
 
             <div className="flex gap-2">
               <button

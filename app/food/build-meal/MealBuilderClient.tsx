@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import UsageMeter from '@/components/UsageMeter'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 
@@ -171,6 +172,7 @@ export default function MealBuilderClient() {
 
   const initialDate = searchParams.get('date') || buildTodayIso()
   const initialCategory = normalizeCategory(searchParams.get('category'))
+  const editFavoriteId = (searchParams.get('editFavoriteId') || '').trim()
 
   const [selectedDate] = useState<string>(initialDate)
   const [category] = useState<MealCategory>(initialCategory)
@@ -185,6 +187,9 @@ export default function MealBuilderClient() {
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<NormalizedFoodItem[]>([])
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
+  const [loadedFavoriteId, setLoadedFavoriteId] = useState<string | null>(null)
+  const [favoriteSaving, setFavoriteSaving] = useState(false)
 
   const [items, setItems] = useState<BuilderItem[]>([])
   const itemsRef = useRef<BuilderItem[]>([])
@@ -212,6 +217,85 @@ export default function MealBuilderClient() {
   useEffect(() => {
     itemsRef.current = items
   }, [items])
+
+  useEffect(() => {
+    // Cleanup blob preview URLs.
+    return () => {
+      try {
+        if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+      } catch {}
+    }
+  }, [photoPreviewUrl])
+
+  const parseFavoriteItems = (fav: any): any[] | null => {
+    const candidate = fav?.items
+    if (Array.isArray(candidate)) return candidate
+    if (typeof candidate === 'string') {
+      try {
+        const parsed = JSON.parse(candidate)
+        return Array.isArray(parsed) ? parsed : null
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+
+  const convertToBuilderItems = (rawItems: any[]): BuilderItem[] => {
+    const next: BuilderItem[] = []
+    for (const raw of Array.isArray(rawItems) ? rawItems : []) {
+      const name = String(raw?.name || raw?.food || 'Food').trim() || 'Food'
+      const brand = raw?.brand ?? null
+      const serving_size = raw?.serving_size || raw?.servingSize || raw?.serving || ''
+      const servings = toNumber(raw?.servings) ?? 1
+      const base = parseServingBase(serving_size)
+      const baseAmount = base.amount
+      const baseUnit = base.unit
+      const id = `edit:${Date.now()}:${Math.random().toString(16).slice(2)}`
+      const resolvedServings = Number.isFinite(servings) && servings > 0 ? servings : 1
+      next.push({
+        id,
+        name,
+        brand,
+        serving_size: serving_size || null,
+        calories: toNumber(raw?.calories),
+        protein_g: toNumber(raw?.protein_g),
+        carbs_g: toNumber(raw?.carbs_g),
+        fat_g: toNumber(raw?.fat_g),
+        fiber_g: toNumber(raw?.fiber_g),
+        sugar_g: toNumber(raw?.sugar_g),
+        servings: resolvedServings,
+        __baseAmount: baseAmount,
+        __baseUnit: baseUnit,
+        __amount: baseAmount && baseUnit ? round3(baseAmount * resolvedServings) : round3(resolvedServings),
+        __amountInput: String(baseAmount && baseUnit ? round3(baseAmount * resolvedServings) : round3(resolvedServings)),
+        __unit: baseUnit,
+      })
+    }
+    return next
+  }
+
+  useEffect(() => {
+    // Editing mode: load a favorite meal into the builder for edits.
+    if (!editFavoriteId) return
+    if (loadedFavoriteId === editFavoriteId) return
+    const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+    const fav = favorites.find((f: any) => String(f?.id || '') === editFavoriteId) || null
+    if (!fav) return
+
+    const label = normalizeMealLabel(fav?.label || fav?.description || '').trim()
+    if (label) setMealName(label)
+
+    const favItems = parseFavoriteItems(fav)
+    if (favItems && favItems.length > 0) {
+      const converted = convertToBuilderItems(favItems)
+      setItems(converted)
+      setExpandedId(converted[0]?.id || null)
+    }
+
+    setLoadedFavoriteId(editFavoriteId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editFavoriteId, loadedFavoriteId, userData?.favorites])
 
   useEffect(() => {
     // Keep /food on the same date when the user returns.
@@ -613,11 +697,37 @@ export default function MealBuilderClient() {
     setTimeout(() => setFavoritesToast(null), 1400)
   }
 
+  const deleteFavorite = (id: string) => {
+    const favId = String(id || '').trim()
+    if (!favId) return
+    const prev = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+    const next = prev.filter((f: any) => String(f?.id || '') !== favId)
+    persistFavorites(next)
+    setFavoritesToast('Removed')
+    setTimeout(() => setFavoritesToast(null), 1400)
+  }
+
+  const openEditFavorite = (fav: any) => {
+    const id = String(fav?.id || '').trim()
+    if (!id) return
+    const favCategory = normalizeCategory(fav?.meal || fav?.category || category)
+    router.push(
+      `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(favCategory)}&editFavoriteId=${encodeURIComponent(id)}`,
+    )
+  }
+
   const analyzePhotoAndAdd = async (file: File) => {
     if (!file) return
     setError(null)
     setPhotoLoading(true)
     try {
+      triggerHaptic(10)
+      try {
+        if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+      } catch {}
+      try {
+        setPhotoPreviewUrl(URL.createObjectURL(file))
+      } catch {}
       const fd = new FormData()
       fd.append('image', file)
       // Use the existing Food image analyzer. This can return multiple ingredients.
@@ -640,6 +750,9 @@ export default function MealBuilderClient() {
         return
       }
       addItemsFromAi(detected)
+      try {
+        window.dispatchEvent(new Event('credits:refresh'))
+      } catch {}
     } catch {
       setError('Photo analysis failed. Please try again.')
     } finally {
@@ -901,20 +1014,116 @@ export default function MealBuilderClient() {
 
     setSavingMeal(true)
     try {
+      if (editFavoriteId) {
+        setFavoriteSaving(true)
+        const prev = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+        const existing = prev.find((f: any) => String(f?.id || '') === editFavoriteId) || null
+        if (!existing) {
+          setError('Could not find that saved meal to edit. Please reopen from Favorites → Custom.')
+          return
+        }
+
+        const updatedFavorite = {
+          ...existing,
+          label: title,
+          description,
+          nutrition: payload.nutrition,
+          total: payload.nutrition,
+          items: cleanedItems,
+          method: existing?.method || 'text',
+          meal: existing?.meal || category,
+          createdAt: existing?.createdAt || Date.now(),
+        }
+        const nextFavorites = prev.map((f: any) => (String(f?.id || '') === editFavoriteId ? updatedFavorite : f))
+        persistFavorites(nextFavorites)
+
+        // If this favorite is linked to a saved diary entry, update it too.
+        const linkedId = existing?.sourceId ? String(existing.sourceId) : ''
+        if (linkedId) {
+          try {
+            await fetch('/api/food-log', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: linkedId,
+                description,
+                nutrition: payload.nutrition,
+                items: cleanedItems,
+                meal: existing?.meal || category,
+                category: existing?.meal || category,
+              }),
+            })
+          } catch {}
+          try {
+            sessionStorage.setItem(
+              'foodDiary:scrollToEntry',
+              JSON.stringify({ dbId: linkedId, localDate: selectedDate, category: existing?.meal || category }),
+            )
+          } catch {}
+        }
+
+        router.push('/food')
+        return
+      }
+
       const res = await fetch('/api/food-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
+      const data = await res.json().catch(() => ({} as any))
       if (!res.ok) {
         setError('Saving failed. Please try again.')
         return
       }
-      // Go back to Food Diary. It will refresh and show the new meal.
+
+      // Auto-save newly created meals into Favorites so they appear under Favorites → Custom.
+      try {
+        const createdId = typeof data?.id === 'string' ? data.id : null
+        const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+        const favoritePayload = {
+          id: `fav-${Date.now()}`,
+          sourceId: createdId,
+          label: title,
+          description,
+          nutrition: payload.nutrition,
+          total: payload.nutrition,
+          items: cleanedItems,
+          photo: null,
+          method: 'text',
+          meal: category,
+          createdAt: Date.now(),
+        }
+        const existingIndex = favorites.findIndex(
+          (fav: any) =>
+            (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
+            (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
+        )
+        const nextFavorites =
+          existingIndex >= 0
+            ? favorites.map((fav: any, idx: number) =>
+                idx === existingIndex ? { ...favoritePayload, id: fav.id || favoritePayload.id } : fav,
+              )
+            : [...favorites, favoritePayload]
+        persistFavorites(nextFavorites)
+      } catch {}
+
+      // Scroll to the saved meal when returning to the diary.
+      try {
+        const createdId = typeof data?.id === 'string' ? data.id : null
+        if (createdId) {
+          sessionStorage.setItem(
+            'foodDiary:scrollToEntry',
+            JSON.stringify({ dbId: createdId, localDate: selectedDate, category }),
+          )
+        }
+      } catch {}
+
       router.push('/food')
     } catch {
       setError('Saving failed. Please try again.')
     } finally {
+      setFavoriteSaving(false)
       setSavingMeal(false)
     }
   }
@@ -932,19 +1141,24 @@ export default function MealBuilderClient() {
             <span aria-hidden>←</span>
           </button>
           <div className="flex-1 min-w-0">
-            <div className="text-lg font-semibold text-gray-900 truncate">Build a meal</div>
+            <div className="text-lg font-semibold text-gray-900 truncate">{editFavoriteId ? 'Edit meal' : 'Build a meal'}</div>
             <div className="text-xs text-gray-500">
               {CATEGORY_LABELS[category]} • {selectedDate}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={createMeal}
-            disabled={busy}
-            className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
-          >
-            Save meal
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={createMeal}
+              disabled={busy || favoriteSaving}
+              className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
+            >
+              {editFavoriteId ? (favoriteSaving ? 'Saving…' : 'Save changes') : 'Save meal'}
+            </button>
+            <div className="text-[11px] text-gray-500 text-right max-w-[240px]">
+              Find this later in <span className="font-semibold">Food Diary → {CATEGORY_LABELS[category]}</span> (tap to edit) and <span className="font-semibold">Favorites → Custom</span>.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1058,6 +1272,8 @@ export default function MealBuilderClient() {
                         const key = normalizeMealLabel(label).toLowerCase()
                         const isSaved = Boolean(item?.favorite) || (key ? favoritesKeySet.has(key) : false)
                         const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item?.entry)
+                        const favorite = item?.favorite || null
+                        const favoriteId = favorite?.id ? String(favorite.id) : null
                         return (
                           <div
                             key={String(item?.id || idx)}
@@ -1106,6 +1322,37 @@ export default function MealBuilderClient() {
                                     Save
                                   </button>
                                 )}
+                              </div>
+                            )}
+
+                            {favoritesActiveTab !== 'all' && favoriteId && (
+                              <div className="flex items-center pr-2 gap-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    openEditFavorite(favorite)
+                                  }}
+                                  className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                                  title="Edit meal"
+                                  aria-label="Edit meal"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    deleteFavorite(favoriteId)
+                                  }}
+                                  className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-red-700 hover:bg-red-50"
+                                  title="Delete meal"
+                                  aria-label="Delete meal"
+                                >
+                                  Delete
+                                </button>
                               </div>
                             )}
                           </div>
@@ -1246,7 +1493,10 @@ export default function MealBuilderClient() {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => photoInputRef.current?.click()}
+                onClick={() => {
+                  triggerHaptic(10)
+                  photoInputRef.current?.click()
+                }}
                 className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
               >
                 {photoLoading ? 'Adding photo…' : 'Add by photo'}
@@ -1283,6 +1533,44 @@ export default function MealBuilderClient() {
               }}
             />
           </div>
+
+          <UsageMeter inline className="mt-1" />
+
+          {photoPreviewUrl && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+              <div className="relative w-full max-w-sm mx-auto">
+                {photoLoading && (
+                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                    <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin" />
+                  </div>
+                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photoPreviewUrl}
+                  alt="Analyzed food"
+                  className="w-full aspect-square object-cover"
+                />
+              </div>
+              <div className="px-3 py-2 text-xs text-gray-600 flex items-center justify-between gap-2">
+                <span>{photoLoading ? 'Analyzing photo…' : 'Photo added'}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+                    } catch {}
+                    setPhotoPreviewUrl(null)
+                    try {
+                      if (photoInputRef.current) photoInputRef.current.value = ''
+                    } catch {}
+                  }}
+                  className="text-xs font-semibold text-gray-700 hover:text-gray-900"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && <div className="text-xs text-red-600">{error}</div>}
           {(searchLoading || savingMeal || photoLoading || barcodeLoading) && (
