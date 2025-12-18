@@ -6247,6 +6247,13 @@ Please add nutritional information manually if needed.`);
       }
     }
     const normalizeKey = (raw: any) => normalizeMealLabel(raw || '').toLowerCase()
+    const simplifyKey = (raw: any) => {
+      const s = normalizeMealLabel(raw || '').trim()
+      if (!s) return ''
+      const withoutQty = s.replace(/^\s*\d+(?:\.\d+)?\s*(?:×|x)?\s*/i, '').trim()
+      const head = (withoutQty.split(',')[0] || withoutQty).split('(')[0] || withoutQty
+      return normalizeMealLabel(head).toLowerCase()
+    }
 
     // Allow "All" to treat renamed favorites as the same item, without rewriting history.
     const favoriteIdByAlias = new Map<string, string>()
@@ -6255,10 +6262,14 @@ Please add nutritional information manually if needed.`);
       if (!favId) return
       const labelKey = normalizeKey(fav?.label || fav?.description || '')
       if (labelKey) favoriteIdByAlias.set(labelKey, favId)
+      const labelSimple = simplifyKey(fav?.label || fav?.description || '')
+      if (labelSimple) favoriteIdByAlias.set(labelSimple, favId)
       const aliases = Array.isArray((fav as any)?.aliases) ? (fav as any).aliases : []
       for (const a of Array.isArray(aliases) ? aliases : []) {
         const k = normalizeKey(a)
         if (k) favoriteIdByAlias.set(k, favId)
+        const ks = simplifyKey(a)
+        if (ks) favoriteIdByAlias.set(ks, favId)
       }
     })
 
@@ -6267,7 +6278,10 @@ Please add nutritional information manually if needed.`);
       if (linkedId) return `fav:${linkedId}`
       const label = normalizeKey(entry?.description || entry?.label || '')
       const aliasHit = label ? favoriteIdByAlias.get(label) : ''
-      if (aliasHit) return `fav:${aliasHit}`
+      const labelSimple = simplifyKey(entry?.description || entry?.label || '')
+      const aliasHitSimple = labelSimple ? favoriteIdByAlias.get(labelSimple) : ''
+      const hit = aliasHit || aliasHitSimple
+      if (hit) return `fav:${hit}`
       return label ? `label:${label}` : ''
     }
     history.forEach((entry) => {
@@ -6310,7 +6324,12 @@ Please add nutritional information manually if needed.`);
         // If this entry matches a renamed favorite alias, show the latest favorite label.
         try {
           const labelKey = normalizeKey(entry?.description || entry?.label || '')
-          const aliasId = labelKey ? favoriteIdByAlias.get(labelKey) : ''
+          const aliasId =
+            (labelKey ? favoriteIdByAlias.get(labelKey) : '') ||
+            (() => {
+              const s = simplifyKey(entry?.description || entry?.label || '')
+              return s ? favoriteIdByAlias.get(s) : ''
+            })()
           if (aliasId && favoritesById.has(aliasId)) {
             const fav = favoritesById.get(aliasId)
             return favoriteDisplayLabel(fav) || normalizeMealLabel(entry?.description || entry?.label || 'Meal')
@@ -6328,7 +6347,12 @@ Please add nutritional information manually if needed.`);
               if (linkedId && favoritesById.has(linkedId)) return favoritesById.get(linkedId)
               try {
                 const labelKey = normalizeKey(entry?.description || entry?.label || '')
-                const aliasId = labelKey ? favoriteIdByAlias.get(labelKey) : ''
+                const aliasId =
+                  (labelKey ? favoriteIdByAlias.get(labelKey) : '') ||
+                  (() => {
+                    const s = simplifyKey(entry?.description || entry?.label || '')
+                    return s ? favoriteIdByAlias.get(s) : ''
+                  })()
                 if (aliasId && favoritesById.has(aliasId)) return favoritesById.get(aliasId)
               } catch {}
               return favoritesByKey.get(normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()) || null
