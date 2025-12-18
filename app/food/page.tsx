@@ -6224,8 +6224,30 @@ Please add nutritional information manually if needed.`);
   const buildFavoritesDatasets = () => {
     const history = collectHistoryMeals()
     const allByKey = new Map<string, any>()
+    const linkedFavoriteIdForEntry = (entry: any) => {
+      try {
+        const fromNutrition =
+          entry?.nutrition && typeof entry.nutrition === 'object' && typeof (entry.nutrition as any).__favoriteId === 'string'
+            ? String((entry.nutrition as any).__favoriteId).trim()
+            : ''
+        if (fromNutrition) return fromNutrition
+        const fromTotal =
+          entry?.total && typeof entry.total === 'object' && typeof (entry.total as any).__favoriteId === 'string'
+            ? String((entry.total as any).__favoriteId).trim()
+            : ''
+        return fromTotal
+      } catch {
+        return ''
+      }
+    }
+    const entryKey = (entry: any) => {
+      const linkedId = linkedFavoriteIdForEntry(entry)
+      if (linkedId) return `fav:${linkedId}`
+      const label = normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()
+      return label ? `label:${label}` : ''
+    }
     history.forEach((entry) => {
-      const key = normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()
+      const key = entryKey(entry)
       if (!key) return
       const existing = allByKey.get(key)
       const created = Number(entry?.createdAt ? new Date(entry.createdAt).getTime() : entry?.id || 0)
@@ -6246,25 +6268,30 @@ Please add nutritional information manually if needed.`);
       if (fav?.id) favoritesById.set(String(fav.id), fav)
       // If something is a Favorite, it should still be selectable from "All".
       // Prefer the explicit favorite payload when no history entry exists.
-      if (!allByKey.has(key)) {
-        allByKey.set(key, { ...fav, sourceTag: 'Favorite' })
+      const favId = fav?.id ? String(fav.id).trim() : ''
+      const allKey = favId ? `fav:${favId}` : `label:${key}`
+      if (allKey && !allByKey.has(allKey)) {
+        allByKey.set(allKey, { ...fav, sourceTag: 'Favorite' })
       }
     })
 
     const allMeals = Array.from(allByKey.values()).map((entry) => ({
       id: entry?.id || `all-${Math.random()}`,
-      label: normalizeMealLabel(entry?.description || entry?.label || 'Meal'),
+      label: (() => {
+        const linkedId = linkedFavoriteIdForEntry(entry)
+        if (linkedId && favoritesById.has(linkedId)) {
+          const fav = favoritesById.get(linkedId)
+          return favoriteDisplayLabel(fav) || normalizeMealLabel(entry?.description || entry?.label || 'Meal')
+        }
+        return normalizeMealLabel(entry?.description || entry?.label || 'Meal')
+      })(),
       entry,
       favorite:
         (entry as any)?.sourceTag === 'Favorite'
           ? entry
           : (() => {
               const linkedId =
-                entry?.nutrition && typeof entry.nutrition === 'object' && typeof (entry.nutrition as any).__favoriteId === 'string'
-                  ? String((entry.nutrition as any).__favoriteId).trim()
-                  : entry?.total && typeof entry.total === 'object' && typeof (entry.total as any).__favoriteId === 'string'
-                  ? String((entry.total as any).__favoriteId).trim()
-                  : ''
+                linkedFavoriteIdForEntry(entry) || ''
               if (linkedId && favoritesById.has(linkedId)) return favoritesById.get(linkedId)
               return favoritesByKey.get(normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()) || null
             })(),
