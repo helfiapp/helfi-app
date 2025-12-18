@@ -179,8 +179,14 @@ export default function MealBuilderClient() {
   const [category] = useState<MealCategory>(initialCategory)
 
   const [mealName, setMealName] = useState('')
+  const mealNameBackupRef = useRef<string>('')
+  const mealNameEditedRef = useRef(false)
+  const mealNameWasClearedOnFocusRef = useRef(false)
 
   const [query, setQuery] = useState('')
+  const queryBackupRef = useRef<string>('')
+  const queryEditedRef = useRef(false)
+  const queryWasClearedOnFocusRef = useRef(false)
   const [kind, setKind] = useState<'packaged' | 'single'>('packaged')
   const [searchLoading, setSearchLoading] = useState(false)
   const [savingMeal, setSavingMeal] = useState(false)
@@ -206,6 +212,9 @@ export default function MealBuilderClient() {
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const [barcodeStatusHint, setBarcodeStatusHint] = useState<string>('Ready')
   const [manualBarcode, setManualBarcode] = useState('')
+  const manualBarcodeBackupRef = useRef<string>('')
+  const manualBarcodeEditedRef = useRef(false)
+  const manualBarcodeWasClearedOnFocusRef = useRef(false)
   const barcodeScannerRef = useRef<any>(null)
 
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
@@ -1421,7 +1430,23 @@ export default function MealBuilderClient() {
                   <div className="flex gap-2">
                     <input
                       value={manualBarcode}
-                      onChange={(e) => setManualBarcode(e.target.value)}
+                      onFocus={() => {
+                        manualBarcodeBackupRef.current = manualBarcode
+                        manualBarcodeEditedRef.current = false
+                        manualBarcodeWasClearedOnFocusRef.current = manualBarcode.trim().length > 0
+                        if (manualBarcodeWasClearedOnFocusRef.current) setManualBarcode('')
+                      }}
+                      onChange={(e) => {
+                        manualBarcodeEditedRef.current = true
+                        setManualBarcode(e.target.value)
+                      }}
+                      onBlur={() => {
+                        if (manualBarcodeWasClearedOnFocusRef.current && !manualBarcodeEditedRef.current) {
+                          setManualBarcode(manualBarcodeBackupRef.current)
+                        }
+                        manualBarcodeWasClearedOnFocusRef.current = false
+                        manualBarcodeEditedRef.current = false
+                      }}
                       placeholder="Enter barcode"
                       className="flex-1 px-3 py-2 rounded-lg bg-white text-gray-900 text-sm"
                     />
@@ -1463,7 +1488,23 @@ export default function MealBuilderClient() {
           <div className="text-sm font-semibold text-gray-900">Meal name (optional)</div>
           <input
             value={mealName}
-            onChange={(e) => setMealName(e.target.value)}
+            onFocus={() => {
+              mealNameBackupRef.current = mealName
+              mealNameEditedRef.current = false
+              mealNameWasClearedOnFocusRef.current = mealName.trim().length > 0
+              if (mealNameWasClearedOnFocusRef.current) setMealName('')
+            }}
+            onChange={(e) => {
+              mealNameEditedRef.current = true
+              setMealName(e.target.value)
+            }}
+            onBlur={() => {
+              if (mealNameWasClearedOnFocusRef.current && !mealNameEditedRef.current) {
+                setMealName(mealNameBackupRef.current)
+              }
+              mealNameWasClearedOnFocusRef.current = false
+              mealNameEditedRef.current = false
+            }}
             placeholder={buildDefaultMealName(items)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           />
@@ -1474,7 +1515,23 @@ export default function MealBuilderClient() {
           <div className="flex gap-2">
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => {
+                queryBackupRef.current = query
+                queryEditedRef.current = false
+                queryWasClearedOnFocusRef.current = query.trim().length > 0
+                if (queryWasClearedOnFocusRef.current) setQuery('')
+              }}
+              onChange={(e) => {
+                queryEditedRef.current = true
+                setQuery(e.target.value)
+              }}
+              onBlur={() => {
+                if (queryWasClearedOnFocusRef.current && !queryEditedRef.current) {
+                  setQuery(queryBackupRef.current)
+                }
+                queryWasClearedOnFocusRef.current = false
+                queryEditedRef.current = false
+              }}
               placeholder="e.g. chicken breast"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             />
