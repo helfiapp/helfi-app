@@ -6201,11 +6201,15 @@ Please add nutritional information manually if needed.`);
       }
     })
 
-    // If something is a Favorite, it should still be selectable from "All".
-    // Prefer the explicit favorite payload when present.
+    // Track favorites by label so "All" can still show edit/delete actions
+    // even when a matching history entry exists (same name).
+    const favoritesByKey = new Map<string, any>()
     ;(favorites || []).forEach((fav: any) => {
       const key = favoriteDisplayLabel(fav).toLowerCase()
       if (!key) return
+      favoritesByKey.set(key, fav)
+      // If something is a Favorite, it should still be selectable from "All".
+      // Prefer the explicit favorite payload when no history entry exists.
       if (!allByKey.has(key)) {
         allByKey.set(key, { ...fav, sourceTag: 'Favorite' })
       }
@@ -6215,7 +6219,10 @@ Please add nutritional information manually if needed.`);
       id: entry?.id || `all-${Math.random()}`,
       label: normalizeMealLabel(entry?.description || entry?.label || 'Meal'),
       entry,
-      favorite: (entry as any)?.sourceTag === 'Favorite' ? entry : null,
+      favorite:
+        (entry as any)?.sourceTag === 'Favorite'
+          ? entry
+          : favoritesByKey.get(normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()) || null,
       createdAt: entry?.createdAt || entry?.id || Date.now(),
       sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
       calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
@@ -13071,11 +13078,16 @@ Please add nutritional information manually if needed.`);
                               handleAddToFavorites(item.entry)
                               showQuickToast('Saved to Favorites')
                             }}
-                            className="px-3 flex items-center justify-center hover:bg-emerald-50 text-emerald-700 disabled:opacity-50"
+                            className="px-3 flex items-center justify-center hover:bg-emerald-50 text-helfi-green disabled:opacity-50"
                             title={isSaved ? 'Already in favorites' : 'Save to favorites'}
                             aria-label="Save to favorites"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg
+                              className="w-5 h-5"
+                              fill={isSaved ? 'currentColor' : 'none'}
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
