@@ -308,6 +308,43 @@ export default function MealBuilderClient() {
   }, [editFavoriteId, loadedFavoriteId, userData?.favorites])
 
   useEffect(() => {
+    // Editing mode (diary): load a FoodLog row directly when a Build-a-meal diary entry is edited.
+    if (!sourceLogId) return
+    if (editFavoriteId) return
+    if (loadedFavoriteId === `log:${sourceLogId}`) return
+
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/food-log?id=${encodeURIComponent(sourceLogId)}`, { method: 'GET' })
+        const data = await res.json().catch(() => ({} as any))
+        if (!res.ok) return
+        const log = (data as any)?.log || null
+        if (!log) return
+
+        const label = normalizeMealLabel(log?.description || log?.name || '').trim()
+        if (!cancelled && label) setMealName(label)
+
+        const rawItems = Array.isArray(log?.items) ? log.items : null
+        if (!cancelled && rawItems && rawItems.length > 0) {
+          const converted = convertToBuilderItems(rawItems)
+          setItems(converted)
+          setExpandedId(converted[0]?.id || null)
+        }
+
+        if (!cancelled) setLoadedFavoriteId(`log:${sourceLogId}`)
+      } catch {
+        // non-blocking
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceLogId, editFavoriteId, loadedFavoriteId])
+
+  useEffect(() => {
     // Keep /food on the same date when the user returns.
     try {
       const raw = sessionStorage.getItem('foodDiary:warmState')
@@ -552,7 +589,6 @@ export default function MealBuilderClient() {
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
-    if (isLegacyMealBuilderFavorite(fav)) return true
     return false
   }
 
@@ -1041,6 +1077,7 @@ export default function MealBuilderClient() {
         fat: round3(mealTotals.fat),
         fiber: round3(mealTotals.fiber),
         sugar: round3(mealTotals.sugar),
+        __origin: 'meal-builder',
       },
       imageUrl: null,
       items: cleanedItems,
@@ -1052,6 +1089,32 @@ export default function MealBuilderClient() {
 
     setSavingMeal(true)
     try {
+      // Editing a diary entry directly (no favorites template involved).
+      if (!editFavoriteId && sourceLogId) {
+        try {
+          await fetch('/api/food-log', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: sourceLogId,
+              description,
+              nutrition: payload.nutrition,
+              items: cleanedItems,
+              meal: category,
+              category,
+            }),
+          })
+        } catch {}
+        try {
+          sessionStorage.setItem(
+            'foodDiary:scrollToEntry',
+            JSON.stringify({ dbId: sourceLogId, localDate: selectedDate, category }),
+          )
+        } catch {}
+        router.push('/food')
+        return
+      }
+
       if (editFavoriteId) {
         setFavoriteSaving(true)
         const prev = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []

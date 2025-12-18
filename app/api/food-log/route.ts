@@ -69,10 +69,35 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
+    const idParam = searchParams.get('id')
     dateStr = searchParams.get('date') // YYYY-MM-DD (local date)
     tzOffsetMinRaw = searchParams.get('tz') // minutes: same as new Date().getTimezoneOffset()
     console.log(`📥 GET /api/food-log - Request: date=${dateStr}, tz=${tzOffsetMinRaw}, user=${userEmail}`);
     
+    // Support fetching a single log row by id (used by Build-a-meal edit routing).
+    if (idParam && typeof idParam === 'string' && idParam.trim().length > 0) {
+      const logId = idParam.trim()
+      console.log(`📥 GET /api/food-log - Fetching by id=${logId}`)
+
+      let user
+      try {
+        user = await prisma.user.findUnique({ where: { email: userEmail } })
+      } catch (userError) {
+        console.error('❌ GET /api/food-log - Error looking up user for id fetch:', userError)
+        return NextResponse.json(
+          { error: 'Database error', details: userError instanceof Error ? userError.message : String(userError) },
+          { status: 500 },
+        )
+      }
+      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+      const log = await prisma.foodLog.findUnique({ where: { id: logId as any } })
+      if (!log || log.userId !== user.id) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      }
+      return NextResponse.json({ success: true, log })
+    }
+
     if (!dateStr) {
       console.error('❌ GET /api/food-log - Missing date parameter');
       return NextResponse.json({ error: 'Missing date' }, { status: 400 })

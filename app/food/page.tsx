@@ -2355,7 +2355,6 @@ export default function FoodDiary() {
         const raw = (userData as any).favorites as any[]
         const repaired = repairAndDedupeFavorites(raw)
         setFavorites(repaired.next)
-        if (repaired.changed) persistFavorites(repaired.next)
         return
       }
       if (typeof window !== 'undefined') {
@@ -2365,7 +2364,6 @@ export default function FoodDiary() {
           if (Array.isArray(parsed)) {
             const repaired = repairAndDedupeFavorites(parsed)
             setFavorites(repaired.next)
-            if (repaired.changed) persistFavorites(repaired.next)
           }
         }
       }
@@ -4234,6 +4232,22 @@ const applyStructuredItems = (
         l.createdAt ? new Date(l.createdAt).toISOString() : new Date().toISOString(),
         (l as any).localDate || fallbackDate,
       )
+      const storedOrigin = (() => {
+        const n = (l as any)?.nutrients
+        if (n && typeof n === 'object') {
+          const raw = (n as any).__origin
+          return typeof raw === 'string' ? raw.toLowerCase() : ''
+        }
+        return ''
+      })()
+      const method =
+        storedOrigin === 'meal-builder'
+          ? 'meal-builder'
+          : storedOrigin === 'combined'
+          ? 'combined'
+          : l.imageUrl
+          ? 'photo'
+          : 'text'
       return {
         id: new Date(createdAtIso).getTime(), // UI key and sorting by timestamp
         dbId: l.id, // actual database id for delete operations
@@ -4242,7 +4256,7 @@ const applyStructuredItems = (
           hour: '2-digit',
           minute: '2-digit',
         }),
-        method: l.imageUrl ? 'photo' : 'text',
+        method,
         photo: l.imageUrl || null,
         nutrition: l.nutrients || null,
         items: (l as any).items || (l.nutrients as any)?.items || null,
@@ -5420,9 +5434,11 @@ Please add nutritional information manually if needed.`);
   const updateFoodEntry = async () => {
     if (!editingEntry) return;
 
-    const generatedSummary = buildMealSummaryFromItems(analyzedItems);
-    const fallbackDescription = (editedDescription?.trim?.() || aiDescription || editingEntry.description || '').trim();
-    const finalDescription = generatedSummary || fallbackDescription;
+    // Never override a user-provided title with an auto-generated ingredient summary.
+    const manualDescription = (editedDescription?.trim?.() || '').trim()
+    const fallbackDescription = (manualDescription || aiDescription || editingEntry.description || '').trim()
+    const generatedSummary = buildMealSummaryFromItems(analyzedItems)
+    const finalDescription = fallbackDescription || generatedSummary || ''
 
     // Calculate new createdAt from entryTime + selectedDate
     let newCreatedAt = editingEntry.createdAt;
@@ -5990,6 +6006,8 @@ Please add nutritional information manually if needed.`);
     // - ai:1734567890123:deadbeef
     if (/^(openfoodfacts|usda|fatsecret):[^:]+:\d{9,}$/i.test(id)) return true
     if (/^ai:\d{9,}:[0-9a-f]+$/i.test(id)) return true
+    // Build-a-meal editor assigns local ids like: edit:1734567890123:deadbeef
+    if (/^edit:\d{9,}:[0-9a-f]+$/i.test(id)) return true
     return false
   }
 
@@ -6084,7 +6102,6 @@ Please add nutritional information manually if needed.`);
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
-    if (isLegacyMealBuilderFavorite(fav)) return true
     return false
   }
 
@@ -6092,7 +6109,8 @@ Please add nutritional information manually if needed.`);
     const input = Array.isArray(list) ? list : []
     let changed = false
 
-    // 1) Normalize records (ids, flags)
+    // Only normalize basics here. Do NOT auto-migrate or re-classify favorites in the background.
+    // (Background rewrites were the root cause of favorites being overwritten on the server.)
     const normalized = input
       .filter((fav) => fav && typeof fav === 'object')
       .map((fav: any) => {
@@ -6102,76 +6120,27 @@ Please add nutritional information manually if needed.`);
           next.id = id
           changed = true
         }
-        const method = String(next?.method || '').toLowerCase()
-        const legacyBuilder = isLegacyMealBuilderFavorite(next)
-        const shouldBeCustom = method === 'meal-builder' || method === 'combined' || legacyBuilder
-
-        // Correct any bad migrations: only builder/combined should be customMeal.
-        if (shouldBeCustom) {
-          if (next.customMeal !== true) {
-            next.customMeal = true
-            changed = true
-          }
-          if (legacyBuilder && method === 'text') {
-            next.method = 'meal-builder'
-            changed = true
-          }
-        } else if (next.customMeal === true) {
-          delete next.customMeal
-          changed = true
-        }
         return next
       })
 
-    // 2) Dedupe
-    const byKey = new Map<string, any>()
-    const pickWinner = (a: any, b: any) => {
-      const aTs = Number(a?.createdAt) || 0
-      const bTs = Number(b?.createdAt) || 0
-      if (aTs !== bTs) return aTs > bTs ? a : b
-      // Prefer custom meals when tie
-      const aCustom = a?.customMeal === true || ['meal-builder', 'combined'].includes(String(a?.method || '').toLowerCase())
-      const bCustom = b?.customMeal === true || ['meal-builder', 'combined'].includes(String(b?.method || '').toLowerCase())
-      if (aCustom !== bCustom) return aCustom ? a : b
-      return a
-    }
-
-    const deduped: any[] = []
+    // Dedupe only on exact id collisions (safest).
+    const byId = new Map<string, any>()
     for (const fav of normalized) {
-      const method = String(fav?.method || '').toLowerCase()
-      const isCustom = fav?.customMeal === true || method === 'meal-builder' || method === 'combined'
-      const sourceId = fav?.sourceId ? String(fav.sourceId) : ''
-      const itemsSig = stableItemsSignature(parseFavoriteItems(fav))
-      // For Custom meals, de-dupe by ingredient signature (rename-safe) rather than by sourceId.
-      // Favorites are intended to be reusable templates, not one-per-diary-entry.
-      const key =
-        isCustom && itemsSig
-          ? `customItems:${itemsSig}`
-          : sourceId
-          ? `source:${sourceId}`
-          : `label:${favoriteDisplayLabel(fav).toLowerCase()}|method:${method}`
-
-      const existing = byKey.get(key)
+      const id = String(fav?.id || '')
+      if (!id) continue
+      const existing = byId.get(id)
       if (!existing) {
-        byKey.set(key, fav)
-        deduped.push(fav)
+        byId.set(id, fav)
         continue
       }
-      const winner = pickWinner(existing, fav)
-      if (winner !== existing) {
-        const merged = {
-          ...(winner as any),
-          // Preserve a usable sourceId if one exists (helps route edits from diary)
-          sourceId: (winner as any)?.sourceId ?? (existing as any)?.sourceId ?? (fav as any)?.sourceId ?? null,
-        }
-        byKey.set(key, merged)
-        const idx = deduped.findIndex((x) => String(x?.id || '') === String(existing?.id || ''))
-        if (idx >= 0) deduped[idx] = merged
-      }
+      // Keep the most recently created record (best-effort).
+      const aTs = Number(existing?.createdAt) || 0
+      const bTs = Number(fav?.createdAt) || 0
+      if (bTs >= aTs) byId.set(id, fav)
       changed = true
     }
 
-    return { next: deduped, changed }
+    return { next: Array.from(byId.values()), changed }
   }
 
   const buildSourceTag = (entry: any) => {
@@ -6269,83 +6238,8 @@ Please add nutritional information manually if needed.`);
     return { allMeals, favoriteMeals, customMeals }
   }
 
-  const mealBuilderDiaryBackfillSigRef = useRef<string>('')
-  useEffect(() => {
-    try {
-      const history = collectHistoryMeals()
-      if (!Array.isArray(history) || history.length === 0) return
-
-      const candidates = history.filter((e: any) => Boolean(e?.dbId) && isMealBuilderDiaryEntry(e))
-      if (candidates.length === 0) return
-
-      const existingSourceIds = new Set<string>()
-      ;(Array.isArray(favorites) ? favorites : []).forEach((fav: any) => {
-        const sid = fav?.sourceId ? String(fav.sourceId) : ''
-        if (sid) existingSourceIds.add(sid)
-      })
-
-      const missing = candidates.filter((e: any) => {
-        const dbId = e?.dbId ? String(e.dbId) : ''
-        return dbId ? !existingSourceIds.has(dbId) : false
-      })
-      if (missing.length === 0) return
-
-      const sig = missing
-        .map((e: any) => String(e?.dbId || '').trim())
-        .filter(Boolean)
-        .sort()
-        .join('|')
-      if (!sig) return
-      if (mealBuilderDiaryBackfillSigRef.current === sig) return
-      mealBuilderDiaryBackfillSigRef.current = sig
-
-      let nextFavorites = Array.isArray(favorites) ? [...favorites] : []
-      let changed = false
-
-      for (const entry of missing) {
-        const dbId = entry?.dbId ? String(entry.dbId) : ''
-        if (!dbId) continue
-        const entrySig = stableItemsSignature(Array.isArray(entry?.items) ? entry.items : null)
-
-        // Prefer updating an existing custom meal with identical ingredients (rename-safe),
-        // rather than creating a duplicate record.
-        if (entrySig) {
-          const idx = nextFavorites.findIndex((fav: any) => {
-            if (!fav) return false
-            const method = String(fav?.method || '').toLowerCase()
-            const isCustom = fav?.customMeal === true || method === 'meal-builder' || method === 'combined'
-            if (!isCustom) return false
-            const favItemsSig = stableItemsSignature(parseFavoriteItems(fav))
-            return favItemsSig && favItemsSig === entrySig
-          })
-          if (idx >= 0) {
-            const existing = nextFavorites[idx]
-            nextFavorites[idx] = {
-              ...(existing as any),
-              id: normalizeFavoriteId((existing as any)?.id) || (existing as any)?.id || generateFavoriteId(),
-              sourceId: dbId,
-              customMeal: true,
-              method: String((existing as any)?.method || 'meal-builder') || 'meal-builder',
-            }
-            changed = true
-            continue
-          }
-        }
-
-        nextFavorites.push(buildMealBuilderFavoriteFromEntry(entry))
-        changed = true
-      }
-
-      if (changed) {
-        const repaired = repairAndDedupeFavorites(nextFavorites)
-        setFavorites(repaired.next)
-        persistFavorites(repaired.next)
-      }
-    } catch {
-      // non-blocking
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todaysFoods, historyFoods, persistentDiarySnapshot, selectedDate, favorites])
+  // IMPORTANT: Do not auto-create or auto-persist favorites based on diary history.
+  // Favorites should only be changed when the user explicitly takes an action.
 
   const resetTorchState = () => {
     barcodeTorchTrackRef.current = null
@@ -6983,7 +6877,7 @@ Please add nutritional information manually if needed.`);
         ? JSON.parse(JSON.stringify(source.items))
         : null
     const sourceMethod = String(source?.method || 'text').toLowerCase()
-    const inferredCustomMeal = sourceMethod === 'combined' || sourceMethod === 'meal-builder' || isLegacyMealBuilderFavorite(source)
+    const inferredCustomMeal = source?.customMeal === true || sourceMethod === 'combined' || sourceMethod === 'meal-builder'
     const favoritePayload = {
       id: `fav-${Date.now()}`,
       // Prefer the real DB id when present; mapped history entries use `id` as a timestamp UI key.
@@ -6994,7 +6888,10 @@ Please add nutritional information manually if needed.`);
       total: source.total || source.nutrition || null,
       items: clonedItems,
       photo: source.photo || null,
-      method: inferredCustomMeal && sourceMethod === 'text' ? 'meal-builder' : (source.method || 'text'),
+      method:
+        inferredCustomMeal && sourceMethod !== 'meal-builder' && sourceMethod !== 'combined'
+          ? 'meal-builder'
+          : (source.method || 'text'),
       ...(inferredCustomMeal ? { customMeal: true } : {}),
       meal: normalizeCategory(source.meal || source.category || source.mealType),
       createdAt: Date.now(),
@@ -7104,6 +7001,26 @@ Please add nutritional information manually if needed.`);
       return next
     })
     showQuickToast('Favorite removed')
+  }
+
+  const handleRenameFavorite = (id: string) => {
+    const favId = String(id || '').trim()
+    if (!favId) return
+    const existing = (Array.isArray(favorites) ? favorites : []).find((f: any) => String(f?.id || '') === favId) || null
+    if (!existing) return
+    const current = favoriteDisplayLabel(existing) || 'Favorite'
+    const nextRaw = typeof window !== 'undefined' ? window.prompt('Rename to:', current) : null
+    const nextName = (nextRaw || '').toString().trim()
+    if (!nextName) return
+    const cleaned = normalizeMealLabel(nextName) || nextName
+    setFavorites((prev) => {
+      const next = (Array.isArray(prev) ? prev : []).map((fav: any) =>
+        String(fav?.id || '') === favId ? { ...fav, label: cleaned, description: cleaned } : fav,
+      )
+      persistFavorites(next)
+      return next
+    })
+    showQuickToast('Renamed')
   }
 
   const duplicateEntryToCategory = async (targetCategory: typeof MEAL_CATEGORY_ORDER[number]) => {
@@ -7449,27 +7366,30 @@ Please add nutritional information manually if needed.`);
       try {
         const dbId = (safeFood as any)?.dbId ? String((safeFood as any).dbId) : ''
         const key = normalizeMealLabel(safeFood.description || '').toLowerCase()
+        const method = String((safeFood as any)?.method || '').toLowerCase()
 
-        // If this entry looks like it came from Build-a-meal (structured items with builder ids),
-        // ensure it exists as a Custom favorite and route edits to the builder.
-        if (isMealBuilderDiaryEntry(safeFood)) {
-          const ensured = ensureMealBuilderFavoriteForEntry(safeFood)
-          if (ensured.changed) {
-            setFavorites(ensured.nextFavorites)
-            persistFavorites(ensured.nextFavorites)
-          }
-          if (ensured.favorite?.id) {
-            const favCategory =
-              (ensured.favorite?.meal && String(ensured.favorite.meal)) ||
-              normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType)
-            const qs = new URLSearchParams()
-            qs.set('date', selectedDate)
-            qs.set('category', String(favCategory))
-            qs.set('editFavoriteId', String(ensured.favorite.id))
-            if (dbId) qs.set('sourceLogId', dbId)
-            router.push(`/food/build-meal?${qs.toString()}`)
-            return
-          }
+        // If this entry is known to be a Build-a-meal / Combined entry (durable marker),
+        // always open it in the Build-a-meal editor for edits.
+        if ((method === 'meal-builder' || method === 'combined') && dbId) {
+          const favCategory = normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType)
+          const qs = new URLSearchParams()
+          qs.set('date', selectedDate)
+          qs.set('category', String(favCategory))
+          qs.set('sourceLogId', dbId)
+          router.push(`/food/build-meal?${qs.toString()}`)
+          return
+        }
+
+        // Back-compat: if this looks like a Build-a-meal entry (based on item ids),
+        // open it in the Build-a-meal editor, but do NOT auto-save anything.
+        if (dbId && isMealBuilderDiaryEntry(safeFood)) {
+          const favCategory = normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType)
+          const qs = new URLSearchParams()
+          qs.set('date', selectedDate)
+          qs.set('category', String(favCategory))
+          qs.set('sourceLogId', dbId)
+          router.push(`/food/build-meal?${qs.toString()}`)
+          return
         }
 
         const match = (favorites || []).find((fav: any) => {
@@ -13114,7 +13034,7 @@ Please add nutritional information manually if needed.`);
                     const favoriteId =
                       item?.favorite?.id || (typeof item?.id === 'string' && item.id.startsWith('fav-') ? item.id : null)
                     const canDeleteFavorite = Boolean(favoriteId && item.favorite)
-                    const canEditFavorite = Boolean(favoriteId && item.favorite && isCustomMealFavorite(item.favorite))
+                    const canEditFavorite = Boolean(favoriteId && item.favorite)
                     const key = normalizeMealLabel(item?.label || '').toLowerCase()
                     const isSaved = Boolean(item.favorite) || (key ? favoriteKeySet.has(key) : false)
                     const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item.entry)
@@ -13190,19 +13110,23 @@ Please add nutritional information manually if needed.`);
                               try {
                                 const fav = item.favorite
                                 const favId = String(favoriteId)
-                                const favCategory =
-                                  (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
-                                setShowFavoritesPicker(false)
-                                router.push(
-                                  `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
-                                    favCategory,
-                                  )}&editFavoriteId=${encodeURIComponent(favId)}`,
-                                )
+                                if (fav && isCustomMealFavorite(fav)) {
+                                  const favCategory =
+                                    (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
+                                  setShowFavoritesPicker(false)
+                                  router.push(
+                                    `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
+                                      favCategory,
+                                    )}&editFavoriteId=${encodeURIComponent(favId)}`,
+                                  )
+                                } else {
+                                  handleRenameFavorite(favId)
+                                }
                               } catch {}
                             }}
                             className="px-3 flex items-center justify-center hover:bg-gray-50 text-gray-700"
-                            title="Edit meal"
-                            aria-label="Edit meal"
+                            title={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Rename'}
+                            aria-label={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Rename'}
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path

@@ -1064,9 +1064,10 @@ export async function POST(request: NextRequest) {
         const referer = (request.headers.get('referer') || '').slice(0, 200)
 
         // Load existing favorites to avoid accidental wipes from empty payloads
+        let existingFavGoal: any | null = null
         let existingFavorites: any[] = []
         try {
-          const existingFavGoal = await prisma.healthGoal.findFirst({
+          existingFavGoal = await prisma.healthGoal.findFirst({
             where: { userId: user.id, name: '__FOOD_FAVORITES__' },
           })
           if (existingFavGoal?.category) {
@@ -1085,20 +1086,68 @@ export async function POST(request: NextRequest) {
           })
         } else {
           console.log('AGENT_DEBUG favorites write', { favoritesCount, referer })
-          await prisma.healthGoal.deleteMany({
-            where: {
-              userId: user.id,
-              name: '__FOOD_FAVORITES__'
+          // Safety: store a backup copy BEFORE overwriting.
+          try {
+            if (existingFavGoal?.category) {
+              await prisma.healthGoal.create({
+                data: {
+                  userId: user.id,
+                  name: `__FOOD_FAVORITES__BACKUP__${Date.now()}`,
+                  category: String(existingFavGoal.category),
+                  currentRating: 0,
+                },
+              })
+
+              // Keep only the most recent backups (best effort).
+              const oldBackups = await prisma.healthGoal.findMany({
+                where: {
+                  userId: user.id,
+                  name: { startsWith: '__FOOD_FAVORITES__BACKUP__' },
+                },
+                orderBy: { createdAt: 'desc' },
+                select: { id: true },
+                skip: 20,
+              })
+              if (oldBackups.length > 0) {
+                await prisma.healthGoal.deleteMany({
+                  where: { id: { in: oldBackups.map((b) => b.id) } },
+                })
+              }
             }
+          } catch (backupErr) {
+            console.warn('AGENT_DEBUG favorites backup failed (non-blocking)', backupErr)
+          }
+
+          // Avoid delete+create: update the latest record (and prune duplicates) when possible.
+          const existingGoals = await prisma.healthGoal.findMany({
+            where: { userId: user.id, name: '__FOOD_FAVORITES__' },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true },
           })
-          await prisma.healthGoal.create({
-            data: {
-              userId: user.id,
-              name: '__FOOD_FAVORITES__',
-              category: JSON.stringify({ favorites: favoritesArray }),
-              currentRating: 0,
+          const primary = existingGoals[0] || null
+          if (primary?.id) {
+            await prisma.healthGoal.update({
+              where: { id: primary.id },
+              data: {
+                category: JSON.stringify({ favorites: favoritesArray }),
+                currentRating: 0,
+              },
+            })
+            if (existingGoals.length > 1) {
+              await prisma.healthGoal.deleteMany({
+                where: { id: { in: existingGoals.slice(1).map((g) => g.id) } },
+              })
             }
-          })
+          } else {
+            await prisma.healthGoal.create({
+              data: {
+                userId: user.id,
+                name: '__FOOD_FAVORITES__',
+                category: JSON.stringify({ favorites: favoritesArray }),
+                currentRating: 0,
+              },
+            })
+          }
           console.log('Stored favorites data successfully')
         }
       }
