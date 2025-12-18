@@ -537,7 +537,6 @@ export default function MealBuilderClient() {
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
-    if (method === 'text' && !(fav as any)?.photo) return true
     return false
   }
 
@@ -1045,6 +1044,10 @@ export default function MealBuilderClient() {
           setError('Could not find that saved meal to edit. Please reopen from Favorites → Custom.')
           return
         }
+        if (!isCustomMealFavorite(existing)) {
+          setError('Only custom meals (Build-a-meal / Combined) can be edited here.')
+          return
+        }
 
         const updatedFavorite = {
           ...existing,
@@ -1054,6 +1057,7 @@ export default function MealBuilderClient() {
           total: payload.nutrition,
           items: cleanedItems,
           method: existing?.method || 'meal-builder',
+          customMeal: true,
           meal: existing?.meal || category,
           createdAt: existing?.createdAt || Date.now(),
         }

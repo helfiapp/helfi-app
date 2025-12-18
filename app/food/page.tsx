@@ -5964,8 +5964,6 @@ Please add nutritional information manually if needed.`);
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
-    // Back-compat: older Build-a-meal saves used `method: "text"` (and no photo).
-    if (method === 'text' && !(fav as any)?.photo) return true
     return false
   }
 
