@@ -196,6 +196,7 @@ export default function MealBuilderClient() {
   const [results, setResults] = useState<NormalizedFoodItem[]>([])
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
   const [loadedFavoriteId, setLoadedFavoriteId] = useState<string | null>(null)
+  const [linkedFavoriteId, setLinkedFavoriteId] = useState<string>('')
   const [favoriteSaving, setFavoriteSaving] = useState(false)
 
   const [items, setItems] = useState<BuilderItem[]>([])
@@ -321,6 +322,16 @@ export default function MealBuilderClient() {
         if (!res.ok) return
         const log = (data as any)?.log || null
         if (!log) return
+
+        const linked = (() => {
+          const n = log?.nutrients
+          if (n && typeof n === 'object') {
+            const raw = (n as any).__favoriteId
+            return typeof raw === 'string' ? raw.trim() : ''
+          }
+          return ''
+        })()
+        if (!cancelled) setLinkedFavoriteId(linked)
 
         const label = normalizeMealLabel(log?.description || log?.name || '').trim()
         if (!cancelled && label) setMealName(label)
@@ -1060,6 +1071,15 @@ export default function MealBuilderClient() {
 
     const title = sanitizeMealTitle(mealName) || buildDefaultMealName(items)
     const description = title
+    const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+    const existingWithSameTitle =
+      favorites.find((f: any) => isCustomMealFavorite(f) && String(f?.label || f?.description || '').trim() === title.trim()) || null
+    const favoriteLinkId = (() => {
+      if (editFavoriteId) return editFavoriteId
+      if (linkedFavoriteId && linkedFavoriteId.trim().length > 0) return linkedFavoriteId.trim()
+      if (existingWithSameTitle?.id) return String(existingWithSameTitle.id)
+      return `fav-${Date.now()}`
+    })()
 
     const cleanedItems = items.map((it) => {
       const { __baseAmount, __baseUnit, __amount, __amountInput, __unit, ...rest } = it
@@ -1078,6 +1098,7 @@ export default function MealBuilderClient() {
         fiber: round3(mealTotals.fiber),
         sugar: round3(mealTotals.sugar),
         __origin: 'meal-builder',
+        ...(favoriteLinkId ? { __favoriteId: favoriteLinkId } : {}),
       },
       imageUrl: null,
       items: cleanedItems,
@@ -1105,6 +1126,33 @@ export default function MealBuilderClient() {
             }),
           })
         } catch {}
+
+        // Keep the linked saved meal in sync (if one exists, or create one for future use).
+        try {
+          if (favoriteLinkId) {
+            const favoritePayload = {
+              id: favoriteLinkId,
+              sourceId: sourceLogId,
+              label: title,
+              description,
+              nutrition: payload.nutrition,
+              total: payload.nutrition,
+              items: cleanedItems,
+              photo: null,
+              method: 'meal-builder',
+              customMeal: true,
+              meal: category,
+              createdAt: Date.now(),
+            }
+            const existingIndex = favorites.findIndex((f: any) => String(f?.id || '') === favoriteLinkId)
+            const nextFavorites =
+              existingIndex >= 0
+                ? favorites.map((f: any, idx: number) => (idx === existingIndex ? { ...favoritePayload, id: f.id || favoritePayload.id } : f))
+                : [...favorites, favoritePayload]
+            persistFavorites(nextFavorites)
+          }
+        } catch {}
+
         try {
           sessionStorage.setItem(
             'foodDiary:scrollToEntry',
@@ -1117,7 +1165,7 @@ export default function MealBuilderClient() {
 
       if (editFavoriteId) {
         setFavoriteSaving(true)
-        const prev = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+        const prev = favorites
         const existing = prev.find((f: any) => String(f?.id || '') === editFavoriteId) || null
         if (!existing) {
           setError('Could not find that saved meal to edit. Please reopen from Favorites → Custom.')
@@ -1187,9 +1235,8 @@ export default function MealBuilderClient() {
       // Auto-save newly created meals into Favorites so they appear under Favorites → Custom.
       try {
         const createdId = typeof data?.id === 'string' ? data.id : null
-        const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
         const favoritePayload = {
-          id: `fav-${Date.now()}`,
+          id: favoriteLinkId,
           sourceId: createdId,
           label: title,
           description,
@@ -1204,6 +1251,7 @@ export default function MealBuilderClient() {
         }
         const existingIndex = favorites.findIndex(
           (fav: any) =>
+            (fav.id && favoritePayload.id && String(fav.id) === String(favoritePayload.id)) ||
             (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
             (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
         )

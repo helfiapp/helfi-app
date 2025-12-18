@@ -5450,13 +5450,30 @@ Please add nutritional information manually if needed.`);
       newCreatedAt = date.toISOString();
     }
 
+    const meta = (() => {
+      const n = editingEntry?.nutrition
+      if (!n || typeof n !== 'object') return { favoriteId: '', origin: '' }
+      const favoriteId = typeof (n as any).__favoriteId === 'string' ? String((n as any).__favoriteId).trim() : ''
+      const origin = typeof (n as any).__origin === 'string' ? String((n as any).__origin).trim() : ''
+      return { favoriteId, origin }
+    })()
+
+    const mergedNutrition = (() => {
+      const base = (analyzedNutrition || editingEntry.nutrition) as any
+      if (!base || typeof base !== 'object') return base
+      const next: any = { ...(base as any) }
+      if (meta.favoriteId) next.__favoriteId = meta.favoriteId
+      if (meta.origin) next.__origin = meta.origin
+      return next
+    })()
+
     const updatedEntry = {
       ...editingEntry,
       localDate: editingEntry.localDate || selectedDate,
       createdAt: newCreatedAt,
       description: finalDescription,
       photo: photoPreview || editingEntry.photo,
-      nutrition: analyzedNutrition || editingEntry.nutrition,
+      nutrition: mergedNutrition,
       items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : (editingEntry.items || null),
       total: analyzedTotal || (editingEntry.total || null)
     };
@@ -5500,6 +5517,23 @@ Please add nutritional information manually if needed.`);
       } else {
         console.warn('⚠️ Editing entry without dbId; skipping FoodLog update')
       }
+
+      // If this diary entry came from a saved meal, keep the saved meal name in sync (forward-looking).
+      try {
+        if (meta.favoriteId) {
+          const nextLabel = normalizeMealLabel(updatedEntry.description || '') || (updatedEntry.description || 'Meal')
+          setFavorites((prev) => {
+            const base = Array.isArray(prev) ? prev : []
+            const idx = base.findIndex((f: any) => String(f?.id || '') === meta.favoriteId)
+            if (idx < 0) return prev
+            const existing = base[idx]
+            const updated = { ...(existing as any), label: nextLabel, description: nextLabel }
+            const next = base.map((f: any, i: number) => (i === idx ? updated : f))
+            persistFavorites(next)
+            return next
+          })
+        }
+      } catch {}
 
       // Keep local snapshot in sync (but do not create a new history row)
       await saveFoodEntries(updatedFoods, { appendHistory: false });
@@ -6204,10 +6238,12 @@ Please add nutritional information manually if needed.`);
     // Track favorites by label so "All" can still show edit/delete actions
     // even when a matching history entry exists (same name).
     const favoritesByKey = new Map<string, any>()
+    const favoritesById = new Map<string, any>()
     ;(favorites || []).forEach((fav: any) => {
       const key = favoriteDisplayLabel(fav).toLowerCase()
       if (!key) return
       favoritesByKey.set(key, fav)
+      if (fav?.id) favoritesById.set(String(fav.id), fav)
       // If something is a Favorite, it should still be selectable from "All".
       // Prefer the explicit favorite payload when no history entry exists.
       if (!allByKey.has(key)) {
@@ -6222,7 +6258,16 @@ Please add nutritional information manually if needed.`);
       favorite:
         (entry as any)?.sourceTag === 'Favorite'
           ? entry
-          : favoritesByKey.get(normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()) || null,
+          : (() => {
+              const linkedId =
+                entry?.nutrition && typeof entry.nutrition === 'object' && typeof (entry.nutrition as any).__favoriteId === 'string'
+                  ? String((entry.nutrition as any).__favoriteId).trim()
+                  : entry?.total && typeof entry.total === 'object' && typeof (entry.total as any).__favoriteId === 'string'
+                  ? String((entry.total as any).__favoriteId).trim()
+                  : ''
+              if (linkedId && favoritesById.has(linkedId)) return favoritesById.get(linkedId)
+              return favoritesByKey.get(normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()) || null
+            })(),
       createdAt: entry?.createdAt || entry?.id || Date.now(),
       sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
       calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
@@ -6795,6 +6840,69 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const saveFavoriteFromEntry = (
+    source: any,
+    opts?: { labelOverride?: string; forceCustomMeal?: boolean },
+  ): { favorite: any; nextFavorites: any[] } | null => {
+    if (!source) return null
+    const cleanLabel = (() => {
+      const raw =
+        typeof opts?.labelOverride === 'string' && opts.labelOverride.trim().length > 0
+          ? opts.labelOverride
+          : extractBaseMealDescription(source.description || '') ||
+            (source.description || 'Favorite meal').split('\n')[0].split('Calories:')[0].trim()
+      return normalizeMealLabel(raw) || raw || 'Favorite meal'
+    })()
+
+    const clonedItems =
+      source.items && Array.isArray(source.items) && source.items.length > 0
+        ? JSON.parse(JSON.stringify(source.items))
+        : null
+    const sourceMethod = String(source?.method || 'text').toLowerCase()
+    const inferredCustomMeal =
+      opts?.forceCustomMeal === true ||
+      source?.customMeal === true ||
+      sourceMethod === 'combined' ||
+      sourceMethod === 'meal-builder' ||
+      isMealBuilderDiaryEntry(source)
+
+    const id = `fav-${Date.now()}`
+    const favoritePayload = {
+      id,
+      // Prefer the real DB id when present; mapped history entries use `id` as a timestamp UI key.
+      sourceId: (source as any)?.dbId || (source as any)?.id || null,
+      label: cleanLabel || 'Favorite meal',
+      description: cleanLabel || 'Favorite meal',
+      nutrition: source.nutrition || source.total || null,
+      total: source.total || source.nutrition || null,
+      items: clonedItems,
+      photo: source.photo || null,
+      method:
+        inferredCustomMeal && sourceMethod !== 'meal-builder' && sourceMethod !== 'combined'
+          ? 'meal-builder'
+          : (source.method || 'text'),
+      ...(inferredCustomMeal ? { customMeal: true } : {}),
+      meal: normalizeCategory(source.meal || source.category || source.mealType),
+      createdAt: Date.now(),
+    }
+
+    const base = Array.isArray(favorites) ? favorites : []
+    const existingIndex = base.findIndex(
+      (fav: any) =>
+        (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
+        (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
+    )
+    const payloadWithStableId =
+      existingIndex >= 0 ? { ...favoritePayload, id: base[existingIndex]?.id || favoritePayload.id } : favoritePayload
+    const next =
+      existingIndex >= 0
+        ? base.map((fav: any, idx: number) => (idx === existingIndex ? payloadWithStableId : fav))
+        : [...base, payloadWithStableId]
+    setFavorites(next)
+    persistFavorites(next)
+    return { favorite: payloadWithStableId, nextFavorites: next }
+  }
+
   const insertMealIntoDiary = async (source: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (!source) return
     const category = normalizeCategory(targetCategory || selectedAddCategory)
@@ -6876,48 +6984,37 @@ Please add nutritional information manually if needed.`);
       showQuickToast('Could not add to favorites')
       return
     }
-    const cleanLabel =
-      extractBaseMealDescription(source.description || '') ||
-      (source.description || 'Favorite meal').split('\n')[0].split('Calories:')[0].trim()
-    const clonedItems =
-      source.items && Array.isArray(source.items) && source.items.length > 0
-        ? JSON.parse(JSON.stringify(source.items))
-        : null
-    const sourceMethod = String(source?.method || 'text').toLowerCase()
-    const inferredCustomMeal = source?.customMeal === true || sourceMethod === 'combined' || sourceMethod === 'meal-builder'
-    const favoritePayload = {
-      id: `fav-${Date.now()}`,
-      // Prefer the real DB id when present; mapped history entries use `id` as a timestamp UI key.
-      sourceId: (source as any)?.dbId || (source as any)?.id || null,
-      label: cleanLabel || 'Favorite meal',
-      description: source.description || cleanLabel || 'Favorite meal',
-      nutrition: source.nutrition || source.total || null,
-      total: source.total || source.nutrition || null,
-      items: clonedItems,
-      photo: source.photo || null,
-      method:
-        inferredCustomMeal && sourceMethod !== 'meal-builder' && sourceMethod !== 'combined'
-          ? 'meal-builder'
-          : (source.method || 'text'),
-      ...(inferredCustomMeal ? { customMeal: true } : {}),
-      meal: normalizeCategory(source.meal || source.category || source.mealType),
-      createdAt: Date.now(),
-    }
-    setFavorites((prev) => {
-      const existingIndex = prev.findIndex(
-        (fav: any) =>
-          (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
-          (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
-      )
-      const next =
-        existingIndex >= 0
-          ? prev.map((fav: any, idx: number) =>
-              idx === existingIndex ? { ...favoritePayload, id: fav.id || favoritePayload.id } : fav,
-            )
-          : [...prev, favoritePayload]
-      persistFavorites(next)
-      return next
-    })
+    const saved = saveFavoriteFromEntry(source)
+    // If this came from the diary history (FoodLog), persist a link so future edits can keep the name in sync.
+    try {
+      const dbId = (source as any)?.dbId ? String((source as any).dbId) : ''
+      const favId = String(saved?.favorite?.id || '').trim()
+      if (dbId && favId) {
+        const baseNutrition = source?.nutrition || source?.total || null
+        const origin = (() => {
+          const m = String(saved?.favorite?.method || '').toLowerCase()
+          return m === 'meal-builder' || m === 'combined' ? m : ''
+        })()
+        const linkedNutrition =
+          baseNutrition && typeof baseNutrition === 'object'
+            ? { ...(baseNutrition as any), __favoriteId: favId, ...(origin ? { __origin: origin } : {}) }
+            : baseNutrition
+        fetch('/api/food-log', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: dbId,
+            description: source?.description || null,
+            nutrition: linkedNutrition,
+            imageUrl: source?.photo || null,
+            items: Array.isArray(source?.items) ? source.items : null,
+            localDate: source?.localDate || selectedDate,
+            meal: source?.meal || source?.category,
+            category: source?.category || source?.meal,
+          }),
+        }).catch(() => {})
+      }
+    } catch {}
     showQuickToast('Added to favorites')
   }
 
@@ -6937,6 +7034,18 @@ Please add nutritional information manually if needed.`);
         ? JSON.parse(JSON.stringify(favorite.items))
         : null
     const baseDescription = favorite.label || favorite.description || 'Favorite meal'
+    const favoriteId = typeof favorite?.id === 'string' ? favorite.id.trim() : ''
+    const origin = (() => {
+      const m = String(favorite?.method || '').toLowerCase()
+      return m === 'meal-builder' || m === 'combined' ? m : ''
+    })()
+    const attachMeta = (raw: any) => {
+      if (!raw || typeof raw !== 'object') return raw
+      const next: any = { ...(raw as any) }
+      if (favoriteId) next.__favoriteId = favoriteId
+      if (origin) next.__origin = origin
+      return next
+    }
     const entry = {
       id: makeUniqueLocalEntryId(
         new Date(createdAtIso).getTime(),
@@ -6947,7 +7056,7 @@ Please add nutritional information manually if needed.`);
       time: new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method: favorite.method || 'text',
       photo: favorite.photo || null,
-      nutrition: favorite.nutrition || favorite.total || null,
+      nutrition: attachMeta(favorite.nutrition || favorite.total || null),
       items: Array.isArray(clonedItems)
         ? clonedItems
         : typeof (favorite as any)?.items === 'string'
@@ -7978,12 +8087,27 @@ Please add nutritional information manually if needed.`);
 
     setCombineSaving(true)
     try {
+      const combineFavoriteId = (() => {
+        const base = Array.isArray(favorites) ? favorites : []
+        const existing = base.find((fav: any) => {
+          const label = String(fav?.label || fav?.description || '').trim()
+          return label && label === name
+        })
+        return existing?.id ? String(existing.id) : `fav-${Date.now()}`
+      })()
+
       // 1) Add the combined entry
       await insertMealIntoDiary(
         {
           description: name,
-          nutrition: mergedTotals,
-          total: mergedTotals,
+          nutrition:
+            mergedTotals && typeof mergedTotals === 'object'
+              ? { ...(mergedTotals as any), __origin: 'combined', __favoriteId: combineFavoriteId }
+              : mergedTotals,
+          total:
+            mergedTotals && typeof mergedTotals === 'object'
+              ? { ...(mergedTotals as any), __origin: 'combined', __favoriteId: combineFavoriteId }
+              : mergedTotals,
           items: mergedItems,
           method: 'combined',
         },
@@ -7993,12 +8117,18 @@ Please add nutritional information manually if needed.`);
       // 1b) Save this combined meal into Favorites → Custom (so it is editable/reusable).
       try {
         const favoritePayload = {
-          id: `fav-${Date.now()}`,
+          id: combineFavoriteId,
           sourceId: null,
           label: name,
           description: name,
-          nutrition: mergedTotals,
-          total: mergedTotals,
+          nutrition:
+            mergedTotals && typeof mergedTotals === 'object'
+              ? { ...(mergedTotals as any), __origin: 'combined', __favoriteId: combineFavoriteId }
+              : mergedTotals,
+          total:
+            mergedTotals && typeof mergedTotals === 'object'
+              ? { ...(mergedTotals as any), __origin: 'combined', __favoriteId: combineFavoriteId }
+              : mergedTotals,
           items: mergedItems,
           photo: null,
           method: 'combined',
@@ -13041,7 +13171,7 @@ Please add nutritional information manually if needed.`);
                     const favoriteId =
                       item?.favorite?.id || (typeof item?.id === 'string' && item.id.startsWith('fav-') ? item.id : null)
                     const canDeleteFavorite = Boolean(favoriteId && item.favorite)
-                    const canEditFavorite = Boolean(favoriteId && item.favorite)
+                    const canEditFavorite = Boolean((favoriteId && item.favorite) || (favoritesActiveTab === 'all' && Boolean(item.entry)))
                     const key = normalizeMealLabel(item?.label || '').toLowerCase()
                     const isSaved = Boolean(item.favorite) || (key ? favoriteKeySet.has(key) : false)
                     const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item.entry)
@@ -13121,24 +13251,57 @@ Please add nutritional information manually if needed.`);
                             onClick={() => {
                               try {
                                 const fav = item.favorite
-                                const favId = String(favoriteId)
-                                if (fav && isCustomMealFavorite(fav)) {
-                                  const favCategory =
-                                    (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
-                                  setShowFavoritesPicker(false)
-                                  router.push(
-                                    `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
-                                      favCategory,
-                                    )}&editFavoriteId=${encodeURIComponent(favId)}`,
-                                  )
-                                } else {
-                                  handleRenameFavorite(favId)
+                                const favId = favoriteId ? String(favoriteId) : ''
+                                if (fav && favId) {
+                                  if (isCustomMealFavorite(fav)) {
+                                    const favCategory =
+                                      (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
+                                    setShowFavoritesPicker(false)
+                                    router.push(
+                                      `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
+                                        favCategory,
+                                      )}&editFavoriteId=${encodeURIComponent(favId)}`,
+                                    )
+                                  } else {
+                                    handleRenameFavorite(favId)
+                                  }
+                                  return
+                                }
+
+                                // In "All", allow editing any entry by saving it first as a favorite template.
+                                if (favoritesActiveTab === 'all' && item?.entry) {
+                                  const entry = item.entry
+                                  const entryMethod = String(entry?.method || '').toLowerCase()
+                                  const shouldBeCustom =
+                                    entryMethod === 'combined' || entryMethod === 'meal-builder' || isMealBuilderDiaryEntry(entry)
+                                  if (shouldBeCustom) {
+                                    const saved = saveFavoriteFromEntry(entry, { forceCustomMeal: true })
+                                    const newFavId = String(saved?.favorite?.id || '').trim()
+                                    if (!newFavId) return
+                                    const favCategory =
+                                      normalizeCategory(entry?.meal || entry?.category || entry?.mealType || selectedAddCategory)
+                                    setShowFavoritesPicker(false)
+                                    router.push(
+                                      `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
+                                        favCategory,
+                                      )}&editFavoriteId=${encodeURIComponent(newFavId)}`,
+                                    )
+                                    return
+                                  }
+
+                                  const current = normalizeMealLabel(entry?.description || entry?.label || 'Meal') || 'Meal'
+                                  const nextRaw = typeof window !== 'undefined' ? window.prompt('Rename to:', current) : null
+                                  const nextName = (nextRaw || '').toString().trim()
+                                  if (!nextName) return
+                                  saveFavoriteFromEntry(entry, { labelOverride: nextName })
+                                  showQuickToast('Saved to Favorites')
+                                  return
                                 }
                               } catch {}
                             }}
                             className="px-3 flex items-center justify-center hover:bg-gray-50 text-gray-700"
-                            title={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Rename'}
-                            aria-label={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Rename'}
+                            title={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Edit'}
+                            aria-label={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Edit'}
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path
