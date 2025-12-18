@@ -5998,6 +5998,55 @@ Please add nutritional information manually if needed.`);
     return items.some((it: any) => looksLikeMealBuilderItemId(it?.id))
   }
 
+  const isMealBuilderDiaryEntry = (entry: any) => {
+    if (!entry) return false
+    const items = Array.isArray(entry?.items) ? entry.items : null
+    if (!items || items.length === 0) return false
+    return items.some((it: any) => looksLikeMealBuilderItemId(it?.id))
+  }
+
+  const buildMealBuilderFavoriteFromEntry = (entry: any, opts?: { idOverride?: string }) => {
+    const dbId = entry?.dbId ? String(entry.dbId) : ''
+    const label = normalizeMealLabel(entry?.description || entry?.label || 'Meal') || 'Meal'
+    const totals = sanitizeNutritionTotals(entry?.total || entry?.nutrition || null) || null
+    const items = Array.isArray(entry?.items) ? entry.items : null
+    const meal = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+    return {
+      id: (opts?.idOverride || `fav-${Date.now()}`) as string,
+      sourceId: dbId || null,
+      label,
+      description: label,
+      nutrition: totals,
+      total: totals,
+      items,
+      photo: null,
+      method: 'meal-builder',
+      customMeal: true,
+      meal,
+      createdAt: Date.now(),
+    }
+  }
+
+  const ensureMealBuilderFavoriteForEntry = (entry: any) => {
+    const base = Array.isArray(favorites) ? favorites : []
+    const dbId = entry?.dbId ? String(entry.dbId) : ''
+    const key = normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()
+    const existing = base.find((fav: any) => {
+      if (!fav) return false
+      if (dbId && fav?.sourceId && String(fav.sourceId) === dbId) return true
+      return key ? favoriteDisplayLabel(fav).toLowerCase() === key : false
+    })
+    if (existing) {
+      if (isCustomMealFavorite(existing)) return { favorite: existing, nextFavorites: base, changed: false }
+      const updated = { ...(existing as any), customMeal: true, method: String((existing as any)?.method || 'meal-builder') || 'meal-builder' }
+      const nextFavorites = base.map((f: any) => (String(f?.id || '') === String(existing?.id || '') ? updated : f))
+      return { favorite: updated, nextFavorites, changed: true }
+    }
+    const created = buildMealBuilderFavoriteFromEntry(entry)
+    const nextFavorites = [...base, created]
+    return { favorite: created, nextFavorites, changed: true }
+  }
+
   const isCustomMealFavorite = (fav: any) => {
     if (!fav) return false
     if ((fav as any)?.customMeal === true) return true
@@ -6120,6 +6169,63 @@ Please add nutritional information manually if needed.`);
 
     return { allMeals, favoriteMeals, customMeals }
   }
+
+  const mealBuilderBackfillSigRef = useRef<string>('')
+  useEffect(() => {
+    try {
+      const history = collectHistoryMeals()
+      if (!Array.isArray(history) || history.length === 0) return
+
+      const candidates = history.filter((e: any) => isMealBuilderDiaryEntry(e))
+      if (candidates.length === 0) return
+
+      const signature = candidates
+        .map((e: any) => `${String(e?.dbId || e?.id || '')}:${normalizeMealLabel(e?.description || '').toLowerCase()}`)
+        .sort()
+        .join('|')
+      const favCount = Array.isArray(favorites) ? favorites.length : 0
+      const sig = `${favCount}|${signature}`
+      if (mealBuilderBackfillSigRef.current === sig) return
+
+      let nextFavorites = Array.isArray(favorites) ? favorites : []
+      let changed = false
+      for (const entry of candidates) {
+        const ensured = (() => {
+          // Inline to ensure we use the incremental `nextFavorites` list
+          const dbId = entry?.dbId ? String(entry.dbId) : ''
+          const key = normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()
+          const existing = nextFavorites.find((fav: any) => {
+            if (!fav) return false
+            if (dbId && fav?.sourceId && String(fav.sourceId) === dbId) return true
+            return key ? favoriteDisplayLabel(fav).toLowerCase() === key : false
+          })
+          if (existing) {
+            if (isCustomMealFavorite(existing)) return null
+            const updated = { ...(existing as any), customMeal: true, method: String((existing as any)?.method || 'meal-builder') || 'meal-builder' }
+            nextFavorites = nextFavorites.map((f: any) =>
+              String(f?.id || '') === String(existing?.id || '') ? updated : f,
+            )
+            changed = true
+            return null
+          }
+          const created = buildMealBuilderFavoriteFromEntry(entry)
+          nextFavorites = [...nextFavorites, created]
+          changed = true
+          return null
+        })()
+        void ensured
+      }
+
+      mealBuilderBackfillSigRef.current = sig
+      if (changed) {
+        setFavorites(nextFavorites)
+        persistFavorites(nextFavorites)
+      }
+    } catch {
+      // non-blocking
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todaysFoods, historyFoods, persistentDiarySnapshot, selectedDate, favorites])
 
   const resetTorchState = () => {
     barcodeTorchTrackRef.current = null
@@ -7223,6 +7329,29 @@ Please add nutritional information manually if needed.`);
       try {
         const dbId = (safeFood as any)?.dbId ? String((safeFood as any).dbId) : ''
         const key = normalizeMealLabel(safeFood.description || '').toLowerCase()
+
+        // If this entry looks like it came from Build-a-meal (structured items with builder ids),
+        // ensure it exists as a Custom favorite and route edits to the builder.
+        if (isMealBuilderDiaryEntry(safeFood)) {
+          const ensured = ensureMealBuilderFavoriteForEntry(safeFood)
+          if (ensured.changed) {
+            setFavorites(ensured.nextFavorites)
+            persistFavorites(ensured.nextFavorites)
+          }
+          if (ensured.favorite?.id) {
+            const favCategory =
+              (ensured.favorite?.meal && String(ensured.favorite.meal)) ||
+              normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType)
+            const qs = new URLSearchParams()
+            qs.set('date', selectedDate)
+            qs.set('category', String(favCategory))
+            qs.set('editFavoriteId', String(ensured.favorite.id))
+            if (dbId) qs.set('sourceLogId', dbId)
+            router.push(`/food/build-meal?${qs.toString()}`)
+            return
+          }
+        }
+
         const match = (favorites || []).find((fav: any) => {
           if (!isCustomMealFavorite(fav)) return false
           if (dbId && fav?.sourceId && String(fav.sourceId) === dbId) return true
