@@ -5527,7 +5527,13 @@ Please add nutritional information manually if needed.`);
             const idx = base.findIndex((f: any) => String(f?.id || '') === meta.favoriteId)
             if (idx < 0) return prev
             const existing = base[idx]
-            const updated = { ...(existing as any), label: nextLabel, description: nextLabel }
+            const existingLabel = favoriteDisplayLabel(existing) || ''
+            const aliases = Array.isArray((existing as any)?.aliases) ? ([...(existing as any).aliases] as string[]) : []
+            const normalizedExisting = normalizeMealLabel(existingLabel) || existingLabel
+            if (normalizedExisting && normalizedExisting !== nextLabel && !aliases.includes(normalizedExisting)) {
+              aliases.push(normalizedExisting)
+            }
+            const updated = { ...(existing as any), label: nextLabel, description: nextLabel, ...(aliases.length > 0 ? { aliases } : {}) }
             const next = base.map((f: any, i: number) => (i === idx ? updated : f))
             persistFavorites(next)
             return next
@@ -6240,10 +6246,28 @@ Please add nutritional information manually if needed.`);
         return ''
       }
     }
+    const normalizeKey = (raw: any) => normalizeMealLabel(raw || '').toLowerCase()
+
+    // Allow "All" to treat renamed favorites as the same item, without rewriting history.
+    const favoriteIdByAlias = new Map<string, string>()
+    ;(favorites || []).forEach((fav: any) => {
+      const favId = fav?.id ? String(fav.id).trim() : ''
+      if (!favId) return
+      const labelKey = normalizeKey(fav?.label || fav?.description || '')
+      if (labelKey) favoriteIdByAlias.set(labelKey, favId)
+      const aliases = Array.isArray((fav as any)?.aliases) ? (fav as any).aliases : []
+      for (const a of Array.isArray(aliases) ? aliases : []) {
+        const k = normalizeKey(a)
+        if (k) favoriteIdByAlias.set(k, favId)
+      }
+    })
+
     const entryKey = (entry: any) => {
       const linkedId = linkedFavoriteIdForEntry(entry)
       if (linkedId) return `fav:${linkedId}`
-      const label = normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()
+      const label = normalizeKey(entry?.description || entry?.label || '')
+      const aliasHit = label ? favoriteIdByAlias.get(label) : ''
+      if (aliasHit) return `fav:${aliasHit}`
       return label ? `label:${label}` : ''
     }
     history.forEach((entry) => {
@@ -6283,6 +6307,15 @@ Please add nutritional information manually if needed.`);
           const fav = favoritesById.get(linkedId)
           return favoriteDisplayLabel(fav) || normalizeMealLabel(entry?.description || entry?.label || 'Meal')
         }
+        // If this entry matches a renamed favorite alias, show the latest favorite label.
+        try {
+          const labelKey = normalizeKey(entry?.description || entry?.label || '')
+          const aliasId = labelKey ? favoriteIdByAlias.get(labelKey) : ''
+          if (aliasId && favoritesById.has(aliasId)) {
+            const fav = favoritesById.get(aliasId)
+            return favoriteDisplayLabel(fav) || normalizeMealLabel(entry?.description || entry?.label || 'Meal')
+          }
+        } catch {}
         return normalizeMealLabel(entry?.description || entry?.label || 'Meal')
       })(),
       entry,
@@ -6293,6 +6326,11 @@ Please add nutritional information manually if needed.`);
               const linkedId =
                 linkedFavoriteIdForEntry(entry) || ''
               if (linkedId && favoritesById.has(linkedId)) return favoritesById.get(linkedId)
+              try {
+                const labelKey = normalizeKey(entry?.description || entry?.label || '')
+                const aliasId = labelKey ? favoriteIdByAlias.get(labelKey) : ''
+                if (aliasId && favoritesById.has(aliasId)) return favoritesById.get(aliasId)
+              } catch {}
               return favoritesByKey.get(normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()) || null
             })(),
       createdAt: entry?.createdAt || entry?.id || Date.now(),
@@ -7157,9 +7195,16 @@ Please add nutritional information manually if needed.`);
     if (!nextName) return
     const cleaned = normalizeMealLabel(nextName) || nextName
     setFavorites((prev) => {
-      const next = (Array.isArray(prev) ? prev : []).map((fav: any) =>
-        String(fav?.id || '') === favId ? { ...fav, label: cleaned, description: cleaned } : fav,
-      )
+      const next = (Array.isArray(prev) ? prev : []).map((fav: any) => {
+        if (String(fav?.id || '') !== favId) return fav
+        const existingLabel = favoriteDisplayLabel(fav) || ''
+        const aliases = Array.isArray((fav as any)?.aliases) ? ([...(fav as any).aliases] as string[]) : []
+        const normalizedExisting = normalizeMealLabel(existingLabel) || existingLabel
+        if (normalizedExisting && normalizedExisting !== cleaned && !aliases.includes(normalizedExisting)) {
+          aliases.push(normalizedExisting)
+        }
+        return { ...fav, label: cleaned, description: cleaned, ...(aliases.length > 0 ? { aliases } : {}) }
+      })
       persistFavorites(next)
       return next
     })
