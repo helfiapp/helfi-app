@@ -173,6 +173,7 @@ export default function MealBuilderClient() {
   const initialDate = searchParams.get('date') || buildTodayIso()
   const initialCategory = normalizeCategory(searchParams.get('category'))
   const editFavoriteId = (searchParams.get('editFavoriteId') || '').trim()
+  const sourceLogId = (searchParams.get('sourceLogId') || '').trim()
 
   const [selectedDate] = useState<string>(initialDate)
   const [category] = useState<MealCategory>(initialCategory)
@@ -522,6 +523,15 @@ export default function MealBuilderClient() {
     return normalizeMealLabel(raw)
   }
 
+  const isCustomMealFavorite = (fav: any) => {
+    if (!fav) return false
+    if ((fav as any)?.customMeal === true) return true
+    const method = String((fav as any)?.method || '').toLowerCase()
+    if (method === 'meal-builder' || method === 'combined') return true
+    if (method === 'text' && !(fav as any)?.photo) return true
+    return false
+  }
+
   const buildSourceTag = (entry: any) => {
     if (!entry) return 'Custom'
     if (entry?.sourceTag) return String(entry.sourceTag)
@@ -635,9 +645,8 @@ export default function MealBuilderClient() {
       serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
     }))
 
-    // Product request: newly saved meals should always be visible under the "Custom" tab.
-    // Treat Custom as "all saved favorites" (photos + source-linked entries included).
-    const customMeals = favoriteMeals
+    // Product request: "Custom" only shows meals the user created (Build-a-meal / Combined).
+    const customMeals = favoriteMeals.filter((m: any) => isCustomMealFavorite(m?.favorite))
 
     return { allMeals, favoriteMeals, customMeals }
   }
@@ -1035,22 +1044,24 @@ export default function MealBuilderClient() {
           nutrition: payload.nutrition,
           total: payload.nutrition,
           items: cleanedItems,
-          method: existing?.method || 'text',
+          method: existing?.method || 'meal-builder',
           meal: existing?.meal || category,
           createdAt: existing?.createdAt || Date.now(),
         }
         const nextFavorites = prev.map((f: any) => (String(f?.id || '') === editFavoriteId ? updatedFavorite : f))
         persistFavorites(nextFavorites)
 
-        // If this favorite is linked to a saved diary entry, update it too.
+        // If this favorite is linked to a saved diary entry (or we were opened from a diary entry),
+        // update that entry too.
         const linkedId = existing?.sourceId ? String(existing.sourceId) : ''
-        if (linkedId) {
+        const targetLogId = linkedId || (sourceLogId ? String(sourceLogId) : '')
+        if (targetLogId) {
           try {
             await fetch('/api/food-log', {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                id: linkedId,
+                id: targetLogId,
                 description,
                 nutrition: payload.nutrition,
                 items: cleanedItems,
@@ -1062,7 +1073,7 @@ export default function MealBuilderClient() {
           try {
             sessionStorage.setItem(
               'foodDiary:scrollToEntry',
-              JSON.stringify({ dbId: linkedId, localDate: selectedDate, category: existing?.meal || category }),
+              JSON.stringify({ dbId: targetLogId, localDate: selectedDate, category: existing?.meal || category }),
             )
           } catch {}
         }
@@ -1095,7 +1106,8 @@ export default function MealBuilderClient() {
           total: payload.nutrition,
           items: cleanedItems,
           photo: null,
-          method: 'text',
+          method: 'meal-builder',
+          customMeal: true,
           meal: category,
           createdAt: Date.now(),
         }
@@ -1332,19 +1344,21 @@ export default function MealBuilderClient() {
 
                             {favoritesActiveTab !== 'all' && favoriteId && (
                               <div className="flex items-center pr-2 gap-1">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    openEditFavorite(favorite)
-                                  }}
-                                  className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
-                                  title="Edit meal"
-                                  aria-label="Edit meal"
-                                >
-                                  Edit
-                                </button>
+                                {isCustomMealFavorite(favorite) && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      openEditFavorite(favorite)
+                                    }}
+                                    className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                                    title="Edit meal"
+                                    aria-label="Edit meal"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={(e) => {

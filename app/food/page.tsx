@@ -5959,6 +5959,16 @@ Please add nutritional information manually if needed.`);
     return normalizeMealLabel(raw)
   }
 
+  const isCustomMealFavorite = (fav: any) => {
+    if (!fav) return false
+    if ((fav as any)?.customMeal === true) return true
+    const method = String((fav as any)?.method || '').toLowerCase()
+    if (method === 'meal-builder' || method === 'combined') return true
+    // Back-compat: older Build-a-meal saves used `method: "text"` (and no photo).
+    if (method === 'text' && !(fav as any)?.photo) return true
+    return false
+  }
+
   const buildSourceTag = (entry: any) => {
     if (entry?.sourceTag) return entry.sourceTag
     if ((entry as any)?.source) {
@@ -6048,9 +6058,8 @@ Please add nutritional information manually if needed.`);
       serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
     }))
 
-    // Product request: newly saved meals should always be visible under the "Custom" tab.
-    // Treat Custom as "all saved favorites" (photos + source-linked entries included).
-    const customMeals = favoriteMeals
+    // Product request: "Custom" only shows meals the user created (Build-a-meal / Combined).
+    const customMeals = favoriteMeals.filter((m: any) => isCustomMealFavorite(m?.favorite))
 
     return { allMeals, favoriteMeals, customMeals }
   }
@@ -7149,6 +7158,29 @@ Please add nutritional information manually if needed.`);
         total: safeNutrition || null,
       }
 
+      // Custom meals should be edited in the Build-a-meal editor (not the analyzer-style editor).
+      try {
+        const dbId = (safeFood as any)?.dbId ? String((safeFood as any).dbId) : ''
+        const key = normalizeMealLabel(safeFood.description || '').toLowerCase()
+        const match = (favorites || []).find((fav: any) => {
+          if (!isCustomMealFavorite(fav)) return false
+          if (dbId && fav?.sourceId && String(fav.sourceId) === dbId) return true
+          return favoriteDisplayLabel(fav).toLowerCase() === key
+        })
+        if (match?.id) {
+          const favCategory =
+            (match?.meal && String(match.meal)) ||
+            normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType)
+          const qs = new URLSearchParams()
+          qs.set('date', selectedDate)
+          qs.set('category', String(favCategory))
+          qs.set('editFavoriteId', String(match.id))
+          if (dbId) qs.set('sourceLogId', dbId)
+          router.push(`/food/build-meal?${qs.toString()}`)
+          return
+        }
+      } catch {}
+
       setEditingEntry(safeFood);
       setEnergyUnit('kcal')
       setSelectedAddCategory(normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType) as any);
@@ -7720,6 +7752,38 @@ Please add nutritional information manually if needed.`);
         },
         combineCategory,
       )
+
+      // 1b) Save this combined meal into Favorites → Custom (so it is editable/reusable).
+      try {
+        const favoritePayload = {
+          id: `fav-${Date.now()}`,
+          sourceId: null,
+          label: name,
+          description: name,
+          nutrition: mergedTotals,
+          total: mergedTotals,
+          items: mergedItems,
+          photo: null,
+          method: 'combined',
+          customMeal: true,
+          meal: normalizeCategory(combineCategory),
+          createdAt: Date.now(),
+        }
+        setFavorites((prev) => {
+          const base = Array.isArray(prev) ? prev : []
+          const existingIndex = base.findIndex(
+            (fav: any) =>
+              (fav.label && favoritePayload.label && String(fav.label).trim() === String(favoritePayload.label).trim()) ||
+              (fav.description && favoritePayload.description && String(fav.description).trim() === String(favoritePayload.description).trim()),
+          )
+          const next =
+            existingIndex >= 0
+              ? base.map((fav: any, idx: number) => (idx === existingIndex ? { ...favoritePayload, id: fav.id || favoritePayload.id } : fav))
+              : [...base, favoritePayload]
+          persistFavorites(next)
+          return next
+        })
+      } catch {}
 
       // 2) Delete the originals so they don't double count.
       // If any delete fails, tombstones will still suppress resurrection.
@@ -12739,7 +12803,7 @@ Please add nutritional information manually if needed.`);
                     const favoriteId =
                       item?.favorite?.id || (typeof item?.id === 'string' && item.id.startsWith('fav-') ? item.id : null)
                     const canDeleteFavorite = Boolean(favoriteId && item.favorite)
-                    const canEditFavorite = Boolean(favoriteId && item.favorite)
+                    const canEditFavorite = Boolean(favoriteId && item.favorite && isCustomMealFavorite(item.favorite))
                     const key = normalizeMealLabel(item?.label || '').toLowerCase()
                     const isSaved = Boolean(item.favorite) || (key ? favoriteKeySet.has(key) : false)
                     const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item.entry)
