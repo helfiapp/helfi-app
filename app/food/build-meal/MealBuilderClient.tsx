@@ -517,6 +517,11 @@ export default function MealBuilderClient() {
     return firstLine.split('Calories:')[0].trim()
   }
 
+  const favoriteDisplayLabel = (fav: any) => {
+    const raw = (fav?.label || fav?.description || '').toString()
+    return normalizeMealLabel(raw)
+  }
+
   const buildSourceTag = (entry: any) => {
     if (!entry) return 'Custom'
     if (entry?.sourceTag) return String(entry.sourceTag)
@@ -604,7 +609,7 @@ export default function MealBuilderClient() {
     })
 
     favorites.forEach((fav: any) => {
-      const key = normalizeMealLabel(fav?.description || fav?.label || '').toLowerCase()
+      const key = favoriteDisplayLabel(fav).toLowerCase()
       if (!key) return
       if (!allByKey.has(key)) allByKey.set(key, { ...fav, sourceTag: 'Favorite' })
     })
@@ -622,7 +627,7 @@ export default function MealBuilderClient() {
 
     const favoriteMeals = favorites.map((fav: any) => ({
       id: fav?.id || `fav-${Math.random()}`,
-      label: normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal') || 'Favorite meal',
+      label: favoriteDisplayLabel(fav) || normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal') || 'Favorite meal',
       favorite: fav,
       createdAt: fav?.createdAt || fav?.id || Date.now(),
       sourceTag: 'Favorite',
@@ -641,7 +646,7 @@ export default function MealBuilderClient() {
     const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
     const set = new Set<string>()
     favorites.forEach((fav: any) => {
-      const key = normalizeMealLabel(fav?.description || fav?.label || '').toLowerCase()
+      const key = favoriteDisplayLabel(fav).toLowerCase()
       if (key) set.add(key)
     })
     return set

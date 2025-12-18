@@ -5954,6 +5954,11 @@ Please add nutritional information manually if needed.`);
       extractBaseMealDescription((raw || '').toString().split('Calories:')[0]) || (raw || '').toString(),
     )
 
+  const favoriteDisplayLabel = (fav: any) => {
+    const raw = (fav?.label || fav?.description || '').toString()
+    return normalizeMealLabel(raw)
+  }
+
   const buildSourceTag = (entry: any) => {
     if (entry?.sourceTag) return entry.sourceTag
     if ((entry as any)?.source) {
@@ -6015,7 +6020,7 @@ Please add nutritional information manually if needed.`);
     // If something is a Favorite, it should still be selectable from "All".
     // Prefer the explicit favorite payload when present.
     ;(favorites || []).forEach((fav: any) => {
-      const key = normalizeMealLabel(fav?.description || fav?.label || '').toLowerCase()
+      const key = favoriteDisplayLabel(fav).toLowerCase()
       if (!key) return
       if (!allByKey.has(key)) {
         allByKey.set(key, { ...fav, sourceTag: 'Favorite' })
@@ -6035,7 +6040,7 @@ Please add nutritional information manually if needed.`);
 
     const favoriteMeals = (favorites || []).map((fav: any) => ({
       id: fav?.id || `fav-${Math.random()}`,
-      label: normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal'),
+      label: favoriteDisplayLabel(fav) || normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal'),
       favorite: fav,
       createdAt: fav?.createdAt || fav?.id || Date.now(),
       sourceTag: 'Favorite',
@@ -6731,7 +6736,7 @@ Please add nutritional information manually if needed.`);
       favorite.items && Array.isArray(favorite.items) && favorite.items.length > 0
         ? JSON.parse(JSON.stringify(favorite.items))
         : null
-    const baseDescription = favorite.description || favorite.label || 'Favorite meal'
+    const baseDescription = favorite.label || favorite.description || 'Favorite meal'
     const entry = {
       id: makeUniqueLocalEntryId(
         new Date(createdAtIso).getTime(),
@@ -12700,7 +12705,7 @@ Please add nutritional information manually if needed.`);
 
               const favoriteKeySet = new Set<string>()
               ;(favorites || []).forEach((fav: any) => {
-                const key = normalizeMealLabel(fav?.description || fav?.label || '').toLowerCase()
+                const key = favoriteDisplayLabel(fav).toLowerCase()
                 if (key) favoriteKeySet.add(key)
               })
 
