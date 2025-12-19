@@ -6053,15 +6053,21 @@ Please add nutritional information manually if needed.`);
   const foodNameOverrideMap = useMemo(() => {
     const map = new Map<string, string>()
     const byItemId = new Map<string, string>()
+    const byFavoriteId = new Map<string, string>()
+    const bySourceId = new Map<string, string>()
     const list = Array.isArray(foodNameOverrides) ? foodNameOverrides : []
     for (const row of list) {
       const fromRaw = typeof (row as any)?.from === 'string' ? String((row as any).from) : ''
       const toRaw = typeof (row as any)?.to === 'string' ? String((row as any).to) : ''
       const itemIdRaw = typeof (row as any)?.itemId === 'string' ? String((row as any).itemId).trim() : ''
+      const favIdRaw = typeof (row as any)?.favoriteId === 'string' ? String((row as any).favoriteId).trim() : ''
+      const srcIdRaw = typeof (row as any)?.sourceId === 'string' ? String((row as any).sourceId).trim() : ''
       const from = normalizeMealLabel(fromRaw || '')
       const to = normalizeMealLabel(toRaw || '').trim()
       if (!from || !to) continue
       if (itemIdRaw) byItemId.set(itemIdRaw, to)
+      if (favIdRaw) byFavoriteId.set(favIdRaw, to)
+      if (srcIdRaw) bySourceId.set(srcIdRaw, to)
       const key = normalizeFoodName(from)
       if (key) map.set(key, to)
       try {
@@ -6072,6 +6078,8 @@ Please add nutritional information manually if needed.`);
       } catch {}
     }
     ;(map as any).__byItemId = byItemId
+    ;(map as any).__byFavoriteId = byFavoriteId
+    ;(map as any).__bySourceId = bySourceId
     return map
   }, [foodNameOverrides])
 
@@ -6083,6 +6091,27 @@ Please add nutritional information manually if needed.`);
       const byItemId = (foodNameOverrideMap as any)?.__byItemId
       if (itemId && byItemId && typeof byItemId.get === 'function') {
         const hit = byItemId.get(itemId)
+        if (hit) return hit
+      }
+      const favId =
+        (entry?.favorite && entry.favorite.id && String(entry.favorite.id)) ||
+        (entry?.nutrition && (entry.nutrition as any).__favoriteId) ||
+        (entry?.total && (entry.total as any).__favoriteId) ||
+        (entry?.id && String(entry.id).startsWith('fav-') ? String(entry.id) : '')
+      const byFavoriteId = (foodNameOverrideMap as any)?.__byFavoriteId
+      if (favId && byFavoriteId && typeof byFavoriteId.get === 'function') {
+        const hit = byFavoriteId.get(String(favId).trim())
+        if (hit) return hit
+      }
+      const srcId =
+        (entry?.favorite && entry.favorite.sourceId) ||
+        entry?.sourceId ||
+        entry?.dbId ||
+        (entry?.nutrition && (entry.nutrition as any).__sourceId) ||
+        (entry?.total && (entry.total as any).__sourceId)
+      const bySourceId = (foodNameOverrideMap as any)?.__bySourceId
+      if (srcId && bySourceId && typeof bySourceId.get === 'function') {
+        const hit = bySourceId.get(String(srcId).trim())
         if (hit) return hit
       }
     } catch {}
@@ -7064,19 +7093,45 @@ Please add nutritional information manually if needed.`);
     const fromKey = normalizeFoodName(from)
     if (!fromKey) return
     let itemId = ''
+    let favoriteId = ''
+    let sourceId = ''
     try {
       const items = Array.isArray(entry?.items) ? entry.items : null
       const single = Array.isArray(items) && items.length === 1 ? items[0] : null
       itemId = single && typeof single?.id === 'string' ? String(single.id).trim() : ''
+      favoriteId =
+        (entry?.favorite && entry.favorite.id && String(entry.favorite.id)) ||
+        (entry?.nutrition && (entry.nutrition as any).__favoriteId) ||
+        (entry?.total && (entry.total as any).__favoriteId) ||
+        (entry?.id && String(entry.id).startsWith('fav-') ? String(entry.id) : '') ||
+        ''
+      sourceId =
+        (entry?.favorite && entry.favorite.sourceId) ||
+        entry?.sourceId ||
+        entry?.dbId ||
+        (entry?.nutrition && (entry.nutrition as any).__sourceId) ||
+        (entry?.total && (entry.total as any).__sourceId) ||
+        ''
     } catch {}
     setFoodNameOverrides((prev) => {
       const base = Array.isArray(prev) ? prev : []
       const next = base.filter((row: any) => {
         const rowItemId = typeof row?.itemId === 'string' ? String(row.itemId).trim() : ''
+        const rowFavId = typeof row?.favoriteId === 'string' ? String(row.favoriteId).trim() : ''
+        const rowSrcId = typeof row?.sourceId === 'string' ? String(row.sourceId).trim() : ''
         if (itemId && rowItemId && rowItemId === itemId) return false
+        if (favoriteId && rowFavId && rowFavId === favoriteId) return false
+        if (sourceId && rowSrcId && rowSrcId === sourceId) return false
         return normalizeFoodName(normalizeMealLabel(row?.from || '')) !== fromKey
       })
-      next.unshift({ from, to, ...(itemId ? { itemId } : {}), createdAt: Date.now() })
+      next.unshift({
+        from,
+        to,
+        ...(itemId ? { itemId } : {}),
+        ...(favoriteId ? { favoriteId } : {}),
+        ...(sourceId ? { sourceId } : {}),
+        createdAt: Date.now(),
+      })
       persistFoodNameOverrides(next)
       return next
     })
@@ -13307,7 +13362,7 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <div className="fixed inset-0 z-50 bg-white overflow-x-hidden overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-white overflow-auto">
           <div className="min-h-full w-full max-w-6xl mx-auto flex flex-col px-3 sm:px-4">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div>
