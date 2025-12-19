@@ -6314,7 +6314,7 @@ Please add nutritional information manually if needed.`);
       return src
     }
     if ((entry as any)?.method === 'photo') return 'CRDB'
-    if ((entry as any)?.method === 'text') return 'Custom Food'
+    if ((entry as any)?.method === 'text') return 'Manual'
     return 'CRDB'
   }
 

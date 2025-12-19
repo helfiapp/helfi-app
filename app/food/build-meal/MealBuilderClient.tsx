@@ -608,7 +608,7 @@ export default function MealBuilderClient() {
     if (entry?.sourceTag) return String(entry.sourceTag)
     if ((entry as any)?.source) return String((entry as any).source).toUpperCase()
     if ((entry as any)?.method === 'photo') return 'CRDB'
-    if ((entry as any)?.method === 'text') return 'Custom Food'
+    if ((entry as any)?.method === 'text') return 'Manual'
     return 'CRDB'
   }
 
