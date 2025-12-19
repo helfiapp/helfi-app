@@ -309,10 +309,22 @@ export const checkDietCompatibility = (input: DietCheckInput): DietCheckResult =
     // Animal-focused
     case 'carnivore':
       maybeWarn(hasAny(blob, KEYWORDS.plantsCommon) || hasGrains, 'This looks like it contains plant foods, which doesn’t fit a carnivore diet.')
+      if (Number.isFinite(carbs) && carbs > 10) {
+        warnings.push('This looks higher in carbs than most carnivore meals.')
+      }
+      if (Number.isFinite(sugar) && sugar > 5) {
+        warnings.push('This looks higher in sugar than most carnivore meals.')
+      }
       if (warnings.length) addSuggestion(suggestions, 'Try a simple meat-only meal (e.g. steak, eggs, fish).')
       break
     case 'lion':
       maybeWarn(hasAny(blob, KEYWORDS.nonRuminantAnimal) || hasAny(blob, KEYWORDS.plantsCommon) || hasDairy, 'Lion diet is usually ruminant meat only (plus salt/water). This meal may not fit.')
+      if (Number.isFinite(carbs) && carbs > 10) {
+        warnings.push('This looks higher in carbs than most lion diet meals.')
+      }
+      if (Number.isFinite(sugar) && sugar > 5) {
+        warnings.push('This looks higher in sugar than most lion diet meals.')
+      }
       if (warnings.length) addSuggestion(suggestions, 'Try beef or lamb (simple, unseasoned) as a swap.')
       break
     case 'keto-carnivore':
@@ -355,7 +367,7 @@ export const checkDietCompatibility = (input: DietCheckInput): DietCheckResult =
       }
       break
     case 'zero-carb':
-      maybeWarn(Number.isFinite(carbs) ? carbs > 10 : hasAny(blob, KEYWORDS.grains) || hasAny(blob, KEYWORDS.sugary), 'This looks like it contains carbs, which may not fit zero-carb.')
+      maybeWarn(Number.isFinite(carbs) ? carbs > 5 : hasAny(blob, KEYWORDS.grains) || hasAny(blob, KEYWORDS.sugary), 'This looks like it contains carbs, which may not fit zero-carb.')
       if (warnings.length) addSuggestion(suggestions, 'Try a meat/egg/fish-based meal with no bread, rice, or fruit.')
       break
 

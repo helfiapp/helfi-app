@@ -39,6 +39,7 @@ import { COMMON_USDA_FOODS } from '@/data/usda-common'
 import { calculateDailyTargets } from '@/lib/daily-targets'
 import { AI_MEAL_RECOMMENDATION_CREDITS } from '@/lib/ai-meal-recommendation'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
+import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets'
 
 const NUTRIENT_DISPLAY_ORDER: Array<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'> = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']
 
@@ -5963,6 +5964,76 @@ Please add nutritional information manually if needed.`);
     setTimeout(() => setQuickToast(null), 1400)
   }
 
+  const buildDietTotalsForCheck = (entry: any) => {
+    const rawTotal = entry?.total
+    if (rawTotal && typeof rawTotal === 'object') {
+      // Prefer the canonical shape used across the app.
+      if ((rawTotal as any).carbs_g !== undefined || (rawTotal as any).sugar_g !== undefined) return rawTotal
+      // Fallback: some stored totals use non-suffixed keys.
+      if ((rawTotal as any).carbs !== undefined || (rawTotal as any).sugar !== undefined) {
+        return {
+          calories: (rawTotal as any).calories,
+          protein_g: (rawTotal as any).protein_g ?? (rawTotal as any).protein,
+          carbs_g: (rawTotal as any).carbs_g ?? (rawTotal as any).carbs,
+          fat_g: (rawTotal as any).fat_g ?? (rawTotal as any).fat,
+          fiber_g: (rawTotal as any).fiber_g ?? (rawTotal as any).fiber,
+          sugar_g: (rawTotal as any).sugar_g ?? (rawTotal as any).sugar,
+        }
+      }
+      return rawTotal
+    }
+    const n = entry?.nutrition
+    if (!n || typeof n !== 'object') return null
+    return {
+      calories: (n as any).calories,
+      protein_g: (n as any).protein,
+      carbs_g: (n as any).carbs,
+      fat_g: (n as any).fat,
+      fiber_g: (n as any).fiber,
+      sugar_g: (n as any).sugar,
+    }
+  }
+
+  // Diet warnings (no extra AI / no extra credits):
+  // If a user has selected diets in Health Setup, warn when they add meals via
+  // favorites or copying, even if they didn't run the Food Analyzer again.
+  const maybeShowDietWarningToast = (entry: any) => {
+    try {
+      const dietIds = normalizeDietTypes((userData as any)?.dietTypes ?? (userData as any)?.dietType)
+      if (!dietIds.length) return
+
+      const itemNames = Array.isArray(entry?.items)
+        ? entry.items
+            .map((it: any) => (it?.name || it?.label || '').toString().trim())
+            .filter((v: string) => v.length > 0)
+        : []
+
+      const totals = buildDietTotalsForCheck(entry)
+
+      const result = checkMultipleDietCompatibility({
+        dietIds,
+        itemNames,
+        analysisText: (entry?.description || '').toString(),
+        totals,
+      })
+
+      if (!result.warningsByDiet.length) return
+      const names = result.warningsByDiet
+        .map((w) => w.dietLabel)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(', ')
+      const suggestion = result.suggestions?.[0] ? ` ${result.suggestions[0]}` : ''
+
+      // Delay slightly so it doesn't instantly replace the "Added/Copied" toast.
+      setTimeout(() => {
+        showQuickToast(`Heads up: this may not match your diet${result.warningsByDiet.length > 1 ? 's' : ''} (${names}).${suggestion}`)
+      }, 1600)
+    } catch {
+      // non-blocking
+    }
+  }
+
   const pendingEntryScrollRef = useRef<{
     startedAt: number
     entryKey?: string | null
@@ -7471,6 +7542,7 @@ Please add nutritional information manually if needed.`);
     setShowPhotoOptions(false)
     setShowAddFood(false)
     setQuickToast(`Adding to ${categoryLabel(category)}...`)
+    maybeShowDietWarningToast(entry)
     if (!isViewingToday) {
       setHistoryFoods((prev: any[] | null) => {
         const base = Array.isArray(prev) ? prev : []
@@ -7599,6 +7671,7 @@ Please add nutritional information manually if needed.`);
       [category]: true,
     }))
     showQuickToast(toastMessage)
+    maybeShowDietWarningToast(copiedEntry)
     setDuplicateModalContext(null)
     triggerHaptic(10)
 
@@ -7656,6 +7729,32 @@ Please add nutritional information manually if needed.`);
     setTodaysFoods(deduped)
     setExpandedCategories((prev) => ({ ...prev, [categoryKey]: true }))
     showQuickToast(`Copied ${categoryLabel(categoryKey)} to today`)
+    // Warn once if any copied meals don't match the selected diets.
+    try {
+      const dietIds = normalizeDietTypes((userData as any)?.dietTypes ?? (userData as any)?.dietType)
+      if (dietIds.length) {
+        const anyMismatch = clones.some((clone: any) => {
+          const itemNames = Array.isArray(clone?.items)
+            ? clone.items
+                .map((it: any) => (it?.name || it?.label || '').toString().trim())
+                .filter((v: string) => v.length > 0)
+            : []
+          const totals = buildDietTotalsForCheck(clone)
+          const res = checkMultipleDietCompatibility({
+            dietIds,
+            itemNames,
+            analysisText: (clone?.description || '').toString(),
+            totals,
+          })
+          return res.warningsByDiet.length > 0
+        })
+        if (anyMismatch) {
+          setTimeout(() => {
+            showQuickToast('Heads up: some copied meals may not match your selected diets.')
+          }, 1600)
+        }
+      }
+    } catch {}
     try {
       // Persist to user-data snapshot (without history append to avoid single-entry overwrite)
       await saveFoodEntries(deduped, { appendHistory: false, snapshotDateOverride: targetDate })

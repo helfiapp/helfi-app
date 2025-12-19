@@ -151,6 +151,12 @@ function normalizeForComparison(value: any): any {
 
 function getInsightsRelevantOnboardingFormSnapshot(source: any): any {
   const sanitized = sanitizeUserDataPayload(source) || {};
+  const normalizeRoundedNumberString = (raw: any) => {
+    if (raw === null || raw === undefined || raw === '') return ''
+    const n = typeof raw === 'number' ? raw : Number(String(raw))
+    if (!Number.isFinite(n)) return (raw || '').toString()
+    return String(Math.round(n))
+  }
   const healthSituationsDefault = {
     healthIssues: '',
     healthProblems: '',
@@ -160,8 +166,10 @@ function getInsightsRelevantOnboardingFormSnapshot(source: any): any {
 
   return {
     gender: typeof sanitized.gender === 'string' ? sanitized.gender : '',
-    weight: sanitized.weight ?? '',
-    height: sanitized.height ?? '',
+    // Important: backend may load these as numbers (DB Floats) while the form saves strings.
+    // Normalizing prevents false "Update Insights" prompts when the value is the same.
+    weight: normalizeRoundedNumberString((sanitized as any).weight),
+    height: normalizeRoundedNumberString((sanitized as any).height),
     bodyType: typeof sanitized.bodyType === 'string' ? sanitized.bodyType : '',
     birthdate: typeof sanitized.birthdate === 'string' ? sanitized.birthdate : '',
     dietTypes: normalizeDietTypes((sanitized as any)?.dietTypes ?? (sanitized as any)?.dietType).sort(),
@@ -1339,33 +1347,35 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
     return (
       <div className="bg-gray-50 min-h-screen flex flex-col">
-        <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-4 bg-gray-50/95 backdrop-blur-md border-b border-gray-100">
-          <button
-            type="button"
-            onClick={() => setDietPickerView('categories')}
-            className="flex items-center justify-center size-10 rounded-full hover:bg-gray-200 transition-colors"
-            aria-label="Back"
-          >
-            <MaterialSymbol name="arrow_back" className="text-2xl" />
-          </button>
-          <h1 className="text-lg font-bold tracking-tight">Select diets</h1>
-          <button
-            type="button"
-            onClick={clearAllDiets}
-            className="text-sm font-semibold text-gray-600 hover:text-gray-900"
-          >
-            Clear
-          </button>
+        <header className="sticky top-0 z-50 bg-gray-50/95 backdrop-blur-md border-b border-gray-100">
+          <div className="max-w-md mx-auto w-full flex items-center justify-between px-4 py-4">
+            <button
+              type="button"
+              onClick={() => setDietPickerView('categories')}
+              className="flex items-center justify-center size-10 rounded-full hover:bg-gray-200 transition-colors"
+              aria-label="Back"
+            >
+              <MaterialSymbol name="arrow_back" className="text-2xl" />
+            </button>
+            <h1 className="text-lg font-bold tracking-tight">Select diets</h1>
+            <button
+              type="button"
+              onClick={clearAllDiets}
+              className="text-sm font-semibold text-gray-600 hover:text-gray-900"
+            >
+              Clear
+            </button>
+          </div>
         </header>
 
-        <div className="px-5 pt-3 pb-4">
+        <div className="max-w-md mx-auto w-full px-5 pt-3 pb-4">
           <h2 className="text-2xl font-bold leading-tight tracking-tight mb-1">Choose diets that fit you.</h2>
           <p className="text-gray-600 text-base font-medium">
             You can pick more than one. We’ll warn you when a meal doesn’t match.
           </p>
         </div>
 
-        <div className="px-5 pb-3">
+        <div className="max-w-md mx-auto w-full px-5 pb-3">
           <div className="flex gap-2 overflow-x-auto">
             {DIET_CATEGORIES.map((cat) => {
               const active = cat.id === activeDietCategoryId
@@ -1427,7 +1437,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         </main>
 
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-50/95 backdrop-blur-xl border-t border-gray-200 z-40">
-          <div className="max-w-md mx-auto space-y-2">
+          <div className="max-w-md mx-auto w-full space-y-2">
             <button
               type="button"
               onClick={() => setShowDietPicker(false)}
