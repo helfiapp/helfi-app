@@ -1814,6 +1814,7 @@ export default function FoodDiary() {
   const deletedEntryKeysRef = useRef<Set<string>>(new Set())
   const [deletedEntryNonce, setDeletedEntryNonce] = useState(0) // bump to force dedupe refresh after deletes
   const [favorites, setFavorites] = useState<any[]>([])
+  const [foodNameOverrides, setFoodNameOverrides] = useState<any[]>([])
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
   type MultiCopyClipboardItem = {
@@ -2382,6 +2383,34 @@ export default function FoodDiary() {
       // Best-effort only
     }
   }, [favorites])
+
+  useEffect(() => {
+    try {
+      const raw = (userData as any)?.foodNameOverrides
+      if (Array.isArray(raw)) {
+        setFoodNameOverrides(raw)
+        return
+      }
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('food:nameOverrides')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) setFoodNameOverrides(parsed)
+        }
+      }
+    } catch (error) {
+      console.warn('Could not load food name overrides', error)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(userData as any)?.foodNameOverrides])
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('food:nameOverrides', JSON.stringify(foodNameOverrides))
+      }
+    } catch {}
+  }, [foodNameOverrides])
 
   const dailyTargets = useMemo(() => {
     if (!userData) return { calories: null, protein: null, carbs: null, fat: null }
@@ -6021,6 +6050,43 @@ Please add nutritional information manually if needed.`);
     return normalizeMealLabel(raw)
   }
 
+  const foodNameOverrideMap = useMemo(() => {
+    const map = new Map<string, string>()
+    const list = Array.isArray(foodNameOverrides) ? foodNameOverrides : []
+    for (const row of list) {
+      const fromRaw = typeof (row as any)?.from === 'string' ? String((row as any).from) : ''
+      const toRaw = typeof (row as any)?.to === 'string' ? String((row as any).to) : ''
+      const from = normalizeMealLabel(fromRaw || '')
+      const to = normalizeMealLabel(toRaw || '').trim()
+      if (!from || !to) continue
+      const key = normalizeFoodName(from)
+      if (key) map.set(key, to)
+      try {
+        const withoutQty = from.replace(/^\s*\d+(?:\.\d+)?\s*(?:×|x)?\s*/i, '').trim()
+        const head = (withoutQty.split(',')[0] || withoutQty).split('(')[0] || withoutQty
+        const simpleKey = normalizeFoodName(normalizeMealLabel(head))
+        if (simpleKey) map.set(simpleKey, to)
+      } catch {}
+    }
+    return map
+  }, [foodNameOverrides])
+
+  const applyFoodNameOverride = (raw: any) => {
+    const base = normalizeMealLabel(raw || '').trim()
+    if (!base) return ''
+    const key = normalizeFoodName(base)
+    const hit = key ? foodNameOverrideMap.get(key) : ''
+    if (hit) return hit
+    try {
+      const withoutQty = base.replace(/^\s*\d+(?:\.\d+)?\s*(?:×|x)?\s*/i, '').trim()
+      const head = (withoutQty.split(',')[0] || withoutQty).split('(')[0] || withoutQty
+      const simpleKey = normalizeFoodName(normalizeMealLabel(head))
+      const simpleHit = simpleKey ? foodNameOverrideMap.get(simpleKey) : ''
+      if (simpleHit) return simpleHit
+    } catch {}
+    return base
+  }
+
   const parseFavoriteItems = (fav: any): any[] | null => {
     const candidate = fav?.items
     if (Array.isArray(candidate)) return candidate
@@ -6248,9 +6314,9 @@ Please add nutritional information manually if needed.`);
     }
     // Use the same normalization we use for food names so things like "Bürgen" and "Burgen"
     // (and various punctuation/spacing differences) still match reliably.
-    const normalizeKey = (raw: any) => normalizeFoodName(normalizeMealLabel(raw || ''))
+    const normalizeKey = (raw: any) => normalizeFoodName(applyFoodNameOverride(raw || ''))
     const simplifyKey = (raw: any) => {
-      const s = normalizeMealLabel(raw || '').trim()
+      const s = applyFoodNameOverride(raw || '').trim()
       if (!s) return ''
       const withoutQty = s.replace(/^\s*\d+(?:\.\d+)?\s*(?:×|x)?\s*/i, '').trim()
       const head = (withoutQty.split(',')[0] || withoutQty).split('(')[0] || withoutQty
@@ -6276,15 +6342,11 @@ Please add nutritional information manually if needed.`);
     })
 
     const entryKey = (entry: any) => {
-      const linkedId = linkedFavoriteIdForEntry(entry)
-      if (linkedId) return `fav:${linkedId}`
+      // "All" is a picker list; we key by the (possibly renamed) label so old names collapse cleanly.
       const label = normalizeKey(entry?.description || entry?.label || '')
-      const aliasHit = label ? favoriteIdByAlias.get(label) : ''
       const labelSimple = simplifyKey(entry?.description || entry?.label || '')
-      const aliasHitSimple = labelSimple ? favoriteIdByAlias.get(labelSimple) : ''
-      const hit = aliasHit || aliasHitSimple
-      if (hit) return `fav:${hit}`
-      return label ? `label:${label}` : ''
+      const key = label || labelSimple
+      return key ? `label:${key}` : ''
     }
     history.forEach((entry) => {
       const key = entryKey(entry)
@@ -6302,14 +6364,13 @@ Please add nutritional information manually if needed.`);
     const favoritesByKey = new Map<string, any>()
     const favoritesById = new Map<string, any>()
     ;(favorites || []).forEach((fav: any) => {
-      const key = favoriteDisplayLabel(fav).toLowerCase()
+      const key = normalizeKey(fav?.label || fav?.description || favoriteDisplayLabel(fav) || '')
       if (!key) return
       favoritesByKey.set(key, fav)
       if (fav?.id) favoritesById.set(String(fav.id), fav)
       // If something is a Favorite, it should still be selectable from "All".
       // Prefer the explicit favorite payload when no history entry exists.
-      const favId = fav?.id ? String(fav.id).trim() : ''
-      const allKey = favId ? `fav:${favId}` : `label:${key}`
+      const allKey = `label:${key}`
       if (allKey && !allByKey.has(allKey)) {
         allByKey.set(allKey, { ...fav, sourceTag: 'Favorite' })
       }
@@ -6321,7 +6382,7 @@ Please add nutritional information manually if needed.`);
         const linkedId = linkedFavoriteIdForEntry(entry)
         if (linkedId && favoritesById.has(linkedId)) {
           const fav = favoritesById.get(linkedId)
-          return favoriteDisplayLabel(fav) || normalizeMealLabel(entry?.description || entry?.label || 'Meal')
+          return applyFoodNameOverride(favoriteDisplayLabel(fav) || entry?.description || entry?.label || 'Meal')
         }
         // If this entry matches a renamed favorite alias, show the latest favorite label.
         try {
@@ -6334,10 +6395,10 @@ Please add nutritional information manually if needed.`);
             })()
           if (aliasId && favoritesById.has(aliasId)) {
             const fav = favoritesById.get(aliasId)
-            return favoriteDisplayLabel(fav) || normalizeMealLabel(entry?.description || entry?.label || 'Meal')
+            return applyFoodNameOverride(favoriteDisplayLabel(fav) || entry?.description || entry?.label || 'Meal')
           }
         } catch {}
-        return normalizeMealLabel(entry?.description || entry?.label || 'Meal')
+        return applyFoodNameOverride(entry?.description || entry?.label || 'Meal')
       })(),
       entry,
       favorite:
@@ -6357,7 +6418,7 @@ Please add nutritional information manually if needed.`);
                   })()
                 if (aliasId && favoritesById.has(aliasId)) return favoritesById.get(aliasId)
               } catch {}
-              return favoritesByKey.get(normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()) || null
+              return favoritesByKey.get(normalizeKey(entry?.description || entry?.label || '')) || null
             })(),
       createdAt: entry?.createdAt || entry?.id || Date.now(),
       sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
@@ -6367,7 +6428,7 @@ Please add nutritional information manually if needed.`);
 
     const favoriteMeals = (favorites || []).map((fav: any) => ({
       id: fav?.id || `fav-${Math.random()}`,
-      label: favoriteDisplayLabel(fav) || normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal'),
+      label: applyFoodNameOverride(fav?.label || fav?.description || 'Favorite meal') || favoriteDisplayLabel(fav) || normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal'),
       favorite: fav,
       createdAt: fav?.createdAt || fav?.id || Date.now(),
       sourceTag: 'Favorite',
@@ -6931,6 +6992,34 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const persistFoodNameOverrides = (nextOverrides: any[]) => {
+    updateUserData({ foodNameOverrides: nextOverrides } as any)
+    try {
+      fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foodNameOverrides: nextOverrides }),
+      }).catch(() => {})
+    } catch (error) {
+      console.error('Failed to persist food name overrides', error)
+    }
+  }
+
+  const saveFoodNameOverride = (fromLabel: any, toLabel: any) => {
+    const from = normalizeMealLabel(fromLabel || '').trim()
+    const to = normalizeMealLabel(toLabel || '').trim()
+    if (!from || !to || from === to) return
+    const fromKey = normalizeFoodName(from)
+    if (!fromKey) return
+    setFoodNameOverrides((prev) => {
+      const base = Array.isArray(prev) ? prev : []
+      const next = base.filter((row: any) => normalizeFoodName(normalizeMealLabel(row?.from || '')) !== fromKey)
+      next.unshift({ from, to, createdAt: Date.now() })
+      persistFoodNameOverrides(next)
+      return next
+    })
+  }
+
   const saveFavoriteFromEntry = (
     source: any,
     opts?: { labelOverride?: string; forceCustomMeal?: boolean },
@@ -7016,9 +7105,7 @@ Please add nutritional information manually if needed.`);
     setQuickToast(`Adding to ${categoryLabel(category)}...`)
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    const description = normalizeMealLabel(
-      source?.description || source?.label || source?.favorite?.label || 'Meal',
-    )
+    const description = applyFoodNameOverride(source?.description || source?.label || source?.favorite?.label || 'Meal')
     const totals =
       sanitizeNutritionTotals(source?.nutrition || source?.total || source?.entry?.total || source?.entry?.nutrition) ||
       null
@@ -7230,11 +7317,14 @@ Please add nutritional information manually if needed.`);
     if (!favId) return
     const existing = (Array.isArray(favorites) ? favorites : []).find((f: any) => String(f?.id || '') === favId) || null
     if (!existing) return
-    const current = favoriteDisplayLabel(existing) || 'Favorite'
+    const current = applyFoodNameOverride(favoriteDisplayLabel(existing) || 'Favorite') || 'Favorite'
     const nextRaw = typeof window !== 'undefined' ? window.prompt('Rename to:', current) : null
     const nextName = (nextRaw || '').toString().trim()
     if (!nextName) return
     const cleaned = normalizeMealLabel(nextName) || nextName
+    try {
+      saveFoodNameOverride(favoriteDisplayLabel(existing) || current, cleaned)
+    } catch {}
     setFavorites((prev) => {
       const next = (Array.isArray(prev) ? prev : []).map((fav: any) => {
         if (String(fav?.id || '') !== favId) return fav
@@ -8575,6 +8665,7 @@ Please add nutritional information manually if needed.`);
   return (
     <DiaryErrorBoundary>
       <div ref={pageTopRef} className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+        <div className="w-full max-w-6xl mx-auto flex-1 flex flex-col px-3 sm:px-4 lg:px-6">
       {/* Saved Toast (brief confirmation) */}
       {showSavedToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
@@ -13154,7 +13245,8 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-x-hidden">
+        <div className="fixed inset-0 z-50 bg-white overflow-x-hidden">
+          <div className="h-full w-full max-w-6xl mx-auto flex flex-col px-3 sm:px-4">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div>
               <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
@@ -13402,12 +13494,12 @@ Please add nutritional information manually if needed.`);
                                     return
                                   }
 
-                                  const current = normalizeMealLabel(entry?.description || entry?.label || 'Meal') || 'Meal'
+                                  const current = applyFoodNameOverride(entry?.description || entry?.label || 'Meal') || 'Meal'
                                   const nextRaw = typeof window !== 'undefined' ? window.prompt('Rename to:', current) : null
                                   const nextName = (nextRaw || '').toString().trim()
                                   if (!nextName) return
-                                  saveFavoriteFromEntry(entry, { labelOverride: nextName })
-                                  showQuickToast('Saved to Favorites')
+                                  saveFoodNameOverride(entry?.description || entry?.label || current, nextName)
+                                  showQuickToast('Renamed')
                                   return
                                 }
                               } catch {}
@@ -13433,6 +13525,7 @@ Please add nutritional information manually if needed.`);
                 </div>
               )
             })()}
+          </div>
           </div>
         </div>
       )}
@@ -13927,6 +14020,7 @@ Please add nutritional information manually if needed.`);
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Credit Purchase Modal */}

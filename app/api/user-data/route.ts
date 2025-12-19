@@ -226,6 +226,22 @@ export async function GET(request: NextRequest) {
       console.log('No favorites data found in storage');
     }
 
+    // Get saved food name overrides (used for user renames without forcing favorites)
+    let foodNameOverrides: any[] = []
+    try {
+      const storedOverrides = user.healthGoals.find((goal: any) => goal.name === '__FOOD_NAME_OVERRIDES__')
+      if (storedOverrides && storedOverrides.category) {
+        const parsed = JSON.parse(storedOverrides.category)
+        if (Array.isArray(parsed?.overrides)) {
+          foodNameOverrides = parsed.overrides
+        } else if (Array.isArray(parsed)) {
+          foodNameOverrides = parsed
+        }
+      }
+    } catch (e) {
+      console.log('No food name overrides data found in storage')
+    }
+
     // Get device interest (stored in hidden goal record)
     let deviceInterestData: any = {}
     try {
@@ -336,6 +352,7 @@ export async function GET(request: NextRequest) {
       profileImage: user.image || null,
       todaysFoods: normalizedTodaysFoods,
       favorites,
+      foodNameOverrides,
       profileInfo: profileInfoData,
       deviceInterest: deviceInterestData,
       termsAccepted: (user as any).termsAccepted === true,
@@ -1153,6 +1170,44 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error storing favorites data:', error)
+    }
+
+    // 7b. Handle food name overrides (user renames that should apply across the UI)
+    try {
+      if (data && Array.isArray((data as any).foodNameOverrides)) {
+        const overridesArray = (data as any).foodNameOverrides
+        const existingGoals = await prisma.healthGoal.findMany({
+          where: { userId: user.id, name: '__FOOD_NAME_OVERRIDES__' },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        })
+        const primary = existingGoals[0] || null
+        if (primary?.id) {
+          await prisma.healthGoal.update({
+            where: { id: primary.id },
+            data: {
+              category: JSON.stringify({ overrides: overridesArray }),
+              currentRating: 0,
+            },
+          })
+          if (existingGoals.length > 1) {
+            await prisma.healthGoal.deleteMany({
+              where: { id: { in: existingGoals.slice(1).map((g) => g.id) } },
+            })
+          }
+        } else {
+          await prisma.healthGoal.create({
+            data: {
+              userId: user.id,
+              name: '__FOOD_NAME_OVERRIDES__',
+              category: JSON.stringify({ overrides: overridesArray }),
+              currentRating: 0,
+            },
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error storing food name overrides data:', error)
     }
 
     // 8. Handle profileInfo data from profile page - store as special health goal
