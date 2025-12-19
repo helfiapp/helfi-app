@@ -6481,10 +6481,7 @@ Please add nutritional information manually if needed.`);
       for (const item of Array.isArray(allMealsRaw) ? allMealsRaw : []) {
         const labelKey = normalizeFoodName(String(item?.label || '').trim())
         if (!labelKey) continue
-        const servingKey = normalizeFoodName(String(item?.serving || '').trim())
-        const caloriesKey =
-          item?.calories != null && Number.isFinite(Number(item.calories)) ? String(Math.round(Number(item.calories))) : ''
-        const key = `${labelKey}|${servingKey}|${caloriesKey}`
+        const key = labelKey
         const existing = byDisplay.get(key)
         if (!existing) {
           byDisplay.set(key, item)
@@ -13362,7 +13359,7 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <div className="fixed inset-0 z-50 bg-white overflow-auto">
+        <div className="fixed inset-0 z-50 bg-white">
           <div className="min-h-full w-full max-w-6xl mx-auto flex flex-col px-3 sm:px-4">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div>
