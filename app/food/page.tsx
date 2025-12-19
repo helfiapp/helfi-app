@@ -24,7 +24,7 @@ import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
  * Any change requires explicit written approval from the user.
  */
 
-import React, { useState, useEffect, useMemo, useRef, Component } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback, Component } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -1294,7 +1294,11 @@ export default function FoodDiary() {
   const router = useRouter()
   const { userData, profileImage, updateUserData } = useUserData()
   const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
-  const persistentDiarySnapshot = useMemo(() => readPersistentDiarySnapshot(), [])
+  const [persistentDiarySnapshotVersion, setPersistentDiarySnapshotVersion] = useState(0)
+  const refreshPersistentDiarySnapshot = useCallback(() => {
+    setPersistentDiarySnapshotVersion((prev) => prev + 1)
+  }, [])
+  const persistentDiarySnapshot = useMemo(() => readPersistentDiarySnapshot(), [persistentDiarySnapshotVersion])
   const initialSelectedDate =
     warmDiaryState?.selectedDate && warmDiaryState.selectedDate.length >= 8
       ? warmDiaryState.selectedDate
@@ -3743,9 +3747,9 @@ const applyStructuredItems = (
 
   // Persist a durable snapshot per date to avoid reload flicker across navigations
   useEffect(() => {
-      if (typeof window === 'undefined') return
-      try {
-        const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
+    if (typeof window === 'undefined') return
+    try {
+      const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
       const sourceEntriesForDate = normalizeDiaryList(
         isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []),
         selectedDate,
@@ -3757,10 +3761,20 @@ const applyStructuredItems = (
         normalized: true,
       }
       writePersistentDiarySnapshot(snapshot)
+      refreshPersistentDiarySnapshot()
     } catch (err) {
       console.warn('Could not persist diary snapshot', err)
     }
-  }, [selectedDate, isViewingToday, todaysFoods, historyFoods, expandedCategories])
+  }, [selectedDate, isViewingToday, todaysFoods, historyFoods, expandedCategories, refreshPersistentDiarySnapshot])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = showFavoritesPicker ? 'hidden' : previousOverflow
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [showFavoritesPicker])
 
   // Ensure diary is considered hydrated once data is loaded through any path
   useEffect(() => {
@@ -7083,6 +7097,37 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const renamePersistentDiaryEntries = useCallback(
+    (mapper: (entry: any) => any) => {
+      if (typeof window === 'undefined') return
+      try {
+        const snapshot = readPersistentDiarySnapshot()
+        if (!snapshot || !snapshot.byDate) return
+        let changed = false
+        const nextSnapshot: DiarySnapshot = { byDate: {} }
+        Object.entries(snapshot.byDate).forEach(([iso, data]) => {
+          if (!data || !Array.isArray(data.entries)) {
+            nextSnapshot.byDate[iso] = data
+            return
+          }
+          const updatedEntries = (data.entries || []).map((entry) => {
+            const mapped = mapper(entry)
+            if (mapped !== entry) changed = true
+            return mapped
+          })
+          nextSnapshot.byDate[iso] = { ...(data || {}), entries: updatedEntries }
+        })
+        if (changed) {
+          writePersistentDiarySnapshot(nextSnapshot)
+          refreshPersistentDiarySnapshot()
+        }
+      } catch (error) {
+        console.warn('Failed to rename persistent diary entries', error)
+      }
+    },
+    [refreshPersistentDiarySnapshot],
+  )
+
   const renameEntriesWithLabel = (fromKey: string, toLabel: string) => {
     const updateEntry = (entry: any) => {
       if (!entry) return entry
@@ -7097,6 +7142,7 @@ Please add nutritional information manually if needed.`);
 
     setTodaysFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
     setHistoryFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
+    renamePersistentDiaryEntries(updateEntry)
   }
 
   const saveFoodNameOverride = (fromLabel: any, toLabel: any, entry?: any) => {
@@ -7816,28 +7862,47 @@ Please add nutritional information manually if needed.`);
       try {
         const dbId = (safeFood as any)?.dbId ? String((safeFood as any).dbId) : ''
         const key = normalizeMealLabel(safeFood.description || '').toLowerCase()
-        const method = String((safeFood as any)?.method || '').toLowerCase()
+        const explicitMethod = String((safeFood as any)?.method || '').toLowerCase()
+        const originMethod = String(
+          (safeFood as any)?.nutrition?.__origin ||
+            (safeFood as any)?.total?.__origin ||
+            (safeFood as any)?.favorite?.method ||
+            '',
+        ).toLowerCase()
+        const method = explicitMethod || originMethod
+        const builderLogId =
+          dbId ||
+          (typeof (safeFood as any)?.sourceId === 'string'
+            ? (safeFood as any).sourceId
+            : typeof (safeFood as any)?.sourceId === 'number'
+            ? String((safeFood as any).sourceId)
+            : '') ||
+          (typeof (safeFood as any)?.favorite?.sourceId === 'string'
+            ? safeFood.favorite.sourceId
+            : typeof (safeFood as any)?.favorite?.sourceId === 'number'
+            ? String((safeFood as any).favorite.sourceId)
+            : '')
 
         // If this entry is known to be a Build-a-meal / Combined entry (durable marker),
         // always open it in the Build-a-meal editor for edits.
-        if ((method === 'meal-builder' || method === 'combined') && dbId) {
+        if ((method === 'meal-builder' || method === 'combined') && builderLogId) {
           const favCategory = normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType)
           const qs = new URLSearchParams()
           qs.set('date', selectedDate)
           qs.set('category', String(favCategory))
-          qs.set('sourceLogId', dbId)
+          qs.set('sourceLogId', builderLogId)
           router.push(`/food/build-meal?${qs.toString()}`)
           return
         }
 
         // Back-compat: if this looks like a Build-a-meal entry (based on item ids),
         // open it in the Build-a-meal editor, but do NOT auto-save anything.
-        if (dbId && isMealBuilderDiaryEntry(safeFood)) {
+        if (builderLogId && isMealBuilderDiaryEntry(safeFood)) {
           const favCategory = normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType)
           const qs = new URLSearchParams()
           qs.set('date', selectedDate)
           qs.set('category', String(favCategory))
-          qs.set('sourceLogId', dbId)
+          qs.set('sourceLogId', builderLogId)
           router.push(`/food/build-meal?${qs.toString()}`)
           return
         }
@@ -13376,11 +13441,10 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <>
-          <div className="fixed inset-0 bg-white z-[45]" />
-          <div className="relative z-[50]">
-            <div className="mx-auto max-w-6xl px-3 sm:px-4 py-4">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
+        <div className="fixed inset-0 z-[50] bg-white overflow-y-auto">
+          <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-4">
+            <div className="w-full overflow-hidden border border-gray-200 rounded-2xl shadow-xl bg-white">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
                 <div>
                   <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
                   <div className="text-sm text-gray-600">Insert into {categoryLabel(selectedAddCategory)}</div>
@@ -13481,7 +13545,7 @@ Please add nutritional information manually if needed.`);
 
                   if (data.length === 0) {
                     return (
-                      <div className="px-4 py-8 text-center text-sm text-gray-500 border border-gray-200 rounded-xl">
+                      <div className="px-4 py-8 text-center text-sm text-gray-500 border border-gray-200 rounded-xl mx-4">
                         {favoritesActiveTab === 'all'
                           ? 'No meals yet. Add some entries to see them here.'
                           : favoritesActiveTab === 'favorites'
@@ -13553,7 +13617,7 @@ Please add nutritional information manually if needed.`);
                                 <svg
                                   className="w-5 h-5"
                                   fill={isSaved ? 'currentColor' : 'none'}
-                                  stroke="currentColor"
+                                  stroke={isSaved ? 'none' : 'currentColor'}
                                   viewBox="0 0 24 24"
                                 >
                                   <path
@@ -13661,7 +13725,7 @@ Please add nutritional information manually if needed.`);
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {showMultiCopyModal && (
