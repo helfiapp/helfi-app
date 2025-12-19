@@ -12178,12 +12178,12 @@ Please add nutritional information manually if needed.`);
                           </button>
                         </div>
                       </div>
-                      {source.length === 0 ? (
-                        <p className="text-xs text-gray-500">
-                          Add a meal to see how today compares to your daily targets.
+                      {source.length === 0 && (
+                        <p className="text-xs text-gray-500 mb-3">
+                          No meals yet today. Here are your daily targets to start the day.
                         </p>
-                      ) : (
-                        (() => {
+                      )}
+                      {(() => {
                           const slides: JSX.Element[] = []
 
                           // Slide 1: Separate used vs remaining rings
@@ -12298,11 +12298,10 @@ Please add nutritional information manually if needed.`);
                                     />
                                   ))}
                                 </div>
-                          )}
+                              )}
                             </>
                           )
-                        })()
-                      )}
+                        })()}
                     </div>
                   </div>
                 )
