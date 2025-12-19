@@ -667,6 +667,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [dietPickerView, setDietPickerView] = useState<'categories' | 'detail'>('categories');
   const [dietSearch, setDietSearch] = useState('');
   const [activeDietCategoryId, setActiveDietCategoryId] = useState<string>(DIET_CATEGORIES[0]?.id || 'plant-based');
+  const [showDietSavedNotice, setShowDietSavedNotice] = useState(false);
+  const dietSavedNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dietHydratedRef = useRef(false);
   const dietTouchedRef = useRef(false);
   const allergiesHydratedRef = useRef(false);
@@ -915,6 +917,25 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       onUnsavedChange();
     }
   }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, initial, unit]);
+
+  const triggerDietSavedNotice = useCallback(() => {
+    setShowDietSavedNotice(true);
+    if (dietSavedNoticeTimeoutRef.current) {
+      clearTimeout(dietSavedNoticeTimeoutRef.current);
+    }
+    dietSavedNoticeTimeoutRef.current = setTimeout(() => {
+      setShowDietSavedNotice(false);
+    }, 4500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (dietSavedNoticeTimeoutRef.current) {
+        clearTimeout(dietSavedNoticeTimeoutRef.current);
+        dietSavedNoticeTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Warn if the user tries to close the tab or browser with unsaved changes
   useEffect(() => {
@@ -1440,7 +1461,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           <div className="max-w-md mx-auto w-full space-y-2">
             <button
               type="button"
-              onClick={() => setShowDietPicker(false)}
+              onClick={() => {
+                setShowDietPicker(false)
+                triggerDietSavedNotice()
+              }}
               className="w-full flex items-center justify-center rounded-lg h-14 px-8 bg-helfi-green hover:bg-helfi-green/90 active:scale-[0.98] transition-all duration-200 text-white text-lg font-bold tracking-wide shadow-lg shadow-helfi-green/10"
             >
               Confirm selection
@@ -1794,6 +1818,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           </div>
           <span className="text-gray-500 font-semibold">›</span>
         </button>
+        {showDietSavedNotice && (
+          <div className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+            Saved. We’ll ask you to update insights when you leave Health Setup.
+          </div>
+        )}
         {normalizeDietTypes(dietTypes).length > 0 && (
           <button
             type="button"
@@ -6543,6 +6572,22 @@ export default function Onboarding() {
   const formBaselineInitializedRef = useRef<boolean>(false);
   const pendingNavigationRef = useRef<(() => void) | null>(null);
 
+  // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
+  useEffect(() => {
+    try {
+      (window as any).__helfiOnboardingHasUnsavedChanges = hasGlobalUnsavedChanges;
+    } catch {
+      // ignore
+    }
+    return () => {
+      try {
+        (window as any).__helfiOnboardingHasUnsavedChanges = false;
+      } catch {
+        // ignore
+      }
+    };
+  }, [hasGlobalUnsavedChanges]);
+
   const runPendingNavigation = useCallback(() => {
     const fn = pendingNavigationRef.current;
     pendingNavigationRef.current = null;
@@ -6613,6 +6658,25 @@ export default function Onboarding() {
       window.removeEventListener('message', handleMessage);
     };
   }, [dropdownOpen]);
+
+  // Allow the desktop sidebar to request an "Update insights?" prompt before leaving Health Setup.
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e?.data?.type !== 'OPEN_ONBOARDING_UPDATE_POPUP') return
+      const raw = e?.data?.navigateTo
+      const navigateTo = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : '/dashboard'
+      pendingNavigationRef.current = () => {
+        try {
+          router.push(navigateTo)
+        } catch {
+          window.location.assign(navigateTo)
+        }
+      }
+      setShowGlobalUpdatePopup(true)
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [router]);
 
   // Basic session validation without aggressive checks
   useEffect(() => {

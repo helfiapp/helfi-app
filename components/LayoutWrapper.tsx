@@ -3,11 +3,17 @@ import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { ReactNode, useEffect, useState } from 'react'
+import { MouseEvent, ReactNode, useEffect, useState } from 'react'
 import UsageMeter from '@/components/UsageMeter'
 
 // Desktop Sidebar Navigation Component  
-function DesktopSidebar() {
+function DesktopSidebar({
+  pathname,
+  onNavigate,
+}: {
+  pathname: string
+  onNavigate: (href: string, e: MouseEvent<HTMLAnchorElement>) => void
+}) {
   return (
     <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:w-64 md:flex md:flex-col">
       <div className="flex flex-col flex-grow bg-[#1f2937] text-white border-r border-gray-800 pt-5 pb-4 overflow-y-auto">
@@ -29,6 +35,7 @@ function DesktopSidebar() {
         <nav className="mt-8 flex-1 px-4 space-y-1">
           <a
             href="/dashboard"
+            onClick={(e) => onNavigate('/dashboard', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
@@ -39,6 +46,7 @@ function DesktopSidebar() {
           
           <a
             href="/insights"
+            onClick={(e) => onNavigate('/insights', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,6 +57,7 @@ function DesktopSidebar() {
           
           <a
             href="/health-tips"
+            onClick={(e) => onNavigate('/health-tips', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -59,6 +68,7 @@ function DesktopSidebar() {
           
           <a
             href="/food"
+            onClick={(e) => onNavigate('/food', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,6 +79,7 @@ function DesktopSidebar() {
           
           <a
             href="/symptoms"
+            onClick={(e) => onNavigate('/symptoms', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -79,6 +90,7 @@ function DesktopSidebar() {
 
           <a
             href="/medical-images"
+            onClick={(e) => onNavigate('/medical-images', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,6 +101,7 @@ function DesktopSidebar() {
 
           <a
             href="/health-tracking"
+            onClick={(e) => onNavigate('/health-tracking', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,6 +112,7 @@ function DesktopSidebar() {
           
           <a
             href="/devices"
+            onClick={(e) => onNavigate('/devices', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,6 +124,7 @@ function DesktopSidebar() {
           
           <a
             href="/onboarding?step=1"
+            onClick={(e) => onNavigate('/onboarding?step=1', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,36 +134,40 @@ function DesktopSidebar() {
           </a>
           
           <div className="border-t border-gray-700 mt-6 pt-6">
-            <a
-              href="/check-in"
-              className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
-            >
+          <a
+            href="/check-in"
+            onClick={(e) => onNavigate('/check-in', e)}
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
               <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Today's Check-in
             </a>
-            <a
-              href="/check-in/history"
-              className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
-            >
+          <a
+            href="/check-in/history"
+            onClick={(e) => onNavigate('/check-in/history', e)}
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
               <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M5 19h14M7 11v8m10-8v8" />
               </svg>
               Rating History
             </a>
-            <a
-              href="/settings"
-              className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
-            >
+          <a
+            href="/settings"
+            onClick={(e) => onNavigate('/settings', e)}
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
               <Cog6ToothIcon className="text-gray-300 group-hover:text-white mr-3 h-6 w-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
               Settings
             </a>
             
-            <a
-              href="/reports"
-              className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
-            >
+          <a
+            href="/reports"
+            onClick={(e) => onNavigate('/reports', e)}
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
               <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
@@ -395,13 +414,44 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   // 1. User is authenticated (status === 'authenticated') AND
   // 2. Current page is not in publicPages list AND
   // 3. Current page is not an admin panel path
-  const shouldShowSidebar = status === 'authenticated' && !publicPages.includes(pathname) && !isAdminPanelPath
+  const isOnboardingPath = pathname.startsWith('/onboarding')
+  const shouldShowSidebar =
+    status === 'authenticated' &&
+    !isAdminPanelPath &&
+    (!publicPages.includes(pathname) || isOnboardingPath)
+
+  const handleSidebarNavigate = (href: string, e: MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault()
+    if (typeof href !== 'string' || !href) return
+
+    // Health Setup / Onboarding: if there are unsaved changes, ask the user once
+    // before leaving the section (the onboarding page owns the popup).
+    if (isOnboardingPath) {
+      try {
+        const hasUnsaved =
+          !!(window as any).__helfiOnboardingPhysicalHasUnsavedChanges ||
+          !!(window as any).__helfiOnboardingHasUnsavedChanges
+        if (hasUnsaved) {
+          window.postMessage({ type: 'OPEN_ONBOARDING_UPDATE_POPUP', navigateTo: href }, '*')
+          return
+        }
+      } catch {
+        // fall through
+      }
+    }
+
+    try {
+      router.push(href)
+    } catch {
+      window.location.assign(href)
+    }
+  }
 
   if (shouldShowSidebar) {
     return (
       <div className="flex min-h-screen bg-gray-50">
         {/* Desktop Sidebar - Only for authenticated users on app pages */}
-        <DesktopSidebar />
+        <DesktopSidebar pathname={pathname} onNavigate={handleSidebarNavigate} />
         
         {/* Main Content */}
         <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto relative">

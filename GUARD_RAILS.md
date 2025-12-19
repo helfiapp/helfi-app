@@ -12,7 +12,8 @@ protected areas listed below.
 ---
 
 ## 0. Update Insights / Add More flow (Jan 2026 – Locked)
-- Navigation guard now tracks unsaved changes across onboarding steps and forces the “Update Insights / Add more” prompt before leaving (including Go to Dashboard). Do NOT remove or loosen this guard.
+- Health Setup must let users make multiple edits across pages, then ask **once** to “Update Insights” when they try to leave Health Setup (including Dashboard or another page). Do NOT reintroduce “prompt on every Next/Back”.
+- The navigation guard must still protect leaving Health Setup when changes exist. Do NOT remove or loosen this guard.
 - Warm + durable caching keeps onboarding fields (including birthdate) loaded immediately; do not strip this cache.
 - Leave the current per-step targeted update buttons as-is; do not change when the popup appears or how it blocks navigation.
 - Pending request for the next agent (do not implement without explicit user approval): force per-step insights regeneration to always call the model and charge tokens (no cache reuse). Only the edited step’s change type should be regenerated; do NOT switch to full “regen all sections,” and keep the current guards/prompt behaviour intact.
@@ -192,6 +193,14 @@ Layout behaviour (`components/LayoutWrapper.tsx`):
 This reminder is meant to be a **gentle nudge**, not a gate. Agents must not convert
 it into a hard block or significantly change the timing/behaviour without consulting
 the user.
+
+---
+
+### 2.6 Health Setup Desktop Sidebar (Dec 2025 – Locked)
+
+- Health Setup (`/onboarding`) must show the standard desktop left menu so users can move around the app like other pages.
+- Leaving Health Setup via the left menu must still trigger the “Update Insights / Add more” prompt when there are unsaved changes.
+- Do NOT allow silent navigation away from Health Setup when unsaved changes exist.
 
 ---
 
@@ -590,14 +599,14 @@ The remaining calories ring displays:
 - Desktop: Grid layout with macros progress bars on left, remaining calories ring on right
 - Mobile: Stacked layout with remaining calories ring on top, macros progress bars below
 - Header shows "Today's energy summary" or "Energy summary" with kcal/kJ toggle
-- Empty state message when no meals added
+- Energy summary stays visible even when no meals are added (targets show with 0 used)
 
 **What Agents MUST NOT Do:**
 - Change the responsive layout behavior (grid on desktop, stacked on mobile)
 - Remove the energy unit toggle (kcal/kJ)
 - Modify the section header text or styling
 - Change the order of elements (ring vs progress bars)
-- Remove the empty state message
+- Hide the Energy summary until a meal is added
 
 ### 4.5 Testing Requirements
 
@@ -795,6 +804,23 @@ If changes are requested, explain them to the user first, get explicit approval,
 - If you must touch this area, first explain the exact change in plain language and get approval; then re-test live scanning on iOS PWA.
 
 ---
+
+## 12. Diet Preferences, Warnings, and Macro Targets (Dec 2025 – Locked)
+
+**Protected files:**
+- `app/onboarding/page.tsx`
+- `app/api/user-data/route.ts`
+- `app/api/analyze-food/route.ts`
+- `app/food/page.tsx`
+- `lib/diets.ts`
+- `lib/daily-targets.ts`
+
+**Guard rails:**
+- Diet selection is optional inside Health Setup and must not add extra numbered steps.
+- Users can select multiple diets; preferences are stored via the special `__DIET_PREFERENCE__` record.
+- Diet warnings must not trigger extra AI calls by default and must not cost extra credits by default.
+- Diet warnings must show for meals added by analysis, favorites, and copy/duplicate.
+- Diet-based macro targets must remain consistent with selected diets; when multiple diets are selected, apply the strictest carb cap and the highest protein floor.
 
 ## 8. Rules for Future Modifications
 
