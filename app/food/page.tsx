@@ -7083,6 +7083,22 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const renameEntriesWithLabel = (fromKey: string, toLabel: string) => {
+    const updateEntry = (entry: any) => {
+      if (!entry) return entry
+      const labelKey = normalizeFoodName(normalizeMealLabel(entry?.description || entry?.label || ''))
+      if (!labelKey || labelKey !== fromKey) return entry
+      return {
+        ...entry,
+        description: toLabel,
+        label: toLabel,
+      }
+    }
+
+    setTodaysFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
+    setHistoryFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
+  }
+
   const saveFoodNameOverride = (fromLabel: any, toLabel: any, entry?: any) => {
     const from = normalizeMealLabel(fromLabel || '').trim()
     const to = normalizeMealLabel(toLabel || '').trim()
@@ -7132,6 +7148,7 @@ Please add nutritional information manually if needed.`);
       persistFoodNameOverrides(next)
       return next
     })
+    renameEntriesWithLabel(fromKey, to)
   }
 
   const saveFavoriteFromEntry = (
@@ -13359,289 +13376,292 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <div className="fixed inset-0 z-50 bg-white">
-          <div className="min-h-full w-full max-w-6xl mx-auto flex flex-col px-3 sm:px-4">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-            <div>
-              <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
-              <div className="text-sm text-gray-600">Insert into {categoryLabel(selectedAddCategory)}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowFavoritesPicker(false)}
-              className="p-2 rounded-full hover:bg-gray-100"
-            >
-              <span aria-hidden>✕</span>
-            </button>
-          </div>
+        <>
+          <div className="fixed inset-0 bg-white z-[45]" />
+          <div className="relative z-[50]">
+            <div className="mx-auto max-w-6xl px-3 sm:px-4 py-4">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
+                <div>
+                  <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
+                  <div className="text-sm text-gray-600">Insert into {categoryLabel(selectedAddCategory)}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFavoritesPicker(false)}
+                  className="p-2 rounded-full hover:bg-gray-100"
+                >
+                  <span aria-hidden>✕</span>
+                </button>
+              </div>
 
-          <div className="px-4 pt-3 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="flex-1 relative">
-                <input
-                  value={favoritesSearch}
-                  onChange={(e) => setFavoritesSearch(e.target.value)}
-                  placeholder="Search all foods..."
-                  className="w-full pl-10 pr-16 py-3 border border-gray-300 bg-white text-base focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-                  style={{ borderRadius: 0 }}
-                />
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
-                </svg>
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                  {favoritesSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setFavoritesSearch('')}
-                      className="p-2 text-gray-500 hover:text-gray-700"
-                    >
-                      ✕
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowFavoritesPicker(false)
-                      setShowBarcodeScanner(true)
-                      setBarcodeError(null)
-                      setBarcodeValue('')
-                    }}
-                    className="p-2 text-gray-700 hover:text-gray-900"
-                    aria-label="Open barcode scanner"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h4v2H6v2H4V4zm12 0h4v4h-2V6h-2V4zm0 16h2v-2h2v4h-4v-2zM4 16h2v2h2v2H4v-4z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9h6v6H9z" />
+              <div className="px-4 pt-3 space-y-3 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 relative">
+                    <input
+                      value={favoritesSearch}
+                      onChange={(e) => setFavoritesSearch(e.target.value)}
+                      placeholder="Search all foods..."
+                      className="w-full pl-10 pr-16 py-3 border border-gray-300 bg-white text-base focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                      style={{ borderRadius: 0 }}
+                    />
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
                     </svg>
-                  </button>
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      {favoritesSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setFavoritesSearch('')}
+                          className="p-2 text-gray-500 hover:text-gray-700"
+                        >
+                          ✕
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowFavoritesPicker(false)
+                          setShowBarcodeScanner(true)
+                          setBarcodeError(null)
+                          setBarcodeValue('')
+                        }}
+                        className="p-2 text-gray-700 hover:text-gray-900"
+                        aria-label="Open barcode scanner"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h4v2H6v2H4V4zm12 0h4v4h-2V6h-2V4zm0 16h2v-2h2v4h-4v-2zM4 16h2v2h2v2H4v-4z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9h6v6H9z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {(['all', 'favorites', 'custom'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setFavoritesActiveTab(tab)}
+                      className={`flex-1 py-2 text-sm font-semibold border ${
+                        favoritesActiveTab === tab ? 'bg-gray-200 text-gray-900 border-gray-300' : 'bg-white text-gray-700 border-gray-300'
+                      }`}
+                      style={{ borderRadius: 0 }}
+                    >
+                      {tab === 'all' ? 'All' : tab === 'favorites' ? 'Favorites' : 'Custom'}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              {(['all', 'favorites', 'custom'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setFavoritesActiveTab(tab)}
-                  className={`flex-1 py-2 text-sm font-semibold border ${
-                    favoritesActiveTab === tab ? 'bg-gray-200 text-gray-900 border-gray-300' : 'bg-white text-gray-700 border-gray-300'
-                  }`}
-                  style={{ borderRadius: 0 }}
-                >
-                  {tab === 'all' ? 'All' : tab === 'favorites' ? 'Favorites' : 'Custom'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-3 pb-6">
-            {(() => {
-              const { allMeals, favoriteMeals, customMeals } = buildFavoritesDatasets()
-              const search = favoritesSearch.trim().toLowerCase()
-              const filterBySearch = (item: any) => {
-                if (!search) return true
-                return (
-                  item?.label?.toLowerCase().includes(search) ||
-                  (item?.serving || '').toString().toLowerCase().includes(search) ||
-                  (item?.sourceTag || '').toString().toLowerCase().includes(search)
-                )
-              }
-              const sortList = (list: any[]) =>
-                [...list].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
-              let data: any[] = []
-              if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
-              if (favoritesActiveTab === 'favorites')
-                data = sortList(favoriteMeals.filter((m: any) => !isCustomMealFavorite(m?.favorite)).filter(filterBySearch))
-              if (favoritesActiveTab === 'custom') data = sortList(customMeals.filter(filterBySearch))
-
-              const favoriteKeySet = new Set<string>()
-              ;(favorites || []).forEach((fav: any) => {
-                const key = favoriteDisplayLabel(fav).toLowerCase()
-                if (key) favoriteKeySet.add(key)
-              })
-
-              if (data.length === 0) {
-                return (
-                  <div className="px-4 py-8 text-center text-sm text-gray-500 border-t border-b border-gray-200">
-                    {favoritesActiveTab === 'all'
-                      ? 'No meals yet. Add some entries to see them here.'
-                      : favoritesActiveTab === 'favorites'
-                      ? 'Save a meal using “Add to Favorites” to see it here.'
-                      : 'Create custom meals and they will appear here.'}
-                  </div>
-                )
-              }
-
-              return (
-                <div className="px-0 divide-y divide-gray-200 border-t border-b border-gray-200">
-                  {data.map((item) => {
-                    const calories = item?.calories
-                    const tag = item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom')
-                    const serving = item?.serving || '1 serving'
-                    const handleSelect = () => {
-                      if (item.favorite) {
-                        insertFavoriteIntoDiary(item.favorite, selectedAddCategory)
-                      } else if (item.entry) {
-                        insertMealIntoDiary(item.entry, selectedAddCategory)
-                      } else {
-                        insertMealIntoDiary(item, selectedAddCategory)
-                      }
-                    }
-                    const favoriteId =
-                      item?.favorite?.id || (typeof item?.id === 'string' && item.id.startsWith('fav-') ? item.id : null)
-                    const canDeleteFavorite = Boolean(favoriteId && item.favorite)
-                    const canEditFavorite = Boolean((favoriteId && item.favorite) || (favoritesActiveTab === 'all' && Boolean(item.entry)))
-                    const key = normalizeMealLabel(item?.label || '').toLowerCase()
-                    const isSaved = Boolean(item.favorite) || (key ? favoriteKeySet.has(key) : false)
-                    const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item.entry)
+              <div className="py-6">
+                {(() => {
+                  const { allMeals, favoriteMeals, customMeals } = buildFavoritesDatasets()
+                  const search = favoritesSearch.trim().toLowerCase()
+                  const filterBySearch = (item: any) => {
+                    if (!search) return true
                     return (
-                      <div
-                        key={item.id}
-                        className="w-full bg-white flex items-stretch min-w-0 overflow-hidden"
-                        style={{ borderRadius: 0 }}
-                      >
-                        <button
-                          onClick={handleSelect}
-                          className="flex-1 min-w-0 w-full overflow-hidden text-left px-4 py-3 hover:bg-gray-50"
-                          style={{ borderRadius: 0 }}
-                        >
-                          <div className="flex items-center justify-between gap-3 min-w-0">
-                            <div className="min-w-0">
-                              <div className="text-sm font-semibold text-gray-900 truncate">{item.label}</div>
-                              <div className="text-xs text-gray-600 truncate">{serving}</div>
-                            </div>
-                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                              {calories != null && (
-                                <span className="text-sm font-semibold text-gray-900">{calories} kcal</span>
-                              )}
-                              <span className="text-xs text-gray-500">{tag}</span>
-                            </div>
-                          </div>
-                        </button>
-                        {favoritesActiveTab === 'all' && (
-                          <button
-                            type="button"
-                            disabled={!canSaveFromAll}
-                            onClick={() => {
-                              if (!item?.entry) return
-                              handleAddToFavorites(item.entry)
-                              showQuickToast('Saved to Favorites')
-                            }}
-                            className="px-3 flex items-center justify-center hover:bg-emerald-50 text-helfi-green disabled:opacity-50"
-                            title={isSaved ? 'Already in favorites' : 'Save to favorites'}
-                            aria-label="Save to favorites"
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill={isSaved ? 'currentColor' : 'none'}
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.618 4.98a1 1 0 00.95.69h5.236c.969 0 1.371 1.24.588 1.81l-4.236 3.078a1 1 0 00-.364 1.118l1.618 4.98c.3.921-.755 1.688-1.539 1.118l-4.236-3.078a1 1 0 00-1.176 0l-4.236 3.078c-.783.57-1.838-.197-1.539-1.118l1.618-4.98a1 1 0 00-.364-1.118L2.98 10.407c-.783-.57-.38-1.81.588-1.81h5.236a1 1 0 00.95-.69l1.618-4.98z"
-                              />
-                            </svg>
-                          </button>
-                        )}
-                        {canDeleteFavorite && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteFavorite(String(favoriteId))}
-                            className="px-3 flex items-center justify-center hover:bg-red-50 text-red-600"
-                            title="Remove from favorites"
-                            aria-label="Remove from favorites"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
-                          </button>
-                        )}
-                        {canEditFavorite && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              try {
-                                const fav = item.favorite
-                                const favId = favoriteId ? String(favoriteId) : ''
-                                if (fav && favId) {
-                                  if (isCustomMealFavorite(fav)) {
-                                    const favCategory =
-                                      (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
-                                    setShowFavoritesPicker(false)
-                                    router.push(
-                                      `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
-                                        favCategory,
-                                      )}&editFavoriteId=${encodeURIComponent(favId)}`,
-                                    )
-                                  } else {
-                                    handleRenameFavorite(favId)
-                                  }
-                                  return
-                                }
+                      item?.label?.toLowerCase().includes(search) ||
+                      (item?.serving || '').toString().toLowerCase().includes(search) ||
+                      (item?.sourceTag || '').toString().toLowerCase().includes(search)
+                    )
+                  }
+                  const sortList = (list: any[]) =>
+                    [...list].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+                  let data: any[] = []
+                  if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
+                  if (favoritesActiveTab === 'favorites')
+                    data = sortList(favoriteMeals.filter((m: any) => !isCustomMealFavorite(m?.favorite)).filter(filterBySearch))
+                  if (favoritesActiveTab === 'custom') data = sortList(customMeals.filter(filterBySearch))
 
-                                // In "All", allow editing any entry by saving it first as a favorite template.
-                                if (favoritesActiveTab === 'all' && item?.entry) {
-                                  const entry = item.entry
-                                  const entryMethod = String(entry?.method || '').toLowerCase()
-                                  const shouldBeCustom =
-                                    entryMethod === 'combined' || entryMethod === 'meal-builder' || isMealBuilderDiaryEntry(entry)
-                                  if (shouldBeCustom) {
-                                    const saved = saveFavoriteFromEntry(entry, { forceCustomMeal: true })
-                                    const newFavId = String(saved?.favorite?.id || '').trim()
-                                    if (!newFavId) return
-                                    const favCategory =
-                                      normalizeCategory(entry?.meal || entry?.category || entry?.mealType || selectedAddCategory)
-                                    setShowFavoritesPicker(false)
-                                    router.push(
-                                      `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
-                                        favCategory,
-                                      )}&editFavoriteId=${encodeURIComponent(newFavId)}`,
-                                    )
-                                    return
-                                  }
+                  const favoriteKeySet = new Set<string>()
+                  ;(favorites || []).forEach((fav: any) => {
+                    const key = favoriteDisplayLabel(fav).toLowerCase()
+                    if (key) favoriteKeySet.add(key)
+                  })
 
-                                  const current = applyFoodNameOverride(entry?.description || entry?.label || 'Meal', entry) || 'Meal'
-                                  const nextRaw = typeof window !== 'undefined' ? window.prompt('Rename to:', current) : null
-                                  const nextName = (nextRaw || '').toString().trim()
-                                  if (!nextName) return
-                                  saveFoodNameOverride(entry?.description || entry?.label || current, nextName, entry)
-                                  showQuickToast('Renamed')
-                                  return
-                                }
-                              } catch {}
-                            }}
-                            className="px-3 flex items-center justify-center hover:bg-gray-50 text-gray-700"
-                            title={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Edit'}
-                            aria-label={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Edit'}
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z"
-                              />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20h9" />
-                            </svg>
-                          </button>
-                        )}
+                  if (data.length === 0) {
+                    return (
+                      <div className="px-4 py-8 text-center text-sm text-gray-500 border border-gray-200 rounded-xl">
+                        {favoritesActiveTab === 'all'
+                          ? 'No meals yet. Add some entries to see them here.'
+                          : favoritesActiveTab === 'favorites'
+                          ? 'Save a meal using “Add to Favorites” to see it here.'
+                          : 'Create custom meals and they will appear here.'}
                       </div>
                     )
-                  })}
-                </div>
-              )
-            })()}
+                  }
+
+                  return (
+                    <div className="px-0 divide-y divide-gray-200 border border-gray-200 rounded-xl bg-white">
+                      {data.map((item) => {
+                        const calories = item?.calories
+                        const tag = item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom')
+                        const serving = item?.serving || '1 serving'
+                        const handleSelect = () => {
+                          if (item.favorite) {
+                            insertFavoriteIntoDiary(item.favorite, selectedAddCategory)
+                          } else if (item.entry) {
+                            insertMealIntoDiary(item.entry, selectedAddCategory)
+                          } else {
+                            insertMealIntoDiary(item, selectedAddCategory)
+                          }
+                        }
+                        const favoriteId =
+                          item?.favorite?.id || (typeof item?.id === 'string' && item.id.startsWith('fav-') ? item.id : null)
+                        const canDeleteFavorite = Boolean(favoriteId && item.favorite)
+                        const canEditFavorite = Boolean((favoriteId && item.favorite) || (favoritesActiveTab === 'all' && Boolean(item.entry)))
+                        const key = normalizeMealLabel(item?.label || '').toLowerCase()
+                        const isSaved = Boolean(item.favorite) || (key ? favoriteKeySet.has(key) : false)
+                        const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item.entry)
+                        return (
+                          <div
+                            key={item.id}
+                            className="w-full bg-white flex items-stretch min-w-0 overflow-hidden"
+                            style={{ borderRadius: 0 }}
+                          >
+                            <button
+                              onClick={handleSelect}
+                              className="flex-1 min-w-0 w-full overflow-hidden text-left px-4 py-3 hover:bg-gray-50"
+                              style={{ borderRadius: 0 }}
+                            >
+                              <div className="flex items-center justify-between gap-3 min-w-0">
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-gray-900 truncate">{item.label}</div>
+                                  <div className="text-xs text-gray-600 truncate">{serving}</div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                  {calories != null && (
+                                    <span className="text-sm font-semibold text-gray-900">{calories} kcal</span>
+                                  )}
+                                  <span className="text-xs text-gray-500">{tag}</span>
+                                </div>
+                              </div>
+                            </button>
+                            {favoritesActiveTab === 'all' && (
+                              <button
+                                type="button"
+                                disabled={!canSaveFromAll}
+                                onClick={() => {
+                                  if (!item?.entry) return
+                                  handleAddToFavorites(item.entry)
+                                  showQuickToast('Saved to Favorites')
+                                }}
+                                className="px-3 flex items-center justify-center hover:bg-emerald-50 text-helfi-green disabled:opacity-50"
+                                title={isSaved ? 'Already in favorites' : 'Save to favorites'}
+                                aria-label="Save to favorites"
+                              >
+                                <svg
+                                  className="w-5 h-5"
+                                  fill={isSaved ? 'currentColor' : 'none'}
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.618 4.98a1 1 0 00.95.69h5.236c.969 0 1.371 1.24.588 1.81l-4.236 3.078a1 1 0 00-.364 1.118l1.618 4.98c.3.921-.755 1.688-1.539 1.118l-4.236-3.078a1 1 0 00-1.176 0l-4.236 3.078c-.783.57-1.838-.197-1.539-1.118l1.618-4.98a1 1 0 00-.364-1.118L2.98 10.407c-.783-.57-.38-1.81.588-1.81h5.236a1 1 0 00.95-.69l1.618-4.98z"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                            {canDeleteFavorite && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFavorite(String(favoriteId))}
+                                className="px-3 flex items-center justify-center hover:bg-red-50 text-red-600"
+                                title="Remove from favorites"
+                                aria-label="Remove from favorites"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                            {canEditFavorite && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  try {
+                                    const fav = item.favorite
+                                    const favId = favoriteId ? String(favoriteId) : ''
+                                    if (fav && favId) {
+                                      if (isCustomMealFavorite(fav)) {
+                                        const favCategory =
+                                          (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
+                                        setShowFavoritesPicker(false)
+                                        router.push(
+                                          `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
+                                            favCategory,
+                                          )}&editFavoriteId=${encodeURIComponent(favId)}`,
+                                        )
+                                      } else {
+                                        handleRenameFavorite(favId)
+                                      }
+                                      return
+                                    }
+
+                                    // In "All", allow editing any entry by saving it first as a favorite template.
+                                    if (favoritesActiveTab === 'all' && item?.entry) {
+                                      const entry = item.entry
+                                      const entryMethod = String(entry?.method || '').toLowerCase()
+                                      const shouldBeCustom =
+                                        entryMethod === 'combined' || entryMethod === 'meal-builder' || isMealBuilderDiaryEntry(entry)
+                                      if (shouldBeCustom) {
+                                        const saved = saveFavoriteFromEntry(entry, { forceCustomMeal: true })
+                                        const newFavId = String(saved?.favorite?.id || '').trim()
+                                        if (!newFavId) return
+                                        const favCategory =
+                                          normalizeCategory(entry?.meal || entry?.category || entry?.mealType || selectedAddCategory)
+                                        setShowFavoritesPicker(false)
+                                        router.push(
+                                          `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
+                                            favCategory,
+                                          )}&editFavoriteId=${encodeURIComponent(newFavId)}`,
+                                        )
+                                        return
+                                      }
+
+                                      const current = applyFoodNameOverride(entry?.description || entry?.label || 'Meal', entry) || 'Meal'
+                                      const nextRaw = typeof window !== 'undefined' ? window.prompt('Rename to:', current) : null
+                                      const nextName = (nextRaw || '').toString().trim()
+                                      if (!nextName) return
+                                      saveFoodNameOverride(entry?.description || entry?.label || current, nextName, entry)
+                                      showQuickToast('Renamed')
+                                      return
+                                    }
+                                  } catch {}
+                                }}
+                                className="px-3 flex items-center justify-center hover:bg-gray-50 text-gray-700"
+                                title={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Edit'}
+                                aria-label={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Edit'}
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z"
+                                  />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20h9" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
           </div>
-          </div>
-        </div>
+        </>
       )}
 
       {showMultiCopyModal && (
