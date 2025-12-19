@@ -6934,6 +6934,11 @@ Please add nutritional information manually if needed.`);
     opts?: { labelOverride?: string; forceCustomMeal?: boolean },
   ): { favorite: any; nextFavorites: any[] } | null => {
     if (!source) return null
+    const sourceLabelForAlias = (() => {
+      const raw = source?.description || source?.label || ''
+      const cleaned = normalizeMealLabel(raw) || String(raw || '').trim()
+      return cleaned
+    })()
     const cleanLabel = (() => {
       const raw =
         typeof opts?.labelOverride === 'string' && opts.labelOverride.trim().length > 0
@@ -6983,13 +6988,23 @@ Please add nutritional information manually if needed.`);
     )
     const payloadWithStableId =
       existingIndex >= 0 ? { ...favoritePayload, id: base[existingIndex]?.id || favoritePayload.id } : favoritePayload
+
+    // If the user saved with a new name, remember the old name as an alias so "All" doesn't show duplicates.
+    const withAliases = (() => {
+      const shouldAlias = sourceLabelForAlias && sourceLabelForAlias !== cleanLabel
+      if (!shouldAlias) return payloadWithStableId
+      const existingAliases = Array.isArray((payloadWithStableId as any)?.aliases) ? (payloadWithStableId as any).aliases : []
+      const aliases = Array.from(new Set([...(Array.isArray(existingAliases) ? existingAliases : []), sourceLabelForAlias]))
+      return { ...(payloadWithStableId as any), aliases }
+    })()
+
     const next =
       existingIndex >= 0
-        ? base.map((fav: any, idx: number) => (idx === existingIndex ? payloadWithStableId : fav))
-        : [...base, payloadWithStableId]
+        ? base.map((fav: any, idx: number) => (idx === existingIndex ? withAliases : fav))
+        : [...base, withAliases]
     setFavorites(next)
     persistFavorites(next)
-    return { favorite: payloadWithStableId, nextFavorites: next }
+    return { favorite: withAliases, nextFavorites: next }
   }
 
   const insertMealIntoDiary = async (source: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
