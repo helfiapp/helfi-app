@@ -11990,11 +11990,11 @@ Please add nutritional information manually if needed.`);
           </div>
         ) : (
         <div className="overflow-visible space-y-6">
-          {/* Daily Totals Row - only show on main diary view, not while editing an entry */}
-          {!editingEntry && dedupeEntries(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), { fallbackDate: selectedDate }).length > 0 && (
-            <div className="mb-4">
-              {(() => {
-                const source = dedupeEntries(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), { fallbackDate: selectedDate })
+	          {/* Daily Totals Row - only show on main diary view, not while editing an entry */}
+	          {!editingEntry && (
+	            <div className="mb-4">
+	              {(() => {
+	                const source = dedupeEntries(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), { fallbackDate: selectedDate })
 
                 const safeNumber = (value: any) => {
                   const num = Number(value)
