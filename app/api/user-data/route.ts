@@ -128,6 +128,18 @@ export async function GET(request: NextRequest) {
       console.log('No allergy data found in storage');
     }
 
+    // Get diet preference (optional)
+    let dietType = ''
+    try {
+      const storedDiet = user.healthGoals.find((goal: any) => goal.name === '__DIET_PREFERENCE__')
+      if (storedDiet?.category) {
+        const parsed = JSON.parse(storedDiet.category)
+        dietType = typeof parsed?.dietType === 'string' ? parsed.dietType : ''
+      }
+    } catch (e) {
+      console.log('No diet preference found in storage')
+    }
+
     // Get blood results data
     let bloodResultsData = { uploadMethod: 'documents', documents: [], images: [], notes: '', skipped: false };
     try {
@@ -360,6 +372,7 @@ export async function GET(request: NextRequest) {
       goalIntensity: (primaryGoalData.goalIntensity || 'standard').toString().toLowerCase(),
       allergies: allergyData.allergies,
       diabetesType: allergyData.diabetesType,
+      dietType,
     }
 
     // Fallback: if primary goal still missing, use the first non-hidden health goal as a soft default
@@ -723,6 +736,34 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error storing allergy data:', error)
+      // Continue with other updates
+    }
+
+    // 3.15. Handle diet preference (Step 2) - store as special health goal
+    try {
+      const hasIncomingDiet = Object.prototype.hasOwnProperty.call(data as any, 'dietType')
+      if (hasIncomingDiet) {
+        const normalizedDietType = typeof (data as any).dietType === 'string' ? ((data as any).dietType as string).trim() : ''
+
+        // Clear if blank, otherwise upsert the preference.
+        await prisma.healthGoal.deleteMany({
+          where: { userId: user.id, name: '__DIET_PREFERENCE__' },
+        })
+
+        if (normalizedDietType.length > 0) {
+          await prisma.healthGoal.create({
+            data: {
+              userId: user.id,
+              name: '__DIET_PREFERENCE__',
+              category: JSON.stringify({ dietType: normalizedDietType }),
+              currentRating: 0,
+            },
+          })
+        }
+        console.log('Stored diet preference successfully')
+      }
+    } catch (error) {
+      console.error('Error storing diet preference:', error)
       // Continue with other updates
     }
 

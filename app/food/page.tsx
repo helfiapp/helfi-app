@@ -1560,6 +1560,8 @@ export default function FoodDiary() {
   const [numericInputDrafts, setNumericInputDrafts] = useState<Record<string, string>>({})
   const [healthWarning, setHealthWarning] = useState<string | null>(null)
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
+  const [dietWarning, setDietWarning] = useState<string | null>(null)
+  const [dietAlternatives, setDietAlternatives] = useState<string | null>(null)
   const [historySaveError, setHistorySaveError] = useState<string | null>(null)
   const [lastHistoryPayload, setLastHistoryPayload] = useState<any>(null)
   const [historyRetrying, setHistoryRetrying] = useState(false)
@@ -5205,9 +5207,11 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         setAnalysisPhase('building');
         setAiDescription(result.analysis);
         applyStructuredItems(result.items, result.total, result.analysis);
-        // Set health warning and alternatives if present
+        // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
+        setDietWarning(result.dietWarning || null);
+        setDietAlternatives(result.dietAlternatives || null);
         setShowAiResult(true);
         // Trigger usage meter refresh after successful analysis
         setUsageMeterRefresh(prev => prev + 1);
@@ -5324,9 +5328,11 @@ Meanwhile, you can describe your food manually:
         setAnalysisPhase('building');
         setAiDescription(result.analysis);
         applyStructuredItems(result.items, result.total, result.analysis);
-        // Set health warning and alternatives if present
+        // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
+        setDietWarning(result.dietWarning || null);
+        setDietAlternatives(result.dietAlternatives || null);
         setShowAiResult(true);
         
         // Clear manual form
@@ -5625,6 +5631,8 @@ Please add nutritional information manually if needed.`);
           applyStructuredItems(result.items, result.total, result.analysis);
           setHealthWarning(result.healthWarning || null);
           setHealthAlternatives(result.alternatives || null);
+          setDietWarning(result.dietWarning || null);
+          setDietAlternatives(result.dietAlternatives || null);
           setUsageMeterRefresh(prev => prev + 1);
           try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
         } else {
@@ -5648,11 +5656,13 @@ Please add nutritional information manually if needed.`);
     setPhotoPreview(null)
     setAiDescription('')
     setAnalyzedItems([])
-    setAnalyzedNutrition(null)
-    setAnalyzedTotal(null)
-    setHealthWarning(null)
-    setHealthAlternatives(null)
-    setShowAiResult(false)
+	    setAnalyzedNutrition(null)
+	    setAnalyzedTotal(null)
+	    setHealthWarning(null)
+	    setHealthAlternatives(null)
+	    setDietWarning(null)
+	    setDietAlternatives(null)
+	    setShowAiResult(false)
     setShowAddFood(false)
     setShowPhotoOptions(false)
     setPhotoOptionsAnchor(null)
@@ -11240,6 +11250,32 @@ Please add nutritional information manually if needed.`);
                             <div className="text-sm text-red-700 whitespace-pre-line">{healthWarning.replace('⚠️ HEALTH WARNING:', '').trim()}</div>
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Diet Warning */}
+                    {dietWarning && (
+                      <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-start">
+                          <svg className="w-5 h-5 text-amber-700 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l2.2 6.6H21l-5.4 3.9L17.8 20 12 16.3 6.2 20l2.2-7.5L3 8.6h6.8L12 2z" />
+                          </svg>
+                          <div className="flex-1">
+                            <div className="font-semibold text-amber-900 mb-1">Diet Warning</div>
+                            <div className="text-sm text-amber-900 whitespace-pre-line">
+                              {dietWarning
+                                .replace(/^⚠️\s*diet warning[^:]*:/i, '')
+                                .trim()}
+                            </div>
+                          </div>
+                        </div>
+                        {dietAlternatives && (
+                          <div className="mt-3 text-sm text-amber-900 whitespace-pre-line">
+                            <div className="font-semibold mb-1">Swap idea</div>
+                            {dietAlternatives}
+                          </div>
+                        )}
+                        <div className="mt-2 text-xs text-amber-800">No extra credits were used for this diet check.</div>
                       </div>
                     )}
                     

@@ -34,6 +34,7 @@ import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
 import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 import { getImageMetadata } from '@/lib/image-metadata';
+import { checkDietCompatibility, getDietOption } from '@/lib/diets';
 // NOTE: USDA/FatSecret lookup removed from AI analysis - kept only for manual ingredient lookup via /api/food-data
 
 // Best-effort relaxed JSON parsing to handle minor LLM formatting issues
@@ -1112,6 +1113,19 @@ export async function POST(req: NextRequest) {
       }
     } catch (error) {
       console.warn('⚠️ Could not load allergy settings for analyzer:', error);
+    }
+
+    let dietType = ''
+    try {
+      const storedDiet = await prisma.healthGoal.findFirst({
+        where: { userId: user.id, name: '__DIET_PREFERENCE__' },
+      })
+      if (storedDiet?.category) {
+        const parsed = JSON.parse(storedDiet.category)
+        dietType = typeof parsed?.dietType === 'string' ? parsed.dietType : ''
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not load diet preference for analyzer:', error)
     }
 
     // We'll check free use, premium, or credits below
@@ -2225,6 +2239,38 @@ CRITICAL REQUIREMENTS:
       resp.alternatives = null;
     } catch (healthError) {
       console.warn('⚠️ Health compatibility section skipped due to error:', healthError);
+    }
+
+    // DIET CHECK: advisory-only, uses saved diet preference (no extra AI calls)
+    try {
+      const normalizedDiet = (dietType || '').toString().trim()
+      if (normalizedDiet.length > 0) {
+        const option = getDietOption(normalizedDiet)
+        const itemNames = Array.isArray(resp.items)
+          ? resp.items.map((it: any) => `${it?.name || ''} ${it?.serving_size || ''}`.trim()).filter(Boolean)
+          : []
+        const analysisText = (analysis || (resp as any)?.analysis || '').toString()
+        const result = checkDietCompatibility({
+          dietId: normalizedDiet,
+          itemNames,
+          analysisText,
+          totals: (resp as any)?.total || null,
+        })
+
+        const warnings = result.warnings || []
+        const suggestions = result.suggestions || []
+
+        ;(resp as any).dietWarning =
+          warnings.length > 0
+            ? `⚠️ Diet warning (${option?.label || normalizedDiet}):\n- ${warnings.join('\n- ')}`
+            : null
+        ;(resp as any).dietAlternatives = suggestions.length > 0 ? `- ${suggestions.join('\n- ')}` : null
+      } else {
+        ;(resp as any).dietWarning = null
+        ;(resp as any).dietAlternatives = null
+      }
+    } catch (dietError) {
+      console.warn('⚠️ Diet compatibility section skipped due to error:', dietError)
     }
 
     // Charge wallet for all costs (food analysis + health checks)

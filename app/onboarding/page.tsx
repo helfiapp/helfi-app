@@ -13,6 +13,8 @@ import MobileMoreMenu from '@/components/MobileMoreMenu';
 import UsageMeter from '@/components/UsageMeter';
 import InsightsProgressBar from '@/components/InsightsProgressBar';
 import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import DietIcon from '@/components/DietIcon';
+import { DIET_OPTIONS, getDietOption } from '@/lib/diets';
 
 const sanitizeUserDataPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return payload;
@@ -162,6 +164,7 @@ function getInsightsRelevantOnboardingFormSnapshot(source: any): any {
     height: sanitized.height ?? '',
     bodyType: typeof sanitized.bodyType === 'string' ? sanitized.bodyType : '',
     birthdate: typeof sanitized.birthdate === 'string' ? sanitized.birthdate : '',
+    dietType: typeof sanitized.dietType === 'string' ? sanitized.dietType : '',
     goalChoice: typeof sanitized.goalChoice === 'string' ? sanitized.goalChoice : '',
     goalIntensity: (sanitized.goalIntensity || 'standard').toString().toLowerCase(),
     profileInfo: sanitized.profileInfo && typeof sanitized.profileInfo === 'object' ? sanitized.profileInfo : {},
@@ -206,8 +209,8 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
 
   if (
     hasChanged(
-      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
-      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
+      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'dietType', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
+      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'dietType', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
     )
   ) {
     changeTypes.push('profile');
@@ -651,6 +654,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [diabetesType, setDiabetesType] = useState<'type1' | 'type2' | 'prediabetes' | ''>(
     (initial?.diabetesType as any) || '',
   );
+  const [dietType, setDietType] = useState<string>(initial?.dietType || '');
+  const [showDietPicker, setShowDietPicker] = useState(false);
+  const dietHydratedRef = useRef(false);
+  const dietTouchedRef = useRef(false);
   const allergiesHydratedRef = useRef(false);
   const diabetesHydratedRef = useRef(false);
   const bodyTypeHydratedRef = useRef(false);
@@ -758,6 +765,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       setAllergies(initial.allergies);
       allergiesHydratedRef.current = true;
     }
+    if (!dietHydratedRef.current) {
+      dietHydratedRef.current = true;
+      if (!dietTouchedRef.current) {
+        const incomingDiet = typeof initial.dietType === 'string' ? initial.dietType.trim() : '';
+        if (incomingDiet && !dietType) {
+          setDietType(incomingDiet);
+        }
+      }
+    }
     if (!diabetesHydratedRef.current && initial.diabetesType) {
       setDiabetesType(initial.diabetesType);
       diabetesHydratedRef.current = true;
@@ -845,6 +861,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const initialBirthdate = (baseline?.birthdate || '').toString();
     const initialAllergies: string[] = Array.isArray(baseline?.allergies) ? baseline.allergies : [];
     const initialDiabetesType = (baseline?.diabetesType || '').toString();
+    const initialDietType = (baseline?.dietType || '').toString();
 
     const normalizeArray = (list?: string[]) =>
       Array.isArray(list) ? list.map((v) => (v || '').toString().toLowerCase().trim()).filter(Boolean).sort() : [];
@@ -869,6 +886,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       weightChanged ||
       heightChanged ||
       (bodyType || '').toString().toLowerCase().trim() !== (initialBodyType || '').toString().toLowerCase().trim() ||
+      ((dietHydratedRef.current || dietTouchedRef.current) &&
+        (dietType || '').toString().trim() !== (initialDietType || '').toString().trim()) ||
       (goalChoice || '').toString().toLowerCase().trim() !== (initialGoalChoice || '').toString().toLowerCase().trim() ||
       (goalIntensity || 'standard').toString().toLowerCase() !== (initialGoalIntensity || 'standard').toString().toLowerCase() ||
       (birthdate || '').toString().trim() !== (initialBirthdate || '').toString().trim() ||
@@ -876,13 +895,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       (diabetesType || '').toString().toLowerCase().trim() !== (initialDiabetesType || '').toString().toLowerCase().trim();
 
     const hasAny =
-      !!(weight || height || feet || inches || bodyType || goalChoice || birthdate || allergies.length || diabetesType);
+      !!(weight || height || feet || inches || bodyType || dietType || goalChoice || birthdate || allergies.length || diabetesType);
 
     setHasUnsavedChanges(changed && hasAny);
     if ((changed && hasAny) && onUnsavedChange) {
       onUnsavedChange();
     }
-  }, [weight, height, feet, inches, bodyType, goalChoice, goalIntensity, birthdate, allergies, diabetesType, initial, unit]);
+  }, [weight, height, feet, inches, bodyType, dietType, goalChoice, goalIntensity, birthdate, allergies, diabetesType, initial, unit]);
 
   // Warn if the user tries to close the tab or browser with unsaved changes
   useEffect(() => {
@@ -942,12 +961,14 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const buildPayload = () => {
     const weightKgRounded = getCurrentWeightKgRounded();
     const heightCmRounded = getCurrentHeightCmRounded();
+    const includeDietType = dietHydratedRef.current || dietTouchedRef.current;
     return {
       // Persist canonical measurements so targets/insights stay consistent everywhere
       weight: weightKgRounded != null ? String(weightKgRounded) : '',
       birthdate: birthdateFromParts || birthdate || initial?.birthdate || '',
       height: heightCmRounded != null ? String(heightCmRounded) : '',
       bodyType,
+      ...(includeDietType ? { dietType: dietType || '' } : {}),
       goalChoice: goalChoice?.trim(),
       goalIntensity: goalIntensity,
       allergies,
@@ -1146,6 +1167,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if (!onPartialSave) return;
     const weightKgRounded = getCurrentWeightKgRounded();
     const heightCmRounded = getCurrentHeightCmRounded();
+    const includeDietType = dietHydratedRef.current || dietTouchedRef.current;
     const payload = {
       weight: weightKgRounded != null ? String(weightKgRounded) : '',
       birthdate: birthdateFromParts || '',
@@ -1155,6 +1177,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       goalIntensity,
       allergies,
       diabetesType,
+      ...(includeDietType ? { dietType: dietType || '' } : {}),
     };
     onPartialSave(payload);
   }, [
@@ -1162,6 +1185,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     birthdateFromParts,
     height,
     bodyType,
+    dietType,
     goalChoice,
     goalIntensity,
     allergies,
@@ -1174,6 +1198,97 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     mesomorph: "Naturally muscular and athletic build. Gains muscle easily and maintains weight well.",
     endomorph: "Naturally broader and rounder physique. Gains weight easily, slower metabolism."
   };
+
+  if (showDietPicker) {
+    const selected = getDietOption(dietType);
+    const grouped = DIET_OPTIONS.reduce((acc: Record<string, typeof DIET_OPTIONS>, item) => {
+      acc[item.group] = acc[item.group] || [];
+      acc[item.group].push(item);
+      return acc;
+    }, {});
+
+    return (
+      <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded shadow">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            type="button"
+            onClick={() => setShowDietPicker(false)}
+            className="text-gray-700 hover:text-gray-900 font-medium"
+          >
+            ← Back
+          </button>
+          <div className="text-sm text-gray-500">Diet</div>
+        </div>
+
+        <h2 className="text-xl font-bold mb-2">Choose your diet (optional)</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          We can warn you when a meal doesn’t match your diet and suggest simple swaps. This uses no extra credits.
+        </p>
+
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => {
+              dietTouchedRef.current = true;
+              setDietType('');
+            }}
+            className={`w-full px-4 py-3 rounded-lg border text-left ${!dietType ? 'border-helfi-green bg-green-50' : 'border-gray-200 hover:bg-gray-50'}`}
+          >
+            <div className="font-semibold text-gray-900">No diet selected</div>
+            <div className="text-xs text-gray-600">Turn diet warnings off.</div>
+          </button>
+        </div>
+
+        <div className="space-y-5">
+          {Object.entries(grouped).map(([groupName, items]) => (
+            <div key={groupName}>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{groupName}</div>
+              <div className="space-y-2">
+                {items.map((d) => {
+                  const active = dietType === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => {
+                        dietTouchedRef.current = true;
+                        setDietType(d.id);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left ${
+                        active ? 'border-helfi-green bg-green-50' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <DietIcon dietId={d.id} size={44} />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-gray-900">{d.label}</div>
+                        <div className="text-xs text-gray-600">{d.summary}</div>
+                      </div>
+                      {active && <span className="text-helfi-green font-semibold text-sm">Selected</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowDietPicker(false)}
+            className="w-full px-6 py-3 rounded-lg bg-helfi-green text-white font-medium hover:opacity-90"
+          >
+            Save and go back
+          </button>
+          {selected && (
+            <div className="text-xs text-gray-500 text-center">
+              Current choice: <span className="font-semibold text-gray-700">{selected.label}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded shadow">
@@ -1484,6 +1599,38 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           </div>
         )}
       </div>
+
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold mb-2">Do you follow a specific diet? (optional)</h2>
+        <p className="mb-3 text-gray-600">We can warn you when a meal doesn&apos;t match your diet and suggest simple swaps.</p>
+        <button
+          type="button"
+          onClick={() => setShowDietPicker(true)}
+          className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-gray-300 hover:bg-gray-50"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <DietIcon dietId={dietType || 'plate'} size={40} />
+            <div className="text-left min-w-0">
+              <div className="font-semibold text-gray-900">{getDietOption(dietType)?.label || 'Choose your diet'}</div>
+              <div className="text-xs text-gray-600 truncate">{getDietOption(dietType)?.summary || 'Tap to choose one diet type.'}</div>
+            </div>
+          </div>
+          <span className="text-gray-500 font-semibold">›</span>
+        </button>
+        {dietType && (
+          <button
+            type="button"
+            onClick={() => {
+              dietTouchedRef.current = true;
+              setDietType('');
+            }}
+            className="mt-3 text-sm text-gray-600 underline hover:text-gray-900"
+          >
+            Clear diet selection
+          </button>
+        )}
+      </div>
+
       <h2 className="text-2xl font-bold mb-4">Choose your body type (optional)</h2>
       <p className="mb-4 text-gray-600">Helps tailor insights to your body composition.</p>
       <div className="space-y-3 mb-6">
