@@ -6517,6 +6517,9 @@ Please add nutritional information manually if needed.`);
       }
       return Array.from(byDisplay.values())
     })()
+    // Product decision: "All" is for browsing non-favorited items.
+    // If a user saves something as a favorite, it should only appear in Favorites/Custom tabs.
+    const allMealsWithoutFavorites = allMeals.filter((it: any) => !it?.favorite)
 
     const favoriteMeals = (favorites || []).map((fav: any) => ({
       id: fav?.id || `fav-${Math.random()}`,
@@ -6531,7 +6534,7 @@ Please add nutritional information manually if needed.`);
     // Product request: "Custom" only shows meals the user created (Build-a-meal / Combined).
     const customMeals = favoriteMeals.filter((m: any) => isCustomMealFavorite(m?.favorite))
 
-    return { allMeals, favoriteMeals, customMeals }
+    return { allMeals: allMealsWithoutFavorites, favoriteMeals, customMeals }
   }
 
   // IMPORTANT: Do not auto-create or auto-persist favorites based on diary history.
@@ -13608,6 +13611,7 @@ Please add nutritional information manually if needed.`);
                                 onClick={() => {
                                   if (!item?.entry) return
                                   handleAddToFavorites(item.entry)
+                                  setFavoritesActiveTab('favorites')
                                   showQuickToast('Saved to Favorites')
                                 }}
                                 className="px-3 flex items-center justify-center hover:bg-emerald-50 text-helfi-green disabled:opacity-50"
