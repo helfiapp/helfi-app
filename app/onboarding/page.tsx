@@ -147,6 +147,39 @@ function normalizeForComparison(value: any): any {
   return value ?? null;
 }
 
+function getInsightsRelevantOnboardingFormSnapshot(source: any): any {
+  const sanitized = sanitizeUserDataPayload(source) || {};
+  const healthSituationsDefault = {
+    healthIssues: '',
+    healthProblems: '',
+    additionalInfo: '',
+    skipped: false,
+  };
+
+  return {
+    gender: typeof sanitized.gender === 'string' ? sanitized.gender : '',
+    weight: sanitized.weight ?? '',
+    height: sanitized.height ?? '',
+    bodyType: typeof sanitized.bodyType === 'string' ? sanitized.bodyType : '',
+    birthdate: typeof sanitized.birthdate === 'string' ? sanitized.birthdate : '',
+    goalChoice: typeof sanitized.goalChoice === 'string' ? sanitized.goalChoice : '',
+    goalIntensity: (sanitized.goalIntensity || 'standard').toString().toLowerCase(),
+    profileInfo: sanitized.profileInfo && typeof sanitized.profileInfo === 'object' ? sanitized.profileInfo : {},
+    allergies: Array.isArray(sanitized.allergies) ? sanitized.allergies : [],
+    diabetesType: typeof sanitized.diabetesType === 'string' ? sanitized.diabetesType : '',
+
+    goals: Array.isArray(sanitized.goals) ? sanitized.goals : [],
+    healthSituations:
+      sanitized.healthSituations && typeof sanitized.healthSituations === 'object'
+        ? { ...healthSituationsDefault, ...sanitized.healthSituations }
+        : healthSituationsDefault,
+    supplements: Array.isArray(sanitized.supplements) ? sanitized.supplements : [],
+    medications: Array.isArray(sanitized.medications) ? sanitized.medications : [],
+    bloodResults:
+      sanitized.bloodResults && typeof sanitized.bloodResults === 'object' ? sanitized.bloodResults : {},
+  };
+}
+
 function pickFields(source: any, fields: string[]) {
   const result: Record<string, any> = {};
   for (const field of fields) {
@@ -158,13 +191,14 @@ function pickFields(source: any, fields: string[]) {
 }
 
 function detectChangedInsightTypes(baselineJson: string, currentForm: any): InsightChangeType[] {
-  let baseline: any = {};
+  let baselineRaw: any = {};
   try {
-    baseline = baselineJson ? JSON.parse(baselineJson) : {};
+    baselineRaw = baselineJson ? JSON.parse(baselineJson) : {};
   } catch {
-    baseline = {};
+    baselineRaw = {};
   }
-  const current = currentForm || {};
+  const baseline = getInsightsRelevantOnboardingFormSnapshot(baselineRaw);
+  const current = getInsightsRelevantOnboardingFormSnapshot(currentForm || {});
   const hasChanged = (a: any, b: any) =>
     JSON.stringify(normalizeForComparison(a)) !== JSON.stringify(normalizeForComparison(b));
 
@@ -172,8 +206,8 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
 
   if (
     hasChanged(
-      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'unit', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
-      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'unit', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
+      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
+      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
     )
   ) {
     changeTypes.push('profile');
@@ -360,6 +394,11 @@ function stableStringify(value: any): string {
       return '';
     }
   }
+}
+
+function onboardingGuardSnapshotJson(form: any): string {
+  const relevant = getInsightsRelevantOnboardingFormSnapshot(form);
+  return stableStringify(normalizeForComparison(relevant));
 }
 
 // Track when the user chooses to continue without running Update Insights so navigation isn't blocked
@@ -571,7 +610,7 @@ function GenderStep({ onNext, initial, initialAgreed, onPartialSave }: { onNext:
         <div className="flex justify-between pt-4">
           <button 
             className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-            onClick={() => onNext({ gender: gender || 'not specified', agreed })}
+            onClick={() => onNext({ gender: gender || 'not specified', termsAccepted: agreed })}
           >
             Skip
           </button>
@@ -582,7 +621,7 @@ function GenderStep({ onNext, initial, initialAgreed, onPartialSave }: { onNext:
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
             disabled={!agreed}
-            onClick={() => agreed && onNext({ gender: gender || 'not specified', agreed })}
+            onClick={() => agreed && onNext({ gender: gender || 'not specified', termsAccepted: agreed })}
           >
             Continue
           </button>
@@ -908,12 +947,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       weight: weightKgRounded != null ? String(weightKgRounded) : '',
       birthdate: birthdateFromParts || birthdate || initial?.birthdate || '',
       height: heightCmRounded != null ? String(heightCmRounded) : '',
-      feet,
-      inches,
       bodyType,
       goalChoice: goalChoice?.trim(),
       goalIntensity: goalIntensity,
-      unit,
       allergies,
       diabetesType,
     }
@@ -1114,12 +1150,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       weight: weightKgRounded != null ? String(weightKgRounded) : '',
       birthdate: birthdateFromParts || '',
       height: heightCmRounded != null ? String(heightCmRounded) : '',
-      feet,
-      inches,
       bodyType,
       goalChoice,
       goalIntensity,
-      unit,
       allergies,
       diabetesType,
     };
@@ -1128,12 +1161,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     weight,
     birthdateFromParts,
     height,
-    feet,
-    inches,
     bodyType,
     goalChoice,
     goalIntensity,
-    unit,
     allergies,
     diabetesType,
     onPartialSave,
@@ -6186,6 +6216,7 @@ export default function Onboarding() {
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
   const [usageMeterRefresh, setUsageMeterRefresh] = useState(0);
   const formBaselineRef = useRef<string>(''); // canonical snapshot to detect real edits
+  const formBaselineInitializedRef = useRef<boolean>(false);
   const pendingNavigationRef = useRef<(() => void) | null>(null);
 
   const runPendingNavigation = useCallback(() => {
@@ -6193,11 +6224,13 @@ export default function Onboarding() {
     pendingNavigationRef.current = null;
     if (fn) fn();
   }, []);
-  const syncFormBaseline = useCallback(() => {
+  const syncFormBaseline = useCallback((nextForm?: any) => {
     try {
-      formBaselineRef.current = stableStringify(formRef.current || {});
+      formBaselineRef.current = onboardingGuardSnapshotJson(nextForm ?? formRef.current ?? {});
+      formBaselineInitializedRef.current = true;
     } catch {
       formBaselineRef.current = '';
+      formBaselineInitializedRef.current = false;
     }
   }, []);
   
@@ -6280,13 +6313,16 @@ export default function Onboarding() {
 
   // Optimized: Consolidated data loading - no separate profile image API call
   const loadUserData = async () => {
+    let mergedForBaseline: any = null;
     try {
       const response = await fetch('/api/user-data');
       if (response.ok) {
         const userData = await response.json();
         console.log('Loaded user data from database:', userData);
         if (userData && userData.data && Object.keys(userData.data).length > 0) {
-          setForm((prev: any) => ({ ...prev, ...userData.data }));
+          mergedForBaseline = { ...(formRef.current || {}), ...userData.data };
+          formRef.current = mergedForBaseline;
+          setForm(mergedForBaseline);
           // Load profile image from the same API response
           if (userData.data.profileImage) {
             setProfileImage(userData.data.profileImage);
@@ -6298,7 +6334,7 @@ export default function Onboarding() {
     } finally {
       setAllowAutosave(true);
       // Establish a clean baseline after the initial load so navigation guard only triggers on new edits
-      syncFormBaseline();
+      syncFormBaseline(mergedForBaseline ?? formRef.current ?? form);
       setHasGlobalUnsavedChanges(false);
     }
   };
@@ -6309,11 +6345,9 @@ export default function Onboarding() {
 
   // Initialize baseline once the form has loaded real data
   useEffect(() => {
-    const baselineEmpty = !formBaselineRef.current || formBaselineRef.current === '{}';
     const hasMeaningfulData = form && Object.keys(form || {}).length > 0;
-    if (baselineEmpty && hasMeaningfulData) {
-      syncFormBaseline();
-    }
+    if (formBaselineInitializedRef.current) return;
+    if (hasMeaningfulData) syncFormBaseline(form);
   }, [form, syncFormBaseline]);
 
   // Warm cache: load last known form instantly on mount
@@ -6407,7 +6441,7 @@ export default function Onboarding() {
           debouncedSave(next);
           // Mark dirty only if current form differs from baseline
           try {
-            if (formBaselineRef.current && stableStringify(next) !== formBaselineRef.current) {
+            if (formBaselineRef.current && onboardingGuardSnapshotJson(next) !== formBaselineRef.current) {
               setHasGlobalUnsavedChanges(true);
             }
           } catch {
@@ -6467,7 +6501,7 @@ export default function Onboarding() {
       // Keep shared user data context in sync so calorie targets/macros recalc immediately
       updateUserData(updatedForm);
       try {
-        const canonical = stableStringify(updatedForm);
+        const canonical = onboardingGuardSnapshotJson(updatedForm);
         if (!formBaselineRef.current || canonical !== formBaselineRef.current) {
           setHasGlobalUnsavedChanges(true);
         }
@@ -6629,7 +6663,7 @@ export default function Onboarding() {
                   const hasRealChanges = (() => {
                     try {
                       if (!formBaselineRef.current) return false;
-                      return stableStringify(formRef.current || {}) !== formBaselineRef.current;
+                      return onboardingGuardSnapshotJson(formRef.current || {}) !== formBaselineRef.current;
                     } catch {
                       return hasGlobalUnsavedChanges;
                     }
