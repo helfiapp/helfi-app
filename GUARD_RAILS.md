@@ -633,6 +633,7 @@ for a change.
 - `lib/credit-system.ts` (`CreditManager` and credit charging logic)
 - `app/api/credit/status/route.ts` (credits remaining bar – wallet status)
 - `app/api/credit/feature-usage/route.ts` (“This AI feature has been used X times…”)
+- `app/api/credit/feature-usage-stats/route.ts` (Billing page “Your usage” time-range stats)
 - `app/api/credit/usage-breakdown/route.ts` (admin/diagnostic usage breakdown)
 - **Do not remove the photo-analysis cache or curated USDA enforcement (Nov 2025):**
   - `app/api/analyze-food/route.ts` hashes the image and returns cached items/macros for repeat analyses of the same photo. This stabilizes totals and avoids run-to-run drift. Do not remove or bypass this cache without explicit approval.
@@ -679,6 +680,20 @@ If credits or usage counters ever look wrong, agents must:
 
 Only after following the above and explaining the exact plan in plain English
 may an agent change any of the protected files in this section.
+
+### 4.3 Usage Stats (Billing) – Counting Rules (Dec 2025)
+
+Billing shows a “Your usage” section with time ranges (7 days, 1/2/6 months, all time, custom).
+These counts are meant to reflect **user-visible actions**, not internal helper calls.
+
+**Counting rules (must stay stable):**
+- Food photo analysis: count **one** use per `scanId` for `food:image-analysis`, `food:text-analysis`, `food:analyze-packaged` (exclude re-analysis and ignore events without `scanId` to avoid double-logging).
+- Symptom analysis: count `symptoms:analysis` events.
+- Medical image analysis: count `medical-image:analysis` events.
+- Light chat: count `symptoms:chat` + `medical-image:chat` events.
+- Insights generation: count **one** use per `runId` for `insights:*` (excluding `insights:ask` / `insights:unknown`), plus count `insights:landing-generate` when `runId` is missing.
+
+If you change logging or feature names, you must update these rules and re-check that displayed counts do not jump unexpectedly.
 
 ---
 

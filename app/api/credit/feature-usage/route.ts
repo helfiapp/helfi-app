@@ -54,13 +54,11 @@ export async function GET(_req: NextRequest) {
 
     const hasSubscription = user.subscription?.plan === 'PREMIUM'
 
-    // Use live monthly counters where available, but fall back to lifetime totals
-    // so that historical usage (before monthly fields existed) is still visible.
     debugStage = 'prepare-counts'
     const foodMonthly = user.monthlyFoodAnalysisUsed || 0
     const foodLifetime = user.totalFoodAnalysisCount || 0
-    const actualFoodUsage = Math.max(foodMonthly, foodLifetime)
     const foodLabel: 'monthly' | 'total' = foodMonthly > 0 ? 'monthly' : 'total'
+    const actualFoodUsage = foodLabel === 'monthly' ? foodMonthly : foodLifetime
 
     const symptomMonthly = user.monthlySymptomAnalysisUsed || 0
     const symptomAnalysisLifetime = Math.max(
@@ -69,17 +67,28 @@ export async function GET(_req: NextRequest) {
         (user.totalFoodAnalysisCount || 0) -
         (user.totalInteractionAnalysisCount || 0)
     )
-    const symptomCount = hasSubscription
-      ? symptomMonthly
-      : Math.max(symptomMonthly, symptomAnalysisLifetime)
-    const symptomLabel: 'monthly' | 'total' =
-      hasSubscription && symptomMonthly > 0 ? 'monthly' : 'total'
+    const symptomLabel: 'monthly' | 'total' = symptomMonthly > 0 ? 'monthly' : 'total'
+    const symptomCount = symptomLabel === 'monthly' ? symptomMonthly : symptomAnalysisLifetime
 
     const interactionMonthly = user.monthlyInteractionAnalysisUsed || 0
     const interactionLifetime = user.totalInteractionAnalysisCount || 0
 
     const medicalMonthly = user.monthlyMedicalImageAnalysisUsed || 0
     const insightsMonthly = user.monthlyInsightsGenerationUsed || 0
+
+    // Health tips usage (no counters; derive from usage events)
+    const startOfUtcMonth = (() => {
+      const now = new Date()
+      return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0))
+    })()
+    const healthTipsMonthly = await prisma.aIUsageEvent.count({
+      where: {
+        userId: user.id,
+        success: true,
+        createdAt: { gte: startOfUtcMonth },
+        feature: { startsWith: 'health-tips:' },
+      },
+    })
 
     const featureUsage: any = {
       symptomAnalysis: {
@@ -93,12 +102,9 @@ export async function GET(_req: NextRequest) {
         label: foodLabel,
       },
       interactionAnalysis: {
-        count: Math.max(interactionMonthly, interactionLifetime),
+        count: interactionMonthly > 0 ? interactionMonthly : interactionLifetime,
         costPerUse: CREDIT_COSTS.INTERACTION_ANALYSIS,
-        label:
-          interactionMonthly >= interactionLifetime && interactionMonthly > 0
-            ? 'monthly'
-            : 'total',
+        label: interactionMonthly > 0 ? 'monthly' : 'total',
       },
       medicalImageAnalysis: {
         count: medicalMonthly,
@@ -110,19 +116,17 @@ export async function GET(_req: NextRequest) {
         costPerUse: CREDIT_COSTS.INSIGHTS_GENERATION,
         label: insightsMonthly > 0 ? 'monthly' : 'total',
       },
-      // Health Tips usage remains optional and is currently reported as zero,
-      // but the shape is kept for forward‑compatibility with UI.
       healthTips: {
-        count: 0,
+        count: healthTipsMonthly,
         costPerUse: 0,
-        label: 'total',
+        label: 'monthly',
         totalCredits: 0,
       },
     }
 
     return NextResponse.json({
       debugStage: 'success',
-      schemaVersion: 2,
+      schemaVersion: 3,
       featureUsage,
       hasSubscription,
       actualCreditsUsed: user.walletMonthlyUsedCents || 0,

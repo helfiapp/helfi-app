@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { precomputeIssueSectionsForUser, precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
+import { withRunContext } from '@/lib/run-context'
+import { randomUUID } from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,10 +50,14 @@ export async function POST(request: NextRequest) {
     // Start quick regeneration first, then full regeneration
     setImmediate(async () => {
       try {
+        const runId = randomUUID()
         console.log('🚀 Starting FULL insights regeneration for user:', userId)
         
         // Generate full insights for all issues
-        await precomputeIssueSectionsForUser(userId, { concurrency: 2 })
+        await withRunContext(
+          { runId, feature: 'insights:regenerate', meta: { userId } },
+          () => precomputeIssueSectionsForUser(userId, { concurrency: 2 })
+        )
         
         console.log('✅ FULL insights regeneration complete for user:', userId)
       } catch (error) {
@@ -73,4 +79,3 @@ export async function POST(request: NextRequest) {
     }, { status: 500 })
   }
 }
-

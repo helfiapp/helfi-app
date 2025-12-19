@@ -32,6 +32,21 @@ export default function BillingPage() {
 
   // Stripe checkout
   const [isCreatingCheckout, setIsCreatingCheckout] = useState<string | null>(null)
+  
+  // Usage stats (real usage history)
+  const [usageRange, setUsageRange] = useState<'7d' | '1m' | '2m' | '6m' | 'all' | 'custom'>('7d')
+  const [usageStart, setUsageStart] = useState<string>('')
+  const [usageEnd, setUsageEnd] = useState<string>('')
+  const [usageStats, setUsageStats] = useState<Record<string, number> | null>(null)
+  const [usageStatsLoading, setUsageStatsLoading] = useState(false)
+  const [usageStatsError, setUsageStatsError] = useState<string | null>(null)
+
+  const toDateInputValue = (d: Date) => {
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
   const startCheckout = async (plan: string, quantity: number = 1) => {
     try {
       setIsCreatingCheckout(plan)
@@ -69,6 +84,50 @@ export default function BillingPage() {
       setIsCreatingCheckout(null)
     }
   }
+
+  // Load real usage stats for Billing
+  useEffect(() => {
+    if (!session?.user) return
+
+    const load = async () => {
+      setUsageStatsLoading(true)
+      setUsageStatsError(null)
+      try {
+        const params = new URLSearchParams()
+        params.set('range', usageRange)
+        if (usageRange === 'custom') {
+          if (usageStart) params.set('start', usageStart)
+          if (usageEnd) params.set('end', usageEnd)
+        }
+        const res = await fetch(`/api/credit/feature-usage-stats?${params.toString()}`, { cache: 'no-store' })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data?.error || 'Could not load usage stats')
+        }
+        const data = await res.json()
+        setUsageStats(data?.usage || null)
+      } catch (e: any) {
+        setUsageStats(null)
+        setUsageStatsError(e?.message || 'Could not load usage stats')
+      } finally {
+        setUsageStatsLoading(false)
+      }
+    }
+
+    // If user picks custom but dates are empty, set a sensible default (last 7 days).
+    if (usageRange === 'custom' && (!usageStart || !usageEnd)) {
+      const now = new Date()
+      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      const startValue = usageStart || toDateInputValue(start)
+      const endValue = usageEnd || toDateInputValue(now)
+      if (!usageStart) setUsageStart(startValue)
+      if (!usageEnd) setUsageEnd(endValue)
+      // Wait for state updates, then the effect will re-run and load.
+      return
+    }
+
+    load()
+  }, [session, usageRange, usageStart, usageEnd])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -624,6 +683,83 @@ export default function BillingPage() {
 
         </div>
       </nav>
+
+      {/* Usage stats */}
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">Your usage</h2>
+            <p className="text-sm text-gray-600">See how many times you used each feature.</p>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm font-medium text-gray-700">
+              Time period
+              <select
+                value={usageRange}
+                onChange={(e) => setUsageRange(e.target.value as any)}
+                className="ml-2 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+              >
+                <option value="7d">Last 7 days</option>
+                <option value="1m">Last month</option>
+                <option value="2m">Last 2 months</option>
+                <option value="6m">Last 6 months</option>
+                <option value="all">All time</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+
+            {usageRange === 'custom' && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-sm text-gray-700">
+                  Start
+                  <input
+                    type="date"
+                    value={usageStart}
+                    onChange={(e) => setUsageStart(e.target.value)}
+                    className="ml-2 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                  />
+                </label>
+                <label className="text-sm text-gray-700">
+                  End
+                  <input
+                    type="date"
+                    value={usageEnd}
+                    onChange={(e) => setUsageEnd(e.target.value)}
+                    className="ml-2 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-5">
+          {usageStatsLoading && (
+            <p className="text-sm text-gray-500">Loading…</p>
+          )}
+
+          {!usageStatsLoading && usageStatsError && (
+            <p className="text-sm text-red-600">{usageStatsError}</p>
+          )}
+
+          {!usageStatsLoading && !usageStatsError && usageStats && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {creditDisplayList.map((item) => {
+                const count = Number((usageStats as any)?.[item.key] ?? 0)
+                return (
+                  <div key={item.key} className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">{item.label}</span>
+                    <span className="text-sm font-semibold text-gray-800">
+                      {count.toLocaleString()} {count === 1 ? 'time' : 'times'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* AI feature credit costs reference */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
