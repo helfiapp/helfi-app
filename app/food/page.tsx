@@ -6052,13 +6052,16 @@ Please add nutritional information manually if needed.`);
 
   const foodNameOverrideMap = useMemo(() => {
     const map = new Map<string, string>()
+    const byItemId = new Map<string, string>()
     const list = Array.isArray(foodNameOverrides) ? foodNameOverrides : []
     for (const row of list) {
       const fromRaw = typeof (row as any)?.from === 'string' ? String((row as any).from) : ''
       const toRaw = typeof (row as any)?.to === 'string' ? String((row as any).to) : ''
+      const itemIdRaw = typeof (row as any)?.itemId === 'string' ? String((row as any).itemId).trim() : ''
       const from = normalizeMealLabel(fromRaw || '')
       const to = normalizeMealLabel(toRaw || '').trim()
       if (!from || !to) continue
+      if (itemIdRaw) byItemId.set(itemIdRaw, to)
       const key = normalizeFoodName(from)
       if (key) map.set(key, to)
       try {
@@ -6068,10 +6071,21 @@ Please add nutritional information manually if needed.`);
         if (simpleKey) map.set(simpleKey, to)
       } catch {}
     }
+    ;(map as any).__byItemId = byItemId
     return map
   }, [foodNameOverrides])
 
-  const applyFoodNameOverride = (raw: any) => {
+  const applyFoodNameOverride = (raw: any, entry?: any) => {
+    try {
+      const items = Array.isArray(entry?.items) ? entry.items : null
+      const single = Array.isArray(items) && items.length === 1 ? items[0] : null
+      const itemId = single && typeof single?.id === 'string' ? String(single.id).trim() : ''
+      const byItemId = (foodNameOverrideMap as any)?.__byItemId
+      if (itemId && byItemId && typeof byItemId.get === 'function') {
+        const hit = byItemId.get(itemId)
+        if (hit) return hit
+      }
+    } catch {}
     const base = normalizeMealLabel(raw || '').trim()
     if (!base) return ''
     const key = normalizeFoodName(base)
@@ -6314,7 +6328,7 @@ Please add nutritional information manually if needed.`);
     }
     // Use the same normalization we use for food names so things like "Bürgen" and "Burgen"
     // (and various punctuation/spacing differences) still match reliably.
-    const normalizeKey = (raw: any) => normalizeFoodName(applyFoodNameOverride(raw || ''))
+    const normalizeKey = (raw: any, entry?: any) => normalizeFoodName(applyFoodNameOverride(raw || '', entry))
     const simplifyKey = (raw: any) => {
       const s = applyFoodNameOverride(raw || '').trim()
       if (!s) return ''
@@ -6343,7 +6357,7 @@ Please add nutritional information manually if needed.`);
 
     const entryKey = (entry: any) => {
       // "All" is a picker list; we key by the (possibly renamed) label so old names collapse cleanly.
-      const label = normalizeKey(entry?.description || entry?.label || '')
+      const label = normalizeKey(entry?.description || entry?.label || '', entry)
       const labelSimple = simplifyKey(entry?.description || entry?.label || '')
       const key = label || labelSimple
       return key ? `label:${key}` : ''
@@ -6364,7 +6378,7 @@ Please add nutritional information manually if needed.`);
     const favoritesByKey = new Map<string, any>()
     const favoritesById = new Map<string, any>()
     ;(favorites || []).forEach((fav: any) => {
-      const key = normalizeKey(fav?.label || fav?.description || favoriteDisplayLabel(fav) || '')
+      const key = normalizeKey(fav?.label || fav?.description || favoriteDisplayLabel(fav) || '', fav)
       if (!key) return
       favoritesByKey.set(key, fav)
       if (fav?.id) favoritesById.set(String(fav.id), fav)
@@ -6382,11 +6396,11 @@ Please add nutritional information manually if needed.`);
         const linkedId = linkedFavoriteIdForEntry(entry)
         if (linkedId && favoritesById.has(linkedId)) {
           const fav = favoritesById.get(linkedId)
-          return applyFoodNameOverride(favoriteDisplayLabel(fav) || entry?.description || entry?.label || 'Meal')
+          return applyFoodNameOverride(favoriteDisplayLabel(fav) || entry?.description || entry?.label || 'Meal', entry)
         }
         // If this entry matches a renamed favorite alias, show the latest favorite label.
         try {
-          const labelKey = normalizeKey(entry?.description || entry?.label || '')
+          const labelKey = normalizeKey(entry?.description || entry?.label || '', entry)
           const aliasId =
             (labelKey ? favoriteIdByAlias.get(labelKey) : '') ||
             (() => {
@@ -6395,10 +6409,10 @@ Please add nutritional information manually if needed.`);
             })()
           if (aliasId && favoritesById.has(aliasId)) {
             const fav = favoritesById.get(aliasId)
-            return applyFoodNameOverride(favoriteDisplayLabel(fav) || entry?.description || entry?.label || 'Meal')
+            return applyFoodNameOverride(favoriteDisplayLabel(fav) || entry?.description || entry?.label || 'Meal', entry)
           }
         } catch {}
-        return applyFoodNameOverride(entry?.description || entry?.label || 'Meal')
+        return applyFoodNameOverride(entry?.description || entry?.label || 'Meal', entry)
       })(),
       entry,
       favorite:
@@ -6418,7 +6432,7 @@ Please add nutritional information manually if needed.`);
                   })()
                 if (aliasId && favoritesById.has(aliasId)) return favoritesById.get(aliasId)
               } catch {}
-              return favoritesByKey.get(normalizeKey(entry?.description || entry?.label || '')) || null
+              return favoritesByKey.get(normalizeKey(entry?.description || entry?.label || '', entry)) || null
             })(),
       createdAt: entry?.createdAt || entry?.id || Date.now(),
       sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
@@ -7043,16 +7057,26 @@ Please add nutritional information manually if needed.`);
     }
   }
 
-  const saveFoodNameOverride = (fromLabel: any, toLabel: any) => {
+  const saveFoodNameOverride = (fromLabel: any, toLabel: any, entry?: any) => {
     const from = normalizeMealLabel(fromLabel || '').trim()
     const to = normalizeMealLabel(toLabel || '').trim()
     if (!from || !to || from === to) return
     const fromKey = normalizeFoodName(from)
     if (!fromKey) return
+    let itemId = ''
+    try {
+      const items = Array.isArray(entry?.items) ? entry.items : null
+      const single = Array.isArray(items) && items.length === 1 ? items[0] : null
+      itemId = single && typeof single?.id === 'string' ? String(single.id).trim() : ''
+    } catch {}
     setFoodNameOverrides((prev) => {
       const base = Array.isArray(prev) ? prev : []
-      const next = base.filter((row: any) => normalizeFoodName(normalizeMealLabel(row?.from || '')) !== fromKey)
-      next.unshift({ from, to, createdAt: Date.now() })
+      const next = base.filter((row: any) => {
+        const rowItemId = typeof row?.itemId === 'string' ? String(row.itemId).trim() : ''
+        if (itemId && rowItemId && rowItemId === itemId) return false
+        return normalizeFoodName(normalizeMealLabel(row?.from || '')) !== fromKey
+      })
+      next.unshift({ from, to, ...(itemId ? { itemId } : {}), createdAt: Date.now() })
       persistFoodNameOverrides(next)
       return next
     })
@@ -7143,7 +7167,7 @@ Please add nutritional information manually if needed.`);
     setQuickToast(`Adding to ${categoryLabel(category)}...`)
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    const description = applyFoodNameOverride(source?.description || source?.label || source?.favorite?.label || 'Meal')
+    const description = applyFoodNameOverride(source?.description || source?.label || source?.favorite?.label || 'Meal', source)
     const totals =
       sanitizeNutritionTotals(source?.nutrition || source?.total || source?.entry?.total || source?.entry?.nutrition) ||
       null
@@ -7361,7 +7385,7 @@ Please add nutritional information manually if needed.`);
     if (!nextName) return
     const cleaned = normalizeMealLabel(nextName) || nextName
     try {
-      saveFoodNameOverride(favoriteDisplayLabel(existing) || current, cleaned)
+      saveFoodNameOverride(favoriteDisplayLabel(existing) || current, cleaned, existing)
     } catch {}
     setFavorites((prev) => {
       const next = (Array.isArray(prev) ? prev : []).map((fav: any) => {
@@ -13283,8 +13307,8 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <div className="fixed inset-0 z-50 bg-white overflow-x-hidden">
-          <div className="h-full w-full max-w-6xl mx-auto flex flex-col px-3 sm:px-4">
+        <div className="fixed inset-0 z-50 bg-white overflow-x-hidden overflow-y-auto">
+          <div className="min-h-full w-full max-w-6xl mx-auto flex flex-col px-3 sm:px-4">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div>
               <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
@@ -13358,7 +13382,7 @@ Please add nutritional information manually if needed.`);
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 pb-6">
+          <div className="mt-3 pb-6">
             {(() => {
               const { allMeals, favoriteMeals, customMeals } = buildFavoritesDatasets()
               const search = favoritesSearch.trim().toLowerCase()
@@ -13532,11 +13556,11 @@ Please add nutritional information manually if needed.`);
                                     return
                                   }
 
-                                  const current = applyFoodNameOverride(entry?.description || entry?.label || 'Meal') || 'Meal'
+                                  const current = applyFoodNameOverride(entry?.description || entry?.label || 'Meal', entry) || 'Meal'
                                   const nextRaw = typeof window !== 'undefined' ? window.prompt('Rename to:', current) : null
                                   const nextName = (nextRaw || '').toString().trim()
                                   if (!nextName) return
-                                  saveFoodNameOverride(entry?.description || entry?.label || current, nextName)
+                                  saveFoodNameOverride(entry?.description || entry?.label || current, nextName, entry)
                                   showQuickToast('Renamed')
                                   return
                                 }
