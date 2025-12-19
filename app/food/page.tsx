@@ -6376,7 +6376,7 @@ Please add nutritional information manually if needed.`);
       }
     })
 
-    const allMeals = Array.from(allByKey.values()).map((entry) => ({
+    const allMealsRaw = Array.from(allByKey.values()).map((entry) => ({
       id: entry?.id || `all-${Math.random()}`,
       label: (() => {
         const linkedId = linkedFavoriteIdForEntry(entry)
@@ -6425,6 +6425,44 @@ Please add nutritional information manually if needed.`);
       calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
       serving: entry?.items?.[0]?.serving_size || entry?.serving || entry?.items?.[0]?.servings || '',
     }))
+
+    // Last safety net: if two different sources end up displaying the same label/serving,
+    // show only one row in "All" (prefer the saved Favorite version so edit/delete works).
+    const allMeals = (() => {
+      const byDisplay = new Map<string, any>()
+      const score = (it: any) => {
+        const hasFavorite = Boolean(it?.favorite)
+        const hasEntry = Boolean(it?.entry)
+        return (hasFavorite ? 100 : 0) + (hasEntry ? 10 : 0)
+      }
+      for (const item of Array.isArray(allMealsRaw) ? allMealsRaw : []) {
+        const labelKey = normalizeFoodName(String(item?.label || '').trim())
+        if (!labelKey) continue
+        const servingKey = normalizeFoodName(String(item?.serving || '').trim())
+        const caloriesKey =
+          item?.calories != null && Number.isFinite(Number(item.calories)) ? String(Math.round(Number(item.calories))) : ''
+        const key = `${labelKey}|${servingKey}|${caloriesKey}`
+        const existing = byDisplay.get(key)
+        if (!existing) {
+          byDisplay.set(key, item)
+          continue
+        }
+        const a = existing
+        const b = item
+        const aScore = score(a)
+        const bScore = score(b)
+        if (bScore > aScore) {
+          byDisplay.set(key, b)
+          continue
+        }
+        if (bScore === aScore) {
+          const aTs = Number(a?.createdAt) || 0
+          const bTs = Number(b?.createdAt) || 0
+          if (bTs > aTs) byDisplay.set(key, b)
+        }
+      }
+      return Array.from(byDisplay.values())
+    })()
 
     const favoriteMeals = (favorites || []).map((fav: any) => ({
       id: fav?.id || `fav-${Math.random()}`,
