@@ -576,12 +576,27 @@ const buildTargetsForUser = async (user: any) => {
     }
   })()
 
+  const dietTypes = (() => {
+    try {
+      const stored = user.healthGoals?.find((g: any) => g?.name === '__DIET_PREFERENCE__')
+      const parsed = stored?.category ? JSON.parse(stored.category) : null
+      if (!parsed || typeof parsed !== 'object') return []
+      const raw = Array.isArray((parsed as any).dietTypes) ? (parsed as any).dietTypes : (parsed as any).dietType
+      if (Array.isArray(raw)) return raw.map((v: any) => String(v || '').trim()).filter(Boolean)
+      if (typeof raw === 'string' && raw.trim()) return [raw.trim()]
+      return []
+    } catch {
+      return []
+    }
+  })()
+
   const targets = calculateDailyTargets({
     gender: user.gender ? String(user.gender).toLowerCase() : '',
     birthdate: typeof profile?.dateOfBirth === 'string' ? profile.dateOfBirth : '',
     weightKg: typeof user.weight === 'number' ? user.weight : null,
     heightCm: typeof user.height === 'number' ? user.height : null,
     exerciseFrequency: typeof user.exerciseFrequency === 'string' ? user.exerciseFrequency : '',
+    dietTypes,
     goals: selectedIssues,
     goalChoice: typeof primaryGoal?.goalChoice === 'string' ? primaryGoal.goalChoice : '',
     goalIntensity:

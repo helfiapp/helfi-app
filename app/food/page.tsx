@@ -2440,6 +2440,7 @@ export default function FoodDiary() {
       birthdate: (userData as any).birthdate || userData.profileInfo?.dateOfBirth,
       weightKg: Number.isFinite(weightKg || NaN) ? (weightKg as number) : null,
       heightCm: Number.isFinite(heightCm || NaN) ? (heightCm as number) : null,
+      dietTypes: (userData as any).dietTypes ?? (userData as any).dietType,
       exerciseFrequency: (userData as any).exerciseFrequency,
       goals: goalsArray,
       goalChoice: (userData as any).goalChoice,
