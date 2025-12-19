@@ -13,8 +13,8 @@ import MobileMoreMenu from '@/components/MobileMoreMenu';
 import UsageMeter from '@/components/UsageMeter';
 import InsightsProgressBar from '@/components/InsightsProgressBar';
 import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
-import DietIcon from '@/components/DietIcon';
-import { DIET_OPTIONS, getDietOption } from '@/lib/diets';
+import MaterialSymbol from '@/components/MaterialSymbol';
+import { DIET_CATEGORIES, DIET_OPTIONS, getDietOption, normalizeDietTypes } from '@/lib/diets';
 
 const sanitizeUserDataPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return payload;
@@ -164,7 +164,7 @@ function getInsightsRelevantOnboardingFormSnapshot(source: any): any {
     height: sanitized.height ?? '',
     bodyType: typeof sanitized.bodyType === 'string' ? sanitized.bodyType : '',
     birthdate: typeof sanitized.birthdate === 'string' ? sanitized.birthdate : '',
-    dietType: typeof sanitized.dietType === 'string' ? sanitized.dietType : '',
+    dietTypes: normalizeDietTypes((sanitized as any)?.dietTypes ?? (sanitized as any)?.dietType).sort(),
     goalChoice: typeof sanitized.goalChoice === 'string' ? sanitized.goalChoice : '',
     goalIntensity: (sanitized.goalIntensity || 'standard').toString().toLowerCase(),
     profileInfo: sanitized.profileInfo && typeof sanitized.profileInfo === 'object' ? sanitized.profileInfo : {},
@@ -209,8 +209,8 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
 
   if (
     hasChanged(
-      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'dietType', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
-      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'dietType', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
+      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'dietTypes', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
+      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'dietTypes', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
     )
   ) {
     changeTypes.push('profile');
@@ -654,8 +654,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [diabetesType, setDiabetesType] = useState<'type1' | 'type2' | 'prediabetes' | ''>(
     (initial?.diabetesType as any) || '',
   );
-  const [dietType, setDietType] = useState<string>(initial?.dietType || '');
+  const [dietTypes, setDietTypes] = useState<string[]>(normalizeDietTypes((initial as any)?.dietTypes ?? (initial as any)?.dietType));
   const [showDietPicker, setShowDietPicker] = useState(false);
+  const [dietPickerView, setDietPickerView] = useState<'categories' | 'detail'>('categories');
+  const [dietSearch, setDietSearch] = useState('');
+  const [activeDietCategoryId, setActiveDietCategoryId] = useState<string>(DIET_CATEGORIES[0]?.id || 'plant-based');
   const dietHydratedRef = useRef(false);
   const dietTouchedRef = useRef(false);
   const allergiesHydratedRef = useRef(false);
@@ -768,9 +771,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if (!dietHydratedRef.current) {
       dietHydratedRef.current = true;
       if (!dietTouchedRef.current) {
-        const incomingDiet = typeof initial.dietType === 'string' ? initial.dietType.trim() : '';
-        if (incomingDiet && !dietType) {
-          setDietType(incomingDiet);
+        const incomingDietTypes = normalizeDietTypes((initial as any)?.dietTypes ?? (initial as any)?.dietType)
+        if (incomingDietTypes.length && dietTypes.length === 0) {
+          setDietTypes(incomingDietTypes)
         }
       }
     }
@@ -861,13 +864,16 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const initialBirthdate = (baseline?.birthdate || '').toString();
     const initialAllergies: string[] = Array.isArray(baseline?.allergies) ? baseline.allergies : [];
     const initialDiabetesType = (baseline?.diabetesType || '').toString();
-    const initialDietType = (baseline?.dietType || '').toString();
+    const initialDietTypes = normalizeDietTypes((baseline as any)?.dietTypes ?? (baseline as any)?.dietType).sort();
 
     const normalizeArray = (list?: string[]) =>
       Array.isArray(list) ? list.map((v) => (v || '').toString().toLowerCase().trim()).filter(Boolean).sort() : [];
 
     const allergiesChanged =
       JSON.stringify(normalizeArray(allergies)) !== JSON.stringify(normalizeArray(initialAllergies));
+    const dietChanged =
+      (dietHydratedRef.current || dietTouchedRef.current) &&
+      JSON.stringify(normalizeDietTypes(dietTypes).sort()) !== JSON.stringify(initialDietTypes);
 
     const currentWeightKg = getCurrentWeightKgRounded();
     const currentHeightCm = getCurrentHeightCmRounded();
@@ -886,8 +892,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       weightChanged ||
       heightChanged ||
       (bodyType || '').toString().toLowerCase().trim() !== (initialBodyType || '').toString().toLowerCase().trim() ||
-      ((dietHydratedRef.current || dietTouchedRef.current) &&
-        (dietType || '').toString().trim() !== (initialDietType || '').toString().trim()) ||
+      dietChanged ||
       (goalChoice || '').toString().toLowerCase().trim() !== (initialGoalChoice || '').toString().toLowerCase().trim() ||
       (goalIntensity || 'standard').toString().toLowerCase() !== (initialGoalIntensity || 'standard').toString().toLowerCase() ||
       (birthdate || '').toString().trim() !== (initialBirthdate || '').toString().trim() ||
@@ -895,13 +900,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       (diabetesType || '').toString().toLowerCase().trim() !== (initialDiabetesType || '').toString().toLowerCase().trim();
 
     const hasAny =
-      !!(weight || height || feet || inches || bodyType || dietType || goalChoice || birthdate || allergies.length || diabetesType);
+      !!(weight || height || feet || inches || bodyType || dietTypes.length || goalChoice || birthdate || allergies.length || diabetesType);
 
     setHasUnsavedChanges(changed && hasAny);
     if ((changed && hasAny) && onUnsavedChange) {
       onUnsavedChange();
     }
-  }, [weight, height, feet, inches, bodyType, dietType, goalChoice, goalIntensity, birthdate, allergies, diabetesType, initial, unit]);
+  }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, initial, unit]);
 
   // Warn if the user tries to close the tab or browser with unsaved changes
   useEffect(() => {
@@ -961,14 +966,14 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const buildPayload = () => {
     const weightKgRounded = getCurrentWeightKgRounded();
     const heightCmRounded = getCurrentHeightCmRounded();
-    const includeDietType = dietHydratedRef.current || dietTouchedRef.current;
+    const includeDietTypes = dietHydratedRef.current || dietTouchedRef.current;
     return {
       // Persist canonical measurements so targets/insights stay consistent everywhere
       weight: weightKgRounded != null ? String(weightKgRounded) : '',
       birthdate: birthdateFromParts || birthdate || initial?.birthdate || '',
       height: heightCmRounded != null ? String(heightCmRounded) : '',
       bodyType,
-      ...(includeDietType ? { dietType: dietType || '' } : {}),
+      ...(includeDietTypes ? { dietTypes: Array.from(new Set(dietTypes)).sort() } : {}),
       goalChoice: goalChoice?.trim(),
       goalIntensity: goalIntensity,
       allergies,
@@ -1167,7 +1172,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if (!onPartialSave) return;
     const weightKgRounded = getCurrentWeightKgRounded();
     const heightCmRounded = getCurrentHeightCmRounded();
-    const includeDietType = dietHydratedRef.current || dietTouchedRef.current;
+    const includeDietTypes = dietHydratedRef.current || dietTouchedRef.current;
     const payload = {
       weight: weightKgRounded != null ? String(weightKgRounded) : '',
       birthdate: birthdateFromParts || '',
@@ -1177,7 +1182,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       goalIntensity,
       allergies,
       diabetesType,
-      ...(includeDietType ? { dietType: dietType || '' } : {}),
+      ...(includeDietTypes ? { dietTypes: Array.from(new Set(dietTypes)).sort() } : {}),
     };
     onPartialSave(payload);
   }, [
@@ -1185,7 +1190,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     birthdateFromParts,
     height,
     bodyType,
-    dietType,
+    dietTypes,
     goalChoice,
     goalIntensity,
     allergies,
@@ -1200,94 +1205,241 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   };
 
   if (showDietPicker) {
-    const selected = getDietOption(dietType);
-    const grouped = DIET_OPTIONS.reduce((acc: Record<string, typeof DIET_OPTIONS>, item) => {
-      acc[item.group] = acc[item.group] || [];
-      acc[item.group].push(item);
-      return acc;
-    }, {});
+    const selectedDietIds = normalizeDietTypes(dietTypes).sort()
+    const selectedCount = selectedDietIds.length
+
+    const toggleDiet = (dietId: string) => {
+      const id = (dietId || '').toString().trim()
+      if (!id) return
+      dietTouchedRef.current = true
+      setDietTypes((prev) => {
+        const next = Array.isArray(prev) ? [...prev] : []
+        const idx = next.indexOf(id)
+        if (idx >= 0) {
+          next.splice(idx, 1)
+        } else {
+          next.push(id)
+        }
+        return normalizeDietTypes(next).sort()
+      })
+    }
+
+    const clearAllDiets = () => {
+      dietTouchedRef.current = true
+      setDietTypes([])
+    }
+
+    const optionIcon = (dietId: string) => {
+      const id = (dietId || '').toLowerCase()
+      if (id.includes('vegan') || id.includes('vegetarian') || id.includes('wfpb')) return 'eco'
+      if (id.includes('carnivore')) return 'restaurant'
+      if (id.includes('lion')) return 'pets'
+      if (id.includes('keto')) return 'egg'
+      if (id.includes('paleo')) return 'forest'
+      if (id.includes('primal')) return 'spa'
+      if (id.includes('gluten') || id.includes('grain') || id.includes('wheat')) return 'grain'
+      if (id.includes('fast') || id.includes('omad') || id.includes('time')) return 'timer'
+      if (id.includes('renal') || id.includes('diabetic') || id.includes('gerd') || id.includes('histamine') || id.includes('oxalate') || id.includes('purine'))
+        return 'monitor_heart'
+      if (id.includes('halal') || id.includes('kosher') || id.includes('jain') || id.includes('buddhist')) return 'public'
+      if (id.includes('athlete') || id.includes('bodybuilding') || id.includes('protein') || id.includes('cutting') || id.includes('bulking'))
+        return 'fitness_center'
+      return 'restaurant'
+    }
+
+    const activeCategory =
+      DIET_CATEGORIES.find((c) => c.id === activeDietCategoryId) || DIET_CATEGORIES[0]
+    const activeGroup = activeCategory?.group || 'Plant-Based'
+    const groupOptions = DIET_OPTIONS.filter((d) => d.group === activeGroup)
+
+    const switchToCategory = (categoryId: string) => {
+      setActiveDietCategoryId(categoryId)
+      setDietPickerView('detail')
+    }
+
+    const filteredCategories = (() => {
+      const q = (dietSearch || '').toLowerCase().trim()
+      if (!q) return DIET_CATEGORIES
+      return DIET_CATEGORIES.filter((cat) => {
+        const base = `${cat.label} ${cat.subtitle}`.toLowerCase()
+        if (base.includes(q)) return true
+        const opts = DIET_OPTIONS.filter((o) => o.group === cat.group)
+        return opts.some((o) => o.label.toLowerCase().includes(q))
+      })
+    })()
+
+    if (dietPickerView === 'categories') {
+      return (
+        <div className="relative flex h-full min-h-screen w-full flex-col max-w-md mx-auto overflow-x-hidden pb-6 bg-gray-50">
+          <div className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm px-4 pt-6 pb-2 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => setShowDietPicker(false)}
+                className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 transition-colors text-gray-900"
+                aria-label="Back"
+              >
+                <MaterialSymbol name="arrow_back" className="text-2xl" />
+              </button>
+              <div className="text-sm text-gray-500">{selectedCount ? `${selectedCount} selected` : ''}</div>
+              <div className="flex size-10 shrink-0 items-center justify-center" />
+            </div>
+            <h1 className="text-gray-900 text-3xl font-extrabold leading-tight tracking-tight px-1">Explore Diets</h1>
+          </div>
+
+          <div className="px-5 py-2 mb-2">
+            <label className="relative flex flex-col w-full">
+              <div className="flex w-full items-center rounded-xl h-12 bg-white border border-gray-200 focus-within:border-helfi-green focus-within:ring-1 focus-within:ring-helfi-green transition-all shadow-sm">
+                <div className="text-helfi-green ml-4 mr-2 flex items-center justify-center">
+                  <MaterialSymbol name="search" className="text-xl" />
+                </div>
+                <input
+                  className="flex w-full flex-1 bg-transparent border-none text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 h-full text-base font-medium"
+                  placeholder="Search categories (e.g. Keto, Vegan)"
+                  type="text"
+                  value={dietSearch}
+                  onChange={(e) => setDietSearch(e.target.value)}
+                />
+              </div>
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-3 px-5 py-2">
+            {filteredCategories.map((cat) => {
+              const countInGroup = selectedDietIds.filter((id) => getDietOption(id)?.group === cat.group).length
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => switchToCategory(cat.id)}
+                  className="group flex items-center gap-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm active:scale-[0.98] transition-all hover:border-helfi-green/30"
+                >
+                  <div className="flex items-center justify-center rounded-lg bg-helfi-green/10 shrink-0 size-12 text-helfi-green group-hover:bg-helfi-green group-hover:text-white transition-colors">
+                    <MaterialSymbol name={cat.icon} className="text-[28px]" />
+                  </div>
+                  <div className="flex flex-col justify-center text-left flex-1 min-w-0">
+                    <p className="text-gray-900 text-base font-bold leading-normal truncate">{cat.label}</p>
+                    <p className="text-gray-500 text-sm font-medium leading-normal truncate">
+                      {cat.subtitle}
+                      {countInGroup ? ` • ${countInGroup} selected` : ''}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-gray-300 group-hover:text-helfi-green transition-colors">
+                    <MaterialSymbol name="chevron_right" className="text-2xl" />
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="h-10" />
+        </div>
+      )
+    }
 
     return (
-      <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded shadow">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-gray-50 min-h-screen flex flex-col">
+        <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-4 bg-gray-50/95 backdrop-blur-md border-b border-gray-100">
           <button
             type="button"
-            onClick={() => setShowDietPicker(false)}
-            className="text-gray-700 hover:text-gray-900 font-medium"
+            onClick={() => setDietPickerView('categories')}
+            className="flex items-center justify-center size-10 rounded-full hover:bg-gray-200 transition-colors"
+            aria-label="Back"
           >
-            ← Back
+            <MaterialSymbol name="arrow_back" className="text-2xl" />
           </button>
-          <div className="text-sm text-gray-500">Diet</div>
-        </div>
-
-        <h2 className="text-xl font-bold mb-2">Choose your diet (optional)</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          We can warn you when a meal doesn’t match your diet and suggest simple swaps. This uses no extra credits.
-        </p>
-
-        <div className="mb-4">
+          <h1 className="text-lg font-bold tracking-tight">Select diets</h1>
           <button
             type="button"
-            onClick={() => {
-              dietTouchedRef.current = true;
-              setDietType('');
-            }}
-            className={`w-full px-4 py-3 rounded-lg border text-left ${!dietType ? 'border-helfi-green bg-green-50' : 'border-gray-200 hover:bg-gray-50'}`}
+            onClick={clearAllDiets}
+            className="text-sm font-semibold text-gray-600 hover:text-gray-900"
           >
-            <div className="font-semibold text-gray-900">No diet selected</div>
-            <div className="text-xs text-gray-600">Turn diet warnings off.</div>
+            Clear
           </button>
+        </header>
+
+        <div className="px-5 pt-3 pb-4">
+          <h2 className="text-2xl font-bold leading-tight tracking-tight mb-1">Choose diets that fit you.</h2>
+          <p className="text-gray-600 text-base font-medium">
+            You can pick more than one. We’ll warn you when a meal doesn’t match.
+          </p>
         </div>
 
-        <div className="space-y-5">
-          {Object.entries(grouped).map(([groupName, items]) => (
-            <div key={groupName}>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{groupName}</div>
-              <div className="space-y-2">
-                {items.map((d) => {
-                  const active = dietType === d.id;
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => {
-                        dietTouchedRef.current = true;
-                        setDietType(d.id);
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left ${
-                        active ? 'border-helfi-green bg-green-50' : 'border-gray-200 hover:bg-gray-50'
+        <div className="px-5 pb-3">
+          <div className="flex gap-2 overflow-x-auto">
+            {DIET_CATEGORIES.map((cat) => {
+              const active = cat.id === activeDietCategoryId
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setActiveDietCategoryId(cat.id)}
+                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
+                    active
+                      ? 'bg-helfi-green text-white border-helfi-green'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-helfi-green/40'
+                  }`}
+                >
+                  {cat.group}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <main className="flex-1 flex flex-col w-full max-w-md mx-auto pb-32">
+          <div className="flex flex-col gap-3 px-5">
+            {groupOptions.map((d) => {
+              const checked = selectedDietIds.includes(d.id)
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => toggleDiet(d.id)}
+                  className={`group relative flex items-center gap-4 p-4 rounded-xl border-2 bg-white shadow-sm transition-all duration-200 ease-in-out active:scale-[0.98] ${
+                    checked ? 'border-helfi-green' : 'border-transparent hover:border-helfi-green/30'
+                  }`}
+                >
+                  <div
+                    className={`flex shrink-0 items-center justify-center size-12 rounded-full transition-colors ${
+                      checked ? 'bg-helfi-green text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-helfi-green/10 group-hover:text-helfi-green'
+                    }`}
+                  >
+                    <MaterialSymbol name={optionIcon(d.id)} className="text-2xl" />
+                  </div>
+                  <div className="flex flex-col grow text-left">
+                    <span className="text-base font-bold text-gray-900 mb-0.5">{d.label}</span>
+                    <span className="text-sm font-medium text-gray-500 leading-snug">{d.summary}</span>
+                  </div>
+                  <div className="shrink-0">
+                    <div
+                      className={`size-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                        checked ? 'border-helfi-green bg-helfi-green' : 'border-gray-300'
                       }`}
                     >
-                      <DietIcon dietId={d.id} size={44} />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-gray-900">{d.label}</div>
-                        <div className="text-xs text-gray-600">{d.summary}</div>
-                      </div>
-                      {active && <span className="text-helfi-green font-semibold text-sm">Selected</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+                      <MaterialSymbol name="check" className={`text-sm ${checked ? 'text-white' : 'opacity-0'}`} />
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </main>
 
-        <div className="mt-6 space-y-3">
-          <button
-            type="button"
-            onClick={() => setShowDietPicker(false)}
-            className="w-full px-6 py-3 rounded-lg bg-helfi-green text-white font-medium hover:opacity-90"
-          >
-            Save and go back
-          </button>
-          {selected && (
-            <div className="text-xs text-gray-500 text-center">
-              Current choice: <span className="font-semibold text-gray-700">{selected.label}</span>
-            </div>
-          )}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-50/95 backdrop-blur-xl border-t border-gray-200 z-40">
+          <div className="max-w-md mx-auto space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowDietPicker(false)}
+              className="w-full flex items-center justify-center rounded-lg h-14 px-8 bg-helfi-green hover:bg-helfi-green/90 active:scale-[0.98] transition-all duration-200 text-white text-lg font-bold tracking-wide shadow-lg shadow-helfi-green/10"
+            >
+              Confirm selection
+            </button>
+            <div className="text-center text-xs text-gray-600">No extra credits are used for diet warnings.</div>
+          </div>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -1605,24 +1757,39 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         <p className="mb-3 text-gray-600">We can warn you when a meal doesn&apos;t match your diet and suggest simple swaps.</p>
         <button
           type="button"
-          onClick={() => setShowDietPicker(true)}
+          onClick={() => {
+            setDietPickerView('categories')
+            setDietSearch('')
+            setShowDietPicker(true)
+          }}
           className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-gray-300 hover:bg-gray-50"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <DietIcon dietId={dietType || 'plate'} size={40} />
+            <div className="flex items-center justify-center rounded-lg bg-helfi-green/10 shrink-0 size-10 text-helfi-green">
+              <MaterialSymbol name="restaurant" className="text-2xl" />
+            </div>
             <div className="text-left min-w-0">
-              <div className="font-semibold text-gray-900">{getDietOption(dietType)?.label || 'Choose your diet'}</div>
-              <div className="text-xs text-gray-600 truncate">{getDietOption(dietType)?.summary || 'Tap to choose one diet type.'}</div>
+              <div className="font-semibold text-gray-900">
+                {normalizeDietTypes(dietTypes).length ? `Selected diets: ${normalizeDietTypes(dietTypes).length}` : 'Choose your diets'}
+              </div>
+              <div className="text-xs text-gray-600 truncate">
+                {normalizeDietTypes(dietTypes).length
+                  ? normalizeDietTypes(dietTypes)
+                      .slice(0, 3)
+                      .map((id) => getDietOption(id)?.label || id)
+                      .join(', ')
+                  : 'Tap to pick diet types.'}
+              </div>
             </div>
           </div>
           <span className="text-gray-500 font-semibold">›</span>
         </button>
-        {dietType && (
+        {normalizeDietTypes(dietTypes).length > 0 && (
           <button
             type="button"
             onClick={() => {
-              dietTouchedRef.current = true;
-              setDietType('');
+              dietTouchedRef.current = true
+              setDietTypes([])
             }}
             className="mt-3 text-sm text-gray-600 underline hover:text-gray-900"
           >

@@ -52,6 +52,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Helfi" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL,GRAD@500,0,0"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `

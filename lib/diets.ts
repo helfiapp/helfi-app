@@ -5,6 +5,80 @@ export type DietOption = {
   summary: string
 }
 
+export type DietCategory = {
+  id: string
+  label: string
+  group: string
+  subtitle: string
+  icon: string
+}
+
+export const DIET_CATEGORIES: DietCategory[] = [
+  {
+    id: 'animal-focused',
+    label: 'Animal-Focused Diets',
+    group: 'Animal-Focused',
+    subtitle: 'Carnivore, Paleo, Primal',
+    icon: 'skillet',
+  },
+  {
+    id: 'plant-based',
+    label: 'Plant-Based Diets',
+    group: 'Plant-Based',
+    subtitle: 'Vegan, Vegetarian, WFPB',
+    icon: 'eco',
+  },
+  {
+    id: 'mixed-balanced',
+    label: 'Mixed / Balanced Diets',
+    group: 'Mixed / Balanced',
+    subtitle: 'Mediterranean, Nordic',
+    icon: 'restaurant',
+  },
+  {
+    id: 'low-carb',
+    label: 'Low-Carb / Carb-Restricted',
+    group: 'Low-Carb',
+    subtitle: 'Keto, Atkins, Zero-Carb',
+    icon: 'egg',
+  },
+  {
+    id: 'grain-gluten',
+    label: 'Grain / Gluten / Carb-Free',
+    group: 'Grain / Gluten',
+    subtitle: 'Gluten-Free, Grain-Free',
+    icon: 'grain',
+  },
+  {
+    id: 'timing-based',
+    label: 'Calorie / Timing-Based',
+    group: 'Timing-Based',
+    subtitle: 'Intermittent Fasting, OMAD',
+    icon: 'timer',
+  },
+  {
+    id: 'medical-therapeutic',
+    label: 'Medical / Therapeutic',
+    group: 'Medical / Therapeutic',
+    subtitle: 'Diabetic, Low-FODMAP, Renal',
+    icon: 'monitor_heart',
+  },
+  {
+    id: 'ethical-lifestyle',
+    label: 'Ethical / Lifestyle-Driven',
+    group: 'Ethical / Lifestyle',
+    subtitle: 'Halal, Kosher, Jain',
+    icon: 'public',
+  },
+  {
+    id: 'performance-goal',
+    label: 'Performance / Goal-Based',
+    group: 'Performance / Goal-Based',
+    subtitle: 'High-Protein, Cutting, Bulking',
+    icon: 'fitness_center',
+  },
+]
+
 export const DIET_OPTIONS: DietOption[] = [
   // Animal-Focused
   { id: 'carnivore', label: 'Carnivore', group: 'Animal-Focused', summary: 'Animal foods only.' },
@@ -72,6 +146,24 @@ export const getDietOption = (id: string | null | undefined): DietOption | null 
   const key = (id || '').toString().trim()
   if (!key) return null
   return DIET_OPTIONS.find((d) => d.id === key) || null
+}
+
+export const normalizeDietTypes = (raw: any): string[] => {
+  if (Array.isArray(raw)) {
+    return Array.from(
+      new Set(
+        raw
+          .filter((v) => typeof v === 'string')
+          .map((v) => v.trim())
+          .filter(Boolean),
+      ),
+    )
+  }
+  if (typeof raw === 'string') {
+    const v = raw.trim()
+    return v ? [v] : []
+  }
+  return []
 }
 
 type DietCheckInput = {
@@ -361,4 +453,37 @@ export const checkDietCompatibility = (input: DietCheckInput): DietCheckResult =
   }
 
   return { warnings, suggestions }
+}
+
+export type MultiDietCheckResult = {
+  warningsByDiet: Array<{ dietId: string; dietLabel: string; warnings: string[] }>
+  suggestions: string[]
+}
+
+export const checkMultipleDietCompatibility = (input: Omit<DietCheckInput, 'dietId'> & { dietIds: string[] }): MultiDietCheckResult => {
+  const dietIds = normalizeDietTypes(input.dietIds)
+  const warningsByDiet: Array<{ dietId: string; dietLabel: string; warnings: string[] }> = []
+  const suggestions: string[] = []
+
+  for (const dietId of dietIds) {
+    const option = getDietOption(dietId)
+    const single = checkDietCompatibility({
+      dietId,
+      itemNames: input.itemNames,
+      analysisText: input.analysisText,
+      totals: input.totals,
+    })
+    if (single.warnings.length) {
+      warningsByDiet.push({
+        dietId,
+        dietLabel: option?.label || dietId,
+        warnings: single.warnings,
+      })
+    }
+    for (const s of single.suggestions) {
+      if (!suggestions.includes(s)) suggestions.push(s)
+    }
+  }
+
+  return { warningsByDiet, suggestions }
 }

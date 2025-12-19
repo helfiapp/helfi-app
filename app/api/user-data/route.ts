@@ -129,12 +129,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Get diet preference (optional)
-    let dietType = ''
+    let dietTypes: string[] = []
     try {
       const storedDiet = user.healthGoals.find((goal: any) => goal.name === '__DIET_PREFERENCE__')
       if (storedDiet?.category) {
         const parsed = JSON.parse(storedDiet.category)
-        dietType = typeof parsed?.dietType === 'string' ? parsed.dietType : ''
+        const raw = Array.isArray(parsed?.dietTypes) ? parsed.dietTypes : parsed?.dietType
+        dietTypes = Array.isArray(raw)
+          ? raw.filter((v: any) => typeof v === 'string' && v.trim().length > 0)
+          : typeof raw === 'string' && raw.trim().length > 0
+          ? [raw.trim()]
+          : []
       }
     } catch (e) {
       console.log('No diet preference found in storage')
@@ -372,7 +377,7 @@ export async function GET(request: NextRequest) {
       goalIntensity: (primaryGoalData.goalIntensity || 'standard').toString().toLowerCase(),
       allergies: allergyData.allergies,
       diabetesType: allergyData.diabetesType,
-      dietType,
+      dietTypes,
     }
 
     // Fallback: if primary goal still missing, use the first non-hidden health goal as a soft default
@@ -741,21 +746,32 @@ export async function POST(request: NextRequest) {
 
     // 3.15. Handle diet preference (Step 2) - store as special health goal
     try {
-      const hasIncomingDiet = Object.prototype.hasOwnProperty.call(data as any, 'dietType')
+      const hasIncomingDiet =
+        Object.prototype.hasOwnProperty.call(data as any, 'dietTypes') ||
+        Object.prototype.hasOwnProperty.call(data as any, 'dietType')
       if (hasIncomingDiet) {
-        const normalizedDietType = typeof (data as any).dietType === 'string' ? ((data as any).dietType as string).trim() : ''
+        const raw =
+          Object.prototype.hasOwnProperty.call(data as any, 'dietTypes') ? (data as any).dietTypes : (data as any).dietType
+        const normalizedDietTypes = Array.isArray(raw)
+          ? raw
+              .filter((v: any) => typeof v === 'string')
+              .map((v: string) => v.trim())
+              .filter((v: string) => v.length > 0)
+          : typeof raw === 'string' && raw.trim().length > 0
+          ? [raw.trim()]
+          : []
 
         // Clear if blank, otherwise upsert the preference.
         await prisma.healthGoal.deleteMany({
           where: { userId: user.id, name: '__DIET_PREFERENCE__' },
         })
 
-        if (normalizedDietType.length > 0) {
+        if (normalizedDietTypes.length > 0) {
           await prisma.healthGoal.create({
             data: {
               userId: user.id,
               name: '__DIET_PREFERENCE__',
-              category: JSON.stringify({ dietType: normalizedDietType }),
+              category: JSON.stringify({ dietTypes: Array.from(new Set(normalizedDietTypes)).sort() }),
               currentRating: 0,
             },
           })
