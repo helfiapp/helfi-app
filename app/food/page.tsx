@@ -6246,13 +6246,15 @@ Please add nutritional information manually if needed.`);
         return ''
       }
     }
-    const normalizeKey = (raw: any) => normalizeMealLabel(raw || '').toLowerCase()
+    // Use the same normalization we use for food names so things like "Bürgen" and "Burgen"
+    // (and various punctuation/spacing differences) still match reliably.
+    const normalizeKey = (raw: any) => normalizeFoodName(normalizeMealLabel(raw || ''))
     const simplifyKey = (raw: any) => {
       const s = normalizeMealLabel(raw || '').trim()
       if (!s) return ''
       const withoutQty = s.replace(/^\s*\d+(?:\.\d+)?\s*(?:×|x)?\s*/i, '').trim()
       const head = (withoutQty.split(',')[0] || withoutQty).split('(')[0] || withoutQty
-      return normalizeMealLabel(head).toLowerCase()
+      return normalizeFoodName(normalizeMealLabel(head))
     }
 
     // Allow "All" to treat renamed favorites as the same item, without rewriting history.
