@@ -164,8 +164,8 @@ export default function MoodCheckInPage() {
           </div>
 
           <div className="mt-8">
-            <details className="rounded-2xl border border-slate-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
-              <summary className="cursor-pointer select-none text-base font-bold text-slate-800 dark:text-white">
+            <details className="mt-2">
+              <summary className="cursor-pointer select-none text-base font-bold text-slate-800 dark:text-white px-1">
                 Optional details
               </summary>
               <div className="mt-4 space-y-3">
@@ -220,7 +220,7 @@ export default function MoodCheckInPage() {
                   <FivePointScale label="Activity level" value={physicalActivity} onChange={setPhysicalActivity} />
                 </ExpandableContextRow>
 
-                <div className="rounded-2xl border border-slate-100 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+                <div className="px-1">
                   <div className="text-sm font-bold text-slate-800 dark:text-white">Note (optional)</div>
                   <textarea
                     value={note}
