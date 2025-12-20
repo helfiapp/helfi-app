@@ -59,15 +59,31 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              // Dark mode initialization - runs before React hydration to prevent flash
+              // Dark mode initialization - runs before React hydration to prevent flash.
+              // IMPORTANT: Dark mode is only allowed inside the signed-in app.
+              // Public pages (like / and /auth/*) should always render in light mode.
               (function() {
                 try {
-                  const darkMode = localStorage.getItem('darkMode') === 'true';
-                  if (darkMode) {
-                    document.documentElement.classList.add('dark');
+                  var path = (window && window.location && window.location.pathname) ? window.location.pathname : '';
+                  var isPublic =
+                    path === '/' ||
+                    path === '/healthapp' ||
+                    path === '/privacy' ||
+                    path === '/terms' ||
+                    path === '/help' ||
+                    path === '/faq' ||
+                    path.indexOf('/auth/') === 0 ||
+                    path.indexOf('/staging-signin') === 0;
+
+                  if (isPublic) {
+                    document.documentElement.classList.remove('dark');
+                    return;
                   }
+
+                  var darkMode = localStorage.getItem('darkMode') === 'true';
+                  document.documentElement.classList.toggle('dark', darkMode);
                 } catch (e) {
-                  // Ignore localStorage errors in SSR
+                  // Ignore localStorage/cookie errors
                 }
               })();
             `,

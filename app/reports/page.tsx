@@ -71,7 +71,15 @@ export default function Reports() {
                 alt="Helfi Logo"
                 width={80}
                 height={80}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain dark:hidden"
+                priority
+              />
+              <Image
+                src="/mobile-assets/LOGOS/helfi-01-06.png"
+                alt="Helfi Logo"
+                width={80}
+                height={80}
+                className="w-full h-full object-contain hidden dark:block"
                 priority
               />
             </Link>

@@ -394,7 +394,15 @@ export default function Dashboard() {
                 alt="Helfi Logo"
                 width={72}
                 height={72}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain dark:hidden"
+                priority
+              />
+              <Image
+                src="/mobile-assets/LOGOS/helfi-01-06.png"
+                alt="Helfi Logo"
+                width={72}
+                height={72}
+                className="w-full h-full object-contain hidden dark:block"
                 priority
               />
             </Link>
@@ -479,7 +487,15 @@ export default function Dashboard() {
                 alt="Helfi Logo"
                 width={96}
                 height={96}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain dark:hidden"
+                priority
+              />
+              <Image
+                src="/mobile-assets/LOGOS/helfi-01-06.png"
+                alt="Helfi Logo"
+                width={96}
+                height={96}
+                className="w-full h-full object-contain hidden dark:block"
                 priority
               />
             </Link>

@@ -11,6 +11,62 @@
   body {
     @apply bg-white text-helfi-black antialiased;
   }
+
+  /* Dark mode foundation (only applies when <html class="dark"> is present) */
+  html.dark body {
+    @apply bg-gray-900 text-white;
+  }
+
+  /* Bridge legacy light-only Tailwind classes into dark mode without touching every page */
+  html.dark .bg-white {
+    @apply bg-gray-800;
+  }
+  html.dark .bg-gray-50 {
+    @apply bg-gray-900;
+  }
+  html.dark .bg-gray-100 {
+    @apply bg-gray-800;
+  }
+  html.dark .bg-gray-200 {
+    @apply bg-gray-700;
+  }
+
+  html.dark .text-gray-900 {
+    @apply text-white;
+  }
+  html.dark .text-gray-800 {
+    @apply text-gray-100;
+  }
+  html.dark .text-gray-700 {
+    @apply text-gray-200;
+  }
+  html.dark .text-gray-600 {
+    @apply text-gray-300;
+  }
+  html.dark .text-gray-500 {
+    @apply text-gray-400;
+  }
+
+  html.dark .border-gray-100 {
+    @apply border-gray-700;
+  }
+  html.dark .border-gray-200 {
+    @apply border-gray-700;
+  }
+  html.dark .border-gray-300 {
+    @apply border-gray-600;
+  }
+
+  /* Common hover backgrounds used across the app */
+  html.dark .hover\\:bg-gray-50:hover {
+    @apply bg-gray-700;
+  }
+  html.dark .hover\\:bg-gray-100:hover {
+    @apply bg-gray-700;
+  }
+  html.dark .hover\\:bg-gray-200:hover {
+    @apply bg-gray-600;
+  }
 }
 
 @layer components {

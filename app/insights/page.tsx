@@ -23,8 +23,8 @@ export default async function InsightsPage() {
   // guide the user back to onboarding instead of showing empty insights.
   if (!payload.onboardingComplete) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-6 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 dark:from-gray-900 dark:to-gray-900 px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 text-center">
           <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
             <span className="text-2xl">📝</span>
           </div>
@@ -44,7 +44,7 @@ export default async function InsightsPage() {
             </Link>
             <Link
               href="/dashboard"
-              className="block w-full bg-gray-100 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-200 transition-colors"
+              className="block w-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-100 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
               Back to Dashboard
             </Link>

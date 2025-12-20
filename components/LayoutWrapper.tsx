@@ -198,6 +198,30 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const isAdminPanelPath =
     pathname.startsWith('/admin-panel') || pathname.startsWith('/main-admin')
 
+  // Dark mode is only allowed inside the signed-in app.
+  // Keep public/auth pages in light mode even if the user enabled dark mode previously.
+  const isOnboardingPath = pathname.startsWith('/onboarding')
+  const themeAllowed =
+    status === 'authenticated' &&
+    !isAdminPanelPath &&
+    (!publicPages.includes(pathname) || isOnboardingPath)
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    if (!themeAllowed) {
+      document.documentElement.classList.remove('dark')
+      return
+    }
+
+    try {
+      const enabled = localStorage.getItem('darkMode') === 'true'
+      document.documentElement.classList.toggle('dark', enabled)
+    } catch {
+      // Ignore storage errors
+    }
+  }, [themeAllowed])
+
   // ⚠️ HEALTH SETUP GUARD RAIL
   // The 5-minute global Health Setup reminder must:
   // - Only appear for authenticated users on non-public, non-admin pages.
@@ -414,7 +438,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   // 1. User is authenticated (status === 'authenticated') AND
   // 2. Current page is not in publicPages list AND
   // 3. Current page is not an admin panel path
-  const isOnboardingPath = pathname.startsWith('/onboarding')
   const shouldShowSidebar =
     status === 'authenticated' &&
     !isAdminPanelPath &&
