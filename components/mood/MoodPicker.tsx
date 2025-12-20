@@ -69,18 +69,19 @@ export default function MoodPicker({
               >
                 <div
                   className={[
-                    'relative overflow-hidden rounded-full bg-slate-100 dark:bg-gray-700/60',
-                    'border-2 border-transparent shadow-sm',
+                    'relative overflow-hidden rounded-full bg-transparent',
+                    'border-2 border-transparent',
                     'flex items-center justify-center',
                     isSelected
-                      ? 'w-[88px] h-[88px] border-helfi-green bg-helfi-green/10 shadow-[0_0_20px_rgba(77,175,80,0.35)]'
-                      : 'w-[72px] h-[72px] group-hover:border-helfi-green/40',
+                      ? 'w-[96px] h-[96px] border-helfi-green/0 ring-4 ring-helfi-green/25 shadow-[0_0_20px_rgba(77,175,80,0.25)]'
+                      : 'w-[80px] h-[80px] group-hover:ring-2 group-hover:ring-helfi-green/15',
                   ].join(' ')}
                 >
                   <span
                     className={[
-                      'text-4xl leading-none',
-                      isSelected ? '' : 'opacity-70 group-hover:opacity-100 grayscale group-hover:grayscale-0',
+                      isSelected ? 'text-6xl' : 'text-5xl',
+                      'leading-none',
+                      isSelected ? '' : 'opacity-80 group-hover:opacity-100',
                       'transition-all',
                     ].join(' ')}
                   >
@@ -103,4 +104,3 @@ export default function MoodPicker({
     </div>
   )
 }
-
