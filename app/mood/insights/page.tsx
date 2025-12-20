@@ -38,9 +38,8 @@ function pickFirst(map: InsightsResponse['insights']) {
   }
   add('sleep', 'bedtime', 'bg-purple-100 text-purple-600')
   add('nutrition', 'restaurant', 'bg-green-100 text-green-600')
-  add('supplements', 'medication', 'bg-amber-100 text-amber-700')
   add('activity', 'directions_walk', 'bg-emerald-100 text-emerald-700')
-  add('stress', 'calendar_month', 'bg-blue-100 text-blue-600')
+  add('stress', 'schedule', 'bg-blue-100 text-blue-600')
   return cards
 }
 
@@ -80,10 +79,9 @@ export default function MoodInsightsPage() {
     if (!data) return [] as Array<{ label: string; items: Insight[] }>
     return [
       { label: 'Sleep', items: data.insights.sleep || [] },
-      { label: 'Nutrition', items: data.insights.nutrition || [] },
-      { label: 'Supplements', items: data.insights.supplements || [] },
+      { label: 'Meals', items: data.insights.nutrition || [] },
       { label: 'Activity', items: data.insights.activity || [] },
-      { label: 'Stress', items: data.insights.stress || [] },
+      { label: 'Timing', items: data.insights.stress || [] },
     ]
   }, [data])
 
@@ -94,17 +92,9 @@ export default function MoodInsightsPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-6">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-lg font-semibold text-gray-900 dark:text-white">Insights</div>
-              <div className="text-sm text-gray-500 dark:text-gray-300">
-                This looks for simple patterns between your mood check‑ins and the things you already track in Helfi (like sleep, meals, and activity). It’s not medical advice.
-              </div>
-              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                The more you check in, the clearer this becomes.
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white">Insights</div>
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setPeriod('week')}
@@ -128,6 +118,12 @@ export default function MoodInsightsPage() {
                 Month
               </button>
             </div>
+          </div>
+          <div className="mt-2 text-sm text-gray-500 dark:text-gray-300">
+            This is a simple “pattern finder” using your mood check‑ins alongside things like sleep, meals, and activity. It’s not medical advice.
+          </div>
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            The more you check in, the clearer this becomes.
           </div>
 
           {loading ? (
@@ -164,7 +160,7 @@ export default function MoodInsightsPage() {
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${c.color}`}>
                         <span className="material-symbols-outlined text-lg">{c.icon}</span>
                       </div>
-                      <span className="text-gray-900 dark:text-white font-bold text-sm">Pattern</span>
+                      <span className="text-gray-900 dark:text-white font-bold text-sm">Insight</span>
                     </div>
                     <div className="text-gray-900 dark:text-white font-bold text-sm">
                       {c.title}

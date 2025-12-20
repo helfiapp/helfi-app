@@ -245,7 +245,7 @@ export default function MoodPreferencesPage() {
                     className={[
                       'flex-1 rounded-full px-4 py-2 text-sm font-bold transition-all border',
                       active
-                        ? 'bg-helfi-green text-white border-helfi-green'
+                        ? 'bg-white dark:bg-gray-900 text-helfi-green border-helfi-green shadow-sm'
                         : 'bg-white dark:bg-gray-900 text-slate-700 dark:text-gray-200 border-slate-200 dark:border-gray-700',
                       !enabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50 dark:hover:bg-gray-800/60',
                     ].join(' ')}
@@ -318,4 +318,3 @@ export default function MoodPreferencesPage() {
     </div>
   )
 }
-

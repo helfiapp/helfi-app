@@ -213,17 +213,8 @@ export async function GET(req: NextRequest) {
       sampleSize,
     })
 
-    // Supplement intake isn't logged yet; keep this gentle and non-claiming.
-    const supplementsCount = await prisma.supplement.count({ where: { userId: user.id } }).catch(() => 0)
-    insights.supplements.push({
-      id: 'supplements-coverage',
-      title: 'Supplement context is limited today',
-      detail: supplementsCount > 0
-        ? `You have ${supplementsCount} supplement(s) saved. If you want correlations, add a quick “took supplements” context when checking in.`
-        : 'Add supplements in your profile to help connect mood to your stack over time.',
-      confidence: 'low',
-      sampleSize: supplementsCount,
-    })
+    // Supplements aren't reliably trackable per-day yet for correlation, so keep this empty for now.
+    insights.supplements = []
 
     return NextResponse.json({
       range: { start, end },

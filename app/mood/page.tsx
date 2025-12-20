@@ -135,7 +135,7 @@ export default function MoodCheckInPage() {
     null
   const nutritionValue =
     context ? `${context.meals.todayCount} meal${context.meals.todayCount === 1 ? '' : 's'} logged` : null
-  const supplementsValue = context ? `${context.supplements.count} saved` : null
+  const supplementsValue = context ? (context.supplements.count > 0 ? 'Saved in Helfi' : 'None saved') : null
 
   const firstName = (() => {
     const raw = String(session?.user?.name || '').trim()

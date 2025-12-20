@@ -344,9 +344,8 @@ export default function MoodHistoryPage() {
     }
     pushFirst('sleep', 'bedtime', 'bg-purple-100 text-purple-600')
     pushFirst('nutrition', 'restaurant', 'bg-green-100 text-green-600')
-    pushFirst('supplements', 'medication', 'bg-amber-100 text-amber-700')
     pushFirst('activity', 'directions_walk', 'bg-emerald-100 text-emerald-700')
-    pushFirst('stress', 'calendar_month', 'bg-blue-100 text-blue-600')
+    pushFirst('stress', 'schedule', 'bg-blue-100 text-blue-600')
     return list.slice(0, 6)
   }, [insights])
 
