@@ -2,13 +2,15 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
-import MoodSlider from '@/components/mood/MoodSlider'
-import MoodTagChips from '@/components/mood/MoodTagChips'
+import MoodPicker from '@/components/mood/MoodPicker'
+import IntensitySlider from '@/components/mood/IntensitySlider'
+import InfluenceChips from '@/components/mood/InfluenceChips'
 import ExpandableContextRow from '@/components/mood/ExpandableContextRow'
 import FivePointScale from '@/components/mood/FivePointScale'
 import MoodTabs from '@/components/mood/MoodTabs'
 import InsightsBottomNav from '@/app/insights/InsightsBottomNav'
 import { ArrowTrendingUpIcon, BeakerIcon, BoltIcon, MoonIcon, SparklesIcon } from '@heroicons/react/24/outline'
+import { useSession } from 'next-auth/react'
 
 type ContextResponse = {
   localDate: string
@@ -33,11 +35,13 @@ function minutesToHours(minutes: number | null) {
 }
 
 export default function MoodCheckInPage() {
+  const { data: session } = useSession()
   const [mood, setMood] = useState<number | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [intensityPercent, setIntensityPercent] = useState<number>(35)
 
   const [context, setContext] = useState<ContextResponse | null>(null)
   const [energyLevel, setEnergyLevel] = useState<number | null>(null)
@@ -77,6 +81,7 @@ export default function MoodCheckInPage() {
           localDate,
           context: {
             localHour: new Date().getHours(),
+            intensityPercent,
             ...(energyLevel == null ? {} : { energyLevel }),
             ...(sleepQuality == null ? {} : { sleepQuality }),
             ...(nutrition == null ? {} : { nutrition }),
@@ -90,6 +95,7 @@ export default function MoodCheckInPage() {
       setMood(null)
       setTags([])
       setNote('')
+      setIntensityPercent(35)
       setEnergyLevel(null)
       setSleepQuality(null)
       setNutrition(null)
@@ -112,9 +118,15 @@ export default function MoodCheckInPage() {
     context ? `${context.meals.todayCount} meal${context.meals.todayCount === 1 ? '' : 's'} logged` : null
   const supplementsValue = context ? `${context.supplements.count} saved` : null
 
+  const firstName = (() => {
+    const raw = String(session?.user?.name || '').trim()
+    if (!raw) return ''
+    return raw.split(' ')[0] || raw
+  })()
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <PageHeader title="Mood" backHref="/more" />
+    <div className="min-h-screen bg-[#f8f9fa] dark:bg-gray-900 pb-28">
+      <PageHeader title="Daily Check‑In" backHref="/more" />
       <MoodTabs />
 
       <main className="max-w-3xl mx-auto px-4 py-6">
@@ -131,31 +143,34 @@ export default function MoodCheckInPage() {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">How are you feeling?</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">A quick check-in to spot patterns over time.</p>
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm p-6 border border-slate-100 dark:border-gray-700">
+          <div className="mb-6 text-center px-2">
+            <h1 className="tracking-tight text-[30px] sm:text-[32px] font-bold leading-tight text-slate-800 dark:text-white">
+              How are you feeling{firstName ? `, ${firstName}` : ''}?
+            </h1>
+            <p className="text-slate-500 dark:text-gray-300 text-base font-medium leading-normal mt-2">
+              Pick the face that matches your vibe.
+            </p>
           </div>
 
-          <MoodSlider value={mood as any} onChange={(v) => setMood(v)} />
+          <MoodPicker value={mood} onChange={setMood} />
 
-          <div className="mt-6 space-y-4">
-            <details className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-              <summary className="cursor-pointer select-none text-sm font-medium text-gray-900 dark:text-white">
-                Mood tags (optional)
-              </summary>
-              <div className="mt-3">
-                <MoodTagChips value={tags} onChange={setTags} />
-              </div>
-            </details>
+          <div className="mt-6">
+            <IntensitySlider value={intensityPercent} onChange={setIntensityPercent} />
+          </div>
 
-            <details className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-              <summary className="cursor-pointer select-none text-sm font-medium text-gray-900 dark:text-white">
-                Context (optional)
+          <div className="mt-8">
+            <InfluenceChips value={tags} onChange={setTags} />
+          </div>
+
+          <div className="mt-8">
+            <details className="rounded-2xl border border-slate-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
+              <summary className="cursor-pointer select-none text-base font-bold text-slate-800 dark:text-white">
+                Optional details
               </summary>
-              <div className="mt-3 space-y-3">
+              <div className="mt-4 space-y-3">
                 <ExpandableContextRow
-                  label="Energy level"
+                  label="Energy"
                   value={energyLevel ? `Level ${energyLevel}/5` : 'Optional'}
                   icon={<BoltIcon className="w-5 h-5" aria-hidden="true" />}
                 >
@@ -163,12 +178,12 @@ export default function MoodCheckInPage() {
                 </ExpandableContextRow>
 
                 <ExpandableContextRow
-                  label="Sleep quality"
-                  value={sleepQuality ? `Level ${sleepQuality}/5` : (sleepValue ? `Last sleep: ${sleepValue}` : 'Optional')}
+                  label="Sleep"
+                  value={sleepQuality ? `Level ${sleepQuality}/5` : (sleepValue ? `Recent: ${sleepValue}` : 'Optional')}
                   icon={<MoonIcon className="w-5 h-5" aria-hidden="true" />}
                 >
                   <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                    {sleepValue ? `Recent sleep: ${sleepValue}.` : 'Connect a device for automatic sleep context.'}
+                    {sleepValue ? `Recent sleep: ${sleepValue}.` : 'If you connect a device, sleep can fill in automatically.'}
                   </div>
                   <FivePointScale label="Sleep quality" value={sleepQuality} onChange={setSleepQuality} />
                 </ExpandableContextRow>
@@ -191,56 +206,69 @@ export default function MoodCheckInPage() {
                   value={supplements ? `Level ${supplements}/5` : (supplementsValue || 'Optional')}
                   icon={<BeakerIcon className="w-5 h-5" aria-hidden="true" />}
                 >
-                  <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                    Supplement intake timing isn’t tracked yet; you can still add a quick rating for context.
-                  </div>
                   <FivePointScale label="Supplements impact" value={supplements} onChange={setSupplements} />
                 </ExpandableContextRow>
 
                 <ExpandableContextRow
-                  label="Physical activity"
+                  label="Activity"
                   value={physicalActivity ? `Level ${physicalActivity}/5` : (activityValue || 'Optional')}
                   icon={<ArrowTrendingUpIcon className="w-5 h-5" aria-hidden="true" />}
                 >
                   <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                    {activityValue ? `Today: ${activityValue}.` : 'Log an exercise entry or sync a device for activity context.'}
+                    {activityValue ? `Today: ${activityValue}.` : 'If you log activity, it can show up here automatically.'}
                   </div>
                   <FivePointScale label="Activity level" value={physicalActivity} onChange={setPhysicalActivity} />
                 </ExpandableContextRow>
+
+                <div className="rounded-2xl border border-slate-100 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+                  <div className="text-sm font-bold text-slate-800 dark:text-white">Note (optional)</div>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={3}
+                    maxLength={600}
+                    placeholder="Write a quick note…"
+                    className="mt-3 w-full rounded-2xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-helfi-green/10"
+                  />
+                  <div className="mt-1 text-xs text-slate-400 dark:text-gray-400">
+                    {note.length}/600
+                  </div>
+                </div>
               </div>
             </details>
 
-            <details className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-              <summary className="cursor-pointer select-none text-sm font-medium text-gray-900 dark:text-white">
-                Note (optional)
-              </summary>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={3}
-                maxLength={600}
-                placeholder="Write a note…"
-                className="mt-3 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-              />
-              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {note.length}/600
-              </div>
-            </details>
-
-            <button
-              type="button"
-              onClick={save}
-              disabled={mood == null || saving}
-              className="w-full rounded-xl bg-helfi-green px-4 py-3 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="mt-4 text-xs text-slate-500 dark:text-gray-400 px-1">
               Mood is required. Everything else is optional.
+            </div>
+
+            <div className="hidden md:block mt-6">
+              <button
+                type="button"
+                onClick={save}
+                disabled={mood == null || saving}
+                className="w-full bg-helfi-green hover:bg-helfi-green-dark active:scale-[0.98] text-white text-lg font-bold py-4 rounded-2xl shadow-lg shadow-green-200/60 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving…' : 'Log Mood'}
+                <span className="material-symbols-outlined text-[24px]">arrow_forward</span>
+              </button>
             </div>
           </div>
         </div>
       </main>
+
+      <div className="md:hidden fixed bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-gray-900 dark:via-gray-900/90 pt-10 z-40">
+        <div className="max-w-3xl mx-auto px-4">
+          <button
+            type="button"
+            onClick={save}
+            disabled={mood == null || saving}
+            className="w-full bg-helfi-green hover:bg-helfi-green-dark active:scale-[0.98] text-white text-lg font-bold py-4 rounded-2xl shadow-lg shadow-green-200/60 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Saving…' : 'Log Mood'}
+            <span className="material-symbols-outlined text-[24px]">arrow_forward</span>
+          </button>
+        </div>
+      </div>
 
       <InsightsBottomNav />
     </div>

@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
 import MoodTabs from '@/components/mood/MoodTabs'
-import InsightCard from '@/components/mood/InsightCard'
 import InsightsBottomNav from '@/app/insights/InsightsBottomNav'
 
 export const dynamic = 'force-dynamic'
@@ -28,20 +27,29 @@ type InsightsResponse = {
   meta: { sampleSize: number }
 }
 
-const TABS = [
-  { key: 'sleep', label: 'Sleep' },
-  { key: 'nutrition', label: 'Nutrition' },
-  { key: 'supplements', label: 'Supplements' },
-  { key: 'activity', label: 'Activity' },
-  { key: 'stress', label: 'Stress' },
-] as const
+type Card = { id: string; title: string; detail: string; icon: string; color: string }
+
+function pickFirst(map: InsightsResponse['insights']) {
+  const cards: Card[] = []
+  const add = (key: keyof InsightsResponse['insights'], icon: string, color: string) => {
+    const arr = map[key]
+    if (!Array.isArray(arr) || arr.length === 0) return
+    cards.push({ id: `${key}-${arr[0].id}`, title: arr[0].title, detail: arr[0].detail, icon, color })
+  }
+  add('sleep', 'bedtime', 'bg-purple-100 text-purple-600')
+  add('nutrition', 'restaurant', 'bg-green-100 text-green-600')
+  add('supplements', 'medication', 'bg-amber-100 text-amber-700')
+  add('activity', 'directions_walk', 'bg-emerald-100 text-emerald-700')
+  add('stress', 'calendar_month', 'bg-blue-100 text-blue-600')
+  return cards
+}
 
 export default function MoodInsightsPage() {
   const [period, setPeriod] = useState<'week' | 'month'>('month')
-  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('sleep')
   const [data, setData] = useState<InsightsResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
     let ignore = false
@@ -63,10 +71,21 @@ export default function MoodInsightsPage() {
     return () => { ignore = true }
   }, [period])
 
-  const cards = useMemo(() => {
-    const list = (data?.insights as any)?.[tab]
-    return Array.isArray(list) ? (list as Insight[]) : []
-  }, [data, tab])
+  const carousel = useMemo(() => {
+    if (!data) return []
+    return pickFirst(data.insights)
+  }, [data])
+
+  const allGroups = useMemo(() => {
+    if (!data) return [] as Array<{ label: string; items: Insight[] }>
+    return [
+      { label: 'Sleep', items: data.insights.sleep || [] },
+      { label: 'Nutrition', items: data.insights.nutrition || [] },
+      { label: 'Supplements', items: data.insights.supplements || [] },
+      { label: 'Activity', items: data.insights.activity || [] },
+      { label: 'Stress', items: data.insights.stress || [] },
+    ]
+  }, [data])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
@@ -74,44 +93,38 @@ export default function MoodInsightsPage() {
       <MoodTabs />
 
       <main className="max-w-3xl mx-auto px-4 py-6">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">Insights</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Patterns are shown as tendencies — not guarantees.
+              <div className="text-sm text-gray-500 dark:text-gray-300">
+                These are gentle patterns — not guarantees.
               </div>
             </div>
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value as any)}
-              className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-              aria-label="Time range"
-            >
-              <option value="week">Week</option>
-              <option value="month">Month</option>
-            </select>
-          </div>
-
-          <div className="mt-4 flex gap-2 overflow-x-auto no-scrollbar">
-            {TABS.map((t) => {
-              const active = t.key === tab
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTab(t.key)}
-                  className={[
-                    'shrink-0 rounded-full px-4 py-2 text-sm border touch-manipulation',
-                    active
-                      ? 'bg-helfi-green/10 border-helfi-green/30 text-helfi-green-dark dark:text-helfi-green-light'
-                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50',
-                  ].join(' ')}
-                >
-                  {t.label}
-                </button>
-              )
-            })}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPeriod('week')}
+                className={`px-4 py-2 rounded-full text-sm font-bold border transition-colors ${
+                  period === 'week'
+                    ? 'bg-helfi-green text-white border-helfi-green'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                Week
+              </button>
+              <button
+                type="button"
+                onClick={() => setPeriod('month')}
+                className={`px-4 py-2 rounded-full text-sm font-bold border transition-colors ${
+                  period === 'month'
+                    ? 'bg-helfi-green text-white border-helfi-green'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                Month
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -122,22 +135,74 @@ export default function MoodInsightsPage() {
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
               {error}
             </div>
-          ) : cards.length === 0 ? (
+          ) : !data || carousel.length === 0 ? (
             <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 px-4 py-6 text-sm">
               No insights yet. Add a few mood check‑ins first.
             </div>
           ) : (
-            <div className="mt-4 space-y-3">
-              {cards.map((c) => (
-                <InsightCard key={c.id} title={c.title} detail={c.detail} confidence={c.confidence} />
-              ))}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-gray-900 dark:text-white text-xl font-bold">Highlights</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAll((v) => !v)}
+                  className="text-helfi-green text-xs font-bold uppercase tracking-wide hover:underline"
+                >
+                  {showAll ? 'Hide details' : 'View all'}
+                </button>
+              </div>
+              <div className="flex overflow-x-auto no-scrollbar gap-4 pb-2">
+                {carousel.map((c) => (
+                  <div key={c.id} className="min-w-[260px] bg-white dark:bg-gray-800 rounded-2xl p-5 flex flex-col gap-3 border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${c.color}`}>
+                        <span className="material-symbols-outlined text-lg">{c.icon}</span>
+                      </div>
+                      <span className="text-gray-900 dark:text-white font-bold text-sm">Pattern</span>
+                    </div>
+                    <div className="text-gray-900 dark:text-white font-bold text-sm">
+                      {c.title}
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+                      {c.detail}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {showAll && (
+                <div className="mt-6 space-y-4">
+                  {allGroups.map((g) => (
+                    <div key={g.label}>
+                      <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-300 mb-2">
+                        {g.label}
+                      </div>
+                      <div className="space-y-3">
+                        {g.items.map((it) => (
+                          <div key={it.id} className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm">
+                            <div className="text-sm font-bold text-gray-900 dark:text-white">{it.title}</div>
+                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{it.detail}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
       </main>
 
+      <a
+        href="/mood"
+        className="md:hidden fixed bottom-28 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-helfi-green text-white shadow-[0_0_15px_rgba(77,175,80,0.4)] flex items-center justify-center"
+        aria-label="Add mood"
+      >
+        <span className="material-symbols-outlined text-[32px]">add</span>
+      </a>
+
       <InsightsBottomNav />
     </div>
   )
 }
-

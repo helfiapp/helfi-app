@@ -53,6 +53,7 @@ function pickContextFields(value: any) {
   const supplements = clampInt(value?.supplements, 1, 5)
   const physicalActivity = clampInt(value?.physicalActivity, 1, 5)
   const localHour = clampInt(value?.localHour, 0, 23)
+  const intensityPercent = clampInt(value?.intensityPercent, 0, 100)
   return {
     ...(energyLevel == null ? {} : { energyLevel }),
     ...(sleepQuality == null ? {} : { sleepQuality }),
@@ -60,6 +61,7 @@ function pickContextFields(value: any) {
     ...(supplements == null ? {} : { supplements }),
     ...(physicalActivity == null ? {} : { physicalActivity }),
     ...(localHour == null ? {} : { localHour }),
+    ...(intensityPercent == null ? {} : { intensityPercent }),
   }
 }
 
