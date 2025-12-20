@@ -401,7 +401,7 @@ export default function BillingPage() {
       <PageHeader title="Subscription & Billing" />
 
       {/* Main Content */}
-              <div className="max-w-6xl mx-auto px-6 py-8 pb-24 md:pb-8">
+      <div className="max-w-6xl mx-auto px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))] md:pb-8">
         {/* Test mode note */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-900">
           Stripe Sandbox is enabled for testing. Use test card 4242 4242 4242 4242, any future expiry, any CVC and ZIP.
