@@ -13,6 +13,8 @@ type FitbitSeries = {
 
 type CheckinRow = { date: string; issueId: string; name: string; polarity: 'positive' | 'negative'; value: number | null; note?: string }
 type CheckinHistory = { history: CheckinRow[] }
+type MoodEntry = { localDate: string; mood: number }
+type MoodHistory = { entries: MoodEntry[] }
 
 function pearson(x: number[], y: number[]): number | null {
   const n = Math.min(x.length, y.length)
@@ -49,6 +51,7 @@ function strengthLabel(r: number | null): string {
 export default function FitbitCorrelations({ rangeDays = 30 }: { rangeDays?: number }) {
   const [fitbit, setFitbit] = useState<FitbitSeries | null>(null)
   const [checkins, setCheckins] = useState<CheckinHistory | null>(null)
+  const [mood, setMood] = useState<MoodHistory | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,6 +69,9 @@ export default function FitbitCorrelations({ rangeDays = 30 }: { rangeDays?: num
         const fbRes = await fetch(`/api/fitbit/data?start=${startStr}&end=${endStr}&dataTypes=steps,sleep`)
         if (!fbRes.ok) throw new Error('Failed to load Fitbit data')
         setFitbit((await fbRes.json()) as FitbitSeries)
+        // Mood (preferred)
+        const moodRes = await fetch(`/api/mood/entries?start=${startStr}&end=${endStr}`)
+        if (moodRes.ok) setMood((await moodRes.json()) as MoodHistory)
         // Checkins
         const ciRes = await fetch(`/api/checkins/history?start=${startStr}&end=${endStr}`)
         if (!ciRes.ok) throw new Error('Failed to load check-ins')
@@ -81,7 +87,18 @@ export default function FitbitCorrelations({ rangeDays = 30 }: { rangeDays?: num
 
   const dailyMood = useMemo(() => {
     const map = new Map<string, number[]>()
-    if (checkins?.history) {
+    const moodEntries = (mood as any)?.entries
+    if (Array.isArray(moodEntries) && moodEntries.length > 0) {
+      for (const row of moodEntries as MoodEntry[]) {
+        const d = String(row.localDate || '').slice(0, 10)
+        const v = Number(row.mood)
+        if (!d || !Number.isFinite(v)) continue
+        // Align to 0..6 range used elsewhere.
+        const scaled = Math.max(0, Math.min(6, v - 1))
+        if (!map.has(d)) map.set(d, [])
+        map.get(d)!.push(scaled)
+      }
+    } else if (checkins?.history) {
       for (const row of checkins.history) {
         const d = row.date.slice(0, 10)
         const v = row.value ?? 0
@@ -95,7 +112,7 @@ export default function FitbitCorrelations({ rangeDays = 30 }: { rangeDays?: num
       avg.set(d, mean)
     })
     return avg
-  }, [checkins])
+  }, [checkins, mood])
 
   const series = useMemo(() => {
     if (!fitbit) return null
@@ -160,12 +177,12 @@ export default function FitbitCorrelations({ rangeDays = 30 }: { rangeDays?: num
         <div className="p-4 rounded-lg border">
           <div className="text-sm text-gray-500">Steps ↔︎ Mood</div>
           <div className="text-xl font-semibold mt-1">{strengthLabel(series.stepsMood)}</div>
-          <p className="text-xs text-gray-500 mt-1">Correlation uses daily steps and average daily check-in ratings.</p>
+          <p className="text-xs text-gray-500 mt-1">Correlation uses daily steps and your daily mood check-ins (or check-in ratings if mood is empty).</p>
         </div>
         <div className="p-4 rounded-lg border">
           <div className="text-sm text-gray-500">Sleep ↔︎ Mood</div>
           <div className="text-xl font-semibold mt-1">{strengthLabel(series.sleepMood)}</div>
-          <p className="text-xs text-gray-500 mt-1">Correlation uses total sleep hours per night vs. daily ratings.</p>
+          <p className="text-xs text-gray-500 mt-1">Correlation uses total sleep hours per night vs. your daily mood check-ins.</p>
         </div>
       </div>
 
@@ -197,5 +214,3 @@ export default function FitbitCorrelations({ rangeDays = 30 }: { rangeDays?: num
     </div>
   )
 }
-
-
