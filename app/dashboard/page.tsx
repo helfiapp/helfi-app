@@ -660,7 +660,7 @@ export default function Dashboard() {
 
             {/* Device Integration Section */}
             {onboardingData && (
-              <div className="mb-8 bg-gradient-to-r from-blue-50 to-green-50 dark:from-gray-800 dark:to-gray-800 rounded-lg p-4 md:p-6 border border-blue-200 dark:border-gray-700">
+              <div className="mb-8 bg-gradient-to-r from-blue-50 to-green-50 dark:bg-none dark:bg-gray-800 rounded-lg p-4 md:p-6 border border-blue-200 dark:border-gray-700">
                 <div className="mb-3 md:mb-4">
                   {/* Mobile: centered heading and badge */}
                   <div className="md:hidden text-center">
