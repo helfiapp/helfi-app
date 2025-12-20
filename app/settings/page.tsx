@@ -29,6 +29,8 @@ export default function Settings() {
   const [profileVisibility, setProfileVisibility] = useState('private')
   const [dataAnalytics, setDataAnalytics] = useState(true)
   const [hapticsEnabled, setHapticsEnabled] = useState(true)
+  // Prevent "auto-save" effects from overwriting stored values on first load
+  const [localPrefsLoaded, setLocalPrefsLoaded] = useState(false)
   const [showPdf, setShowPdf] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string>('')
   const [exporting, setExporting] = useState(false)
@@ -83,19 +85,23 @@ export default function Settings() {
 
   // Initialize settings from localStorage
   useEffect(() => {
-    const savedDarkMode = localStorage.getItem('darkMode')
-    const savedEmailNotifications = localStorage.getItem('emailNotifications')
-    const savedPushNotifications = localStorage.getItem('pushNotifications')
-    const savedProfileVisibility = localStorage.getItem('profileVisibility')
-    const savedDataAnalytics = localStorage.getItem('dataAnalytics')
-    const savedHaptics = localStorage.getItem('hapticsEnabled')
-    
-    if (savedDarkMode) setDarkMode(savedDarkMode === 'true')
-    if (savedEmailNotifications) setEmailNotifications(savedEmailNotifications === 'true')
-    if (savedPushNotifications) setPushNotifications(savedPushNotifications === 'true')
-    if (savedProfileVisibility) setProfileVisibility(savedProfileVisibility)
-    if (savedDataAnalytics) setDataAnalytics(savedDataAnalytics === 'true')
-    if (savedHaptics !== null) setHapticsEnabled(savedHaptics === 'true')
+    try {
+      const savedDarkMode = localStorage.getItem('darkMode')
+      const savedEmailNotifications = localStorage.getItem('emailNotifications')
+      const savedPushNotifications = localStorage.getItem('pushNotifications')
+      const savedProfileVisibility = localStorage.getItem('profileVisibility')
+      const savedDataAnalytics = localStorage.getItem('dataAnalytics')
+      const savedHaptics = localStorage.getItem('hapticsEnabled')
+      
+      if (savedDarkMode !== null) setDarkMode(savedDarkMode === 'true')
+      if (savedEmailNotifications !== null) setEmailNotifications(savedEmailNotifications === 'true')
+      if (savedPushNotifications !== null) setPushNotifications(savedPushNotifications === 'true')
+      if (savedProfileVisibility) setProfileVisibility(savedProfileVisibility)
+      if (savedDataAnalytics !== null) setDataAnalytics(savedDataAnalytics === 'true')
+      if (savedHaptics !== null) setHapticsEnabled(savedHaptics === 'true')
+    } catch {
+      // If storage is blocked/unavailable, keep defaults
+    }
     
     // Detect iOS devices
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
@@ -112,39 +118,39 @@ export default function Settings() {
     }
     
     window.addEventListener('darkModeChanged', handleDarkModeChange as EventListener)
+    // Mark local settings as loaded (enables auto-save effects without overwriting on first paint)
+    setLocalPrefsLoaded(true)
     return () => window.removeEventListener('darkModeChanged', handleDarkModeChange as EventListener)
   }, [])
 
   // Auto-save dark mode changes
   useEffect(() => {
+    if (!localPrefsLoaded) return
     localStorage.setItem('darkMode', darkMode.toString())
     if (window.toggleDarkMode) {
       window.toggleDarkMode(darkMode)
     }
-  }, [darkMode])
+  }, [darkMode, localPrefsLoaded])
 
   // Auto-save haptics changes
   useEffect(() => {
+    if (!localPrefsLoaded) return
     localStorage.setItem('hapticsEnabled', hapticsEnabled.toString())
-  }, [hapticsEnabled])
+  }, [hapticsEnabled, localPrefsLoaded])
 
   // Auto-save email notifications
   useEffect(() => {
+    if (!localPrefsLoaded) return
     localStorage.setItem('emailNotifications', emailNotifications.toString())
     // TODO: Send to backend API to update user preferences
-  }, [emailNotifications])
+  }, [emailNotifications, localPrefsLoaded])
 
   // Auto-save push notifications
   useEffect(() => {
+    if (!localPrefsLoaded) return
     localStorage.setItem('pushNotifications', pushNotifications.toString())
     // TODO: Send to backend API to update user preferences
-  }, [pushNotifications])
-
-  // Auto-save push notifications
-  useEffect(() => {
-    localStorage.setItem('pushNotifications', pushNotifications.toString())
-    // TODO: Send to backend API to update user preferences
-  }, [pushNotifications])
+  }, [pushNotifications, localPrefsLoaded])
 
   // Detect existing subscription on load and reflect in UI
   useEffect(() => {
@@ -203,12 +209,14 @@ export default function Settings() {
 
   // Auto-save profile visibility
   useEffect(() => {
+    if (!localPrefsLoaded) return
     localStorage.setItem('profileVisibility', profileVisibility)
     // TODO: Send to backend API to update user preferences
-  }, [profileVisibility])
+  }, [profileVisibility, localPrefsLoaded])
 
   // Auto-save data analytics with comprehensive tracking
   useEffect(() => {
+    if (!localPrefsLoaded) return
     localStorage.setItem('dataAnalytics', dataAnalytics.toString())
     
     // Track analytics events if user has opted in
@@ -244,7 +252,7 @@ export default function Settings() {
         body: JSON.stringify(analyticsEvent)
       }).catch(err => console.log('📊 Analytics tracking error:', err))
     }
-  }, [dataAnalytics, session, darkMode, emailNotifications, pushNotifications, profileVisibility])
+  }, [dataAnalytics, session, darkMode, emailNotifications, pushNotifications, profileVisibility, localPrefsLoaded])
 
   // Track individual setting changes
   const trackSettingChange = (settingName: string, newValue: any) => {
