@@ -47,6 +47,14 @@
     @apply text-gray-400;
   }
 
+  /* Brand black needs a dark-mode override */
+  html.dark .text-helfi-black {
+    @apply text-white;
+  }
+  html.dark .text-black {
+    @apply text-white;
+  }
+
   html.dark .border-gray-100 {
     @apply border-gray-700;
   }
@@ -66,6 +74,24 @@
   }
   html.dark .hover\\:bg-gray-200:hover {
     @apply bg-gray-600;
+  }
+
+  /* Desktop-only pastel backgrounds (often applied via md:*) should not stay bright in dark mode */
+  @media (min-width: 768px) {
+    html.dark .md\\:bg-emerald-50,
+    html.dark .md\\:bg-blue-50,
+    html.dark .md\\:bg-purple-50 {
+      @apply bg-gray-800;
+    }
+
+    html.dark .md\\:border-emerald-200,
+    html.dark .md\\:border-blue-200,
+    html.dark .md\\:border-purple-200,
+    html.dark .md\\:border-emerald-300,
+    html.dark .md\\:border-blue-300,
+    html.dark .md\\:border-purple-300 {
+      @apply border-gray-700;
+    }
   }
 }
 
