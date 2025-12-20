@@ -158,7 +158,7 @@ export default function Reports() {
       <div className="max-w-7xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-helfi-black mb-4">
+            <h1 className="text-3xl font-bold text-helfi-black dark:text-white mb-4">
               Health Reports
             </h1>
             <p className="text-gray-600">
@@ -170,7 +170,7 @@ export default function Reports() {
             {reports.length > 0 ? (
               reports.map((r) => (
                 <div key={r.id} className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
-                  <h3 className="font-semibold text-helfi-black mb-1">📊 Weekly Summary</h3>
+                  <h3 className="font-semibold text-helfi-black dark:text-white mb-1">📊 Weekly Summary</h3>
                   <p className="text-sm text-gray-600 mb-2">Week starting {r.weekStart}</p>
                   <div className="text-sm text-purple-800">{r.summary}</div>
                 </div>

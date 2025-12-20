@@ -481,7 +481,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           {showHealthSetupReminder && (
             <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full mx-4 md:mx-0">
               <div className="bg-white border border-helfi-green/30 shadow-xl rounded-lg p-4">
-                <h2 className="text-sm font-semibold text-helfi-black mb-1">
+                <h2 className="text-sm font-semibold text-helfi-black dark:text-white mb-1">
                   Complete your Health Setup for accurate insights
                 </h2>
                 <p className="text-xs text-gray-600 mb-3">

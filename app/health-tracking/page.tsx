@@ -283,7 +283,7 @@ export default function HealthTracking() {
               <div className="max-w-7xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <div className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-helfi-black">Health Tracking</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-helfi-black dark:text-white">Health Tracking</h1>
             <p className="text-gray-600">Monitor your steps, heart rate, sleep, and more — alongside your check-ins.</p>
           </div>
 

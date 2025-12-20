@@ -601,7 +601,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 md:py-8">
           <div className="bg-white rounded-lg shadow-sm p-8">
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-helfi-black mb-4">
+              <h1 className="text-3xl font-bold text-helfi-black dark:text-white mb-4">
                 Welcome to Your Health Dashboard
               </h1>
               <p className="text-gray-600">
@@ -612,7 +612,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
               <Link href="/check-in" className="block">
               <div className="bg-white md:bg-emerald-50 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-emerald-200 hover:md:border-emerald-300 shadow-sm md:shadow-none transition-colors">
-                <h3 className="text-[17px] font-semibold text-helfi-black mb-1.5">✅ Daily Check-In</h3>
+                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">✅ Daily Check-In</h3>
                 <p className="text-[13px] text-gray-600">Rate your health issues for today</p>
                 <div className="mt-3">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">Active</span>
@@ -622,7 +622,7 @@ export default function Dashboard() {
 
               <Link href="/health-tracking" className="block">
               <div className="bg-white md:bg-helfi-green/5 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-helfi-green/20 hover:md:border-helfi-green/40 shadow-sm md:shadow-none transition-colors">
-                <h3 className="text-[17px] font-semibold text-helfi-black mb-1.5">🎯 Health Tracking</h3>
+                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">🎯 Health Tracking</h3>
                 <p className="text-[13px] text-gray-600">Track your daily metrics and progress</p>
                 <div className="mt-3">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-helfi-green/10 text-helfi-green">Coming Soon</span>
@@ -632,7 +632,7 @@ export default function Dashboard() {
 
               <Link href="/insights" className="block">
               <div className="bg-white md:bg-blue-50 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-blue-200 hover:md:border-blue-300 shadow-sm md:shadow-none transition-colors">
-                <h3 className="text-[17px] font-semibold text-helfi-black mb-1.5">🤖 AI Insights</h3>
+                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">🤖 AI Insights</h3>
                 <p className="text-[13px] text-gray-600">Personalized health recommendations</p>
                 <div className="mt-3">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-600">Coming Soon</span>
@@ -642,7 +642,7 @@ export default function Dashboard() {
 
               <Link href="/reports" className="block">
               <div className="bg-white md:bg-purple-50 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-purple-200 hover:md:border-purple-300 shadow-sm md:shadow-none transition-colors">
-                <h3 className="text-[17px] font-semibold text-helfi-black mb-1.5">📊 Reports</h3>
+                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">📊 Reports</h3>
                 <p className="text-[13px] text-gray-600">Weekly health analysis and trends</p>
                 <div className="mt-3">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-600">Coming Soon</span>
@@ -664,12 +664,12 @@ export default function Dashboard() {
                 <div className="mb-3 md:mb-4">
                   {/* Mobile: centered heading and badge */}
                   <div className="md:hidden text-center">
-                    <h3 className="text-[17px] font-semibold text-helfi-black">📱 Connect Your Devices</h3>
+                    <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white">📱 Connect Your Devices</h3>
                     <div className="text-[12px] text-green-600 font-medium mt-1">Enhanced Analytics</div>
                   </div>
                   {/* Desktop: left title, right badge */}
                   <div className="hidden md:flex items-center justify-between">
-                    <h3 className="text-[17px] font-semibold text-helfi-black">📱 Connect Your Devices</h3>
+                    <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white">📱 Connect Your Devices</h3>
                     <span className="text-[12px] md:text-sm text-green-600 font-medium whitespace-nowrap">Enhanced Analytics</span>
                   </div>
                   <p className="text-[13px] text-gray-600 text-center mt-2">Sync your smartwatch and fitness devices for better health insights</p>
