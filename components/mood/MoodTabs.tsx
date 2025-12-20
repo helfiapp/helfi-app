@@ -9,6 +9,7 @@ export default function MoodTabs() {
   const isCheckIn = pathname === '/mood'
   const isHistory = pathname === '/mood/history'
   const isInsights = pathname === '/mood/insights'
+  const isPrefs = pathname === '/mood/preferences'
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4">
@@ -44,9 +45,19 @@ export default function MoodTabs() {
           >
             Insights
           </Link>
+          <Link
+            href="/mood/preferences"
+            className={`px-4 py-3 text-center font-medium transition-colors ${
+              isPrefs
+                ? 'text-helfi-green border-b-2 border-helfi-green'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+            aria-label="Preferences"
+          >
+            <span className="material-symbols-outlined align-middle text-[20px]">settings</span>
+          </Link>
         </div>
       </div>
     </div>
   )
 }
-

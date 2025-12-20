@@ -98,7 +98,10 @@ export default function MoodInsightsPage() {
             <div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">Insights</div>
               <div className="text-sm text-gray-500 dark:text-gray-300">
-                These are gentle patterns — not guarantees.
+                This looks for simple patterns between your mood check‑ins and the things you already track in Helfi (like sleep, meals, and activity). It’s not medical advice.
+              </div>
+              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                The more you check in, the clearer this becomes.
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -150,6 +153,9 @@ export default function MoodInsightsPage() {
                 >
                   {showAll ? 'Hide details' : 'View all'}
                 </button>
+              </div>
+              <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                Based on {data.meta?.sampleSize ?? 0} day(s) of mood history in this view.
               </div>
               <div className="flex overflow-x-auto no-scrollbar gap-4 pb-2">
                 {carousel.map((c) => (

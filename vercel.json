@@ -3,6 +3,10 @@
     {
       "path": "/api/push/scheduler",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/mood/push-scheduler",
+      "schedule": "* * * * *"
     }
   ]
 }

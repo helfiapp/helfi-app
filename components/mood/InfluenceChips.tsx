@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type Influence = {
   label: string
@@ -27,6 +28,7 @@ export default function InfluenceChips({
   value: string[]
   onChange: (next: string[]) => void
 }) {
+  const router = useRouter()
   const [adding, setAdding] = useState(false)
   const [custom, setCustom] = useState('')
 
@@ -59,7 +61,21 @@ export default function InfluenceChips({
 
   return (
     <div className="w-full">
-      <h3 className="text-base font-bold mb-4 px-1 text-slate-800 dark:text-white">What’s affecting you?</h3>
+      <div className="flex items-center justify-between mb-4 px-1">
+        <h3 className="text-base font-bold text-slate-800 dark:text-white">What’s affecting you?</h3>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              sessionStorage.setItem('moodActivitySelectionsDraft', JSON.stringify(value || []))
+            } catch {}
+            router.push('/mood/activity')
+          }}
+          className="text-sm font-bold text-helfi-green hover:underline"
+        >
+          Browse
+        </button>
+      </div>
 
       <div className="flex flex-wrap gap-3">
         {all.map((item) => {
@@ -118,4 +134,3 @@ export default function InfluenceChips({
     </div>
   )
 }
-

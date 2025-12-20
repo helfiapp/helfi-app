@@ -466,6 +466,9 @@ export default function MoodHistoryPage() {
               View All
             </a>
           </div>
+          <div className="px-1 mb-3 text-sm text-gray-600 dark:text-gray-300">
+            A quick look at possible patterns between your mood and things like sleep, meals, and activity.
+          </div>
           <div className="flex overflow-x-auto no-scrollbar gap-4 px-1 pb-2">
             {insightCards.length === 0 ? (
               <div className="min-w-[260px] bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm text-sm text-gray-600 dark:text-gray-300">

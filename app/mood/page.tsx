@@ -53,6 +53,25 @@ export default function MoodCheckInPage() {
   const localDate = useMemo(() => localDateToday(), [])
 
   useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('moodActivitySelections')
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return
+      setTags((prev) => {
+        const next = new Set<string>(prev || [])
+        for (const t of parsed) {
+          const s = String(t ?? '').trim()
+          if (!s) continue
+          next.add(s)
+        }
+        return Array.from(next).slice(0, 12)
+      })
+      sessionStorage.removeItem('moodActivitySelections')
+    } catch {}
+  }, [])
+
+  useEffect(() => {
     let ignore = false
     const load = async () => {
       try {
