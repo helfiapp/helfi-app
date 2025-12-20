@@ -7024,7 +7024,7 @@ export default function Onboarding() {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
+    <div className="relative min-h-screen bg-gray-50 dark:bg-gray-900 overflow-y-auto overflow-x-hidden" id="onboarding-container">
       {showFirstTimeModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-xl bg-white shadow-xl p-6">
@@ -7039,12 +7039,12 @@ export default function Onboarding() {
       )}
       <div className="min-h-full flex flex-col max-w-full">
         {/* Sophisticated Progress with Numbered Steps */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-3 safe-area-inset-top z-50">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-8 py-3 safe-area-inset-top z-50">
           <div className="flex items-center justify-between mb-4 max-w-4xl mx-auto">
             {/* Back Button */}
             <a 
               href="/dashboard"
-              className="flex items-center text-gray-600 hover:text-gray-900"
+              className="flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
               title="back button to Dashboard"
               onClick={(e) => {
                 try {
@@ -7081,7 +7081,7 @@ export default function Onboarding() {
               <span className="ml-2 hidden md:inline font-medium">Go To Dashboard</span>
             </a>
             
-            <h1 className="text-lg font-semibold text-gray-900">
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
               Edit Health Info
             </h1>
             
@@ -7090,10 +7090,10 @@ export default function Onboarding() {
               {/* Reset Button */}
               <button
                 onClick={() => setShowResetConfirm(true)}
-                className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+                className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800"
                 title="Reset page"
               >
-                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
@@ -7120,8 +7120,8 @@ export default function Onboarding() {
                   )}
                 </button>
                 {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                    <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-2 z-50 border border-gray-100 dark:border-gray-700 animate-fade-in">
+                    <div className="flex items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                     {hasProfileImage ? (
                       <Image
                         src={userImage}
@@ -7136,22 +7136,22 @@ export default function Onboarding() {
                       </div>
                     )}
                       <div>
-                        <div className="font-semibold text-gray-900">{userName}</div>
-                        <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                        <div className="font-semibold text-gray-900 dark:text-white">{userName}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{session?.user?.email || 'user@email.com'}</div>
                       </div>
                     </div>
-                    <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                    <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                    <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
-                    <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                    <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                    <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                    <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                    <div className="border-t border-gray-100 my-2"></div>
-                    <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
+                    <Link href="/profile" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Profile</Link>
+                    <Link href="/account" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Account Settings</Link>
+                    <Link href="/profile/image" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Upload/Change Profile Photo</Link>
+                    <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Subscription & Billing</Link>
+                    <Link href="/notifications" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
+                    <Link href="/privacy" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Privacy Settings</Link>
+                    <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>
+                    <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
+                    <Link href="/reports" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Reports</Link>
                     <button
                       onClick={() => signOut()}
-                      className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                      className="block w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold"
                     >
                       Logout
                     </button>
@@ -7171,7 +7171,7 @@ export default function Onboarding() {
                 className={`p-1 rounded ${
                   step === 0 || isNavigating
                     ? 'text-gray-300 cursor-not-allowed' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7191,7 +7191,7 @@ export default function Onboarding() {
                         ? 'bg-green-600 text-white' 
                         : stepNum < step + 1
                         ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
                     } ${isNavigating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:scale-105'}`}
                     title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
                   >
@@ -7207,7 +7207,7 @@ export default function Onboarding() {
                 className={`p-1 rounded ${
                   step === stepNames.length - 1 || isNavigating
                     ? 'text-gray-300 cursor-not-allowed' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7218,8 +7218,8 @@ export default function Onboarding() {
 
             {/* Mobile Step Name and Progress */}
             <div className="text-center mt-2">
-              <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
-              <div className="text-xs text-gray-500">Step {step + 1} of {stepNames.length}</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">{stepNames[step]}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Step {step + 1} of {stepNames.length}</div>
             </div>
           </div>
           
@@ -7240,7 +7240,7 @@ export default function Onboarding() {
                         ? 'bg-green-600 text-white hover:bg-green-700' 
                         : stepNum < step + 1
                         ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-gray-300 text-gray-600 hover:bg-gray-400'
+                        : 'bg-gray-300 text-gray-600 hover:bg-gray-400 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
                     }`}
                     title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
                   >
@@ -7248,7 +7248,7 @@ export default function Onboarding() {
                   </button>
                   {index < 10 && (
                     <div className={`h-0.5 w-4 transition-all ${
-                      stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
+                      stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-700'
                     }`} />
                   )}
                 </div>
@@ -7257,7 +7257,7 @@ export default function Onboarding() {
           </div>
           
           {/* Progress Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-2 mb-3 max-w-4xl mx-auto">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3 max-w-4xl mx-auto">
             <div 
               className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
@@ -7284,12 +7284,12 @@ export default function Onboarding() {
 
           {/* Skip and Step Info - Desktop Only */}
           <div className="hidden sm:flex items-center justify-between max-w-4xl mx-auto">
-            <button className="text-sm text-gray-500 hover:text-gray-700">Skip</button>
+            <button className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Skip</button>
             <div className="text-center">
-              <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
-              <div className="text-xs text-gray-500">Step {step + 1} of 11</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">{stepNames[step]}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Step {step + 1} of 11</div>
             </div>
-            <div className="text-sm text-gray-500">{step + 1}/11</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">{step + 1}/11</div>
           </div>
         </div>
 
