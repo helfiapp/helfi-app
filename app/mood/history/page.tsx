@@ -49,7 +49,10 @@ function safeContext(ctx: any): Record<string, any> {
 }
 
 function asDateString(d: Date) {
-  return d.toISOString().slice(0, 10)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
 }
 
 function parseLocalDate(localDate: string) {
@@ -280,6 +283,23 @@ export default function MoodHistoryPage() {
     return xs
   }, [entries])
 
+  const recent = useMemo(() => {
+    return entries
+      .slice()
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 6)
+  }, [entries])
+
+  const formatTime = (ts: any) => {
+    try {
+      const d = new Date(ts)
+      if (Number.isNaN(d.getTime())) return ''
+      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    } catch {
+      return ''
+    }
+  }
+
   const dailyAverages = useMemo(() => {
     const sums = new Map()
     for (const e of entries) {
@@ -414,9 +434,29 @@ export default function MoodHistoryPage() {
 	                No mood entries yet. Add your first check‑in from the Mood tab.
 	              </div>
 	            ) : (
-	              <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-hidden">
-	                <MoodTrendGraph points={points} />
-	              </div>
+                <div className="space-y-4">
+	                <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-hidden">
+	                  <MoodTrendGraph points={points} />
+	                </div>
+                  <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 p-4">
+                    <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-300 mb-3">
+                      Recent check‑ins
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {recent.map((e) => (
+                        <div
+                          key={e.id}
+                          className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2"
+                        >
+                          <span className="text-lg leading-none">{emojiForMood(Number(e.mood))}</span>
+                          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                            {formatTime(e.timestamp)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 	            )}
 	          </div>
 	        </div>

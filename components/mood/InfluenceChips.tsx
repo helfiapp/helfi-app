@@ -71,9 +71,10 @@ export default function InfluenceChips({
             } catch {}
             router.push('/mood/activity')
           }}
-          className="text-sm font-bold text-helfi-green hover:underline"
+          className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm font-bold text-helfi-green hover:bg-slate-50 dark:hover:bg-gray-700/50"
         >
-          Browse
+          <span className="material-symbols-outlined text-[18px]">apps</span>
+          Activity Log
         </button>
       </div>
 
