@@ -169,10 +169,10 @@ export default function Reports() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {reports.length > 0 ? (
               reports.map((r) => (
-                <div key={r.id} className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
+                <div key={r.id} className="bg-purple-50 dark:bg-gray-800 p-6 rounded-lg border-2 border-purple-200 dark:border-gray-700">
                   <h3 className="font-semibold text-helfi-black dark:text-white mb-1">📊 Weekly Summary</h3>
                   <p className="text-sm text-gray-600 mb-2">Week starting {r.weekStart}</p>
-                  <div className="text-sm text-purple-800">{r.summary}</div>
+                  <div className="text-sm text-purple-800 dark:text-purple-200">{r.summary}</div>
                 </div>
               ))
             ) : (
