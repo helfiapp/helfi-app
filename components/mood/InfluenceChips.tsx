@@ -118,7 +118,7 @@ export default function InfluenceChips({
             value={custom}
             onChange={(e) => setCustom(e.target.value)}
             placeholder="Add your own"
-            className="flex-1 rounded-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-slate-900 dark:text-white"
+            className="flex-1 min-w-0 rounded-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-base text-slate-900 dark:text-white"
             maxLength={24}
           />
           <button
