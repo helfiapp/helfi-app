@@ -108,6 +108,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: range.error }, { status: 400 })
   }
 
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      totalFoodAnalysisCount: true,
+      monthlyFoodAnalysisUsed: true,
+    },
+  })
+
   const where: any = {
     userId: session.user.id,
     success: true,
@@ -130,6 +138,26 @@ export async function GET(req: NextRequest) {
     },
   })
 
+  // Food "times used" should match what the user experiences (including cached results),
+  // not just the number of AI calls. The most reliable proxy we have today is FoodLog
+  // creation count in the selected time window.
+  const foodLogWhere: any = { userId: session.user.id }
+  if (range.start && range.end) {
+    foodLogWhere.createdAt = { gte: range.start, lte: range.end }
+  } else if (range.start) {
+    foodLogWhere.createdAt = { gte: range.start }
+  } else if (range.end) {
+    foodLogWhere.createdAt = { lte: range.end }
+  }
+  // Best-effort filter to focus on analyzed entries (most analyzed entries have nutrients/items).
+  foodLogWhere.OR = [{ nutrients: { not: null } }, { items: { not: null } }, { imageUrl: { not: null } }]
+  const foodLogCount = await prisma.foodLog.count({ where: foodLogWhere }).catch(async () => {
+    // Fallback: count all food logs if JSON filtering isn't supported on this DB version.
+    const fallbackWhere: any = { userId: session.user.id }
+    if (foodLogWhere.createdAt) fallbackWhere.createdAt = foodLogWhere.createdAt
+    return prisma.foodLog.count({ where: fallbackWhere })
+  })
+
   const foodActionIds = new Set<string>()
   let symptomCount = 0
   let medicalCount = 0
@@ -141,7 +169,7 @@ export async function GET(req: NextRequest) {
   for (const ev of events) {
     const f = String(ev.feature || '')
 
-    // Food photo analysis (count one per scanId; ignore internal helper calls and re-analyses)
+    // Food photo analysis (AI calls only): keep this for fallback/debug, but prefer FoodLog count.
     if (
       (f === 'food:image-analysis' || f === 'food:text-analysis' || f === 'food:analyze-packaged') &&
       !f.includes('reanalysis')
@@ -185,7 +213,15 @@ export async function GET(req: NextRequest) {
       end: range.end ? range.end.toISOString() : null,
     },
     usage: {
-      foodAnalysis: foodActionIds.size,
+      foodAnalysis:
+        range.key === 'all'
+          ? Math.max(
+              Number(foodLogCount || 0),
+              Number(user?.totalFoodAnalysisCount || 0),
+              Number(user?.monthlyFoodAnalysisUsed || 0),
+              Number(foodActionIds.size || 0)
+            )
+          : Math.max(Number(foodLogCount || 0), Number(foodActionIds.size || 0)),
       symptomAnalysis: symptomCount,
       medicalImageAnalysis: medicalCount,
       insightsGeneration: insightsRunIds.size + insightsLandingCount,
@@ -195,4 +231,3 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(payload)
 }
-
