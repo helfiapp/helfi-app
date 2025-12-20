@@ -1418,7 +1418,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           </div>
         </div>
 
-        <main className="flex-1 flex flex-col w-full max-w-md mx-auto pb-32">
+        <main className="flex-1 flex flex-col w-full max-w-md mx-auto pb-[calc(12rem+env(safe-area-inset-bottom))] md:pb-32">
           <div className="flex flex-col gap-3 px-5">
             {groupOptions.map((d) => {
               const checked = selectedDietIds.includes(d.id)
@@ -1457,7 +1457,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           </div>
         </main>
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-50/95 backdrop-blur-xl border-t border-gray-200 z-40">
+        <div className="fixed bottom-0 left-0 right-0 pt-4 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-4 bg-gray-50/95 backdrop-blur-xl border-t border-gray-200 z-50">
           <div className="max-w-md mx-auto w-full space-y-2">
             <button
               type="button"
