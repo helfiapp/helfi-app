@@ -6,7 +6,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const FOOD_MODEL_GOAL_NAME = '__FOOD_ANALYZER_MODEL__'
-const DEFAULT_MODEL = (process.env.OPENAI_FOOD_MODEL || 'gpt-4o').trim()
+const DEFAULT_MODEL = (process.env.OPENAI_FOOD_MODEL || 'gpt-5.2').trim()
 const ALLOWED_MODELS = new Set(['gpt-4o', 'gpt-5.2'])
 
 const normalizeEmail = (raw: string) => raw.trim().toLowerCase()
@@ -135,4 +135,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to update food analyzer model' }, { status: 500 })
   }
 }
-

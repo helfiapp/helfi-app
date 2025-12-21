@@ -2974,6 +2974,7 @@ const applyStructuredItems = (
   let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
   let finalTotal = sanitizeNutritionTotals(totalFromApi)
   const allowTextFallback = options?.allowTextFallback ?? true
+  const isPackagedAnalysis = analysisMode === 'packaged'
 
   console.log('🔍 applyStructuredItems called:', {
     itemsFromApiCount: Array.isArray(itemsFromApi) ? itemsFromApi.length : 0,
@@ -3000,13 +3001,17 @@ const applyStructuredItems = (
   }
 
   const curatedEnriched =
-    finalItems.length > 0 ? enrichItemsFromCuratedUsda(finalItems) : []
-  const enrichedItems = curatedEnriched.length > 0 ? enrichItemsFromStarter(curatedEnriched) : []
+    finalItems.length > 0
+      ? (isPackagedAnalysis ? finalItems : enrichItemsFromCuratedUsda(finalItems))
+      : []
+  const enrichedItems = curatedEnriched.length > 0
+    ? (isPackagedAnalysis ? curatedEnriched : enrichItemsFromStarter(curatedEnriched))
+    : []
   // The backend *tries* to return correct discrete counts and totals, but we still apply a
   // conservative client-side safety pass for discrete items where the label clearly says
   // multiple pieces (e.g., "6 drumsticks") but the macros look like a single piece.
   // This does not change pieces/weight syncing; it only scales obviously-too-low macros.
-  const normalizedItems = normalizeDiscreteServingsWithLabel(enrichedItems)
+  const normalizedItems = isPackagedAnalysis ? enrichedItems : normalizeDiscreteServingsWithLabel(enrichedItems)
 
   const addEstimatedServingWeights = (items: any[]) =>
     items.map((it) => {
@@ -3073,7 +3078,27 @@ const applyStructuredItems = (
     existingItemsFromState.length > 0 ? existingItemsFromState : existingItemsFromEditingEntry
 
   const filteredItems = stripGenericPlateItems(estimatedItems, analysisText)
-  const itemsToUseRaw = filteredItems.length > 0 ? filteredItems : fallbackExistingItems
+  const fallbackItemName = analysisText ? extractBaseMealDescription(analysisText) : ''
+  const fallbackItem = {
+    name: fallbackItemName || 'Meal',
+    brand: null,
+    serving_size: '1 serving',
+    servings: 1,
+    calories: null,
+    protein_g: null,
+    carbs_g: null,
+    fat_g: null,
+    fiber_g: null,
+    sugar_g: null,
+    isGuess: true,
+  }
+  const itemsToUseRaw = (() => {
+    if (filteredItems.length > 0) return filteredItems
+    if (estimatedItems.length > 0) return estimatedItems
+    if (fallbackExistingItems.length > 0) return fallbackExistingItems
+    if (analysisText) return [fallbackItem]
+    return []
+  })()
   const inferredCount = parseCountFromFreeText(analysisText || '')
   const itemsToUse = itemsToUseRaw.map((it: any) => {
     const next = normalizeDiscreteItem(it)
@@ -8538,6 +8563,7 @@ Please add nutritional information manually if needed.`);
       return key && Boolean(combineSelectedKeys[key])
     })
     if (selected.length === 0) return
+    beginDiaryMutation()
 
     const name = (combineMealName || '').trim() || `Combined ${categoryLabel(combineCategory)}`
 
@@ -8684,6 +8710,8 @@ Please add nutritional information manually if needed.`);
       console.warn('Combine ingredients failed', err)
       showQuickToast('Could not combine these items. Please try again.')
       setCombineSaving(false)
+    } finally {
+      endDiaryMutation()
     }
   }
 

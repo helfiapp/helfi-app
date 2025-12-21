@@ -1577,7 +1577,7 @@ CRITICAL REQUIREMENTS:
     // Main food model selection.
     // Default is env-controlled; admin can set a per-user override via __FOOD_ANALYZER_MODEL__.
     // Temperature is set to 0 for maximum consistency between runs on the same meal.
-    let model = (process.env.OPENAI_FOOD_MODEL || 'gpt-4o').trim() || 'gpt-4o'
+    let model = (process.env.OPENAI_FOOD_MODEL || 'gpt-5.2').trim() || 'gpt-5.2'
     try {
       const goal = await prisma.healthGoal.findFirst({
         where: { userId: currentUser.id, name: '__FOOD_ANALYZER_MODEL__' },
@@ -1592,6 +1592,10 @@ CRITICAL REQUIREMENTS:
       }
     } catch (e) {
       console.warn('Food analyzer model override lookup failed (non-fatal):', e)
+    }
+
+    if (imageDataUrl && model !== 'gpt-5.2') {
+      model = 'gpt-5.2'
     }
 
     const maxTokens = 600;

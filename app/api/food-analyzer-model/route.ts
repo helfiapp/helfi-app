@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      model: model || 'gpt-4o',
+      model: model || 'gpt-5.2',
       source: model ? 'user_override' : 'default',
     })
   } catch (err) {
