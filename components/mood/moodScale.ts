@@ -11,14 +11,22 @@ export const MOOD_LEVELS = [
 export type MoodValue = (typeof MOOD_LEVELS)[number]['value']
 
 export const DEFAULT_MOOD_TAGS = [
-  'Calm',
-  'Focused',
-  'Motivated',
-  'Anxious',
-  'Irritable',
-  'Energised',
-  'Flat',
-  'Social',
-  'Overwhelmed',
+  { label: 'Calm', emoji: '😌' },
+  { label: 'Focused', emoji: '🤓' },
+  { label: 'Motivated', emoji: '😤' },
+  { label: 'Anxious', emoji: '😰' },
+  { label: 'Stressed', emoji: '😫' },
+  { label: 'Sad', emoji: '😢' },
+  { label: 'Lonely', emoji: '🥺' },
+  { label: 'Tired', emoji: '😴' },
+  { label: 'Restless', emoji: '😬' },
+  { label: 'Content', emoji: '😊' },
+  { label: 'Confident', emoji: '😎' },
+  { label: 'Grateful', emoji: '😇' },
+  { label: 'Hopeful', emoji: '🙂' },
+  { label: 'Irritable', emoji: '😠' },
+  { label: 'Energised', emoji: '😁' },
+  { label: 'Flat', emoji: '😶' },
+  { label: 'Social', emoji: '🥳' },
+  { label: 'Overwhelmed', emoji: '😵‍💫' },
 ] as const
-

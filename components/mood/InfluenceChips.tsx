@@ -2,33 +2,34 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 
-function normalize(tag: string) {
-  return tag.trim().replace(/\s+/g, ' ').slice(0, 24)
-}
-
-function firstMark(label: string): string {
-  const s = label.trim()
-  if (!s) return '•'
-  try {
-    const Seg = (Intl as any)?.Segmenter
-    if (Seg) {
-      const seg = new Seg(undefined, { granularity: 'grapheme' })
-      const it = seg.segment(s)[Symbol.iterator]()
-      const first = it.next()?.value
-      const val = first?.segment
-      if (val) return String(val)
-    }
-  } catch {}
-  return Array.from(s)[0] || '•'
+type CustomIcon = {
+  type: 'badge' | 'image'
+  value: string
+  color?: string
 }
 
 type Tile = {
   id: string
   label: string
   imageUrl?: string
+  badgeMark?: string
+  badgeColor?: string
   fallbackIcon?: string
-  mark?: string
+  isCustom?: boolean
 }
+
+const CUSTOM_ICON_KEY = 'moodCustomIconsV1'
+
+const BADGE_COLORS = [
+  '#E8F5E9',
+  '#E3F2FD',
+  '#FCE4EC',
+  '#FFF3E0',
+  '#E8EAF6',
+  '#E0F7FA',
+  '#F3E5F5',
+  '#F1F8E9',
+] as const
 
 const ICON_URLS = {
   gaming:
@@ -57,6 +58,57 @@ const ICON_URLS = {
     'https://lh3.googleusercontent.com/aida-public/AB6AXuBZ94RO9gg7tfuQolGGmqg1x_-6VLPNS3W2S9qFrS2Phm7vNUx6afLKrZ1haBHrjJvfeV3EeGCGqtjJPSBHwx_ZSWGwpxkCjLraYb22JTPcFCsAmWvF8WuH4qYSY4YPB1obI-GPrZNSKF9TNrMVE41MwMsxjs3xcJ-Y0C8vjyg5VAYEmQ2kJMMMuOCRdxKtlpQeolMUlI0fCJHI0YwxzYHkenFZeuPr_nwYAGlgwUl-0iOIhQc1FQD1xpmgo4GdHA6vKJVEVaJqpfk',
 } as const
 
+const ICON_CHOICES = [
+  { id: 'work', label: 'Work', imageUrl: ICON_URLS.work },
+  { id: 'family', label: 'Family', imageUrl: ICON_URLS.friends },
+  { id: 'sleep', label: 'Sleep', imageUrl: ICON_URLS.nap },
+  { id: 'food', label: 'Food', imageUrl: ICON_URLS.pizza },
+  { id: 'weather', label: 'Weather', imageUrl: ICON_URLS.weather },
+  { id: 'exercise', label: 'Exercise', imageUrl: ICON_URLS.run },
+  { id: 'gaming', label: 'Gaming', imageUrl: ICON_URLS.gaming },
+  { id: 'reading', label: 'Reading', imageUrl: ICON_URLS.reading },
+  { id: 'music', label: 'Music', imageUrl: ICON_URLS.music },
+  { id: 'movies', label: 'Movies', imageUrl: ICON_URLS.movies },
+  { id: 'shopping', label: 'Shopping', imageUrl: ICON_URLS.shopping },
+  { id: 'cleaning', label: 'Cleaning', imageUrl: ICON_URLS.cleaning },
+] as const
+
+function normalize(tag: string) {
+  return tag.trim().replace(/\s+/g, ' ').slice(0, 24)
+}
+
+function colorForLabel(label: string) {
+  let hash = 0
+  for (let i = 0; i < label.length; i++) {
+    hash = (hash * 31 + label.charCodeAt(i)) % 997
+  }
+  return BADGE_COLORS[hash % BADGE_COLORS.length]
+}
+
+function firstMark(label: string): string {
+  const s = label.trim()
+  if (!s) return '•'
+  try {
+    const Seg = (Intl as any)?.Segmenter
+    if (Seg) {
+      const seg = new Seg(undefined, { granularity: 'grapheme' })
+      const it = seg.segment(s)[Symbol.iterator]()
+      const first = it.next()?.value
+      const val = first?.segment
+      if (val) return String(val)
+    }
+  } catch {}
+  return Array.from(s)[0] || '•'
+}
+
+function defaultBadge(label: string): CustomIcon {
+  return {
+    type: 'badge',
+    value: firstMark(label),
+    color: colorForLabel(label),
+  }
+}
+
 export default function InfluenceChips({
   value,
   onChange,
@@ -67,6 +119,10 @@ export default function InfluenceChips({
   const [adding, setAdding] = useState(false)
   const [custom, setCustom] = useState('')
   const [expanded, setExpanded] = useState(false)
+  const [customIcons, setCustomIcons] = useState<Record<string, CustomIcon>>({})
+  const [iconPickerOpen, setIconPickerOpen] = useState(false)
+  const [iconPickerLabel, setIconPickerLabel] = useState<string | null>(null)
+  const [pendingIcon, setPendingIcon] = useState<CustomIcon | null>(null)
 
   useEffect(() => {
     try {
@@ -77,6 +133,21 @@ export default function InfluenceChips({
       }
     } catch {}
   }, [])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CUSTOM_ICON_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') setCustomIcons(parsed)
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CUSTOM_ICON_KEY, JSON.stringify(customIcons))
+    } catch {}
+  }, [customIcons])
 
   const selected = useMemo(() => new Set(value.map((t) => normalize(t)).filter(Boolean)), [value])
 
@@ -89,15 +160,38 @@ export default function InfluenceChips({
     onChange(Array.from(next))
   }
 
+  const openPicker = (label: string | null) => {
+    setIconPickerLabel(label)
+    setIconPickerOpen(true)
+  }
+
+  const closePicker = () => {
+    setIconPickerOpen(false)
+    setIconPickerLabel(null)
+  }
+
+  const applyIcon = (label: string, icon: CustomIcon) => {
+    const key = normalize(label)
+    setCustomIcons((prev) => ({ ...prev, [key]: icon }))
+  }
+
   const addCustom = () => {
     const t = normalize(custom)
     if (!t) return
     const next = new Set(selected)
     next.add(t)
     onChange(Array.from(next))
+    const icon = pendingIcon || defaultBadge(t)
+    applyIcon(t, icon)
     setCustom('')
     setAdding(false)
+    setPendingIcon(null)
     setExpanded(true)
+  }
+
+  const getCustomIcon = (label: string) => {
+    const key = normalize(label)
+    return customIcons[key] || defaultBadge(label)
   }
 
   const tiles = useMemo((): Tile[] => {
@@ -112,10 +206,6 @@ export default function InfluenceChips({
 
     const more: Tile[] = [
       { id: 'gaming', label: 'Gaming', imageUrl: ICON_URLS.gaming },
-      { id: 'run', label: 'Run', imageUrl: ICON_URLS.run },
-      { id: 'pizza', label: 'Pizza', imageUrl: ICON_URLS.pizza },
-      { id: 'nap', label: 'Nap', imageUrl: ICON_URLS.nap },
-      { id: 'friends', label: 'Friends', imageUrl: ICON_URLS.friends },
       { id: 'reading', label: 'Reading', imageUrl: ICON_URLS.reading },
       { id: 'music', label: 'Music', imageUrl: ICON_URLS.music },
       { id: 'movies', label: 'Movies', imageUrl: ICON_URLS.movies },
@@ -126,12 +216,18 @@ export default function InfluenceChips({
     const known = new Set<string>([...main, ...more].map((t) => normalize(t.label)))
     const customTiles: Tile[] = Array.from(selected)
       .filter((t) => !known.has(normalize(t)))
-      .map((t) => ({
-        id: `custom-${t}`,
-        label: t,
-        mark: firstMark(t),
-        fallbackIcon: 'sell',
-      }))
+      .map((t) => {
+        const icon = getCustomIcon(t)
+        return {
+          id: `custom-${t}`,
+          label: t,
+          isCustom: true,
+          imageUrl: icon.type === 'image' ? icon.value : undefined,
+          badgeMark: icon.type === 'badge' ? icon.value : undefined,
+          badgeColor: icon.type === 'badge' ? icon.color : undefined,
+          fallbackIcon: 'sell',
+        }
+      })
 
     const selectedMore = more.filter((t) => selected.has(normalize(t.label)))
 
@@ -149,7 +245,13 @@ export default function InfluenceChips({
 
     const base = expanded ? dedupe([...main, ...more]) : dedupe([...main, ...selectedMore])
     return [...base, ...customTiles]
-  }, [selected, expanded])
+  }, [selected, expanded, customIcons])
+
+  const pendingPreview = useMemo(() => {
+    if (pendingIcon) return pendingIcon
+    if (!custom.trim()) return defaultBadge('New')
+    return defaultBadge(custom)
+  }, [pendingIcon, custom])
 
   return (
     <div className="w-full">
@@ -192,15 +294,32 @@ export default function InfluenceChips({
                     className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#e3e6e8] dark:bg-[#2f2a1d] object-cover"
                   />
                 ) : (
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 flex items-center justify-center">
-                    {item.mark ? (
-                      <span className="text-3xl leading-none">{item.mark}</span>
+                  <div
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-slate-200 dark:border-gray-700 flex items-center justify-center"
+                    style={{ backgroundColor: item.badgeColor || '#ffffff' }}
+                  >
+                    {item.badgeMark ? (
+                      <span className="text-3xl leading-none text-slate-700">{item.badgeMark}</span>
                     ) : (
                       <span className="material-symbols-outlined text-[34px] text-slate-400 dark:text-gray-400">
                         {item.fallbackIcon || 'sell'}
                       </span>
                     )}
                   </div>
+                )}
+
+                {item.isCustom && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openPicker(item.label)
+                    }}
+                    className="absolute -top-1 -right-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-full p-1 shadow-sm"
+                    aria-label={`Change icon for ${item.label}`}
+                  >
+                    <span className="material-symbols-outlined text-[14px] text-slate-500">edit</span>
+                  </button>
                 )}
 
                 {isSelected && (
@@ -211,7 +330,13 @@ export default function InfluenceChips({
                   </div>
                 )}
               </div>
-              <p className={isSelected ? 'text-slate-900 dark:text-white text-sm font-semibold leading-normal text-center' : 'text-slate-500 dark:text-gray-400 text-sm font-medium leading-normal text-center group-hover:text-helfi-green transition-colors'}>
+              <p
+                className={
+                  isSelected
+                    ? 'text-slate-900 dark:text-white text-sm font-semibold leading-normal text-center'
+                    : 'text-slate-500 dark:text-gray-400 text-sm font-medium leading-normal text-center group-hover:text-helfi-green transition-colors'
+                }
+              >
                 {item.label}
               </p>
             </button>
@@ -229,29 +354,102 @@ export default function InfluenceChips({
               <span className="material-symbols-outlined text-[34px] text-slate-400">add</span>
             </div>
           </div>
-          <p className="text-slate-400 dark:text-gray-500 text-sm font-medium leading-normal text-center">
-            Add
-          </p>
+          <p className="text-slate-400 dark:text-gray-500 text-sm font-medium leading-normal text-center">Add</p>
         </button>
       </div>
 
       {adding && (
-        <div className="mt-4 flex gap-2">
-          <input
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-            placeholder="Type it (optional emoji first)"
-            className="flex-1 min-w-0 rounded-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-base text-slate-900 dark:text-white"
-            maxLength={24}
-          />
-          <button
-            type="button"
-            onClick={addCustom}
-            disabled={!normalize(custom)}
-            className="rounded-full bg-helfi-green px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
-          >
-            Add
-          </button>
+        <div className="mt-4 flex flex-col gap-3">
+          <div className="flex gap-2 items-center">
+            <div
+              className="w-12 h-12 rounded-full border border-slate-200 dark:border-gray-700 flex items-center justify-center"
+              style={{ backgroundColor: pendingPreview.color || '#ffffff' }}
+            >
+              {pendingPreview.type === 'image' ? (
+                <img
+                  src={pendingPreview.value}
+                  alt="Selected icon"
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <span className="text-2xl text-slate-700">{pendingPreview.value}</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => openPicker('__new__')}
+              className="rounded-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm font-bold text-helfi-green hover:bg-slate-50 dark:hover:bg-gray-700/50"
+            >
+              Change icon
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              placeholder="Type it (emoji first if you want one)"
+              className="flex-1 min-w-0 rounded-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-base text-slate-900 dark:text-white"
+              maxLength={24}
+            />
+            <button
+              type="button"
+              onClick={addCustom}
+              disabled={!normalize(custom)}
+              className="rounded-full bg-helfi-green px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+
+      {iconPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 p-4">
+            <div className="text-base font-bold text-slate-800 dark:text-white">Choose an icon</div>
+            <div className="mt-3 grid grid-cols-4 gap-3">
+              {ICON_CHOICES.map((icon) => (
+                <button
+                  key={icon.id}
+                  type="button"
+                  onClick={() => {
+                    if (iconPickerLabel === '__new__') {
+                      setPendingIcon({ type: 'image', value: icon.imageUrl })
+                    } else if (iconPickerLabel) {
+                      applyIcon(iconPickerLabel, { type: 'image', value: icon.imageUrl })
+                    }
+                    closePicker()
+                  }}
+                  className="rounded-full border border-slate-200 dark:border-gray-700 p-1 hover:border-helfi-green"
+                >
+                  <img src={icon.imageUrl} alt={icon.label} className="w-14 h-14 rounded-full object-cover" />
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (iconPickerLabel === '__new__') {
+                    setPendingIcon(null)
+                  } else if (iconPickerLabel) {
+                    applyIcon(iconPickerLabel, defaultBadge(iconPickerLabel))
+                  }
+                  closePicker()
+                }}
+                className="flex-1 rounded-full border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-bold text-slate-700 dark:text-gray-200"
+              >
+                Use letter badge
+              </button>
+              <button
+                type="button"
+                onClick={closePicker}
+                className="flex-1 rounded-full bg-helfi-green px-4 py-2 text-sm font-bold text-white"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

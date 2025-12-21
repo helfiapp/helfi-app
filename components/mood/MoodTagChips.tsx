@@ -7,12 +7,24 @@ function normalizeTag(tag: string) {
   return tag.trim().replace(/\s+/g, ' ').slice(0, 24)
 }
 
+const DEFAULT_TAG_LABELS = DEFAULT_MOOD_TAGS.map((tag) => tag.label)
+const DEFAULT_TAG_EMOJI = new Map(
+  DEFAULT_MOOD_TAGS.map((tag) => [normalizeTag(tag.label), tag.emoji]),
+)
+
+function extractEmoji(tag: string) {
+  const match = tag.match(/\p{Extended_Pictographic}/u)
+  return match ? match[0] : ''
+}
+
 export default function MoodTagChips({
   value,
   onChange,
+  title = 'Mood tags',
 }: {
   value: string[]
   onChange: (next: string[]) => void
+  title?: string
 }) {
   const [adding, setAdding] = useState(false)
   const [custom, setCustom] = useState('')
@@ -39,7 +51,7 @@ export default function MoodTagChips({
   }
 
   const allTags = useMemo(() => {
-    const merged = new Set<string>(DEFAULT_MOOD_TAGS as any)
+    const merged = new Set<string>(DEFAULT_TAG_LABELS)
     selected.forEach((t) => merged.add(t))
     return Array.from(merged)
   }, [selected])
@@ -47,7 +59,7 @@ export default function MoodTagChips({
   return (
     <div className="w-full">
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-medium text-gray-700 dark:text-gray-200">Mood tags</div>
+        <div className="text-sm font-medium text-gray-700 dark:text-gray-200">{title}</div>
         {value.length > 0 && (
           <button
             type="button"
@@ -61,14 +73,30 @@ export default function MoodTagChips({
 
       <div className="flex flex-wrap gap-2">
         {allTags.map((tag) => {
-          const isSelected = selected.has(normalizeTag(tag))
+          const normalized = normalizeTag(tag)
+          const isSelected = selected.has(normalized)
+          const defaultEmoji = DEFAULT_TAG_EMOJI.get(normalized)
+          let emoji = defaultEmoji
+          let label = tag
+
+          if (!emoji) {
+            const fromTag = extractEmoji(tag)
+            if (fromTag) {
+              emoji = fromTag
+              label = tag.replace(fromTag, '').trim()
+            } else {
+              emoji = '🙂'
+            }
+          }
+
+          if (!label) label = tag
           return (
             <button
               key={tag}
               type="button"
               onClick={() => toggle(tag)}
               className={[
-                'px-3 py-1.5 rounded-full border text-sm touch-manipulation',
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm touch-manipulation',
                 'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-helfi-green focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900',
                 isSelected
                   ? 'bg-helfi-green/10 border-helfi-green/30 text-helfi-green-dark dark:text-helfi-green-light'
@@ -76,7 +104,10 @@ export default function MoodTagChips({
               ].join(' ')}
               aria-pressed={isSelected}
             >
-              {tag}
+              <span className="text-base leading-none" aria-hidden>
+                {emoji}
+              </span>
+              <span>{label}</span>
             </button>
           )
         })}

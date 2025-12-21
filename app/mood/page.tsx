@@ -8,6 +8,7 @@ import InfluenceChips from '@/components/mood/InfluenceChips'
 import ExpandableContextRow from '@/components/mood/ExpandableContextRow'
 import FivePointScale from '@/components/mood/FivePointScale'
 import MoodTabs from '@/components/mood/MoodTabs'
+import MoodTagChips from '@/components/mood/MoodTagChips'
 import InsightsBottomNav from '@/app/insights/InsightsBottomNav'
 import { ArrowTrendingUpIcon, BeakerIcon, BoltIcon, MoonIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import { useSession } from 'next-auth/react'
@@ -38,6 +39,7 @@ export default function MoodCheckInPage() {
   const { data: session } = useSession()
   const [mood, setMood] = useState<number | null>(null)
   const [tags, setTags] = useState<string[]>([])
+  const [feelings, setFeelings] = useState<string[]>([])
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -101,6 +103,7 @@ export default function MoodCheckInPage() {
           context: {
             localHour: new Date().getHours(),
             intensityPercent,
+            ...(feelings.length ? { feelings } : {}),
             ...(energyLevel == null ? {} : { energyLevel }),
             ...(sleepQuality == null ? {} : { sleepQuality }),
             ...(nutrition == null ? {} : { nutrition }),
@@ -113,6 +116,7 @@ export default function MoodCheckInPage() {
       setBanner({ type: 'success', message: 'Saved.' })
       setMood(null)
       setTags([])
+      setFeelings([])
       setNote('')
       setIntensityPercent(35)
       setEnergyLevel(null)
@@ -176,6 +180,10 @@ export default function MoodCheckInPage() {
 
           <div className="mt-6">
             <IntensitySlider value={intensityPercent} onChange={setIntensityPercent} />
+          </div>
+
+          <div className="mt-6">
+            <MoodTagChips value={feelings} onChange={setFeelings} title="Emotions (optional)" />
           </div>
 
           <div className="mt-8">

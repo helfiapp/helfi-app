@@ -54,6 +54,7 @@ function pickContextFields(value: any) {
   const physicalActivity = clampInt(value?.physicalActivity, 1, 5)
   const localHour = clampInt(value?.localHour, 0, 23)
   const intensityPercent = clampInt(value?.intensityPercent, 0, 100)
+  const feelings = normalizeTags(value?.feelings)
   return {
     ...(energyLevel == null ? {} : { energyLevel }),
     ...(sleepQuality == null ? {} : { sleepQuality }),
@@ -62,6 +63,7 @@ function pickContextFields(value: any) {
     ...(physicalActivity == null ? {} : { physicalActivity }),
     ...(localHour == null ? {} : { localHour }),
     ...(intensityPercent == null ? {} : { intensityPercent }),
+    ...(feelings.length > 0 ? { feelings } : {}),
   }
 }
 

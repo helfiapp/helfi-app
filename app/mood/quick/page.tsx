@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
 import MoodPicker from '@/components/mood/MoodPicker'
 import InfluenceChips from '@/components/mood/InfluenceChips'
+import MoodTagChips from '@/components/mood/MoodTagChips'
 import InsightsBottomNav from '@/app/insights/InsightsBottomNav'
 
 function localDateToday() {
@@ -17,6 +18,7 @@ function localDateToday() {
 export default function QuickMoodCheckInPage() {
   const [mood, setMood] = useState<number | null>(null)
   const [tags, setTags] = useState<string[]>([])
+  const [feelings, setFeelings] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
@@ -30,7 +32,15 @@ export default function QuickMoodCheckInPage() {
       const res = await fetch('/api/mood/entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mood, tags, localDate, context: { localHour: new Date().getHours() } }),
+        body: JSON.stringify({
+          mood,
+          tags,
+          localDate,
+          context: {
+            localHour: new Date().getHours(),
+            ...(feelings.length ? { feelings } : {}),
+          },
+        }),
       })
       if (!res.ok) throw new Error('save failed')
       setBanner({ type: 'success', message: 'Saved.' })
@@ -71,6 +81,10 @@ export default function QuickMoodCheckInPage() {
           </div>
 
           <MoodPicker value={mood} onChange={setMood} />
+
+          <div className="mt-6">
+            <MoodTagChips value={feelings} onChange={setFeelings} title="Emotions (optional)" />
+          </div>
 
           <div className="mt-8">
             <InfluenceChips value={tags} onChange={setTags} />
