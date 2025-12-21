@@ -6425,6 +6425,13 @@ Please add nutritional information manually if needed.`);
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
+    const origin =
+      typeof (fav as any)?.nutrition === 'object' && (fav as any)?.nutrition
+        ? String((fav as any).nutrition?.__origin || '').toLowerCase()
+        : typeof (fav as any)?.total === 'object' && (fav as any)?.total
+        ? String((fav as any).total?.__origin || '').toLowerCase()
+        : ''
+    if (origin === 'meal-builder' || origin === 'combined') return true
     return false
   }
 
