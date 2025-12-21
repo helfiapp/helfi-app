@@ -13,8 +13,14 @@ const DEFAULT_TAG_EMOJI = new Map(
 )
 
 function extractEmoji(tag: string) {
-  const match = tag.match(/\p{Extended_Pictographic}/u)
-  return match ? match[0] : ''
+  const trimmed = tag.trim()
+  if (!trimmed) return ''
+  const first = Array.from(trimmed)[0] ?? ''
+  const code = first.codePointAt(0) ?? 0
+  const isEmoji =
+    (code >= 0x1f300 && code <= 0x1fbff) ||
+    (code >= 0x2600 && code <= 0x27bf)
+  return isEmoji ? first : ''
 }
 
 export default function MoodTagChips({
