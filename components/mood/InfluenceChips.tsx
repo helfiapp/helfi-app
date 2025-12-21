@@ -32,45 +32,79 @@ const BADGE_COLORS = [
 ] as const
 
 const ICON_URLS = {
-  gaming:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuA2nXnYiQfNHSBiVEu-HaFggmNOlA2TdYUxM_XVwEZI8sbF9Ont2IaMrs8R19tk6XzNbRTTcLPbgy0ZLGwUWWfDOkX6wFTYleLHomldLuBKhVnhumomMLaMCbItPlU5DRivcVBKnMOKsNIVxFljV-ikQTevIo0UjsHZ_FrmSDwF7yOu3gnssoDhhnAXTS4D_o1AlkgbfhDXKcuIQizlOZt4Qiz3R0QfN-xqQYXbSJqBMLQe4vKr_lAKQl1PLfdUridrEmDMNQ4TfOA',
-  run:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuAhvYFOcwX8QGNzMGg4wYhv2VvhLbfwNAr4KTwI9iidowf_rIuHZTVy-3P8DiI-SA2V2M-q1lVLWN7rqtRxh_kar5l2mv6DXMyoXY8ZCfw-Y3sSY0Z5ybGeRy30W2dcyR1eMbrT9I0cwtDouT8wY_dUa4jXNevcS8hzSFoRU8l1vlJBgjBPvNiPt559EX8SvirrwRhIbW4ArL7xyIUzCq1rPjj45bJnP9U4sN-O45jqEYoo8e7eswUWnblYfcjnKG12UFLuTlmPOVc',
-  pizza:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuBJeCZkxjX2tSE8rRhscSbvaIpNwCJKRPAbCIDnoFWk0Q0V56TyQ7ZfpkDgTq91_TuiarEbi-_zVDz7nR7g0gnM8H6VwhTRrqkDhm1nx1oBxUSUZa-lWLTxm0Aqkj4MvNKfu_sJhI2Hg629kWUI4j2MscHdKCSU58OMVibL-z1t-BOuV7OskK1e76G-CA0zMR1tPaft79Qr_E_omVJ7y-T7weFU-Q0_nkiXMQt326LTLZLtHc8dkmshPiQRL0oiyY0SOBTlGuWmvbI',
-  nap:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDtGAgOKnCVYJfkDyWYA5lKBMGk6sGNuqe_jo5hm4eijXmGVMjKX1QxWMHmkFnKYXlaKcr77XIKHyx9RLt7QSpxObtnwM_Iz79SPb43apfLr8EcTYyLmeLJ6hYtyDxAPwHVvfC_vRV5Sxp_KOD_gWa6E79agdhplo9cfTnOe8fHw6sHuX_kBCb_R5sPY3niNFsPxt4YUQMucnpzzFfbs9ahLTKe4GknbWnQf4KI0tj4NyXUfaqXz8WmwJ83XloXPWK_hxo3Pi-AZZw',
-  friends:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuCzKlTivvkzaZTKg89nAPxkFbF-k1ZpCT56FMz6vXsxmPH_rwJlzPhgRwYP8kUlu-UktbuCocVTBNPb6i7X8meq_e9e_N8-hIpNGY35lzEj4uph_-NukcRDlPui0e7c400wtxIHEPnWUFYG7RkuaU373l4ZARfjMx2sBfJNDVOVL3KuExsdeDZAvYd6mo7o2vvXy37NP3c17MjOs3aQWx5U_RkB20N-7qcD361fkTYobIQw05bSsoQ3yUtR-OygSQRrVF_zSq-OgSQ',
-  reading:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuCR1ibOxp0qTJnkUyr-6VOZMpo6rFwM3nRbEu6QJiMLe_A751MFdv-YSt5-YtVJg5L-8eZEQbdXJojMV6Lc5obTacjD8NeuzwRHVZrtK9kiMPBZIpTBPibrMtSCErbPjaewyY0zyOqlu_ep5BOGcib0z3L_sEO4fSyRQF40Lv3aJQhWfQu5ut29sOWRMMqCiOZIxo5NZ9mO01zXIaT65A5bmosbzh2GZMlsyd1D3IAbE-7jzR_1HQewCU8srLMrpdaUMIQg8D_elj4',
-  work:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuCicmhoakhgzV9c4LR9WKsy5IKcjOCJBVhevmq5DAQSQQWlFRFv2v_Dy7yQk99aP3VCd-94GJczw6gCUNLiwr2Ox6-R3jTcUXd3TnTF_YCF6D8qw7DOTnWyFgi2vyYILMZAXOqlGCIWvRBjsqd0HJhhToNLyOrTONWGZt0tZkDJGHFGfJuK5gOwJsDrbtlDv5z3tENM9mPMnBEo7NQvu4x2YUaItdeDg44d3MAki1GaeD6celTMYmwoohMv7u1rEAy1CTuCKl3lal0',
-  weather:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDIIgC8nRMT5zXSzUZC_mDTySMiOXVk5d3AgLat0BEC_Q4qmHsZ5yUR2H_PGd6YimUDRlFoHhNB0mt9T8YEeuW0hkTgLhaPzr8JjySynUttMt-WhWe0IM6W4wQaQrwRW8DAIOeI9YY7TXlLw0iJqowWOPFNbMztknWGCWGIASHJx2PXuVz2kK88rPC2IRSANHk8pIer3U65Jrl6wje7e1Su6q9wTQCnO0b-0ilmL0oDDPnIT7sqzBeGoyb9G3Uat6Gbeo5sW8OeIjA',
-  music:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDJQvO7dUCgV9JDUlogcNc-5YAhtS0tYavitB_lQLLpJERbYJhLr24RI0pxJEPO-xT2HqrZlhP1kUs0oO3hX8tpL-B9DaCoJfAxc4m_HtOAedrL4BgMXe1lcRxmB5fevuWhtnmxFp7_AcT6byUP3KahNVp-2YS89bUeuCzPKC3ny7k2pA0dS_0lDf3yrbPglwUsLr817I_jAEUyKG_b3R8c-hrtZt5fx0ZGrKCYyTOdWt_hZ72CkVbZL-TFIztaOnja-yOwEPHIFxg',
-  movies:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuD5dWR5lIJCiXSGCsS0JEyeMF0q0yBmY0j8EZISjVIeHh7z1CpE415Pjm8VPYbw4k39LyV-hIaUoLnCPrK1zd2IeGedQxyUPCYSP94XwB0qGFTSN3G0UxmmGQDTSau6bQElMZeHf5QCBrvGppZwoNy5JjI77FWDUNcXFrQFsFSt7cYzrXGuVMuHFrU7Cr7UKxzeOYABwtd4Lflr8iqD5m7p8k19nhfeRq3orVXBAun6Lb9kbEFoQnLXc_DAat_R3wfrk4q3u6oq1Dc',
-  shopping:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuCB6om4_DrD8c7QgUNFmlh1vvWcv4_HKyPAEyb8KrwBsrN46Vkt0WPPriJZeiJESnx34VZBYD_qUe3ihVHvb4FKDy4F1vyDat289b2lksmQ-372yUzeGt_U7VdYOxpxSbG_CHmBF-Dd1td1NGp-aMtU91zsIjmaZaafHuUnvCnZbInAK3OpqCGkUmfOwVSIQtzFhqkzRpYc4D-dEbWDNzKiW4Ucv6xHXGWgxUJ5eWe4DTM0k_ZrzmEEm8xEuEWyGboUhdjc4XuO29A',
-  cleaning:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuBZ94RO9gg7tfuQolGGmqg1x_-6VLPNS3W2S9qFrS2Phm7vNUx6afLKrZ1haBHrjJvfeV3EeGCGqtjJPSBHwx_ZSWGwpxkCjLraYb22JTPcFCsAmWvF8WuH4qYSY4YPB1obI-GPrZNSKF9TNrMVE41MwMsxjs3xcJ-Y0C8vjyg5VAYEmQ2kJMMMuOCRdxKtlpQeolMUlI0fCJHI0YwxzYHkenFZeuPr_nwYAGlgwUl-0iOIhQc1FQD1xpmgo4GdHA6vKJVEVaJqpfk',
+  work: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/5f20be-computer/dynamic/200/color.webp',
+  family: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/1acc3d-heart/dynamic/200/color.webp',
+  sleep: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/a63030-moon/dynamic/200/color.webp',
+  food: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/7fb19c-cup/dynamic/200/color.webp',
+  weather: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/801da3-sun/dynamic/200/color.webp',
+  exercise: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/10c35a-gym/dynamic/200/color.webp',
+  travel: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/fa6099-travel/dynamic/200/color.webp',
+  social: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/eec43d-chat-bubble/dynamic/200/color.webp',
+  music: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/331e9c-music/dynamic/200/color.webp',
+  movies: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/b1dccf-video-cam/dynamic/200/color.webp',
+  gaming: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/a68576-puzzle/dynamic/200/color.webp',
+  reading: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/628100-notebook/dynamic/200/color.webp',
+  shopping: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/f71a3e-bag/dynamic/200/color.webp',
+  cleaning: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/368c50-broom/dynamic/200/color.webp',
+  cooking: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/544d0d-cauldron/dynamic/200/color.webp',
+  tea: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/845bf0-tea-cup/dynamic/200/color.webp',
+  photography: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/5656e5-camera/dynamic/200/color.webp',
+  art: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/fcbbf1-painting-kit/dynamic/200/color.webp',
+  nature: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/2c84d9-leaf/dynamic/200/color.webp',
+  pets: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/1dec68-bone/dynamic/200/color.webp',
+  money: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/7d956f-wallet/dynamic/200/color.webp',
+  goals: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/49b6f4-target/dynamic/200/color.webp',
+  calendar: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/f32794-calendar/dynamic/200/color.webp',
+  walk: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/1858b9-map-pin/dynamic/200/color.webp',
+  study: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/66b0f8-pencil/dynamic/200/color.webp',
+  relax: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/6e6a21-candle/dynamic/200/color.webp',
+  calls: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/87c2c5-call-out/dynamic/200/color.webp',
+  sports: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/7db5bc-ball/dynamic/200/color.webp',
+  diy: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/ff5be0-tools/dynamic/200/color.webp',
+  chores: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/add2ea-trash-can/dynamic/200/color.webp',
+  rainy: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/3f82a3-umbrella/dynamic/200/color.webp',
+  audio: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/b81ead-headphone/dynamic/200/color.webp',
+  achievement: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/39121b-medal/dynamic/200/color.webp',
+  motivation: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/744cc0-rocket/dynamic/200/color.webp',
+  time: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/8ef1fa-clock/dynamic/200/color.webp',
 } as const
 
 const ICON_CHOICES = [
   { id: 'work', label: 'Work', imageUrl: ICON_URLS.work },
-  { id: 'family', label: 'Family', imageUrl: ICON_URLS.friends },
-  { id: 'sleep', label: 'Sleep', imageUrl: ICON_URLS.nap },
-  { id: 'food', label: 'Food', imageUrl: ICON_URLS.pizza },
+  { id: 'family', label: 'Family', imageUrl: ICON_URLS.family },
+  { id: 'sleep', label: 'Sleep', imageUrl: ICON_URLS.sleep },
+  { id: 'food', label: 'Food & Drink', imageUrl: ICON_URLS.food },
   { id: 'weather', label: 'Weather', imageUrl: ICON_URLS.weather },
-  { id: 'exercise', label: 'Exercise', imageUrl: ICON_URLS.run },
-  { id: 'gaming', label: 'Gaming', imageUrl: ICON_URLS.gaming },
-  { id: 'reading', label: 'Reading', imageUrl: ICON_URLS.reading },
+  { id: 'exercise', label: 'Exercise', imageUrl: ICON_URLS.exercise },
+  { id: 'travel', label: 'Travel', imageUrl: ICON_URLS.travel },
+  { id: 'social', label: 'Social', imageUrl: ICON_URLS.social },
   { id: 'music', label: 'Music', imageUrl: ICON_URLS.music },
   { id: 'movies', label: 'Movies', imageUrl: ICON_URLS.movies },
+  { id: 'gaming', label: 'Gaming', imageUrl: ICON_URLS.gaming },
+  { id: 'reading', label: 'Reading', imageUrl: ICON_URLS.reading },
   { id: 'shopping', label: 'Shopping', imageUrl: ICON_URLS.shopping },
   { id: 'cleaning', label: 'Cleaning', imageUrl: ICON_URLS.cleaning },
+  { id: 'cooking', label: 'Cooking', imageUrl: ICON_URLS.cooking },
+  { id: 'tea', label: 'Tea/Coffee', imageUrl: ICON_URLS.tea },
+  { id: 'photography', label: 'Photography', imageUrl: ICON_URLS.photography },
+  { id: 'art', label: 'Art', imageUrl: ICON_URLS.art },
+  { id: 'nature', label: 'Nature', imageUrl: ICON_URLS.nature },
+  { id: 'pets', label: 'Pets', imageUrl: ICON_URLS.pets },
+  { id: 'money', label: 'Money', imageUrl: ICON_URLS.money },
+  { id: 'goals', label: 'Goals', imageUrl: ICON_URLS.goals },
+  { id: 'calendar', label: 'Schedule', imageUrl: ICON_URLS.calendar },
+  { id: 'walk', label: 'Walk', imageUrl: ICON_URLS.walk },
+  { id: 'study', label: 'Study', imageUrl: ICON_URLS.study },
+  { id: 'relax', label: 'Relax', imageUrl: ICON_URLS.relax },
+  { id: 'calls', label: 'Calls', imageUrl: ICON_URLS.calls },
+  { id: 'sports', label: 'Sports', imageUrl: ICON_URLS.sports },
+  { id: 'diy', label: 'DIY', imageUrl: ICON_URLS.diy },
+  { id: 'chores', label: 'Chores', imageUrl: ICON_URLS.chores },
+  { id: 'rainy', label: 'Rainy day', imageUrl: ICON_URLS.rainy },
+  { id: 'audio', label: 'Podcasts', imageUrl: ICON_URLS.audio },
+  { id: 'achievement', label: 'Achievement', imageUrl: ICON_URLS.achievement },
+  { id: 'motivation', label: 'Motivation', imageUrl: ICON_URLS.motivation },
+  { id: 'time', label: 'Time', imageUrl: ICON_URLS.time },
 ] as const
 
 function normalize(tag: string) {
@@ -197,20 +231,43 @@ export default function InfluenceChips({
   const tiles = useMemo((): Tile[] => {
     const main: Tile[] = [
       { id: 'work', label: 'Work', imageUrl: ICON_URLS.work, fallbackIcon: 'work' },
-      { id: 'family', label: 'Family', imageUrl: ICON_URLS.friends, fallbackIcon: 'family_restroom' },
-      { id: 'sleep', label: 'Sleep', imageUrl: ICON_URLS.nap, fallbackIcon: 'bedtime' },
-      { id: 'food', label: 'Food', imageUrl: ICON_URLS.pizza, fallbackIcon: 'restaurant' },
+      { id: 'family', label: 'Family', imageUrl: ICON_URLS.family, fallbackIcon: 'family_restroom' },
+      { id: 'sleep', label: 'Sleep', imageUrl: ICON_URLS.sleep, fallbackIcon: 'bedtime' },
+      { id: 'food', label: 'Food & Drink', imageUrl: ICON_URLS.food, fallbackIcon: 'restaurant' },
       { id: 'weather', label: 'Weather', imageUrl: ICON_URLS.weather, fallbackIcon: 'sunny' },
-      { id: 'exercise', label: 'Exercise', imageUrl: ICON_URLS.run, fallbackIcon: 'fitness_center' },
+      { id: 'exercise', label: 'Exercise', imageUrl: ICON_URLS.exercise, fallbackIcon: 'fitness_center' },
     ]
 
     const more: Tile[] = [
-      { id: 'gaming', label: 'Gaming', imageUrl: ICON_URLS.gaming },
-      { id: 'reading', label: 'Reading', imageUrl: ICON_URLS.reading },
+      { id: 'travel', label: 'Travel', imageUrl: ICON_URLS.travel },
+      { id: 'social', label: 'Social', imageUrl: ICON_URLS.social },
       { id: 'music', label: 'Music', imageUrl: ICON_URLS.music },
       { id: 'movies', label: 'Movies', imageUrl: ICON_URLS.movies },
+      { id: 'gaming', label: 'Gaming', imageUrl: ICON_URLS.gaming },
+      { id: 'reading', label: 'Reading', imageUrl: ICON_URLS.reading },
       { id: 'shopping', label: 'Shopping', imageUrl: ICON_URLS.shopping },
       { id: 'cleaning', label: 'Cleaning', imageUrl: ICON_URLS.cleaning },
+      { id: 'cooking', label: 'Cooking', imageUrl: ICON_URLS.cooking },
+      { id: 'tea', label: 'Tea/Coffee', imageUrl: ICON_URLS.tea },
+      { id: 'photography', label: 'Photography', imageUrl: ICON_URLS.photography },
+      { id: 'art', label: 'Art', imageUrl: ICON_URLS.art },
+      { id: 'nature', label: 'Nature', imageUrl: ICON_URLS.nature },
+      { id: 'pets', label: 'Pets', imageUrl: ICON_URLS.pets },
+      { id: 'money', label: 'Money', imageUrl: ICON_URLS.money },
+      { id: 'goals', label: 'Goals', imageUrl: ICON_URLS.goals },
+      { id: 'calendar', label: 'Schedule', imageUrl: ICON_URLS.calendar },
+      { id: 'walk', label: 'Walk', imageUrl: ICON_URLS.walk },
+      { id: 'study', label: 'Study', imageUrl: ICON_URLS.study },
+      { id: 'relax', label: 'Relax', imageUrl: ICON_URLS.relax },
+      { id: 'calls', label: 'Calls', imageUrl: ICON_URLS.calls },
+      { id: 'sports', label: 'Sports', imageUrl: ICON_URLS.sports },
+      { id: 'diy', label: 'DIY', imageUrl: ICON_URLS.diy },
+      { id: 'chores', label: 'Chores', imageUrl: ICON_URLS.chores },
+      { id: 'rainy', label: 'Rainy day', imageUrl: ICON_URLS.rainy },
+      { id: 'audio', label: 'Podcasts', imageUrl: ICON_URLS.audio },
+      { id: 'achievement', label: 'Achievement', imageUrl: ICON_URLS.achievement },
+      { id: 'motivation', label: 'Motivation', imageUrl: ICON_URLS.motivation },
+      { id: 'time', label: 'Time', imageUrl: ICON_URLS.time },
     ]
 
     const known = new Set<string>([...main, ...more].map((t) => normalize(t.label)))
@@ -291,7 +348,7 @@ export default function InfluenceChips({
                     src={item.imageUrl}
                     alt={item.label}
                     loading="lazy"
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#e3e6e8] dark:bg-[#2f2a1d] object-cover"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white dark:bg-gray-800 object-contain p-2"
                   />
                 ) : (
                   <div
@@ -369,7 +426,7 @@ export default function InfluenceChips({
                 <img
                   src={pendingPreview.value}
                   alt="Selected icon"
-                  className="w-12 h-12 rounded-full object-cover"
+                  className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 object-contain p-1"
                 />
               ) : (
                 <span className="text-2xl text-slate-700">{pendingPreview.value}</span>
@@ -422,7 +479,11 @@ export default function InfluenceChips({
                   }}
                   className="rounded-full border border-slate-200 dark:border-gray-700 p-1 hover:border-helfi-green"
                 >
-                  <img src={icon.imageUrl} alt={icon.label} className="w-14 h-14 rounded-full object-cover" />
+                  <img
+                    src={icon.imageUrl}
+                    alt={icon.label}
+                    className="w-14 h-14 rounded-full bg-white dark:bg-gray-800 object-contain p-2"
+                  />
                 </button>
               ))}
             </div>
