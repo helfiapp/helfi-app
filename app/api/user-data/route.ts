@@ -259,6 +259,24 @@ export async function GET(request: NextRequest) {
       console.log('No food name overrides data found in storage')
     }
 
+    // Get food library (all-items list, independent from daily diary)
+    let foodLibrary: any[] = []
+    try {
+      const storedLibrary = user.healthGoals.find((goal: any) => goal.name === '__FOOD_LIBRARY__')
+      if (storedLibrary && storedLibrary.category) {
+        const parsed = JSON.parse(storedLibrary.category)
+        if (Array.isArray(parsed?.items)) {
+          foodLibrary = parsed.items
+        } else if (Array.isArray(parsed?.library)) {
+          foodLibrary = parsed.library
+        } else if (Array.isArray(parsed)) {
+          foodLibrary = parsed
+        }
+      }
+    } catch (e) {
+      console.log('No food library data found in storage')
+    }
+
     // Get device interest (stored in hidden goal record)
     let deviceInterestData: any = {}
     try {
@@ -369,6 +387,7 @@ export async function GET(request: NextRequest) {
       profileImage: user.image || null,
       todaysFoods: normalizedTodaysFoods,
       favorites,
+      foodLibrary,
       foodNameOverrides,
       profileInfo: profileInfoData,
       deviceInterest: deviceInterestData,
@@ -1265,6 +1284,45 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error storing food name overrides data:', error)
+    }
+
+    // 7c. Handle food library (All tab source list)
+    try {
+      if (data && Array.isArray((data as any).foodLibrary)) {
+        const libraryArray = (data as any).foodLibrary
+        const limited = Array.isArray(libraryArray) ? libraryArray.slice(0, 400) : []
+        const existingGoals = await prisma.healthGoal.findMany({
+          where: { userId: user.id, name: '__FOOD_LIBRARY__' },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        })
+        const primary = existingGoals[0] || null
+        if (primary?.id) {
+          await prisma.healthGoal.update({
+            where: { id: primary.id },
+            data: {
+              category: JSON.stringify({ items: limited }),
+              currentRating: 0,
+            },
+          })
+          if (existingGoals.length > 1) {
+            await prisma.healthGoal.deleteMany({
+              where: { id: { in: existingGoals.slice(1).map((g) => g.id) } },
+            })
+          }
+        } else {
+          await prisma.healthGoal.create({
+            data: {
+              userId: user.id,
+              name: '__FOOD_LIBRARY__',
+              category: JSON.stringify({ items: limited }),
+              currentRating: 0,
+            },
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error storing food library data:', error)
     }
 
     // 8. Handle profileInfo data from profile page - store as special health goal

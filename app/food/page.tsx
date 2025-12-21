@@ -386,6 +386,16 @@ const formatNumberInputValue = (value: any) => {
   return value
 }
 
+const normalizeAllCapsLabel = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return trimmed
+  const lettersOnly = trimmed.replace(/[^A-Za-z]+/g, '')
+  if (!lettersOnly) return trimmed
+  if (/[a-z]/.test(lettersOnly)) return trimmed
+  const lowered = trimmed.toLowerCase()
+  return lowered.replace(/^./, (c) => c.toUpperCase())
+}
+
 // Normalize meal descriptions to drop boilerplate like "This image shows..."
 const sanitizeMealDescription = (text: string | null | undefined) => {
   if (!text) return ''
@@ -393,7 +403,8 @@ const sanitizeMealDescription = (text: string | null | undefined) => {
     .replace(/^(the\s+image\s+shows|this\s+image\s+shows|i\s+can\s+see|based\s+on\s+the\s+image|the\s+food\s+appears\s+to\s+be|this\s+appears\s+to\s+be)\s*/i, '')
     .trim()
   if (!stripped) return ''
-  return stripped.replace(/^./, (c) => c.toUpperCase())
+  const normalized = normalizeAllCapsLabel(stripped)
+  return normalized.replace(/^./, (c) => c.toUpperCase())
 }
 
 const extractBaseMealDescription = (value: string | null | undefined) => {
@@ -1874,6 +1885,7 @@ export default function FoodDiary() {
   const deletedEntryKeysRef = useRef<Set<string>>(new Set())
   const [deletedEntryNonce, setDeletedEntryNonce] = useState(0) // bump to force dedupe refresh after deletes
   const [favorites, setFavorites] = useState<any[]>([])
+  const [foodLibrary, setFoodLibrary] = useState<any[]>([])
   const [foodNameOverrides, setFoodNameOverrides] = useState<any[]>([])
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
@@ -2436,6 +2448,26 @@ export default function FoodDiary() {
 
   useEffect(() => {
     try {
+      const raw = (userData as any)?.foodLibrary
+      if (Array.isArray(raw)) {
+        setFoodLibrary(raw)
+        return
+      }
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('food:library')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) setFoodLibrary(parsed)
+        }
+      }
+    } catch (error) {
+      console.warn('Could not load food library', error)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(userData as any)?.foodLibrary])
+
+  useEffect(() => {
+    try {
       if (typeof window !== 'undefined') {
         localStorage.setItem('food:favorites', JSON.stringify(favorites))
       }
@@ -2443,6 +2475,14 @@ export default function FoodDiary() {
       // Best-effort only
     }
   }, [favorites])
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('food:library', JSON.stringify(foodLibrary))
+      }
+    } catch {}
+  }, [foodLibrary])
 
   useEffect(() => {
     try {
@@ -2663,6 +2703,7 @@ export default function FoodDiary() {
 
   const isEntryDeleted = (entry: any) => {
     if (!entry) return false
+    if ((entry as any)?.__library) return false
     const candidates = [
       buildDeleteKey(entry),
       stableDeleteKeyForEntry(entry),
@@ -3973,10 +4014,7 @@ const applyStructuredItems = (
               // Merge authoritative DB rows with local cache so fresh (not-yet-synced) entries
               // don't disappear when the DB is stale or incomplete.
               if (mappedFromDb.length > 0) {
-                const mergedForDate = dedupeEntries(
-                  [...mappedFromDb, ...deduped],
-                  { fallbackDate: selectedDate },
-                )
+                const mergedForDate = mergeServerEntries(mappedFromDb, deduped, selectedDate)
                 console.log('♻️ Merging cache with DB rows for date', selectedDate, {
                   dbCount: mappedFromDb.length,
                   cacheCount: deduped.length,
@@ -3984,6 +4022,7 @@ const applyStructuredItems = (
                 })
                 if (isViewingToday) {
                   setTodaysFoods(mergedForDate)
+                  updateUserData({ todaysFoods: mergedForDate })
                 } else {
                   setHistoryFoods(mergedForDate)
                 }
@@ -4393,6 +4432,38 @@ const applyStructuredItems = (
       }
     })
 
+  const isLikelyUnsyncedEntry = (entry: any, targetDate: string) => {
+    if (!entry) return false
+    if ((entry as any)?.dbId) return false
+    if (!entryMatchesDate(entry, targetDate)) return false
+    if (isEntryDeleted(entry)) return false
+    const descKey = normalizedDescription(entry?.description || entry?.name || '')
+    if (!descKey) return false
+    const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+    const entryTs = extractEntryTimestampMs(entry)
+    const isRecent = Number.isFinite(entryTs) ? Date.now() - entryTs < 10 * 60 * 1000 : false
+    const pendingMatch = Array.isArray(pendingQueue)
+      ? pendingQueue.some((payload: any) => {
+          const payloadDesc = normalizedDescription(payload?.description || payload?.name || '')
+          if (!payloadDesc || payloadDesc !== descKey) return false
+          const payloadCategory = normalizeCategory(payload?.meal || payload?.category || payload?.mealType)
+          if (payloadCategory !== entryCategory) return false
+          const payloadDate =
+            typeof payload?.localDate === 'string' && payload.localDate.length >= 8 ? payload.localDate : ''
+          if (payloadDate && payloadDate !== (dateKeyForEntry(entry) || targetDate)) return false
+          return true
+        })
+      : false
+    return pendingMatch || isRecent
+  }
+
+  const mergeServerEntries = (serverEntries: any[], localEntries: any[], targetDate: string) => {
+    const serverList = dedupeEntries(serverEntries || [], { fallbackDate: targetDate })
+    const localList = Array.isArray(localEntries) ? localEntries : []
+    const keepLocal = localList.filter((entry) => isLikelyUnsyncedEntry(entry, targetDate))
+    return dedupeEntries([...serverList, ...keepLocal], { fallbackDate: targetDate })
+  }
+
   // Best-effort reload to keep UI in sync with the authoritative DB rows right after saving.
   const refreshEntriesFromServer = async () => {
     try {
@@ -4435,25 +4506,13 @@ const applyStructuredItems = (
         }
         return e
       })
-      // IMPORTANT:
-      // Treat the server as authoritative for DB-backed rows. Only keep local entries that
-      // are NOT DB-backed (optimistic/pending), otherwise polling/focus-refresh can
-      // accumulate duplicates when `id` timestamps don't match the mapped server `createdAt`.
-      const keptLocal = Array.isArray(localList)
-        ? localList.filter((e: any) => {
-            if (!e) return false
-            if ((e as any)?.dbId) return false
-            if (isEntryDeleted(e)) return false
-            return entryMatchesDate(e, selectedDate)
-          })
-        : []
-      const deduped = dedupeEntries([...mappedWithStableIds, ...keptLocal], { fallbackDate: selectedDate });
+      const merged = mergeServerEntries(mappedWithStableIds, localList, selectedDate)
 
       if (isViewingToday) {
-        setTodaysFoods(deduped);
-        updateUserData({ todaysFoods: deduped });
+        setTodaysFoods(merged)
+        updateUserData({ todaysFoods: merged })
       } else {
-        setHistoryFoods(deduped);
+        setHistoryFoods(merged)
       }
     } catch (error) {
       console.error('Error refreshing food diary after save:', error);
@@ -6168,13 +6227,13 @@ Please add nutritional information manually if needed.`);
         el.scrollIntoView({ behavior: 'smooth', block: 'start' })
         try {
           const prevOutline = el.style.outline
-          const prevOutlineOffset = el.style.outlineOffset
-          el.style.outline = '2px solid rgb(16, 185, 129)'
-          el.style.outlineOffset = '6px'
+          const prevBoxShadow = el.style.boxShadow
+          el.style.outline = 'none'
+          el.style.boxShadow = '0 0 0 2px rgba(16, 185, 129, 0.35)'
           setTimeout(() => {
             try {
               el.style.outline = prevOutline
-              el.style.outlineOffset = prevOutlineOffset
+              el.style.boxShadow = prevBoxShadow
             } catch {}
           }, 900)
         } catch {}
@@ -6222,6 +6281,60 @@ Please add nutritional information manually if needed.`);
   const favoriteDisplayLabel = (fav: any) => {
     const raw = (fav?.label || fav?.description || '').toString()
     return normalizeMealLabel(raw)
+  }
+
+  const FOOD_LIBRARY_MAX_ENTRIES = 400
+  const buildFoodLibraryEntry = (entry: any, fallbackDate: string) => {
+    const compacted = compactEntryForSnapshot(entry, fallbackDate)
+    if (!compacted || typeof compacted !== 'object') return null
+    const description = (compacted as any)?.description || (compacted as any)?.label || ''
+    if (!description || !String(description).trim()) return null
+    const localDate =
+      typeof (compacted as any)?.localDate === 'string' && (compacted as any).localDate.length >= 8
+        ? String((compacted as any).localDate).slice(0, 10)
+        : fallbackDate
+    const createdAt = (compacted as any)?.createdAt || new Date().toISOString()
+    const category = normalizeCategory((compacted as any)?.meal || (compacted as any)?.category || (compacted as any)?.persistedCategory)
+    return {
+      ...(compacted as any),
+      __library: true,
+      description,
+      localDate,
+      createdAt,
+      meal: category,
+      category,
+      persistedCategory: category,
+    }
+  }
+
+  const mergeFoodLibraryEntries = (current: any[], additions: any[], fallbackDate: string) => {
+    const pool = []
+    const base = Array.isArray(current) ? current : []
+    const next = Array.isArray(additions) ? additions : []
+    for (const entry of [...next, ...base]) {
+      const normalized = buildFoodLibraryEntry(entry, fallbackDate)
+      if (normalized) pool.push(normalized)
+    }
+    const byLabel = new Map<string, any>()
+    for (const entry of pool) {
+      const label = normalizeFoodName(normalizeMealLabel(entry?.description || entry?.label || ''))
+      if (!label) continue
+      const existing = byLabel.get(label)
+      const entryTs = extractEntryTimestampMs(entry)
+      const existingTs = existing ? extractEntryTimestampMs(existing) : -Infinity
+      if (!existing || entryTs > existingTs) {
+        byLabel.set(label, entry)
+      }
+    }
+    const sorted = Array.from(byLabel.values()).sort((a, b) => {
+      const aTs = extractEntryTimestampMs(a)
+      const bTs = extractEntryTimestampMs(b)
+      if (!Number.isFinite(aTs) && !Number.isFinite(bTs)) return 0
+      if (!Number.isFinite(aTs)) return 1
+      if (!Number.isFinite(bTs)) return -1
+      return bTs - aTs
+    })
+    return sorted.slice(0, FOOD_LIBRARY_MAX_ENTRIES)
   }
 
   const foodNameOverrideMap = useMemo(() => {
@@ -6489,6 +6602,7 @@ Please add nutritional information manually if needed.`);
     const pool: any[] = []
     if (Array.isArray(todaysFoods)) pool.push(...todaysFoods)
     if (Array.isArray(historyFoods)) pool.push(...historyFoods)
+    if (Array.isArray(foodLibrary)) pool.push(...foodLibrary)
     if (persistentDiarySnapshot?.byDate) {
       Object.values(persistentDiarySnapshot.byDate).forEach((snap: any) => {
         if (Array.isArray((snap as any)?.entries)) {
@@ -7295,6 +7409,26 @@ Please add nutritional information manually if needed.`);
     } catch (error) {
       console.error('Failed to persist favorites', error)
     }
+  }
+
+  const persistFoodLibrary = (nextLibrary: any[]) => {
+    setFoodLibrary(nextLibrary)
+    updateUserData({ foodLibrary: nextLibrary } as any)
+    try {
+      fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foodLibrary: nextLibrary }),
+      }).catch(() => {})
+    } catch (error) {
+      console.error('Failed to persist food library', error)
+    }
+  }
+
+  const addEntriesToFoodLibrary = (entries: any[]) => {
+    const fallbackDate = selectedDate || todayIso
+    const merged = mergeFoodLibraryEntries(foodLibrary, entries, fallbackDate)
+    persistFoodLibrary(merged)
   }
 
   const persistFoodNameOverrides = (nextOverrides: any[]) => {
@@ -8791,6 +8925,11 @@ Please add nutritional information manually if needed.`);
           persistFavorites(next)
           return next
         })
+      } catch {}
+
+      // 1c) Keep original ingredients available in "All" even after combining.
+      try {
+        addEntriesToFoodLibrary(selected)
       } catch {}
 
       // 2) Delete the originals so they don't double count.
@@ -13384,7 +13523,7 @@ Please add nutritional information manually if needed.`);
                                 ) : (
                                 <div
                                   ref={desktopAddMenuRef}
-                                  className="food-options-dropdown fixed z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain md:max-h-none"
+                                  className="food-options-dropdown fixed z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => e.stopPropagation()}
                                   style={{
