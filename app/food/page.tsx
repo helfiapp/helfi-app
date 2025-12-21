@@ -6774,22 +6774,55 @@ Please add nutritional information manually if needed.`);
       const num = Number(value)
       return Number.isFinite(num) ? num : null
     }
+    const piecesPerServingRaw =
+      Number.isFinite(Number(food?.piecesPerServing)) && Number(food?.piecesPerServing) > 0
+        ? Number(food?.piecesPerServing)
+        : Number.isFinite(Number(food?.pieces_per_serving)) && Number(food?.pieces_per_serving) > 0
+        ? Number(food?.pieces_per_serving)
+        : Number.isFinite(Number(food?.pieces)) && Number(food?.pieces) > 0
+        ? Number(food?.pieces)
+        : null
+    const piecesRaw =
+      Number.isFinite(Number(food?.pieces)) && Number(food?.pieces) > 0
+        ? Number(food?.pieces)
+        : piecesPerServingRaw && piecesPerServingRaw > 0
+        ? piecesPerServingRaw
+        : null
+    const servingSizeRaw = food?.serving_size || (Number.isFinite(Number(food?.quantity_g)) && Number(food?.quantity_g) > 0 ? `${Number(food.quantity_g)} g` : null)
+    const serving_size = servingSizeRaw || '1 serving'
+    const servingInfo = parseServingSizeInfo({ serving_size })
+    const quantityG =
+      Number.isFinite(Number(food?.quantity_g)) && Number(food?.quantity_g) > 0
+        ? Number(food?.quantity_g)
+        : servingInfo?.gramsPerServing && servingInfo.gramsPerServing > 0
+        ? Number(servingInfo.gramsPerServing)
+        : null
+    const quantityMl =
+      !quantityG && servingInfo?.mlPerServing && servingInfo.mlPerServing > 0
+        ? Number(servingInfo.mlPerServing)
+        : null
+    const customGramsPerServing = quantityG ? quantityG : null
+    const customMlPerServing = quantityMl ? quantityMl : null
+    const weightUnit = quantityMl ? 'ml' : 'g'
+    const weightAmount = quantityMl ?? quantityG ?? null
     return {
       name: food?.name || 'Scanned food',
       brand: food?.brand || null,
-      serving_size: food?.serving_size || '1 serving',
+      serving_size,
       servings: 1,
       portionMode: 'servings',
-      weightAmount: null,
-      weightUnit: 'g',
-      customGramsPerServing: null,
-      customMlPerServing: null,
+      weightAmount,
+      weightUnit,
+      customGramsPerServing,
+      customMlPerServing,
       calories: toNumber(food?.calories),
       protein_g: toNumber(food?.protein_g),
       carbs_g: toNumber(food?.carbs_g),
       fat_g: toNumber(food?.fat_g),
       fiber_g: toNumber(food?.fiber_g),
       sugar_g: toNumber(food?.sugar_g),
+      piecesPerServing: piecesPerServingRaw,
+      pieces: piecesRaw,
       source: food?.source || 'barcode',
       barcode: code || food?.barcode || null,
       barcodeSource: food?.source || null,
@@ -11002,11 +11035,6 @@ Please add nutritional information manually if needed.`);
                                   <div className="font-semibold text-gray-900 text-base">
                                     {displayName}
                                   </div>
-                                  {item.isGuess && (
-                                    <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 rounded-full border border-amber-200">
-                                      AI guess
-                                    </span>
-                                  )}
                                 </div>
                                 {(!isMultiIngredient || isExpanded) && (
                                   <>
