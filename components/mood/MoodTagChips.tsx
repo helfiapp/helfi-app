@@ -8,7 +8,7 @@ function normalizeTag(tag: string) {
 }
 
 const DEFAULT_TAG_LABELS = DEFAULT_MOOD_TAGS.map((tag) => tag.label)
-const DEFAULT_TAG_EMOJI = new Map(
+const DEFAULT_TAG_EMOJI = new Map<string, string>(
   DEFAULT_MOOD_TAGS.map((tag) => [normalizeTag(tag.label), tag.emoji]),
 )
 
@@ -82,7 +82,7 @@ export default function MoodTagChips({
           const normalized = normalizeTag(tag)
           const isSelected = selected.has(normalized)
           const defaultEmoji = DEFAULT_TAG_EMOJI.get(normalized)
-          let emoji = defaultEmoji
+          let emoji = defaultEmoji ?? ''
           let label = tag
 
           if (!emoji) {
