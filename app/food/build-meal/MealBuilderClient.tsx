@@ -872,6 +872,12 @@ export default function MealBuilderClient() {
       if (!res.ok) {
         if (res.status === 402) {
           setBarcodeError('Not enough credits for barcode scanning.')
+        } else if (res.status === 422) {
+          setBarcodeError(
+            data?.message ||
+              data?.error ||
+              'Nutrition data is missing for this barcode. Please scan the nutrition label instead.',
+          )
         } else if (res.status === 404) {
           setBarcodeError('No product found for that barcode. Try photo or search.')
         } else if (res.status === 401) {

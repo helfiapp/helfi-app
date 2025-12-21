@@ -6992,6 +6992,16 @@ Please add nutritional information manually if needed.`);
         setBarcodeStatus('idle')
         return
       }
+      if (res.status === 422) {
+        const data = await res.json().catch(() => null)
+        const msg =
+          data?.message ||
+          data?.error ||
+          'Nutrition data is missing for this barcode. Please scan the nutrition label instead.'
+        setBarcodeError(msg)
+        setBarcodeStatus('idle')
+        return
+      }
       if (res.status === 401) {
         setBarcodeError('Please sign in to scan barcodes.')
         setBarcodeStatus('idle')

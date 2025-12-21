@@ -494,6 +494,26 @@ export async function GET(req: NextRequest) {
       id: String(food.id || code),
     }
 
+    const nutritionValues = [
+      food.calories,
+      food.protein_g,
+      food.carbs_g,
+      food.fat_g,
+      food.fiber_g,
+      food.sugar_g,
+    ]
+    const hasAnyNutrition = nutritionValues.some((v) => Number.isFinite(Number(v)))
+    if (!hasAnyNutrition) {
+      return NextResponse.json(
+        {
+          found: false,
+          error: 'nutrition_missing',
+          message: 'Product found, but nutrition data is missing. Please scan the nutrition label instead.',
+        },
+        { status: 422 },
+      )
+    }
+
     const discreteLog = summarizeDiscreteItemsForLog([food])
     if (discreteLog.length > 0) {
       console.log('[BARCODE_DEBUG] discrete normalization', discreteLog)
