@@ -677,6 +677,8 @@ const isDiscreteUnitLabel = (label: string) => {
   const discreteKeywords = [
   'egg','slice','cookie','piece','patty','pattie','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop',
   'cracker','crackers','chip','chips',
+  'bacon','rasher','rashers','strip','strips',
+  'sausage','sausages','link','links',
   // whole-vegetable / whole-fruit pieces
   'zucchini','zucchinis','courgette','courgettes',
   'carrot','carrots','cucumber','cucumbers',
@@ -700,30 +702,43 @@ const getExplicitPieces = (item: any): number | null => {
   return null
 }
 
-// Extract pieces-per-serving for discrete items from serving_size or name (supports digit or word numbers)
+// Extract pieces-per-serving only when an explicit count is present.
 const getPiecesPerServing = (item: any): number | null => {
-  const source = `${item?.serving_size || ''} ${item?.name || ''}`.trim().toLowerCase()
   const explicitPieces = getExplicitPieces(item)
   if (explicitPieces && explicitPieces > 0) return explicitPieces
 
-  if (!source) return null
-  if (!isDiscreteUnitLabel(source)) return null
+  const normalizeWordNumbersLocal = (value: string) =>
+    value.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi, (m) => {
+      const map: Record<string, string> = {
+        one: '1',
+        two: '2',
+        three: '3',
+        four: '4',
+        five: '5',
+        six: '6',
+        seven: '7',
+        eight: '8',
+        nine: '9',
+        ten: '10',
+        eleven: '11',
+        twelve: '12',
+      }
+      return map[m.toLowerCase()] || m
+    })
 
-  const numberMatch = source.match(/(\d+(?:\.\d+)?)/)
-  if (numberMatch) {
-    const n = parseFloat(numberMatch[1])
-    if (Number.isFinite(n) && n > 0) return n
+  const servingLabel = normalizeWordNumbersLocal(String(item?.serving_size || '').trim())
+  const nameLabel = normalizeWordNumbersLocal(String(item?.name || '').trim())
+
+  const fromServing = servingLabel ? parseServingUnitMetadata(servingLabel) : null
+  if (fromServing && isDiscreteUnitLabel(fromServing.unitLabel) && fromServing.quantity > 0) {
+    return fromServing.quantity
   }
 
-  const wordMatch = source.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i)
-  if (wordMatch) {
-    const map: Record<string, number> = {
-      one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
-      seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
-    }
-    const n = map[wordMatch[1].toLowerCase()]
-    if (n) return n
+  const fromName = nameLabel ? parseServingUnitMetadata(nameLabel) : null
+  if (fromName && isDiscreteUnitLabel(fromName.unitLabel) && fromName.quantity > 0) {
+    return fromName.quantity
   }
+
   return null
 }
 
@@ -747,33 +762,73 @@ const replaceWordNumbers = (text: string) => {
   )
 }
 
-const parseCountFromFreeText = (text: string | null | undefined): number | null => {
-  if (!text) return null
-  const normalized = replaceWordNumbers(String(text))
-  const numeric = normalized.match(/(\d+(?:\.\d+)?)/)
-  if (numeric) {
-    const n = parseFloat(numeric[1])
-    if (Number.isFinite(n) && n > 0) return n
-  }
-  const wordMatch = normalized.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i)
-  if (wordMatch) {
-    const map: Record<string, number> = {
-      one: 1,
-      two: 2,
-      three: 3,
-      four: 4,
-      five: 5,
-      six: 6,
-      seven: 7,
-      eight: 8,
-      nine: 9,
-      ten: 10,
-      eleven: 11,
-      twelve: 12,
+const inferPiecesFromAnalysisForItem = (analysisText: string | null | undefined, item: any): number | null => {
+  if (!analysisText) return null
+  const label = `${String(item?.name || '')} ${String(item?.serving_size || '')}`.toLowerCase()
+  if (!label.trim() || !isDiscreteUnitLabel(label)) return null
+
+  const text = replaceWordNumbers(String(analysisText).toLowerCase())
+  const rules = [
+    {
+      keywords: ['egg', 'eggs'],
+      patterns: [/\b(\d+(?:\.\d+)?)\s*(?:x\s*)?eggs?\b/, /\b(?:a|an|one)\s+egg\b/],
+    },
+    {
+      keywords: ['bacon', 'rasher', 'rashers', 'strip', 'strips'],
+      patterns: [
+        /\b(\d+(?:\.\d+)?)\s*(?:slices?|strips?|rashers?)\s*(?:of\s+)?bacon\b/,
+        /\b(\d+(?:\.\d+)?)\s*bacon\b/,
+        /\b(?:a|an|one)\s+(?:slice|strip|rasher)\s+of\s+bacon\b/,
+      ],
+    },
+    {
+      keywords: ['sausage', 'sausages', 'link', 'links'],
+      patterns: [/\b(\d+(?:\.\d+)?)\s*(?:sausages?|links?)\b/, /\b(?:a|an|one)\s+(?:sausage|link)\b/],
+    },
+    {
+      keywords: ['patty', 'pattie', 'patties'],
+      patterns: [/\b(\d+(?:\.\d+)?)\s*patt(?:y|ies)\b/, /\b(?:a|an|one)\s+patty\b/],
+    },
+    {
+      keywords: ['nugget', 'nuggets'],
+      patterns: [/\b(\d+(?:\.\d+)?)\s*nuggets?\b/, /\b(?:a|an|one)\s+nugget\b/],
+    },
+    {
+      keywords: ['wing', 'wings'],
+      patterns: [/\b(\d+(?:\.\d+)?)\s*wings?\b/, /\b(?:a|an|one)\s+wing\b/],
+    },
+    {
+      keywords: ['slice', 'slices'],
+      patterns: [/\b(\d+(?:\.\d+)?)\s*slices?\b/, /\b(?:a|an|one)\s+slice\b/],
+    },
+    {
+      keywords: ['cookie', 'cookies'],
+      patterns: [/\b(\d+(?:\.\d+)?)\s*cookies?\b/, /\b(?:a|an|one)\s+cookie\b/],
+    },
+    {
+      keywords: ['cracker', 'crackers'],
+      patterns: [/\b(\d+(?:\.\d+)?)\s*crackers?\b/, /\b(?:a|an|one)\s+cracker\b/],
+    },
+    {
+      keywords: ['piece', 'pieces'],
+      patterns: [/\b(\d+(?:\.\d+)?)\s*pieces?\b/, /\b(?:a|an|one)\s+piece\b/],
+    },
+  ]
+
+  for (const rule of rules) {
+    if (!rule.keywords.some((k) => label.includes(k))) continue
+    for (const pattern of rule.patterns) {
+      const match = text.match(pattern)
+      if (!match) continue
+      if (match[1]) {
+        const n = parseFloat(match[1])
+        if (Number.isFinite(n) && n > 0) return n
+      } else {
+        return 1
+      }
     }
-    const n = map[wordMatch[1].toLowerCase()]
-    if (n) return n
   }
+
   return null
 }
 
@@ -823,9 +878,7 @@ const normalizeDiscreteItem = (item: any) => {
   const normalizedName = replaceWordNumbers(String(item?.name || ''))
   const normalizedServingSize = replaceWordNumbers(String(item?.serving_size || ''))
   const working: any = { ...item, name: normalizedName, serving_size: normalizedServingSize }
-  const piecesPerServing =
-    getPiecesPerServing(working) ||
-    (isDiscreteUnitLabel(normalizedName) ? 1 : null)
+  const piecesPerServing = getPiecesPerServing(working)
   if (piecesPerServing && piecesPerServing > 0) {
     working.piecesPerServing = piecesPerServing
   }
@@ -3099,21 +3152,21 @@ const applyStructuredItems = (
     if (analysisText) return [fallbackItem]
     return []
   })()
-  const inferredCount = parseCountFromFreeText(analysisText || '')
   const itemsToUse = itemsToUseRaw.map((it: any) => {
     const next = normalizeDiscreteItem(it)
-    // Apply analysis-text inferred count to discrete items when it beats the current piecesPerServing
-    // (previously was eggs-only; now overrides serving_size "1 medium" defaults for produce, etc.)
     const itemLabel = `${String(next?.name || '')} ${String(next?.serving_size || '')}`.toLowerCase()
     const isDiscrete = isDiscreteUnitLabel(itemLabel)
-    if (
-      isDiscrete &&
-      inferredCount &&
-      inferredCount > 1 &&
-      inferredCount > (next.piecesPerServing || 1)
-    ) {
-      next.piecesPerServing = inferredCount
-      next.pieces = inferredCount
+    const inferredPieces = inferPiecesFromAnalysisForItem(analysisText, next)
+    const explicitPieces = getPiecesPerServing(next)
+    const preferredPieces =
+      inferredPieces && inferredPieces > 0
+        ? inferredPieces
+        : explicitPieces && explicitPieces > 0
+        ? explicitPieces
+        : null
+    if (isDiscrete && preferredPieces && preferredPieces > 0) {
+      next.piecesPerServing = preferredPieces
+      next.pieces = preferredPieces
       next.servings = 1
     }
     // If we have multiple pieces, re-seed weight using the combined estimate (previous seed may have been per-piece).
