@@ -129,8 +129,13 @@ const inferPiecesFromLabel = (name?: string | null, servingSize?: string | null)
     if (Number.isFinite(val) && val > 0) return val
   }
 
-  const fromText = parseCountFromText(label)
-  if (fromText && isDiscreteLabel(label)) return fromText
+  const explicit = label.match(
+    /(\d+(?:\.\d+)?)\s*(?:pieces?|pcs|crackers?|cookies?|nuggets?|patt(?:y|ies)|slices?|eggs?|bacon|rashers?|strips?|sausages?|links?|wings?|drumsticks?|tenders?|meatballs?|sticks?|bars?|bites?|biscuits?)/i,
+  )
+  if (explicit) {
+    const val = parseFloat(explicit[1])
+    if (Number.isFinite(val) && val > 0) return val
+  }
   return null
 }
 
