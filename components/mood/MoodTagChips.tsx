@@ -70,9 +70,9 @@ export default function MoodTagChips({
           <button
             type="button"
             onClick={() => onChange([])}
-            className="text-xs text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-xs font-semibold text-helfi-green hover:text-helfi-green-dark dark:text-helfi-green-light"
           >
-            Clear
+            Clear all
           </button>
         )}
       </div>
@@ -114,6 +114,9 @@ export default function MoodTagChips({
                 {emoji}
               </span>
               <span>{label}</span>
+              {isSelected && (
+                <span className="text-sm leading-none text-helfi-green-dark dark:text-helfi-green-light">×</span>
+              )}
             </button>
           )
         })}
