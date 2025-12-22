@@ -10695,7 +10695,7 @@ Please add nutritional information manually if needed.`);
               )}
               {photoPreview && (
                 <button
-                  onClick={analyzePhoto}
+                  onClick={() => analyzePhoto()}
                   className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold"
                 >
                   🤖 Analyze with AI
@@ -10755,7 +10755,7 @@ Please add nutritional information manually if needed.`);
                 </div>
                 <div className="space-y-3">
                   <button
-                    onClick={analyzePhoto}
+                    onClick={() => analyzePhoto()}
                     disabled={isAnalyzing}
                     className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold"
                   >
