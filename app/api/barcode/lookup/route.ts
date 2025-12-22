@@ -502,8 +502,8 @@ export async function GET(req: NextRequest) {
       food.fiber_g,
       food.sugar_g,
     ]
-    const hasAnyNutrition = nutritionValues.some((v) => Number.isFinite(Number(v)))
-    if (!hasAnyNutrition) {
+    const hasMeaningfulNutrition = nutritionValues.some((v) => Number.isFinite(Number(v)) && Number(v) > 0)
+    if (!hasMeaningfulNutrition) {
       return NextResponse.json(
         {
           found: false,

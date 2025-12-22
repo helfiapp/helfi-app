@@ -3763,12 +3763,17 @@ const applyStructuredItems = (
       if (!target.closest('.edit-actions-menu')) {
         setShowEditActionsMenu(false);
       }
+      if ((showPhotoOptions || showCategoryPicker) && !target.closest('.food-options-dropdown')) {
+        if (!target.closest('.category-add-button') && !target.closest('.add-food-entry-container')) {
+          closeAddMenus()
+        }
+      }
     }
-    if (dropdownOpen || showEntryOptions || showIngredientOptions || showEditActionsMenu) {
+    if (dropdownOpen || showEntryOptions || showIngredientOptions || showEditActionsMenu || showPhotoOptions || showCategoryPicker) {
       document.addEventListener('mousedown', handleClick);
       return () => document.removeEventListener('mousedown', handleClick);
     }
-  }, [dropdownOpen, showEntryOptions, showIngredientOptions, showEditActionsMenu]);
+  }, [dropdownOpen, showEntryOptions, showIngredientOptions, showEditActionsMenu, showPhotoOptions, showCategoryPicker, closeAddMenus]);
 
   // Reset which ingredient card is expanded whenever we switch which entry is being edited.
   // Multi-ingredient meals will start with all cards collapsed; single-ingredient meals
@@ -5985,36 +5990,17 @@ Please add nutritional information manually if needed.`);
         if (!fullHeight || !Number.isFinite(fullHeight)) return
 
         const availableFull = Math.max(0, viewportHeight - margin * 2)
-        const desiredHeight = Math.min(fullHeight, availableFull)
+        const maxHeight = Math.min(fullHeight, availableFull)
 
-        const belowTop = anchorRect.bottom + 8
-        const aboveTop = anchorRect.top - 8 - desiredHeight
-
-        const canShowBelowFully = belowTop + desiredHeight <= viewportHeight - margin
-        const canShowAboveFully = aboveTop >= margin
-
-        // Prefer below if it fully fits; otherwise prefer above if it fully fits.
-        if (canShowBelowFully) {
-          setPhotoOptionsPosition((prev) =>
-            prev ? { ...prev, top: Math.max(margin, belowTop), maxHeight: fullHeight <= availableFull ? undefined : availableFull } : prev,
-          )
-          return
+        let top = anchorRect.bottom + 8
+        if (top + maxHeight > viewportHeight - margin) {
+          top = anchorRect.top - 8 - maxHeight
+        }
+        if (top < margin) {
+          top = margin
         }
 
-        if (canShowAboveFully) {
-          setPhotoOptionsPosition((prev) =>
-            prev ? { ...prev, top: Math.max(margin, aboveTop), maxHeight: fullHeight <= availableFull ? undefined : availableFull } : prev,
-          )
-          return
-        }
-
-        // If neither fully fits, clamp to viewport and keep it reachable with internal scroll.
-        // Choose the side with more space so fewer scrolls are needed.
-        const spaceBelow = viewportHeight - belowTop - margin
-        const spaceAbove = anchorRect.top - 8 - margin
-        const useAbove = spaceAbove > spaceBelow
-        const top = useAbove ? Math.max(margin, anchorRect.top - 8 - availableFull) : Math.max(margin, belowTop)
-        setPhotoOptionsPosition((prev) => (prev ? { ...prev, top, maxHeight: Math.max(260, availableFull) } : prev))
+        setPhotoOptionsPosition((prev) => (prev ? { ...prev, top, maxHeight } : prev))
       } catch {}
     })
 
