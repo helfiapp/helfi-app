@@ -5,6 +5,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/mood/push-scheduler",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/affiliate-payout-run",
       "schedule": "0 3 1 * *"
     }
