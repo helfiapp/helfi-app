@@ -5814,7 +5814,7 @@ Please add nutritional information manually if needed.`);
     setManualMealBuildMode(false)
   }
 
-  const closeAddMenus = () => {
+  function closeAddMenus() {
     setShowPhotoOptions(false)
     setShowCategoryPicker(false)
     setPhotoOptionsAnchor(null)
