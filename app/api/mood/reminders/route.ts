@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
+import { scheduleAllMoodReminders } from '@/lib/qstash'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,12 @@ function normalizeTimezone(input: unknown) {
   const tz = String(input ?? '').trim()
   if (!tz) return 'UTC'
   if (tz.length > 64) return 'UTC'
-  return tz
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: tz })
+    return tz
+  } catch {
+    return 'UTC'
+  }
 }
 
 export async function GET() {
@@ -89,6 +95,23 @@ export async function POST(req: NextRequest) {
     frequency,
   )
 
-  return NextResponse.json({ success: true })
-}
+  let scheduleResults: any[] = []
+  if (enabled) {
+    scheduleResults = await scheduleAllMoodReminders(user.id, {
+      time1,
+      time2,
+      time3,
+      timezone,
+      frequency,
+    }).catch((error) => {
+      console.error('[MOOD] Failed to schedule reminders via QStash', error)
+      return []
+    })
+    const failedSchedules = scheduleResults.filter((result) => !result.scheduled)
+    if (failedSchedules.length > 0) {
+      console.error('[MOOD] QStash scheduling failures detected', { failedSchedules })
+    }
+  }
 
+  return NextResponse.json({ success: true, scheduleResults })
+}

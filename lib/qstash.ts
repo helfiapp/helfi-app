@@ -253,6 +253,19 @@ export async function scheduleReminderWithQStash(
   })
 }
 
+export async function scheduleMoodReminderWithQStash(
+  userId: string,
+  timeHHMM: string,
+  timeZone: string
+): Promise<{ scheduled: boolean; reason?: string; status?: number; responseBody?: string }> {
+  return scheduleWithQStash({
+    userId,
+    timeHHMM,
+    timeZone,
+    callbackPath: '/api/mood/dispatch',
+  })
+}
+
 export async function scheduleHealthTipWithQStash(
   userId: string,
   timeHHMM: string,
@@ -328,6 +341,31 @@ export async function scheduleAllActiveReminders(
     return await Promise.all(tasks)
   } catch (error) {
     console.error('[QSTASH] scheduleAllActiveReminders encountered an error', error)
+    return []
+  }
+}
+
+export async function scheduleAllMoodReminders(
+  userId: string,
+  settings: { time1: string; time2: string; time3: string; timezone: string; frequency: number }
+) {
+  const { time1, time2, time3, timezone, frequency } = settings
+  const reminders: string[] = []
+  if (frequency >= 1) reminders.push(time1)
+  if (frequency >= 2) reminders.push(time2)
+  if (frequency >= 3) reminders.push(time3)
+
+  const tasks = reminders.map((reminderTime) =>
+    scheduleMoodReminderWithQStash(userId, reminderTime, timezone).then((result) => ({
+      reminderTime,
+      ...result,
+    }))
+  )
+
+  try {
+    return await Promise.all(tasks)
+  } catch (error) {
+    console.error('[QSTASH] scheduleAllMoodReminders encountered an error', error)
     return []
   }
 }

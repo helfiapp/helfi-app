@@ -34,16 +34,21 @@ export default function MoodPreferencesPage() {
   const [time2, setTime2] = useState('12:00')
   const [time3, setTime3] = useState('18:00')
 
-  const timezone = useMemo(() => {
+  const deviceTimezone = useMemo(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     } catch {
       return 'UTC'
     }
   }, [])
+  const [timezone, setTimezone] = useState(deviceTimezone)
+  const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
+  const [timezoneQuery, setTimezoneQuery] = useState(deviceTimezone)
+  const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false)
 
   const [notificationsReady, setNotificationsReady] = useState(false)
   const [notificationsBusy, setNotificationsBusy] = useState(false)
+  const [sendingNow, setSendingNow] = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -56,11 +61,14 @@ export default function MoodPreferencesPage() {
           setTime1(normalizeTime(data.time1 || '', '20:00'))
           setTime2(normalizeTime(data.time2 || '', '12:00'))
           setTime3(normalizeTime(data.time3 || '', '18:00'))
+          const savedTimezone = (data.timezone && String(data.timezone).trim()) || deviceTimezone
+          setTimezone(savedTimezone)
+          setTimezoneQuery(savedTimezone)
         }
       } catch {}
       setLoading(false)
     })()
-  }, [])
+  }, [deviceTimezone])
 
   useEffect(() => {
     ;(async () => {
@@ -72,6 +80,75 @@ export default function MoodPreferencesPage() {
       } catch {}
     })()
   }, [])
+
+  useEffect(() => {
+    try {
+      const anyIntl = Intl as any
+      if (anyIntl && typeof anyIntl.supportedValuesOf === 'function') {
+        const supported = anyIntl.supportedValuesOf('timeZone') as string[]
+        if (Array.isArray(supported) && supported.length > 0) {
+          const sorted = [...supported].sort((a, b) => a.localeCompare(b))
+          setTimezoneOptions(sorted)
+          if (!timezone) {
+            const guessed = deviceTimezone || sorted[0] || 'UTC'
+            setTimezone(guessed)
+            setTimezoneQuery(guessed)
+          }
+          return
+        }
+      }
+    } catch {}
+
+    const fallback = [
+      'UTC',
+      'Europe/London',
+      'Europe/Paris',
+      'Europe/Berlin',
+      'Europe/Madrid',
+      'Europe/Rome',
+      'Europe/Amsterdam',
+      'Europe/Zurich',
+      'Europe/Stockholm',
+      'Europe/Athens',
+      'Africa/Johannesburg',
+      'Asia/Dubai',
+      'Asia/Kolkata',
+      'Asia/Bangkok',
+      'Asia/Singapore',
+      'Asia/Kuala_Lumpur',
+      'Asia/Hong_Kong',
+      'Asia/Tokyo',
+      'Asia/Seoul',
+      'Asia/Shanghai',
+      'Australia/Perth',
+      'Australia/Adelaide',
+      'Australia/Melbourne',
+      'Australia/Sydney',
+      'Pacific/Auckland',
+      'America/New_York',
+      'America/Chicago',
+      'America/Denver',
+      'America/Los_Angeles',
+      'America/Toronto',
+      'America/Vancouver',
+      'America/Mexico_City',
+      'America/Bogota',
+      'America/Sao_Paulo',
+    ]
+    setTimezoneOptions(fallback)
+    if (!timezone) {
+      const guessed = deviceTimezone || fallback[0] || 'UTC'
+      setTimezone(guessed)
+      setTimezoneQuery(guessed)
+    }
+  }, [deviceTimezone, timezone])
+
+  const filteredTimezones = useMemo(() => {
+    if (!timezoneOptions.length) return []
+    const query = (timezoneQuery || '').trim().toLowerCase()
+    if (!query) return timezoneOptions.slice(0, 50)
+    return timezoneOptions.filter((tz) => tz.toLowerCase().includes(query)).slice(0, 50)
+  }, [timezoneOptions, timezoneQuery])
 
   const ensureNotifications = async (): Promise<boolean> => {
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return false
@@ -256,7 +333,7 @@ export default function MoodPreferencesPage() {
               })}
             </div>
             <div className="mt-2 text-xs text-slate-500 dark:text-gray-400">
-              Uses your device time zone automatically.
+              Defaults to your device time zone.
             </div>
           </div>
 
@@ -297,6 +374,47 @@ export default function MoodPreferencesPage() {
             )}
           </div>
 
+          <div className="mt-5">
+            <div className="text-sm font-bold text-slate-800 dark:text-white mb-2">Timezone</div>
+            <div className="relative">
+              <input
+                type="text"
+                value={timezoneQuery}
+                onChange={(e) => {
+                  setTimezoneQuery(e.target.value)
+                  setShowTimezoneDropdown(true)
+                }}
+                onFocus={() => {
+                  if (enabled && timezoneOptions.length > 0) setShowTimezoneDropdown(true)
+                }}
+                placeholder="Start typing e.g. Australia/Melbourne"
+                disabled={!enabled}
+                className="w-full rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-slate-800 dark:text-white disabled:opacity-50"
+              />
+              {enabled && showTimezoneDropdown && filteredTimezones.length > 0 && (
+                <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg">
+                  {filteredTimezones.map((tzValue) => (
+                    <button
+                      key={tzValue}
+                      type="button"
+                      onClick={() => {
+                        setTimezone(tzValue)
+                        setTimezoneQuery(tzValue)
+                        setShowTimezoneDropdown(false)
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-gray-800"
+                    >
+                      {tzValue}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="mt-2 text-xs text-slate-500 dark:text-gray-400">
+              Detected on this device: {deviceTimezone}
+            </div>
+          </div>
+
           <div className="mt-6">
             <button
               type="button"
@@ -305,6 +423,47 @@ export default function MoodPreferencesPage() {
               className="w-full rounded-2xl bg-helfi-green hover:bg-helfi-green-dark text-white text-base font-bold py-4 transition-colors disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-bold text-slate-800 dark:text-white">Send reminder now</div>
+              <div className="text-xs text-slate-500 dark:text-gray-400">
+                Triggers a quick mood notification to this device.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                setSendingNow(true)
+                setBanner(null)
+                try {
+                  const ok = notificationsReady || (await ensureNotifications())
+                  if (!ok) {
+                    setBanner({ type: 'error', message: 'Notifications are not enabled on this device.' })
+                    return
+                  }
+                  const res = await fetch('/api/mood/send-reminder-now', { method: 'POST' })
+                  const data = await res.json().catch(() => ({}))
+                  if (!res.ok) {
+                    const msg = data?.error || 'Failed to send reminder'
+                    setBanner({ type: 'error', message: msg })
+                    return
+                  }
+                  setBanner({ type: 'success', message: 'Reminder sent. Check your notifications.' })
+                } catch (e: any) {
+                  setBanner({ type: 'error', message: e?.message || 'Could not send reminder.' })
+                } finally {
+                  setSendingNow(false)
+                }
+              }}
+              disabled={sendingNow}
+              className="px-3 py-2 rounded-xl bg-helfi-green text-white text-sm font-bold hover:bg-helfi-green-dark disabled:opacity-60"
+            >
+              {sendingNow ? 'Sending…' : 'Send'}
             </button>
           </div>
         </div>
