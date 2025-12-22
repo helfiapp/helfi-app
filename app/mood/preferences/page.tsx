@@ -197,9 +197,17 @@ export default function MoodPreferencesPage() {
           timezone,
         }),
       })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error('save failed')
       setEnabled(nextEnabled)
-      setBanner({ type: 'success', message: 'Saved.' })
+      const failed = Array.isArray(data?.scheduleResults)
+        ? data.scheduleResults.filter((result: any) => result && result.scheduled === false)
+        : []
+      if (failed.length > 0) {
+        setBanner({ type: 'error', message: 'Saved, but scheduling failed. Tap “Send” to verify.' })
+      } else {
+        setBanner({ type: 'success', message: 'Saved.' })
+      }
     } catch {
       setBanner({ type: 'error', message: 'Could not save. Please try again.' })
     } finally {
