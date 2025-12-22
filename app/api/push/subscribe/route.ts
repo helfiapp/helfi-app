@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { mergeSubscriptionList } from '@/lib/push-subscriptions'
 
 async function ensurePushSubscriptionsTable() {
   await prisma.$executeRawUnsafe(`
@@ -27,17 +28,28 @@ export async function POST(req: NextRequest) {
 
   try {
     await ensurePushSubscriptionsTable()
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO PushSubscriptions (userId, subscription, updatedAt) VALUES ($1, $2::jsonb, NOW())
-       ON CONFLICT (userId) DO UPDATE SET subscription=EXCLUDED.subscription, updatedAt=NOW()`,
-      user.id,
-      JSON.stringify(subscription)
+    const rows: Array<{ subscription: any }> = await prisma.$queryRawUnsafe(
+      `SELECT subscription FROM PushSubscriptions WHERE userId = $1`,
+      user.id
     )
-    return NextResponse.json({ success: true })
+    const merged = mergeSubscriptionList(rows[0]?.subscription, subscription)
+    if (rows.length) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+        user.id,
+        JSON.stringify(merged)
+      )
+    } else {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO PushSubscriptions (userId, subscription, updatedAt) VALUES ($1, $2::jsonb, NOW())`,
+        user.id,
+        JSON.stringify(merged)
+      )
+    }
+    return NextResponse.json({ success: true, subscriptionCount: merged.length })
   } catch (e) {
     console.error('push subscribe save error', e)
     return NextResponse.json({ error: 'Failed to save subscription' }, { status: 500 })
   }
 }
-
 

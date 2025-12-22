@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
+import { mergeSubscriptionList, normalizeSubscriptionList } from '@/lib/push-subscriptions'
 
 function getFallbackAdminEmail(authHeader: string | null) {
   if (authHeader && authHeader.includes('temp-admin-token')) {
@@ -58,14 +59,26 @@ export async function POST(req: NextRequest) {
 
     // Save push subscription
     await ensurePushSubscriptionsTable()
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO PushSubscriptions (userId, subscription, updatedAt) VALUES ($1, $2::jsonb, NOW())
-       ON CONFLICT (userId) DO UPDATE SET subscription=EXCLUDED.subscription, updatedAt=NOW()`,
-      user.id,
-      JSON.stringify(subscription)
+    const rows: Array<{ subscription: any }> = await prisma.$queryRawUnsafe(
+      `SELECT subscription FROM PushSubscriptions WHERE userId = $1`,
+      user.id
     )
+    const merged = mergeSubscriptionList(rows[0]?.subscription, subscription)
+    if (rows.length) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+        user.id,
+        JSON.stringify(merged)
+      )
+    } else {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO PushSubscriptions (userId, subscription, updatedAt) VALUES ($1, $2::jsonb, NOW())`,
+        user.id,
+        JSON.stringify(merged)
+      )
+    }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, subscriptionCount: merged.length })
   } catch (e) {
     console.error('admin push subscribe save error', e)
     return NextResponse.json({ error: 'Failed to save subscription' }, { status: 500 })
@@ -102,10 +115,12 @@ export async function GET(req: NextRequest) {
       `SELECT subscription, updatedAt FROM PushSubscriptions WHERE userId = $1`,
       user.id
     )
+    const subscriptionCount = rows.length ? normalizeSubscriptionList(rows[0].subscription).length : 0
 
     return NextResponse.json({
-      hasSubscription: rows.length > 0,
-      lastUpdated: rows[0]?.updatedAt ?? null
+      hasSubscription: subscriptionCount > 0,
+      lastUpdated: rows[0]?.updatedAt ?? null,
+      subscriptionCount
     })
   } catch (e) {
     console.error('admin push status error', e)
@@ -148,4 +163,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to unsubscribe' }, { status: 500 })
   }
 }
-

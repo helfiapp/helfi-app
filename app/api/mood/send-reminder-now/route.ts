@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
+import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 export const runtime = 'nodejs'
 
@@ -17,6 +18,8 @@ export async function POST(_req: NextRequest) {
     user.id,
   )
   if (!rows.length) return NextResponse.json({ error: 'No subscription' }, { status: 400 })
+  const subscriptions = normalizeSubscriptionList(rows[0].subscription)
+  if (!subscriptions.length) return NextResponse.json({ error: 'No subscription' }, { status: 400 })
 
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
   const privateKey = process.env.VAPID_PRIVATE_KEY || ''
@@ -32,8 +35,22 @@ export async function POST(_req: NextRequest) {
   })
 
   try {
-    await webpush.sendNotification(rows[0].subscription, payload)
-    return NextResponse.json({ success: true })
+    const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
+      webpush.sendNotification(sub, payload)
+    )
+    if (goneEndpoints.length) {
+      const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
+      await prisma.$executeRawUnsafe(
+        `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+        user.id,
+        JSON.stringify(remaining)
+      )
+    }
+    if (!sent) {
+      console.error('mood send-reminder-now error', errors.map((e) => e.message).join('; '))
+      return NextResponse.json({ error: 'Failed to send reminder' }, { status: 500 })
+    }
+    return NextResponse.json({ success: true, sent })
   } catch (e: any) {
     console.error('mood send-reminder-now error', e?.body || e?.message || e)
     return NextResponse.json({ error: 'Failed to send reminder' }, { status: 500 })

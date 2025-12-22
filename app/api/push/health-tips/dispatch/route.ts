@@ -8,6 +8,7 @@ import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { costCentsEstimateFromText } from '@/lib/cost-meter'
 import { scheduleHealthTipWithQStash } from '@/lib/qstash'
 import { logAIUsage } from '@/lib/ai-usage-logger'
+import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -432,6 +433,11 @@ export async function POST(req: NextRequest) {
       await scheduleHealthTipWithQStash(userId, reminderTime, timezone).catch(() => {})
       return NextResponse.json({ skipped: 'no_subscription' })
     }
+    let subscriptions = normalizeSubscriptionList(subscriptionRows[0].subscription)
+    if (!subscriptions.length) {
+      await scheduleHealthTipWithQStash(userId, reminderTime, timezone).catch(() => {})
+      return NextResponse.json({ skipped: 'no_subscription' })
+    }
 
     const settings = settingsRows[0]
     if (!settings || !settings.enabled) {
@@ -550,11 +556,20 @@ export async function POST(req: NextRequest) {
         body: 'We could not send today’s health tip because your credits are low. Tap to add more credits or upgrade your plan.',
         url: '/billing',
       })
-      await webpush
-        .sendNotification(subscriptionRows[0].subscription, payload)
-      .catch((err: unknown) => {
-          console.error('[HEALTH_TIPS] Low-credit notification send error', err)
-        })
+      const lowCreditSend = await sendToSubscriptions(subscriptions, (sub) =>
+        webpush.sendNotification(sub, payload)
+      )
+      if (lowCreditSend.goneEndpoints.length) {
+        subscriptions = removeSubscriptionsByEndpoint(subscriptions, lowCreditSend.goneEndpoints)
+        await prisma.$executeRawUnsafe(
+          `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+          userId,
+          JSON.stringify(subscriptions)
+        )
+      }
+      if (!lowCreditSend.sent) {
+        console.error('[HEALTH_TIPS] Low-credit notification send error', lowCreditSend.errors)
+      }
 
       await prisma.$executeRawUnsafe(
         `INSERT INTO HealthTipDeliveryLog (userId, reminderTime, tipDate, sentAt)
@@ -652,11 +667,18 @@ export async function POST(req: NextRequest) {
       url: '/health-tips',
     })
 
-    await webpush
-      .sendNotification(subscriptionRows[0].subscription, payload)
-      .catch((err: unknown) => {
-        console.error('[HEALTH_TIPS] Notification send error', err)
-      })
+    const tipSend = await sendToSubscriptions(subscriptions, (sub) => webpush.sendNotification(sub, payload))
+    if (tipSend.goneEndpoints.length) {
+      subscriptions = removeSubscriptionsByEndpoint(subscriptions, tipSend.goneEndpoints)
+      await prisma.$executeRawUnsafe(
+        `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+        userId,
+        JSON.stringify(subscriptions)
+      )
+    }
+    if (!tipSend.sent) {
+      console.error('[HEALTH_TIPS] Notification send error', tipSend.errors)
+    }
 
     // Schedule the next tip for this time tomorrow
     await scheduleHealthTipWithQStash(userId, reminderTime, effectiveTimezone).catch(
@@ -692,4 +714,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-

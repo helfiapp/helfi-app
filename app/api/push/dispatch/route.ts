@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
 import { scheduleAllActiveReminders, scheduleReminderWithQStash } from '@/lib/qstash'
+import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,6 +45,10 @@ export async function POST(req: NextRequest) {
       userId
     )
     if (!rows.length) {
+      return NextResponse.json({ error: 'no_subscription' }, { status: 400 })
+    }
+    const subscriptions = normalizeSubscriptionList(rows[0].subscription)
+    if (!subscriptions.length) {
       return NextResponse.json({ error: 'no_subscription' }, { status: 400 })
     }
 
@@ -141,7 +146,20 @@ export async function POST(req: NextRequest) {
         body: 'Rate your selected issues for today in under a minute.',
         url: '/check-in',
       })
-      await webpush.sendNotification(rows[0].subscription, payload)
+      const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
+        webpush.sendNotification(sub, payload)
+      )
+      if (goneEndpoints.length) {
+        const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
+        await prisma.$executeRawUnsafe(
+          `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+          userId,
+          JSON.stringify(remaining)
+        )
+      }
+      if (!sent) {
+        return NextResponse.json({ error: 'push_failed', details: errors }, { status: 500 })
+      }
       await prisma.$queryRawUnsafe(
         `INSERT INTO ReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
          VALUES ($1, $2, $3::date, NOW())
@@ -172,5 +190,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'dispatch_error', message: e?.message || String(e) }, { status: 500 })
   }
 }
-
 

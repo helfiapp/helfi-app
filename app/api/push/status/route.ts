@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { normalizeSubscriptionList } from '@/lib/push-subscriptions'
 
 export async function GET(_req: NextRequest) {
   try {
@@ -38,13 +39,15 @@ export async function GET(_req: NextRequest) {
     const settingsRows: Array<{ time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
       await prisma.$queryRawUnsafe(`SELECT time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`, user.id)
 
-    const hasSubscription = subRows.length > 0
+    const subscriptionCount = subRows.length ? normalizeSubscriptionList(subRows[0].subscription).length : 0
+    const hasSubscription = subscriptionCount > 0
     const hasSettings = settingsRows.length > 0
 
     return NextResponse.json({
       ok: true,
       userId: user.id,
       hasSubscription,
+      subscriptionCount,
       hasSettings,
       settings: hasSettings ? settingsRows[0] : null,
     })
@@ -52,5 +55,4 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'server_error' }, { status: 500 })
   }
 }
-
 

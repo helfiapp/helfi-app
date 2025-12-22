@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { normalizeSubscriptionList } from '@/lib/push-subscriptions'
 
 // Debug endpoint to check scheduler status and test timing
 export async function GET(req: NextRequest) {
@@ -132,7 +133,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       userId: user.id,
-      hasSubscription: subRows.length > 0,
+      hasSubscription: subRows.length > 0 && normalizeSubscriptionList(subRows[0]?.subscription).length > 0,
+      subscriptionCount: subRows.length ? normalizeSubscriptionList(subRows[0]?.subscription).length : 0,
       settings: {
         time1: settings.time1,
         time2: settings.time2,
@@ -157,4 +159,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 })
   }
 }
-

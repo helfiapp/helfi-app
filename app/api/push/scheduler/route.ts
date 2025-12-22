@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
 import crypto from 'crypto'
+import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 // Force dynamic execution - prevent caching for cron jobs
 export const dynamic = 'force-dynamic'
@@ -238,6 +239,12 @@ export async function POST(req: NextRequest) {
         continue
       }
 
+      const subscriptions = normalizeSubscriptionList(r.subscription)
+      if (!subscriptions.length) {
+        errors.push({ userId: r.userId ?? 'unknown', error: 'no_subscription' })
+        continue
+      }
+
       const alreadySent: Array<{ exists: number }> = await prisma.$queryRawUnsafe(
         `SELECT 1 as exists FROM ReminderDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND sentDate = $3::date LIMIT 1`,
         r.userId,
@@ -257,7 +264,22 @@ export async function POST(req: NextRequest) {
         body: 'Rate your selected issues for today in under a minute.',
         url: '/check-in'
       })
-      await webpush.sendNotification(r.subscription, payload)
+      const { sent, errors: sendErrors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
+        webpush.sendNotification(sub, payload)
+      )
+      if (goneEndpoints.length) {
+        const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
+        await prisma.$executeRawUnsafe(
+          `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+          r.userId,
+          JSON.stringify(remaining)
+        )
+      }
+      if (!sent) {
+        const msg = sendErrors.map((err) => err.message).join('; ')
+        errors.push({ userId: r.userId ?? 'unknown', error: msg || 'push_failed' })
+        continue
+      }
       sentTo.push(r.userId ?? 'unknown')
       await prisma.$queryRawUnsafe(
         `INSERT INTO ReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
@@ -315,5 +337,3 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   return POST(req)
 }
-
-

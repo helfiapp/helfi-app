@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
+import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 // Manual trigger endpoint - bypasses cron and sends reminder immediately
 export async function POST(req: NextRequest) {
@@ -21,6 +22,10 @@ export async function POST(req: NextRequest) {
       user.id
     )
     if (!subRows.length) {
+      return NextResponse.json({ error: 'No push subscription found' }, { status: 400 })
+    }
+    const subscriptions = normalizeSubscriptionList(subRows[0].subscription)
+    if (!subscriptions.length) {
       return NextResponse.json({ error: 'No push subscription found' }, { status: 400 })
     }
 
@@ -53,7 +58,20 @@ export async function POST(req: NextRequest) {
       url: '/check-in'
     })
     
-    await webpush.sendNotification(subRows[0].subscription, payload)
+    const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
+      webpush.sendNotification(sub, payload)
+    )
+    if (goneEndpoints.length) {
+      const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
+      await prisma.$executeRawUnsafe(
+        `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+        user.id,
+        JSON.stringify(remaining)
+      )
+    }
+    if (!sent) {
+      return NextResponse.json({ error: 'Failed to send reminder', details: errors }, { status: 500 })
+    }
     
     return NextResponse.json({ 
       success: true, 
@@ -69,4 +87,3 @@ export async function POST(req: NextRequest) {
     }, { status: 500 })
   }
 }
-

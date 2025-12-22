@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
 import { ensureMoodTables } from '@/app/api/mood/_db'
+import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -59,6 +60,12 @@ export async function POST(req: NextRequest) {
       try {
         if (!r.userId) continue
         if (!r.enabled) continue
+
+        const subscriptions = normalizeSubscriptionList(r.subscription)
+        if (!subscriptions.length) {
+          errors.push({ userId: r.userId, error: 'no_subscription' })
+          continue
+        }
 
         const tz = r.timezone || 'UTC'
         const fmt = new Intl.DateTimeFormat('en-GB', {
@@ -139,7 +146,22 @@ export async function POST(req: NextRequest) {
           url: '/mood/quick',
         })
 
-        await webpush.sendNotification(r.subscription, payload)
+        const { sent, errors: sendErrors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
+          webpush.sendNotification(sub, payload)
+        )
+        if (goneEndpoints.length) {
+          const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
+          await prisma.$executeRawUnsafe(
+            `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+            r.userId,
+            JSON.stringify(remaining)
+          )
+        }
+        if (!sent) {
+          const msg = sendErrors.map((err) => err.message).join('; ')
+          errors.push({ userId: r.userId, error: msg || 'push_failed' })
+          continue
+        }
         sentTo.push(r.userId)
 
         await prisma.$queryRawUnsafe(
@@ -164,4 +186,3 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   return POST(req)
 }
-

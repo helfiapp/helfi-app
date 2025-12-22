@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
+import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 // Upstash QStash will POST here. This simply reuses our notifyOwner pathway,
 // which resolves owner's subscription and performs the web-push delivery.
@@ -66,6 +67,10 @@ export async function POST(req: NextRequest) {
     if (!subRows.length) {
       return NextResponse.json({ error: 'no_owner_subscription' }, { status: 400 })
     }
+    const subscriptions = normalizeSubscriptionList(subRows[0].subscription)
+    if (!subscriptions.length) {
+      return NextResponse.json({ error: 'no_owner_subscription' }, { status: 400 })
+    }
 
     // Build payload
     const titleMap: Record<string, string> = {
@@ -87,7 +92,20 @@ export async function POST(req: NextRequest) {
       url: '/admin-panel',
     })
 
-    await webpush.sendNotification(subRows[0].subscription, payload)
+    const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
+      webpush.sendNotification(sub, payload)
+    )
+    if (goneEndpoints.length) {
+      const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
+      await prisma.$executeRawUnsafe(
+        `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+        owner.id,
+        JSON.stringify(remaining)
+      )
+    }
+    if (!sent) {
+      return NextResponse.json({ error: 'push_failed', details: errors }, { status: 500 })
+    }
     try {
       await prisma.$executeRawUnsafe(
         `INSERT INTO OwnerPushLog (event, userEmail, status, info) VALUES ($1, $2, $3, $4)`,
@@ -107,5 +125,4 @@ export async function POST(req: NextRequest) {
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
 

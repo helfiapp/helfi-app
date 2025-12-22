@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
+import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 /**
  * Owner Notification System
@@ -65,7 +66,7 @@ async function getOwnerUserId(): Promise<string | null> {
 /**
  * Get owner's push subscription from database
  */
-async function getOwnerSubscription(): Promise<any | null> {
+async function getOwnerSubscription(): Promise<{ userId: string; subscription: any } | null> {
   const ownerUserId = await getOwnerUserId()
   if (!ownerUserId) {
     return null
@@ -90,7 +91,7 @@ async function getOwnerSubscription(): Promise<any | null> {
       return null
     }
 
-    return rows[0].subscription
+    return { userId: ownerUserId, subscription: rows[0].subscription }
   } catch (error) {
     console.error('❌ Failed to get owner subscription:', error)
     return null
@@ -219,9 +220,13 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
       return
     }
 
-    const subscription = await getOwnerSubscription()
-    if (!subscription) {
+    const subscriptionInfo = await getOwnerSubscription()
+    if (!subscriptionInfo) {
       // Silently fail - owner hasn't subscribed yet
+      return
+    }
+    const subscriptions = normalizeSubscriptionList(subscriptionInfo.subscription)
+    if (!subscriptions.length) {
       return
     }
 
@@ -231,7 +236,18 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
     const payloadJson = JSON.stringify(payload)
 
     // Send notification (don't await to avoid blocking)
-    webpush.sendNotification(subscription, payloadJson).then(async () => {
+    sendToSubscriptions(subscriptions, (sub) => webpush.sendNotification(sub, payloadJson)).then(async (result) => {
+      if (result.goneEndpoints.length) {
+        const remaining = removeSubscriptionsByEndpoint(subscriptions, result.goneEndpoints)
+        await prisma.$executeRawUnsafe(
+          `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+          subscriptionInfo.userId,
+          JSON.stringify(remaining)
+        ).catch(() => {})
+      }
+      if (!result.sent) {
+        throw new Error('owner_push_failed')
+      }
       try {
         // await prisma.$executeRawUnsafe(`
         //   CREATE TABLE IF NOT EXISTS OwnerPushLog (
@@ -271,4 +287,3 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
     console.error('❌ [OWNER NOTIFICATION] Failed to queue notification:', error)
   }
 }
-

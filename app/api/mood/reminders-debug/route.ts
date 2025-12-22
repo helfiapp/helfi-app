@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
+import { normalizeSubscriptionList } from '@/lib/push-subscriptions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -164,8 +165,8 @@ export async function GET() {
       user.id,
     )
 
-  const subscriptionRows: Array<{ updatedAt: string }> = await prisma.$queryRawUnsafe(
-    `SELECT updatedAt::text AS "updatedAt" FROM PushSubscriptions WHERE userId = $1 LIMIT 1`,
+  const subscriptionRows: Array<{ subscription: any; updatedAt: string }> = await prisma.$queryRawUnsafe(
+    `SELECT subscription, updatedAt::text AS "updatedAt" FROM PushSubscriptions WHERE userId = $1 LIMIT 1`,
     user.id,
   )
 
@@ -182,8 +183,9 @@ export async function GET() {
       backfillWindowMinutes: backfillWindow,
     },
     subscription: {
-      present: subscriptionRows.length > 0,
+      present: subscriptionRows.length > 0 && normalizeSubscriptionList(subscriptionRows[0]?.subscription).length > 0,
       updatedAt: subscriptionRows[0]?.updatedAt || null,
+      count: subscriptionRows.length ? normalizeSubscriptionList(subscriptionRows[0]?.subscription).length : 0,
     },
     recentDeliveries: deliveryRows,
   })
