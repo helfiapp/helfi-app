@@ -63,6 +63,10 @@ model User {
   exerciseLogs        ExerciseLog[]
   exerciseEntries     ExerciseEntry[]
   subscription        Subscription?
+  affiliate           Affiliate?             @relation("AffiliateUser")
+  affiliateApplications AffiliateApplication[] @relation("AffiliateApplicationUser")
+  affiliateReferral   AffiliateReferral?     @relation("AffiliateReferredUser")
+  affiliateConversions AffiliateConversion[] @relation("AffiliateConvertedUser")
   supportTickets      SupportTicket[]
   interactionAnalyses InteractionAnalysis[]
   creditTopUps        CreditTopUp[]
@@ -182,6 +186,31 @@ model FoodLog {
 
   // File relationships (PHASE 2 addition)
   images File[] @relation("FoodLogImages")
+}
+
+model BarcodeProduct {
+  id               String   @id @default(cuid())
+  barcode          String   @unique
+  name             String
+  brand            String?
+  servingSize      String?
+  calories         Float?
+  proteinG         Float?
+  carbsG           Float?
+  fatG             Float?
+  fiberG           Float?
+  sugarG           Float?
+  quantityG        Float?
+  piecesPerServing Float?
+  source           String?
+  reportCount      Int      @default(0)
+  lastReportedAt   DateTime?
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([barcode])
 }
 
 model ExerciseLog {
@@ -323,6 +352,205 @@ model Subscription {
   user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Affiliate program
+model AffiliateApplication {
+  id              String                     @id @default(cuid())
+  userId          String?
+  email           String
+  name            String
+  website         String?
+  primaryChannel  String?
+  primaryChannelOther String?
+  audienceSize    String?
+  termsVersion    String?
+  termsAcceptedAt DateTime?
+  promotionMethod String
+  notes           String?
+
+  // Automated screening inputs
+  ip        String?
+  userAgent String?
+  country   String?
+  region    String?
+  city      String?
+
+  // AI screening outputs
+  riskLevel      AffiliateRiskLevel?
+  recommendation AffiliateRecommendation?
+  aiReasoning    String?
+  aiRawJson      Json?
+
+  status           AffiliateApplicationStatus @default(PENDING_REVIEW)
+  autoApproved     Boolean                   @default(false)
+  reviewedAt       DateTime?
+  reviewedByAdminId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User?      @relation("AffiliateApplicationUser", fields: [userId], references: [id], onDelete: SetNull)
+  reviewedBy AdminUser? @relation("AffiliateApplicationReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  affiliate  Affiliate?
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+model Affiliate {
+  id            String          @id @default(cuid())
+  userId        String          @unique
+  applicationId String?         @unique
+  code          String          @unique
+  status        AffiliateStatus @default(ACTIVE)
+
+  stripeConnectAccountId        String?  @unique
+  stripeConnectDetailsSubmitted Boolean  @default(false)
+  stripeConnectChargesEnabled   Boolean  @default(false)
+  stripeConnectPayoutsEnabled   Boolean  @default(false)
+  stripeConnectOnboardedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User                  @relation("AffiliateUser", fields: [userId], references: [id], onDelete: Cascade)
+  application AffiliateApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  clicks      AffiliateClick[]
+  referrals   AffiliateReferral[]
+  conversions AffiliateConversion[]
+  commissions AffiliateCommission[]
+  payouts     AffiliatePayout[]
+
+  @@index([status])
+}
+
+model AffiliateClick {
+  id              String   @id @default(cuid())
+  affiliateId     String
+  visitorId       String
+  createdAt       DateTime @default(now())
+
+  ip              String?
+  userAgent       String?
+  referer         String?
+  landingPath     String?
+  destinationPath String?
+  country         String?
+  region          String?
+  city            String?
+
+  affiliate   Affiliate            @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  referrals   AffiliateReferral[]
+  conversions AffiliateConversion[]
+
+  @@index([affiliateId, createdAt])
+  @@index([affiliateId, visitorId])
+  @@index([createdAt])
+}
+
+model AffiliateReferral {
+  id             String   @id @default(cuid())
+  affiliateId    String
+  clickId        String?
+  referredUserId String   @unique
+  createdAt      DateTime @default(now())
+
+  affiliate    Affiliate      @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  click        AffiliateClick? @relation(fields: [clickId], references: [id], onDelete: SetNull)
+  referredUser User           @relation("AffiliateReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId, createdAt])
+}
+
+model AffiliateConversion {
+  id                     String                  @id @default(cuid())
+  affiliateId             String
+  clickId                 String?
+  referredUserId          String?
+  type                   AffiliateConversionType
+
+  stripeEventId            String  @unique
+  stripeCheckoutSessionId  String? @unique
+  stripePaymentIntentId    String?
+  stripeChargeId           String? @unique
+  stripeInvoiceId          String?
+
+  currency          String
+  amountGrossCents  Int
+  stripeFeeCents    Int
+  amountNetCents    Int
+  occurredAt        DateTime
+  createdAt         DateTime @default(now())
+
+  affiliate   Affiliate      @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  click       AffiliateClick? @relation(fields: [clickId], references: [id], onDelete: SetNull)
+  referredUser User?         @relation("AffiliateConvertedUser", fields: [referredUserId], references: [id], onDelete: SetNull)
+  commission  AffiliateCommission?
+
+  @@index([affiliateId, occurredAt])
+  @@index([type, occurredAt])
+}
+
+model AffiliateCommission {
+  id             String                   @id @default(cuid())
+  affiliateId    String
+  conversionId   String                   @unique
+  status         AffiliateCommissionStatus @default(PENDING)
+
+  currency        String
+  netRevenueCents Int
+  commissionCents Int
+
+  payableAt DateTime
+  paidAt    DateTime?
+  payoutId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  affiliate  Affiliate           @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  conversion AffiliateConversion @relation(fields: [conversionId], references: [id], onDelete: Cascade)
+  payout     AffiliatePayout?    @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+
+  @@index([affiliateId, status])
+  @@index([status, payableAt])
+}
+
+model AffiliatePayoutRun {
+  id               String                   @id @default(cuid())
+  createdByAdminId  String?
+  currency          String
+  periodStart       DateTime
+  periodEnd         DateTime
+  runAt             DateTime                 @default(now())
+  status            AffiliatePayoutRunStatus
+  totalCents        Int                      @default(0)
+  transferCount     Int                      @default(0)
+  note              String?
+  createdAt         DateTime                 @default(now())
+
+  createdBy AdminUser?       @relation("AffiliatePayoutRunCreatedBy", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  payouts   AffiliatePayout[]
+
+  @@index([runAt])
+}
+
+model AffiliatePayout {
+  id              String   @id @default(cuid())
+  payoutRunId     String
+  affiliateId     String
+  currency        String
+  amountCents     Int
+  stripeTransferId String  @unique
+  createdAt       DateTime @default(now())
+
+  payoutRun   AffiliatePayoutRun   @relation(fields: [payoutRunId], references: [id], onDelete: Cascade)
+  affiliate   Affiliate           @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  commissions AffiliateCommission[]
+
+  @@index([affiliateId, createdAt])
+  @@index([payoutRunId])
+}
+
 // Monetary credit top-ups valid for up to 12 months, consumed FIFO
 model CreditTopUp {
   id          String   @id @default(cuid())
@@ -352,6 +580,44 @@ enum Plan {
   PREMIUM
 }
 
+enum AffiliateStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum AffiliateApplicationStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum AffiliateRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AffiliateRecommendation {
+  AUTO_APPROVE
+  MANUAL_REVIEW
+}
+
+enum AffiliateConversionType {
+  SUBSCRIPTION_INITIAL
+  TOPUP
+}
+
+enum AffiliateCommissionStatus {
+  PENDING
+  VOIDED
+  PAID
+}
+
+enum AffiliatePayoutRunStatus {
+  SUCCEEDED
+  FAILED
+}
+
 model Waitlist {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -376,6 +642,8 @@ model AdminUser {
   // Support ticket relations
   assignedTickets SupportTicket[]  @relation("AssignedTickets")
   ticketResponses TicketResponse[] @relation("TicketResponses")
+  reviewedAffiliateApplications AffiliateApplication[] @relation("AffiliateApplicationReviewedBy")
+  affiliatePayoutRuns          AffiliatePayoutRun[]    @relation("AffiliatePayoutRunCreatedBy")
 }
 
 enum AdminRole {

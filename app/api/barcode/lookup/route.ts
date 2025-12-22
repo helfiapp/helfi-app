@@ -35,7 +35,7 @@ type FatSecretFood = {
 }
 
 interface NormalizedFood {
-  source: 'fatsecret' | 'openfoodfacts' | 'usda'
+  source: 'helfi' | 'fatsecret' | 'openfoodfacts' | 'usda'
   id: string
   name: string
   brand?: string | null
@@ -76,6 +76,39 @@ const parseGramsFromLabel = (label?: string | null): number | null => {
   const oz = normalized.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)/i)
   if (oz) return parseFloat(oz[1]) * 28.3495
   return null
+}
+
+// ============ Helfi Barcode Cache ============
+
+async function fetchFoodFromHelfiBarcode(barcode: string): Promise<NormalizedFood | null> {
+  try {
+    const record = await prisma.barcodeProduct.findUnique({
+      where: { barcode },
+    })
+    if (!record) return null
+    return {
+      source: 'helfi',
+      id: record.id,
+      name: record.name || 'Scanned food',
+      brand: record.brand || null,
+      serving_size: record.servingSize || '1 serving',
+      calories: record.calories ?? null,
+      protein_g: record.proteinG ?? null,
+      carbs_g: record.carbsG ?? null,
+      fat_g: record.fatG ?? null,
+      fiber_g: record.fiberG ?? null,
+      sugar_g: record.sugarG ?? null,
+      barcode,
+      basis: null,
+      quantity_g: record.quantityG ?? null,
+      piecesPerServing: record.piecesPerServing ?? null,
+      pieces: record.piecesPerServing ?? null,
+      energyUnit: null,
+    }
+  } catch (err) {
+    console.warn('Helfi barcode lookup failed', err)
+    return null
+  }
 }
 
 // ============ FatSecret API ============
@@ -449,8 +482,13 @@ export async function GET(req: NextRequest) {
   let food: NormalizedFood | null = null
   let openFoodFacts: OpenFoodFactsResult | null = null
 
+  // Try Helfi cache first (user-labeled nutrition from barcode scans)
+  food = await fetchFoodFromHelfiBarcode(code)
+
   // Try FatSecret first (best for packaged foods)
-  food = await fetchFoodFromFatSecret(code)
+  if (!food) {
+    food = await fetchFoodFromFatSecret(code)
+  }
 
   // Try OpenFoodFacts second (great global coverage) if still missing
   if (!food) {
@@ -509,6 +547,12 @@ export async function GET(req: NextRequest) {
           found: false,
           error: 'nutrition_missing',
           message: 'Product found, but nutrition data is missing. Please scan the nutrition label instead.',
+          product: {
+            name: food.name || null,
+            brand: food.brand || null,
+            serving_size: food.serving_size || null,
+          },
+          barcode: code,
         },
         { status: 422 },
       )
@@ -533,8 +577,12 @@ export async function GET(req: NextRequest) {
 
   console.log('⚠️ No barcode match found after FatSecret, OpenFoodFacts, or USDA for:', code)
   
-  return NextResponse.json({ 
-    found: false, 
-    message: 'No product found for this barcode. Try searching by product name instead.' 
-  }, { status: 404 })
+  return NextResponse.json(
+    {
+      found: false,
+      message: 'No product found for this barcode. Try searching by product name instead.',
+      barcode: code,
+    },
+    { status: 404 },
+  )
 }

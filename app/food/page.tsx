@@ -1769,6 +1769,8 @@ export default function FoodDiary() {
   const summaryCarouselRef = useRef<HTMLDivElement | null>(null)
   const pageTopRef = useRef<HTMLDivElement | null>(null)
   const desktopAddMenuRef = useRef<HTMLDivElement | null>(null)
+  const barcodeLabelTimeoutRef = useRef<number | null>(null)
+  const photoPreviewRef = useRef<string | null>(null)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -1797,6 +1799,14 @@ export default function FoodDiary() {
   const [barcodeValue, setBarcodeValue] = useState('')
   const [barcodeStatus, setBarcodeStatus] = useState<'idle' | 'scanning' | 'loading'>('idle')
   const [barcodeStatusHint, setBarcodeStatusHint] = useState<string>('')
+  const [barcodeLabelFlow, setBarcodeLabelFlow] = useState<{
+    barcode: string
+    reason: 'missing' | 'report'
+    productName?: string | null
+    brand?: string | null
+  } | null>(null)
+  const [showBarcodeLabelPrompt, setShowBarcodeLabelPrompt] = useState(false)
+  const [autoAnalyzeLabelPhoto, setAutoAnalyzeLabelPhoto] = useState(false)
   const [torchEnabled, setTorchEnabled] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
   const [showManualBarcodeInput, setShowManualBarcodeInput] = useState(false)
@@ -3063,12 +3073,13 @@ const applyStructuredItems = (
   itemsFromApi: any[] | null | undefined,
   totalFromApi: any,
   analysisText: string | null | undefined,
-  options?: { allowTextFallback?: boolean },
+  options?: { allowTextFallback?: boolean; barcodeTag?: { barcode: string; source?: string } },
 ) => {
   let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
   let finalTotal = sanitizeNutritionTotals(totalFromApi)
   const allowTextFallback = options?.allowTextFallback ?? true
   const isPackagedAnalysis = analysisMode === 'packaged'
+  const barcodeTag = options?.barcodeTag
 
   console.log('🔍 applyStructuredItems called:', {
     itemsFromApiCount: Array.isArray(itemsFromApi) ? itemsFromApi.length : 0,
@@ -3276,10 +3287,24 @@ const applyStructuredItems = (
     return next
   })
 
-  setAnalyzedItems(itemsToUse)
+  const taggedItems =
+    barcodeTag && barcodeTag.barcode
+      ? itemsToUse.map((item: any, index: number) =>
+          index === 0
+            ? {
+                ...item,
+                barcode: barcodeTag.barcode,
+                barcodeSource: barcodeTag.source || 'label-photo',
+                detectionMethod: 'barcode',
+              }
+            : item,
+        )
+      : itemsToUse
+
+  setAnalyzedItems(taggedItems)
 
   console.log('📊 Processing totals:', {
-    enrichedItemsCount: itemsToUse.length,
+    enrichedItemsCount: taggedItems.length,
     hasFinalTotal: !!finalTotal,
     finalTotalValue: finalTotal ? JSON.stringify(finalTotal) : 'null',
   })
@@ -3290,8 +3315,8 @@ const applyStructuredItems = (
   // 3. Extracted from analysis text (fallback)
   let totalsToUse: NutritionTotals | null = null
 
-  if (itemsToUse.length > 0) {
-    const fromItems = recalculateNutritionFromItems(itemsToUse)
+  if (taggedItems.length > 0) {
+    const fromItems = recalculateNutritionFromItems(taggedItems)
     console.log(
       '📊 Recalculated totals from enriched items:',
       fromItems ? JSON.stringify(fromItems) : 'null',
@@ -3319,9 +3344,9 @@ const applyStructuredItems = (
     setAnalyzedNutrition(totalsToUse)
     setAnalyzedTotal(convertTotalsForStorage(totalsToUse))
     console.log('✅ Set nutrition totals:', JSON.stringify(totalsToUse))
-  } else if (itemsToUse.length > 0) {
+  } else if (taggedItems.length > 0) {
     // If we have items but no totals, recalculate one more time as a last resort
-    const lastResortTotals = recalculateNutritionFromItems(itemsToUse)
+    const lastResortTotals = recalculateNutritionFromItems(taggedItems)
     if (lastResortTotals) {
       setAnalyzedNutrition(lastResortTotals)
       setAnalyzedTotal(convertTotalsForStorage(lastResortTotals))
@@ -3337,7 +3362,7 @@ const applyStructuredItems = (
     setAnalyzedTotal(null)
   }
 
-  return { items: itemsToUse, total: totalsToUse }
+  return { items: taggedItems, total: totalsToUse }
 }
 
   const clampNumber = (value: any, min: number, max: number) => {
@@ -4883,9 +4908,14 @@ const applyStructuredItems = (
     }
   }, [pendingQueue, isFlushingQueue])
 
+  useEffect(() => {
+    photoPreviewRef.current = photoPreview
+  }, [photoPreview])
+
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const shouldAutoAnalyze = autoAnalyzeLabelPhoto && Boolean(barcodeLabelFlow?.barcode);
       try {
         // Compress the uploaded file to balance quality and cost (higher quality for better detection)
         const compressedFile = await compressImage(file, 1024, 0.85);
@@ -4898,7 +4928,17 @@ const applyStructuredItems = (
           setIsEditingDescription(false);
           setPhotoOptionsAnchor(null);
           // Keep the analysis mode modal visible so the 🤖 Analyze button stays in view after picking
-          setShowAnalysisModeModal(true);
+          setShowAnalysisModeModal(!shouldAutoAnalyze);
+          if (shouldAutoAnalyze) {
+            setAutoAnalyzeLabelPhoto(false);
+            if (barcodeLabelTimeoutRef.current) {
+              clearTimeout(barcodeLabelTimeoutRef.current);
+              barcodeLabelTimeoutRef.current = null;
+            }
+            setTimeout(() => {
+              analyzePhoto(compressedFile);
+            }, 0);
+          }
         };
         reader.readAsDataURL(compressedFile);
       } catch (error) {
@@ -4912,7 +4952,17 @@ const applyStructuredItems = (
           setShowAiResult(false);
           setIsEditingDescription(false);
           setPhotoOptionsAnchor(null);
-          setShowAnalysisModeModal(true);
+          setShowAnalysisModeModal(!shouldAutoAnalyze);
+          if (shouldAutoAnalyze) {
+            setAutoAnalyzeLabelPhoto(false);
+            if (barcodeLabelTimeoutRef.current) {
+              clearTimeout(barcodeLabelTimeoutRef.current);
+              barcodeLabelTimeoutRef.current = null;
+            }
+            setTimeout(() => {
+              analyzePhoto(file);
+            }, 0);
+          }
         };
         reader.readAsDataURL(file);
       }
@@ -5243,8 +5293,9 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     return `${rounded}${unit}`
   }
 
-  const analyzePhoto = async () => {
-    if (!photoFile) return;
+  const analyzePhoto = async (fileOverride?: File) => {
+    const fileToAnalyze = fileOverride || photoFile
+    if (!fileToAnalyze) return;
     
     setShowAnalysisModeModal(false);
     setIsAnalyzing(true);
@@ -5265,23 +5316,23 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     try {
       console.log('🔍 AGENT #6 DEBUG: Starting photo analysis...');
       console.log('📊 Original file:', { 
-        name: photoFile.name, 
-        size: photoFile.size, 
-        type: photoFile.type 
+        name: fileToAnalyze.name, 
+        size: fileToAnalyze.size, 
+        type: fileToAnalyze.type 
       });
       
       // Step 1: Compress image (with better error handling)
       let compressedFile;
       try {
-        compressedFile = await compressImage(photoFile, 800, 0.8); // Less aggressive compression
+        compressedFile = await compressImage(fileToAnalyze, 800, 0.8); // Less aggressive compression
         console.log('✅ Image compression successful:', {
-          originalSize: photoFile.size,
+          originalSize: fileToAnalyze.size,
           compressedSize: compressedFile.size,
-          reduction: Math.round((1 - compressedFile.size/photoFile.size) * 100) + '%'
+          reduction: Math.round((1 - compressedFile.size/fileToAnalyze.size) * 100) + '%'
         });
       } catch (compressionError) {
         console.warn('⚠️ Image compression failed, using original:', compressionError);
-        compressedFile = photoFile; // Fallback to original file
+        compressedFile = fileToAnalyze; // Fallback to original file
       }
       
       // Step 2: Create FormData
@@ -5350,7 +5401,10 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         console.log('🎉 SUCCESS: Real AI analysis received!');
         setAnalysisPhase('building');
         setAiDescription(result.analysis);
-        applyStructuredItems(result.items, result.total, result.analysis);
+        const barcodeTag = barcodeLabelFlow?.barcode
+          ? { barcode: barcodeLabelFlow.barcode, source: 'label-photo' }
+          : undefined
+        applyStructuredItems(result.items, result.total, result.analysis, { barcodeTag });
         // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
@@ -5593,6 +5647,7 @@ Please add nutritional information manually if needed.`);
     try {
       await saveFoodEntries(updatedFoods)
       await refreshEntriesFromServer()
+      await saveBarcodeLabelIfNeeded(newEntry.items)
       
       // Show subtle notification that insights are updating
       setInsightsNotification({
@@ -5737,6 +5792,7 @@ Please add nutritional information manually if needed.`);
       // Keep local snapshot in sync (but do not create a new history row)
       await saveFoodEntries(updatedFoods, { appendHistory: false });
       await refreshEntriesFromServer();
+      await saveBarcodeLabelIfNeeded(updatedEntry.items)
       
       // Reset all form states
       resetAnalyzerPanel()
@@ -5812,6 +5868,13 @@ Please add nutritional information manually if needed.`);
     setPhotoOptionsAnchor(null)
     setEntryTime('')
     setManualMealBuildMode(false)
+    setBarcodeLabelFlow(null)
+    setShowBarcodeLabelPrompt(false)
+    setAutoAnalyzeLabelPhoto(false)
+    if (barcodeLabelTimeoutRef.current) {
+      clearTimeout(barcodeLabelTimeoutRef.current)
+      barcodeLabelTimeoutRef.current = null
+    }
   }
 
   function closeAddMenus() {
@@ -6929,6 +6992,40 @@ Please add nutritional information manually if needed.`);
     resetTorchState()
   }
 
+  const startBarcodeLabelCapture = (payload: {
+    barcode: string
+    reason: 'missing' | 'report'
+    productName?: string | null
+    brand?: string | null
+  }) => {
+    setBarcodeLabelFlow(payload)
+    setShowBarcodeLabelPrompt(false)
+    setShowBarcodeScanner(false)
+    setBarcodeError(null)
+    setAnalysisMode('packaged')
+    setShowAddFood(true)
+    setShowAiResult(false)
+    setIsEditingDescription(false)
+    setPhotoOptionsAnchor(null)
+    setPendingPhotoPicker(false)
+    setShowAnalysisModeModal(false)
+    setAutoAnalyzeLabelPhoto(true)
+    if (typeof window !== 'undefined') {
+      if (barcodeLabelTimeoutRef.current) {
+        clearTimeout(barcodeLabelTimeoutRef.current)
+      }
+      barcodeLabelTimeoutRef.current = window.setTimeout(() => {
+        if (!photoPreviewRef.current) {
+          setAutoAnalyzeLabelPhoto(false)
+          setBarcodeLabelFlow(null)
+        }
+      }, 20000)
+    }
+    try {
+      selectPhotoInputRef.current?.click()
+    } catch {}
+  }
+
   const buildBarcodeIngredientItem = (food: any, code?: string) => {
     const toNumber = (value: any) => {
       const num = Number(value)
@@ -7064,6 +7161,60 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const saveBarcodeLabelIfNeeded = async (items: any[] | null | undefined) => {
+    if (!barcodeLabelFlow?.barcode) return
+    const primary = Array.isArray(items) && items.length > 0 ? items[0] : null
+    if (!primary) return
+
+    const servingSize = primary?.serving_size || ''
+    const servingInfo = parseServingSizeInfo({ serving_size: servingSize })
+    const quantityG =
+      Number.isFinite(Number(primary?.customGramsPerServing)) && Number(primary.customGramsPerServing) > 0
+        ? Number(primary.customGramsPerServing)
+        : servingInfo?.gramsPerServing && servingInfo.gramsPerServing > 0
+        ? Number(servingInfo.gramsPerServing)
+        : null
+    const piecesPerServing = getPiecesPerServing(primary)
+    try {
+      const res = await fetch('/api/barcode/label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barcode: barcodeLabelFlow.barcode,
+          report: barcodeLabelFlow.reason === 'report',
+          item: {
+            name: primary?.name || barcodeLabelFlow.productName || 'Packaged item',
+            brand: primary?.brand || barcodeLabelFlow.brand || null,
+            serving_size: servingSize,
+            calories: primary?.calories,
+            protein_g: primary?.protein_g,
+            carbs_g: primary?.carbs_g,
+            fat_g: primary?.fat_g,
+            fiber_g: primary?.fiber_g,
+            sugar_g: primary?.sugar_g,
+            quantity_g: quantityG,
+            piecesPerServing,
+          },
+        }),
+      })
+      if (res.ok) {
+        showQuickToast('Saved for future barcode scans')
+      } else {
+        showQuickToast('Saved to your diary, but the barcode label did not save')
+      }
+    } catch (err) {
+      console.warn('Barcode label save failed', err)
+      showQuickToast('Saved to your diary, but the barcode label did not save')
+    } finally {
+      setBarcodeLabelFlow(null)
+      setShowBarcodeLabelPrompt(false)
+      if (barcodeLabelTimeoutRef.current) {
+        clearTimeout(barcodeLabelTimeoutRef.current)
+        barcodeLabelTimeoutRef.current = null
+      }
+    }
+  }
+
   const lookupBarcodeAndAdd = async (code: string) => {
     const normalized = (code || '').replace(/[^0-9A-Za-z]/g, '')
     if (!normalized) {
@@ -7078,8 +7229,17 @@ Please add nutritional information manually if needed.`);
     try {
       const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(normalized)}`)
       if (res.status === 404) {
-        setBarcodeError('No food found for this barcode. Try again or enter it manually.')
-        setBarcodeStatus('scanning')
+        const data = await res.json().catch(() => null)
+        setBarcodeStatus('idle')
+        setBarcodeError(null)
+        setShowBarcodeScanner(false)
+        setBarcodeLabelFlow({
+          barcode: normalized,
+          reason: 'missing',
+          productName: data?.product?.name || null,
+          brand: data?.product?.brand || null,
+        })
+        setShowBarcodeLabelPrompt(true)
         return
       }
       if (res.status === 402) {
@@ -7094,12 +7254,16 @@ Please add nutritional information manually if needed.`);
       }
       if (res.status === 422) {
         const data = await res.json().catch(() => null)
-        const msg =
-          data?.message ||
-          data?.error ||
-          'Nutrition data is missing for this barcode. Please scan the nutrition label instead.'
-        setBarcodeError(msg)
         setBarcodeStatus('idle')
+        setBarcodeError(null)
+        setShowBarcodeScanner(false)
+        setBarcodeLabelFlow({
+          barcode: normalized,
+          reason: 'missing',
+          productName: data?.product?.name || null,
+          brand: data?.product?.brand || null,
+        })
+        setShowBarcodeLabelPrompt(true)
         return
       }
       if (res.status === 401) {
@@ -8125,6 +8289,13 @@ Please add nutritional information manually if needed.`);
       setHealthWarning(null)
       setHealthAlternatives(null)
       setShowPhotoOptions(false)
+      setBarcodeLabelFlow(null)
+      setShowBarcodeLabelPrompt(false)
+      setAutoAnalyzeLabelPhoto(false)
+      if (barcodeLabelTimeoutRef.current) {
+        clearTimeout(barcodeLabelTimeoutRef.current)
+        barcodeLabelTimeoutRef.current = null
+      }
       // When cancelling an edit, close the add/edit panel so we return to the main diary view
       setShowAddFood(false)
     } else {
@@ -10820,6 +10991,19 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
+                  {barcodeLabelFlow && (
+                    <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                      <div className="font-semibold">
+                        {barcodeLabelFlow.reason === 'report' ? 'Barcode update' : 'Barcode label scan'}
+                      </div>
+                      <div className="text-xs text-emerald-800 mt-1">
+                        {barcodeLabelFlow.reason === 'report'
+                          ? 'This will refresh the barcode nutrition for everyone after you save.'
+                          : 'We’ll save this nutrition to the barcode so future scans are correct.'}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Food Description - read-only summary (desktop & mobile) */}
                   {(foodTitle || foodDescriptionText) && (
                     <div className="mb-4 space-y-2">
@@ -11211,6 +11395,10 @@ Please add nutritional information manually if needed.`);
                           return servingSizeLabel
                         })()
 
+                        const isBarcodeItem = Boolean(
+                          item?.barcode || item?.barcodeSource || item?.detectionMethod === 'barcode',
+                        )
+                        const barcodeCode = item?.barcode ? String(item.barcode) : ''
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
                         
@@ -11247,6 +11435,23 @@ Please add nutritional information manually if needed.`);
                                     >
                                       Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
                                     </div>
+                                    {isBarcodeItem && barcodeCode && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setBarcodeLabelFlow({
+                                            barcode: barcodeCode,
+                                            reason: 'report',
+                                            productName: item?.name || null,
+                                            brand: item?.brand || null,
+                                          })
+                                          setShowBarcodeLabelPrompt(true)
+                                        }}
+                                        className="mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline"
+                                      >
+                                        Report incorrect nutrition
+                                      </button>
+                                    )}
                                   </>
                                 )}
                               </div>
@@ -14484,6 +14689,74 @@ Please add nutritional information manually if needed.`);
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2m2 0h2m2 0h2m2 0h2M4 18h2m2 0h2m2 0h2m2 0h2M7 6v12m4-12v12m4-12v12" />
                 </svg>
                 <span className="text-sm uppercase tracking-wide">{showManualBarcodeInput ? 'Hide Input' : 'Type Barcode'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBarcodeLabelPrompt && barcodeLabelFlow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {barcodeLabelFlow.reason === 'report'
+                    ? 'Update nutrition label'
+                    : 'Nutrition label needed'}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">
+                  {barcodeLabelFlow.reason === 'report'
+                    ? 'Take a clear photo of the nutrition panel so we can refresh this barcode.'
+                    : 'We don’t have reliable nutrition for this barcode yet. Take a clear photo of the nutrition panel and we’ll save it for future scans.'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBarcodeLabelPrompt(false)
+                  setBarcodeLabelFlow(null)
+                  setAutoAnalyzeLabelPhoto(false)
+                  if (barcodeLabelTimeoutRef.current) {
+                    clearTimeout(barcodeLabelTimeoutRef.current)
+                    barcodeLabelTimeoutRef.current = null
+                  }
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <span aria-hidden>✕</span>
+              </button>
+            </div>
+
+            {(barcodeLabelFlow.productName || barcodeLabelFlow.brand) && (
+              <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                {barcodeLabelFlow.productName || 'Packaged item'}
+                {barcodeLabelFlow.brand ? ` • ${barcodeLabelFlow.brand}` : ''}
+              </div>
+            )}
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => startBarcodeLabelCapture(barcodeLabelFlow)}
+                className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+              >
+                Take label photo
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBarcodeLabelPrompt(false)
+                  setBarcodeLabelFlow(null)
+                  setAutoAnalyzeLabelPhoto(false)
+                  if (barcodeLabelTimeoutRef.current) {
+                    clearTimeout(barcodeLabelTimeoutRef.current)
+                    barcodeLabelTimeoutRef.current = null
+                  }
+                }}
+                className="flex-1 bg-white border border-gray-200 text-gray-700 py-2.5 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Not now
               </button>
             </div>
           </div>
