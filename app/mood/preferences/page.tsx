@@ -218,7 +218,7 @@ export default function MoodPreferencesPage() {
   const toggleEnabled = async () => {
     const next = !enabled
     if (next) {
-      const ok = notificationsReady || (await ensureNotifications())
+      const ok = await ensureNotifications()
       if (!ok) {
         setBanner({ type: 'error', message: 'Notifications are not enabled on this device.' })
         return
@@ -449,7 +449,7 @@ export default function MoodPreferencesPage() {
                 setSendingNow(true)
                 setBanner(null)
                 try {
-                  const ok = notificationsReady || (await ensureNotifications())
+                  const ok = await ensureNotifications()
                   if (!ok) {
                     setBanner({ type: 'error', message: 'Notifications are not enabled on this device.' })
                     return
