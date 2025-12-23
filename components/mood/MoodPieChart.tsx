@@ -101,8 +101,8 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
         caretPadding: 6,
         caretSize: 8,
         cornerRadius: 12,
-        titleFont: { size: 16, weight: '600' },
-        bodyFont: { size: 14, weight: '500' },
+        titleFont: { size: 16, weight: 600 },
+        bodyFont: { size: 14, weight: 500 },
         boxWidth: 14,
         boxHeight: 14,
         callbacks: {
