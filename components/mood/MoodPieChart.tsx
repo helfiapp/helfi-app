@@ -95,37 +95,94 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
     plugins: {
       legend: { display: false },
       tooltip: {
-        padding: 12,
-        bodySpacing: 6,
-        boxPadding: 6,
-        caretPadding: 6,
-        caretSize: 8,
-        cornerRadius: 12,
-        titleFont: { size: 16, weight: 600 },
-        titleAlign: 'center',
-        bodyFont: { size: 14, weight: 500 },
-        bodyAlign: 'center',
-        footerAlign: 'center',
-        boxWidth: 14,
-        boxHeight: 14,
-        callbacks: {
-          title: (items) => slices[items[0]?.dataIndex ?? 0]?.label || 'Mood',
-          label: (ctx) => {
-            const label = slices[ctx.dataIndex]?.label || 'Mood'
-            const count = ctx.parsed || 0
-            return `${label}: ${count}`
-          },
-          afterLabel: (ctx) => {
-            const value = slices[ctx.dataIndex]?.value
-            if (!value) return ''
-            const times = timeMap.get(value) ?? []
-            if (!times.length) return ''
-            const maxItems = 4
-            const shown = times.slice(0, maxItems)
-            const suffix = times.length > maxItems ? ` +${times.length - maxItems} more` : ''
-            const prefix = times.length > 1 ? 'Times' : 'Time'
-            return `${prefix}: ${shown.join(', ')}${suffix}`
-          },
+        enabled: false,
+        external: (context) => {
+          const { chart, tooltip } = context
+          const parent = chart.canvas.parentNode as HTMLElement | null
+          if (!parent) return
+
+          let tooltipEl = parent.querySelector<HTMLDivElement>('#mood-pie-tooltip')
+          if (!tooltipEl) {
+            tooltipEl = document.createElement('div')
+            tooltipEl.id = 'mood-pie-tooltip'
+            tooltipEl.style.position = 'absolute'
+            tooltipEl.style.pointerEvents = 'none'
+            tooltipEl.style.opacity = '0'
+            tooltipEl.style.transform = 'translate(-50%, -110%)'
+            tooltipEl.style.transition = 'opacity 0.1s ease'
+            tooltipEl.style.background = 'rgba(17, 24, 39, 0.9)'
+            tooltipEl.style.borderRadius = '12px'
+            tooltipEl.style.padding = '12px 14px'
+            tooltipEl.style.color = '#fff'
+            tooltipEl.style.textAlign = 'center'
+            tooltipEl.style.fontFamily = 'inherit'
+            tooltipEl.style.minWidth = '140px'
+            tooltipEl.style.maxWidth = '220px'
+            tooltipEl.style.boxShadow = '0 8px 20px rgba(0,0,0,0.2)'
+            parent.appendChild(tooltipEl)
+          }
+
+          if (tooltip.opacity === 0) {
+            tooltipEl.style.opacity = '0'
+            return
+          }
+
+          const dataIndex = tooltip.dataPoints?.[0]?.dataIndex ?? 0
+          const slice = slices[dataIndex]
+          const label = slice?.label || 'Mood'
+          const count = slice?.count ?? 0
+          const color = slice ? moodColorForValue(slice.value) : '#bbf7d0'
+          const times = slice ? (timeMap.get(slice.value) ?? []) : []
+          const maxItems = 4
+          const shown = times.slice(0, maxItems)
+          const suffix = times.length > maxItems ? ` +${times.length - maxItems} more` : ''
+          const timeLabel = times.length
+            ? `${times.length > 1 ? 'Times' : 'Time'}: ${shown.join(', ')}${suffix}`
+            : 'Time: —'
+
+          tooltipEl.innerHTML = ''
+
+          const titleEl = document.createElement('div')
+          titleEl.style.fontSize = '16px'
+          titleEl.style.fontWeight = '600'
+          titleEl.style.marginBottom = '6px'
+          titleEl.textContent = label
+
+          const lineEl = document.createElement('div')
+          lineEl.style.display = 'flex'
+          lineEl.style.alignItems = 'center'
+          lineEl.style.justifyContent = 'center'
+          lineEl.style.gap = '8px'
+          lineEl.style.fontSize = '14px'
+          lineEl.style.fontWeight = '500'
+          lineEl.style.marginBottom = '4px'
+
+          const swatch = document.createElement('span')
+          swatch.style.width = '12px'
+          swatch.style.height = '12px'
+          swatch.style.borderRadius = '3px'
+          swatch.style.background = color
+          swatch.style.display = 'inline-block'
+
+          const text = document.createElement('span')
+          text.textContent = `${label}: ${count}`
+
+          lineEl.appendChild(swatch)
+          lineEl.appendChild(text)
+
+          const timeEl = document.createElement('div')
+          timeEl.style.fontSize = '14px'
+          timeEl.style.fontWeight = '500'
+          timeEl.textContent = timeLabel
+
+          tooltipEl.appendChild(titleEl)
+          tooltipEl.appendChild(lineEl)
+          tooltipEl.appendChild(timeEl)
+
+          const { offsetLeft, offsetTop } = chart.canvas
+          tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`
+          tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`
+          tooltipEl.style.opacity = '1'
         },
       },
     },
@@ -140,7 +197,7 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
   }
 
   return (
-    <div className="h-48 w-full">
+    <div className="relative h-48 w-full">
       <Pie data={data} options={options} plugins={[emojiPlugin]} />
     </div>
   )

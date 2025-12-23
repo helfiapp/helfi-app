@@ -302,7 +302,7 @@ export default function MoodHistoryPage() {
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(entry)
     }
-    const days = Array.from(map.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+    const days = Array.from(map.keys()).sort((a, b) => parseLocalDate(b).getTime() - parseLocalDate(a).getTime())
     return days.map((day) => {
       const items = (map.get(day) || []).slice().sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       return {
