@@ -44,7 +44,11 @@ export async function GET(request: NextRequest) {
 
   try {
     do {
-      const result = await list({ prefix: FOOD_PHOTO_PREFIX, limit: 1000, cursor })
+      const result: Awaited<ReturnType<typeof list>> = await list({
+        prefix: FOOD_PHOTO_PREFIX,
+        limit: 1000,
+        cursor,
+      })
       cursor = result.cursor
       const expiredUrls = result.blobs
         .filter((blob) => {
