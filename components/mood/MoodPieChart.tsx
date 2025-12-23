@@ -102,7 +102,10 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
         caretSize: 8,
         cornerRadius: 12,
         titleFont: { size: 16, weight: 600 },
+        titleAlign: 'center',
         bodyFont: { size: 14, weight: 500 },
+        bodyAlign: 'center',
+        footerAlign: 'center',
         boxWidth: 14,
         boxHeight: 14,
         callbacks: {
