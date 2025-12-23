@@ -29,6 +29,29 @@ ChartJS.register(
 export type MoodPoint = { timestamp: string; mood: number }
 
 export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
+  const chartPoints = useMemo(() => {
+    if (points.length !== 1) {
+      return points.map((p) => ({ x: p.timestamp, y: p.mood }))
+    }
+
+    const base = points[0]
+    const baseDate = new Date(base.timestamp)
+    if (Number.isNaN(baseDate.getTime())) {
+      return [{ x: new Date().toISOString(), y: base.mood }]
+    }
+
+    const start = new Date(baseDate)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(baseDate)
+    end.setHours(23, 59, 59, 999)
+
+    return [
+      { x: start.toISOString(), y: base.mood, synthetic: true },
+      { x: baseDate.toISOString(), y: base.mood },
+      { x: end.toISOString(), y: base.mood, synthetic: true },
+    ]
+  }, [points])
+
   const emojiPlugin = useMemo(() => ({
     id: 'emojiPoints',
     afterDatasetsDraw: (chart: any) => {
@@ -37,16 +60,18 @@ export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
       const dataset = chart.data.datasets?.[0]
       if (!dataset) return
       const { ctx, chartArea } = chart
+      const fontSize = 24
       ctx.save()
-      ctx.font = '16px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'
+      ctx.font = `${fontSize}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       meta.data.forEach((point: any, index: number) => {
         const raw = (dataset.data as any[])?.[index]
+        if (raw?.synthetic) return
         const moodValue = Number(raw?.y)
         if (!Number.isFinite(moodValue)) return
         const emoji = emojiForMoodValue(moodValue)
-        const y = Math.max(point.y - 16, chartArea.top + 10)
+        const y = Math.max(point.y - (fontSize * 0.9), chartArea.top + fontSize * 0.6)
         ctx.fillText(emoji, point.x, y)
       })
       ctx.restore()
@@ -59,18 +84,18 @@ export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
       datasets: [
         {
           label: 'Mood',
-          data: points.map((p) => ({ x: p.timestamp, y: p.mood })),
+          data: chartPoints,
           borderColor: 'rgb(34, 197, 94)',
           backgroundColor: 'rgba(34, 197, 94, 0.12)',
           tension: 0.35,
           fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 5,
+          pointRadius: (ctx) => ((ctx.raw as any)?.synthetic ? 0 : 3),
+          pointHoverRadius: (ctx) => ((ctx.raw as any)?.synthetic ? 0 : 5),
           pointBackgroundColor: 'rgb(34, 197, 94)',
         },
       ],
     }
-  }, [points])
+  }, [chartPoints])
 
   const options: ChartOptions<'line'> = useMemo(() => ({
     responsive: true,
