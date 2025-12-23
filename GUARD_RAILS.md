@@ -620,6 +620,30 @@ Before modifying macros progress bars or remaining calories ring, agents must te
 
 ---
 
+## 3.8 Food Diary Photo Storage (Dec 2025 – locked)
+
+Food diary photos now live in **Vercel Blob** and must not be stored in Neon.
+
+**Protected files:**
+- `app/api/food-log/route.ts`
+- `app/api/food-log/delete/route.ts`
+- `app/api/food-log/delete-atomic/route.ts`
+- `app/api/food-log/delete-by-description/route.ts`
+- `app/api/cron/food-photo-cleanup/route.ts`
+- `lib/food-photo-storage.ts`
+- `vercel.json` (daily cleanup cron)
+
+**Rules that must stay:**
+- `imageUrl` stored in `FoodLog` is always a **remote Blob URL** (no base64 stored long-term).
+- When a diary entry is deleted, its photo is deleted **immediately** if no other entry still uses it.
+- A daily cleanup job removes photos older than the retention window and clears `imageUrl`.
+- Retention is controlled by `FOOD_PHOTO_RETENTION_DAYS` (default 90). Do not change the default without approval.
+- If Blob storage is not configured, the system must fail softly (do not break saving entries).
+
+**Why locked:**
+- Prevents database bloat in Neon.
+- Keeps storage costs predictable while preserving nutrition data.
+
 ## 5. AI Food Analyzer & Credit/Billing System (Critical Lock)
 
 These flows have been broken repeatedly by past agents. The current behaviour
@@ -635,8 +659,8 @@ for a change.
 - `app/api/credit/feature-usage/route.ts` (“This AI feature has been used X times…”)
 - `app/api/credit/feature-usage-stats/route.ts` (Billing page “Your usage” time-range stats)
 - `app/api/credit/usage-breakdown/route.ts` (admin/diagnostic usage breakdown)
-- **Do not remove the photo-analysis cache or curated USDA enforcement (Nov 2025):**
-  - `app/api/analyze-food/route.ts` hashes the image and returns cached items/macros for repeat analyses of the same photo. This stabilizes totals and avoids run-to-run drift. Do not remove or bypass this cache without explicit approval.
+- **Food image freshness + curated USDA enforcement (Dec 2025):**
+  - `app/api/analyze-food/route.ts` still hashes images, but **food photo analysis and barcode label scans must pass `forceFresh`** so each analysis is new. Do not re-enable cached reuse for these scans without explicit user approval.
   - `app/food/page.tsx` enriches common items (bun, patty, cheese, ketchup, etc.) with curated USDA-backed macros, enforces realistic floors, and normalizes names (e.g., “Burger bun” instead of random variants). Do not weaken or remove this enrichment/normalization.
 - “Never wipe ingredient cards” guard: `applyStructuredItems` must not replace existing cards with an empty list if a new analysis yields nothing. Preserve existing items and totals in that case. **Do not change this behaviour or clear `analyzedItems` / `analyzedTotal` in new flows without explicit written approval from the user. If ingredient cards ever disappear after a photo or text re‑analysis, treat that as a critical bug and restore this guard – do NOT redefine the UX.**
   - Intent: keep macros realistic (~6 oz patty ~450 kcal) and totals consistent across repeated analyses of the same image; preserve cards at all times.
@@ -647,6 +671,11 @@ for a change.
   - Packaged (“Product nutrition image”) uses **gpt-4o** for per-serving extraction; do not downgrade the model without user approval.
   - Use the per-serving column exactly; ignore per-100g and do not sum saturated/trans into total fat. If macros overshoot label calories, only clamp fat (and carbs if clearly under-read) to fit label kcal; otherwise keep the per-serving numbers from the label.
   - Barcode mode is **removed**; do not reintroduce barcode lookups or hallucinated products. If nothing is found, stick to label OCR.
+- **Barcode label scan accuracy (Dec 2025 – locked):**
+  - Barcode label scans must read **ONLY the first per-serve column** on the label. Never use the per-100g column.
+  - If the per-serve values are unclear or do not fit the serving size, block saving and show the red warning. Do not allow silent saves.
+  - The warning must include the **Edit label numbers** action so users can correct values.
+  - For label scans, do not use FatSecret/USDA fallbacks. Use label values or user edits only.
 - **Serving step snapping (Nov 24, 2025 – locked):**
   - If the serving label includes a discrete count in parentheses (e.g., “10g (6 crackers)”, “1 serving (3 eggs)”), the serving step is exactly `1 / count`, and values snap to that fraction so whole numbers stay exact (no 2.002 drift).
   - For non-discrete or unspecified counts, keep the 0.25 step. Do not loosen this snapping logic without user approval.
