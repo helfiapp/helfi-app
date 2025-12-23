@@ -26,6 +26,10 @@ export function emojiForMoodValue(value: number) {
   return MOOD_FACE_OPTIONS.find((o) => o.value === value)?.emoji ?? '🙂'
 }
 
+export function moodColorForValue(value: number) {
+  return MOOD_LEVELS.find((level) => level.value === value)?.color ?? '#84cc16'
+}
+
 export const DEFAULT_MOOD_TAGS = [
   { label: 'Calm', emoji: '😌' },
   { label: 'Focused', emoji: '🤓' },

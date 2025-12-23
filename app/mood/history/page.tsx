@@ -5,6 +5,7 @@ import PageHeader from '@/components/PageHeader'
 import MoodTabs from '@/components/mood/MoodTabs'
 import MoodTrendGraph from '@/components/mood/MoodTrendGraph'
 import { emojiForMoodValue } from '@/components/mood/moodScale'
+import MoodPieChart from '@/components/mood/MoodPieChart'
 import InsightsBottomNav from '@/app/insights/InsightsBottomNav'
 
 export const dynamic = 'force-dynamic'
@@ -129,6 +130,7 @@ function entryDayKey(entry: MoodEntry) {
 
 export default function MoodHistoryPage() {
   const [timeframe, setTimeframe] = useState<'day' | 'week' | 'month' | 'year'>('week')
+  const [chartMode, setChartMode] = useState<'pie' | 'wave'>('pie')
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [entries, setEntries] = useState<MoodEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -448,18 +450,40 @@ export default function MoodHistoryPage() {
           </div>
 
           <div className="mt-6">
-            <div className="flex flex-col gap-1 mb-4">
-              <h3 className="text-gray-500 dark:text-gray-300 text-sm font-bold uppercase tracking-wider">Mood Wave</h3>
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <p className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-                  {overallAverage == null ? 'No data yet' : moodSummaryFromAverage(overallAverage)}
-                </p>
-                {trendPct != null && (
-                  <span className="inline-flex items-center gap-1 text-helfi-green text-sm font-bold bg-helfi-green/10 px-2 py-0.5 rounded-full">
-                    <span className="material-symbols-outlined text-sm leading-none">trending_up</span>
-                    {Math.abs(trendPct).toFixed(0)}%
-                  </span>
-                )}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-gray-500 dark:text-gray-300 text-sm font-bold uppercase tracking-wider">
+                  {chartMode === 'pie' ? 'Mood Breakdown' : 'Mood Wave'}
+                </h3>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <p className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                    {overallAverage == null ? 'No data yet' : moodSummaryFromAverage(overallAverage)}
+                  </p>
+                  {trendPct != null && (
+                    <span className="inline-flex items-center gap-1 text-helfi-green text-sm font-bold bg-helfi-green/10 px-2 py-0.5 rounded-full">
+                      <span className="material-symbols-outlined text-sm leading-none">trending_up</span>
+                      {Math.abs(trendPct).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-1">
+                {(['pie', 'wave'] as const).map((mode) => {
+                  const active = chartMode === mode
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setChartMode(mode)}
+                      className={[
+                        'px-3 py-1 rounded-full text-xs font-semibold transition-colors',
+                        active ? 'bg-helfi-green text-white' : 'text-gray-600 dark:text-gray-300',
+                      ].join(' ')}
+                    >
+                      {mode === 'pie' ? 'Pie' : 'Wave'}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -489,7 +513,11 @@ export default function MoodHistoryPage() {
                               {day.label}
                             </div>
                             <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-hidden">
-                              <MoodTrendGraph points={day.points} />
+                              {chartMode === 'pie' ? (
+                                <MoodPieChart entries={day.points} />
+                              ) : (
+                                <MoodTrendGraph points={day.points} />
+                              )}
                             </div>
                           </div>
                         ))}
@@ -497,7 +525,11 @@ export default function MoodHistoryPage() {
                     </div>
                   ) : (
                     <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-hidden">
-                      <MoodTrendGraph points={points} />
+                      {chartMode === 'pie' ? (
+                        <MoodPieChart entries={entries} />
+                      ) : (
+                        <MoodTrendGraph points={points} />
+                      )}
                     </div>
                   )}
                   <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 p-4">

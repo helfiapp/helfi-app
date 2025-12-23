@@ -60,7 +60,7 @@ export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
       const dataset = chart.data.datasets?.[0]
       if (!dataset) return
       const { ctx, chartArea } = chart
-      const fontSize = 24
+      const fontSize = 28
       ctx.save()
       ctx.font = `${fontSize}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`
       ctx.textAlign = 'center'
