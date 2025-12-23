@@ -119,6 +119,14 @@ function formatDayLabel(localDate: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+function entryDayKey(entry: MoodEntry) {
+  const localDate = String(entry.localDate || '').slice(0, 10)
+  if (localDate) return localDate
+  const ts = new Date(entry.timestamp)
+  if (!Number.isNaN(ts.getTime())) return asDateString(ts)
+  return ''
+}
+
 export default function MoodHistoryPage() {
   const [timeframe, setTimeframe] = useState<'day' | 'week' | 'month' | 'year'>('week')
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
@@ -284,6 +292,25 @@ export default function MoodHistoryPage() {
     return xs
   }, [entries])
 
+  const daySeries = useMemo(() => {
+    const map = new Map<string, MoodEntry[]>()
+    for (const entry of entries) {
+      const day = entryDayKey(entry)
+      if (!day) continue
+      if (!map.has(day)) map.set(day, [])
+      map.get(day)!.push(entry)
+    }
+    const days = Array.from(map.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+    return days.map((day) => {
+      const items = (map.get(day) || []).slice().sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      return {
+        day,
+        label: formatDayLabel(day),
+        points: items.map((e) => ({ timestamp: e.timestamp, mood: Number(e.mood) })),
+      }
+    })
+  }, [entries])
+
   const recentGroups = useMemo(() => {
     const sorted = entries
       .slice()
@@ -291,7 +318,7 @@ export default function MoodHistoryPage() {
     const map = new Map<string, MoodEntry[]>()
     const order: string[] = []
     for (const entry of sorted) {
-      const day = String(entry.localDate || '').slice(0, 10)
+      const day = entryDayKey(entry)
       if (!day) continue
       if (!map.has(day)) {
         map.set(day, [])
@@ -444,15 +471,35 @@ export default function MoodHistoryPage() {
 	              <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
 	                {error}
 	              </div>
-	            ) : points.length === 0 ? (
+            ) : points.length === 0 ? (
 	              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 px-4 py-6 text-sm">
 	                No mood entries yet. Add your first check‑in from the Mood tab.
 	              </div>
 	            ) : (
                 <div className="space-y-4">
-	                <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-hidden">
-	                  <MoodTrendGraph points={points} />
-	                </div>
+                  {timeframe === 'week' ? (
+                    <div className="space-y-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        Swipe left or right to view each day.
+                      </div>
+                      <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4">
+                        {daySeries.map((day) => (
+                          <div key={day.day} className="min-w-full snap-center">
+                            <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                              {day.label}
+                            </div>
+                            <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-hidden">
+                              <MoodTrendGraph points={day.points} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-hidden">
+                      <MoodTrendGraph points={points} />
+                    </div>
+                  )}
                   <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 p-4">
                     <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-300 mb-3">
                       Recent check‑ins
