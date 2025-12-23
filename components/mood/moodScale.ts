@@ -27,7 +27,16 @@ export function emojiForMoodValue(value: number) {
 }
 
 export function moodColorForValue(value: number) {
-  return MOOD_LEVELS.find((level) => level.value === value)?.color ?? '#84cc16'
+  const palette: Record<number, string> = {
+    1: '#ef4444',
+    2: '#f87171',
+    3: '#fb923c',
+    4: '#facc15',
+    5: '#bbf7d0',
+    6: '#4ade80',
+    7: '#22c55e',
+  }
+  return palette[value] ?? '#bbf7d0'
 }
 
 export const DEFAULT_MOOD_TAGS = [

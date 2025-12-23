@@ -8,19 +8,37 @@ import { emojiForMoodValue, moodColorForValue, MOOD_FACE_OPTIONS } from '@/compo
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
-type MoodEntry = { mood: number }
+type MoodEntry = {
+  mood: number
+  timestamp?: string | null
+}
 
 export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
-  const slices = useMemo(() => {
+  const { slices, timeMap } = useMemo(() => {
     const counts = new Map<number, number>()
+    const times = new Map<number, string[]>()
+
     for (const entry of entries) {
       const value = Number(entry.mood)
       if (!Number.isFinite(value)) continue
       counts.set(value, (counts.get(value) || 0) + 1)
+
+      if (entry.timestamp) {
+        const d = new Date(entry.timestamp)
+        if (!Number.isNaN(d.getTime())) {
+          const label = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+          const list = times.get(value) ?? []
+          list.push(label)
+          times.set(value, list)
+        }
+      }
     }
-    return MOOD_FACE_OPTIONS
+
+    const result = MOOD_FACE_OPTIONS
       .map((opt) => ({ value: opt.value, label: opt.label, count: counts.get(opt.value) || 0 }))
       .filter((slice) => slice.count > 0)
+
+    return { slices: result, timeMap: times }
   }, [entries])
 
   const emojiSize = useMemo(() => {
@@ -77,18 +95,38 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
     plugins: {
       legend: { display: false },
       tooltip: {
+        padding: 12,
+        bodySpacing: 6,
+        boxPadding: 6,
+        caretPadding: 6,
+        caretSize: 8,
+        cornerRadius: 12,
+        titleFont: { size: 16, weight: '600' },
+        bodyFont: { size: 14, weight: '500' },
+        boxWidth: 14,
+        boxHeight: 14,
         callbacks: {
+          title: (items) => slices[items[0]?.dataIndex ?? 0]?.label || 'Mood',
           label: (ctx) => {
-            const value = slices[ctx.dataIndex]?.value
             const label = slices[ctx.dataIndex]?.label || 'Mood'
             const count = ctx.parsed || 0
-            const emoji = value ? emojiForMoodValue(value) : '🙂'
-            return `${emoji} ${label}: ${count}`
+            return `${label}: ${count}`
+          },
+          afterLabel: (ctx) => {
+            const value = slices[ctx.dataIndex]?.value
+            if (!value) return ''
+            const times = timeMap.get(value) ?? []
+            if (!times.length) return ''
+            const maxItems = 4
+            const shown = times.slice(0, maxItems)
+            const suffix = times.length > maxItems ? ` +${times.length - maxItems} more` : ''
+            const prefix = times.length > 1 ? 'Times' : 'Time'
+            return `${prefix}: ${shown.join(', ')}${suffix}`
           },
         },
       },
     },
-  }), [slices])
+  }), [slices, timeMap])
 
   if (!slices.length) {
     return (
