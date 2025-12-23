@@ -118,6 +118,14 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
   return summaryParts.join(', ')
 }
 
+const stripNutritionFromServingSize = (raw: string) => {
+  return String(raw || '')
+    .replace(/\([^)]*(calories?|kcal|kilojoules?|kj|protein|carbs?|fat|fibre|fiber|sugar)[^)]*\)/gi, '')
+    .replace(/\b\d+(?:\.\d+)?\s*(kcal|cal|kj)\b[^,)]*(?:protein|carb|fat|fiber|fibre|sugar)[^,)]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 const buildTodayIso = () => {
   const d = new Date()
   const y = d.getFullYear()
@@ -887,7 +895,9 @@ const piecesMultiplierForServing = (item: any) => {
 
 const normalizeDiscreteItem = (item: any) => {
   const normalizedName = replaceWordNumbers(String(item?.name || ''))
-  const normalizedServingSize = replaceWordNumbers(String(item?.serving_size || ''))
+  const normalizedServingSize = stripNutritionFromServingSize(
+    replaceWordNumbers(String(item?.serving_size || '')),
+  )
   const working: any = { ...item, name: normalizedName, serving_size: normalizedServingSize }
   const piecesPerServing = getPiecesPerServing(working)
   if (piecesPerServing && piecesPerServing > 0) {
@@ -5565,6 +5575,10 @@ Please add nutritional information manually if needed.`);
 
 
   const addFoodEntry = async (description: string, method: 'text' | 'photo', nutrition?: any) => {
+    if (barcodeLabelBlocked) {
+      showQuickToast('Please fix the label values before saving.')
+      return
+    }
     // Prevent duplicate entries - check if this exact entry already exists
     const existingEntry = todaysFoods.find(food => 
       food.description === description && 
@@ -5681,6 +5695,10 @@ Please add nutritional information manually if needed.`);
   // New function to update existing entries with AI re-analysis
   const updateFoodEntry = async () => {
     if (!editingEntry) return;
+    if (barcodeLabelBlocked) {
+      showQuickToast('Please fix the label values before saving.')
+      return
+    }
 
     // Never override a user-provided title with an auto-generated ingredient summary.
     const manualDescription = (editedDescription?.trim?.() || '').trim()
@@ -7166,7 +7184,7 @@ Please add nutritional information manually if needed.`);
     const primary = Array.isArray(items) && items.length > 0 ? items[0] : null
     if (!primary) return
 
-    const servingSize = primary?.serving_size || ''
+    const servingSize = stripNutritionFromServingSize(primary?.serving_size || '')
     const servingInfo = parseServingSizeInfo({ serving_size: servingSize })
     const quantityG =
       Number.isFinite(Number(primary?.customGramsPerServing)) && Number(primary.customGramsPerServing) > 0
@@ -7214,6 +7232,53 @@ Please add nutritional information manually if needed.`);
       }
     }
   }
+
+  const validateBarcodeLabelItems = (items: any[] | null | undefined) => {
+    if (!barcodeLabelFlow?.barcode) return { ok: true, message: '' }
+    const list = Array.isArray(items) ? items : []
+    if (list.length === 0) return { ok: true, message: '' }
+    const target =
+      list.find((it) => it?.barcode || it?.barcodeSource || it?.detectionMethod === 'barcode') || list[0]
+    if (!target) return { ok: true, message: '' }
+    const servingSize = stripNutritionFromServingSize(String(target?.serving_size || ''))
+    const servingInfo = parseServingSizeInfo({ serving_size: servingSize })
+    const weight = servingInfo.gramsPerServing ?? servingInfo.mlPerServing ?? null
+    if (!weight || weight <= 0) return { ok: true, message: '' }
+
+    const safe = (value: any) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0)
+    const protein = safe(target?.protein_g)
+    const carbs = safe(target?.carbs_g)
+    const fat = safe(target?.fat_g)
+    const fiber = safe(target?.fiber_g)
+    const calories = safe(target?.calories)
+
+    const macroSum = protein + carbs + fat + fiber
+    const macroLimit = weight * 1.3 + 2
+    if (macroSum > macroLimit) {
+      return {
+        ok: false,
+        message:
+          "These numbers don't fit the serving size. It looks like the per-100g column was used. Please retake the label photo or edit the macros to match the label.",
+      }
+    }
+
+    const calorieLimit = weight * 9.5 + 10
+    if (calories > calorieLimit) {
+      return {
+        ok: false,
+        message:
+          'Calories are far too high for that serving size. Please retake the label photo or edit the macros to match the label.',
+      }
+    }
+
+    return { ok: true, message: '' }
+  }
+
+  const barcodeLabelValidation = useMemo(
+    () => validateBarcodeLabelItems(analyzedItems),
+    [analyzedItems, barcodeLabelFlow],
+  )
+  const barcodeLabelBlocked = Boolean(barcodeLabelFlow?.barcode) && !barcodeLabelValidation.ok
 
   const lookupBarcodeAndAdd = async (code: string) => {
     const normalized = (code || '').replace(/[^0-9A-Za-z]/g, '')
@@ -10966,7 +11031,7 @@ Please add nutritional information manually if needed.`);
                       <button
                         type="button"
                         onClick={() => updateFoodEntry()}
-                        disabled={isAnalyzing || isSavingEntry}
+                        disabled={isAnalyzing || isSavingEntry || barcodeLabelBlocked}
                         className="px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs sm:text-sm font-medium shadow-sm hover:bg-emerald-600 disabled:opacity-60"
                       >
                         {isSavingEntry ? (
@@ -11000,6 +11065,16 @@ Please add nutritional information manually if needed.`);
                         {barcodeLabelFlow.reason === 'report'
                           ? 'This will refresh the barcode nutrition for everyone after you save.'
                           : 'We’ll save this nutrition to the barcode so future scans are correct.'}
+                      </div>
+                    </div>
+                  )}
+
+                  {barcodeLabelBlocked && (
+                    <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                      <div className="font-semibold">Label numbers look wrong</div>
+                      <div className="text-xs text-red-800 mt-1">{barcodeLabelValidation.message}</div>
+                      <div className="text-xs text-red-800 mt-1">
+                        Fix the macros with the pencil icon or retake the label photo to continue.
                       </div>
                     </div>
                   )}
@@ -11885,7 +11960,7 @@ Please add nutritional information manually if needed.`);
 	                    onClick={() =>
 	                      editingEntry ? updateFoodEntry() : addFoodEntry(aiDescription, manualMealBuildMode ? 'text' : 'photo')
 	                    }
-	                    disabled={isAnalyzing || isSavingEntry}
+	                    disabled={isAnalyzing || isSavingEntry || barcodeLabelBlocked}
 	                    className="w-full py-3 px-4 mx-auto max-w-[95%] bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
 	                  >
                     {isAnalyzing || isSavingEntry ? (
@@ -14708,7 +14783,7 @@ Please add nutritional information manually if needed.`);
                 <div className="text-sm text-gray-600 mt-1">
                   {barcodeLabelFlow.reason === 'report'
                     ? 'Take a clear photo of the nutrition panel so we can refresh this barcode.'
-                    : 'We don’t have reliable nutrition for this barcode yet. Take a clear photo of the nutrition panel and we’ll save it for future scans.'}
+                    : "We don't have reliable nutrition for this barcode yet. Take a clear photo of the nutrition panel and we'll save it for future scans."}
                 </div>
               </div>
               <button

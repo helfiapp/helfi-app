@@ -78,6 +78,38 @@ const parseGramsFromLabel = (label?: string | null): number | null => {
   return null
 }
 
+const parseServingWeight = (servingSize?: string | null): number | null => {
+  if (!servingSize) return null
+  const normalized = String(servingSize).toLowerCase()
+  const g = normalized.match(/(\d+(?:\.\d+)?)\s*(g|gram|grams)\b/i)
+  if (g) return parseFloat(g[1])
+  const ml = normalized.match(/(\d+(?:\.\d+)?)\s*(ml|milliliter|millilitre)\b/i)
+  if (ml) return parseFloat(ml[1])
+  const oz = normalized.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
+  if (oz) return parseFloat(oz[1]) * 28.3495
+  return null
+}
+
+const isServingNutritionPlausible = (data: {
+  servingSize?: string | null
+  calories?: number | null
+  protein?: number | null
+  carbs?: number | null
+  fat?: number | null
+  fiber?: number | null
+}) => {
+  const weight = parseServingWeight(data.servingSize || null)
+  if (!weight || weight <= 0) return true
+  const safe = (v?: number | null) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0)
+  const macroSum = safe(data.protein) + safe(data.carbs) + safe(data.fat) + safe(data.fiber)
+  const macroLimit = weight * 1.3 + 2
+  if (macroSum > macroLimit) return false
+  const calories = safe(data.calories)
+  const calorieLimit = weight * 9.5 + 10
+  if (calories > calorieLimit) return false
+  return true
+}
+
 // ============ Helfi Barcode Cache ============
 
 async function fetchFoodFromHelfiBarcode(barcode: string): Promise<NormalizedFood | null> {
@@ -86,6 +118,18 @@ async function fetchFoodFromHelfiBarcode(barcode: string): Promise<NormalizedFoo
       where: { barcode },
     })
     if (!record) return null
+    const plausible = isServingNutritionPlausible({
+      servingSize: record.servingSize || null,
+      calories: record.calories ?? null,
+      protein: record.proteinG ?? null,
+      carbs: record.carbsG ?? null,
+      fat: record.fatG ?? null,
+      fiber: record.fiberG ?? null,
+    })
+    if (!plausible) {
+      console.warn('Helfi barcode cache rejected due to implausible nutrition', barcode)
+      return null
+    }
     return {
       source: 'helfi',
       id: record.id,
