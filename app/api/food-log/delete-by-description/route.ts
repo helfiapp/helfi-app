@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeMealCategory } from '../route'
+import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 
 // Danger zone endpoint: delete matching food logs by description + category for the authenticated user.
 // Used as a last-resort cleaner when client-side deletes fail due to mismatched IDs or dates.
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const matches = await prisma.foodLog.findMany({
       where: whereClause,
-      select: { id: true, description: true, meal: true, localDate: true },
+      select: { id: true, description: true, meal: true, localDate: true, imageUrl: true },
     })
 
     // #region agent log
@@ -91,6 +92,13 @@ export async function POST(request: NextRequest) {
     const result = await prisma.foodLog.deleteMany({
       where: { id: { in: ids }, userId: user.id },
     })
+
+    try {
+      await deleteFoodPhotosIfUnused(matches.map((row) => row.imageUrl))
+    } catch (cleanupError) {
+      console.warn('AGENT_DEBUG', JSON.stringify({ hypothesisId: 'PHOTO_CLEAN', location: 'app/api/food-log/delete-by-description/route.ts:POST:cleanup', message: 'Food photo cleanup failed (non-blocking)', timestamp: Date.now() }))
+      console.warn(cleanupError)
+    }
 
     return NextResponse.json({ success: true, deleted: result.count, ids })
   } catch (error) {

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 
 // Delete a specific food log (by id) for the authenticated user
 export async function POST(request: NextRequest) {
@@ -52,6 +53,10 @@ export async function POST(request: NextRequest) {
     const existing = await prisma.foodLog.findUnique({ where: { id: id as any } })
     if (!existing || existing.userId !== user.id) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    const imageUrlsToCheck = new Set<string>()
+    if (typeof existing.imageUrl === 'string' && existing.imageUrl.trim()) {
+      imageUrlsToCheck.add(existing.imageUrl.trim())
     }
 
     // Many users have duplicate FoodLog rows that represent one visible "meal card".
@@ -123,9 +128,14 @@ export async function POST(request: NextRequest) {
                 : undefined,
             ].filter(Boolean) as any,
           },
-          select: { id: true },
+          select: { id: true, imageUrl: true },
         })
 
+        duplicates.forEach((row) => {
+          if (typeof row.imageUrl === 'string' && row.imageUrl.trim()) {
+            imageUrlsToCheck.add(row.imageUrl.trim())
+          }
+        })
         const ids = Array.from(new Set(duplicates.map((d) => d.id))).slice(0, 50)
         const result = await prisma.foodLog.deleteMany({
           where: { userId: user.id, id: { in: ids } },
@@ -163,6 +173,13 @@ export async function POST(request: NextRequest) {
         deletedCount = Math.max(deletedCount, 1)
       } catch {}
       console.warn('AGENT_DEBUG', JSON.stringify({ hypothesisId: 'A', location: 'app/api/food-log/delete/route.ts:POST:sweep', message: 'Duplicate sweep failed; fell back to single-row delete', data: { requestedIdPrefix: id.slice(0, 8) }, timestamp: Date.now() }))
+    }
+
+    try {
+      await deleteFoodPhotosIfUnused(Array.from(imageUrlsToCheck))
+    } catch (cleanupError) {
+      console.warn('AGENT_DEBUG', JSON.stringify({ hypothesisId: 'PHOTO_CLEAN', location: 'app/api/food-log/delete/route.ts:POST:cleanup', message: 'Food photo cleanup failed (non-blocking)', timestamp: Date.now() }))
+      console.warn(cleanupError)
     }
 
     return NextResponse.json({ success: true, deleted: deletedCount })

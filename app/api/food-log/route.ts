@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 import { Prisma } from '@prisma/client'
 import { put } from '@vercel/blob'
+import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 
 const FOOD_PHOTO_PREFIX = 'food-photos'
 
@@ -812,7 +813,14 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
+    const imageUrl = typeof existing.imageUrl === 'string' ? existing.imageUrl : null
     await prisma.foodLog.delete({ where: { id: id as any } })
+    try {
+      await deleteFoodPhotosIfUnused([imageUrl])
+    } catch (cleanupError) {
+      console.warn('AGENT_DEBUG', JSON.stringify({ hypothesisId: 'PHOTO_CLEAN', location: 'app/api/food-log/route.ts:DELETE:cleanup', message: 'Food photo cleanup failed (non-blocking)', timestamp: Date.now() }))
+      console.warn(cleanupError)
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('DELETE /api/food-log error', error)

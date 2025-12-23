@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeMealCategory } from '../route'
+import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 
 // Atomic delete endpoint (Food Diary ghost-entry hardening)
 //
@@ -73,12 +74,16 @@ export async function POST(request: NextRequest) {
 
     const deletedIds = new Set<string>()
     let deletedCount = 0
+    const imageUrlsToCheck = new Set<string>()
 
     // 1) Delete by id + conservative duplicate sweep (fast path + anti-ghost).
     if (requestedId) {
       try {
         const existing = await prisma.foodLog.findUnique({ where: { id: requestedId as any } })
         if (existing && existing.userId === user.id) {
+          if (typeof existing.imageUrl === 'string' && existing.imageUrl.trim()) {
+            imageUrlsToCheck.add(existing.imageUrl.trim())
+          }
           const rawText = String(existing.description || existing.name || '').trim()
           const needle = rawText.split('\n')[0].trim().slice(0, 140)
           const createdAt = existing.createdAt instanceof Date ? existing.createdAt : new Date(existing.createdAt as any)
@@ -138,9 +143,14 @@ export async function POST(request: NextRequest) {
                     : undefined,
                 ].filter(Boolean) as any,
               },
-              select: { id: true },
+              select: { id: true, imageUrl: true },
             })
 
+            duplicates.forEach((row) => {
+              if (typeof row.imageUrl === 'string' && row.imageUrl.trim()) {
+                imageUrlsToCheck.add(row.imageUrl.trim())
+              }
+            })
             const ids = Array.from(new Set(duplicates.map((d) => d.id))).slice(0, 50)
             if (ids.length > 0) {
               const result = await prisma.foodLog.deleteMany({
@@ -197,10 +207,15 @@ export async function POST(request: NextRequest) {
 
           const matches = await prisma.foodLog.findMany({
             where: whereClause,
-            select: { id: true },
+            select: { id: true, imageUrl: true },
             take: 50,
           })
 
+          matches.forEach((row) => {
+            if (typeof row.imageUrl === 'string' && row.imageUrl.trim()) {
+              imageUrlsToCheck.add(row.imageUrl.trim())
+            }
+          })
           const ids = Array.from(new Set(matches.map((m) => String(m.id)))).filter(Boolean).slice(0, 50)
           if (ids.length > 0) {
             const result = await prisma.foodLog.deleteMany({
@@ -279,6 +294,13 @@ export async function POST(request: NextRequest) {
       console.warn('AGENT_DEBUG', JSON.stringify({ hypothesisId: 'A', location: 'app/api/food-log/delete-atomic/route.ts:POST:snapshot', message: 'Snapshot sync failed (best-effort)', timestamp: Date.now() }))
     }
 
+    try {
+      await deleteFoodPhotosIfUnused(Array.from(imageUrlsToCheck))
+    } catch (cleanupError) {
+      console.warn('AGENT_DEBUG', JSON.stringify({ hypothesisId: 'PHOTO_CLEAN', location: 'app/api/food-log/delete-atomic/route.ts:POST:cleanup', message: 'Food photo cleanup failed (non-blocking)', timestamp: Date.now() }))
+      console.warn(cleanupError)
+    }
+
     return NextResponse.json({
       success: true,
       deleted: deletedCount,
@@ -291,4 +313,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete log' }, { status: 500 })
   }
 }
-
