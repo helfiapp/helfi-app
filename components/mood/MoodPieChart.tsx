@@ -23,26 +23,40 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
       .filter((slice) => slice.count > 0)
   }, [entries])
 
+  const emojiSize = useMemo(() => {
+    const totalEntries = slices.reduce((sum, slice) => sum + slice.count, 0)
+    const weight = Math.max(slices.length, Math.ceil(totalEntries / 2))
+    const size = 72 - weight * 8
+    return Math.max(22, Math.min(64, size))
+  }, [slices])
+
   const emojiPlugin = useMemo(() => ({
     id: 'emojiLabels',
     afterDatasetsDraw: (chart: any) => {
       const meta = chart.getDatasetMeta(0)
       if (!meta?.data?.length) return
       const { ctx } = chart
-      const fontSize = 32
+      const fontSize = emojiSize
       ctx.save()
       ctx.font = `${fontSize}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      meta.data.forEach((arc: any, index: number) => {
-        const slice = slices[index]
-        if (!slice) return
-        const center = arc.getCenterPoint()
-        ctx.fillText(emojiForMoodValue(slice.value), center.x, center.y)
-      })
+      if (slices.length === 1) {
+        const { left, right, top, bottom } = chart.chartArea
+        const centerX = (left + right) / 2
+        const centerY = (top + bottom) / 2
+        ctx.fillText(emojiForMoodValue(slices[0].value), centerX, centerY)
+      } else {
+        meta.data.forEach((arc: any, index: number) => {
+          const slice = slices[index]
+          if (!slice) return
+          const center = arc.getCenterPoint()
+          ctx.fillText(emojiForMoodValue(slice.value), center.x, center.y)
+        })
+      }
       ctx.restore()
     },
-  }), [slices])
+  }), [slices, emojiSize])
 
   const data: ChartData<'pie', number[], string> = useMemo(() => {
     return {
