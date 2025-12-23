@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/affiliate-payout-run",
       "schedule": "0 3 1 * *"
+    },
+    {
+      "path": "/api/cron/food-photo-cleanup",
+      "schedule": "0 4 * * *"
     }
   ]
 }

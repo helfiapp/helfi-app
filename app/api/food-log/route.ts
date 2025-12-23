@@ -5,6 +5,50 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 import { Prisma } from '@prisma/client'
+import { put } from '@vercel/blob'
+
+const FOOD_PHOTO_PREFIX = 'food-photos'
+
+const isDataUrl = (value: string) => /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(value)
+const isRemoteUrl = (value: string) => /^https?:\/\//i.test(value)
+
+const dataUrlToBuffer = (value: string) => {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(value)
+  if (!match) return null
+  const contentType = match[1]
+  const buffer = Buffer.from(match[2], 'base64')
+  return { contentType, buffer }
+}
+
+const contentTypeToExt = (contentType: string) => {
+  if (contentType === 'image/png') return 'png'
+  if (contentType === 'image/webp') return 'webp'
+  if (contentType === 'image/gif') return 'gif'
+  return 'jpg'
+}
+
+const uploadFoodPhoto = async (userId: string, imageDataUrl: string) => {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    console.warn('⚠️ Food photo upload skipped: BLOB_READ_WRITE_TOKEN missing')
+    return imageDataUrl
+  }
+  const parsed = dataUrlToBuffer(imageDataUrl)
+  if (!parsed) return imageDataUrl
+  const ext = contentTypeToExt(parsed.contentType)
+  const filename = `${Date.now()}.${ext}`
+  const pathname = `${FOOD_PHOTO_PREFIX}/${userId}/${filename}`
+  try {
+    const blob = await put(pathname, parsed.buffer, {
+      access: 'public',
+      contentType: parsed.contentType,
+      addRandomSuffix: true,
+    })
+    return blob.url
+  } catch (error) {
+    console.error('❌ Food photo upload failed, keeping original imageUrl', error)
+    return imageDataUrl
+  }
+}
 
 export const normalizeMealCategory = (raw: any): string | null => {
   const value = typeof raw === 'string' ? raw.toLowerCase() : ''
@@ -469,6 +513,14 @@ export async function POST(request: NextRequest) {
       normalizedCreatedAt: normalizedCreatedAt ? normalizedCreatedAt.toISOString() : 'server default',
     })
     
+    let storedImageUrl = typeof imageUrl === 'string' ? imageUrl.trim() : ''
+    if (storedImageUrl && isDataUrl(storedImageUrl)) {
+      storedImageUrl = await uploadFoodPhoto(user.id, storedImageUrl)
+    }
+    if (storedImageUrl && !isRemoteUrl(storedImageUrl)) {
+      storedImageUrl = ''
+    }
+
     const name = (description || '')
       .toString()
       .split('\n')[0]
@@ -537,7 +589,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         name,
         description: description || null,
-        imageUrl: imageUrl || null,
+        imageUrl: storedImageUrl || null,
         nutrients: nutrition || null,
         items: Array.isArray(items) && items.length > 0 ? items : Prisma.JsonNull,
         localDate: normalizedLocalDate,
@@ -666,6 +718,14 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    let storedImageUrl = typeof imageUrl === 'string' ? imageUrl.trim() : ''
+    if (storedImageUrl && isDataUrl(storedImageUrl)) {
+      storedImageUrl = await uploadFoodPhoto(user.id, storedImageUrl)
+    }
+    if (storedImageUrl && !isRemoteUrl(storedImageUrl)) {
+      storedImageUrl = ''
+    }
+
     const name = (description || existing.description || existing.name || '')
       .toString()
       .split('\n')[0]
@@ -697,7 +757,7 @@ export async function PUT(request: NextRequest) {
       data: {
         name,
         description: description || null,
-        imageUrl: imageUrl || null,
+        imageUrl: storedImageUrl || null,
         nutrients: nutrition || null,
         items: Array.isArray(items) && items.length > 0 ? items : Prisma.JsonNull,
         localDate: normalizedLocalDate,
