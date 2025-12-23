@@ -10,6 +10,22 @@ export const MOOD_LEVELS = [
 
 export type MoodValue = (typeof MOOD_LEVELS)[number]['value']
 
+export const MOOD_FACE_OPTIONS = [
+  { value: 1, label: 'Terrible', emoji: '😡' },
+  { value: 2, label: 'Bad', emoji: '😞' },
+  { value: 3, label: 'Meh', emoji: '😕' },
+  { value: 4, label: 'Okay', emoji: '😐' },
+  { value: 5, label: 'Good', emoji: '🙂' },
+  { value: 6, label: 'Great', emoji: '😄' },
+  { value: 7, label: 'Amazing', emoji: '🤩' },
+] as const
+
+export type MoodFaceOption = (typeof MOOD_FACE_OPTIONS)[number]
+
+export function emojiForMoodValue(value: number) {
+  return MOOD_FACE_OPTIONS.find((o) => o.value === value)?.emoji ?? '🙂'
+}
+
 export const DEFAULT_MOOD_TAGS = [
   { label: 'Calm', emoji: '😌' },
   { label: 'Focused', emoji: '🤓' },

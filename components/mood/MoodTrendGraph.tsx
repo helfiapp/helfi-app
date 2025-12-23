@@ -14,7 +14,7 @@ import {
 } from 'chart.js'
 import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
 import 'chartjs-adapter-date-fns'
-import { MOOD_LEVELS } from '@/components/mood/moodScale'
+import { MOOD_LEVELS, emojiForMoodValue } from '@/components/mood/moodScale'
 
 ChartJS.register(
   CategoryScale,
@@ -29,6 +29,30 @@ ChartJS.register(
 export type MoodPoint = { timestamp: string; mood: number }
 
 export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
+  const emojiPlugin = useMemo(() => ({
+    id: 'emojiPoints',
+    afterDatasetsDraw: (chart: any) => {
+      const meta = chart.getDatasetMeta(0)
+      if (!meta?.data?.length) return
+      const dataset = chart.data.datasets?.[0]
+      if (!dataset) return
+      const { ctx, chartArea } = chart
+      ctx.save()
+      ctx.font = '16px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      meta.data.forEach((point: any, index: number) => {
+        const raw = (dataset.data as any[])?.[index]
+        const moodValue = Number(raw?.y)
+        if (!Number.isFinite(moodValue)) return
+        const emoji = emojiForMoodValue(moodValue)
+        const y = Math.max(point.y - 16, chartArea.top + 10)
+        ctx.fillText(emoji, point.x, y)
+      })
+      ctx.restore()
+    },
+  }), [])
+
   const data: ChartData<'line', { x: string; y: number }[]> = useMemo(() => {
     return {
       labels: [],
@@ -84,8 +108,7 @@ export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
 
   return (
     <div className="h-48 w-full">
-      <Line data={data as any} options={options as any} />
+      <Line data={data as any} options={options as any} plugins={[emojiPlugin]} />
     </div>
   )
 }
-

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
 import MoodTabs from '@/components/mood/MoodTabs'
 import MoodTrendGraph from '@/components/mood/MoodTrendGraph'
+import { emojiForMoodValue } from '@/components/mood/moodScale'
 import InsightsBottomNav from '@/app/insights/InsightsBottomNav'
 
 export const dynamic = 'force-dynamic'
@@ -82,16 +83,6 @@ function moodSummaryFromAverage(avg: number) {
   return 'Mostly Terrible'
 }
 
-function emojiForMood(mood: number) {
-  if (mood <= 1) return '😡'
-  if (mood === 2) return '😞'
-  if (mood === 3) return '😕'
-  if (mood === 4) return '😐'
-  if (mood === 5) return '🙂'
-  if (mood === 6) return '😄'
-  return '🤩'
-}
-
 function dotColorForAvg(avg: number | null) {
   if (avg == null) return 'bg-gray-300 dark:bg-gray-600'
   if (avg >= 5) return 'bg-green-400'
@@ -119,6 +110,15 @@ function mondayIndexFromUtcDate(localDate: string) {
   return (dow + 6) % 7
 }
 
+function formatDayLabel(localDate: string) {
+  const today = asDateString(new Date())
+  const yesterday = shiftDays(today, -1)
+  if (localDate === today) return 'Today'
+  if (localDate === yesterday) return 'Yesterday'
+  const d = new Date(`${localDate}T00:00:00`)
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 export default function MoodHistoryPage() {
   const [timeframe, setTimeframe] = useState<'day' | 'week' | 'month' | 'year'>('week')
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
@@ -129,6 +129,7 @@ export default function MoodHistoryPage() {
   const [monthMap, setMonthMap] = useState(() => new Map())
   const [insights, setInsights] = useState<InsightsResponse | null>(null)
   const [streakDays, setStreakDays] = useState<number>(0)
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
 
   const [banner, setBanner] = useState<string | null>(null)
   useEffect(() => {
@@ -283,11 +284,25 @@ export default function MoodHistoryPage() {
     return xs
   }, [entries])
 
-  const recent = useMemo(() => {
-    return entries
+  const recentGroups = useMemo(() => {
+    const sorted = entries
       .slice()
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 6)
+    const map = new Map<string, MoodEntry[]>()
+    const order: string[] = []
+    for (const entry of sorted) {
+      const day = String(entry.localDate || '').slice(0, 10)
+      if (!day) continue
+      if (!map.has(day)) {
+        map.set(day, [])
+        order.push(day)
+      }
+      map.get(day)!.push(entry)
+    }
+    return order.slice(0, 3).map((day) => ({
+      day,
+      entries: (map.get(day) || []).slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+    }))
   }, [entries])
 
   const formatTime = (ts: any) => {
@@ -442,19 +457,66 @@ export default function MoodHistoryPage() {
                     <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-300 mb-3">
                       Recent check‑ins
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {recent.map((e) => (
-                        <div
-                          key={e.id}
-                          className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2"
-                        >
-                          <span className="text-lg leading-none">{emojiForMood(Number(e.mood))}</span>
-                          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                            {formatTime(e.timestamp)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    {recentGroups.length === 0 ? (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        No check‑ins yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {recentGroups.map((group) => {
+                          const expanded = !!expandedDays[group.day]
+                          return (
+                            <div
+                              key={group.day}
+                              className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 overflow-hidden"
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedDays((prev) => ({
+                                    ...prev,
+                                    [group.day]: !prev[group.day],
+                                  }))
+                                }
+                                className="w-full flex items-center justify-between px-3 py-2"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                    {formatDayLabel(group.day)}
+                                  </span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {group.entries.length} check‑in{group.entries.length === 1 ? '' : 's'}
+                                  </span>
+                                </div>
+                                <span
+                                  className={[
+                                    'material-symbols-outlined text-base text-gray-500 transition-transform',
+                                    expanded ? 'rotate-180' : '',
+                                  ].join(' ')}
+                                >
+                                  expand_more
+                                </span>
+                              </button>
+                              {expanded && (
+                                <div className="flex flex-wrap gap-2 px-3 pb-3">
+                                  {group.entries.map((e) => (
+                                    <div
+                                      key={e.id}
+                                      className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2"
+                                    >
+                                      <span className="text-lg leading-none">{emojiForMoodValue(Number(e.mood))}</span>
+                                      <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                        {formatTime(e.timestamp)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 	            )}
@@ -466,16 +528,16 @@ export default function MoodHistoryPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 flex flex-col justify-between aspect-[4/3] relative overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
               <div className="absolute top-0 right-0 p-4 opacity-10">
-                <span className="text-6xl grayscale opacity-50">{topMoodValue ? emojiForMood(topMoodValue) : '🙂'}</span>
+                <span className="text-6xl grayscale opacity-50">{topMoodValue ? emojiForMoodValue(topMoodValue) : '🙂'}</span>
               </div>
               <div>
                 <p className="text-gray-500 dark:text-gray-300 text-xs font-bold uppercase tracking-wider mb-1">Top Mood</p>
                 <p className="text-gray-900 dark:text-white text-lg font-bold leading-tight">
-                  {topMoodValue ? `“${emojiForMood(topMoodValue)}”` : '—'}
+                  {topMoodValue ? `“${emojiForMoodValue(topMoodValue)}”` : '—'}
                 </p>
               </div>
               <div className="flex items-end justify-between relative z-10">
-                <span className="text-4xl">{topMoodValue ? emojiForMood(topMoodValue) : '🙂'}</span>
+                <span className="text-4xl">{topMoodValue ? emojiForMoodValue(topMoodValue) : '🙂'}</span>
                 <span className="text-xs font-medium text-helfi-green bg-helfi-green/10 px-2 py-1 rounded-lg">
                   {topMoodCount ? `${topMoodCount}x` : '0x'}
                 </span>
@@ -602,7 +664,7 @@ export default function MoodHistoryPage() {
                   <summary className="list-none cursor-pointer select-none">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-full bg-helfi-green/10 flex items-center justify-center">
-                        <span className="text-2xl">{emojiForMood(Number(e.mood))}</span>
+                        <span className="text-2xl">{emojiForMoodValue(Number(e.mood))}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">

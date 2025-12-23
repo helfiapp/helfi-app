@@ -1,22 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
-
-type MoodOption = {
-  value: number
-  label: string
-  emoji: string
-}
-
-const OPTIONS: MoodOption[] = [
-  { value: 1, label: 'Terrible', emoji: '😡' },
-  { value: 2, label: 'Bad', emoji: '😞' },
-  { value: 3, label: 'Meh', emoji: '😕' },
-  { value: 4, label: 'Okay', emoji: '😐' },
-  { value: 5, label: 'Good', emoji: '🙂' },
-  { value: 6, label: 'Great', emoji: '😄' },
-  { value: 7, label: 'Amazing', emoji: '🤩' },
-] as const
+import { MOOD_FACE_OPTIONS } from '@/components/mood/moodScale'
 
 function triggerHaptic() {
   try {
@@ -36,7 +21,7 @@ export default function MoodPicker({
   value: number | null
   onChange: (next: number) => void
 }) {
-  const selected = useMemo(() => OPTIONS.find((o) => o.value === value) ?? null, [value])
+  const selected = useMemo(() => MOOD_FACE_OPTIONS.find((o) => o.value === value) ?? null, [value])
 
   return (
     <div className="w-full">
@@ -49,7 +34,7 @@ export default function MoodPicker({
 
       <div className="mt-4 w-full overflow-x-auto no-scrollbar">
         <div className="flex items-end gap-4 min-w-max px-1 pb-2">
-          {OPTIONS.map((o) => {
+          {MOOD_FACE_OPTIONS.map((o) => {
             const isSelected = o.value === value
             return (
               <button
