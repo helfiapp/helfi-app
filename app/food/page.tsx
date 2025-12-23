@@ -3312,7 +3312,25 @@ const applyStructuredItems = (
         )
       : itemsToUse
 
-  setAnalyzedItems(taggedItems)
+  const scrubbedItems = taggedItems.map((item: any) => {
+    if (!item?.labelNeedsReview) return item
+    return {
+      ...item,
+      calories: null,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+      fiber_g: null,
+      sugar_g: null,
+    }
+  })
+
+  const hasLabelReviewFlag = scrubbedItems.some((item: any) => item?.labelNeedsReview)
+  if (hasLabelReviewFlag) {
+    finalTotal = null
+  }
+
+  setAnalyzedItems(scrubbedItems)
 
   console.log('📊 Processing totals:', {
     enrichedItemsCount: taggedItems.length,
@@ -3326,8 +3344,8 @@ const applyStructuredItems = (
   // 3. Extracted from analysis text (fallback)
   let totalsToUse: NutritionTotals | null = null
 
-  if (taggedItems.length > 0) {
-    const fromItems = recalculateNutritionFromItems(taggedItems)
+  if (scrubbedItems.length > 0) {
+    const fromItems = recalculateNutritionFromItems(scrubbedItems)
     console.log(
       '📊 Recalculated totals from enriched items:',
       fromItems ? JSON.stringify(fromItems) : 'null',
@@ -3355,9 +3373,9 @@ const applyStructuredItems = (
     setAnalyzedNutrition(totalsToUse)
     setAnalyzedTotal(convertTotalsForStorage(totalsToUse))
     console.log('✅ Set nutrition totals:', JSON.stringify(totalsToUse))
-  } else if (taggedItems.length > 0) {
+  } else if (scrubbedItems.length > 0) {
     // If we have items but no totals, recalculate one more time as a last resort
-    const lastResortTotals = recalculateNutritionFromItems(taggedItems)
+    const lastResortTotals = recalculateNutritionFromItems(scrubbedItems)
     if (lastResortTotals) {
       setAnalyzedNutrition(lastResortTotals)
       setAnalyzedTotal(convertTotalsForStorage(lastResortTotals))
@@ -5350,9 +5368,13 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       let compressedFile;
       const wantsLabelAccuracy = analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)
       try {
-        const targetWidth = wantsLabelAccuracy ? 1400 : 800
-        const targetQuality = wantsLabelAccuracy ? 0.92 : 0.8
-        compressedFile = await compressImage(fileToAnalyze, targetWidth, targetQuality); // Less aggressive compression
+        if (wantsLabelAccuracy) {
+          compressedFile = fileToAnalyze
+        } else {
+          const targetWidth = 800
+          const targetQuality = 0.8
+          compressedFile = await compressImage(fileToAnalyze, targetWidth, targetQuality); // Less aggressive compression
+        }
         console.log('✅ Image compression successful:', {
           originalSize: fileToAnalyze.size,
           compressedSize: compressedFile.size,
@@ -5368,6 +5390,10 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       const formData = new FormData();
       formData.append('image', compressedFile);
       formData.append('analysisMode', analysisMode);
+      formData.append('forceFresh', '1');
+      if (barcodeLabelFlow?.barcode) {
+        formData.append('labelScan', '1');
+      }
       console.log('✅ FormData created successfully');
 
       // Step 3: API call with detailed logging
@@ -7311,6 +7337,16 @@ Please add nutritional information manually if needed.`);
     [analyzedItems, barcodeLabelFlow],
   )
   const barcodeLabelBlocked = Boolean(barcodeLabelFlow?.barcode) && !barcodeLabelValidation.ok
+  const openBarcodeLabelEdit = () => {
+    const list = Array.isArray(analyzedItems) ? analyzedItems : []
+    if (list.length === 0) return
+    const targetIndex = list.findIndex(
+      (it) => it?.barcode || it?.barcodeSource || it?.detectionMethod === 'barcode',
+    )
+    const index = targetIndex >= 0 ? targetIndex : 0
+    setEditingItemIndex(index)
+    setShowItemEditModal(true)
+  }
 
   const lookupBarcodeAndAdd = async (code: string) => {
     const normalized = (code || '').replace(/[^0-9A-Za-z]/g, '')
@@ -11108,6 +11144,13 @@ Please add nutritional information manually if needed.`);
                       <div className="text-xs text-red-800 mt-1">
                         Fix the macros with the pencil icon or retake the label photo to continue.
                       </div>
+                      <button
+                        type="button"
+                        onClick={openBarcodeLabelEdit}
+                        className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
+                      >
+                        Edit label numbers
+                      </button>
                     </div>
                   )}
 

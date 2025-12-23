@@ -171,6 +171,50 @@ const sanitizePackagedLabelItems = (items: any[]) => {
   return { items: cleaned, needsReview, message };
 };
 
+const parseLabelJsonBlock = (raw: string): any | null => {
+  if (!raw) return null;
+  const match = raw.match(/<LABEL_JSON>([\s\S]*?)<\/LABEL_JSON>/i);
+  const block = match && match[1] ? match[1].trim() : '';
+  if (!block) return null;
+  return parseItemsJsonRelaxed(block);
+};
+
+const extractLabelPerServingFromImage = async (
+  openai: OpenAI,
+  imageDataUrl: string,
+  model: string,
+) => {
+  const messages: any[] = [
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text:
+            'Read this nutrition label. Use ONLY the first column that says "Quantity per serving" (ignore the per-100g column).\n' +
+            'Return JSON between <LABEL_JSON> and </LABEL_JSON> only with this exact shape:\n' +
+            '{"serving_size":"string","per_serving":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+            '- If both kJ and Cal are shown, use the Cal value for calories.\n' +
+            '- If a value is unclear, set it to null (do not guess).\n' +
+            '- Do NOT use per-100g numbers.',
+        },
+        { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+      ],
+    },
+  ];
+
+  const result = await chatCompletionWithCost(openai, {
+    model,
+    messages,
+    max_tokens: 300,
+    temperature: 0,
+  } as any);
+
+  const content = result.completion?.choices?.[0]?.message?.content || '';
+  const parsed = parseLabelJsonBlock(content);
+  return { parsed, costCents: result.costCents };
+};
+
 const isPlausibleTotal = (total: any): boolean => {
   if (!total || typeof total !== 'object') return false;
   const calories = Number((total as any)?.calories);
@@ -1240,6 +1284,8 @@ export async function POST(req: NextRequest) {
     let preferMultiDetect = true; // default ON: detect multiple foods without changing output line
     let analysisMode: 'auto' | 'packaged' | 'meal' = 'auto';
     let packagedMode = false;
+    let labelScan = false;
+    let forceFresh = false;
     let packagedEmphasisBlock = '';
 
     const setAnalysisMode = (modeRaw: any) => {
@@ -1266,12 +1312,23 @@ PACKAGED MODE SELECTED:
     if (contentType?.includes('application/json')) {
       // Handle text-based food analysis
       const body = await req.json();
-      const { textDescription, foodType, isReanalysis: reFlag, returnItems, multi, analysisMode: bodyMode } = body as any;
+      const {
+        textDescription,
+        foodType,
+        isReanalysis: reFlag,
+        returnItems,
+        multi,
+        analysisMode: bodyMode,
+        labelScan: labelScanFlag,
+        forceFresh: forceFreshFlag,
+      } = body as any;
       isReanalysis = !!reFlag;
       // Default to true unless explicitly disabled
       wantStructured = returnItems !== undefined ? !!returnItems : true;
       preferMultiDetect = multi !== undefined ? !!multi : true;
       setAnalysisMode(bodyMode);
+      labelScan = Boolean(labelScanFlag);
+      forceFresh = Boolean(forceFreshFlag);
       console.log('📝 Text analysis mode:', { textDescription, foodType });
 
       if (!textDescription) {
@@ -1369,6 +1426,8 @@ CRITICAL REQUIREMENTS:
       const formData = await req.formData();
       const imageFile = formData.get('image') as File;
       setAnalysisMode(formData.get('analysisMode'));
+      labelScan = String(formData.get('labelScan') || '') === '1';
+      forceFresh = String(formData.get('forceFresh') || '') === '1';
       
       console.log('📊 Image file info:', {
         hasImageFile: !!imageFile,
@@ -1391,7 +1450,8 @@ CRITICAL REQUIREMENTS:
       const imageBase64 = Buffer.from(imageBuffer).toString('base64');
       imageMeta = getImageMetadata(imageBuffer);
       imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
-      imageHash = crypto.createHash('sha256').update(Buffer.from(imageBuffer)).digest('hex');
+      const baseHash = crypto.createHash('sha256').update(Buffer.from(imageBuffer)).digest('hex');
+      imageHash = forceFresh ? `${baseHash}-${Date.now()}` : baseHash;
       imageBytes = imageBuffer.byteLength;
       imageMime = imageFile.type || null;
       
@@ -2154,6 +2214,61 @@ CRITICAL REQUIREMENTS:
       }
     }
 
+    if (packagedMode && labelScan && imageDataUrl && resp.items && resp.items.length > 0) {
+      try {
+        const labelResult = await extractLabelPerServingFromImage(openai, imageDataUrl, model)
+        totalCostCents += labelResult.costCents
+        const parsed = labelResult.parsed || {}
+        const perServing = parsed?.per_serving || parsed?.perServing || null
+        const toNumber = (value: any) => {
+          const num = Number(value)
+          return Number.isFinite(num) ? num : null
+        }
+        const hasPerServingValues =
+          perServing &&
+          typeof perServing === 'object' &&
+          Object.values(perServing).some((value) => value !== null && value !== undefined && value !== '');
+        if (hasPerServingValues) {
+          const nextItems = [...resp.items]
+          const targetIndex = 0
+          const next = { ...nextItems[targetIndex] }
+          if (parsed?.serving_size || parsed?.servingSize) {
+            next.serving_size = String(parsed.serving_size || parsed.servingSize || '').trim()
+          }
+          next.calories = toNumber(perServing.calories)
+          next.protein_g = toNumber(perServing.protein_g ?? perServing.protein)
+          next.carbs_g = toNumber(perServing.carbs_g ?? perServing.carbs)
+          next.fat_g = toNumber(perServing.fat_g ?? perServing.fat)
+          next.fiber_g = toNumber(perServing.fiber_g ?? perServing.fiber)
+          next.sugar_g = toNumber(perServing.sugar_g ?? perServing.sugar)
+          nextItems[targetIndex] = next
+          resp.items = nextItems
+          resp.total = computeTotalsFromItems(resp.items) || resp.total
+        } else {
+          const nextItems = resp.items.map((item: any, index: number) =>
+            index === 0
+              ? {
+                  ...item,
+                  labelNeedsReview: true,
+                  labelNeedsReviewMessage:
+                    'We could not read the per serve column clearly. Please retake the label photo.',
+                  calories: null,
+                  protein_g: null,
+                  carbs_g: null,
+                  fat_g: null,
+                  fiber_g: null,
+                  sugar_g: null,
+                }
+              : item,
+          )
+          resp.items = nextItems
+          resp.total = computeTotalsFromItems(resp.items) || resp.total
+        }
+      } catch (labelErr) {
+        console.warn('Label per-serving extraction failed (non-fatal):', labelErr)
+      }
+    }
+
     // Final safety pass: if the AI has described a discrete portion like
     // "3 large eggs" or "4 slices of bacon" but provided calories/macros that
     // only match a single unit, scale those macros up so that the totals match
@@ -2193,7 +2308,7 @@ CRITICAL REQUIREMENTS:
     }
 
     // Packaged mode: fill missing macros from FatSecret without overriding existing values.
-    if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+    if (packagedMode && !labelScan && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
       const enriched = await enrichPackagedItemsWithFatSecret(resp.items);
       if (enriched.total) {
         resp.items = enriched.items;
@@ -2202,7 +2317,7 @@ CRITICAL REQUIREMENTS:
     }
 
     // General (non-packaged) enrichment when macros are missing/zero
-    if (resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+    if (!labelScan && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
       const needsEnrichment = resp.items.some(
         (it: any) =>
           (!Number.isFinite(Number(it?.calories)) || Number(it?.calories) === 0) ||
@@ -2223,7 +2338,11 @@ CRITICAL REQUIREMENTS:
     }
 
     // Stabilize totals: prefer plausible incoming total when it roughly matches per-item sums; otherwise recompute from items.
-    resp.total = chooseCanonicalTotal(resp.items, resp.total);
+    if (labelScan) {
+      resp.total = computeTotalsFromItems(resp.items) || resp.total;
+    } else {
+      resp.total = chooseCanonicalTotal(resp.items, resp.total);
+    }
 
     // Packaged mode: skip secondary OpenAI per-serving extraction to keep one API call per analysis.
     if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
