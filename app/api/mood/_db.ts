@@ -19,6 +19,22 @@ export async function ensureMoodTables() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_moodentries_user_timestamp ON MoodEntries(userId, timestamp DESC)`).catch(() => {})
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_moodentries_user_localdate ON MoodEntries(userId, localDate)`).catch(() => {})
 
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS MoodJournalEntries (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      localDate TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      images JSONB NOT NULL DEFAULT '[]'::jsonb,
+      createdAt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_moodjournal_user_created ON MoodJournalEntries(userId, createdAt DESC)`).catch(() => {})
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_moodjournal_user_localdate ON MoodJournalEntries(userId, localDate)`).catch(() => {})
+
   // Mood reminder preferences (push notifications) and delivery log.
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS MoodReminderSettings (

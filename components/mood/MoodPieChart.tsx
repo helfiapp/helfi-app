@@ -156,6 +156,7 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
           lineEl.style.fontSize = '14px'
           lineEl.style.fontWeight = '500'
           lineEl.style.marginBottom = '4px'
+          lineEl.style.width = '100%'
 
           const swatch = document.createElement('span')
           swatch.style.width = '12px'
@@ -173,6 +174,8 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
           const timeEl = document.createElement('div')
           timeEl.style.fontSize = '14px'
           timeEl.style.fontWeight = '500'
+          timeEl.style.textAlign = 'center'
+          timeEl.style.width = '100%'
           timeEl.textContent = timeLabel
 
           tooltipEl.appendChild(titleEl)
@@ -182,6 +185,8 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
           const { offsetLeft, offsetTop } = chart.canvas
           tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`
           tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`
+          const aboveTop = tooltip.caretY - tooltipEl.offsetHeight - 12
+          tooltipEl.style.transform = aboveTop < 0 ? 'translate(-50%, 12px)' : 'translate(-50%, -110%)'
           tooltipEl.style.opacity = '1'
         },
       },

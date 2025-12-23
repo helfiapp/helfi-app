@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
 import MoodTabs from '@/components/mood/MoodTabs'
 import MoodTrendGraph from '@/components/mood/MoodTrendGraph'
@@ -140,6 +140,7 @@ export default function MoodHistoryPage() {
   const [insights, setInsights] = useState<InsightsResponse | null>(null)
   const [streakDays, setStreakDays] = useState<number>(0)
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
+  const weekScrollRef = useRef<HTMLDivElement | null>(null)
 
   const [banner, setBanner] = useState<string | null>(null)
   useEffect(() => {
@@ -302,7 +303,7 @@ export default function MoodHistoryPage() {
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(entry)
     }
-    const days = Array.from(map.keys()).sort((a, b) => parseLocalDate(b).getTime() - parseLocalDate(a).getTime())
+    const days = Array.from(map.keys()).sort((a, b) => parseLocalDate(a).getTime() - parseLocalDate(b).getTime())
     return days.map((day) => {
       const items = (map.get(day) || []).slice().sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       return {
@@ -312,6 +313,15 @@ export default function MoodHistoryPage() {
       }
     })
   }, [entries])
+
+  useEffect(() => {
+    if (timeframe !== 'week') return
+    const el = weekScrollRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      el.scrollTo({ left: el.scrollWidth, behavior: 'auto' })
+    })
+  }, [timeframe, daySeries.length])
 
   const recentGroups = useMemo(() => {
     const sorted = entries
@@ -506,7 +516,10 @@ export default function MoodHistoryPage() {
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         Swipe left or right to view each day.
                       </div>
-                      <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4">
+                      <div
+                        ref={weekScrollRef}
+                        className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4"
+                      >
                         {daySeries.map((day) => (
                           <div key={day.day} className="min-w-full snap-center">
                             <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
