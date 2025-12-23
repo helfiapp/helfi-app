@@ -95,6 +95,82 @@ const computeTotalsFromItems = (items: any[]): any | null => {
   };
 };
 
+const stripNutritionFromServingSize = (raw: string) => {
+  return String(raw || '')
+    .replace(/\([^)]*(calories?|kcal|kilojoules?|kj|protein|carbs?|fat|fibre|fiber|sugar)[^)]*\)/gi, '')
+    .replace(/\b\d+(?:\.\d+)?\s*(kcal|cal|kj)\b[^,)]*(?:protein|carb|fat|fiber|fibre|sugar)[^,)]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const parseServingWeight = (servingSize?: string | null): number | null => {
+  if (!servingSize) return null;
+  const raw = String(servingSize);
+  const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/i);
+  if (gramsMatch) return parseFloat(gramsMatch[1]);
+  const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/i);
+  if (mlMatch) return parseFloat(mlMatch[1]);
+  const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i);
+  if (ozMatch) return parseFloat(ozMatch[1]) * 28.3495;
+  return null;
+};
+
+const sanitizePackagedLabelItems = (items: any[]) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { items, needsReview: false, message: '' };
+  }
+  let needsReview = false;
+  let message = '';
+  const cleaned = items.map((item) => {
+    const next = { ...item };
+    if (next?.serving_size) {
+      next.serving_size = stripNutritionFromServingSize(next.serving_size);
+    }
+    const weight =
+      parseServingWeight(next?.serving_size || null) ||
+      (Number.isFinite(Number(next?.customGramsPerServing)) && Number(next.customGramsPerServing) > 0
+        ? Number(next.customGramsPerServing)
+        : null) ||
+      (Number.isFinite(Number(next?.customMlPerServing)) && Number(next.customMlPerServing) > 0
+        ? Number(next.customMlPerServing)
+        : null);
+
+    if (!weight || weight <= 0) return next;
+
+    const safe = (value: any) =>
+      Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0;
+    const calories = safe(next?.calories);
+    const protein = safe(next?.protein_g);
+    const carbs = safe(next?.carbs_g);
+    const fat = safe(next?.fat_g);
+    const fiber = safe(next?.fiber_g);
+    const macroSum = protein + carbs + fat + fiber;
+    const macroLimit = weight * 1.3 + 2;
+    const calorieLimit = weight * 9.5 + 10;
+    const hasNoNumbers = calories <= 0 && macroSum <= 0;
+    const failsMacro = macroSum > macroLimit;
+    const failsCalories = calories > calorieLimit;
+
+    if (hasNoNumbers || failsMacro || failsCalories) {
+      needsReview = true;
+      message =
+        'We could not read the per serve column clearly. Please retake the label photo and make sure the first column is sharp.';
+      next.labelNeedsReview = true;
+      next.labelNeedsReviewMessage = message;
+      next.calories = null;
+      next.protein_g = null;
+      next.carbs_g = null;
+      next.fat_g = null;
+      next.fiber_g = null;
+      next.sugar_g = null;
+    }
+
+    return next;
+  });
+
+  return { items: cleaned, needsReview, message };
+};
+
 const isPlausibleTotal = (total: any): boolean => {
   if (!total || typeof total !== 'object') return false;
   const calories = Number((total as any)?.calories);
@@ -1178,7 +1254,9 @@ export async function POST(req: NextRequest) {
         ? `
 PACKAGED MODE SELECTED:
 - Use ONLY the per-serving column from the nutrition label (ignore per-100g values).
+- Always read the first column that lists "Quantity per serving" (or similar).
 - Copy the per-serving numbers verbatim (calories, protein, carbs, fat, fiber, sugar) and the printed serving size.
+- If you cannot read the per-serve numbers clearly, set calories/protein/carbs/fat/fiber/sugar to null (do not guess).
 - Do NOT scale from per-100g to per-serving; do NOT "correct" the label.
 - Keep serving_size as written on the label and set servings to 1 by default (user will adjust).`
         : '';
@@ -2296,6 +2374,16 @@ CRITICAL REQUIREMENTS:
       } catch (e) {
         console.warn('Wallet charge failed:', e);
         return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+      }
+    }
+
+    if (packagedMode && Array.isArray(resp.items) && resp.items.length > 0) {
+      const packagedReview = sanitizePackagedLabelItems(resp.items);
+      resp.items = packagedReview.items;
+      if (packagedReview.needsReview) {
+        resp.labelNeedsReview = true;
+        resp.labelReviewMessage = packagedReview.message;
+        resp.total = computeTotalsFromItems(resp.items);
       }
     }
 

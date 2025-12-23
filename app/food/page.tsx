@@ -369,6 +369,7 @@ const formatEnergyValue = (value: number | null | undefined, unit: 'kcal' | 'kJ'
 
 const formatServingSizeDisplay = (label: string, item: any) => {
   const base = label && label.trim().length > 0 ? label.trim() : 'Not specified'
+  if (item?.labelNeedsReview) return base
   const macros: string[] = []
   const kcal = Number(item?.calories)
   const protein = Number(item?.protein_g)
@@ -3405,6 +3406,12 @@ const applyStructuredItems = (
   ) => {
     const itemsCopy = [...analyzedItems]
     if (!itemsCopy[index]) return
+    const clearLabelReviewFlag = () => {
+      if (itemsCopy[index]?.labelNeedsReview) {
+        itemsCopy[index].labelNeedsReview = false
+        delete itemsCopy[index].labelNeedsReviewMessage
+      }
+    }
 
     // Normalize and clamp values by field
     if (field === 'name') {
@@ -3413,7 +3420,8 @@ const applyStructuredItems = (
       const v = String(value || '').trim()
       itemsCopy[index].brand = v.length > 0 ? v : null
     } else if (field === 'serving_size') {
-      itemsCopy[index].serving_size = String(value || '').trim()
+      itemsCopy[index].serving_size = stripNutritionFromServingSize(String(value || '').trim())
+      clearLabelReviewFlag()
     } else if (field === 'servings') {
       // Keep servings stable to 2 decimals to avoid 1.24 vs 1.25 drift when stepping.
       const clamped = clampNumber(value, 0, 20)
@@ -3466,6 +3474,7 @@ const applyStructuredItems = (
         itemsCopy[index].servings = Math.round(derivedServings * 100) / 100
       }
       }
+      clearLabelReviewFlag()
     } else if (field === 'weightUnit') {
       const previousUnit = itemsCopy[index].weightUnit === 'ml' ? 'ml' : itemsCopy[index].weightUnit === 'oz' ? 'oz' : 'g'
       const normalized = value === 'ml' ? 'ml' : value === 'oz' ? 'oz' : 'g'
@@ -3492,23 +3501,28 @@ const applyStructuredItems = (
         }
       }
       itemsCopy[index].weightUnit = normalized
+      clearLabelReviewFlag()
     } else if (field === 'customGramsPerServing') {
       const clamped = clampNumber(value, 0, 5000)
       const rounded = Math.round(clamped * 100) / 100
       itemsCopy[index].customGramsPerServing = rounded
+      clearLabelReviewFlag()
     } else if (field === 'customMlPerServing') {
       const clamped = clampNumber(value, 0, 5000)
       const rounded = Math.round(clamped * 100) / 100
       itemsCopy[index].customMlPerServing = rounded
+      clearLabelReviewFlag()
     } else if (field === 'calories') {
       // Calories as integer, reasonable upper bound per serving
       const clamped = clampNumber(value, 0, 3000)
       itemsCopy[index].calories = Math.round(clamped)
+      clearLabelReviewFlag()
     } else {
       // Macros in grams with 1 decimal place, reasonable upper bound per serving
       const clamped = clampNumber(value, 0, 500)
       const rounded = Math.round(clamped * 10) / 10
       itemsCopy[index][field] = rounded
+      clearLabelReviewFlag()
     }
 
     setAnalyzedItems(itemsCopy)
@@ -4926,9 +4940,10 @@ const applyStructuredItems = (
     const file = e.target.files?.[0];
     if (file) {
       const shouldAutoAnalyze = autoAnalyzeLabelPhoto && Boolean(barcodeLabelFlow?.barcode);
+      const preserveLabelDetail = shouldAutoAnalyze || analysisMode === 'packaged';
       try {
         // Compress the uploaded file to balance quality and cost (higher quality for better detection)
-        const compressedFile = await compressImage(file, 1024, 0.85);
+        const compressedFile = preserveLabelDetail ? file : await compressImage(file, 1024, 0.85);
         setPhotoFile(compressedFile);
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -5333,8 +5348,11 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       
       // Step 1: Compress image (with better error handling)
       let compressedFile;
+      const wantsLabelAccuracy = analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)
       try {
-        compressedFile = await compressImage(fileToAnalyze, 800, 0.8); // Less aggressive compression
+        const targetWidth = wantsLabelAccuracy ? 1400 : 800
+        const targetQuality = wantsLabelAccuracy ? 0.92 : 0.8
+        compressedFile = await compressImage(fileToAnalyze, targetWidth, targetQuality); // Less aggressive compression
         console.log('✅ Image compression successful:', {
           originalSize: fileToAnalyze.size,
           compressedSize: compressedFile.size,
@@ -7240,9 +7258,23 @@ Please add nutritional information manually if needed.`);
     const target =
       list.find((it) => it?.barcode || it?.barcodeSource || it?.detectionMethod === 'barcode') || list[0]
     if (!target) return { ok: true, message: '' }
+    if (target?.labelNeedsReview) {
+      return {
+        ok: false,
+        message:
+          target?.labelNeedsReviewMessage ||
+          'We could not read the per serve column clearly. Please retake the label photo.',
+      }
+    }
     const servingSize = stripNutritionFromServingSize(String(target?.serving_size || ''))
     const servingInfo = parseServingSizeInfo({ serving_size: servingSize })
-    const weight = servingInfo.gramsPerServing ?? servingInfo.mlPerServing ?? null
+    const customWeight =
+      Number.isFinite(Number(target?.customGramsPerServing)) && Number(target.customGramsPerServing) > 0
+        ? Number(target.customGramsPerServing)
+        : Number.isFinite(Number(target?.customMlPerServing)) && Number(target.customMlPerServing) > 0
+        ? Number(target.customMlPerServing)
+        : null
+    const weight = customWeight ?? servingInfo.gramsPerServing ?? servingInfo.mlPerServing ?? null
     if (!weight || weight <= 0) return { ok: true, message: '' }
 
     const safe = (value: any) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0)
