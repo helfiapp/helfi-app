@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
 import MoodTabs from '@/components/mood/MoodTabs'
 import MoodTrendGraph from '@/components/mood/MoodTrendGraph'
@@ -140,7 +140,6 @@ export default function MoodHistoryPage() {
   const [insights, setInsights] = useState<InsightsResponse | null>(null)
   const [streakDays, setStreakDays] = useState<number>(0)
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
-  const weekScrollRef = useRef<HTMLDivElement | null>(null)
 
   const [banner, setBanner] = useState<string | null>(null)
   useEffect(() => {
@@ -153,6 +152,31 @@ export default function MoodHistoryPage() {
       }
     } catch {}
   }, [])
+
+  useEffect(() => {
+    try {
+      const storedTimeframe = localStorage.getItem('moodHistoryTimeframe') as any
+      const storedChartMode = localStorage.getItem('moodHistoryChartMode') as any
+      if (storedTimeframe === 'day' || storedTimeframe === 'week' || storedTimeframe === 'month' || storedTimeframe === 'year') {
+        setTimeframe(storedTimeframe)
+      }
+      if (storedChartMode === 'pie' || storedChartMode === 'wave') {
+        setChartMode(storedChartMode)
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('moodHistoryTimeframe', timeframe)
+    } catch {}
+  }, [timeframe])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('moodHistoryChartMode', chartMode)
+    } catch {}
+  }, [chartMode])
 
   useEffect(() => {
     let ignore = false
@@ -169,7 +193,20 @@ export default function MoodHistoryPage() {
     })()
 
     const load = async () => {
-      setLoading(true)
+      let hasCache = false
+      try {
+        const cacheKey = `moodHistoryCache:${range.start}:${range.end}`
+        const cachedRaw = sessionStorage.getItem(cacheKey)
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw)
+          if (Array.isArray(cached?.entries)) {
+            setEntries(cached.entries)
+            hasCache = true
+          }
+        }
+      } catch {}
+
+      setLoading(!hasCache)
       setError(null)
       try {
         const days = daysBetweenInclusive(range.start, range.end)
@@ -187,6 +224,10 @@ export default function MoodHistoryPage() {
         const prevData = prevRes.ok ? ((await prevRes.json()) as EntriesResponse) : null
         if (ignore) return
         setEntries(Array.isArray(cur.entries) ? cur.entries : [])
+        try {
+          const cacheKey = `moodHistoryCache:${range.start}:${range.end}`
+          sessionStorage.setItem(cacheKey, JSON.stringify({ entries: cur.entries, cachedAt: Date.now() }))
+        } catch {}
 
         const avgMood = (list: MoodEntry[]) => {
           const nums = list.map((e) => Number(e.mood)).filter((n) => Number.isFinite(n))
@@ -306,7 +347,7 @@ export default function MoodHistoryPage() {
 
     const today = asDateString(new Date())
     const days = timeframe === 'week'
-      ? Array.from({ length: 7 }, (_, i) => shiftDays(today, i - 6))
+      ? Array.from({ length: 7 }, (_, i) => shiftDays(today, -i))
       : Array.from(map.keys()).sort((a, b) => parseLocalDate(a).getTime() - parseLocalDate(b).getTime())
 
     return days.map((day) => {
@@ -318,20 +359,6 @@ export default function MoodHistoryPage() {
       }
     })
   }, [entries, timeframe])
-
-  useEffect(() => {
-    if (timeframe !== 'week') return
-    const el = weekScrollRef.current
-    if (!el) return
-    const scrollToEnd = () => {
-      const target = Math.max(0, el.scrollWidth - el.clientWidth)
-      el.scrollLeft = target
-    }
-    requestAnimationFrame(() => {
-      scrollToEnd()
-      setTimeout(scrollToEnd, 50)
-    })
-  }, [timeframe, daySeries.length])
 
   const recentGroups = useMemo(() => {
     const sorted = entries
@@ -526,10 +553,7 @@ export default function MoodHistoryPage() {
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         Swipe left or right to view each day.
                       </div>
-                      <div
-                        ref={weekScrollRef}
-                        className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4"
-                      >
+                      <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4">
                         {daySeries.map((day) => (
                           <div key={day.day} className="min-w-full snap-center">
                             <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">

@@ -92,6 +92,7 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
   const options: ChartOptions<'pie'> = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
+    events: ['mousemove', 'mouseout', 'click'],
     plugins: {
       legend: { display: false },
       tooltip: {
