@@ -3254,6 +3254,7 @@ const applyStructuredItems = (
     if (!next.weightAmount || next.weightAmount === 0) {
       const { gramsPerServing, mlPerServing, ozPerServing } = quickParseServingSize(next?.serving_size)
       const currentUnit = next?.weightUnit === 'ml' ? 'ml' : next?.weightUnit === 'oz' ? 'oz' : 'g'
+      const hasWeightUnit = !!next?.weightUnit
       const servings = Number.isFinite(Number(next?.servings)) && Number(next.servings) > 0 ? Number(next.servings) : 1
       
       let initialWeight: number | null = null
@@ -3271,26 +3272,26 @@ const applyStructuredItems = (
         initialWeight = gramsPerServing * servings
       }
       
-      // Convert to current unit if needed
-      if (initialWeight && initialWeight > 0 && targetUnit !== currentUnit) {
-        if (targetUnit === 'g' && currentUnit === 'oz') {
-          initialWeight = initialWeight / 28.3495
-        } else if (targetUnit === 'oz' && currentUnit === 'g') {
-          initialWeight = initialWeight * 28.3495
-        } else if (targetUnit === 'g' && currentUnit === 'ml') {
-          // assume ~1g/mL
-          initialWeight = initialWeight
-        } else if (targetUnit === 'ml' && currentUnit === 'g') {
-          // assume ~1g/mL
-          initialWeight = initialWeight
+      // Convert to current unit if needed (only when the item already has a weight unit)
+      if (initialWeight && initialWeight > 0 && hasWeightUnit && targetUnit !== currentUnit) {
+        const toGrams = (value: number, unit: string) => {
+          if (unit === 'oz') return value * 28.3495
+          return value // g or ml (assume ~1g/mL)
         }
+        const fromGrams = (value: number, unit: string) => {
+          if (unit === 'oz') return value / 28.3495
+          return value // g or ml
+        }
+        const gramsValue = toGrams(initialWeight, targetUnit)
+        initialWeight = fromGrams(gramsValue, currentUnit)
       }
       
       if (initialWeight && initialWeight > 0) {
-        const precision = currentUnit === 'oz' ? 100 : 1000
+        const finalUnit = hasWeightUnit ? currentUnit : targetUnit
+        const precision = finalUnit === 'oz' ? 100 : 1000
         next.weightAmount = Math.round(initialWeight * precision) / precision
         if (!next.weightUnit) {
-          next.weightUnit = targetUnit
+          next.weightUnit = finalUnit
         }
       }
     }
