@@ -363,7 +363,9 @@ const extractComponentsFromAnalysis = (analysis: string | null | undefined): str
   if (!cleaned) return [];
 
   let listText = '';
-  const componentsMatch = cleaned.match(/\bcomponents?\s*:\s*([^.\n]+)/i);
+  const componentsMatch = cleaned.match(
+    /\b(?:components?|ingredients?)(?:\s+list)?\s*[:\-]\s*([^\n.]+)/i,
+  );
   if (componentsMatch && componentsMatch[1]) {
     listText = componentsMatch[1];
   }
@@ -374,7 +376,7 @@ const extractComponentsFromAnalysis = (analysis: string | null | undefined): str
   if (!listText) return [];
 
   const parts = listText
-    .split(/,| and | & /i)
+    .split(/,|;| and | & /i)
     .map((part) =>
       part
         .replace(/^(?:several\s+components?|components?|includes?|including)\s*:?/i, '')
@@ -383,7 +385,10 @@ const extractComponentsFromAnalysis = (analysis: string | null | undefined): str
     )
     .filter((part) => part.length >= 3);
 
-  const filtered = parts.filter((part) => !/nutrition|breakdown|estimated/i.test(part));
+  const filtered = parts.filter((part) => {
+    if (/^component\s*\d+$/i.test(part)) return false;
+    return !/nutrition|breakdown|estimated|calories?|protein|carbs?|fat|fiber|fibre|sugar/i.test(part);
+  });
   const unique: string[] = [];
   for (const part of filtered) {
     const normalized = normalizeComponentName(part);
@@ -1501,7 +1506,13 @@ PACKAGED / BRANDED FOODS (VERY IMPORTANT):
 - If the text clearly says the person ate multiple units (e.g. "2 hot dog rolls"), keep the serving_size as on the label (per 1 roll) and set "servings" accordingly (e.g. 2).
 ${packagedEmphasisBlock}
 
-Keep your explanation concise (2-3 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
+Keep your explanation concise (2-3 sentences). After the explanation, include a single line exactly in this format:
+Components: component 1, component 2, component 3
+- Use plain ingredient names only (no quantities).
+- Include every distinct component you mentioned or can see.
+- Even for a single-item meal, include one component.
+- Do not use placeholders like "component 1" in the final output.
+Then include a single nutrition line at the end in this exact format:
 
 Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
 
@@ -1732,7 +1743,13 @@ OUTPUT REQUIREMENTS:
 - Keep explanation to 2-3 sentences
 - ALWAYS end with a single nutrition line in this exact format:
 
-Keep your explanation concise (2-3 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
+Keep your explanation concise (2-3 sentences). After the explanation, include a single line exactly in this format:
+Components: component 1, component 2, component 3
+- Use plain ingredient names only (no quantities).
+- Include every distinct component you mentioned or can see.
+- Even for a single-item meal, include one component.
+- Do not use placeholders like "component 1" in the final output.
+Then include a single nutrition line at the end in this exact format:
 
 Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
 
@@ -2113,6 +2130,10 @@ CRITICAL REQUIREMENTS:
     };
     let itemsSource: string = 'none';
     let itemsQuality: 'valid' | 'weak' | 'none' = 'none';
+    let analysisTextForFollowUp = analysis;
+    let listedComponents: string[] = [];
+    let componentsHint = '';
+    let componentsRequirement = '';
     if (wantStructured) {
       try {
         const m = analysis.match(/<ITEMS_JSON>([\s\S]*?)<\/ITEMS_JSON>/i);
@@ -2127,9 +2148,16 @@ CRITICAL REQUIREMENTS:
             .replace(/```/g, '')
             .trim();
           const parsed = parseItemsJsonRelaxed(cleanedBlock);
-          if (parsed && typeof parsed === 'object') {
-            const parsedItems = Array.isArray(parsed.items) ? parsed.items : [];
-            const parsedTotal = typeof parsed.total === 'object' ? parsed.total : null;
+          if (parsed) {
+            const parsedItems = Array.isArray(parsed)
+              ? parsed
+              : Array.isArray((parsed as any).items)
+              ? (parsed as any).items
+              : [];
+            const parsedTotal =
+              !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
+                ? (parsed as any).total
+                : null;
             if (parsedItems.length > 0) {
               // Use the parsed items/total directly; do not overwrite them with fallback/default items
               resp.items = sanitizeStructuredItems(parsedItems);
@@ -2145,11 +2173,22 @@ CRITICAL REQUIREMENTS:
         console.warn('ITEMS_JSON handling failed (non-fatal):', e);
       }
 
+      analysisTextForFollowUp = resp.analysis || analysis;
+      listedComponents = extractComponentsFromAnalysis(analysisTextForFollowUp);
+      componentsHint =
+        listedComponents.length > 0
+          ? `- Components list (include each as its own item): ${listedComponents.join(', ')}.\n`
+          : '';
+      componentsRequirement =
+        listedComponents.length > 1
+          ? `- Return at least ${listedComponents.length} items.\n`
+          : '';
+
       // If the main analysis did not contain a usable ITEMS_JSON block, make a
       // compact follow-up call whose ONLY job is to produce structured items
       // so the UI can render editable ingredient cards. This is text-only and
       // only runs when the first call missed items.
-      if ((!resp.items || resp.items.length === 0) && analysis.length > 0) {
+      if ((!resp.items || resp.items.length === 0) && analysisTextForFollowUp.length > 0) {
         try {
           console.log('ℹ️ No ITEMS_JSON found, running lightweight items extractor (text-only)');
           const extractor = await chatCompletionWithCost(openai, {
@@ -2161,14 +2200,16 @@ CRITICAL REQUIREMENTS:
                   'Convert the nutrition analysis text below into JSON with this exact shape:\n' +
                   '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],' +
                   '"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+                  componentsHint +
+                  componentsRequirement +
                   '- Use realistic per-serving values based on the analysis.\n' +
                   '- If unsure about fiber or sugar, set them to 0.\n' +
                   '- Respond with JSON only, no backticks.\n\n' +
                   'Analysis text:\n' +
-                  analysis,
+                  analysisTextForFollowUp,
               },
             ],
-            max_tokens: 220,
+            max_tokens: 360,
             temperature: 0,
           } as any);
           logAiUsageEvent({
@@ -2191,14 +2232,21 @@ CRITICAL REQUIREMENTS:
               .replace(/```/g, '')
               .trim() || '';
           const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
-          if (parsed && typeof parsed === 'object') {
-            const items = Array.isArray(parsed.items) ? parsed.items : [];
-            const total = typeof parsed.total === 'object' ? parsed.total : null;
+          if (parsed) {
+            const items = Array.isArray(parsed)
+              ? parsed
+              : Array.isArray((parsed as any).items)
+              ? (parsed as any).items
+              : [];
+            const total =
+              !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
+                ? (parsed as any).total
+                : null;
             if (items.length > 0) {
               resp.items = sanitizeStructuredItems(items);
               resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
-                itemsSource = itemsSource === 'none' ? 'text_extractor' : `${itemsSource}+text_extractor`;
-                itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
+              itemsSource = itemsSource === 'none' ? 'text_extractor' : `${itemsSource}+text_extractor`;
+              itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
               console.log('✅ Structured items extracted via follow-up call:', {
                 itemCount: items.length,
               });
@@ -2210,10 +2258,10 @@ CRITICAL REQUIREMENTS:
 
         // If we still have no items, synthesize multiple editable items so cards stay separate.
         if (!resp.items || resp.items.length === 0) {
-          const caloriesMatch = analysis.match(/calories\s*[:\-]?\s*(\d+)/i);
-          const proteinMatch = analysis.match(/protein\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
-          const carbsMatch = analysis.match(/carbs?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
-          const fatMatch = analysis.match(/fat\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
+          const caloriesMatch = analysisTextForFollowUp.match(/calories\s*[:\-]?\s*(\d+)/i);
+          const proteinMatch = analysisTextForFollowUp.match(/protein\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
+          const carbsMatch = analysisTextForFollowUp.match(/carbs?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
+          const fatMatch = analysisTextForFollowUp.match(/fat\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
           const baseTotal =
             resp.total ||
             computeTotalsFromItems([
@@ -2230,7 +2278,7 @@ CRITICAL REQUIREMENTS:
 
           if (preferMultiDetect && !packagedMode) {
             if (!STRICT_AI_ONLY_ITEMS) {
-              const fallback = buildMultiComponentFallback(analysis, baseTotal);
+              const fallback = buildMultiComponentFallback(analysisTextForFollowUp, baseTotal);
               resp.items = fallback.items;
               resp.total = fallback.total;
               console.log('ℹ️ Using multi-item fallback to avoid single-card UI');
@@ -2275,32 +2323,47 @@ CRITICAL REQUIREMENTS:
         looksLikeMultiIngredientSummary(resp.items))
     ) {
       try {
-        console.warn('⚠️ Photo analyzer: generic/missing/summary items detected; running multi-item follow-up.');
+        console.warn('⚠️ Analyzer: generic/missing/summary items detected; running multi-item follow-up.');
         console.log('ℹ️ Enforcing multi-item breakdown via structure-only follow-up');
         const hintTotal = resp.total || computeTotalsFromItems(resp.items || []) || null;
+        const followUpPrompt =
+          'Split this meal description into separate ingredients/components and return JSON only with this shape:\n' +
+          '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+          componentsHint +
+          componentsRequirement +
+          '- Use realistic per-serving values for EACH component (eggs, bacon, bagel, juice, etc).\n' +
+          '- Keep servings to 1 by default and use household measures ("1 slice", "1 cup", "1 egg").\n' +
+          '- Do not collapse everything into a single "Meal" item. Return 1 item per distinct component.\n' +
+          (imageDataUrl ? '- Use the image as the primary source of truth; the analysis text is supplemental.\n' : '') +
+          (hintTotal
+            ? `- Keep totals roughly consistent with Calories ${hintTotal.calories ?? 'unknown'} / Protein ${
+                hintTotal.protein_g ?? 'unknown'
+              }g / Carbs ${hintTotal.carbs_g ?? 'unknown'}g / Fat ${hintTotal.fat_g ?? 'unknown'}g.\n`
+            : '') +
+          '\nAnalysis text:\n' +
+          analysisTextForFollowUp;
+        const followUpModel = imageDataUrl ? 'gpt-4o' : 'gpt-4o-mini';
+        const followUpMessages = imageDataUrl
+          ? [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: followUpPrompt },
+                  { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+                ],
+              },
+            ]
+          : [
+              {
+                role: 'user',
+                content: followUpPrompt,
+              },
+            ];
         const followUp = await chatCompletionWithCost(openai, {
-          model: 'gpt-4o-mini',
+          model: followUpModel,
           response_format: { type: 'json_object' } as any,
-          messages: [
-            {
-              role: 'user',
-              content:
-                'Split this meal description into separate ingredients/components and return JSON only with this shape:\n' +
-                '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
-                '- Use realistic per-serving values for EACH component (eggs, bacon, bagel, juice, etc).\n' +
-                '- Keep servings to 1 by default and use household measures ("1 slice", "1 cup", "1 egg").\n' +
-                '- Do not collapse everything into a single "Meal" item. Return 1 item per distinct component.\n' +
-                '- If the analysis lists components, include ALL of them as separate items.\n' +
-                (hintTotal
-                  ? `- Keep totals roughly consistent with Calories ${hintTotal.calories ?? 'unknown'} / Protein ${
-                      hintTotal.protein_g ?? 'unknown'
-                    }g / Carbs ${hintTotal.carbs_g ?? 'unknown'}g / Fat ${hintTotal.fat_g ?? 'unknown'}g.\n`
-                  : '') +
-                '\nAnalysis text:\n' +
-                analysis,
-            },
-          ],
-          max_tokens: 220,
+          messages: followUpMessages,
+          max_tokens: 360,
           temperature: 0,
         } as any);
 
@@ -2308,13 +2371,23 @@ CRITICAL REQUIREMENTS:
         const text = followUp.completion.choices?.[0]?.message?.content?.trim() || '';
         const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
-        if (parsed && typeof parsed === 'object') {
-          const items = Array.isArray(parsed.items) ? parsed.items : [];
-          const total = typeof parsed.total === 'object' ? parsed.total : null;
-          if (items.length > 1 || (items.length === 1 && !looksLikeSingleGenericItem(items))) {
+        if (parsed) {
+          const items = Array.isArray(parsed)
+            ? parsed
+            : Array.isArray((parsed as any).items)
+            ? (parsed as any).items
+            : [];
+          const total =
+            !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
+              ? (parsed as any).total
+              : null;
+          const requiresMultiple = listedComponents.length > 1;
+          const hasEnoughItems = requiresMultiple ? items.length > 1 : items.length > 0;
+          if (hasEnoughItems && !looksLikeSingleGenericItem(items) && !looksLikeMultiIngredientSummary(items)) {
             resp.items = sanitizeStructuredItems(items);
             resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
-            itemsSource = itemsSource === 'none' ? 'multi_followup' : `${itemsSource}+multi_followup`;
+            const sourceLabel = imageDataUrl ? 'vision_multi_followup' : 'multi_followup';
+            itemsSource = itemsSource === 'none' ? sourceLabel : `${itemsSource}+${sourceLabel}`;
             itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
             console.log('✅ Multi-item follow-up produced structured items:', items.length);
           }
@@ -2326,8 +2399,7 @@ CRITICAL REQUIREMENTS:
 
     // If the analysis text clearly lists components that are missing from ITEMS_JSON,
     // backfill those components so the user can edit/remove them.
-    if (wantStructured && preferMultiDetect && resp.items && resp.items.length > 0) {
-      const listedComponents = extractComponentsFromAnalysis(analysis);
+    if (wantStructured && preferMultiDetect) {
       if (listedComponents.length > 0) {
         const existing = resp.items || [];
         const existingLabels: string[] = existing.map((item: any) =>
@@ -2356,10 +2428,10 @@ CRITICAL REQUIREMENTS:
                     '- Keep servings at 1 and use simple serving sizes ("1 serving", "1/4 cup").\n' +
                     '- If uncertain, set isGuess: true and keep macros conservative.\n' +
                     '\nAnalysis text:\n' +
-                    analysis,
+                    analysisTextForFollowUp,
                 },
               ],
-              max_tokens: 240,
+              max_tokens: 360,
               temperature: 0,
             } as any);
 
@@ -2367,7 +2439,15 @@ CRITICAL REQUIREMENTS:
             const text = followUp.completion.choices?.[0]?.message?.content?.trim() || '';
             const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
             const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
-            const followUpItems = parsed && typeof parsed === 'object' ? sanitizeStructuredItems(parsed.items || []) : [];
+            const followUpItems = parsed
+              ? sanitizeStructuredItems(
+                  Array.isArray(parsed)
+                    ? parsed
+                    : Array.isArray((parsed as any).items)
+                    ? (parsed as any).items
+                    : [],
+                )
+              : [];
             if (followUpItems.length > 0) {
               const additions = followUpItems.filter((item: any) => {
                 const normalized = normalizeComponentName(item?.name || '');
