@@ -2305,7 +2305,7 @@ CRITICAL REQUIREMENTS:
       const listedComponents = extractComponentsFromAnalysis(analysis);
       if (listedComponents.length > 0) {
         const existing = resp.items || [];
-        const existingLabels = existing.map((item: any) =>
+        const existingLabels: string[] = existing.map((item: any) =>
           normalizeComponentName(`${item?.name || ''} ${item?.serving_size || ''}`),
         );
         const missingComponents = listedComponents.filter((component) => {
@@ -2367,7 +2367,7 @@ CRITICAL REQUIREMENTS:
 
           if (resp.items && resp.items.length > 0) {
             const existingNow = resp.items || [];
-            const existingNowLabels = existingNow.map((item: any) =>
+            const existingNowLabels: string[] = existingNow.map((item: any) =>
               normalizeComponentName(`${item?.name || ''} ${item?.serving_size || ''}`),
             );
             const stillMissing = missingComponents.filter((component) => {
