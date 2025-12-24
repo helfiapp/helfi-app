@@ -28,8 +28,8 @@ export default function MoodTabs() {
             <span className="material-symbols-outlined align-middle text-[18px]">settings</span>
           </Link>
         </div>
-        <div className="relative px-1 pb-1">
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pr-8">
+        <div className="px-1 pb-1">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             <Link
               href="/mood"
               className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
@@ -70,11 +70,6 @@ export default function MoodTabs() {
             >
               Insights
             </Link>
-          </div>
-          <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2">
-            <div className="h-8 w-8 flex items-center justify-end pr-1 bg-gradient-to-l from-white via-white/80 to-transparent dark:from-gray-800 dark:via-gray-800/80">
-              <span className="material-symbols-outlined text-[18px] text-gray-400">chevron_right</span>
-            </div>
           </div>
         </div>
       </div>

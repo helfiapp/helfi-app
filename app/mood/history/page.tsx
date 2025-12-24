@@ -323,11 +323,13 @@ export default function MoodHistoryPage() {
     if (timeframe !== 'week') return
     const el = weekScrollRef.current
     if (!el) return
+    const scrollToEnd = () => {
+      const target = Math.max(0, el.scrollWidth - el.clientWidth)
+      el.scrollLeft = target
+    }
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const target = Math.max(0, el.scrollWidth - el.clientWidth)
-        el.scrollTo({ left: target, behavior: 'auto' })
-      })
+      scrollToEnd()
+      setTimeout(scrollToEnd, 50)
     })
   }, [timeframe, daySeries.length])
 
