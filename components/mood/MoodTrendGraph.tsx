@@ -100,7 +100,7 @@ export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
   const options: ChartOptions<'line'> = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
-    events: ['mousemove', 'mouseout', 'click'],
+    events: ['click'],
     plugins: {
       legend: { display: false },
       tooltip: {

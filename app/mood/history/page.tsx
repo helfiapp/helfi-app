@@ -357,17 +357,27 @@ export default function MoodHistoryPage() {
     return () => { ignore = true }
   }, [])
 
+  const chartEntries = useMemo(() => {
+    if (timeframe !== 'day' && timeframe !== 'week') return entries
+    if (timeframe === 'day' && selectedDay) return entries
+    if (recentEntries.length === 0) return entries
+    const merged = new Map<string, MoodEntry>()
+    for (const entry of entries) merged.set(entry.id, entry)
+    for (const entry of recentEntries) merged.set(entry.id, entry)
+    return Array.from(merged.values())
+  }, [entries, recentEntries, timeframe, selectedDay])
+
   const points = useMemo(() => {
-    const xs = entries
+    const xs = chartEntries
       .slice()
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .map((e) => ({ timestamp: e.timestamp, mood: Number(e.mood) }))
     return xs
-  }, [entries])
+  }, [chartEntries])
 
   const daySeries = useMemo(() => {
     const map = new Map<string, MoodEntry[]>()
-    for (const entry of entries) {
+    for (const entry of chartEntries) {
       const day = entryDayKey(entry)
       if (!day) continue
       if (!map.has(day)) map.set(day, [])
@@ -388,10 +398,11 @@ export default function MoodHistoryPage() {
         points: items.map((e) => ({ timestamp: e.timestamp, mood: Number(e.mood) })),
       }
     })
-  }, [entries, timeframe, selectedDay])
+  }, [chartEntries, timeframe, selectedDay])
 
   useEffect(() => {
     if (timeframe !== 'week' && timeframe !== 'day') return
+    if (loading) return
     const el = weekScrollRef.current
     if (!el) return
     const scrollToEnd = () => {
@@ -400,12 +411,15 @@ export default function MoodHistoryPage() {
     }
     requestAnimationFrame(() => {
       scrollToEnd()
-      setTimeout(scrollToEnd, 120)
+      setTimeout(scrollToEnd, 160)
+      setTimeout(scrollToEnd, 320)
     })
-  }, [timeframe, daySeries.length])
+  }, [timeframe, daySeries.length, loading])
 
   const recentGroups = useMemo(() => {
-    const source = timeframe === 'day' ? recentEntries : entries
+    const source = timeframe === 'day'
+      ? (recentEntries.length ? recentEntries : chartEntries)
+      : chartEntries
     const sorted = source
       .slice()
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -424,7 +438,7 @@ export default function MoodHistoryPage() {
       day,
       entries: (map.get(day) || []).slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
     }))
-  }, [entries])
+  }, [chartEntries, recentEntries, timeframe])
 
   const formatTime = (ts: any) => {
     try {
@@ -438,7 +452,7 @@ export default function MoodHistoryPage() {
 
   const dailyAverages = useMemo(() => {
     const sums = new Map()
-    for (const e of entries) {
+    for (const e of chartEntries) {
       const d = String(e.localDate || '').slice(0, 10)
       const v = Number(e.mood)
       if (!d || !Number.isFinite(v)) continue
@@ -450,17 +464,17 @@ export default function MoodHistoryPage() {
     const avg = new Map()
     sums.forEach((v, d) => avg.set(d, v.sum / v.n))
     return avg
-  }, [entries])
+  }, [chartEntries])
 
   const overallAverage = useMemo(() => {
-    const nums = entries.map((e) => Number(e.mood)).filter((n) => Number.isFinite(n))
+    const nums = chartEntries.map((e) => Number(e.mood)).filter((n) => Number.isFinite(n))
     if (nums.length === 0) return null
     return nums.reduce((a, b) => a + b, 0) / nums.length
-  }, [entries])
+  }, [chartEntries])
 
   const topMood = useMemo(() => {
     const counts = new Map()
-    for (const e of entries) {
+    for (const e of chartEntries) {
       const v = Number(e.mood)
       if (!Number.isFinite(v)) continue
       counts.set(v, (counts.get(v) || 0) + 1)
@@ -470,7 +484,7 @@ export default function MoodHistoryPage() {
       if (!best || n > best.n) best = { mood, n }
     })
     return best
-  }, [entries])
+  }, [chartEntries])
 
   const topMoodValue = (topMood as any)?.mood as number | null
   const topMoodCount = (topMood as any)?.n as number | null
