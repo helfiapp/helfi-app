@@ -3662,6 +3662,7 @@ const applyStructuredItems = (
 
   // Mobile date header label: "Today" when on today's date; otherwise "Fri, Dec 12"
   const mobileDateLabel = isViewingToday ? 'Today' : formatShortDayLabel(selectedDate)
+  const desktopDateLabel = isViewingToday ? 'Today' : formatShortDayLabel(selectedDate)
 
   const shiftSelectedDateByDays = (deltaDays: number) => {
     try {
@@ -10367,12 +10368,17 @@ Please add nutritional information manually if needed.`);
             >
               ◀︎ Previous
             </button>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-1"
-            />
+            <div className="relative">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="text-sm border border-gray-200 rounded-lg px-3 py-1 text-transparent caret-transparent"
+              />
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-medium text-gray-700">
+                {desktopDateLabel}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => shiftSelectedDateByDays(1)}
