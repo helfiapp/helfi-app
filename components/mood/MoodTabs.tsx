@@ -15,58 +15,67 @@ export default function MoodTabs() {
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4">
       <div className="bg-white dark:bg-gray-800 rounded-t-xl border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-          <Link
-            href="/mood"
-            className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
-              isCheckIn
-                ? 'text-helfi-green border-b-2 border-helfi-green'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
-          >
-            Check‑in
-          </Link>
-          <Link
-            href="/mood/history"
-            className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
-              isHistory
-                ? 'text-helfi-green border-b-2 border-helfi-green'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
-          >
-            History
-          </Link>
-          <Link
-            href="/mood/journal"
-            className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
-              isJournal
-                ? 'text-helfi-green border-b-2 border-helfi-green'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
-          >
-            Journal
-          </Link>
-          <Link
-            href="/mood/insights"
-            className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
-              isInsights
-                ? 'text-helfi-green border-b-2 border-helfi-green'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-            }`}
-          >
-            Insights
-          </Link>
+        <div className="flex items-center justify-end px-2 pt-2">
           <Link
             href="/mood/preferences"
-            className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
+            className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors ${
               isPrefs
-                ? 'text-helfi-green border-b-2 border-helfi-green'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                ? 'border-helfi-green text-helfi-green'
+                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'
             }`}
             aria-label="Preferences"
           >
-            <span className="material-symbols-outlined align-middle text-[20px]">settings</span>
+            <span className="material-symbols-outlined align-middle text-[18px]">settings</span>
           </Link>
+        </div>
+        <div className="relative px-1 pb-1">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pr-8">
+            <Link
+              href="/mood"
+              className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
+                isCheckIn
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Check‑in
+            </Link>
+            <Link
+              href="/mood/history"
+              className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
+                isHistory
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              History
+            </Link>
+            <Link
+              href="/mood/journal"
+              className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
+                isJournal
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Journal
+            </Link>
+            <Link
+              href="/mood/insights"
+              className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
+                isInsights
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Insights
+            </Link>
+          </div>
+          <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2">
+            <div className="h-8 w-8 flex items-center justify-end pr-1 bg-gradient-to-l from-white via-white/80 to-transparent dark:from-gray-800 dark:via-gray-800/80">
+              <span className="material-symbols-outlined text-[18px] text-gray-400">chevron_right</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
