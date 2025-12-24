@@ -31,9 +31,13 @@ export type MoodPoint = { timestamp: string; mood: number | null; label?: string
 export default function MoodTrendGraph({
   points,
   showTimeAxis = false,
+  fillArea = true,
+  spanGaps = false,
 }: {
   points: MoodPoint[]
   showTimeAxis?: boolean
+  fillArea?: boolean
+  spanGaps?: boolean
 }) {
   const chartPoints = useMemo(() => {
     if (points.length !== 1) {
@@ -117,7 +121,8 @@ export default function MoodTrendGraph({
           borderColor: 'rgb(34, 197, 94)',
           backgroundColor: 'rgba(34, 197, 94, 0.12)',
           tension: 0.35,
-          fill: true,
+          fill: fillArea,
+          spanGaps,
           pointRadius: (ctx) => ((ctx.raw as any)?.synthetic ? 0 : 3),
           pointHoverRadius: (ctx) => ((ctx.raw as any)?.synthetic ? 0 : 5),
           pointHitRadius: (ctx) => ((ctx.raw as any)?.synthetic ? 0 : 18),
@@ -211,7 +216,7 @@ export default function MoodTrendGraph({
         },
       },
     },
-    interaction: { mode: 'nearest', intersect: true },
+    interaction: { mode: 'nearest', intersect: false },
     onClick: (event, elements, chart) => {
       if (!elements?.length) return
       const first = elements[0] as any

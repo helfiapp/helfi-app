@@ -407,11 +407,11 @@ export default function MoodJournalPage() {
   const dateLabel = useMemo(() => formatDateLong(localDate), [localDate])
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24 overflow-x-hidden">
       <PageHeader title="Mood" backHref="/mood" />
       <MoodTabs />
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6 touch-pan-y overscroll-x-none">
         {notice && (
           <div className="rounded-xl border border-green-200 bg-green-50 text-green-800 px-4 py-3 text-sm">
             {notice}
@@ -590,7 +590,7 @@ export default function MoodJournalPage() {
             </div>
           </div>
 
-          <div className="relative rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 min-h-[180px]">
+          <div className="relative rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 min-h-[180px] overflow-x-hidden">
             {!contentHtml && (
               <div className="pointer-events-none absolute left-4 top-3 text-sm text-gray-400">Start writing...</div>
             )}
@@ -599,7 +599,7 @@ export default function MoodJournalPage() {
               contentEditable
               suppressContentEditableWarning
               onInput={() => setContentHtml(editorRef.current?.innerHTML || '')}
-              className="min-h-[140px] text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
+              className="min-h-[140px] text-sm text-gray-900 dark:text-gray-100 focus:outline-none break-words whitespace-pre-wrap max-w-full"
             />
           </div>
 

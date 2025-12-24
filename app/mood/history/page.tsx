@@ -674,7 +674,7 @@ export default function MoodHistoryPage() {
                         {chartMode === 'pie' ? (
                           <MoodPieChart entries={chartEntries} />
                         ) : (
-                          <MoodTrendGraph points={weekSummaryPoints} />
+                          <MoodTrendGraph points={weekSummaryPoints} fillArea={false} spanGaps />
                         )}
                       </div>
                     </div>
