@@ -5391,7 +5391,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       formData.append('image', compressedFile);
       formData.append('analysisMode', analysisMode);
       formData.append('forceFresh', '1');
-      if (barcodeLabelFlow?.barcode) {
+      if (wantsLabelAccuracy) {
         formData.append('labelScan', '1');
       }
       console.log('✅ FormData created successfully');
@@ -5619,7 +5619,7 @@ Please add nutritional information manually if needed.`);
 
 
   const addFoodEntry = async (description: string, method: 'text' | 'photo', nutrition?: any) => {
-    if (barcodeLabelBlocked) {
+    if (labelBlocked) {
       showQuickToast('Please fix the label values before saving.')
       return
     }
@@ -5739,7 +5739,7 @@ Please add nutritional information manually if needed.`);
   // New function to update existing entries with AI re-analysis
   const updateFoodEntry = async () => {
     if (!editingEntry) return;
-    if (barcodeLabelBlocked) {
+    if (labelBlocked) {
       showQuickToast('Please fix the label values before saving.')
       return
     }
@@ -7277,12 +7277,16 @@ Please add nutritional information manually if needed.`);
     }
   }
 
-  const validateBarcodeLabelItems = (items: any[] | null | undefined) => {
-    if (!barcodeLabelFlow?.barcode) return { ok: true, message: '' }
+  const validateLabelItems = (
+    items: any[] | null | undefined,
+    options: { enforce: boolean; preferBarcodeTarget: boolean },
+  ) => {
+    if (!options.enforce) return { ok: true, message: '' }
     const list = Array.isArray(items) ? items : []
     if (list.length === 0) return { ok: true, message: '' }
-    const target =
-      list.find((it) => it?.barcode || it?.barcodeSource || it?.detectionMethod === 'barcode') || list[0]
+    const target = options.preferBarcodeTarget
+      ? list.find((it) => it?.barcode || it?.barcodeSource || it?.detectionMethod === 'barcode') || list[0]
+      : list[0]
     if (!target) return { ok: true, message: '' }
     if (target?.labelNeedsReview) {
       return {
@@ -7332,17 +7336,22 @@ Please add nutritional information manually if needed.`);
     return { ok: true, message: '' }
   }
 
-  const barcodeLabelValidation = useMemo(
-    () => validateBarcodeLabelItems(analyzedItems),
-    [analyzedItems, barcodeLabelFlow],
+  const labelStrictMode = Boolean(barcodeLabelFlow?.barcode) || (isPackagedAnalysis && !!photoPreview)
+  const labelValidation = useMemo(
+    () =>
+      validateLabelItems(analyzedItems, {
+        enforce: labelStrictMode,
+        preferBarcodeTarget: Boolean(barcodeLabelFlow?.barcode),
+      }),
+    [analyzedItems, barcodeLabelFlow, isPackagedAnalysis, photoPreview, labelStrictMode],
   )
-  const barcodeLabelBlocked = Boolean(barcodeLabelFlow?.barcode) && !barcodeLabelValidation.ok
-  const openBarcodeLabelEdit = () => {
+  const labelBlocked = labelStrictMode && !labelValidation.ok
+  const openLabelEdit = () => {
     const list = Array.isArray(analyzedItems) ? analyzedItems : []
     if (list.length === 0) return
-    const targetIndex = list.findIndex(
-      (it) => it?.barcode || it?.barcodeSource || it?.detectionMethod === 'barcode',
-    )
+    const targetIndex = barcodeLabelFlow?.barcode
+      ? list.findIndex((it) => it?.barcode || it?.barcodeSource || it?.detectionMethod === 'barcode')
+      : 0
     const index = targetIndex >= 0 ? targetIndex : 0
     setEditingItemIndex(index)
     setShowItemEditModal(true)
@@ -11099,7 +11108,7 @@ Please add nutritional information manually if needed.`);
                       <button
                         type="button"
                         onClick={() => updateFoodEntry()}
-                        disabled={isAnalyzing || isSavingEntry || barcodeLabelBlocked}
+                        disabled={isAnalyzing || isSavingEntry || labelBlocked}
                         className="px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs sm:text-sm font-medium shadow-sm hover:bg-emerald-600 disabled:opacity-60"
                       >
                         {isSavingEntry ? (
@@ -11137,16 +11146,16 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {barcodeLabelBlocked && (
+                  {labelBlocked && (
                     <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
                       <div className="font-semibold">Label numbers look wrong</div>
-                      <div className="text-xs text-red-800 mt-1">{barcodeLabelValidation.message}</div>
+                      <div className="text-xs text-red-800 mt-1">{labelValidation.message}</div>
                       <div className="text-xs text-red-800 mt-1">
                         Fix the macros with the pencil icon or retake the label photo to continue.
                       </div>
                       <button
                         type="button"
-                        onClick={openBarcodeLabelEdit}
+                        onClick={openLabelEdit}
                         className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
                       >
                         Edit label numbers
@@ -12035,7 +12044,7 @@ Please add nutritional information manually if needed.`);
 	                    onClick={() =>
 	                      editingEntry ? updateFoodEntry() : addFoodEntry(aiDescription, manualMealBuildMode ? 'text' : 'photo')
 	                    }
-	                    disabled={isAnalyzing || isSavingEntry || barcodeLabelBlocked}
+	                    disabled={isAnalyzing || isSavingEntry || labelBlocked}
 	                    className="w-full py-3 px-4 mx-auto max-w-[95%] bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
 	                  >
                     {isAnalyzing || isSavingEntry ? (

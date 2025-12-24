@@ -668,14 +668,16 @@ for a change.
   - `app/food/page.tsx` now *scales macros instead of servings* for discrete items when the label states multiple pieces (e.g., “3 large eggs”, “4 slices bacon”). Servings stays at `1` to avoid “3 servings of 3 eggs”, while calories/macros are multiplied by the labeled count. **Leave this logic intact** unless the user explicitly requests a different design.
 - **Keep bagel starter data intact:** `data/foods-starter.ts` includes `Sesame Bagel` with standard macros so photo analyses have a reliable fallback. Do not remove or rename this entry without approval.
 - **Packaged per-serving OCR (Nov 24, 2025 – locked):**
-  - Packaged (“Product nutrition image”) uses **gpt-4o** for per-serving extraction; do not downgrade the model without user approval.
-  - Use the per-serving column exactly; ignore per-100g and do not sum saturated/trans into total fat. If macros overshoot label calories, only clamp fat (and carbs if clearly under-read) to fit label kcal; otherwise keep the per-serving numbers from the label.
+  - Packaged (“Product nutrition image”) must use **only the per-serving column** from the label; ignore per-100g.
+  - Do not sum saturated/trans into total fat. If macros overshoot label calories, only clamp fat (and carbs if clearly under-read) to fit label kcal; otherwise keep the per-serving numbers from the label.
   - Barcode mode is **removed**; do not reintroduce barcode lookups or hallucinated products. If nothing is found, stick to label OCR.
 - **Barcode label scan accuracy (Dec 2025 – locked):**
   - Barcode label scans must read **ONLY the first per-serve column** on the label. Never use the per-100g column.
   - If the per-serve values are unclear or do not fit the serving size, block saving and show the red warning. Do not allow silent saves.
   - The warning must include the **Edit label numbers** action so users can correct values.
   - For label scans, do not use FatSecret/USDA fallbacks. Use label values or user edits only.
+- **Product nutrition images use the same strict block (Dec 2025 – locked):**
+  - When the user selects “Product nutrition image,” apply the same label checks and block saving if numbers do not fit the serving size.
 - **Serving step snapping (Nov 24, 2025 – locked):**
   - If the serving label includes a discrete count in parentheses (e.g., “10g (6 crackers)”, “1 serving (3 eggs)”), the serving step is exactly `1 / count`, and values snap to that fraction so whole numbers stay exact (no 2.002 drift).
   - For non-discrete or unspecified counts, keep the 0.25 step. Do not loosen this snapping logic without user approval.
