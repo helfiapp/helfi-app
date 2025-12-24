@@ -349,6 +349,50 @@ const inferComponentsFromAnalysis = (analysis: string | null | undefined): strin
   return unique.slice(0, 8);
 };
 
+const normalizeComponentName = (value: string) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const extractComponentsFromAnalysis = (analysis: string | null | undefined): string[] => {
+  if (!analysis) return [];
+  const cleaned = analysis.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return [];
+
+  let listText = '';
+  const componentsMatch = cleaned.match(/\bcomponents?\s*:\s*([^.\n]+)/i);
+  if (componentsMatch && componentsMatch[1]) {
+    listText = componentsMatch[1];
+  }
+  if (!listText) {
+    const withMatch = cleaned.match(/\bwith\b\s+([^.\n]+)/i);
+    if (withMatch && withMatch[1]) listText = withMatch[1];
+  }
+  if (!listText) return [];
+
+  const parts = listText
+    .split(/,| and | & /i)
+    .map((part) =>
+      part
+        .replace(/^(?:several\s+components?|components?|includes?|including)\s*:?/i, '')
+        .replace(/\bhere'?s\b.*$/i, '')
+        .trim(),
+    )
+    .filter((part) => part.length >= 3);
+
+  const filtered = parts.filter((part) => !/nutrition|breakdown|estimated/i.test(part));
+  const unique: string[] = [];
+  for (const part of filtered) {
+    const normalized = normalizeComponentName(part);
+    if (!normalized) continue;
+    if (!unique.some((u) => normalizeComponentName(u) === normalized)) unique.push(part);
+    if (unique.length >= 10) break;
+  }
+  return unique;
+};
+
 // Normalize isGuess flag across items
 const normalizeGuessFlags = (items: any[]): any[] =>
   Array.isArray(items)
@@ -1490,6 +1534,7 @@ CRITICAL REQUIREMENTS:
 - Set "servings" to 1 as the default (user can adjust this in the UI).
 - For multi-item meals: Create separate items for each distinct food component.
 - Include ONLY components explicitly mentioned in the description. Do NOT invent typical sides/toppings.
+- If you mention a component in the description, it MUST appear in ITEMS_JSON (no exceptions).
 - Set "isGuess": true only when the description implies an item but is ambiguous.
 - **Set "isGuess": false only for items you can clearly identify with high confidence.**
 - **Only use pieces for discrete items when the count is clearly visible/stated (e.g., "2 patties"). Otherwise use grams/serving and leave pieces out.**
@@ -1708,6 +1753,7 @@ CRITICAL REQUIREMENTS:
 - Set "servings" to 1 as the default (user can adjust this in the UI).
 - For multi-item meals: Create separate items for each distinct food component.
 - Include ONLY foods/components you can see in the photo. Do NOT add "typical" sides.
+- If you mention a component in the description, it MUST appear in ITEMS_JSON (no exceptions).
 - Set "isGuess": true only for ambiguous items that are still visible (e.g., an unknown dipping sauce).
 - **Set "isGuess": false only for items you can clearly see and identify with high confidence.**
 - **Only use pieces for discrete items when the count is clearly visible/stated (e.g., "2 patties"). Otherwise use grams/serving and leave pieces out.**
@@ -2250,6 +2296,106 @@ CRITICAL REQUIREMENTS:
         }
       } catch (multiErr) {
         console.warn('Multi-item follow-up failed (non-fatal):', multiErr);
+      }
+    }
+
+    // If the analysis text clearly lists components that are missing from ITEMS_JSON,
+    // backfill those components so the user can edit/remove them.
+    if (wantStructured && preferMultiDetect && resp.items && resp.items.length > 0) {
+      const listedComponents = extractComponentsFromAnalysis(analysis);
+      if (listedComponents.length > 0) {
+        const existing = resp.items || [];
+        const existingLabels = existing.map((item: any) =>
+          normalizeComponentName(`${item?.name || ''} ${item?.serving_size || ''}`),
+        );
+        const missingComponents = listedComponents.filter((component) => {
+          const normalized = normalizeComponentName(component);
+          if (!normalized) return false;
+          return !existingLabels.some((label) => label.includes(normalized) || normalized.includes(label));
+        });
+
+        if (missingComponents.length > 0) {
+          try {
+            const followUp = await chatCompletionWithCost(openai, {
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'user',
+                  content:
+                    'Return JSON only with this shape:\n' +
+                    '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0,"isGuess":false}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+                    '- Include EVERY component mentioned in the analysis text.\n' +
+                    '- Do not omit small items (radish, cucumber, seaweed, kimchi).\n' +
+                    '- Keep servings at 1 and use simple serving sizes ("1 serving", "1/4 cup").\n' +
+                    '- If uncertain, set isGuess: true and keep macros conservative.\n' +
+                    '\nAnalysis text:\n' +
+                    analysis,
+                },
+              ],
+              max_tokens: 240,
+              temperature: 0,
+            } as any);
+
+            totalCostCents += followUp.costCents;
+            const text = followUp.completion.choices?.[0]?.message?.content?.trim() || '';
+            const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+            const followUpItems = parsed && typeof parsed === 'object' ? sanitizeStructuredItems(parsed.items || []) : [];
+            if (followUpItems.length > 0) {
+              const additions = followUpItems.filter((item: any) => {
+                const normalized = normalizeComponentName(item?.name || '');
+                if (!normalized) return false;
+                return !existingLabels.some((label) => label.includes(normalized) || normalized.includes(label));
+              });
+              if (additions.length > 0) {
+                const merged = [
+                  ...existing,
+                  ...additions.map((item: any) => ({ ...item, isGuess: item?.isGuess === true })),
+                ];
+                resp.items = sanitizeStructuredItems(merged);
+                resp.total = computeTotalsFromItems(resp.items) || resp.total;
+                itemsSource = itemsSource === 'none' ? 'component_backfill' : `${itemsSource}+component_backfill`;
+                itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+                console.log('✅ Backfilled missing components from analysis text:', {
+                  missingCount: additions.length,
+                });
+              }
+            }
+          } catch (missingErr) {
+            console.warn('Missing component backfill failed (non-fatal):', missingErr);
+          }
+
+          if (resp.items && resp.items.length > 0) {
+            const existingNow = resp.items || [];
+            const existingNowLabels = existingNow.map((item: any) =>
+              normalizeComponentName(`${item?.name || ''} ${item?.serving_size || ''}`),
+            );
+            const stillMissing = missingComponents.filter((component) => {
+              const normalized = normalizeComponentName(component);
+              if (!normalized) return false;
+              return !existingNowLabels.some((label) => label.includes(normalized) || normalized.includes(label));
+            });
+            if (stillMissing.length > 0) {
+              const placeholders = stillMissing.map((name) => ({
+                name,
+                brand: null,
+                serving_size: '1 serving',
+                servings: 1,
+                calories: null,
+                protein_g: null,
+                carbs_g: null,
+                fat_g: null,
+                fiber_g: null,
+                sugar_g: null,
+                isGuess: true,
+              }));
+              resp.items = sanitizeStructuredItems([...existingNow, ...placeholders]);
+              resp.total = resp.total || computeTotalsFromItems(resp.items) || null;
+              itemsSource = itemsSource === 'none' ? 'component_placeholders' : `${itemsSource}+component_placeholders`;
+              itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+            }
+          }
+        }
       }
     }
 
