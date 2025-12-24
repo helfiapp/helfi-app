@@ -1170,6 +1170,17 @@ const looksLikeSingleGenericItem = (items: any[] | null | undefined): boolean =>
   return genericNames.includes(name) || hasMinimalDetail;
 };
 
+const looksLikeMultiIngredientSummary = (items: any[] | null | undefined): boolean => {
+  if (!Array.isArray(items) || items.length !== 1) return false;
+  const item = items[0] || {};
+  const label = `${String(item?.name || '')} ${String(item?.serving_size || '')}`.toLowerCase();
+  if (!label.trim()) return false;
+  if (label.includes('components')) return true;
+  const hasListDelimiters = label.includes(',') || label.includes(' and ') || label.includes(' with ');
+  const wordCount = label.split(/\s+/).filter(Boolean).length;
+  return hasListDelimiters && wordCount >= 6;
+};
+
 const splitAnalysisIntoComponents = (analysis: string | null | undefined): string[] => {
   if (!analysis) return [];
   const cleaned = analysis.replace(/\s+/g, ' ').trim();
@@ -2258,14 +2269,18 @@ CRITICAL REQUIREMENTS:
     if (
       wantStructured &&
       preferMultiDetect &&
-      (!resp.items || resp.items.length === 0 || looksLikeSingleGenericItem(resp.items))
+      (!resp.items ||
+        resp.items.length === 0 ||
+        looksLikeSingleGenericItem(resp.items) ||
+        looksLikeMultiIngredientSummary(resp.items))
     ) {
       try {
-        console.warn('⚠️ Photo analyzer: generic/missing items detected; running multi-item follow-up.');
+        console.warn('⚠️ Photo analyzer: generic/missing/summary items detected; running multi-item follow-up.');
         console.log('ℹ️ Enforcing multi-item breakdown via structure-only follow-up');
         const hintTotal = resp.total || computeTotalsFromItems(resp.items || []) || null;
         const followUp = await chatCompletionWithCost(openai, {
           model: 'gpt-4o-mini',
+          response_format: { type: 'json_object' } as any,
           messages: [
             {
               role: 'user',
@@ -2275,6 +2290,7 @@ CRITICAL REQUIREMENTS:
                 '- Use realistic per-serving values for EACH component (eggs, bacon, bagel, juice, etc).\n' +
                 '- Keep servings to 1 by default and use household measures ("1 slice", "1 cup", "1 egg").\n' +
                 '- Do not collapse everything into a single "Meal" item. Return 1 item per distinct component.\n' +
+                '- If the analysis lists components, include ALL of them as separate items.\n' +
                 (hintTotal
                   ? `- Keep totals roughly consistent with Calories ${hintTotal.calories ?? 'unknown'} / Protein ${
                       hintTotal.protein_g ?? 'unknown'
