@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
 import MoodTabs from '@/components/mood/MoodTabs'
 import MoodTrendGraph from '@/components/mood/MoodTrendGraph'
@@ -140,6 +140,8 @@ export default function MoodHistoryPage() {
   const [insights, setInsights] = useState<InsightsResponse | null>(null)
   const [streakDays, setStreakDays] = useState<number>(0)
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
+  const [recentEntries, setRecentEntries] = useState<MoodEntry[]>([])
+  const weekScrollRef = useRef<HTMLDivElement | null>(null)
 
   const [banner, setBanner] = useState<string | null>(null)
   useEffect(() => {
@@ -209,55 +211,82 @@ export default function MoodHistoryPage() {
       setLoading(!hasCache)
       setError(null)
       try {
-        const days = daysBetweenInclusive(range.start, range.end)
-        const prev = {
-          start: shiftDays(range.start, -days),
-          end: shiftDays(range.start, -1),
-        }
-
-        const [curRes, prevRes] = await Promise.all([
-          fetch(`/api/mood/entries?start=${range.start}&end=${range.end}`, { cache: 'no-store' as any }),
-          fetch(`/api/mood/entries?start=${prev.start}&end=${prev.end}`, { cache: 'no-store' as any }),
-        ])
+        const curRes = await fetch(`/api/mood/entries?start=${range.start}&end=${range.end}`, { cache: 'no-store' as any })
         if (!curRes.ok) throw new Error('Failed to load')
         const cur = (await curRes.json()) as EntriesResponse
-        const prevData = prevRes.ok ? ((await prevRes.json()) as EntriesResponse) : null
         if (ignore) return
         setEntries(Array.isArray(cur.entries) ? cur.entries : [])
         try {
           const cacheKey = `moodHistoryCache:${range.start}:${range.end}`
           sessionStorage.setItem(cacheKey, JSON.stringify({ entries: cur.entries, cachedAt: Date.now() }))
         } catch {}
+        if (!ignore) setLoading(false)
 
-        const avgMood = (list: MoodEntry[]) => {
-          const nums = list.map((e) => Number(e.mood)).filter((n) => Number.isFinite(n))
-          if (nums.length === 0) return null
-          return nums.reduce((a, b) => a + b, 0) / nums.length
-        }
-        const curAvg = avgMood(cur.entries || [])
-        const prevAvg = prevData ? avgMood(prevData.entries || []) : null
-        if (curAvg != null && prevAvg != null && prevAvg > 0) {
-          setTrendPct(((curAvg - prevAvg) / prevAvg) * 100)
-        } else {
-          setTrendPct(null)
+        const days = daysBetweenInclusive(range.start, range.end)
+        const prev = {
+          start: shiftDays(range.start, -days),
+          end: shiftDays(range.start, -1),
         }
 
-        // Light "home" insights carousel (week/month only)
-        const insightPeriod = timeframe === 'week' || timeframe === 'day' ? 'week' : 'month'
-        const insRes = await fetch(`/api/mood/insights?period=${insightPeriod}`, { cache: 'no-store' as any }).catch(() => null)
-        if (insRes && insRes.ok) {
-          const ins = (await insRes.json()) as InsightsResponse
-          if (!ignore) setInsights(ins)
-        }
+        void (async () => {
+          try {
+            const prevRes = await fetch(`/api/mood/entries?start=${prev.start}&end=${prev.end}`, { cache: 'no-store' as any })
+            if (!prevRes.ok) throw new Error('Failed to load previous')
+            const prevData = (await prevRes.json()) as EntriesResponse
+            if (ignore) return
+            const avgMood = (list: MoodEntry[]) => {
+              const nums = list.map((e) => Number(e.mood)).filter((n) => Number.isFinite(n))
+              if (nums.length === 0) return null
+              return nums.reduce((a, b) => a + b, 0) / nums.length
+            }
+            const curAvg = avgMood(cur.entries || [])
+            const prevAvg = avgMood(prevData.entries || [])
+            if (curAvg != null && prevAvg != null && prevAvg > 0) {
+              setTrendPct(((curAvg - prevAvg) / prevAvg) * 100)
+            } else {
+              setTrendPct(null)
+            }
+          } catch {
+            if (!ignore) setTrendPct(null)
+          }
+        })()
+
+        void (async () => {
+          try {
+            const insightPeriod = timeframe === 'week' || timeframe === 'day' ? 'week' : 'month'
+            const insRes = await fetch(`/api/mood/insights?period=${insightPeriod}`, { cache: 'no-store' as any }).catch(() => null)
+            if (insRes && insRes.ok) {
+              const ins = (await insRes.json()) as InsightsResponse
+              if (!ignore) setInsights(ins)
+            }
+          } catch {}
+        })()
       } catch (e: any) {
         if (!ignore) setError(e?.message || 'Failed to load history')
       } finally {
-        if (!ignore) setLoading(false)
+        if (!ignore && !hasCache) setLoading(false)
       }
     }
     load()
     return () => { ignore = true }
   }, [timeframe, selectedDay])
+
+  useEffect(() => {
+    let ignore = false
+    const today = asDateString(new Date())
+    const start = shiftDays(today, -6)
+    const end = today
+    const loadRecent = async () => {
+      try {
+        const res = await fetch(`/api/mood/entries?start=${start}&end=${end}`, { cache: 'no-store' as any })
+        if (!res.ok) return
+        const j = (await res.json()) as EntriesResponse
+        if (!ignore) setRecentEntries(Array.isArray(j.entries) ? j.entries : [])
+      } catch {}
+    }
+    loadRecent()
+    return () => { ignore = true }
+  }, [entries])
 
   useEffect(() => {
     let ignore = false
@@ -347,7 +376,7 @@ export default function MoodHistoryPage() {
 
     const today = asDateString(new Date())
     const days = timeframe === 'week'
-      ? Array.from({ length: 7 }, (_, i) => shiftDays(today, -i))
+      ? Array.from({ length: 7 }, (_, i) => shiftDays(today, i - 6))
       : Array.from(map.keys()).sort((a, b) => parseLocalDate(a).getTime() - parseLocalDate(b).getTime())
 
     return days.map((day) => {
@@ -360,8 +389,23 @@ export default function MoodHistoryPage() {
     })
   }, [entries, timeframe])
 
+  useEffect(() => {
+    if (timeframe !== 'week') return
+    const el = weekScrollRef.current
+    if (!el) return
+    const scrollToEnd = () => {
+      const target = Math.max(0, el.scrollWidth - el.clientWidth)
+      el.scrollLeft = target
+    }
+    requestAnimationFrame(() => {
+      scrollToEnd()
+      setTimeout(scrollToEnd, 120)
+    })
+  }, [timeframe, daySeries.length])
+
   const recentGroups = useMemo(() => {
-    const sorted = entries
+    const source = timeframe === 'day' ? recentEntries : entries
+    const sorted = source
       .slice()
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     const map = new Map<string, MoodEntry[]>()
@@ -553,7 +597,10 @@ export default function MoodHistoryPage() {
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         Swipe left or right to view each day.
                       </div>
-                      <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4">
+                      <div
+                        ref={weekScrollRef}
+                        className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4 touch-pan-x"
+                      >
                         {daySeries.map((day) => (
                           <div key={day.day} className="min-w-full snap-center">
                             <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
