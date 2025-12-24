@@ -666,6 +666,10 @@ for a change.
   - Intent: keep macros realistic (~6 oz patty ~450 kcal) and totals consistent across repeated analyses of the same image; preserve cards at all times.
 - **Do not undo the discrete-portion fix (Nov 22, 2025):**
   - `app/food/page.tsx` now *scales macros instead of servings* for discrete items when the label states multiple pieces (e.g., “3 large eggs”, “4 slices bacon”). Servings stays at `1` to avoid “3 servings of 3 eggs”, while calories/macros are multiplied by the labeled count. **Leave this logic intact** unless the user explicitly requests a different design.
+- **Pieces only when explicitly counted (Dec 2025 – locked):**
+  - In `app/api/analyze-food/route.ts`, only set `pieces` / `piecesPerServing` when the item name or serving size explicitly shows a count (e.g., “1 egg”, “3 strips bacon”, “4 sausages”).  
+  - If a clear count is not visible, default to grams/serving size and **do not** show pieces in the ingredient card.
+  - This applies to meal photo analysis and text-based analysis alike; do not reintroduce inferred piece counts without user approval.
 - **Keep bagel starter data intact:** `data/foods-starter.ts` includes `Sesame Bagel` with standard macros so photo analyses have a reliable fallback. Do not remove or rename this entry without approval.
 - **Packaged per-serving OCR (Nov 24, 2025 – locked):**
   - Packaged (“Product nutrition image”) must use **only the per-serving column** from the label; ignore per-100g.

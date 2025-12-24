@@ -7,8 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
  * A server-side fallback below appends this line when missing.
  *
  * ⚠️ GUARD RAIL (GUARD_RAILS.md §3.9):
- * - Do NOT weaken burger/patty/cheese/bacon/egg per-piece defaults or the
- *   `piecesPerServing` seeding / numeric normalization.
+ * - Keep discrete item handling aligned with the guard rails:
+ *   only set pieces/piecesPerServing when a visible, explicit count is present.
  * - Do NOT change portion sync expectations without explicit user approval.
  */
 import { getServerSession } from 'next-auth';
@@ -245,7 +245,7 @@ const EGG_KEYWORDS = ['egg', 'eggs', 'fried egg', 'boiled egg', 'scrambled egg',
 const enforceEggCountFromAnalysis = (items: any[] | null | undefined, analysis: string | null | undefined) => {
   if (!items || !Array.isArray(items) || items.length === 0) return items;
   const text = (analysis || '').toLowerCase();
-  const inferredCount = parseCountFromText(text);
+  const inferredCount = extractExplicitPieceCount(text, ['egg', 'eggs']);
   if (!inferredCount || inferredCount < 2) return items;
 
   const looksLikeEgg = (name: string) => {
@@ -476,6 +476,62 @@ const parseCountFromText = (text: string): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
+const DISCRETE_PIECE_KEYWORDS = [
+  'egg',
+  'eggs',
+  'patty',
+  'pattie',
+  'patties',
+  'nugget',
+  'nuggets',
+  'wing',
+  'wings',
+  'drumstick',
+  'drumsticks',
+  'leg',
+  'legs',
+  'slice',
+  'slices',
+  'strip',
+  'strips',
+  'tender',
+  'tenders',
+  'piece',
+  'pieces',
+  'cookie',
+  'cookies',
+  'cracker',
+  'crackers',
+  'biscuit',
+  'biscuits',
+  'sausage',
+  'sausages',
+  'link',
+  'links',
+]
+
+const hasDiscreteKeyword = (text: string) => {
+  const lower = String(text || '').toLowerCase()
+  return DISCRETE_PIECE_KEYWORDS.some((k) => lower.includes(k))
+}
+
+const extractExplicitPieceCount = (text: string, keywords: string[] = DISCRETE_PIECE_KEYWORDS): number | null => {
+  if (!text) return null
+  const normalized = replaceWordNumbers(String(text).toLowerCase()).replace(/\b(a|an)\b/g, '1')
+  const keywordPattern = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  const match = normalized.match(
+    new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:[a-z-]+\\s+){0,2}(?:${keywordPattern})\\b`),
+  )
+  if (!match) return null
+  const n = parseFloat(match[1])
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+const hasExplicitPieceCount = (text: string, keywords?: string[]): boolean => {
+  const count = extractExplicitPieceCount(text, keywords)
+  return Number.isFinite(count) && Number(count) > 0
+}
+
 const normalizeDiscreteCounts = (items: any[]): any[] =>
   Array.isArray(items)
     ? items.map((item) => ({
@@ -495,10 +551,6 @@ const fixWeightUnitsMisreadAsPieces = (items: any[]): { items: any[]; changed: b
   let changed = false
 
   const hasWeightUnit = (text: string) => /\b\d+(?:\.\d+)?\s*(g|gram|grams|kg|ml|oz|ounce|ounces)\b/i.test(text || '')
-  const hasDiscreteKeyword = (text: string) =>
-    /\b(egg|eggs|patty|pattie|patties|nugget|nuggets|wing|wings|drumstick|drumsticks|leg|legs|slice|slices|strip|strips|tender|tenders|piece|pieces|cookie|cookies|cracker|crackers|biscuit|biscuits)\b/i.test(
-      text || '',
-    )
 
   const fixed = items.map((item) => {
     if (!item || typeof item !== 'object') return item
@@ -532,6 +584,33 @@ const fixWeightUnitsMisreadAsPieces = (items: any[]): { items: any[]; changed: b
   })
 
   return { items: fixed, changed }
+}
+
+const stripPiecesWithoutExplicitCount = (items: any[]): { items: any[]; changed: boolean } => {
+  if (!Array.isArray(items) || items.length === 0) return { items, changed: false }
+  let changed = false
+
+  const next = items.map((item) => {
+    if (!item || typeof item !== 'object') return item
+    const updated: any = { ...item }
+    const name = String(updated?.name || '')
+    const serving = String(updated?.serving_size || updated?.servingSize || '')
+    const label = replaceWordNumbers(`${name} ${serving}`.trim())
+    const explicitCount = extractExplicitPieceCount(label)
+    const hasPieces =
+      (Number.isFinite(Number(updated?.piecesPerServing)) && Number(updated.piecesPerServing) > 0) ||
+      (Number.isFinite(Number(updated?.pieces)) && Number(updated.pieces) > 0)
+
+    if (!explicitCount && hasPieces) {
+      delete updated.piecesPerServing
+      delete updated.pieces
+      changed = true
+    }
+
+    return updated
+  })
+
+  return { items: next, changed }
 }
 
 // When in packaged mode, try to fill missing/zero macros from FatSecret without overwriting existing values.
@@ -771,32 +850,17 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
     const name = (item?.name || '') as string;
     const servingSize = (item?.serving_size || '') as string;
     const labelSource = replaceWordNumbers(`${name} ${servingSize}`.trim());
-    const detectedCount = parseCountFromText(labelSource);
+    const explicitCount = extractExplicitPieceCount(labelSource);
 
     const defaults = DISCRETE_DEFAULTS.find((d) => containsAny(labelSource, d.keywords));
-    if (!defaults && !detectedCount) continue;
-
-    const existingPieces =
-      Number.isFinite(Number((item as any).piecesPerServing)) && Number(item.piecesPerServing) > 0
-        ? Number(item.piecesPerServing)
-        : null;
+    if (!explicitCount) continue;
     const existingServings =
       Number.isFinite(Number(item?.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1;
 
-    let piecesPerServing = detectedCount && detectedCount > 0 ? detectedCount : existingPieces;
-    if (!piecesPerServing || piecesPerServing <= 0) {
-      piecesPerServing = defaults?.key === 'patty' ? 2 : 1;
-    }
+    const piecesPerServing = explicitCount;
+    const totalPieces = Math.max(1, existingServings * piecesPerServing);
 
-    let totalPieces =
-      (existingServings && piecesPerServing ? existingServings * piecesPerServing : piecesPerServing) || 1;
-    if (detectedCount && detectedCount > totalPieces) {
-      totalPieces = detectedCount;
-    }
-    if (totalPieces <= 0) totalPieces = 1;
-
-    const normalizedServings = Math.max(1, totalPieces / piecesPerServing);
-    item.servings = Math.round(normalizedServings * 1000) / 1000;
+    item.servings = Math.round(existingServings * 1000) / 1000;
     (item as any).piecesPerServing = piecesPerServing;
 
     if (defaults) {
@@ -887,29 +951,46 @@ const ensureBurgerComponents = (items: any[] | null, analysis: string | null | u
     }
   };
 
-  // Normalize patties to the detected count (or default 2) with realistic per-piece macros and weight hints.
+  // Normalize patties to explicit counts only (avoid inferred pieces).
   base.forEach((it) => {
     const n = String(it?.name || '').toLowerCase();
     if (!n.includes('patty')) return;
 
-    const detectedCount = parseCountFromText(`${it?.name || ''} ${it?.serving_size || ''}`) || null;
-    const existingPieces =
-      Number.isFinite(Number((it as any).piecesPerServing)) && Number((it as any).piecesPerServing) > 0
-        ? Number((it as any).piecesPerServing)
-        : null;
-    const piecesPerServing = detectedCount && detectedCount > 0 ? detectedCount : existingPieces || 2;
     const existingServings =
       Number.isFinite(Number(it.servings)) && Number(it.servings) > 0 ? Number(it.servings) : 1;
-    const totalPieces = Math.max(
-      piecesPerServing * existingServings,
-      detectedCount || 0,
-      piecesPerServing,
-      2,
-    );
-    const normalizedServings = Math.max(1, Math.round((totalPieces / piecesPerServing) * 1000) / 1000);
+    const labelSource = replaceWordNumbers(`${it?.name || ''} ${it?.serving_size || ''}`.trim());
+    const explicitCount = extractExplicitPieceCount(labelSource);
 
+    it.servings = Math.round(existingServings * 1000) / 1000;
+
+    if (!explicitCount) {
+      delete (it as any).piecesPerServing;
+      delete (it as any).pieces;
+      if (!it.serving_size) {
+        it.serving_size = '115 g';
+      }
+      if (!it.customGramsPerServing) {
+        it.customGramsPerServing = 115;
+      }
+
+      const calories = Number(it.calories ?? NaN);
+      const protein = Number(it.protein_g ?? NaN);
+      const fat = Number(it.fat_g ?? NaN);
+      if (!Number.isFinite(calories) || calories < 200) {
+        it.calories = 250;
+      }
+      if (!Number.isFinite(protein) || protein < 18) {
+        it.protein_g = 22;
+      }
+      if (!Number.isFinite(fat) || fat < 12) {
+        it.fat_g = 18;
+      }
+      return;
+    }
+
+    const piecesPerServing = explicitCount;
+    const totalPieces = Math.max(1, piecesPerServing * existingServings);
     (it as any).piecesPerServing = piecesPerServing;
-    it.servings = normalizedServings;
 
     const perPieceCalories =
       totalPieces > 0 && Number.isFinite(Number(it.calories)) ? Number(it.calories) / totalPieces : 0;
@@ -938,16 +1019,15 @@ const ensureBurgerComponents = (items: any[] | null, analysis: string | null | u
   ensureItem(['patty', 'pattie'], () => ({
     name: 'Beef patty',
     brand: null,
-    serving_size: '2 patties (4–6 oz each)',
-    piecesPerServing: 2,
+    serving_size: '115 g',
     servings: 1,
-    calories: 500,
-    protein_g: 44,
+    calories: 250,
+    protein_g: 22,
     carbs_g: 0,
-    fat_g: 36,
+    fat_g: 18,
     fiber_g: 0,
     sugar_g: 0,
-    customGramsPerServing: 230,
+    customGramsPerServing: 115,
   }));
 
   ensureItem(['bun'], () => ({
@@ -966,37 +1046,35 @@ const ensureBurgerComponents = (items: any[] | null, analysis: string | null | u
   ensureItem(['cheese'], () => ({
     name: 'Cheddar cheese slice',
     brand: null,
-    serving_size: '2 slices',
-    piecesPerServing: 2,
+    serving_size: '25 g',
     servings: 1,
-    calories: 200,
-    protein_g: 12,
+    calories: 100,
+    protein_g: 6,
     carbs_g: 1,
-    fat_g: 18,
+    fat_g: 9,
     fiber_g: 0,
     sugar_g: 0,
-    customGramsPerServing: 50,
+    customGramsPerServing: 25,
   }));
 
   ensureItem(['bacon'], () => ({
     name: 'Bacon slice',
     brand: null,
-    serving_size: '2 slices',
-    piecesPerServing: 2,
+    serving_size: '15 g',
     servings: 1,
-    calories: 90,
-    protein_g: 6,
+    calories: 45,
+    protein_g: 3,
     carbs_g: 0,
-    fat_g: 7,
+    fat_g: 3.5,
     fiber_g: 0,
     sugar_g: 0,
-    customGramsPerServing: 30,
+    customGramsPerServing: 15,
   }));
 
   ensureItem(['lettuce'], () => ({
     name: 'Lettuce',
     brand: null,
-    serving_size: '1 leaf',
+    serving_size: '10 g',
     servings: 1,
     calories: 5,
     protein_g: 0.5,
@@ -1009,7 +1087,7 @@ const ensureBurgerComponents = (items: any[] | null, analysis: string | null | u
   ensureItem(['tomato'], () => ({
     name: 'Tomato',
     brand: null,
-    serving_size: '2 slices',
+    serving_size: '40 g',
     servings: 1,
     calories: 10,
     protein_g: 0.5,
@@ -1353,6 +1431,7 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 
 - For complex meals, be thorough: don't miss side dishes, condiments, dressings, or toppings mentioned
 - Estimate portions realistically based on the description
+- Only use pieces when a clear count is stated; otherwise use grams/servings (if the count is 1, still write it explicitly, e.g., "1 egg")
 - If unsure about a component, estimate conservatively but include it in your totals
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
 
@@ -1388,7 +1467,8 @@ CRITICAL STRUCTURED OUTPUT RULES:
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
 - Item "name" must be the plain ingredient name only (e.g., "grilled salmon", "white rice"). Do NOT prefix names with "several components:", "components:", "meal:", etc.
 - Do NOT treat weights as counts: "8 oz" means weight, NOT "8 pieces". Never prefix an item name with a weight number.
-- For discrete items like bacon or bread/pizza slices, count visible slices and use that count for servings.
+- Only use pieces when a clear count is stated/visible; otherwise use weight/serving size.
+- For foods like fries, wedges, rice, pasta, and salads: use weight/serving, not pieces.
 - For sliced produce (e.g., avocado slices, tomato slices, cucumber slices): treat it as a PORTION (weight/servings), not a discrete piece count. Prefer a grams estimate or a fraction of the whole food (e.g., "1/4 avocado") and set isGuess: true if uncertain.
 - If uncertain about a count, choose a conservative (lower) number and mark isGuess: true.
 
@@ -1412,7 +1492,7 @@ CRITICAL REQUIREMENTS:
 - Include ONLY components explicitly mentioned in the description. Do NOT invent typical sides/toppings.
 - Set "isGuess": true only when the description implies an item but is ambiguous.
 - **Set "isGuess": false only for items you can clearly identify with high confidence.**
-- **For discrete items like patties, count them in serving_size (e.g., "2 patties" or "3 patties") and set servings to match the count.**
+- **Only use pieces for discrete items when the count is clearly visible/stated (e.g., "2 patties"). Otherwise use grams/serving and leave pieces out.**
 - Do not use "pieces" semantics for sliced produce; use portion/grams as described above.
 - Nutrition values should be PER SERVING (not total) for each item.
 - The "total" object should sum all items multiplied by their servings.
@@ -1483,7 +1563,7 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
   5. List components briefly in your description
 
 - Only include foods you can actually SEE in the photo. Do NOT assume common sides (e.g., fries) unless they are clearly visible.
-- Estimate portions realistically based on what's visible in the image (count pieces when possible).
+- Estimate portions realistically based on what's visible in the image (only count pieces when the count is clearly visible).
 - If something is unclear, prefer leaving it out OR include a generic label (e.g., "dipping sauce") and set isGuess: true.
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
 
@@ -1508,7 +1588,9 @@ CRITICAL STRUCTURED OUTPUT RULES:
 - ALWAYS return the ITEMS_JSON block and include fiber_g and sugar_g for each item (do not leave as 0 unless truly 0).
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
 - Item "name" must be the plain ingredient name only (e.g., "grilled salmon", "white rice"). Do NOT prefix names with "several components:", "components:", "meal:", etc.
-- For discrete items like bacon or bread/pizza slices, count visible slices and use that count for servings.
+- Only use pieces when a clear count is visible/stated; otherwise use grams/serving size.
+- If the count is 1, still write it explicitly (e.g., "1 egg").
+- For foods like fries, wedges, rice, pasta, and salads: use weight/serving, not pieces.
 - For sliced produce (e.g., avocado slices, tomato slices, cucumber slices): treat it as a PORTION (weight/servings), not a discrete piece count. Prefer a grams estimate or a fraction of the whole food (e.g., "1/4 avocado") and set isGuess: true if uncertain.
 - If uncertain about a count, choose a conservative (lower) number and mark isGuess: true.
 - **CRITICAL: Use REALISTIC nutrition values based on standard food databases (USDA, nutrition labels, etc.). Do NOT underestimate calories or macros.**
@@ -1628,7 +1710,7 @@ CRITICAL REQUIREMENTS:
 - Include ONLY foods/components you can see in the photo. Do NOT add "typical" sides.
 - Set "isGuess": true only for ambiguous items that are still visible (e.g., an unknown dipping sauce).
 - **Set "isGuess": false only for items you can clearly see and identify with high confidence.**
-- **For discrete items like patties, count them in serving_size (e.g., "2 patties" or "3 patties") and set servings to match the count.**
+- **Only use pieces for discrete items when the count is clearly visible/stated (e.g., "2 patties"). Otherwise use grams/serving and leave pieces out.**
 - Do not use "pieces" semantics for sliced produce; use portion/grams as described above.
 - Nutrition values should be PER SERVING (not total) for each item.
 - The "total" object should sum all items multiplied by their servings.
@@ -2290,6 +2372,13 @@ CRITICAL REQUIREMENTS:
     resp.items = enforceEggCountFromAnalysis(resp.items, analysis);
     if (resp.items && (!resp.total || !isPlausibleTotal(resp.total))) {
       resp.total = computeTotalsFromItems(resp.items);
+    }
+    if (resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+      const strictPieces = stripPiecesWithoutExplicitCount(resp.items);
+      if (strictPieces.changed) {
+        resp.items = strictPieces.items;
+        resp.total = computeTotalsFromItems(resp.items) || resp.total;
+      }
     }
 
     // Enforce multi-item output for meal analyses (non-packaged) so the UI never shows a single card.
