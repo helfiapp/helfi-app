@@ -186,8 +186,8 @@ export default function MoodHistoryPage() {
 
     const range = (() => {
       if (timeframe === 'day') {
-        const d = selectedDay || today
-        return { start: d, end: d }
+        const base = selectedDay || today
+        return { start: shiftDays(base, -6), end: base }
       }
       if (timeframe === 'week') return { start: shiftDays(today, -6), end: today }
       if (timeframe === 'month') return { start: shiftDays(today, -29), end: today }
@@ -375,8 +375,9 @@ export default function MoodHistoryPage() {
     }
 
     const today = asDateString(new Date())
-    const days = timeframe === 'week'
-      ? Array.from({ length: 7 }, (_, i) => shiftDays(today, i - 6))
+    const base = timeframe === 'day' ? (selectedDay || today) : today
+    const days = (timeframe === 'week' || timeframe === 'day')
+      ? Array.from({ length: 7 }, (_, i) => shiftDays(base, i - 6))
       : Array.from(map.keys()).sort((a, b) => parseLocalDate(a).getTime() - parseLocalDate(b).getTime())
 
     return days.map((day) => {
@@ -387,10 +388,10 @@ export default function MoodHistoryPage() {
         points: items.map((e) => ({ timestamp: e.timestamp, mood: Number(e.mood) })),
       }
     })
-  }, [entries, timeframe])
+  }, [entries, timeframe, selectedDay])
 
   useEffect(() => {
-    if (timeframe !== 'week') return
+    if (timeframe !== 'week' && timeframe !== 'day') return
     const el = weekScrollRef.current
     if (!el) return
     const scrollToEnd = () => {
@@ -592,7 +593,7 @@ export default function MoodHistoryPage() {
 	              </div>
 	            ) : (
                 <div className="space-y-4">
-                  {timeframe === 'week' ? (
+                  {timeframe === 'week' || timeframe === 'day' ? (
                     <div className="space-y-2">
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         Swipe left or right to view each day.
