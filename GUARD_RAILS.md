@@ -664,6 +664,9 @@ for a change.
   - `app/food/page.tsx` enriches common items (bun, patty, cheese, ketchup, etc.) with curated USDA-backed macros, enforces realistic floors, and normalizes names (e.g., “Burger bun” instead of random variants). Do not weaken or remove this enrichment/normalization.
 - “Never wipe ingredient cards” guard: `applyStructuredItems` must not replace existing cards with an empty list if a new analysis yields nothing. Preserve existing items and totals in that case. **Do not change this behaviour or clear `analyzedItems` / `analyzedTotal` in new flows without explicit written approval from the user. If ingredient cards ever disappear after a photo or text re‑analysis, treat that as a critical bug and restore this guard – do NOT redefine the UX.**
   - Intent: keep macros realistic (~6 oz patty ~450 kcal) and totals consistent across repeated analyses of the same image; preserve cards at all times.
+- **Strict AI-only ingredient cards (Dec 2025 – locked):**
+  - Ingredient cards must come from AI‑generated structured items only. Do **not** create placeholder cards or extract cards from prose descriptions on the client.
+  - If ingredients are missing, the backend must re‑ask the AI to output the missing items (AI‑only follow‑up). Do not backfill cards locally.
 - **Do not undo the discrete-portion fix (Nov 22, 2025):**
   - `app/food/page.tsx` now *scales macros instead of servings* for discrete items when the label states multiple pieces (e.g., “3 large eggs”, “4 slices bacon”). Servings stays at `1` to avoid “3 servings of 3 eggs”, while calories/macros are multiplied by the labeled count. **Leave this logic intact** unless the user explicitly requests a different design.
 - **Pieces only when explicitly counted (Dec 2025 – locked):**

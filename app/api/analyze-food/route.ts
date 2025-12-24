@@ -25,6 +25,7 @@ import { normalizeDiscreteItems, summarizeDiscreteItemsForLog } from '@/lib/food
 const CACHE_VERSION = 'v4';
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 3;   // stop runaway loops quickly
+const STRICT_AI_ONLY_ITEMS = true;
 
 // Guard rail: this route powers the main Food Analyzer. Billing enforcement
 // (BILLING_ENFORCED) must remain true for production unless the user explicitly
@@ -2217,11 +2218,16 @@ CRITICAL REQUIREMENTS:
             null;
 
           if (preferMultiDetect && !packagedMode) {
-            const fallback = buildMultiComponentFallback(analysis, baseTotal);
-            resp.items = fallback.items;
-            resp.total = fallback.total;
-            console.log('ℹ️ Using multi-item fallback to avoid single-card UI');
-          } else {
+            if (!STRICT_AI_ONLY_ITEMS) {
+              const fallback = buildMultiComponentFallback(analysis, baseTotal);
+              resp.items = fallback.items;
+              resp.total = fallback.total;
+              console.log('ℹ️ Using multi-item fallback to avoid single-card UI');
+            } else {
+              resp.total = baseTotal || resp.total || null;
+              console.warn('⚠️ Strict AI-only mode: no fallback cards created when items are missing.');
+            }
+          } else if (!STRICT_AI_ONLY_ITEMS) {
             const fallbackItem = {
               name: 'Meal',
               brand: null,
@@ -2237,6 +2243,9 @@ CRITICAL REQUIREMENTS:
             resp.items = [fallbackItem];
             resp.total = baseTotal || computeTotalsFromItems(resp.items) || null;
             console.log('ℹ️ Using fallback single-item card to keep editor usable (packaged/explicit single)');
+          } else {
+            resp.total = baseTotal || resp.total || null;
+            console.warn('⚠️ Strict AI-only mode: no fallback cards created for packaged/single cases.');
           }
         }
       }
@@ -2318,13 +2327,15 @@ CRITICAL REQUIREMENTS:
           try {
             const followUp = await chatCompletionWithCost(openai, {
               model: 'gpt-4o-mini',
+              response_format: { type: 'json_object' } as any,
               messages: [
                 {
                   role: 'user',
                   content:
                     'Return JSON only with this shape:\n' +
                     '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0,"isGuess":false}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
-                    '- Include EVERY component mentioned in the analysis text.\n' +
+                    `- Include ONLY these components, exactly as listed: ${listedComponents.join(', ')}.\n` +
+                    '- Do not omit any component. Do not add extras.\n' +
                     '- Do not omit small items (radish, cucumber, seaweed, kimchi).\n' +
                     '- Keep servings at 1 and use simple serving sizes ("1 serving", "1/4 cup").\n' +
                     '- If uncertain, set isGuess: true and keep macros conservative.\n' +
@@ -2347,53 +2358,20 @@ CRITICAL REQUIREMENTS:
                 if (!normalized) return false;
                 return !existingLabels.some((label) => label.includes(normalized) || normalized.includes(label));
               });
-              if (additions.length > 0) {
-                const merged = [
-                  ...existing,
-                  ...additions.map((item: any) => ({ ...item, isGuess: item?.isGuess === true })),
-                ];
-                resp.items = sanitizeStructuredItems(merged);
-                resp.total = computeTotalsFromItems(resp.items) || resp.total;
-                itemsSource = itemsSource === 'none' ? 'component_backfill' : `${itemsSource}+component_backfill`;
-                itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
-                console.log('✅ Backfilled missing components from analysis text:', {
-                  missingCount: additions.length,
-                });
-              }
+              const merged =
+                additions.length > 0
+                  ? [...existing, ...additions.map((item: any) => ({ ...item, isGuess: item?.isGuess === true }))]
+                  : followUpItems;
+              resp.items = sanitizeStructuredItems(merged);
+              resp.total = computeTotalsFromItems(resp.items) || resp.total;
+              itemsSource = itemsSource === 'none' ? 'component_backfill' : `${itemsSource}+component_backfill`;
+              itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+              console.log('✅ Backfilled missing components from AI-only follow-up:', {
+                missingCount: additions.length,
+              });
             }
           } catch (missingErr) {
-            console.warn('Missing component backfill failed (non-fatal):', missingErr);
-          }
-
-          if (resp.items && resp.items.length > 0) {
-            const existingNow = resp.items || [];
-            const existingNowLabels: string[] = existingNow.map((item: any) =>
-              normalizeComponentName(`${item?.name || ''} ${item?.serving_size || ''}`),
-            );
-            const stillMissing = missingComponents.filter((component) => {
-              const normalized = normalizeComponentName(component);
-              if (!normalized) return false;
-              return !existingNowLabels.some((label) => label.includes(normalized) || normalized.includes(label));
-            });
-            if (stillMissing.length > 0) {
-              const placeholders = stillMissing.map((name) => ({
-                name,
-                brand: null,
-                serving_size: '1 serving',
-                servings: 1,
-                calories: null,
-                protein_g: null,
-                carbs_g: null,
-                fat_g: null,
-                fiber_g: null,
-                sugar_g: null,
-                isGuess: true,
-              }));
-              resp.items = sanitizeStructuredItems([...existingNow, ...placeholders]);
-              resp.total = resp.total || computeTotalsFromItems(resp.items) || null;
-              itemsSource = itemsSource === 'none' ? 'component_placeholders' : `${itemsSource}+component_placeholders`;
-              itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
-            }
+            console.warn('Missing component AI follow-up failed (non-fatal):', missingErr);
           }
         }
       }
@@ -2529,6 +2507,7 @@ CRITICAL REQUIREMENTS:
 
     // Enforce multi-item output for meal analyses (non-packaged) so the UI never shows a single card.
     if (
+      !STRICT_AI_ONLY_ITEMS &&
       preferMultiDetect &&
       !packagedMode &&
       (!resp.items || resp.items.length === 0 || (!validateStructuredItems(resp.items) || looksLikeSingleGenericItem(resp.items)))

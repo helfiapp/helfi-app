@@ -3100,7 +3100,7 @@ const applyStructuredItems = (
     hasAnalysisText: !!analysisText,
   })
 
-  if (!finalItems.length && analysisText) {
+  if (allowTextFallback && !finalItems.length && analysisText) {
     const fallback = extractStructuredItemsFromAnalysis(analysisText)
     if (fallback?.items?.length) {
       finalItems = fallback.items
@@ -3193,82 +3193,7 @@ const applyStructuredItems = (
   const fallbackExistingItems =
     existingItemsFromState.length > 0 ? existingItemsFromState : existingItemsFromEditingEntry
 
-  const normalizeComponentName = (value: string) =>
-    String(value || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-
-  const extractComponentsFromAnalysisText = (analysis: string | null | undefined) => {
-    if (!analysis) return []
-    const cleaned = analysis.replace(/\s+/g, ' ').trim()
-    if (!cleaned) return []
-    let listText = ''
-    const componentsMatch = cleaned.match(/\bcomponents?\s*:\s*([^.\n]+)/i)
-    if (componentsMatch && componentsMatch[1]) {
-      listText = componentsMatch[1]
-    }
-    if (!listText) {
-      const withMatch = cleaned.match(/\bwith\b\s+([^.\n]+)/i)
-      if (withMatch && withMatch[1]) listText = withMatch[1]
-    }
-    if (!listText) return []
-    const parts = listText
-      .split(/,| and | & /i)
-      .map((part) =>
-        part
-          .replace(/^(?:several\s+components?|components?|includes?|including)\s*:?/i, '')
-          .replace(/\bhere'?s\b.*$/i, '')
-          .trim(),
-      )
-      .filter((part) => part.length >= 3)
-    const filtered = parts.filter((part) => !/nutrition|breakdown|estimated/i.test(part))
-    const unique: string[] = []
-    for (const part of filtered) {
-      const normalized = normalizeComponentName(part)
-      if (!normalized) continue
-      if (!unique.some((u) => normalizeComponentName(u) === normalized)) unique.push(part)
-      if (unique.length >= 10) break
-    }
-    return unique
-  }
-
-  const backfillMissingComponents = (items: any[], analysis: string | null | undefined) => {
-    if (isPackagedAnalysis) return items
-    if (!analysis) return items
-    if (!Array.isArray(items) || items.length === 0) return items
-    const listed = extractComponentsFromAnalysisText(analysis)
-    if (!listed.length) return items
-    const existingLabels = items.map((item) =>
-      normalizeComponentName(`${item?.name || ''} ${item?.serving_size || ''}`),
-    )
-    const missing = listed.filter((component) => {
-      const normalized = normalizeComponentName(component)
-      if (!normalized) return false
-      return !existingLabels.some((label) => label.includes(normalized) || normalized.includes(label))
-    })
-    if (!missing.length) return items
-    const placeholders = missing.map((name) => ({
-      name,
-      brand: null,
-      serving_size: '1 serving',
-      servings: 1,
-      calories: null,
-      protein_g: null,
-      carbs_g: null,
-      fat_g: null,
-      fiber_g: null,
-      sugar_g: null,
-      isGuess: true,
-    }))
-    return [...items, ...placeholders]
-  }
-
-  const filteredItems = backfillMissingComponents(
-    stripGenericPlateItems(estimatedItems, analysisText),
-    analysisText,
-  )
+  const filteredItems = stripGenericPlateItems(estimatedItems, analysisText)
   const fallbackItemName = analysisText ? extractBaseMealDescription(analysisText) : ''
   const fallbackItem = {
     name: fallbackItemName || 'Meal',
@@ -3287,7 +3212,7 @@ const applyStructuredItems = (
     if (filteredItems.length > 0) return filteredItems
     if (estimatedItems.length > 0) return estimatedItems
     if (fallbackExistingItems.length > 0) return fallbackExistingItems
-    if (analysisText) return [fallbackItem]
+    if (analysisText && allowTextFallback) return [fallbackItem]
     return []
   })()
   const itemsToUse = itemsToUseRaw.map((it: any) => {
@@ -5535,7 +5460,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         const barcodeTag = barcodeLabelFlow?.barcode
           ? { barcode: barcodeLabelFlow.barcode, source: 'label-photo' }
           : undefined
-        applyStructuredItems(result.items, result.total, result.analysis, { barcodeTag });
+        applyStructuredItems(result.items, result.total, result.analysis, { barcodeTag, allowTextFallback: false });
         // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
@@ -5656,7 +5581,7 @@ Meanwhile, you can describe your food manually:
       if (result.analysis) {
         setAnalysisPhase('building');
         setAiDescription(result.analysis);
-        applyStructuredItems(result.items, result.total, result.analysis);
+        applyStructuredItems(result.items, result.total, result.analysis, { allowTextFallback: false });
         // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
