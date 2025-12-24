@@ -13,8 +13,35 @@ type JournalEntry = {
   title: string
   content: string
   images: any
+  tags?: any
+  audio?: any
+  prompt?: string
+  template?: string
   createdAt: string
 }
+
+const PROMPTS = [
+  'What went well today?',
+  'What felt hard today?',
+  'What am I grateful for?',
+  'What do I need tomorrow?',
+  'What surprised me today?',
+]
+
+const TEMPLATES = [
+  {
+    name: 'Daily reflection',
+    body: '<p><strong>Wins</strong></p><p><br></p><p><strong>Challenges</strong></p><p><br></p><p><strong>What I learned</strong></p><p><br></p>',
+  },
+  {
+    name: 'Gratitude',
+    body: '<p><strong>Today I am grateful for...</strong></p><p><br></p><p><strong>Someone I appreciate</strong></p><p><br></p><p><strong>One small win</strong></p><p><br></p>',
+  },
+  {
+    name: 'Stress check',
+    body: '<p><strong>What caused stress?</strong></p><p><br></p><p><strong>How I responded</strong></p><p><br></p><p><strong>What could help next time</strong></p><p><br></p>',
+  },
+]
 
 function asDateString(d: Date) {
   const yyyy = d.getFullYear()
@@ -30,6 +57,12 @@ function formatDateLabel(localDate: string) {
   if (localDate === yesterday) return 'Yesterday'
   const d = new Date(`${localDate}T00:00:00`)
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function formatDateLong(localDate: string) {
+  const d = new Date(`${localDate}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return localDate
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function stripHtml(html: string) {
@@ -49,11 +82,33 @@ function normalizeImages(raw: any): string[] {
   return []
 }
 
+function normalizeTags(raw: any): string[] {
+  if (Array.isArray(raw)) return raw.filter((item) => typeof item === 'string' && item.trim())
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => typeof item === 'string' && item.trim())
+      }
+    } catch {}
+  }
+  return []
+}
+
+function formatSeconds(total: number) {
+  const mins = Math.floor(total / 60)
+  const secs = total % 60
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
 export default function MoodJournalPage() {
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadingAudio, setUploadingAudio] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [recordSeconds, setRecordSeconds] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -61,15 +116,29 @@ export default function MoodJournalPage() {
   const [localDate, setLocalDate] = useState(asDateString(new Date()))
   const [contentHtml, setContentHtml] = useState('')
   const [images, setImages] = useState<string[]>([])
+  const [audioClips, setAudioClips] = useState<string[]>([])
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [selectedPrompt, setSelectedPrompt] = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   const editorRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const dateInputRef = useRef<HTMLInputElement | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const loadEntries = async () => {
+  const loadEntries = async (query?: string) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/mood/journal/entries?limit=30', { cache: 'no-store' as any })
+      const q = query?.trim()
+      const url = q
+        ? `/api/mood/journal/entries?limit=50&q=${encodeURIComponent(q)}`
+        : '/api/mood/journal/entries?limit=50'
+      const res = await fetch(url, { cache: 'no-store' as any })
       if (!res.ok) throw new Error('Failed to load journal')
       const data = await res.json()
       setEntries(Array.isArray(data?.entries) ? data.entries : [])
@@ -84,12 +153,49 @@ export default function MoodJournalPage() {
     loadEntries()
   }, [])
 
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      loadEntries(searchTerm)
+    }, 300)
+    return () => clearTimeout(handle)
+  }, [searchTerm])
+
+  useEffect(() => {
+    return () => {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current)
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
+      }
+    }
+  }, [])
+
   const handleCommand = (command: string) => {
     const el = editorRef.current
     if (!el) return
     el.focus()
     document.execCommand(command)
     setContentHtml(el.innerHTML)
+  }
+
+  const insertHtml = (html: string) => {
+    const el = editorRef.current
+    if (!el) return
+    el.focus()
+    const ok = document.execCommand('insertHTML', false, html)
+    if (!ok) {
+      el.innerHTML = `${el.innerHTML}${html}`
+    }
+    setContentHtml(el.innerHTML)
+  }
+
+  const applyPrompt = (prompt: string) => {
+    setSelectedPrompt(prompt)
+    insertHtml(`<p><strong>${prompt}</strong></p><p><br></p>`)
+  }
+
+  const applyTemplate = (template: typeof TEMPLATES[number]) => {
+    setSelectedTemplate(template.name)
+    insertHtml(template.body)
   }
 
   const handleImagePick = () => {
@@ -126,19 +232,110 @@ export default function MoodJournalPage() {
     }
   }
 
+  const uploadAudioBlob = async (blob: Blob) => {
+    setUploadingAudio(true)
+    setError(null)
+    try {
+      const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: blob.type || 'audio/webm' })
+      const formData = new FormData()
+      formData.append('audio', file)
+      const res = await fetch('/api/mood/journal/upload-audio', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const msg = await res.json().catch(() => null)
+        throw new Error(msg?.error || 'Audio upload failed')
+      }
+      const data = await res.json()
+      if (data?.url) {
+        setAudioClips((prev) => [...prev, data.url])
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Failed to upload audio')
+    } finally {
+      setUploadingAudio(false)
+    }
+  }
+
+  const startRecording = async () => {
+    if (recording) return
+    setError(null)
+    try {
+      if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        setError('Voice notes are not supported on this device.')
+        return
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      const chunks: BlobPart[] = []
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data)
+      }
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop())
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' })
+        if (blob.size > 0) {
+          await uploadAudioBlob(blob)
+        }
+      }
+      recorder.start()
+      mediaRecorderRef.current = recorder
+      setRecording(true)
+      setRecordSeconds(0)
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current)
+      recordTimerRef.current = setInterval(() => setRecordSeconds((prev) => prev + 1), 1000)
+    } catch (e) {
+      setError('Microphone permission was not granted.')
+    }
+  }
+
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') recorder.stop()
+    mediaRecorderRef.current = null
+    setRecording(false)
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current)
+      recordTimerRef.current = null
+    }
+  }
+
+  const handleAddTag = () => {
+    const value = tagInput.trim()
+    if (!value) return
+    if (tags.includes(value)) {
+      setTagInput('')
+      return
+    }
+    setTags((prev) => [...prev, value])
+    setTagInput('')
+  }
+
   const handleSave = async () => {
     const content = editorRef.current?.innerHTML?.trim() || ''
-    if (!title.trim() && !content && images.length === 0) {
-      setError('Add a title, some text, or a photo first.')
+    if (!title.trim() && !content && images.length === 0 && audioClips.length === 0) {
+      setError('Add a title, some text, a photo, or a voice note first.')
       return
     }
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch('/api/mood/journal/entries', {
-        method: 'POST',
+      const payload = {
+        title,
+        content,
+        images,
+        audio: audioClips,
+        tags,
+        prompt: selectedPrompt,
+        template: selectedTemplate,
+        localDate,
+      }
+      const url = editingId ? `/api/mood/journal/entries/${editingId}` : '/api/mood/journal/entries'
+      const res = await fetch(url, {
+        method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, images, localDate }),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const msg = await res.json().catch(() => null)
@@ -147,10 +344,15 @@ export default function MoodJournalPage() {
       setTitle('')
       setContentHtml('')
       setImages([])
+      setAudioClips([])
+      setTags([])
+      setSelectedPrompt('')
+      setSelectedTemplate('')
+      setEditingId(null)
       if (editorRef.current) editorRef.current.innerHTML = ''
-      setNotice('Journal entry saved.')
+      setNotice(editingId ? 'Journal entry updated.' : 'Journal entry saved.')
       setTimeout(() => setNotice(null), 2000)
-      loadEntries()
+      loadEntries(searchTerm)
     } catch (e: any) {
       setError(e?.message || 'Failed to save entry')
     } finally {
@@ -158,7 +360,51 @@ export default function MoodJournalPage() {
     }
   }
 
+  const handleEdit = (entry: JournalEntry) => {
+    setEditingId(entry.id)
+    setTitle(entry.title || '')
+    setLocalDate(entry.localDate || asDateString(new Date()))
+    setImages(normalizeImages(entry.images))
+    setAudioClips(normalizeImages(entry.audio))
+    setTags(normalizeTags(entry.tags))
+    setSelectedPrompt(entry.prompt || '')
+    setSelectedTemplate(entry.template || '')
+    const html = entry.content || ''
+    setContentHtml(html)
+    if (editorRef.current) editorRef.current.innerHTML = html
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setTitle('')
+    setContentHtml('')
+    setImages([])
+    setAudioClips([])
+    setTags([])
+    setSelectedPrompt('')
+    setSelectedTemplate('')
+    setLocalDate(asDateString(new Date()))
+    if (editorRef.current) editorRef.current.innerHTML = ''
+  }
+
+  const handleDelete = async (entryId: string) => {
+    if (!window.confirm('Delete this journal entry?')) return
+    setError(null)
+    try {
+      const res = await fetch(`/api/mood/journal/entries/${entryId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const msg = await res.json().catch(() => null)
+        throw new Error(msg?.error || 'Failed to delete entry')
+      }
+      if (editingId === entryId) handleCancelEdit()
+      loadEntries(searchTerm)
+    } catch (e: any) {
+      setError(e?.message || 'Failed to delete entry')
+    }
+  }
+
   const visibleEntries = useMemo(() => entries, [entries])
+  const dateLabel = useMemo(() => formatDateLong(localDate), [localDate])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
@@ -178,17 +424,36 @@ export default function MoodJournalPage() {
         )}
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">Journal</h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">Write it out, add photos, and keep the story of your day.</p>
             </div>
-            <input
-              type="date"
-              value={localDate}
-              onChange={(e) => setLocalDate(e.target.value)}
-              className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-xs text-gray-700 dark:text-gray-200"
-            />
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  const el = dateInputRef.current
+                  if (!el) return
+                  if (typeof (el as any).showPicker === 'function') {
+                    ;(el as any).showPicker()
+                  } else {
+                    el.click()
+                  }
+                }}
+                className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap"
+              >
+                {dateLabel}
+              </button>
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={localDate}
+                onChange={(e) => setLocalDate(e.target.value)}
+                className="absolute inset-0 opacity-0 pointer-events-none"
+                aria-label="Journal date"
+              />
+            </div>
           </div>
 
           <input
@@ -223,6 +488,16 @@ export default function MoodJournalPage() {
             >
               {uploading ? 'Uploading...' : 'Add photo'}
             </button>
+            <button
+              type="button"
+              onClick={recording ? stopRecording : startRecording}
+              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
+            >
+              {recording ? `Stop ${formatSeconds(recordSeconds)}` : 'Record voice note'}
+            </button>
+            {uploadingAudio && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 self-center">Uploading audio...</span>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -232,6 +507,87 @@ export default function MoodJournalPage() {
               onChange={(e) => handleImages(e.target.files)}
               className="hidden"
             />
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-300">Prompts</div>
+            <div className="flex flex-wrap gap-2">
+              {PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => applyPrompt(prompt)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                    selectedPrompt === prompt
+                      ? 'border-helfi-green text-helfi-green'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-200'
+                  }`}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-300">Templates</div>
+            <div className="flex flex-wrap gap-2">
+              {TEMPLATES.map((template) => (
+                <button
+                  key={template.name}
+                  type="button"
+                  onClick={() => applyTemplate(template)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                    selectedTemplate === template.name
+                      ? 'border-helfi-green text-helfi-green'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-200'
+                  }`}
+                >
+                  {template.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-300">Tags</div>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-xs text-gray-600 dark:text-gray-200">
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
+                    className="text-xs text-gray-400"
+                    aria-label="Remove tag"
+                  >
+                    x
+                  </button>
+                </span>
+              ))}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddTag()
+                    }
+                  }}
+                  placeholder="Add tag"
+                  className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs text-gray-700 dark:text-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTag}
+                  className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="relative rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 min-h-[180px]">
@@ -265,19 +621,54 @@ export default function MoodJournalPage() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full rounded-xl bg-helfi-green text-white text-sm font-semibold py-3 disabled:opacity-60"
-          >
-            {saving ? 'Saving...' : 'Save entry'}
-          </button>
+          {audioClips.length > 0 && (
+            <div className="space-y-2">
+              {audioClips.map((url) => (
+                <div key={url} className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2">
+                  <audio controls src={url} className="w-full" />
+                  <button
+                    type="button"
+                    onClick={() => setAudioClips((prev) => prev.filter((item) => item !== url))}
+                    className="text-xs text-gray-500"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full rounded-xl bg-helfi-green text-white text-sm font-semibold py-3 disabled:opacity-60"
+            >
+              {saving ? 'Saving...' : editingId ? 'Update entry' : 'Save entry'}
+            </button>
+            {editingId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-semibold py-3 text-gray-600 dark:text-gray-200"
+              >
+                Cancel edit
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h3 className="text-base font-bold text-gray-900 dark:text-white">Recent journal entries</h3>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search journal"
+              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs text-gray-700 dark:text-gray-200"
+            />
           </div>
 
           {loading ? (
@@ -291,6 +682,8 @@ export default function MoodJournalPage() {
           ) : (
             visibleEntries.map((entry) => {
               const entryImages = normalizeImages(entry.images)
+              const entryAudio = normalizeImages(entry.audio)
+              const entryTags = normalizeTags(entry.tags)
               const preview = stripHtml(entry.content || '').slice(0, 140)
               const createdAt = entry.createdAt ? new Date(entry.createdAt) : null
               const time = createdAt ? createdAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
@@ -303,6 +696,21 @@ export default function MoodJournalPage() {
                   <div className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
                     {entry.title || 'Untitled entry'}
                   </div>
+                  {(entry.prompt || entry.template) && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-gray-500 dark:text-gray-300">
+                      {entry.prompt && <span className="px-2 py-1 rounded-full border border-gray-200 dark:border-gray-700">{entry.prompt}</span>}
+                      {entry.template && <span className="px-2 py-1 rounded-full border border-gray-200 dark:border-gray-700">{entry.template}</span>}
+                    </div>
+                  )}
+                  {entryTags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {entryTags.map((tag) => (
+                        <span key={tag} className="px-2 py-1 rounded-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-[11px] text-gray-600 dark:text-gray-200">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {preview && (
                     <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
                       {preview}
@@ -315,6 +723,29 @@ export default function MoodJournalPage() {
                       ))}
                     </div>
                   )}
+                  {entryAudio.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {entryAudio.map((url: string) => (
+                        <audio key={url} controls src={url} className="w-full" />
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-3 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(entry)}
+                      className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(entry.id)}
+                      className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               )
             })

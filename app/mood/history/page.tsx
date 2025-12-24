@@ -303,7 +303,12 @@ export default function MoodHistoryPage() {
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(entry)
     }
-    const days = Array.from(map.keys()).sort((a, b) => parseLocalDate(a).getTime() - parseLocalDate(b).getTime())
+
+    const today = asDateString(new Date())
+    const days = timeframe === 'week'
+      ? Array.from({ length: 7 }, (_, i) => shiftDays(today, i - 6))
+      : Array.from(map.keys()).sort((a, b) => parseLocalDate(a).getTime() - parseLocalDate(b).getTime())
+
     return days.map((day) => {
       const items = (map.get(day) || []).slice().sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       return {
@@ -312,14 +317,17 @@ export default function MoodHistoryPage() {
         points: items.map((e) => ({ timestamp: e.timestamp, mood: Number(e.mood) })),
       }
     })
-  }, [entries])
+  }, [entries, timeframe])
 
   useEffect(() => {
     if (timeframe !== 'week') return
     const el = weekScrollRef.current
     if (!el) return
     requestAnimationFrame(() => {
-      el.scrollTo({ left: el.scrollWidth, behavior: 'auto' })
+      requestAnimationFrame(() => {
+        const target = Math.max(0, el.scrollWidth - el.clientWidth)
+        el.scrollTo({ left: target, behavior: 'auto' })
+      })
     })
   }, [timeframe, daySeries.length])
 
@@ -525,7 +533,7 @@ export default function MoodHistoryPage() {
                             <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">
                               {day.label}
                             </div>
-                            <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-hidden">
+                            <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-visible">
                               {chartMode === 'pie' ? (
                                 <MoodPieChart entries={day.points} />
                               ) : (
@@ -537,7 +545,7 @@ export default function MoodHistoryPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-hidden">
+                    <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-visible">
                       {chartMode === 'pie' ? (
                         <MoodPieChart entries={entries} />
                       ) : (

@@ -27,6 +27,10 @@ export async function ensureMoodTables() {
       title TEXT NOT NULL DEFAULT '',
       content TEXT NOT NULL DEFAULT '',
       images JSONB NOT NULL DEFAULT '[]'::jsonb,
+      tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+      audio JSONB NOT NULL DEFAULT '[]'::jsonb,
+      prompt TEXT NOT NULL DEFAULT '',
+      template TEXT NOT NULL DEFAULT '',
       createdAt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -34,6 +38,11 @@ export async function ensureMoodTables() {
 
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_moodjournal_user_created ON MoodJournalEntries(userId, createdAt DESC)`).catch(() => {})
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_moodjournal_user_localdate ON MoodJournalEntries(userId, localDate)`).catch(() => {})
+
+  await prisma.$executeRawUnsafe(`ALTER TABLE MoodJournalEntries ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb`).catch(() => {})
+  await prisma.$executeRawUnsafe(`ALTER TABLE MoodJournalEntries ADD COLUMN IF NOT EXISTS audio JSONB NOT NULL DEFAULT '[]'::jsonb`).catch(() => {})
+  await prisma.$executeRawUnsafe(`ALTER TABLE MoodJournalEntries ADD COLUMN IF NOT EXISTS prompt TEXT NOT NULL DEFAULT ''`).catch(() => {})
+  await prisma.$executeRawUnsafe(`ALTER TABLE MoodJournalEntries ADD COLUMN IF NOT EXISTS template TEXT NOT NULL DEFAULT ''`).catch(() => {})
 
   // Mood reminder preferences (push notifications) and delivery log.
   await prisma.$executeRawUnsafe(`

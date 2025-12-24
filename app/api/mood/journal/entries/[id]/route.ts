@@ -2,23 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import crypto from 'crypto'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 
 export const dynamic = 'force-dynamic'
-
-function asLocalDate(value: unknown): string | null {
-  const s = String(value ?? '').trim()
-  if (!s) return null
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null
-  return s
-}
-
-function clampInt(value: unknown, min: number, max: number, fallback: number) {
-  const n = Number(value)
-  if (!Number.isFinite(n)) return fallback
-  return Math.max(min, Math.min(max, Math.round(n)))
-}
 
 function normalizeImages(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -48,61 +34,38 @@ function normalizeText(value: unknown, max: number) {
   return String(value ?? '').trim().slice(0, max)
 }
 
-export async function GET(req: NextRequest) {
+function asLocalDate(value: unknown): string | null {
+  const s = String(value ?? '').trim()
+  if (!s) return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null
+  return s
+}
+
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = await prisma.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  const { searchParams } = new URL(req.url)
-  const start = asLocalDate(searchParams.get('start'))
-  const end = asLocalDate(searchParams.get('end'))
-  const limit = clampInt(searchParams.get('limit'), 1, 100, 20)
-  const q = String(searchParams.get('q') ?? '').trim()
-
   try {
     await ensureMoodTables()
-    let rows: any[] = []
-    if (start && end) {
-      rows = await prisma.$queryRawUnsafe(
-        `SELECT id, localDate, title, content, images, tags, audio, prompt, template, createdAt, updatedAt
-         FROM MoodJournalEntries
-         WHERE userId = $1 AND localDate BETWEEN $2 AND $3
-         ORDER BY createdAt DESC`,
-        user.id,
-        start,
-        end,
-      )
-    } else if (q) {
-      rows = await prisma.$queryRawUnsafe(
-        `SELECT id, localDate, title, content, images, tags, audio, prompt, template, createdAt, updatedAt
-         FROM MoodJournalEntries
-         WHERE userId = $1 AND (title ILIKE $2 OR content ILIKE $2)
-         ORDER BY createdAt DESC
-         LIMIT $3`,
-        user.id,
-        `%${q}%`,
-        limit,
-      )
-    } else {
-      rows = await prisma.$queryRawUnsafe(
-        `SELECT id, localDate, title, content, images, tags, audio, prompt, template, createdAt, updatedAt
-         FROM MoodJournalEntries
-         WHERE userId = $1
-         ORDER BY createdAt DESC
-         LIMIT $2`,
-        user.id,
-        limit,
-      )
-    }
-    return NextResponse.json({ entries: rows })
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT id, localDate, title, content, images, tags, audio, prompt, template, createdAt, updatedAt
+       FROM MoodJournalEntries
+       WHERE userId = $1 AND id = $2`,
+      user.id,
+      params.id,
+    )
+    const entry = rows[0] ?? null
+    if (!entry) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ entry })
   } catch (e) {
-    console.error('mood journal get error', e)
-    return NextResponse.json({ error: 'Failed to load journal entries' }, { status: 500 })
+    console.error('mood journal get entry error', e)
+    return NextResponse.json({ error: 'Failed to load entry' }, { status: 500 })
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = await prisma.user.findUnique({ where: { email: session.user.email } })
@@ -124,12 +87,18 @@ export async function POST(req: NextRequest) {
 
   try {
     await ensureMoodTables()
-    const id = crypto.randomUUID()
-    await prisma.$queryRawUnsafe(
-      `INSERT INTO MoodJournalEntries (id, userId, localDate, title, content, images, tags, audio, prompt, template)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10)`,
-      id,
-      user.id,
+    const updated = await prisma.$executeRawUnsafe(
+      `UPDATE MoodJournalEntries
+       SET localDate = $1,
+           title = $2,
+           content = $3,
+           images = $4::jsonb,
+           tags = $5::jsonb,
+           audio = $6::jsonb,
+           prompt = $7,
+           template = $8,
+           updatedAt = NOW()
+       WHERE userId = $9 AND id = $10`,
       localDate,
       title,
       content,
@@ -138,10 +107,33 @@ export async function POST(req: NextRequest) {
       JSON.stringify(audio),
       prompt,
       template,
+      user.id,
+      params.id,
     )
-    return NextResponse.json({ success: true, id })
+    if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ success: true })
   } catch (e) {
-    console.error('mood journal save error', e)
-    return NextResponse.json({ error: 'Failed to save journal entry' }, { status: 500 })
+    console.error('mood journal update error', e)
+    return NextResponse.json({ error: 'Failed to update entry' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  try {
+    await ensureMoodTables()
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM MoodJournalEntries WHERE userId = $1 AND id = $2`,
+      user.id,
+      params.id,
+    )
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    console.error('mood journal delete error', e)
+    return NextResponse.json({ error: 'Failed to delete entry' }, { status: 500 })
   }
 }
