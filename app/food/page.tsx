@@ -7336,14 +7336,14 @@ Please add nutritional information manually if needed.`);
     return { ok: true, message: '' }
   }
 
-  const labelStrictMode = Boolean(barcodeLabelFlow?.barcode) || (isPackagedAnalysis && !!photoPreview)
+  const labelStrictMode = Boolean(barcodeLabelFlow?.barcode) || (analysisMode === 'packaged' && !!photoPreview)
   const labelValidation = useMemo(
     () =>
       validateLabelItems(analyzedItems, {
         enforce: labelStrictMode,
         preferBarcodeTarget: Boolean(barcodeLabelFlow?.barcode),
       }),
-    [analyzedItems, barcodeLabelFlow, isPackagedAnalysis, photoPreview, labelStrictMode],
+    [analyzedItems, barcodeLabelFlow, analysisMode, photoPreview, labelStrictMode],
   )
   const labelBlocked = labelStrictMode && !labelValidation.ok
   const openLabelEdit = () => {
