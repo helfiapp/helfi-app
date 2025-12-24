@@ -400,6 +400,34 @@ export default function MoodHistoryPage() {
     })
   }, [chartEntries, timeframe, selectedDay])
 
+  const weekSummaryPoints = useMemo(() => {
+    if (timeframe !== 'week') return []
+    return daySeries.map((day) => {
+      const counts = new Map<number, number>()
+      for (const point of day.points) {
+        const value = Number(point.mood)
+        if (!Number.isFinite(value)) continue
+        counts.set(value, (counts.get(value) || 0) + 1)
+      }
+      let topMood: number | null = null
+      let topCount = -1
+      counts.forEach((count, mood) => {
+        if (count > topCount) {
+          topCount = count
+          topMood = mood
+        } else if (count === topCount && topMood != null && mood > topMood) {
+          topMood = mood
+        }
+      })
+      const stamp = new Date(`${day.day}T12:00:00`)
+      return {
+        timestamp: Number.isNaN(stamp.getTime()) ? `${day.day}T12:00:00` : stamp.toISOString(),
+        mood: topMood,
+        label: day.label,
+      }
+    })
+  }, [daySeries, timeframe])
+
   useEffect(() => {
     if (timeframe !== 'week' && timeframe !== 'day') return
     if (loading) return
@@ -471,6 +499,11 @@ export default function MoodHistoryPage() {
     if (nums.length === 0) return null
     return nums.reduce((a, b) => a + b, 0) / nums.length
   }, [chartEntries])
+
+  const hasEntries = useMemo(() => {
+    if (timeframe === 'week') return weekSummaryPoints.some((p) => Number.isFinite(p.mood))
+    return points.length > 0
+  }, [timeframe, weekSummaryPoints, points.length])
 
   const topMood = useMemo(() => {
     const counts = new Map()
@@ -601,13 +634,13 @@ export default function MoodHistoryPage() {
 	              <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
 	                {error}
 	              </div>
-            ) : points.length === 0 ? (
+            ) : !hasEntries ? (
 	              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 px-4 py-6 text-sm">
 	                No mood entries yet. Add your first check‑in from the Mood tab.
 	              </div>
 	            ) : (
                 <div className="space-y-4">
-                  {timeframe === 'week' || timeframe === 'day' ? (
+                  {timeframe === 'day' ? (
                     <div className="space-y-2">
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         Swipe left or right to view each day.
@@ -625,11 +658,24 @@ export default function MoodHistoryPage() {
                               {chartMode === 'pie' ? (
                                 <MoodPieChart entries={day.points} />
                               ) : (
-                                <MoodTrendGraph points={day.points} />
+                                <MoodTrendGraph points={day.points} showTimeAxis />
                               )}
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  ) : timeframe === 'week' ? (
+                    <div className="space-y-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        Weekly summary of your most common mood each day.
+                      </div>
+                      <div className="relative h-[220px] w-full rounded-2xl bg-white dark:bg-gray-900 shadow-sm border border-gray-100 dark:border-gray-700 p-4 overflow-visible">
+                        {chartMode === 'pie' ? (
+                          <MoodPieChart entries={chartEntries} />
+                        ) : (
+                          <MoodTrendGraph points={weekSummaryPoints} />
+                        )}
                       </div>
                     </div>
                   ) : (

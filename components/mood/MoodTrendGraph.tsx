@@ -12,7 +12,7 @@ import {
   Tooltip,
   Filler,
 } from 'chart.js'
-import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
+import type { ChartData, ChartOptions } from 'chart.js'
 import 'chartjs-adapter-date-fns'
 import { MOOD_LEVELS, emojiForMoodValue } from '@/components/mood/moodScale'
 
@@ -26,15 +26,24 @@ ChartJS.register(
   Filler,
 )
 
-export type MoodPoint = { timestamp: string; mood: number }
+export type MoodPoint = { timestamp: string; mood: number | null; label?: string }
 
-export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
+export default function MoodTrendGraph({
+  points,
+  showTimeAxis = false,
+}: {
+  points: MoodPoint[]
+  showTimeAxis?: boolean
+}) {
   const chartPoints = useMemo(() => {
     if (points.length !== 1) {
-      return points.map((p) => ({ x: p.timestamp, y: p.mood }))
+      return points.map((p, index) => ({ x: p.timestamp, y: p.mood, sourceIndex: index }))
     }
 
     const base = points[0]
+    if (!Number.isFinite(Number(base?.mood))) {
+      return []
+    }
     const baseDate = new Date(base.timestamp)
     if (Number.isNaN(baseDate.getTime())) {
       return [{ x: new Date().toISOString(), y: base.mood }]
@@ -46,9 +55,9 @@ export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
     end.setHours(23, 59, 59, 999)
 
     return [
-      { x: start.toISOString(), y: base.mood, synthetic: true },
-      { x: baseDate.toISOString(), y: base.mood },
-      { x: end.toISOString(), y: base.mood, synthetic: true },
+      { x: start.toISOString(), y: base.mood, synthetic: true, sourceIndex: -1 },
+      { x: baseDate.toISOString(), y: base.mood, sourceIndex: 0 },
+      { x: end.toISOString(), y: base.mood, synthetic: true, sourceIndex: -1 },
     ]
   }, [points])
 
@@ -78,7 +87,27 @@ export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
     },
   }), [])
 
-  const data: ChartData<'line', { x: string; y: number }[]> = useMemo(() => {
+  const formatTime = (ts: string) => {
+    try {
+      const d = new Date(ts)
+      if (Number.isNaN(d.getTime())) return ''
+      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    } catch {
+      return ''
+    }
+  }
+
+  const formatDay = (ts: string) => {
+    try {
+      const d = new Date(ts)
+      if (Number.isNaN(d.getTime())) return ''
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    } catch {
+      return ''
+    }
+  }
+
+  const data: ChartData<'line', { x: string; y: number | null }[]> = useMemo(() => {
     return {
       labels: [],
       datasets: [
@@ -91,6 +120,7 @@ export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
           fill: true,
           pointRadius: (ctx) => ((ctx.raw as any)?.synthetic ? 0 : 3),
           pointHoverRadius: (ctx) => ((ctx.raw as any)?.synthetic ? 0 : 5),
+          pointHitRadius: (ctx) => ((ctx.raw as any)?.synthetic ? 0 : 18),
           pointBackgroundColor: 'rgb(34, 197, 94)',
         },
       ],
@@ -104,21 +134,103 @@ export default function MoodTrendGraph({ points }: { points: MoodPoint[] }) {
     plugins: {
       legend: { display: false },
       tooltip: {
-        callbacks: {
-          label: (ctx: TooltipItem<'line'>) => {
-            const v = Number(ctx.parsed.y)
-            const label = MOOD_LEVELS.find((m) => m.value === v)?.label ?? `Mood ${v}`
-            return label
-          },
+        enabled: false,
+        external: (context) => {
+          const { chart, tooltip } = context
+          const parent = chart.canvas.parentNode as HTMLElement | null
+          if (!parent) return
+
+          let tooltipEl = parent.querySelector<HTMLDivElement>('#mood-line-tooltip')
+          if (!tooltipEl) {
+            tooltipEl = document.createElement('div')
+            tooltipEl.id = 'mood-line-tooltip'
+            tooltipEl.style.position = 'absolute'
+            tooltipEl.style.pointerEvents = 'none'
+            tooltipEl.style.opacity = '0'
+            tooltipEl.style.transform = 'translate(-50%, -110%)'
+            tooltipEl.style.transition = 'opacity 0.1s ease'
+            tooltipEl.style.background = 'rgba(17, 24, 39, 0.9)'
+            tooltipEl.style.borderRadius = '12px'
+            tooltipEl.style.padding = '12px 14px'
+            tooltipEl.style.color = '#fff'
+            tooltipEl.style.textAlign = 'center'
+            tooltipEl.style.fontFamily = 'inherit'
+            tooltipEl.style.minWidth = '140px'
+            tooltipEl.style.maxWidth = '220px'
+            tooltipEl.style.boxShadow = '0 8px 20px rgba(0,0,0,0.2)'
+            parent.appendChild(tooltipEl)
+          }
+
+          if (tooltip.opacity === 0) {
+            tooltipEl.style.opacity = '0'
+            return
+          }
+
+          const dataIndex = tooltip.dataPoints?.[0]?.dataIndex ?? 0
+          const raw = (chart.data.datasets?.[0]?.data as any[])?.[dataIndex]
+          const sourceIndex = typeof raw?.sourceIndex === 'number' ? raw.sourceIndex : dataIndex
+          const point = sourceIndex >= 0 ? points[sourceIndex] : null
+          const moodValue = Number(point?.mood ?? tooltip.dataPoints?.[0]?.parsed?.y)
+          if (!Number.isFinite(moodValue)) {
+            tooltipEl.style.opacity = '0'
+            return
+          }
+
+          const moodLabel = MOOD_LEVELS.find((m) => m.value === moodValue)?.label ?? `Mood ${moodValue}`
+          const detail = showTimeAxis
+            ? `Time: ${formatTime(point?.timestamp || '') || '—'}`
+            : point?.label
+              ? point.label
+              : `Day: ${formatDay(point?.timestamp || '') || '—'}`
+
+          tooltipEl.innerHTML = ''
+
+          const titleEl = document.createElement('div')
+          titleEl.style.fontSize = '16px'
+          titleEl.style.fontWeight = '600'
+          titleEl.style.marginBottom = '6px'
+          titleEl.style.textAlign = 'center'
+          titleEl.textContent = moodLabel
+
+          const detailEl = document.createElement('div')
+          detailEl.style.fontSize = '14px'
+          detailEl.style.fontWeight = '500'
+          detailEl.style.textAlign = 'center'
+          detailEl.style.width = '100%'
+          detailEl.textContent = detail
+
+          tooltipEl.appendChild(titleEl)
+          tooltipEl.appendChild(detailEl)
+
+          const { offsetLeft, offsetTop } = chart.canvas
+          tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`
+          tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`
+          const aboveTop = tooltip.caretY - tooltipEl.offsetHeight - 12
+          tooltipEl.style.transform = aboveTop < 0 ? 'translate(-50%, 12px)' : 'translate(-50%, -110%)'
+          tooltipEl.style.opacity = '1'
         },
       },
+    },
+    interaction: { mode: 'nearest', intersect: true },
+    onClick: (event, elements, chart) => {
+      if (!elements?.length) return
+      const first = elements[0] as any
+      chart.setActiveElements([{ datasetIndex: first.datasetIndex, index: first.index }])
+      chart.update()
     },
     scales: {
       x: {
         type: 'time',
-        time: { unit: 'day' },
+        time: {
+          unit: showTimeAxis ? 'hour' : 'day',
+          displayFormats: { hour: 'h a', day: 'MMM d' },
+        },
         grid: { display: false },
-        ticks: { maxRotation: 0, autoSkip: true },
+        ticks: {
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: showTimeAxis ? 6 : 7,
+        },
       },
       y: {
         min: 1,
