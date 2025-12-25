@@ -651,6 +651,22 @@ const singularizeUnitLabel = (label: string) => {
   return trimmed
 }
 
+const isGenericSizeLabel = (label: string) => {
+  const l = (label || '').toLowerCase().trim()
+  if (!l) return false
+  return [
+    'small',
+    'medium',
+    'large',
+    'extra large',
+    'extra-large',
+    'xl',
+    'jumbo',
+    'mini',
+    'regular',
+  ].includes(l)
+}
+
 const parseServingUnitMetadata = (servingSize: string | number | null | undefined) => {
   if (servingSize === null || servingSize === undefined) return null
   const normalized = typeof servingSize === 'string' ? servingSize : String(servingSize)
@@ -758,6 +774,16 @@ const getPiecesPerServing = (item: any): number | null => {
     isDiscreteUnitLabel(fromServing.unitLabel) &&
     fromServing.quantity >= 1 &&
     !isFractionalServingQuantity(fromServing.quantity)
+  ) {
+    return fromServing.quantity
+  }
+
+  if (
+    fromServing &&
+    isGenericSizeLabel(fromServing.unitLabel) &&
+    fromServing.quantity >= 1 &&
+    !isFractionalServingQuantity(fromServing.quantity) &&
+    isDiscreteUnitLabel(nameLabel)
   ) {
     return fromServing.quantity
   }
