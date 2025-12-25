@@ -1,5 +1,5 @@
 'use client'
-import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
+import { Cog6ToothIcon, HandThumbDownIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/24/outline'
 /**
  * ABSOLUTE GUARD RAIL – READ BEFORE EDITING
  *
@@ -11772,14 +11772,7 @@ Please add nutritional information manually if needed.`);
                               title="Thumbs up"
                               disabled={analysisFeedbackOverall !== null}
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M14 9V5a3 3 0 00-6 0v4H5a2 2 0 00-2 2v2a2 2 0 002 2h4l3.5 5.5a2 2 0 003.5-1.1V15h2.2a2 2 0 002-1.7l.8-4A2 2 0 0019.1 7H14z"
-                                />
-                              </svg>
+                              <HandThumbUpIcon className="w-4 h-4" />
                             </button>
                             <button
                               type="button"
@@ -11798,14 +11791,7 @@ Please add nutritional information manually if needed.`);
                               title="Thumbs down"
                               disabled={analysisFeedbackOverall !== null}
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M10 15v4a3 3 0 006 0v-4h3a2 2 0 002-2v-2a2 2 0 00-2-2h-4l-3.5-5.5A2 2 0 008 4.5V9H6.8a2 2 0 00-2 1.7l-.8 4A2 2 0 005.2 17H10z"
-                                />
-                              </svg>
+                              <HandThumbDownIcon className="w-4 h-4" />
                             </button>
                           </div>
                           <button
@@ -11995,14 +11981,7 @@ Please add nutritional information manually if needed.`);
                                     title="Thumbs up"
                                     disabled={analysisFeedbackItems[index] !== undefined}
                                   >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M14 9V5a3 3 0 00-6 0v4H5a2 2 0 00-2 2v2a2 2 0 002 2h4l3.5 5.5a2 2 0 003.5-1.1V15h2.2a2 2 0 002-1.7l.8-4A2 2 0 0019.1 7H14z"
-                                      />
-                                    </svg>
+                                    <HandThumbUpIcon className="w-4 h-4" />
                                   </button>
                                   <button
                                     type="button"
@@ -12021,14 +12000,7 @@ Please add nutritional information manually if needed.`);
                                     title="Thumbs down"
                                     disabled={analysisFeedbackItems[index] !== undefined}
                                   >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M10 15v4a3 3 0 006 0v-4h3a2 2 0 002-2v-2a2 2 0 00-2-2h-4l-3.5-5.5A2 2 0 008 4.5V9H6.8a2 2 0 00-2 1.7l-.8 4A2 2 0 005.2 17H10z"
-                                      />
-                                    </svg>
+                                    <HandThumbDownIcon className="w-4 h-4" />
                                   </button>
                                 </div>
                                 {(!isMultiIngredient || isExpanded) && (
