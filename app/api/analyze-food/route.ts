@@ -357,6 +357,45 @@ const normalizeComponentName = (value: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const extractComponentsFromDelimitedText = (raw: string | null | undefined): string[] => {
+  if (!raw) return [];
+  const cleaned = String(raw).replace(/\s+/g, ' ').trim();
+  if (!cleaned) return [];
+
+  let candidate = cleaned.split(/[.]/)[0] || cleaned;
+  candidate = candidate
+    .replace(/^(?:the\s+image\s+shows|this\s+image\s+shows|image\s+shows)\s+/i, '')
+    .replace(/\b(each component|components?)\b.*$/i, '')
+    .trim();
+
+  const hasDelimiters = /,|;|\s+and\s+|\s+&\s+/i.test(candidate);
+  if (!hasDelimiters) return [];
+
+  const parts = candidate
+    .split(/,|;| and | & /i)
+    .map((part) =>
+      part
+        .replace(/^(?:several\s+components?|components?|includes?|including)\s*:?/i, '')
+        .replace(/\bhere'?s\b.*$/i, '')
+        .trim(),
+    )
+    .filter((part) => part.length >= 3);
+
+  const filtered = parts.filter((part) => {
+    if (/^component\s*\d+$/i.test(part)) return false;
+    return !/nutrition|breakdown|estimated|calories?|protein|carbs?|fat|fiber|fibre|sugar/i.test(part);
+  });
+
+  const unique: string[] = [];
+  for (const part of filtered) {
+    const normalized = normalizeComponentName(part);
+    if (!normalized) continue;
+    if (!unique.some((u) => normalizeComponentName(u) === normalized)) unique.push(part);
+    if (unique.length >= 10) break;
+  }
+  return unique;
+};
+
 const extractComponentsFromAnalysis = (analysis: string | null | undefined): string[] => {
   if (!analysis) return [];
   const cleaned = analysis.replace(/\s+/g, ' ').trim();
@@ -373,7 +412,11 @@ const extractComponentsFromAnalysis = (analysis: string | null | undefined): str
     const withMatch = cleaned.match(/\bwith\b\s+([^.\n]+)/i);
     if (withMatch && withMatch[1]) listText = withMatch[1];
   }
-  if (!listText) return [];
+  if (!listText) {
+    const beforeCalories = cleaned.split(/calories\s*:/i)[0] || cleaned;
+    const fallback = extractComponentsFromDelimitedText(beforeCalories);
+    return fallback;
+  }
 
   const parts = listText
     .split(/,|;| and | & /i)
@@ -2128,6 +2171,7 @@ CRITICAL REQUIREMENTS:
       success: true,
       analysis: analysis.trim(),
     };
+    const isImageAnalysis = Boolean(imageDataUrl);
     let itemsSource: string = 'none';
     let itemsQuality: 'valid' | 'weak' | 'none' = 'none';
     let analysisTextForFollowUp = analysis;
@@ -2175,6 +2219,14 @@ CRITICAL REQUIREMENTS:
 
       analysisTextForFollowUp = resp.analysis || analysis;
       listedComponents = extractComponentsFromAnalysis(analysisTextForFollowUp);
+      if (
+        listedComponents.length === 0 &&
+        resp.items &&
+        looksLikeMultiIngredientSummary(resp.items)
+      ) {
+        const summaryLabel = `${resp.items?.[0]?.name || ''} ${resp.items?.[0]?.serving_size || ''}`;
+        listedComponents = extractComponentsFromDelimitedText(summaryLabel);
+      }
       componentsHint =
         listedComponents.length > 0
           ? `- Components list (include each as its own item): ${listedComponents.join(', ')}.\n`
@@ -2188,7 +2240,11 @@ CRITICAL REQUIREMENTS:
       // compact follow-up call whose ONLY job is to produce structured items
       // so the UI can render editable ingredient cards. This is text-only and
       // only runs when the first call missed items.
-      if ((!resp.items || resp.items.length === 0) && analysisTextForFollowUp.length > 0) {
+      if (
+        !isImageAnalysis &&
+        (!resp.items || resp.items.length === 0) &&
+        analysisTextForFollowUp.length > 0
+      ) {
         try {
           console.log('ℹ️ No ITEMS_JSON found, running lightweight items extractor (text-only)');
           const extractor = await chatCompletionWithCost(openai, {
@@ -2250,6 +2306,18 @@ CRITICAL REQUIREMENTS:
               console.log('✅ Structured items extracted via follow-up call:', {
                 itemCount: items.length,
               });
+              if (listedComponents.length === 0 && looksLikeMultiIngredientSummary(resp.items)) {
+                const summaryLabel = `${resp.items?.[0]?.name || ''} ${resp.items?.[0]?.serving_size || ''}`;
+                listedComponents = extractComponentsFromDelimitedText(summaryLabel);
+                componentsHint =
+                  listedComponents.length > 0
+                    ? `- Components list (include each as its own item): ${listedComponents.join(', ')}.\n`
+                    : componentsHint;
+                componentsRequirement =
+                  listedComponents.length > 1
+                    ? `- Return at least ${listedComponents.length} items.\n`
+                    : componentsRequirement;
+              }
             }
           }
         } catch (e) {
@@ -2314,13 +2382,19 @@ CRITICAL REQUIREMENTS:
     // but the prompt was multi-detect capable, run a lightweight structure-only pass to
     // force separate components. This keeps the ingredient cards usable when the primary
     // model skips ITEMS_JSON.
+    const missingFromList =
+      listedComponents.length > 1 &&
+      resp.items &&
+      Array.isArray(resp.items) &&
+      resp.items.length < listedComponents.length;
     if (
       wantStructured &&
       preferMultiDetect &&
       (!resp.items ||
         resp.items.length === 0 ||
         looksLikeSingleGenericItem(resp.items) ||
-        looksLikeMultiIngredientSummary(resp.items))
+        looksLikeMultiIngredientSummary(resp.items) ||
+        missingFromList)
     ) {
       try {
         console.warn('⚠️ Analyzer: generic/missing/summary items detected; running multi-item follow-up.');
@@ -2402,7 +2476,11 @@ CRITICAL REQUIREMENTS:
     if (wantStructured && preferMultiDetect) {
       if (listedComponents.length > 0) {
         const existing = resp.items || [];
-        const existingLabels: string[] = existing.map((item: any) =>
+        const existingFiltered = existing.filter(
+          (item: any) =>
+            !looksLikeMultiIngredientSummary([item]) && !looksLikeSingleGenericItem([item]),
+        );
+        const existingLabels: string[] = existingFiltered.map((item: any) =>
           normalizeComponentName(`${item?.name || ''} ${item?.serving_size || ''}`),
         );
         const missingComponents = listedComponents.filter((component) => {
@@ -2456,7 +2534,10 @@ CRITICAL REQUIREMENTS:
               });
               const merged =
                 additions.length > 0
-                  ? [...existing, ...additions.map((item: any) => ({ ...item, isGuess: item?.isGuess === true }))]
+                  ? [
+                      ...existingFiltered,
+                      ...additions.map((item: any) => ({ ...item, isGuess: item?.isGuess === true })),
+                    ]
                   : followUpItems;
               resp.items = sanitizeStructuredItems(merged);
               resp.total = computeTotalsFromItems(resp.items) || resp.total;
