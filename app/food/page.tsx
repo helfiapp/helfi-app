@@ -5352,10 +5352,7 @@ const applyStructuredItems = (
     }
 
     // If we know there are multiple pieces in this "one serving", scale the weight to cover all pieces.
-    const piecesMultiplier =
-      Number.isFinite(Number((item as any)?.piecesPerServing)) && Number((item as any).piecesPerServing) > 0
-        ? Number((item as any).piecesPerServing)
-        : 1
+    const piecesMultiplier = piecesMultiplierForServing(item)
     if (piecesMultiplier > 1) estimated = estimated * piecesMultiplier
 
     const clamped = Math.min(Math.max(estimated, 5), 1200) // 5g–1200g sane bounds
