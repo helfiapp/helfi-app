@@ -969,6 +969,42 @@ const defaultGramsForItem = (item: any): number | null => {
   return null
 }
 
+const isDessertPortionItem = (item: any) => {
+  const label = `${String(item?.name || '')} ${String(item?.serving_size || '')}`.toLowerCase()
+  if (!label.trim()) return false
+
+  const excluded = ['crab cake', 'fish cake', 'salmon cake', 'rice cake', 'black pudding', 'blood pudding']
+  if (excluded.some((term) => label.includes(term))) return false
+
+  const dessertHints = [
+    'fruitcake',
+    'christmas pudding',
+    'pudding',
+    'cake',
+    'brownie',
+    'cheesecake',
+    'banana bread',
+    'carrot cake',
+    'mud cake',
+    'fudge',
+    'tart',
+    'pie',
+  ]
+  if (!dessertHints.some((term) => label.includes(term))) return false
+
+  const portionHints = ['slice', 'piece', 'portion', 'wedge', 'square', 'bar']
+  const hasPortionHint = portionHints.some((term) => label.includes(term))
+  const hasFraction = /(\d+)\s*\/\s*(\d+)/.test(label)
+
+  return hasPortionHint || hasFraction
+}
+
+const clampDessertPortionWeight = (estimated: number) => {
+  const min = 100
+  const max = 140
+  return Math.min(Math.max(estimated, min), max)
+}
+
 const isVolumeBasedUnitLabel = (label: string) => {
   const l = (label || '').toLowerCase().trim()
   if (!l) return false
@@ -5284,6 +5320,10 @@ const applyStructuredItems = (
     }
 
     if (!estimated || !Number.isFinite(estimated)) return null
+
+    if (isDessertPortionItem(item)) {
+      estimated = clampDessertPortionWeight(estimated)
+    }
 
     // If we know there are multiple pieces in this "one serving", scale the weight to cover all pieces.
     const piecesMultiplier =
