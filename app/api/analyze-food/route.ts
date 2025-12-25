@@ -357,6 +357,69 @@ const normalizeComponentName = (value: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const buildComponentBoundSchema = (components: string[]) => ({
+  name: 'food_component_items',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['items', 'total'],
+    properties: {
+      items: {
+        type: 'array',
+        minItems: components.length,
+        maxItems: components.length,
+        uniqueItems: true,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'component',
+            'name',
+            'brand',
+            'serving_size',
+            'servings',
+            'calories',
+            'protein_g',
+            'carbs_g',
+            'fat_g',
+            'fiber_g',
+            'sugar_g',
+            'isGuess',
+          ],
+          properties: {
+            component: { type: 'string', enum: components },
+            name: { type: 'string' },
+            brand: { type: ['string', 'null'] },
+            serving_size: { type: 'string' },
+            servings: { type: 'number' },
+            calories: { type: ['number', 'null'] },
+            protein_g: { type: ['number', 'null'] },
+            carbs_g: { type: ['number', 'null'] },
+            fat_g: { type: ['number', 'null'] },
+            fiber_g: { type: ['number', 'null'] },
+            sugar_g: { type: ['number', 'null'] },
+            isGuess: { type: 'boolean' },
+          },
+        },
+      },
+      total: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'],
+        properties: {
+          calories: { type: ['number', 'null'] },
+          protein_g: { type: ['number', 'null'] },
+          carbs_g: { type: ['number', 'null'] },
+          fat_g: { type: ['number', 'null'] },
+          fiber_g: { type: ['number', 'null'] },
+          sugar_g: { type: ['number', 'null'] },
+        },
+      },
+    },
+  },
+  strict: true,
+});
+
 const extractComponentsFromDelimitedText = (raw: string | null | undefined): string[] => {
   if (!raw) return [];
   const cleaned = String(raw).replace(/\s+/g, ' ').trim();
@@ -2178,6 +2241,7 @@ CRITICAL REQUIREMENTS:
     let listedComponents: string[] = [];
     let componentsHint = '';
     let componentsRequirement = '';
+    let componentBoundApplied = false;
     if (wantStructured) {
       try {
         const m = analysis.match(/<ITEMS_JSON>([\s\S]*?)<\/ITEMS_JSON>/i);
@@ -2378,6 +2442,102 @@ CRITICAL REQUIREMENTS:
       }
     }
 
+    // For photo analyses with a clear component list, force a component-bound
+    // vision follow-up so we always return one card per ingredient.
+    if (wantStructured && preferMultiDetect && isImageAnalysis && listedComponents.length > 1) {
+      const needsComponentBound =
+        !resp.items ||
+        resp.items.length === 0 ||
+        looksLikeSingleGenericItem(resp.items) ||
+        looksLikeMultiIngredientSummary(resp.items) ||
+        resp.items.length < listedComponents.length;
+      if (needsComponentBound) {
+        try {
+          console.warn('⚠️ Analyzer: running component-bound vision follow-up.');
+          const componentBoundPrompt =
+            'Return JSON only. Use the component list and output exactly one item per component.\n' +
+            'You must include ALL components and no extras.\n' +
+            'Each item name must be the plain ingredient name for that component.\n' +
+            'Component list:\n' +
+            listedComponents.map((c) => `- ${c}`).join('\n') +
+            '\n\nUse the image as the primary source of truth. Analysis text is supplemental:\n' +
+            analysisTextForFollowUp;
+          const componentBoundMessages = [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: componentBoundPrompt },
+                { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+              ],
+            },
+          ];
+
+          let componentBound: any = null;
+          try {
+            componentBound = await chatCompletionWithCost(openai, {
+              model: 'gpt-4o',
+              response_format: {
+                type: 'json_schema',
+                json_schema: buildComponentBoundSchema(listedComponents),
+              } as any,
+              messages: componentBoundMessages,
+              max_tokens: 420,
+              temperature: 0,
+            } as any);
+          } catch (schemaErr) {
+            console.warn('Component-bound schema follow-up failed; retrying with json_object.', schemaErr);
+            componentBound = await chatCompletionWithCost(openai, {
+              model: 'gpt-4o',
+              response_format: { type: 'json_object' } as any,
+              messages: componentBoundMessages,
+              max_tokens: 420,
+              temperature: 0,
+            } as any);
+          }
+
+          if (componentBound?.completion) {
+            totalCostCents += componentBound.costCents;
+            const text = componentBound.completion.choices?.[0]?.message?.content?.trim() || '';
+            const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+            if (parsed) {
+              const items = Array.isArray((parsed as any).items) ? (parsed as any).items : [];
+              const total = typeof (parsed as any).total === 'object' ? (parsed as any).total : null;
+              const normalizedComponents = listedComponents.map((c) => normalizeComponentName(c));
+              const itemsByComponent = items.filter((item: any) => {
+                const key = normalizeComponentName(item?.component || item?.name || '');
+                return key && normalizedComponents.includes(key);
+              });
+              const orderedItems = normalizedComponents
+                .map((comp, idx) => {
+                  const item = itemsByComponent.find(
+                    (candidate: any) =>
+                      normalizeComponentName(candidate?.component || candidate?.name || '') === comp,
+                  );
+                  if (!item) return null;
+                  const next = { ...item };
+                  delete (next as any).component;
+                  if (!next.name) next.name = listedComponents[idx];
+                  return next;
+                })
+                .filter(Boolean) as any[];
+
+              if (orderedItems.length === listedComponents.length) {
+                resp.items = sanitizeStructuredItems(orderedItems);
+                resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
+                itemsSource = itemsSource === 'none' ? 'component_bound' : `${itemsSource}+component_bound`;
+                itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
+                componentBoundApplied = true;
+                console.log('✅ Component-bound follow-up produced items:', resp.items.length);
+              }
+            }
+          }
+        } catch (componentErr) {
+          console.warn('Component-bound vision follow-up failed (non-fatal):', componentErr);
+        }
+      }
+    }
+
     // If we still don't have meaningful per-component items (or only a generic "Meal" card)
     // but the prompt was multi-detect capable, run a lightweight structure-only pass to
     // force separate components. This keeps the ingredient cards usable when the primary
@@ -2390,6 +2550,7 @@ CRITICAL REQUIREMENTS:
     if (
       wantStructured &&
       preferMultiDetect &&
+      !componentBoundApplied &&
       (!resp.items ||
         resp.items.length === 0 ||
         looksLikeSingleGenericItem(resp.items) ||
@@ -2473,7 +2634,7 @@ CRITICAL REQUIREMENTS:
 
     // If the analysis text clearly lists components that are missing from ITEMS_JSON,
     // backfill those components so the user can edit/remove them.
-    if (wantStructured && preferMultiDetect) {
+    if (wantStructured && preferMultiDetect && !componentBoundApplied) {
       if (listedComponents.length > 0) {
         const existing = resp.items || [];
         const existingFiltered = existing.filter(
