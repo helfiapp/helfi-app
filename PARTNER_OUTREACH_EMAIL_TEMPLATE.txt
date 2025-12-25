@@ -1,0 +1,28 @@
+Subject: Data partnership request for verified nutrition + barcode data (Helfi)
+
+Hi {name},
+
+My name is Louie Veleski and I am the founder of Helfi. Helfi is an AI-driven health analysis web app that allows people to take control of every aspect of their health. You can see an overview of what we do at https://www.helfi.ai.
+
+We are looking to license or partner for authoritative barcode and nutrition data to improve accuracy in our Food Diary module, where users track calories and macronutrients. We want the data behind barcode scans to reflect official product nutrition labels.
+
+Key data fields we are looking for:
+- GTIN/UPC/EAN
+- Brand + product name
+- Pack size and serving size (including ml for liquids)
+- Nutrition panel values (per serve and per 100 g/ml)
+- Ingredients + allergens
+- Product images (front of pack / nutrition panel if available)
+- Update cadence or change notifications
+
+If you are the right team, could you please share:
+- The best way to request access (API, GDSN data pool, portal, or data feed)
+- Any licensing requirements or pricing
+- A technical contact for integration details
+
+If this should be directed to a specific data partnerships or product content team, please forward it to the right contact.
+
+Thanks in advance,
+Louie Veleski
+Founder, Helfi
+https://www.helfi.ai

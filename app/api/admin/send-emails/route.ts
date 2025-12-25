@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { emails, subject, message, waitlistData } = await request.json()
+    const { emails, subject, message, waitlistData, emailType, reasonText } = await request.json()
 
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
       return NextResponse.json({ error: 'No recipients provided' }, { status: 400 })
@@ -60,9 +60,16 @@ export async function POST(request: NextRequest) {
         // Find the corresponding waitlist entry to get the name
         const recipient = waitlistData?.find((entry: any) => entry.email === email)
         const name = recipient?.name || 'there'
+        const company = recipient?.company || ''
+        const region = recipient?.region || ''
+        const notes = recipient?.notes || ''
         
         // Personalize the message
-        const personalizedMessage = message.replace(/{name}/g, name)
+        const personalizedMessage = message
+          .replace(/{name}/g, name)
+          .replace(/{company}/g, company)
+          .replace(/{region}/g, region)
+          .replace(/{notes}/g, notes)
         
         // Send real email using Resend
         const resend = getResend()
@@ -90,7 +97,11 @@ export async function POST(request: NextRequest) {
                   <a href="https://helfi.ai" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 10px 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">🚀 Get Started with Helfi</a>
                 </div>
                 
-                ${getEmailFooter({ recipientEmail: email, emailType: 'marketing', reasonText: 'You received this email because you joined our waitlist.' })}
+                ${getEmailFooter({
+                  recipientEmail: email,
+                  emailType: emailType || 'marketing',
+                  reasonText: reasonText || 'You received this email because you joined our waitlist.'
+                })}
               </div>
             </div>
           `

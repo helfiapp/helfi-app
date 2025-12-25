@@ -49,8 +49,10 @@ export default function AdminPanel() {
   
   // Additional admin data states
   const [waitlistData, setWaitlistData] = useState<any[]>([])
+  const [partnerOutreachData, setPartnerOutreachData] = useState<any[]>([])
   const [userStats, setUserStats] = useState<any>(null)
   const [isLoadingWaitlist, setIsLoadingWaitlist] = useState(false)
+  const [isLoadingPartnerOutreach, setIsLoadingPartnerOutreach] = useState(false)
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
   
   // User management states
@@ -71,6 +73,13 @@ export default function AdminPanel() {
   const [customEmailSubject, setCustomEmailSubject] = useState('')
   const [customEmailMessage, setCustomEmailMessage] = useState('')
   const [isComposingEmail, setIsComposingEmail] = useState(false)
+
+  // Partner outreach email states
+  const [selectedPartnerEmails, setSelectedPartnerEmails] = useState<string[]>([])
+  const [showPartnerEmailInterface, setShowPartnerEmailInterface] = useState(false)
+  const [partnerEmailSubject, setPartnerEmailSubject] = useState('')
+  const [partnerEmailMessage, setPartnerEmailMessage] = useState('')
+  const [isComposingPartnerEmail, setIsComposingPartnerEmail] = useState(false)
 
   // User Management Email states
   const [selectedUserEmails, setSelectedUserEmails] = useState<string[]>([])
@@ -105,6 +114,19 @@ export default function AdminPanel() {
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [ticketResponse, setTicketResponse] = useState('')
   const [isRespondingToTicket, setIsRespondingToTicket] = useState(false)
+
+  // Affiliate program admin states
+  const [affiliateApplications, setAffiliateApplications] = useState<any[]>([])
+  const [affiliateStatusFilter, setAffiliateStatusFilter] = useState('PENDING_REVIEW')
+  const [affiliateLoading, setAffiliateLoading] = useState(false)
+  const [affiliateError, setAffiliateError] = useState('')
+  const [affiliateActionLoading, setAffiliateActionLoading] = useState<Record<string, boolean>>({})
+  const [payoutCurrency, setPayoutCurrency] = useState('usd')
+  const [payoutMinThreshold, setPayoutMinThreshold] = useState(5000)
+  const [payoutDryRun, setPayoutDryRun] = useState(true)
+  const [payoutLoading, setPayoutLoading] = useState(false)
+  const [payoutError, setPayoutError] = useState('')
+  const [payoutResult, setPayoutResult] = useState<any>(null)
 
   // Admin management states
   const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
@@ -511,6 +533,227 @@ export default function AdminPanel() {
     }
   }
 
+  const loadPartnerOutreachData = async (token?: string) => {
+    setIsLoadingPartnerOutreach(true)
+    try {
+      const authToken = token || adminToken
+      const response = await fetch('/api/admin/partner-outreach', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setPartnerOutreachData(result.contacts || [])
+        setSelectedPartnerEmails(prev => prev.filter(email =>
+          result.contacts?.some((entry: any) => entry.email === email)
+        ))
+      }
+    } catch (error) {
+      console.error('Error loading partner outreach contacts:', error)
+    }
+    setIsLoadingPartnerOutreach(false)
+  }
+
+  const handleInitPartnerOutreach = async () => {
+    if (!confirm('Load the default partner outreach list? This will add missing contacts.')) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/partner-outreach/init', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+      const result = await response.json()
+      if (response.ok) {
+        alert(`✅ Added ${result.createdCount || 0} partner contacts`)
+        loadPartnerOutreachData()
+      } else {
+        alert(result.error || 'Failed to initialize partner contacts')
+      }
+    } catch (error) {
+      console.error('Error initializing partner outreach contacts:', error)
+      alert('Failed to initialize partner contacts. Please try again.')
+    }
+  }
+
+  const handlePartnerEmailSelect = (email?: string | null) => {
+    if (!email) return
+    setSelectedPartnerEmails(prev =>
+      prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
+    )
+  }
+
+  const handlePartnerSelectAll = () => {
+    const selectable = partnerOutreachData.map(entry => entry.email).filter(Boolean)
+    if (selectedPartnerEmails.length === selectable.length) {
+      setSelectedPartnerEmails([])
+    } else {
+      setSelectedPartnerEmails(selectable)
+    }
+  }
+
+  const handleDeletePartnerContact = async (entryId: string, email: string | null, label: string) => {
+    if (!confirm(`Are you sure you want to delete ${label} from the partner outreach list?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/partner-outreach?id=${entryId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        setPartnerOutreachData(prev => prev.filter(entry => entry.id !== entryId))
+        if (email) {
+          setSelectedPartnerEmails(prev => prev.filter(e => e !== email))
+        }
+        alert('Partner contact deleted successfully')
+      } else {
+        alert(result.error || 'Failed to delete partner contact')
+      }
+    } catch (error) {
+      console.error('Error deleting partner contact:', error)
+      alert('Failed to delete partner contact. Please try again.')
+    }
+  }
+
+  const handleBulkDeletePartnerContacts = async () => {
+    if (selectedPartnerEmails.length === 0) {
+      alert('Please select at least one contact to delete')
+      return
+    }
+
+    const selectedEntries = partnerOutreachData.filter(entry => selectedPartnerEmails.includes(entry.email))
+    const emailList = selectedEntries.map(e => e.email).join(', ')
+
+    if (!confirm(`Are you sure you want to delete ${selectedPartnerEmails.length} partner contact${selectedPartnerEmails.length === 1 ? '' : 's'}?\n\n${emailList}`)) {
+      return
+    }
+
+    try {
+      const deletePromises = selectedEntries.map(entry =>
+        fetch(`/api/admin/partner-outreach?id=${entry.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`
+          }
+        })
+      )
+
+      const results = await Promise.all(deletePromises)
+      const failed = results.filter(r => !r.ok)
+
+      if (failed.length === 0) {
+        const deletedCount = selectedPartnerEmails.length
+        const deletedIds = selectedEntries.map(e => e.id)
+        setPartnerOutreachData(prev => prev.filter(entry => !deletedIds.includes(entry.id)))
+        setSelectedPartnerEmails([])
+        alert(`✅ Successfully deleted ${deletedCount} partner contact${deletedCount === 1 ? '' : 's'}`)
+      } else {
+        alert(`Failed to delete ${failed.length} of ${selectedPartnerEmails.length} contacts. Please try again.`)
+      }
+    } catch (error) {
+      console.error('Error bulk deleting partner contacts:', error)
+      alert('Failed to delete partner contacts. Please try again.')
+    }
+  }
+
+  const handleStartPartnerEmail = () => {
+    if (selectedPartnerEmails.length === 0) {
+      alert('Please select at least one recipient')
+      return
+    }
+    setPartnerEmailSubject('Data partnership request for verified nutrition + barcode data (Helfi)')
+    setPartnerEmailMessage(`Hi {name},
+
+My name is Louie Veleski and I am the founder of Helfi. Helfi is an AI-driven health analysis web app that allows people to take control of every aspect of their health. You can see an overview of what we do at https://www.helfi.ai.
+
+We are looking to license or partner for authoritative barcode and nutrition data to improve accuracy in our Food Diary module, where users track calories and macronutrients. We want the data behind barcode scans to reflect official product nutrition labels.
+
+Key data fields we are looking for:
+- GTIN/UPC/EAN
+- Brand + product name
+- Pack size and serving size (including ml for liquids)
+- Nutrition panel values (per serve and per 100 g/ml)
+- Ingredients + allergens
+- Product images (front of pack / nutrition panel if available)
+- Update cadence or change notifications
+
+If you are the right team, could you please share:
+- The best way to request access (API, GDSN data pool, portal, or data feed)
+- Any licensing requirements or pricing
+- A technical contact for integration details
+
+If this should be directed to a specific data partnerships or product content team, please forward it to the right contact.
+
+Thanks in advance,
+Louie Veleski
+Founder, Helfi
+https://www.helfi.ai`)
+    setShowPartnerEmailInterface(true)
+  }
+
+  const handleCancelPartnerEmail = () => {
+    setShowPartnerEmailInterface(false)
+    setPartnerEmailSubject('')
+    setPartnerEmailMessage('')
+    setIsComposingPartnerEmail(false)
+  }
+
+  const handleSendPartnerEmail = async () => {
+    if (!partnerEmailSubject.trim() || !partnerEmailMessage.trim()) {
+      alert('Please enter both subject and message')
+      return
+    }
+
+    const confirmed = confirm(`Send email to ${selectedPartnerEmails.length} recipients?`)
+    if (!confirmed) return
+
+    setIsComposingPartnerEmail(true)
+
+    try {
+      const selectedEntries = partnerOutreachData.filter(entry => selectedPartnerEmails.includes(entry.email))
+      const response = await fetch('/api/admin/send-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          emails: selectedPartnerEmails,
+          subject: partnerEmailSubject,
+          message: partnerEmailMessage,
+          waitlistData: selectedEntries,
+          emailType: 'marketing',
+          reasonText: 'You received this email because we are reaching out about a potential data partnership with Helfi.'
+        })
+      })
+
+      if (response.ok) {
+        alert(`✅ Successfully sent emails to ${selectedPartnerEmails.length} recipients!`)
+        handleCancelPartnerEmail()
+        setSelectedPartnerEmails([])
+      } else {
+        const error = await response.json()
+        alert(`❌ Failed to send emails: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error sending partner outreach emails:', error)
+      alert('❌ Failed to send emails. Please try again.')
+    }
+
+    setIsComposingPartnerEmail(false)
+  }
+
   const loadUserStats = async (token?: string) => {
     setIsLoadingUsers(true)
     try {
@@ -628,6 +871,91 @@ export default function AdminPanel() {
     setLoadingInsights(false)
   }
 
+  const loadAffiliateApplications = async (statusOverride?: string) => {
+    if (!adminToken) return
+    const status = statusOverride ?? affiliateStatusFilter
+    setAffiliateLoading(true)
+    setAffiliateError('')
+    try {
+      const params = new URLSearchParams()
+      if (status && status !== 'ALL') {
+        params.set('status', status)
+      }
+      const res = await fetch(`/api/admin/affiliates/applications?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to load applications')
+      setAffiliateApplications(data?.applications || [])
+    } catch (err: any) {
+      setAffiliateError(err?.message || 'Failed to load applications')
+    } finally {
+      setAffiliateLoading(false)
+    }
+  }
+
+  const handleAffiliateDecision = async (applicationId: string, action: 'approve' | 'reject') => {
+    if (!adminToken) return
+    const confirmText =
+      action === 'approve'
+        ? 'Approve this affiliate application?'
+        : 'Reject this affiliate application?'
+    if (!confirm(confirmText)) return
+
+    setAffiliateActionLoading((prev) => ({ ...prev, [applicationId]: true }))
+    try {
+      const res = await fetch('/api/admin/affiliates/applications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ applicationId, action }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Action failed')
+      await loadAffiliateApplications()
+    } catch (err: any) {
+      alert(err?.message || 'Action failed')
+    } finally {
+      setAffiliateActionLoading((prev) => {
+        const next = { ...prev }
+        delete next[applicationId]
+        return next
+      })
+    }
+  }
+
+  const runAffiliatePayout = async (dryRunOverride?: boolean) => {
+    if (!adminToken) return
+    setPayoutLoading(true)
+    setPayoutError('')
+    setPayoutResult(null)
+    try {
+      const res = await fetch('/api/admin/affiliates/payout-run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({
+          currency: payoutCurrency,
+          minThresholdCents: Number(payoutMinThreshold) || 0,
+          dryRun: dryRunOverride ?? payoutDryRun,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Payout run failed')
+      setPayoutResult(data)
+    } catch (err: any) {
+      setPayoutError(err?.message || 'Payout run failed')
+    } finally {
+      setPayoutLoading(false)
+    }
+  }
+
   const refreshData = () => {
     loadAnalyticsData()
     loadWaitlistData(adminToken)
@@ -643,6 +971,12 @@ export default function AdminPanel() {
     }
     if (activeTab === 'tickets') {
       loadSupportTickets()
+    }
+    if (activeTab === 'affiliates') {
+      loadAffiliateApplications()
+    }
+    if (activeTab === 'partner-outreach') {
+      loadPartnerOutreachData()
     }
   }
 
@@ -705,7 +1039,9 @@ export default function AdminPanel() {
           emails: selectedEmails,
           subject: customEmailSubject,
           message: customEmailMessage,
-          waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email))
+          waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email)),
+          emailType: 'marketing',
+          reasonText: 'You received this email because you joined the Helfi waitlist.'
         })
       })
 
@@ -1005,7 +1341,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
           emails: selectedUserEmails,
           subject: userEmailSubject,
           message: userEmailMessage,
-          waitlistData: emailData // Using same structure for compatibility
+          waitlistData: emailData, // Using same structure for compatibility
+          emailType: 'marketing',
+          reasonText: 'You received this email because you have a Helfi account.'
         })
       })
 
@@ -1754,7 +2092,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'usage', label: 'AI Usage' },
+              { id: 'affiliates', label: 'Affiliates' },
               { id: 'waitlist', label: 'Waitlist' },
+              { id: 'partner-outreach', label: 'Partners' },
               { id: 'users', label: 'Users' },
               { id: 'settings', label: 'Settings' },
             ].map((item) => (
@@ -1771,6 +2111,12 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   }
                   if (item.id === 'settings') {
                     checkPushNotificationStatus()
+                  }
+                  if (item.id === 'affiliates') {
+                    loadAffiliateApplications('PENDING_REVIEW')
+                  }
+                  if (item.id === 'partner-outreach') {
+                    loadPartnerOutreachData()
                   }
                 }}
                 className={`w-full py-2 rounded-lg border text-sm ${
@@ -1791,9 +2137,11 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             {[
               { id: 'overview', label: '📊 Overview', desc: 'Key metrics' },
               { id: 'usage', label: '💰 AI Usage', desc: 'Vision costs' },
+              { id: 'affiliates', label: '🤝 Affiliates', desc: 'Applications & payouts' },
               { id: 'events', label: '📋 Events', desc: 'Raw data' },
               { id: 'insights', label: '🤖 AI Insights', desc: 'OpenAI analysis' },
               { id: 'waitlist', label: '📧 Waitlist', desc: 'Signups' },
+              { id: 'partner-outreach', label: '📮 Partners', desc: 'Outreach list' },
               { id: 'users', label: '👥 Users', desc: 'User stats' },
               { id: 'management', label: '🛠️ User Management', desc: 'Manage users' },
               { id: 'templates', label: '📝 Templates', desc: 'Email templates' },
@@ -1817,11 +2165,17 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     loadUserManagement(userSearch, userFilter, currentPage)
                     loadEmailTemplates() // Load templates for email campaigns
                   }
+                  if (tab.id === 'affiliates') {
+                    loadAffiliateApplications('PENDING_REVIEW')
+                  }
                   if (tab.id === 'templates') {
                     loadEmailTemplates()
                   }
                   if (tab.id === 'tickets') {
                     loadSupportTickets()
+                  }
+                  if (tab.id === 'partner-outreach') {
+                    loadPartnerOutreachData()
                   }
                   if (tab.id === 'settings') {
                     checkPushNotificationStatus()
@@ -2609,6 +2963,185 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
           </div>
         )}
 
+        {activeTab === 'affiliates' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Affiliate Applications</h2>
+                  <p className="text-sm text-gray-600">Review and approve affiliate applications.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={affiliateStatusFilter}
+                    onChange={(e) => setAffiliateStatusFilter(e.target.value)}
+                    className="border rounded-md px-3 py-2 text-sm"
+                  >
+                    <option value="PENDING_REVIEW">Pending</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="REJECTED">Rejected</option>
+                    <option value="ALL">All</option>
+                  </select>
+                  <button
+                    onClick={() => loadAffiliateApplications()}
+                    className="bg-emerald-600 text-white px-3 py-2 rounded-md text-sm hover:bg-emerald-700"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {affiliateLoading && <div className="mt-4 text-sm text-gray-500">Loading applications…</div>}
+              {affiliateError && <div className="mt-4 text-sm text-red-600">{affiliateError}</div>}
+
+              {!affiliateLoading && !affiliateError && affiliateApplications.length === 0 && (
+                <div className="mt-4 text-sm text-gray-500">No applications found.</div>
+              )}
+
+              <div className="mt-6 space-y-4">
+                {affiliateApplications.map((app) => (
+                  <div key={app.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-gray-900">{app.name}</div>
+                        <div className="text-xs text-gray-500">{app.email}</div>
+                        {app.website && (
+                          <a
+                            href={app.website}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-emerald-700 underline"
+                          >
+                            {app.website}
+                          </a>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        <div>Status: <span className="font-semibold text-gray-700">{app.status}</span></div>
+                        <div>Risk: <span className="font-semibold text-gray-700">{app.riskLevel || '—'}</span></div>
+                        <div>Recommendation: <span className="font-semibold text-gray-700">{app.recommendation || '—'}</span></div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 text-sm text-gray-700">
+                      <div>
+                        Channel: <span className="font-medium">{app.primaryChannel || '—'}</span>
+                        {app.primaryChannelOther ? ` (${app.primaryChannelOther})` : ''}
+                      </div>
+                      <div>Audience: <span className="font-medium">{app.audienceSize || '—'}</span></div>
+                      <div>Submitted: <span className="font-medium">{new Date(app.createdAt).toLocaleString()}</span></div>
+                      <div>Terms: <span className="font-medium">{app.termsVersion || '—'}</span></div>
+                    </div>
+
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-sm text-emerald-700">View details</summary>
+                      <div className="mt-2 text-sm text-gray-700 space-y-2">
+                        <div><span className="font-medium">Promotion method:</span> {app.promotionMethod || '—'}</div>
+                        {app.aiReasoning && (
+                          <div><span className="font-medium">AI reasoning:</span> {app.aiReasoning}</div>
+                        )}
+                        {app.notes && (
+                          <div><span className="font-medium">Notes:</span> {app.notes}</div>
+                        )}
+                        <div className="text-xs text-gray-500">
+                          Location: {[app.city, app.region, app.country].filter(Boolean).join(', ') || '—'}
+                        </div>
+                        <div className="text-xs text-gray-500">IP: {app.ip || '—'}</div>
+                      </div>
+                    </details>
+
+                    {app.status === 'PENDING_REVIEW' && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => handleAffiliateDecision(app.id, 'approve')}
+                          disabled={!!affiliateActionLoading[app.id]}
+                          className="bg-emerald-600 text-white px-3 py-2 rounded-md text-sm hover:bg-emerald-700 disabled:opacity-60"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleAffiliateDecision(app.id, 'reject')}
+                          disabled={!!affiliateActionLoading[app.id]}
+                          className="bg-red-600 text-white px-3 py-2 rounded-md text-sm hover:bg-red-700 disabled:opacity-60"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Affiliate Payout Run</h2>
+                  <p className="text-sm text-gray-600">Process Net‑30 payouts via Stripe Connect.</p>
+                </div>
+                <button
+                  onClick={() => runAffiliatePayout(true)}
+                  disabled={payoutLoading}
+                  className="bg-gray-900 text-white px-3 py-2 rounded-md text-sm hover:bg-black disabled:opacity-60"
+                >
+                  {payoutLoading ? 'Running…' : 'Dry Run'}
+                </button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Currency</label>
+                  <input
+                    value={payoutCurrency}
+                    onChange={(e) => setPayoutCurrency(e.target.value.toLowerCase())}
+                    className="w-full border rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Min threshold (cents)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={payoutMinThreshold}
+                    onChange={(e) => setPayoutMinThreshold(Number(e.target.value))}
+                    className="w-full border rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="payout-dry-run"
+                    type="checkbox"
+                    checked={payoutDryRun}
+                    onChange={(e) => setPayoutDryRun(e.target.checked)}
+                  />
+                  <label htmlFor="payout-dry-run" className="text-sm text-gray-700">Default to dry run</label>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={() => runAffiliatePayout()}
+                  disabled={payoutLoading}
+                  className="bg-emerald-600 text-white px-3 py-2 rounded-md text-sm hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {payoutLoading ? 'Running…' : 'Run Payout'}
+                </button>
+              </div>
+
+              {payoutError && <div className="mt-3 text-sm text-red-600">{payoutError}</div>}
+              {payoutResult && (
+                <div className="mt-3 text-sm text-gray-700">
+                  <div>Transfer count: <span className="font-medium">{payoutResult.transferCount || 0}</span></div>
+                  <div>Total cents: <span className="font-medium">{payoutResult.totalCents || 0}</span></div>
+                  {payoutResult.dryRun && (
+                    <div className="text-xs text-gray-500 mt-1">Dry run completed.</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'insights' && (
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-6">
@@ -2700,7 +3233,9 @@ Ready to start your AI-powered health transformation?
 
 Thank you for your patience and support,
 The Helfi Team`,
-                          waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email))
+                          waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email)),
+                          emailType: 'marketing',
+                          reasonText: 'You received this email because you joined the Helfi waitlist.'
                         })
                       })
 
@@ -2919,6 +3454,237 @@ The Helfi Team`,
                                 onClick={() => handleDeleteWaitlistEntry(entry.id, entry.email)}
                                 className="text-red-600 hover:text-red-800 font-medium transition-colors"
                                 title="Delete entry"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'partner-outreach' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Partner Outreach</h3>
+                  <p className="text-sm text-gray-600">
+                    {selectedPartnerEmails.length > 0
+                      ? `${selectedPartnerEmails.length} recipients selected`
+                      : 'Select recipients to send emails'
+                    }
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handleInitPartnerOutreach}
+                    className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    🔄 Load Default List
+                  </button>
+                  <button
+                    onClick={handleStartPartnerEmail}
+                    disabled={selectedPartnerEmails.length === 0}
+                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    📧 Compose Email
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {showPartnerEmailInterface && (
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-emerald-900">📮 Compose Partner Outreach Email</h3>
+                    <p className="text-sm text-emerald-700">
+                      Sending to {selectedPartnerEmails.length} recipients
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCancelPartnerEmail}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Subject Line <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={partnerEmailSubject}
+                      onChange={(e) => setPartnerEmailSubject(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-lg"
+                      placeholder="Enter email subject..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Message <span className="text-red-500">*</span>
+                      <span className="text-xs text-gray-500 ml-2">(Use {'{name}'}, {'{company}'}, {'{region}'})</span>
+                    </label>
+                    <textarea
+                      value={partnerEmailMessage}
+                      onChange={(e) => setPartnerEmailMessage(e.target.value)}
+                      rows={12}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base leading-relaxed"
+                      placeholder="Enter your email content..."
+                    />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                    <button
+                      onClick={handleCancelPartnerEmail}
+                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSendPartnerEmail}
+                      disabled={isComposingPartnerEmail || !partnerEmailSubject.trim() || !partnerEmailMessage.trim()}
+                      className="px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center"
+                    >
+                      {isComposingPartnerEmail ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          📧 Send to {selectedPartnerEmails.length} Recipients
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Partner Contacts</h3>
+                    <p className="text-sm text-gray-600">
+                      {isLoadingPartnerOutreach ? 'Loading...' : `${partnerOutreachData.length} contacts`}
+                    </p>
+                  </div>
+                  {partnerOutreachData.length > 0 && (
+                    <div className="flex items-center gap-3">
+                      {selectedPartnerEmails.length > 0 && (
+                        <button
+                          onClick={handleBulkDeletePartnerContacts}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete Selected ({selectedPartnerEmails.length})
+                        </button>
+                      )}
+                      <button
+                        onClick={handlePartnerSelectAll}
+                        className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                      >
+                        {selectedPartnerEmails.length === partnerOutreachData.filter(entry => entry.email).length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isLoadingPartnerOutreach ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                  <span className="ml-3 text-gray-600">Loading partner contacts...</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            checked={partnerOutreachData.some(entry => entry.email) && selectedPartnerEmails.length === partnerOutreachData.filter(entry => entry.email).length}
+                            onChange={handlePartnerSelectAll}
+                            className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                          />
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Contact
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Company
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Email
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Region
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Notes
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {partnerOutreachData.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                            No partner contacts yet. Use "Load Default List" to seed the list.
+                          </td>
+                        </tr>
+                      ) : (
+                        partnerOutreachData.map((entry, index) => (
+                          <tr key={entry.id || index} className={selectedPartnerEmails.includes(entry.email) ? 'bg-emerald-50' : ''}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(entry.email) && selectedPartnerEmails.includes(entry.email)}
+                                onChange={() => handlePartnerEmailSelect(entry.email)}
+                                className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                                disabled={!entry.email}
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {entry.name}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {entry.company}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {entry.email || 'Form only'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {entry.region || '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {entry.notes || '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <button
+                                onClick={() => handleDeletePartnerContact(entry.id, entry.email, `${entry.name} (${entry.company})`)}
+                                className="text-red-600 hover:text-red-800 font-medium transition-colors"
+                                title="Delete contact"
                               >
                                 Delete
                               </button>
