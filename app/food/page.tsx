@@ -633,6 +633,9 @@ const parseServingQuantity = (input: string) => {
   return null
 }
 
+const isFractionalServingQuantity = (quantity: number | null | undefined) =>
+  Number.isFinite(quantity) && (quantity as number) > 0 && (quantity as number) < 1
+
 const singularizeUnitLabel = (label: string) => {
   const trimmed = label.trim()
   if (!trimmed) return 'unit'
@@ -750,12 +753,22 @@ const getPiecesPerServing = (item: any): number | null => {
   const nameLabel = normalizeWordNumbersLocal(String(item?.name || '').trim())
 
   const fromServing = servingLabel ? parseServingUnitMetadata(servingLabel) : null
-  if (fromServing && isDiscreteUnitLabel(fromServing.unitLabel) && fromServing.quantity > 0) {
+  if (
+    fromServing &&
+    isDiscreteUnitLabel(fromServing.unitLabel) &&
+    fromServing.quantity >= 1 &&
+    !isFractionalServingQuantity(fromServing.quantity)
+  ) {
     return fromServing.quantity
   }
 
   const fromName = nameLabel ? parseServingUnitMetadata(nameLabel) : null
-  if (fromName && isDiscreteUnitLabel(fromName.unitLabel) && fromName.quantity > 0) {
+  if (
+    fromName &&
+    isDiscreteUnitLabel(fromName.unitLabel) &&
+    fromName.quantity >= 1 &&
+    !isFractionalServingQuantity(fromName.quantity)
+  ) {
     return fromName.quantity
   }
 
@@ -2979,6 +2992,81 @@ export default function FoodDiary() {
         window.requestAnimationFrame(tick)
       }
     } catch {}
+  }
+
+  const buildOfficialItem = (item: any, servingsOverride?: number | null) => {
+    const base = {
+      name: item.name || 'Unknown food',
+      brand: item.brand ?? null,
+      serving_size: item.serving_size || '',
+      servings:
+        Number.isFinite(Number(servingsOverride)) && Number(servingsOverride) > 0
+          ? Number(servingsOverride)
+          : 1,
+      calories: item.calories ?? null,
+      protein_g: item.protein_g ?? null,
+      carbs_g: item.carbs_g ?? null,
+      fat_g: item.fat_g ?? null,
+      fiber_g: item.fiber_g ?? null,
+      sugar_g: item.sugar_g ?? null,
+    }
+
+    let next = normalizeDiscreteItem(base)
+
+    const { gramsPerServing, mlPerServing, ozPerServing } = quickParseServingSize(next?.serving_size)
+    if (!next.weightUnit) {
+      if (mlPerServing && mlPerServing > 0) next.weightUnit = 'ml'
+      else if (ozPerServing && ozPerServing > 0) next.weightUnit = 'oz'
+      else next.weightUnit = 'g'
+    }
+
+    const hasCustom =
+      Number.isFinite((next as any)?.customGramsPerServing) ||
+      Number.isFinite((next as any)?.customMlPerServing)
+    if (!hasCustom && !gramsPerServing && !mlPerServing) {
+      const estimate = estimateGramsPerServing(next)
+      if (estimate && estimate > 0) {
+        next.customGramsPerServing = estimate
+      }
+    }
+
+    const baseWeight = getBaseWeightPerServing(next)
+    if (baseWeight && baseWeight > 0) {
+      const unit = next?.weightUnit === 'ml' ? 'ml' : next?.weightUnit === 'oz' ? 'oz' : 'g'
+      const computed = baseWeight * (next.servings || 1)
+      const precision = unit === 'oz' ? 100 : 1000
+      next.weightAmount = Math.round(computed * precision) / precision
+    }
+
+    return next
+  }
+
+  const replaceIngredientFromOfficial = (item: any, index: number) => {
+    if (!item || index === null || index === undefined) return
+    const itemsCopy = [...analyzedItems]
+    if (!itemsCopy[index]) return
+    const currentServings =
+      Number.isFinite(Number(itemsCopy[index]?.servings)) && Number(itemsCopy[index]?.servings) > 0
+        ? Number(itemsCopy[index]?.servings)
+        : 1
+    const nextItem = buildOfficialItem(item, currentServings)
+    itemsCopy[index] = nextItem
+    setAnalyzedItems(itemsCopy)
+    applyRecalculatedNutrition(itemsCopy)
+    if (editingEntry) {
+      try {
+        const updatedNutrition = recalculateNutritionFromItems(itemsCopy)
+        const updatedEntry = {
+          ...editingEntry,
+          items: itemsCopy,
+          nutrition: updatedNutrition,
+          total: convertTotalsForStorage(updatedNutrition),
+        }
+        setEditingEntry(updatedEntry)
+        setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
+      } catch {}
+    }
+    showQuickToast(`Updated to ${nextItem.name}`)
   }
 
   const handleOfficialSearch = async (mode: 'packaged' | 'single', queryOverride?: string) => {
@@ -11554,7 +11642,8 @@ Please add nutritional information manually if needed.`);
                           getPiecesPerServing(item) ||
                           (servingUnitMeta &&
                             isDiscreteUnitLabel(servingUnitMeta.unitLabel) &&
-                            servingUnitMeta.quantity > 0
+                            servingUnitMeta.quantity >= 1 &&
+                            !isFractionalServingQuantity(servingUnitMeta.quantity)
                             ? servingUnitMeta.quantity
                             : null)
                         const piecesDisplayMultiplier =
@@ -12208,7 +12297,10 @@ Please add nutritional information manually if needed.`);
                           min={0}
                           step={(() => {
                             const meta = parseServingUnitMetadata(analyzedItems[editingItemIndex]?.serving_size || '')
-                            return meta && isDiscreteUnitLabel(meta.unitLabel) ? (1 / meta.quantity) : 0.25
+                            if (!meta || !isDiscreteUnitLabel(meta.unitLabel)) return 0.25
+                            if (isFractionalServingQuantity(meta.quantity)) return 0.25
+                            if (!meta.quantity || meta.quantity <= 0) return 0.25
+                            return 1 / meta.quantity
                           })()}
                           value={(() => {
                             const key = `ai:modal:${editingItemIndex}:servings`
@@ -12242,6 +12334,161 @@ Please add nutritional information manually if needed.`);
                         <p className="text-xs text-gray-500 mt-1">
                           Adjust servings to multiply nutrients accordingly
                         </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-200">
+                        <div className="text-sm font-medium text-gray-900">
+                          Find a better match (USDA + FatSecret + OpenFoodFacts)
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Selecting a result replaces the item name, serving size, and macros.
+                        </p>
+                        <div className="mt-3 flex flex-col gap-2">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={officialSearchQuery}
+                              onChange={(e) => {
+                                const next = e.target.value
+                                setOfficialSearchQuery(next)
+                                setOfficialError(null)
+                                try {
+                                  if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+                                } catch {}
+                                officialSearchDebounceRef.current = null
+                                if (next.trim().length >= 2) {
+                                  officialSearchDebounceRef.current = setTimeout(() => {
+                                    handleOfficialSearch(officialSource, next)
+                                  }, 350)
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  try {
+                                    if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+                                  } catch {}
+                                  officialSearchDebounceRef.current = null
+                                  handleOfficialSearch(officialSource, officialSearchQuery)
+                                }
+                              }}
+                              placeholder="e.g., Christmas pudding"
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                            />
+                            <button
+                              type="button"
+                              disabled={officialLoading || officialSearchQuery.trim().length === 0}
+                              onClick={() => handleOfficialSearch(officialSource)}
+                              className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold disabled:opacity-60"
+                            >
+                              {officialLoading ? 'Searching…' : 'Search'}
+                            </button>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={officialLoading}
+                              onClick={() => {
+                                setOfficialSource('packaged')
+                                if (officialSearchQuery.trim().length >= 2) handleOfficialSearch('packaged', officialSearchQuery)
+                              }}
+                              className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
+                                officialSource === 'packaged'
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-white text-gray-700 border-gray-300'
+                              } disabled:opacity-60`}
+                            >
+                              Packaged
+                            </button>
+                            <button
+                              type="button"
+                              disabled={officialLoading}
+                              onClick={() => {
+                                setOfficialSource('single')
+                                if (officialSearchQuery.trim().length >= 2) handleOfficialSearch('single', officialSearchQuery)
+                              }}
+                              className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
+                                officialSource === 'single'
+                                  ? 'bg-slate-800 text-white border-slate-800'
+                                  : 'bg-white text-gray-700 border-gray-300'
+                              } disabled:opacity-60`}
+                            >
+                              Single food
+                            </button>
+                          </div>
+                        </div>
+                        {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
+                        {officialLoading && <div className="mt-3 text-xs text-gray-500">Searching…</div>}
+                        {!officialLoading && !officialError && officialResults.length > 0 && (
+                          <div className="mt-3 max-h-64 overflow-y-auto space-y-2">
+                            {officialResults.map((r, idx) => (
+                              <div
+                                key={`${r.source}-${r.id}-${idx}`}
+                                className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
+                              >
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-gray-900 truncate">
+                                    {r.name}
+                                    {r.brand ? ` – ${r.brand}` : ''}
+                                  </div>
+                                  <div className="mt-0.5 text-xs text-gray-600">
+                                    {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
+                                    {r.calories != null && !Number.isNaN(Number(r.calories)) && (
+                                      <span>{Math.round(Number(r.calories))} kcal</span>
+                                    )}
+                                    {r.protein_g != null && (
+                                      <span className="ml-2">{`${r.protein_g} g protein`}</span>
+                                    )}
+                                    {r.carbs_g != null && (
+                                      <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
+                                    )}
+                                    {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-gray-400">
+                                    Source:{' '}
+                                    {r.source === 'usda'
+                                      ? 'USDA FoodData Central'
+                                      : r.source === 'fatsecret'
+                                      ? 'FatSecret'
+                                      : r.source === 'openfoodfacts'
+                                      ? 'OpenFoodFacts'
+                                      : officialResultsSource || 'Unknown'}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => replaceIngredientFromOfficial(r, editingItemIndex)}
+                                  className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
+                                >
+                                  Use match
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {!officialLoading && !officialError && officialResults.length === 0 && officialSearchQuery.trim() && (
+                          <div className="mt-4 text-xs text-gray-500">
+                            {(() => {
+                              const last = officialLastRequest
+                              const hasLast =
+                                last &&
+                                last.query?.trim().toLowerCase() === officialSearchQuery.trim().toLowerCase() &&
+                                last.mode === officialSource
+                              const hint = hasLast
+                                ? `Last search: ${last.status ?? '—'} • ${last.itemCount ?? 0} results • ${last.source || '—'}`
+                                : null
+                              const err = hasLast && last?.errorText ? ` (${String(last.errorText).slice(0, 140)})` : ''
+                              return (
+                                <div className="space-y-1">
+                                  <div>No results yet.</div>
+                                  {hint && <div className="text-[11px] text-gray-400">{hint}{err}</div>}
+                                  <div>Try a shorter name or switch between Packaged and Single food.</div>
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        )}
                       </div>
 
                       <div>
