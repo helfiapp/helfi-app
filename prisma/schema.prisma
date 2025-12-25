@@ -73,6 +73,7 @@ model User {
   fitbitData          FitbitData[]
   garminRequestTokens GarminRequestToken[]
   garminWebhookLogs   GarminWebhookLog[]
+  foodAnalysisFeedback FoodAnalysisFeedback[]
 
   // File relationships (PHASE 2 addition)
   uploadedFiles File[] @relation("UploadedFiles")
