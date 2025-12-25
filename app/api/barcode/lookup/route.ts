@@ -90,6 +90,22 @@ const parseServingWeight = (servingSize?: string | null): number | null => {
   return null
 }
 
+const isLikelyOilProduct = (nameRaw: string | null | undefined): boolean => {
+  const name = String(nameRaw || '').toLowerCase()
+  if (!name) return false
+  return (
+    name.includes('oil') ||
+    name.includes('olive oil') ||
+    name.includes('avocado oil') ||
+    name.includes('coconut oil') ||
+    name.includes('sesame oil') ||
+    name.includes('canola oil') ||
+    name.includes('sunflower oil') ||
+    name.includes('vegetable oil') ||
+    name.includes('grapeseed oil')
+  )
+}
+
 const isServingNutritionPlausible = (data: {
   servingSize?: string | null
   calories?: number | null
@@ -574,6 +590,33 @@ export async function GET(req: NextRequest) {
       serving_size: normalized.food.serving_size || food.serving_size || '1 serving',
       name: food.name || 'Scanned food',
       id: String(food.id || code),
+    }
+
+    const protein = Number(food.protein_g ?? 0)
+    const carbs = Number(food.carbs_g ?? 0)
+    const sugar = Number(food.sugar_g ?? 0)
+    const fiber = Number(food.fiber_g ?? 0)
+    const fat = Number(food.fat_g ?? 0)
+    const nonFatMacros =
+      (Number.isFinite(protein) && protein > 0.5) ||
+      (Number.isFinite(carbs) && carbs > 0.5) ||
+      (Number.isFinite(sugar) && sugar > 0.5) ||
+      (Number.isFinite(fiber) && fiber > 0.5)
+    if (food.source !== 'helfi' && isLikelyOilProduct(food.name) && Number.isFinite(fat) && fat > 10 && nonFatMacros) {
+      return NextResponse.json(
+        {
+          found: false,
+          error: 'nutrition_suspect',
+          message: 'Barcode nutrition for oils looks unreliable. Please scan the nutrition label to lock in the correct values.',
+          product: {
+            name: food.name || null,
+            brand: food.brand || null,
+            serving_size: food.serving_size || null,
+          },
+          barcode: code,
+        },
+        { status: 422 },
+      )
     }
 
     const nutritionValues = [

@@ -7091,6 +7091,33 @@ Please add nutritional information manually if needed.`);
   }
 
   const buildBarcodeIngredientItem = (food: any, code?: string) => {
+    const isLikelyLiquid = (nameRaw: string, servingSizeRaw: string | null | undefined) => {
+      const name = String(nameRaw || '').toLowerCase()
+      const serving = String(servingSizeRaw || '').toLowerCase()
+      if (serving.includes('ml') || serving.includes('l ')) return true
+      const liquidKeywords = [
+        'oil',
+        'vinegar',
+        'milk',
+        'juice',
+        'water',
+        'soda',
+        'soft drink',
+        'drink',
+        'beverage',
+        'tea',
+        'coffee',
+        'kombucha',
+        'broth',
+        'stock',
+        'soup',
+        'wine',
+        'beer',
+        'spirit',
+        'liqueur',
+      ]
+      return liquidKeywords.some((k) => name.includes(k))
+    }
     const toNumber = (value: any) => {
       const num = Number(value)
       return Number.isFinite(num) ? num : null
@@ -7109,8 +7136,14 @@ Please add nutritional information manually if needed.`);
         : piecesPerServingRaw && piecesPerServingRaw > 0
         ? piecesPerServingRaw
         : null
-    const servingSizeRaw = food?.serving_size || (Number.isFinite(Number(food?.quantity_g)) && Number(food?.quantity_g) > 0 ? `${Number(food.quantity_g)} g` : null)
-    const serving_size = servingSizeRaw || '1 serving'
+    const servingSizeRaw =
+      food?.serving_size ||
+      (Number.isFinite(Number(food?.quantity_g)) && Number(food?.quantity_g) > 0 ? `${Number(food.quantity_g)} g` : null)
+    let serving_size = servingSizeRaw || '1 serving'
+    const liquidItem = isLikelyLiquid(String(food?.name || ''), serving_size)
+    if (liquidItem && /\b(\d+(?:\.\d+)?)\s*g\b/i.test(serving_size) && !/\bml\b/i.test(serving_size)) {
+      serving_size = serving_size.replace(/\b(\d+(?:\.\d+)?)\s*g\b/i, '$1 ml')
+    }
     const servingInfo = parseServingSizeInfo({ serving_size })
     const quantityG =
       Number.isFinite(Number(food?.quantity_g)) && Number(food?.quantity_g) > 0
@@ -7122,10 +7155,11 @@ Please add nutritional information manually if needed.`);
       !quantityG && servingInfo?.mlPerServing && servingInfo.mlPerServing > 0
         ? Number(servingInfo.mlPerServing)
         : null
-    const customGramsPerServing = quantityG ? quantityG : null
-    const customMlPerServing = quantityMl ? quantityMl : null
-    const weightUnit = quantityMl ? 'ml' : 'g'
-    const weightAmount = quantityMl ?? quantityG ?? null
+    const liquidQuantity = liquidItem && !quantityMl && quantityG ? quantityG : quantityMl
+    const customGramsPerServing = liquidQuantity ? null : quantityG ? quantityG : null
+    const customMlPerServing = liquidQuantity ? liquidQuantity : null
+    const weightUnit = liquidQuantity ? 'ml' : 'g'
+    const weightAmount = liquidQuantity ?? quantityG ?? null
     return {
       name: food?.name || 'Scanned food',
       brand: food?.brand || null,
