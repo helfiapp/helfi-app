@@ -11772,7 +11772,7 @@ Please add nutritional information manually if needed.`);
                               title="Thumbs up"
                               disabled={analysisFeedbackOverall !== null}
                             >
-                              <HandThumbUpIcon className="w-4 h-4" />
+                              <HandThumbUpIcon className="w-5 h-5" />
                             </button>
                             <button
                               type="button"
@@ -11791,7 +11791,7 @@ Please add nutritional information manually if needed.`);
                               title="Thumbs down"
                               disabled={analysisFeedbackOverall !== null}
                             >
-                              <HandThumbDownIcon className="w-4 h-4" />
+                              <HandThumbDownIcon className="w-5 h-5" />
                             </button>
                           </div>
                           <button
@@ -11981,7 +11981,7 @@ Please add nutritional information manually if needed.`);
                                     title="Thumbs up"
                                     disabled={analysisFeedbackItems[index] !== undefined}
                                   >
-                                    <HandThumbUpIcon className="w-4 h-4" />
+                                    <HandThumbUpIcon className="w-5 h-5" />
                                   </button>
                                   <button
                                     type="button"
@@ -12000,7 +12000,7 @@ Please add nutritional information manually if needed.`);
                                     title="Thumbs down"
                                     disabled={analysisFeedbackItems[index] !== undefined}
                                   >
-                                    <HandThumbDownIcon className="w-4 h-4" />
+                                    <HandThumbDownIcon className="w-5 h-5" />
                                   </button>
                                 </div>
                                 {(!isMultiIngredient || isExpanded) && (
