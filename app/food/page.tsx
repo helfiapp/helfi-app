@@ -1695,6 +1695,17 @@ export default function FoodDiary() {
   const [isDiaryMutating, setIsDiaryMutating] = useState(false)
   const [analysisMode, setAnalysisMode] = useState<'auto' | 'packaged' | 'meal'>('auto')
   const [analysisHint, setAnalysisHint] = useState('')
+  const [analysisId, setAnalysisId] = useState<string | null>(null)
+  const [analysisFeedbackOverall, setAnalysisFeedbackOverall] = useState<'up' | 'down' | null>(null)
+  const [analysisFeedbackItems, setAnalysisFeedbackItems] = useState<Record<number, 'up' | 'down'>>({})
+  const [feedbackPrompt, setFeedbackPrompt] = useState<{
+    scope: 'overall' | 'item'
+    itemIndex?: number | null
+  } | null>(null)
+  const [feedbackReasons, setFeedbackReasons] = useState<string[]>([])
+  const [feedbackComment, setFeedbackComment] = useState('')
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const [showAnalysisModeModal, setShowAnalysisModeModal] = useState(false)
   const [pendingPhotoPicker, setPendingPhotoPicker] = useState(false)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -5117,6 +5128,7 @@ const applyStructuredItems = (
         const compressedFile = preserveLabelDetail ? file : await compressImage(file, 1024, 0.85);
         setPhotoFile(compressedFile);
         setAnalysisHint('');
+        resetAnalysisFeedbackState();
         const reader = new FileReader();
         reader.onload = (e) => {
           setPhotoPreview(e.target?.result as string);
@@ -5143,6 +5155,7 @@ const applyStructuredItems = (
         // Fallback to original file if compression fails
         setPhotoFile(file);
         setAnalysisHint('');
+        resetAnalysisFeedbackState();
         const reader = new FileReader();
         reader.onload = (e) => {
           setPhotoPreview(e.target?.result as string);
@@ -5615,6 +5628,13 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         console.log('🎉 SUCCESS: Real AI analysis received!');
         setAnalysisPhase('building');
         setAiDescription(result.analysis);
+        setAnalysisId(result.analysisId ?? null);
+        setAnalysisFeedbackOverall(null);
+        setAnalysisFeedbackItems({});
+        setFeedbackPrompt(null);
+        setFeedbackReasons([]);
+        setFeedbackComment('');
+        setFeedbackError(null);
         const barcodeTag = barcodeLabelFlow?.barcode
           ? { barcode: barcodeLabelFlow.barcode, source: 'label-photo' }
           : undefined
@@ -6371,6 +6391,59 @@ Please add nutritional information manually if needed.`);
   const showQuickToast = (message: string) => {
     setQuickToast(message)
     setTimeout(() => setQuickToast(null), 1400)
+  }
+
+  const FEEDBACK_REASONS = [
+    'Wrong food detected',
+    'Missing ingredients',
+    'Portion size wrong',
+    'Macros wrong',
+    'Other',
+  ]
+
+  const submitFoodAnalysisFeedback = async (payload: {
+    scope: 'overall' | 'item'
+    rating: 'up' | 'down'
+    itemIndex?: number | null
+    reasons?: string[]
+    comment?: string | null
+  }) => {
+    try {
+      const item =
+        payload.scope === 'item' && payload.itemIndex !== null && payload.itemIndex !== undefined
+          ? analyzedItems[payload.itemIndex]
+          : null
+      await fetch('/api/food-analysis-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analysisId,
+          analysisMode,
+          analysisHint,
+          scope: payload.scope,
+          rating: payload.rating === 'up' ? 1 : -1,
+          reasons: payload.reasons || [],
+          comment: payload.comment || null,
+          itemIndex: payload.itemIndex ?? null,
+          itemName: item?.name ?? null,
+          itemServingSize: item?.serving_size ?? null,
+          itemBrand: item?.brand ?? null,
+        }),
+      })
+    } catch (err) {
+      console.warn('Feedback submission failed', err)
+      showQuickToast('Could not send feedback. Please try again.')
+    }
+  }
+
+  const resetAnalysisFeedbackState = () => {
+    setAnalysisId(null)
+    setAnalysisFeedbackOverall(null)
+    setAnalysisFeedbackItems({})
+    setFeedbackPrompt(null)
+    setFeedbackReasons([])
+    setFeedbackComment('')
+    setFeedbackError(null)
   }
 
   const buildDietTotalsForCheck = (entry: any) => {
@@ -11678,19 +11751,75 @@ Please add nutritional information manually if needed.`);
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
                     <div className="mb-6 space-y-3">
-                      <div className="mb-2 flex items-center justify-between">
+                      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
-                        <button
-                          onClick={(e) =>
-                            openAddIngredientModalFromMenu(e, {
-                              mode: 'analysis',
-                            })
-                          }
-                          className="text-sm px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-                          title="Add a missing ingredient"
-                        >
-                          + Add ingredient
-                        </button>
+                        <div className="flex items-center justify-between gap-3 sm:justify-end">
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span>Rate this result</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (analysisFeedbackOverall) return
+                                setAnalysisFeedbackOverall('up')
+                                submitFoodAnalysisFeedback({ scope: 'overall', rating: 'up' })
+                                showQuickToast('Thanks for the feedback!')
+                              }}
+                              className={`p-1 rounded-md transition-colors ${
+                                analysisFeedbackOverall === 'up'
+                                  ? 'text-emerald-600 bg-emerald-50'
+                                  : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
+                              }`}
+                              title="Thumbs up"
+                              disabled={analysisFeedbackOverall !== null}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M14 9V5a3 3 0 00-6 0v4H5a2 2 0 00-2 2v2a2 2 0 002 2h4l3.5 5.5a2 2 0 003.5-1.1V15h2.2a2 2 0 002-1.7l.8-4A2 2 0 0019.1 7H14z"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (analysisFeedbackOverall) return
+                                setFeedbackPrompt({ scope: 'overall' })
+                                setFeedbackReasons([])
+                                setFeedbackComment('')
+                                setFeedbackError(null)
+                              }}
+                              className={`p-1 rounded-md transition-colors ${
+                                analysisFeedbackOverall === 'down'
+                                  ? 'text-red-600 bg-red-50'
+                                  : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                              }`}
+                              title="Thumbs down"
+                              disabled={analysisFeedbackOverall !== null}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M10 15v4a3 3 0 006 0v-4h3a2 2 0 002-2v-2a2 2 0 00-2-2h-4l-3.5-5.5A2 2 0 008 4.5V9H6.8a2 2 0 00-2 1.7l-.8 4A2 2 0 005.2 17H10z"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                          <button
+                            onClick={(e) =>
+                              openAddIngredientModalFromMenu(e, {
+                                mode: 'analysis',
+                              })
+                            }
+                            className="text-sm px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                            title="Add a missing ingredient"
+                          >
+                            + Add ingredient
+                          </button>
+                        </div>
                       </div>
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
@@ -11849,6 +11978,59 @@ Please add nutritional information manually if needed.`);
                                 )}
                               </div>
                               <div className="ml-3 flex items-center gap-1">
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (analysisFeedbackItems[index]) return
+                                      setAnalysisFeedbackItems((prev) => ({ ...prev, [index]: 'up' }))
+                                      submitFoodAnalysisFeedback({ scope: 'item', rating: 'up', itemIndex: index })
+                                      showQuickToast('Thanks for the feedback!')
+                                    }}
+                                    className={`p-1 rounded-md transition-colors ${
+                                      analysisFeedbackItems[index] === 'up'
+                                        ? 'text-emerald-600 bg-emerald-50'
+                                        : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
+                                    }`}
+                                    title="Thumbs up"
+                                    disabled={analysisFeedbackItems[index] !== undefined}
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M14 9V5a3 3 0 00-6 0v4H5a2 2 0 00-2 2v2a2 2 0 002 2h4l3.5 5.5a2 2 0 003.5-1.1V15h2.2a2 2 0 002-1.7l.8-4A2 2 0 0019.1 7H14z"
+                                      />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (analysisFeedbackItems[index]) return
+                                      setFeedbackPrompt({ scope: 'item', itemIndex: index })
+                                      setFeedbackReasons([])
+                                      setFeedbackComment('')
+                                      setFeedbackError(null)
+                                    }}
+                                    className={`p-1 rounded-md transition-colors ${
+                                      analysisFeedbackItems[index] === 'down'
+                                        ? 'text-red-600 bg-red-50'
+                                        : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                                    }`}
+                                    title="Thumbs down"
+                                    disabled={analysisFeedbackItems[index] !== undefined}
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M10 15v4a3 3 0 006 0v-4h3a2 2 0 002-2v-2a2 2 0 00-2-2h-4l-3.5-5.5A2 2 0 008 4.5V9H6.8a2 2 0 00-2 1.7l-.8 4A2 2 0 005.2 17H10z"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
                                 {(!isMultiIngredient || isExpanded) && (
                                   <>
                                     <button
@@ -12826,6 +13008,116 @@ Please add nutritional information manually if needed.`);
                           Save Changes
                         </button>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Feedback Modal */}
+            {feedbackPrompt && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+                  <div className="p-5 border-b border-gray-100 flex items-start justify-between">
+                    <div>
+                      <div className="text-lg font-semibold text-gray-900">What was the problem?</div>
+                      {feedbackPrompt.scope === 'item' && analyzedItems[feedbackPrompt.itemIndex ?? -1] && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {String(analyzedItems[feedbackPrompt.itemIndex ?? -1]?.name || 'This item')}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFeedbackPrompt(null)
+                        setFeedbackReasons([])
+                        setFeedbackComment('')
+                        setFeedbackError(null)
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div className="space-y-2">
+                      {FEEDBACK_REASONS.map((reason) => (
+                        <label key={reason} className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            checked={feedbackReasons.includes(reason)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFeedbackReasons((prev) => [...prev, reason])
+                              } else {
+                                setFeedbackReasons((prev) => prev.filter((r) => r !== reason))
+                              }
+                            }}
+                          />
+                          <span>{reason}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Optional details
+                      </label>
+                      <textarea
+                        value={feedbackComment}
+                        onChange={(e) => setFeedbackComment(e.target.value)}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        placeholder="Tell us what went wrong (optional)"
+                      />
+                    </div>
+                    {feedbackError && <div className="text-xs text-red-600">{feedbackError}</div>}
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        onClick={() => {
+                          setFeedbackPrompt(null)
+                          setFeedbackReasons([])
+                          setFeedbackComment('')
+                          setFeedbackError(null)
+                        }}
+                        className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (feedbackSubmitting) return
+                          if (feedbackReasons.length === 0) {
+                            setFeedbackError('Please select at least one reason.')
+                            return
+                          }
+                          setFeedbackSubmitting(true)
+                          await submitFoodAnalysisFeedback({
+                            scope: feedbackPrompt.scope,
+                            rating: 'down',
+                            itemIndex: feedbackPrompt.itemIndex ?? null,
+                            reasons: feedbackReasons,
+                            comment: feedbackComment,
+                          })
+                          if (feedbackPrompt.scope === 'overall') {
+                            setAnalysisFeedbackOverall('down')
+                          } else if (feedbackPrompt.itemIndex !== null && feedbackPrompt.itemIndex !== undefined) {
+                            setAnalysisFeedbackItems((prev) => ({ ...prev, [feedbackPrompt.itemIndex as number]: 'down' }))
+                          }
+                          setFeedbackPrompt(null)
+                          setFeedbackReasons([])
+                          setFeedbackComment('')
+                          setFeedbackError(null)
+                          setFeedbackSubmitting(false)
+                          showQuickToast('Thanks for the feedback!')
+                        }}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                        disabled={feedbackSubmitting}
+                      >
+                        {feedbackSubmitting ? 'Sending…' : 'Submit'}
+                      </button>
                     </div>
                   </div>
                 </div>

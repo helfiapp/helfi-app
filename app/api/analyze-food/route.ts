@@ -3099,13 +3099,15 @@ CRITICAL REQUIREMENTS:
       console.log('[FOOD_DEBUG] discrete items', discreteLog);
     }
 
+    const analysisId = imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`;
+
     // Log AI usage for the main Food Analyzer (fire-and-forget).
     // Use the primary analysis tokens and the total combined cost (analysis + follow-ups).
     logAiUsageEvent({
       feature: 'food:analysis',
       userId: currentUser.id || null,
       userLabel: currentUser.email || null,
-      scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
+      scanId: analysisId,
       model,
       promptTokens: primary.promptTokens,
       completionTokens: primary.completionTokens,
@@ -3146,6 +3148,7 @@ CRITICAL REQUIREMENTS:
       console.warn('[FOOD_DEBUG] log error', logErr);
     }
 
+    resp.analysisId = analysisId;
     return NextResponse.json(resp);
 
   } catch (error) {

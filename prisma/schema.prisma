@@ -297,6 +297,28 @@ model AIUsageEvent {
   @@index([runId])
 }
 
+model FoodAnalysisFeedback {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  userId          String
+  scanId          String?
+  analysisMode    String?
+  analysisHint    String?
+  scope           String
+  rating          Int
+  reasons         Json?
+  comment         String?
+  itemIndex       Int?
+  itemName        String?
+  itemServingSize String?
+  itemBrand       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([scanId])
+}
+
 // Fitbit Data Sync - stores synced data from Fitbit API
 model FitbitData {
   id        String   @id @default(cuid())
