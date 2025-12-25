@@ -16,6 +16,32 @@ const ensureAdmin = (request: NextRequest) => {
   return admin || { id: 'temp-admin-id' }
 }
 
+const ensurePartnerOutreachSchema = async () => {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PartnerOutreachContact" (
+      "id" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "email" TEXT,
+      "company" TEXT NOT NULL,
+      "region" TEXT,
+      "notes" TEXT,
+      "sourceUrl" TEXT,
+      "unsubscribed" BOOLEAN NOT NULL DEFAULT false,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "PartnerOutreachContact_pkey" PRIMARY KEY ("id")
+    );
+  `)
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "PartnerOutreachContact_email_key"
+    ON "PartnerOutreachContact"("email");
+  `)
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "PartnerOutreachContact_company_idx"
+    ON "PartnerOutreachContact"("company");
+  `)
+}
+
 export async function GET(request: NextRequest) {
   const admin = ensureAdmin(request)
   if (!admin) {
@@ -23,6 +49,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    await ensurePartnerOutreachSchema()
     const contacts = await prisma.partnerOutreachContact.findMany({
       orderBy: [{ company: 'asc' }, { name: 'asc' }]
     })
@@ -41,6 +68,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    await ensurePartnerOutreachSchema()
     const body = await request.json()
     const contacts = Array.isArray(body?.contacts) ? body.contacts : [body]
 
