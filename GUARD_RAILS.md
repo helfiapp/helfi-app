@@ -667,6 +667,10 @@ for a change.
 - **Strict AI-only ingredient cards (Dec 2025 – locked):**
   - Ingredient cards must come from AI‑generated structured items only. Do **not** create placeholder cards or extract cards from prose descriptions on the client.
   - If ingredients are missing, the backend must re‑ask the AI to output the missing items (AI‑only follow‑up). Do not backfill cards locally.
+- **Food photo model defaults + component-bound follow-up (Dec 25, 2025 – locked):**
+  - Food photo analysis defaults to `gpt-4o` for speed and accuracy. Do not revert image analysis to `gpt-5.2` by default.
+  - Packaged/label OCR keeps `gpt-5.2` for per‑serve accuracy; do not downgrade label scans.
+  - The component‑bound vision follow‑up must remain: one ingredient card per listed component, no summary card, no uniform “100 g” defaults.
 - **Do not undo the discrete-portion fix (Nov 22, 2025):**
   - `app/food/page.tsx` now *scales macros instead of servings* for discrete items when the label states multiple pieces (e.g., “3 large eggs”, “4 slices bacon”). Servings stays at `1` to avoid “3 servings of 3 eggs”, while calories/macros are multiplied by the labeled count. **Leave this logic intact** unless the user explicitly requests a different design.
 - **Pieces only when explicitly counted (Dec 2025 – locked):**

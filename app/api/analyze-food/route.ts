@@ -1978,7 +1978,9 @@ CRITICAL REQUIREMENTS:
     // Main food model selection.
     // Default is env-controlled; admin can set a per-user override via __FOOD_ANALYZER_MODEL__.
     // Temperature is set to 0 for maximum consistency between runs on the same meal.
-    let model = (process.env.OPENAI_FOOD_MODEL || 'gpt-5.2').trim() || 'gpt-5.2'
+    const envModelRaw = (process.env.OPENAI_FOOD_MODEL || '').trim()
+    const defaultModel = imageDataUrl ? 'gpt-4o' : (envModelRaw || 'gpt-5.2')
+    let model = defaultModel
     try {
       const goal = await prisma.healthGoal.findFirst({
         where: { userId: currentUser.id, name: '__FOOD_ANALYZER_MODEL__' },
@@ -2761,7 +2763,8 @@ CRITICAL REQUIREMENTS:
 
     if (packagedMode && labelScan && imageDataUrl && resp.items && resp.items.length > 0) {
       try {
-        const labelResult = await extractLabelPerServingFromImage(openai, imageDataUrl, model)
+        const labelModel = model === 'gpt-5.2' ? model : 'gpt-5.2'
+        const labelResult = await extractLabelPerServingFromImage(openai, imageDataUrl, labelModel)
         totalCostCents += labelResult.costCents
         const parsed = labelResult.parsed || {}
         const perServing = parsed?.per_serving || parsed?.perServing || null
