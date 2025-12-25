@@ -1532,6 +1532,7 @@ export async function POST(req: NextRequest) {
     let labelScan = false;
     let forceFresh = false;
     let packagedEmphasisBlock = '';
+    let analysisHint = '';
 
     const setAnalysisMode = (modeRaw: any) => {
       const normalized = String(modeRaw || 'auto').toLowerCase();
@@ -1566,6 +1567,7 @@ PACKAGED MODE SELECTED:
         analysisMode: bodyMode,
         labelScan: labelScanFlag,
         forceFresh: forceFreshFlag,
+        analysisHint: bodyHint,
       } = body as any;
       isReanalysis = !!reFlag;
       // Default to true unless explicitly disabled
@@ -1574,6 +1576,7 @@ PACKAGED MODE SELECTED:
       setAnalysisMode(bodyMode);
       labelScan = Boolean(labelScanFlag);
       forceFresh = Boolean(forceFreshFlag);
+      analysisHint = typeof bodyHint === 'string' ? bodyHint : '';
       console.log('📝 Text analysis mode:', { textDescription, foodType });
 
       if (!textDescription) {
@@ -1583,10 +1586,16 @@ PACKAGED MODE SELECTED:
         );
       }
 
+      const cleanedHint = String(analysisHint || '').trim();
+      const hintBlock =
+        cleanedHint && !packagedMode
+          ? `\nUSER HINT (optional): ${cleanedHint}\n- Use this only to disambiguate a tricky item.\n- Do NOT ignore other foods mentioned in the description.\n- Do NOT invent items that are not described.\n`
+          : '';
+
       messages = [
         {
           role: "user",
-          content: `Analyze this food description and provide accurate nutrition information based on the EXACT portion size specified. Be precise about size differences.
+          content: `Analyze this food description and provide accurate nutrition information based on the EXACT portion size specified. Be precise about size differences.${hintBlock}
 
 CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - If the description mentions multiple distinct foods (e.g., plate with protein, vegetables, grains, salads, soups, stews, sandwiches with multiple fillings, bowls with toppings), you MUST:
@@ -1682,6 +1691,7 @@ CRITICAL REQUIREMENTS:
       setAnalysisMode(formData.get('analysisMode'));
       labelScan = String(formData.get('labelScan') || '') === '1';
       forceFresh = String(formData.get('forceFresh') || '') === '1';
+      analysisHint = String(formData.get('analysisHint') || '');
       
       console.log('📊 Image file info:', {
         hasImageFile: !!imageFile,
@@ -1720,13 +1730,19 @@ CRITICAL REQUIREMENTS:
       wantStructured = true;
       preferMultiDetect = true;
 
+      const cleanedHint = String(analysisHint || '').trim();
+      const hintBlock =
+        cleanedHint && !packagedMode
+          ? `\nUSER HINT (optional): ${cleanedHint}\n- Use this only to disambiguate a tricky item.\n- Do NOT ignore other visible foods.\n- Do NOT invent foods not visible in the photo.\n`
+          : '';
+
       messages = [
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences.
+              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences.${hintBlock}
 
 CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - If the image contains multiple distinct foods (e.g., plate with protein, vegetables, grains, salads, soups, stews, sandwiches with multiple fillings, bowls with toppings), you MUST:

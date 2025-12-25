@@ -1632,6 +1632,7 @@ export default function FoodDiary() {
   const [isSavingEntry, setIsSavingEntry] = useState(false)
   const [isDiaryMutating, setIsDiaryMutating] = useState(false)
   const [analysisMode, setAnalysisMode] = useState<'auto' | 'packaged' | 'meal'>('auto')
+  const [analysisHint, setAnalysisHint] = useState('')
   const [showAnalysisModeModal, setShowAnalysisModeModal] = useState(false)
   const [pendingPhotoPicker, setPendingPhotoPicker] = useState(false)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -5053,6 +5054,7 @@ const applyStructuredItems = (
         // Compress the uploaded file to balance quality and cost (higher quality for better detection)
         const compressedFile = preserveLabelDetail ? file : await compressImage(file, 1024, 0.85);
         setPhotoFile(compressedFile);
+        setAnalysisHint('');
         const reader = new FileReader();
         reader.onload = (e) => {
           setPhotoPreview(e.target?.result as string);
@@ -5078,6 +5080,7 @@ const applyStructuredItems = (
         console.error('Error compressing image:', error);
         // Fallback to original file if compression fails
         setPhotoFile(file);
+        setAnalysisHint('');
         const reader = new FileReader();
         reader.onload = (e) => {
           setPhotoPreview(e.target?.result as string);
@@ -5483,6 +5486,10 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       formData.append('forceFresh', '1');
       if (wantsLabelAccuracy) {
         formData.append('labelScan', '1');
+      }
+      const trimmedHint = analysisHint.trim()
+      if (trimmedHint && analysisMode !== 'packaged') {
+        formData.append('analysisHint', trimmedHint)
       }
       console.log('✅ FormData created successfully');
 
@@ -10950,6 +10957,23 @@ Please add nutritional information manually if needed.`);
                   )
                 })}
               </div>
+              {analysisMode !== 'packaged' && (
+                <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
+                  <label className="block text-sm font-medium text-gray-900">
+                    Optional hint (only for tricky items)
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    If one item could be confused (e.g., beef vs lamb, banana bread vs carrot cake), mention just that item. You don't need to describe the entire plate.
+                  </p>
+                  <input
+                    type="text"
+                    value={analysisHint}
+                    onChange={(e) => setAnalysisHint(e.target.value)}
+                    placeholder="e.g., Christmas pudding"
+                    className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                  />
+                </div>
+              )}
               <div className="text-xs text-gray-600">
                 Product nutrition image: take a clear photo of the nutrition facts panel. We’ll read the per-serving numbers.
               </div>
@@ -11070,6 +11094,23 @@ Please add nutritional information manually if needed.`);
                       )
                     })}
                   </div>
+                  {analysisMode !== 'packaged' && (
+                    <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
+                      <label className="block text-sm font-medium text-gray-900">
+                        Optional hint (only for tricky items)
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        If one item could be confused (e.g., beef vs lamb, banana bread vs carrot cake), mention just that item. You don't need to describe the entire plate.
+                      </p>
+                      <input
+                        type="text"
+                        value={analysisHint}
+                        onChange={(e) => setAnalysisHint(e.target.value)}
+                        placeholder="e.g., Christmas pudding"
+                        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                      />
+                    </div>
+                  )}
                   <div className="text-xs text-gray-600">
                     Product nutrition image reads the per-serving column exactly (ignores per-100g).
                   </div>
