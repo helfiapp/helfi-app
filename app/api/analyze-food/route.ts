@@ -1995,10 +1995,6 @@ CRITICAL REQUIREMENTS:
       console.warn('Food analyzer model override lookup failed (non-fatal):', e)
     }
 
-    if (imageDataUrl && model !== 'gpt-5.2') {
-      model = 'gpt-5.2'
-    }
-
     const maxTokens = 600;
 
     // Wallet pre-check (skip if allowed via free use OR billing checks are disabled)
@@ -2458,6 +2454,9 @@ CRITICAL REQUIREMENTS:
             'Return JSON only. Use the component list and output exactly one item per component.\n' +
             'You must include ALL components and no extras.\n' +
             'Each item name must be the plain ingredient name for that component.\n' +
+            '- Do NOT default every item to "100 g". Use realistic, different portions based on the photo.\n' +
+            '- Prefer household measures with optional grams in parentheses (e.g., "1 fillet (150 g)", "3/4 cup cooked rice (150 g)", "1/4 avocado (50 g)", "1/3 cup cucumber slices (40 g)").\n' +
+            '- If you cannot estimate grams, use a household portion without grams (e.g., "1 fillet", "1/2 cup").\n' +
             'Component list:\n' +
             listedComponents.map((c) => `- ${c}`).join('\n') +
             '\n\nUse the image as the primary source of truth. Analysis text is supplemental:\n' +
@@ -2569,6 +2568,8 @@ CRITICAL REQUIREMENTS:
           '- Use realistic per-serving values for EACH component (eggs, bacon, bagel, juice, etc).\n' +
           '- Keep servings to 1 by default and use household measures ("1 slice", "1 cup", "1 egg").\n' +
           '- Do not collapse everything into a single "Meal" item. Return 1 item per distinct component.\n' +
+          '- Do NOT default every item to "100 g". Use different portion sizes based on the photo.\n' +
+          '- Prefer household measures with optional grams in parentheses.\n' +
           (imageDataUrl ? '- Use the image as the primary source of truth; the analysis text is supplemental.\n' : '') +
           (hintTotal
             ? `- Keep totals roughly consistent with Calories ${hintTotal.calories ?? 'unknown'} / Protein ${
