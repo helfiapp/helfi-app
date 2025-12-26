@@ -125,6 +125,7 @@ export default function MoodJournalPage() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const editorRef = useRef<HTMLDivElement | null>(null)
+  const selectionRef = useRef<Range | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const dateInputRef = useRef<HTMLInputElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -169,6 +170,39 @@ export default function MoodJournalPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const el = editorRef.current
+      const sel = window.getSelection()
+      if (!el || !sel || sel.rangeCount === 0) return
+      const range = sel.getRangeAt(0)
+      if (!el.contains(range.startContainer)) return
+      selectionRef.current = range.cloneRange()
+    }
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => document.removeEventListener('selectionchange', handleSelectionChange)
+  }, [])
+
+  const syncSelectionRef = () => {
+    const el = editorRef.current
+    const sel = window.getSelection()
+    if (!el || !sel || sel.rangeCount === 0) return
+    const range = sel.getRangeAt(0)
+    if (!el.contains(range.startContainer)) return
+    selectionRef.current = range.cloneRange()
+  }
+
+  const restoreEditorSelection = () => {
+    const el = editorRef.current
+    const range = selectionRef.current
+    const sel = window.getSelection()
+    if (!el || !range || !sel) return false
+    if (!el.contains(range.startContainer)) return false
+    sel.removeAllRanges()
+    sel.addRange(range)
+    return true
+  }
+
   const ensureEditorSelection = () => {
     const el = editorRef.current
     if (!el) return
@@ -176,6 +210,7 @@ export default function MoodJournalPage() {
     if (!el.innerHTML || el.innerHTML === '<br>') {
       el.innerHTML = '<p><br></p>'
     }
+    if (restoreEditorSelection()) return
     const sel = window.getSelection()
     if (!sel) return
     if (sel.rangeCount === 0 || !el.contains(sel.anchorNode)) {
@@ -185,6 +220,7 @@ export default function MoodJournalPage() {
       sel.removeAllRanges()
       sel.addRange(range)
     }
+    syncSelectionRef()
   }
 
   const insertHtmlAtSelection = (html: string) => {
@@ -193,6 +229,7 @@ export default function MoodJournalPage() {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return false
     const range = sel.getRangeAt(0)
+    if (!el.contains(range.startContainer)) return false
     range.deleteContents()
     const temp = document.createElement('div')
     temp.innerHTML = html
@@ -209,13 +246,17 @@ export default function MoodJournalPage() {
       sel.removeAllRanges()
       sel.addRange(range)
     }
+    selectionRef.current = range.cloneRange()
     return true
   }
 
   const wrapSelection = (tag: 'strong' | 'em' | 'u') => {
+    const el = editorRef.current
+    if (!el) return false
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return false
     const range = sel.getRangeAt(0)
+    if (!el.contains(range.startContainer)) return false
     const wrapper = document.createElement(tag)
     const selectedText = range.toString()
     range.deleteContents()
@@ -233,13 +274,17 @@ export default function MoodJournalPage() {
     }
     sel.removeAllRanges()
     sel.addRange(range)
+    selectionRef.current = range.cloneRange()
     return true
   }
 
   const insertListElement = (ordered: boolean) => {
+    const el = editorRef.current
+    if (!el) return false
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return false
     const range = sel.getRangeAt(0)
+    if (!el.contains(range.startContainer)) return false
     range.deleteContents()
     const list = document.createElement(ordered ? 'ol' : 'ul')
     const li = document.createElement('li')
@@ -250,13 +295,17 @@ export default function MoodJournalPage() {
     range.collapse(true)
     sel.removeAllRanges()
     sel.addRange(range)
+    selectionRef.current = range.cloneRange()
     return true
   }
 
   const insertLineBreak = () => {
+    const el = editorRef.current
+    if (!el) return false
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return false
     const range = sel.getRangeAt(0)
+    if (!el.contains(range.startContainer)) return false
     range.deleteContents()
     const br = document.createElement('br')
     range.insertNode(br)
@@ -264,6 +313,7 @@ export default function MoodJournalPage() {
     range.collapse(true)
     sel.removeAllRanges()
     sel.addRange(range)
+    selectionRef.current = range.cloneRange()
     return true
   }
 
@@ -287,6 +337,32 @@ export default function MoodJournalPage() {
       }
     }
     setContentHtml(el.innerHTML)
+    syncSelectionRef()
+  }
+
+  const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter') return
+    const el = editorRef.current
+    if (!el) return
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || !el.contains(sel.anchorNode)) return
+    const before = el.innerHTML
+    const execOk = document.execCommand('insertParagraph') || document.execCommand('insertLineBreak')
+    if (execOk && el.innerHTML !== before) {
+      setContentHtml(el.innerHTML)
+      syncSelectionRef()
+      event.preventDefault()
+      return
+    }
+    let node: Node | null = sel.anchorNode
+    while (node && node !== el) {
+      if (node.nodeName === 'LI') return
+      node = node.parentNode
+    }
+    if (insertLineBreak()) {
+      setContentHtml(el.innerHTML)
+      event.preventDefault()
+    }
   }
 
   const insertHtml = (html: string) => {
@@ -298,6 +374,7 @@ export default function MoodJournalPage() {
       el.innerHTML = `${el.innerHTML}${html}`
     }
     setContentHtml(el.innerHTML)
+    syncSelectionRef()
   }
 
   const applyPrompt = (prompt: string) => {
@@ -730,19 +807,15 @@ export default function MoodJournalPage() {
               ref={editorRef}
               contentEditable
               suppressContentEditableWarning
-              onInput={() => setContentHtml(editorRef.current?.innerHTML || '')}
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter') return
-                ensureEditorSelection()
-                const handled =
-                  document.execCommand('insertParagraph') ||
-                  document.execCommand('insertLineBreak') ||
-                  insertLineBreak()
-                if (handled) {
-                  setContentHtml(editorRef.current?.innerHTML || '')
-                  e.preventDefault()
-                }
+              onInput={() => {
+                setContentHtml(editorRef.current?.innerHTML || '')
+                syncSelectionRef()
               }}
+              onKeyDown={handleEditorKeyDown}
+              onKeyUp={syncSelectionRef}
+              onMouseUp={syncSelectionRef}
+              onTouchEnd={syncSelectionRef}
+              onFocus={syncSelectionRef}
               role="textbox"
               aria-multiline="true"
               tabIndex={0}
