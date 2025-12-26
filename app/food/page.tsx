@@ -2709,9 +2709,57 @@ export default function FoodDiary() {
       if (name.includes('dried')) score -= 30
       if (name.includes('powder')) score -= 30
     }
+    if (!q.includes('pickled') && name.includes('pickled')) score -= 30
     if (!q.includes('white') && !q.includes('whites') && (name.includes('white') || name.includes('whites'))) score -= 20
     if (!q.includes('yolk') && !q.includes('yolks') && (name.includes('yolk') || name.includes('yolks'))) score -= 20
     return score
+  }
+
+  const buildEggSizeOptions = (item: any) => {
+    const baseCalories = Number(item?.calories)
+    const baseProtein = Number(item?.protein_g)
+    const baseCarbs = Number(item?.carbs_g)
+    const baseFat = Number(item?.fat_g)
+    const baseFiber = Number(item?.fiber_g)
+    const baseSugar = Number(item?.sugar_g)
+    const hasBase =
+      (Number.isFinite(baseCalories) && baseCalories > 0) ||
+      (Number.isFinite(baseProtein) && baseProtein > 0) ||
+      (Number.isFinite(baseCarbs) && baseCarbs > 0) ||
+      (Number.isFinite(baseFat) && baseFat > 0)
+    if (!hasBase) return []
+
+    const sizes = [
+      { id: 'egg:small', label: 'small — 38g', grams: 38 },
+      { id: 'egg:medium', label: 'medium — 44g', grams: 44 },
+      { id: 'egg:large', label: 'large — 50g', grams: 50 },
+      { id: 'egg:extra-large', label: 'extra large — 56g', grams: 56 },
+      { id: 'egg:jumbo', label: 'jumbo — 63g', grams: 63 },
+    ]
+
+    const roundMacro = (value: number, factor: number, decimals: number) => {
+      const num = value * factor
+      const precision = Math.pow(10, decimals)
+      return Math.round(num * precision) / precision
+    }
+
+    return sizes.map((size) => {
+      const factor = size.grams / 100
+      return {
+        id: size.id,
+        label: size.label,
+        serving_size: size.label,
+        grams: size.grams,
+        unit: 'g',
+        calories: Number.isFinite(baseCalories) ? Math.round(baseCalories * factor) : null,
+        protein_g: Number.isFinite(baseProtein) ? roundMacro(baseProtein, factor, 1) : null,
+        carbs_g: Number.isFinite(baseCarbs) ? roundMacro(baseCarbs, factor, 1) : null,
+        fat_g: Number.isFinite(baseFat) ? roundMacro(baseFat, factor, 1) : null,
+        fiber_g: Number.isFinite(baseFiber) ? roundMacro(baseFiber, factor, 1) : null,
+        sugar_g: Number.isFinite(baseSugar) ? roundMacro(baseSugar, factor, 1) : null,
+        source: 'usda',
+      }
+    })
   }
 
   const getEdibleYieldFactor = (query: string) => {
@@ -2903,6 +2951,7 @@ export default function FoodDiary() {
         if (!analysisHas('dried') && !analysisHas('powder')) {
           avoidEggTerms.push('dried', 'powder', 'powdered')
         }
+        if (!analysisHas('pickled')) avoidEggTerms.push('pickled')
         if (!analysisHas('white') && !analysisHas('whites')) avoidEggTerms.push('white', 'whites')
         if (!analysisHas('yolk') && !analysisHas('yolks')) avoidEggTerms.push('yolk', 'yolks')
         if (!analysisHas('liquid')) avoidEggTerms.push('liquid')
@@ -2968,7 +3017,10 @@ export default function FoodDiary() {
       }
 
       if (options.length > 0) {
-        nextItem.servingOptions = options
+        const useEggSizes = hasEgg && !analysisHasEggDish
+        const eggOptions = useEggSizes ? buildEggSizeOptions(nextItem) : []
+        const finalOptions = eggOptions.length > 0 ? eggOptions : options
+        nextItem.servingOptions = finalOptions
         const isDiscreteItem =
           (Number.isFinite(Number(nextItem?.piecesPerServing)) && Number(nextItem.piecesPerServing) > 1) ||
           (Number.isFinite(Number(nextItem?.pieces)) && Number(nextItem.pieces) > 1) ||
@@ -2976,7 +3028,7 @@ export default function FoodDiary() {
             `${String(nextItem?.name || '')} ${String(nextItem?.serving_size || '')}`.toLowerCase(),
           )
         const discreteOptions = isDiscreteItem
-          ? options.filter((opt: any) => {
+          ? finalOptions.filter((opt: any) => {
               const meta = parseServingUnitMetadata(String(opt?.label || opt?.serving_size || ''))
               return meta && isDiscreteUnitLabel(meta.unitLabel)
             })
@@ -2990,14 +3042,20 @@ export default function FoodDiary() {
             : null
         const queryHasWhole = query.includes('whole')
         const wholeMatch = queryHasWhole
-          ? options.find((opt: any) => /\bwhole\b/i.test(opt?.label || opt?.serving_size || ''))
+          ? finalOptions.find((opt: any) => /\bwhole\b/i.test(opt?.label || opt?.serving_size || ''))
           : null
-        const match = options.find((opt: any) =>
+        const match = finalOptions.find((opt: any) =>
           (opt.serving_size || opt.label || '').toLowerCase().includes(String(best.serving_size || '').toLowerCase()),
         )
-        let selected = singleDiscrete || (discreteOptions.length > 0 ? discreteOptions[0] : null) || wholeMatch || match || null
+        let selected =
+          singleDiscrete ||
+          (useEggSizes ? finalOptions.find((opt: any) => Number(opt?.grams) === 50) : null) ||
+          (discreteOptions.length > 0 ? discreteOptions[0] : null) ||
+          wholeMatch ||
+          match ||
+          null
         if (!selected && currentWeight && Number.isFinite(Number(currentWeight))) {
-          const withGrams = options.filter((opt: any) => Number.isFinite(Number(opt?.grams)) && Number(opt?.grams) > 0)
+          const withGrams = finalOptions.filter((opt: any) => Number.isFinite(Number(opt?.grams)) && Number(opt?.grams) > 0)
           if (withGrams.length > 0) {
             withGrams.sort((a: any, b: any) => Math.abs(Number(a.grams) - currentWeight) - Math.abs(Number(b.grams) - currentWeight))
             selected = withGrams[0]
