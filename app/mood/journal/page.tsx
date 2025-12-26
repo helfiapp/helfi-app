@@ -173,6 +173,9 @@ export default function MoodJournalPage() {
     const el = editorRef.current
     if (!el) return
     el.focus()
+    if (!el.innerHTML || el.innerHTML === '<br>') {
+      el.innerHTML = '<p><br></p>'
+    }
     const sel = window.getSelection()
     if (!sel) return
     if (sel.rangeCount === 0 || !el.contains(sel.anchorNode)) {
@@ -188,7 +191,14 @@ export default function MoodJournalPage() {
     const el = editorRef.current
     if (!el) return
     ensureEditorSelection()
-    document.execCommand(command)
+    const ok = document.execCommand(command)
+    if (!ok) {
+      if (command === 'insertUnorderedList') {
+        insertHtml('<ul><li><br></li></ul>')
+      } else if (command === 'insertOrderedList') {
+        insertHtml('<ol><li><br></li></ol>')
+      }
+    }
     setContentHtml(el.innerHTML)
   }
 
@@ -498,15 +508,14 @@ export default function MoodJournalPage() {
               { cmd: 'insertUnorderedList', label: 'Bullet list' },
               { cmd: 'insertOrderedList', label: '1. List' },
             ] as const).map((btn) => (
-              <button
-                key={btn.cmd}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleCommand(btn.cmd)}
-                className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
-              >
-                {btn.label}
-              </button>
+                <button
+                  key={btn.cmd}
+                  type="button"
+                  onClick={() => handleCommand(btn.cmd)}
+                  className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
+                >
+                  {btn.label}
+                </button>
             ))}
             <button
               type="button"
@@ -543,7 +552,6 @@ export default function MoodJournalPage() {
                 <button
                   key={prompt}
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applyPrompt(prompt)}
                   className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                     selectedPrompt === prompt
@@ -564,7 +572,6 @@ export default function MoodJournalPage() {
                 <button
                   key={template.name}
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applyTemplate(template)}
                   className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                     selectedTemplate === template.name
@@ -578,7 +585,6 @@ export default function MoodJournalPage() {
               {selectedTemplate && (
                 <button
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
                   onClick={clearTemplate}
                   className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600"
                 >
@@ -638,22 +644,6 @@ export default function MoodJournalPage() {
               contentEditable
               suppressContentEditableWarning
               onInput={() => setContentHtml(editorRef.current?.innerHTML || '')}
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter') return
-                const sel = window.getSelection()
-                let node = sel?.anchorNode as HTMLElement | null
-                while (node && node !== editorRef.current) {
-                  if (node.nodeName === 'LI') return
-                  node = node.parentElement
-                }
-                ensureEditorSelection()
-                const ok = document.execCommand('insertLineBreak')
-                if (!ok) {
-                  document.execCommand('insertHTML', false, '<br><br>')
-                }
-                setContentHtml(editorRef.current?.innerHTML || '')
-                e.preventDefault()
-              }}
               className="min-h-[140px] text-sm text-gray-900 dark:text-gray-100 focus:outline-none break-words whitespace-pre-wrap max-w-full"
             />
           </div>
