@@ -5267,12 +5267,42 @@ const applyStructuredItems = (
 
   const parseServingSizeInfo = (item: any) => {
     const raw = (item?.serving_size && String(item.serving_size)) || ''
-    const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/i)
-    const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/i)
-    const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
-    const gramsPerServing = gramsMatch ? parseFloat(gramsMatch[1]) : null
-    const mlPerServing = mlMatch ? parseFloat(mlMatch[1]) : null
-    const ozPerServing = ozMatch ? parseFloat(ozMatch[1]) : null
+    const parseRange = (pattern: RegExp, factor = 1) => {
+      const rangeMatch = raw.match(pattern)
+      if (!rangeMatch) return null
+      const start = parseFloat(rangeMatch[1])
+      const end = parseFloat(rangeMatch[2])
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return null
+      return ((start + end) / 2) * factor
+    }
+    const parseSingle = (pattern: RegExp, factor = 1) => {
+      const match = raw.match(pattern)
+      if (!match) return null
+      const value = parseFloat(match[1])
+      return Number.isFinite(value) ? value * factor : null
+    }
+
+    const gramsRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*g\b/i)
+    const gramsMatch = parseSingle(/(\d+(?:\.\d+)?)\s*g\b/i)
+    const mlRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*ml\b/i)
+    const mlMatch = parseSingle(/(\d+(?:\.\d+)?)\s*ml\b/i)
+    const ozRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:oz|ounce|ounces)\b/i)
+    const ozMatch = parseSingle(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
+    const lbRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:lb|lbs|pound|pounds)\b/i, 453.592)
+    const lbMatch = parseSingle(/(\d+(?:\.\d+)?)\s*(lb|lbs|pound|pounds)\b/i, 453.592)
+
+    const gramsFromOzRange = Number.isFinite(ozRange as number) ? (ozRange as number) * 28.3495 : null
+    const gramsFromOzMatch = Number.isFinite(ozMatch as number) ? (ozMatch as number) * 28.3495 : null
+    const gramsPerServing =
+      gramsRange ??
+      gramsMatch ??
+      lbRange ??
+      lbMatch ??
+      gramsFromOzRange ??
+      gramsFromOzMatch ??
+      null
+    const mlPerServing = mlRange ?? mlMatch ?? null
+    const ozPerServing = ozRange ?? ozMatch ?? null
     const gramsFromOz = ozPerServing ? ozPerServing * 28.3495 : null
     return {
       label: raw,

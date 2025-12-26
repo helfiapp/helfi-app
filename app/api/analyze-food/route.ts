@@ -15,7 +15,7 @@ import { getServerSession } from 'next-auth';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { searchFatSecretFoods } from '@/lib/food-data';
+import { lookupFoodNutrition, searchFatSecretFoods } from '@/lib/food-data';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import crypto from 'crypto';
 import { consumeRateLimit } from '@/lib/rate-limit';
@@ -107,12 +107,44 @@ const stripNutritionFromServingSize = (raw: string) => {
 const parseServingWeight = (servingSize?: string | null): number | null => {
   if (!servingSize) return null;
   const raw = String(servingSize);
-  const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/i);
-  if (gramsMatch) return parseFloat(gramsMatch[1]);
-  const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/i);
-  if (mlMatch) return parseFloat(mlMatch[1]);
-  const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i);
-  if (ozMatch) return parseFloat(ozMatch[1]) * 28.3495;
+  const parseRange = (pattern: RegExp, factor = 1) => {
+    const rangeMatch = raw.match(pattern);
+    if (rangeMatch) {
+      const start = parseFloat(rangeMatch[1]);
+      const end = parseFloat(rangeMatch[2]);
+      if (Number.isFinite(start) && Number.isFinite(end)) {
+        return ((start + end) / 2) * factor;
+      }
+    }
+    return null;
+  };
+  const parseSingle = (pattern: RegExp, factor = 1) => {
+    const match = raw.match(pattern);
+    if (!match) return null;
+    const value = parseFloat(match[1]);
+    return Number.isFinite(value) ? value * factor : null;
+  };
+
+  const gramsRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*g\b/i);
+  if (gramsRange) return gramsRange;
+  const gramsMatch = parseSingle(/(\d+(?:\.\d+)?)\s*g\b/i);
+  if (gramsMatch) return gramsMatch;
+
+  const mlRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*ml\b/i);
+  if (mlRange) return mlRange;
+  const mlMatch = parseSingle(/(\d+(?:\.\d+)?)\s*ml\b/i);
+  if (mlMatch) return mlMatch;
+
+  const ozRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:oz|ounce|ounces)\b/i, 28.3495);
+  if (ozRange) return ozRange;
+  const ozMatch = parseSingle(/(\d+(?:\.\d+)?)\s*(?:oz|ounce|ounces)\b/i, 28.3495);
+  if (ozMatch) return ozMatch;
+
+  const lbRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:lb|lbs|pound|pounds)\b/i, 453.592);
+  if (lbRange) return lbRange;
+  const lbMatch = parseSingle(/(\d+(?:\.\d+)?)\s*(?:lb|lbs|pound|pounds)\b/i, 453.592);
+  if (lbMatch) return lbMatch;
+
   return null;
 };
 
@@ -875,6 +907,149 @@ const enrichItemsWithFatSecretIfMissing = async (items: any[]): Promise<{ items:
   return {
     items: enriched,
     total: changed ? computeTotalsFromItems(enriched) : null,
+    changed,
+  };
+};
+
+const normalizeLookupQuery = (raw: string): string => {
+  const cleaned = replaceWordNumbers(String(raw || ''))
+    .replace(/^\s*\d+(?:\.\d+)?\s+/, '')
+    .replace(/[^a-z0-9\s]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned.toLowerCase();
+};
+
+const scoreLookupNameMatch = (queryNorm: string, candidateName: string): number => {
+  if (!queryNorm) return 0;
+  const nameNorm = normalizeLookupQuery(candidateName);
+  if (!nameNorm) return 0;
+  if (nameNorm === queryNorm) return 100;
+  if (nameNorm.startsWith(queryNorm)) return 80;
+  if (nameNorm.includes(queryNorm)) return 60;
+  const tokens = queryNorm.split(' ').filter(Boolean);
+  if (tokens.length === 0) return 0;
+  const hitCount = tokens.filter((t) => nameNorm.includes(t)).length;
+  return hitCount * 10;
+};
+
+const getItemWeightInGrams = (item: any): number | null => {
+  const customGrams = Number(item?.customGramsPerServing);
+  if (Number.isFinite(customGrams) && customGrams > 0) return customGrams;
+  const customMl = Number(item?.customMlPerServing);
+  if (Number.isFinite(customMl) && customMl > 0) return customMl;
+  const serving = item?.serving_size || item?.servingSize;
+  const parsed = parseServingWeight(serving);
+  if (Number.isFinite(parsed) && parsed && parsed > 0) return parsed;
+  return null;
+};
+
+const selectDatabaseCandidate = (query: string, candidates: any[]) => {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+  const queryNorm = normalizeLookupQuery(query);
+  let best: { candidate: any; weight: number; score: number } | null = null;
+  for (const candidate of candidates) {
+    const weight = parseServingWeight(candidate?.serving_size || null);
+    if (!weight || weight <= 0 || weight > 5000) continue;
+    const calories = Number(candidate?.calories ?? 0);
+    if (!Number.isFinite(calories) || calories <= 0) continue;
+    const sourceBonus = candidate?.source === 'usda' ? 3 : candidate?.source === 'fatsecret' ? 2 : 1;
+    const score = scoreLookupNameMatch(queryNorm, candidate?.name || '') + sourceBonus;
+    if (!best || score > best.score) {
+      best = { candidate, weight, score };
+    }
+  }
+  return best;
+};
+
+// Database-backed calibration for single foods when AI macros look wildly off vs USDA/FatSecret.
+const enrichItemsWithDatabaseIfOutlier = async (
+  items: any[],
+): Promise<{ items: any[]; total: any | null; changed: boolean }> => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { items, total: null, changed: false };
+  }
+
+  const MAX_DB_ITEMS = 1;
+  const OUTLIER_RATIO = 0.2;
+  let checked = 0;
+  let changed = false;
+  const nextItems = items.map((item) => ({ ...item }));
+
+  for (const item of nextItems) {
+    if (checked >= MAX_DB_ITEMS) break;
+
+    const weight = getItemWeightInGrams(item);
+    if (!weight || weight < 15) continue;
+
+    const calories = Number(item?.calories ?? 0);
+    if (!Number.isFinite(calories) || calories <= 0) continue;
+
+    const query = normalizeLookupQuery(item?.name || '');
+    if (!query) continue;
+
+    checked += 1;
+
+    let dbResults: any[] = [];
+    try {
+      dbResults = await lookupFoodNutrition(query, {
+        preferSource: 'usda',
+        maxResults: 3,
+        usdaDataType: 'generic',
+      });
+    } catch (err) {
+      console.warn('Database lookup failed (non-fatal)', err);
+      continue;
+    }
+
+    const selected = selectDatabaseCandidate(query, dbResults);
+    if (!selected) continue;
+
+    const { candidate, weight: candidateWeight } = selected;
+    const candidateCalories = Number(candidate?.calories ?? 0);
+    if (!Number.isFinite(candidateCalories) || candidateCalories <= 0) continue;
+
+    const aiPer100 = (calories / weight) * 100;
+    const dbPer100 = (candidateCalories / candidateWeight) * 100;
+    if (!Number.isFinite(aiPer100) || !Number.isFinite(dbPer100) || dbPer100 <= 0) continue;
+
+    const ratio = Math.abs(aiPer100 - dbPer100) / dbPer100;
+    if (ratio < OUTLIER_RATIO) continue;
+    const aiIsGuess = item?.isGuess === true;
+    const aiHigherThanDb = aiPer100 > dbPer100;
+    if (!aiIsGuess && !aiHigherThanDb) continue;
+
+    const scale = weight / candidateWeight;
+    const scaleMacro = (value: any, decimals = 1) => {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return null;
+      const factor = Math.pow(10, decimals);
+      return Math.round(num * scale * factor) / factor;
+    };
+
+    item.calories = Math.round(candidateCalories * scale);
+    if (candidate?.protein_g !== null && candidate?.protein_g !== undefined) {
+      item.protein_g = scaleMacro(candidate.protein_g);
+    }
+    if (candidate?.carbs_g !== null && candidate?.carbs_g !== undefined) {
+      item.carbs_g = scaleMacro(candidate.carbs_g);
+    }
+    if (candidate?.fat_g !== null && candidate?.fat_g !== undefined) {
+      item.fat_g = scaleMacro(candidate.fat_g);
+    }
+    if (candidate?.fiber_g !== null && candidate?.fiber_g !== undefined) {
+      item.fiber_g = scaleMacro(candidate.fiber_g);
+    }
+    if (candidate?.sugar_g !== null && candidate?.sugar_g !== undefined) {
+      item.sugar_g = scaleMacro(candidate.sugar_g);
+    }
+
+    changed = true;
+  }
+
+  return {
+    items: nextItems,
+    total: changed ? computeTotalsFromItems(nextItems) : null,
     changed,
   };
 };
@@ -2906,6 +3081,17 @@ CRITICAL REQUIREMENTS:
           itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
           console.log('ℹ️ Applied FatSecret enrichment for missing macros.');
         }
+      }
+    }
+
+    if (!labelScan && !packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+      const calibrated = await enrichItemsWithDatabaseIfOutlier(resp.items);
+      if (calibrated.changed) {
+        resp.items = calibrated.items;
+        resp.total = calibrated.total || resp.total || computeTotalsFromItems(calibrated.items);
+        itemsSource = `${itemsSource}+db_calibrate`;
+        itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+        console.log('ℹ️ Applied database calibration for outlier macros.');
       }
     }
 
