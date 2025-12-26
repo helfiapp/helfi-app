@@ -2819,7 +2819,11 @@ export default function FoodDiary() {
     applyRecalculatedNutrition(itemsCopy)
   }
 
-  const autoMatchItemsToDatabase = async (items: any[], seq: number) => {
+  const autoMatchItemsToDatabase = async (
+    items: any[],
+    seq: number,
+    analysisText?: string | null,
+  ) => {
     if (!Array.isArray(items) || items.length === 0) return
     if (analysisMode === 'packaged') return
 
@@ -2830,11 +2834,25 @@ export default function FoodDiary() {
     autoDbMatchAbortRef.current = controller
 
     const updated = [...items]
+    const analysisNormalized = normalizeDbQuery(analysisText || '')
+    const analysisHas = (word: string) => analysisNormalized.includes(word)
+    const eggDishKeywords = ['benedict', 'omelet', 'scrambled', 'burrito', 'salad', 'deviled']
     for (let idx = 0; idx < items.length; idx += 1) {
       const item = updated[idx]
       if (!item || item.dbLocked) continue
       if (item?.barcode || item?.detectionMethod === 'barcode') continue
-      const query = normalizeDbQuery(item?.name || '')
+      const baseQuery = normalizeDbQuery(item?.name || '')
+      const itemLabel = `${String(item?.name || '')} ${String(item?.serving_size || '')}`.toLowerCase()
+      const isDiscreteItem =
+        (Number.isFinite(Number(item?.piecesPerServing)) && Number(item.piecesPerServing) > 1) ||
+        (Number.isFinite(Number(item?.pieces)) && Number(item.pieces) > 1) ||
+        isDiscreteUnitLabel(itemLabel)
+      const hasEgg = baseQuery.includes('egg')
+      const analysisHasEggDish = eggDishKeywords.some((kw) => analysisHas(kw))
+      const query =
+        hasEgg && !analysisHasEggDish && (analysisHas('egg') || baseQuery.includes('egg'))
+          ? 'egg whole'
+          : baseQuery
       if (!query || query.length < 2) continue
 
       const candidateQueries = [query]
@@ -2870,6 +2888,17 @@ export default function FoodDiary() {
       }
 
       if (!results.length) continue
+      if (hasEgg && !analysisHasEggDish) {
+        const filtered = results.filter((r: any) => {
+          const name = normalizeDbQuery(r?.name || '')
+          if (!name.includes('egg')) return false
+          if (eggDishKeywords.some((kw) => name.includes(kw))) return false
+          return name.includes('whole') || name.includes('egg')
+        })
+        if (filtered.length > 0) {
+          results = filtered
+        }
+      }
       const ranked = [...results].sort((a, b) => scoreDbMatch(query, b?.name || '') - scoreDbMatch(query, a?.name || ''))
       const best = ranked[0]
       if (!best) continue
@@ -2894,12 +2923,15 @@ export default function FoodDiary() {
       if (candidateGrams && candidateGrams > 0) {
         nextItem.customGramsPerServing = candidateGrams
         nextItem.weightUnit = 'g'
-        if (currentWeight && currentWeight > 0) {
+        if (!isDiscreteItem && currentWeight && currentWeight > 0) {
           const edibleFactor = getEdibleYieldFactor(query)
           const effectiveWeight = edibleFactor > 0 ? currentWeight * edibleFactor : currentWeight
           const servings = Math.max(effectiveWeight / candidateGrams, 0.01)
           nextItem.servings = Math.round(servings * 100) / 100
         }
+      }
+      if (isDiscreteItem) {
+        nextItem.servings = 1
       }
 
       let options: any[] = []
@@ -3832,7 +3864,7 @@ const applyStructuredItems = (
 
   setAnalyzedItems(scrubbedItems)
   if (analysisSeq) {
-    autoMatchItemsToDatabase(scrubbedItems, analysisSeq)
+    autoMatchItemsToDatabase(scrubbedItems, analysisSeq, analysisText)
   }
 
   console.log('📊 Processing totals:', {
