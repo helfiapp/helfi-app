@@ -1059,6 +1059,11 @@ const DISCRETE_SERVING_RULES = [
     caloriesPerUnitFloor: 120,
     proteinPerUnitFloor: 8,
   },
+  {
+    key: 'carrot',
+    keywords: ['carrot', 'carrots'],
+    caloriesPerUnitFloor: 20,
+  },
 ]
 
 const normalizeDiscreteServingsWithLabel = (items: any[]) => {
@@ -1076,10 +1081,13 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
     const meta = parseServingUnitMetadata(item?.serving_size || item?.name || '')
     const qty = meta?.quantity
     const unitLabel = meta?.unitLabel || meta?.unitLabelSingular || ''
+    const unitIsDiscrete =
+      isDiscreteUnitLabel(unitLabel) ||
+      (isGenericSizeLabel(unitLabel) && isDiscreteUnitLabel(String(item?.name || '')))
     const currentServings = Number.isFinite(Number(next.servings)) ? Number(next.servings) : 1
 
     if (!qty || qty <= 1.001) return next
-    if (!isDiscreteUnitLabel(unitLabel)) return next
+    if (!unitIsDiscrete) return next
 
     const calories = Number(next.calories)
     const protein = Number(next.protein_g)
