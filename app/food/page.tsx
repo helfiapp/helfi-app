@@ -942,9 +942,23 @@ const normalizeDiscreteItem = (item: any) => {
     replaceWordNumbers(String(item?.serving_size || '')),
   )
   const working: any = { ...item, name: normalizedName, serving_size: normalizedServingSize }
-  const piecesPerServing = getPiecesPerServing(working)
+  let piecesPerServing = getPiecesPerServing(working)
+  const servingMeta = parseServingUnitMetadata(working?.serving_size || '')
+  const servingPieces =
+    servingMeta &&
+    isDiscreteUnitLabel(servingMeta.unitLabel) &&
+    servingMeta.quantity >= 1 &&
+    !isFractionalServingQuantity(servingMeta.quantity)
+      ? servingMeta.quantity
+      : null
+  if (servingPieces && servingPieces > 0) {
+    piecesPerServing = servingPieces
+  }
   if (piecesPerServing && piecesPerServing > 0) {
     working.piecesPerServing = piecesPerServing
+    if (servingPieces && servingPieces > 0) {
+      working.pieces = servingPieces
+    }
   }
 
   // For discrete items, keep base servings at 1 so the input matches the label; pieces captures the count.
@@ -12467,74 +12481,9 @@ Please add nutritional information manually if needed.`);
                             data-analysis-ingredient-card="1"
                             className={`bg-white rounded-xl border border-gray-200 shadow-sm ${cardPaddingClass}`}
                           >
-                            {/* Header row with basic info and actions */}
-                            <div className={`flex items-start justify-between ${isMultiIngredient && !isExpanded ? 'mb-1' : 'mb-2'}`}>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <div className="font-semibold text-gray-900 text-base">
-                                    {displayName}
-                                  </div>
-                                </div>
-                                {(!isMultiIngredient || isExpanded) && (
-                                  <>
-                                    {item.brand && (
-                                      <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
-                                    )}
-                                    <div 
-                                      className="text-sm text-gray-500 mt-1 md:cursor-default cursor-pointer active:opacity-70"
-                                      onClick={() => {
-                                        // On mobile, clicking serving size focuses weight input
-                                        if (window.innerWidth < 768) {
-                                          focusWeightInput()
-                                        }
-                                      }}
-                                    >
-                                      Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
-                                    </div>
-                                    {servingOptions.length > 0 && (
-                                      <div className="mt-2">
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">
-                                          Serving size
-                                        </label>
-                                        <select
-                                          value={selectedServingId || servingOptions[0]?.id || ''}
-                                          onChange={(e) => handleServingOptionSelect(index, e.target.value)}
-                                          className="w-full max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                        >
-                                          {servingOptions.map((option: any) => (
-                                            <option key={option.id} value={option.id}>
-                                              {option.label || option.serving_size}
-                                            </option>
-                                          ))}
-                                        </select>
-                                        {item?.dbSource && (
-                                          <div className="mt-1 text-[11px] text-gray-400">
-                                            Data source: {item.dbSource === 'usda' ? 'USDA' : item.dbSource === 'fatsecret' ? 'FatSecret' : 'Database'}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                    {isBarcodeItem && barcodeCode && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setBarcodeLabelFlow({
-                                            barcode: barcodeCode,
-                                            reason: 'report',
-                                            productName: item?.name || null,
-                                            brand: item?.brand || null,
-                                          })
-                                          setShowBarcodeLabelPrompt(true)
-                                        }}
-                                        className="mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline"
-                                      >
-                                        Report incorrect nutrition
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                              <div className="ml-3 flex items-center gap-1">
+                            {/* Header row with actions, title, and description */}
+                            <div className={`flex flex-col ${isMultiIngredient && !isExpanded ? 'mb-1' : 'mb-2'}`}>
+                              <div className="flex items-center justify-end gap-1">
                                 <div className="flex items-center gap-1">
                                   <button
                                     type="button"
@@ -12618,6 +12567,67 @@ Please add nutritional information manually if needed.`);
                                   </button>
                                 )}
                               </div>
+                              <div className="font-semibold text-gray-900 text-base mt-1">
+                                {displayName}
+                              </div>
+                              {(!isMultiIngredient || isExpanded) && (
+                                <>
+                                  {item.brand && (
+                                    <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
+                                  )}
+                                  <div 
+                                    className="text-sm text-gray-500 mt-1 md:cursor-default cursor-pointer active:opacity-70"
+                                    onClick={() => {
+                                      // On mobile, clicking serving size focuses weight input
+                                      if (window.innerWidth < 768) {
+                                        focusWeightInput()
+                                      }
+                                    }}
+                                  >
+                                    Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
+                                  </div>
+                                  {servingOptions.length > 0 && (
+                                    <div className="mt-2">
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                                        Serving size
+                                      </label>
+                                      <select
+                                        value={selectedServingId || servingOptions[0]?.id || ''}
+                                        onChange={(e) => handleServingOptionSelect(index, e.target.value)}
+                                        className="w-full max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      >
+                                        {servingOptions.map((option: any) => (
+                                          <option key={option.id} value={option.id}>
+                                            {option.label || option.serving_size}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {item?.dbSource && (
+                                        <div className="mt-1 text-[11px] text-gray-400">
+                                          Data source: {item.dbSource === 'usda' ? 'USDA' : item.dbSource === 'fatsecret' ? 'FatSecret' : 'Database'}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  {isBarcodeItem && barcodeCode && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setBarcodeLabelFlow({
+                                          barcode: barcodeCode,
+                                          reason: 'report',
+                                          productName: item?.name || null,
+                                          brand: item?.brand || null,
+                                        })
+                                        setShowBarcodeLabelPrompt(true)
+                                      }}
+                                      className="mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline"
+                                    >
+                                      Report incorrect nutrition
+                                    </button>
+                                  )}
+                                </>
+                              )}
                             </div>
                             
                             {/* Portion controls: servings + optional weight editor (keeps servings/pieces/weight in sync). */}
