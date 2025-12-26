@@ -1000,6 +1000,9 @@ const defaultGramsForItem = (item: any): number | null => {
     { keywords: ['tomato', 'tomatoes'], grams: 123 },
     { keywords: ['pancake', 'pancakes'], grams: 40 },
     { keywords: ['hash brown', 'hashbrown'], grams: 70 },
+    { keywords: ['battered fish', 'fried fish', 'fish fillet', 'fish fingers', 'fish sticks'], grams: 90 },
+    { keywords: ['fried shrimp', 'shrimp', 'prawn', 'prawns'], grams: 30 },
+    { keywords: ['sausage', 'sausages', 'link', 'links'], grams: 75 },
     { keywords: ['wing', 'wings'], grams: 30 },
     { keywords: ['nugget', 'nuggets'], grams: 20 },
     { keywords: ['meatball', 'meatballs'], grams: 20 },
@@ -5785,6 +5788,15 @@ const applyStructuredItems = (
     }
   }
 
+  const getDiscreteWeightFloor = (item: any) => {
+    if (analysisMode === 'packaged') return null
+    const pieces = getPiecesPerServing(item)
+    if (!pieces || pieces <= 1) return null
+    const perPiece = defaultGramsForItem(item)
+    if (!perPiece || perPiece <= 0) return null
+    return perPiece * pieces
+  }
+
   // Get base weight per 1 serving in the item's current weightUnit (defaults to grams)
   const getBaseWeightPerServing = (item: any): number | null => {
     const info = parseServingSizeInfo(item)
@@ -5792,6 +5804,7 @@ const applyStructuredItems = (
     const estimatedGrams = estimateGramsPerServing(item)
     const piecesMultiplier = piecesMultiplierForServing(item)
     const fallbackDefault = defaultGramsForItem(item)
+    const discreteFloor = getDiscreteWeightFloor(item)
     if (unit === 'ml') {
       if (Number.isFinite(item?.customMlPerServing)) return Number(item.customMlPerServing)
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing * piecesMultiplier
@@ -5807,6 +5820,13 @@ const applyStructuredItems = (
     } else {
       // grams
       if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
+      if (discreteFloor && discreteFloor > 0) {
+        if (info.gramsPerServing && info.gramsPerServing > 0) {
+          if (info.gramsPerServing < discreteFloor) return discreteFloor
+        } else {
+          return discreteFloor
+        }
+      }
       if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing * piecesMultiplier
       if (fallbackDefault && fallbackDefault > 0) return fallbackDefault * Math.max(1, piecesMultiplier)
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing * piecesMultiplier // assume ~1g/mL fallback
@@ -5826,10 +5846,15 @@ const applyStructuredItems = (
   const estimateGramsPerServing = (item: any): number | null => {
     const { gramsPerServing, mlPerServing } = parseServingSizeInfo(item)
     const hasKnownWeight = (gramsPerServing && gramsPerServing > 0) || (mlPerServing && mlPerServing > 0)
+    const discreteFloor = getDiscreteWeightFloor(item)
     if (hasKnownWeight) {
       const base = gramsPerServing ?? mlPerServing ?? null
       const multiplier = piecesMultiplierForServing(item)
-      return base && base > 0 ? base * multiplier : base
+      const known = base && base > 0 ? base * multiplier : base
+      if (discreteFloor && Number.isFinite(known) && known && known < discreteFloor) {
+        return discreteFloor
+      }
+      return known
     }
 
     const calories = Number(item?.calories)
@@ -5873,6 +5898,9 @@ const applyStructuredItems = (
     // If we know there are multiple pieces in this "one serving", scale the weight to cover all pieces.
     const piecesMultiplier = piecesMultiplierForServing(item)
     if (piecesMultiplier > 1) estimated = estimated * piecesMultiplier
+    if (discreteFloor && estimated < discreteFloor) {
+      estimated = discreteFloor
+    }
 
     const clamped = Math.min(Math.max(estimated, 5), 1200) // 5g–1200g sane bounds
     return Math.round(clamped * 100) / 100

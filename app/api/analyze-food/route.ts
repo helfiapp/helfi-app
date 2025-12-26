@@ -508,6 +508,10 @@ const extractComponentsFromAnalysis = (analysis: string | null | undefined): str
     if (withMatch && withMatch[1]) listText = withMatch[1];
   }
   if (!listText) {
+    const containsMatch = cleaned.match(/\b(?:contains?|includes?|including|consists\s+of)\b\s+([^.\n]+)/i);
+    if (containsMatch && containsMatch[1]) listText = containsMatch[1];
+  }
+  if (!listText) {
     const beforeCalories = cleaned.split(/calories\s*:/i)[0] || cleaned;
     const fallback = extractComponentsFromDelimitedText(beforeCalories);
     return fallback;
@@ -1122,12 +1126,16 @@ const fetchOpenFoodFactsByBarcode = async (barcode: string): Promise<any | null>
 // describes multiple units (e.g. "3 large eggs", "4 slices bacon") but the
 // calories/macros look like a single unit. This runs **after** we have parsed
 // ITEMS_JSON and before values are sent to the Food Diary UI.
-const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any | null } => {
+const harmonizeDiscretePortionItems = (
+  items: any[],
+  options?: { applyWeightDefaults?: boolean },
+): { items: any[]; total: any | null } => {
   if (!Array.isArray(items) || items.length === 0) {
     return { items, total: null };
   }
 
   const cloned = items.map((item) => ({ ...item }));
+  const applyWeightDefaults = options?.applyWeightDefaults !== false;
 
   const containsAny = (text: string, keywords: string[]): boolean => {
     const lower = text.toLowerCase();
@@ -1194,6 +1202,14 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
       label: (n) => `${n} drumstick${n > 1 ? 's' : ''}`,
     },
   ];
+  const WEIGHT_ONLY_DEFAULTS: Array<{
+    keywords: string[];
+    gramsPerPiece: number;
+  }> = [
+    { keywords: ['battered fish', 'fried fish', 'fish fillet', 'fish fingers', 'fish sticks'], gramsPerPiece: 90 },
+    { keywords: ['fried shrimp', 'shrimp', 'prawn', 'prawns'], gramsPerPiece: 30 },
+    { keywords: ['sausage', 'sausages', 'link', 'links'], gramsPerPiece: 75 },
+  ];
 
   for (const item of cloned) {
     const name = (item?.name || '') as string;
@@ -1202,6 +1218,7 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
     const explicitCount = extractExplicitPieceCount(labelSource);
 
     const defaults = DISCRETE_DEFAULTS.find((d) => containsAny(labelSource, d.keywords));
+    const weightDefaults = WEIGHT_ONLY_DEFAULTS.find((d) => containsAny(labelSource, d.keywords));
     if (!explicitCount) continue;
     const existingServings =
       Number.isFinite(Number(item?.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1;
@@ -1211,6 +1228,24 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
 
     item.servings = Math.round(existingServings * 1000) / 1000;
     (item as any).piecesPerServing = piecesPerServing;
+
+    if (applyWeightDefaults) {
+      const perPieceWeight = defaults?.gramsPerPiece ?? weightDefaults?.gramsPerPiece ?? null;
+      if (perPieceWeight && perPieceWeight > 0) {
+        const totalWeight = perPieceWeight * piecesPerServing;
+        const servingWeight = parseServingWeight(item?.serving_size || null);
+        const customWeight = Number(item?.customGramsPerServing);
+        const currentWeight =
+          Number.isFinite(customWeight) && customWeight > 0
+            ? customWeight
+            : Number.isFinite(servingWeight) && servingWeight && servingWeight > 0
+            ? servingWeight
+            : null;
+        if (!currentWeight || currentWeight < totalWeight) {
+          item.customGramsPerServing = totalWeight;
+        }
+      }
+    }
 
     if (defaults) {
       // Seed serving_size with a discrete hint when missing so the UI picks up pieces.
@@ -2446,6 +2481,8 @@ CRITICAL REQUIREMENTS:
     let itemsQuality: 'valid' | 'weak' | 'none' = 'none';
     let analysisTextForFollowUp = analysis;
     let listedComponents: string[] = [];
+    let analysisComponents: string[] = [];
+    let analysisLooksMulti = false;
     let componentsHint = '';
     let componentsRequirement = '';
     let componentBoundApplied = false;
@@ -2490,6 +2527,10 @@ CRITICAL REQUIREMENTS:
 
       analysisTextForFollowUp = resp.analysis || analysis;
       listedComponents = extractComponentsFromAnalysis(analysisTextForFollowUp);
+      analysisComponents = extractComponentsFromDelimitedText(analysisTextForFollowUp);
+      if (listedComponents.length === 0 && analysisComponents.length > 0) {
+        listedComponents = analysisComponents;
+      }
       if (
         listedComponents.length === 0 &&
         resp.items &&
@@ -2498,14 +2539,15 @@ CRITICAL REQUIREMENTS:
         const summaryLabel = `${resp.items?.[0]?.name || ''} ${resp.items?.[0]?.serving_size || ''}`;
         listedComponents = extractComponentsFromDelimitedText(summaryLabel);
       }
+      analysisLooksMulti =
+        analysisComponents.length > 1 || (resp.items ? looksLikeMultiIngredientSummary(resp.items) : false);
       componentsHint =
         listedComponents.length > 0
           ? `- Components list (include each as its own item): ${listedComponents.join(', ')}.\n`
           : '';
+      const requiredComponentCount = Math.max(listedComponents.length, analysisComponents.length);
       componentsRequirement =
-        listedComponents.length > 1
-          ? `- Return at least ${listedComponents.length} items.\n`
-          : '';
+        requiredComponentCount > 1 ? `- Return at least ${requiredComponentCount} items.\n` : '';
 
       // If the main analysis did not contain a usable ITEMS_JSON block, make a
       // compact follow-up call whose ONLY job is to produce structured items
@@ -2828,7 +2870,7 @@ CRITICAL REQUIREMENTS:
             !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
               ? (parsed as any).total
               : null;
-          const requiresMultiple = listedComponents.length > 1;
+          const requiresMultiple = listedComponents.length > 1 || analysisLooksMulti;
           const hasEnoughItems = requiresMultiple ? items.length > 1 : items.length > 0;
           if (hasEnoughItems && !looksLikeSingleGenericItem(items) && !looksLikeMultiIngredientSummary(items)) {
             resp.items = sanitizeStructuredItems(items);
@@ -3033,7 +3075,9 @@ CRITICAL REQUIREMENTS:
     // or diary loading logic – it only corrects the structured items returned
     // from this API.
     if (resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
-      const harmonized = harmonizeDiscretePortionItems(resp.items);
+      const harmonized = harmonizeDiscretePortionItems(resp.items, {
+        applyWeightDefaults: !packagedMode && !labelScan,
+      });
       resp.items = harmonized.items;
       if (harmonized.total) {
         resp.total = harmonized.total;
@@ -3053,6 +3097,30 @@ CRITICAL REQUIREMENTS:
       if (strictPieces.changed) {
         resp.items = strictPieces.items;
         resp.total = computeTotalsFromItems(resp.items) || resp.total;
+      }
+    }
+
+    // Final safety net for image analyses: never return a single multi-ingredient summary card.
+    // If we can detect multiple components but still only have one item, split into multiple
+    // editable cards (macros left blank) to preserve per-ingredient UX.
+    if (
+      isImageAnalysis &&
+      preferMultiDetect &&
+      !packagedMode &&
+      resp.items &&
+      Array.isArray(resp.items) &&
+      resp.items.length <= 1 &&
+      (analysisLooksMulti || looksLikeMultiIngredientSummary(resp.items))
+    ) {
+      const fallback = buildMultiComponentFallback(analysisTextForFollowUp, resp.total);
+      if (fallback.items.length > 1) {
+        resp.items = fallback.items;
+        if (!resp.total) {
+          resp.total = fallback.total || resp.total || null;
+        }
+        itemsSource = itemsSource === 'none' ? 'component_split' : `${itemsSource}+component_split`;
+        itemsQuality = 'weak';
+        console.warn('✅ Split multi-ingredient summary into separate cards (macros left blank).');
       }
     }
 
