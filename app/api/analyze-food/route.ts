@@ -1014,7 +1014,9 @@ const enrichItemsWithDatabaseIfOutlier = async (
     if (!Number.isFinite(aiPer100) || !Number.isFinite(dbPer100) || dbPer100 <= 0) continue;
 
     const ratio = Math.abs(aiPer100 - dbPer100) / dbPer100;
-    if (ratio < OUTLIER_RATIO) continue;
+    const dbScaledCalories = Math.round(candidateCalories * (weight / candidateWeight));
+    const calorieDiff = Math.abs(calories - dbScaledCalories);
+    if (ratio < OUTLIER_RATIO && calorieDiff < 180) continue;
     const aiIsGuess = item?.isGuess === true;
     const aiHigherThanDb = aiPer100 > dbPer100;
     if (!aiIsGuess && !aiHigherThanDb) continue;
@@ -1027,7 +1029,7 @@ const enrichItemsWithDatabaseIfOutlier = async (
       return Math.round(num * scale * factor) / factor;
     };
 
-    item.calories = Math.round(candidateCalories * scale);
+    item.calories = dbScaledCalories;
     if (candidate?.protein_g !== null && candidate?.protein_g !== undefined) {
       item.protein_g = scaleMacro(candidate.protein_g);
     }
