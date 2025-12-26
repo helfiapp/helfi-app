@@ -380,9 +380,30 @@ export default function MoodJournalPage() {
     syncSelectionRef()
   }
 
+  const removePromptBlock = (prompt?: string) => {
+    const el = editorRef.current
+    if (!el) return
+    const marked = Array.from(el.querySelectorAll('[data-journal-prompt="true"]'))
+    if (marked.length > 0) {
+      marked.forEach((node) => node.remove())
+    } else if (prompt) {
+      const candidates = Array.from(el.querySelectorAll('p'))
+      const match = candidates.find((node) => node.textContent?.trim() === prompt)
+      if (match) match.remove()
+    }
+    setContentHtml(el.innerHTML)
+    syncSelectionRef()
+  }
+
   const applyPrompt = (prompt: string) => {
+    removePromptBlock(selectedPrompt)
     setSelectedPrompt(prompt)
-    insertHtml(`<p><strong>${prompt}</strong></p><p><br></p>`)
+    insertHtml(`<p data-journal-prompt="true"><strong>${prompt}</strong></p><p><br></p>`)
+  }
+
+  const clearPrompt = () => {
+    removePromptBlock(selectedPrompt)
+    setSelectedPrompt('')
   }
 
   const clearEditor = () => {
@@ -687,7 +708,7 @@ export default function MoodJournalPage() {
               {selectedPrompt && (
                 <button
                   type="button"
-                  onClick={() => setSelectedPrompt('')}
+                  onClick={clearPrompt}
                   className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600"
                 >
                   Clear prompt
