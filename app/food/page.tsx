@@ -2719,6 +2719,11 @@ export default function FoodDiary() {
 
   const applyServingOptionToItem = (item: any, option: any) => {
     const next = { ...item }
+    const baseWeight = getBaseWeightPerServing(item)
+    const optionGrams =
+      option?.grams && Number.isFinite(Number(option.grams)) ? Number(option.grams) : null
+    const optionMl = option?.ml && Number.isFinite(Number(option.ml)) ? Number(option.ml) : null
+    const optionWeight = optionGrams ?? optionMl
     next.serving_size = option?.serving_size || option?.label || next.serving_size
     if (option?.calories != null) next.calories = option.calories
     if (option?.protein_g != null) next.protein_g = option.protein_g
@@ -2726,20 +2731,47 @@ export default function FoodDiary() {
     if (option?.fat_g != null) next.fat_g = option.fat_g
     if (option?.fiber_g != null) next.fiber_g = option.fiber_g
     if (option?.sugar_g != null) next.sugar_g = option.sugar_g
-    if (option?.grams && Number.isFinite(option.grams)) {
-      next.customGramsPerServing = option.grams
+    if (baseWeight && optionWeight && baseWeight > 0 && optionWeight > 0) {
+      const ratio = optionWeight / baseWeight
+      const scale = (value: any, decimals: number) => {
+        if (!Number.isFinite(Number(value))) return null
+        const num = Number(value) * ratio
+        const factor = Math.pow(10, decimals)
+        return Math.round(num * factor) / factor
+      }
+      if (option?.calories == null && Number.isFinite(Number(item?.calories))) {
+        next.calories = Math.round(Number(item.calories) * ratio)
+      }
+      if (option?.protein_g == null && Number.isFinite(Number(item?.protein_g))) {
+        next.protein_g = scale(item.protein_g, 1)
+      }
+      if (option?.carbs_g == null && Number.isFinite(Number(item?.carbs_g))) {
+        next.carbs_g = scale(item.carbs_g, 1)
+      }
+      if (option?.fat_g == null && Number.isFinite(Number(item?.fat_g))) {
+        next.fat_g = scale(item.fat_g, 1)
+      }
+      if (option?.fiber_g == null && Number.isFinite(Number(item?.fiber_g))) {
+        next.fiber_g = scale(item.fiber_g, 1)
+      }
+      if (option?.sugar_g == null && Number.isFinite(Number(item?.sugar_g))) {
+        next.sugar_g = scale(item.sugar_g, 1)
+      }
+    }
+    if (optionGrams) {
+      next.customGramsPerServing = optionGrams
       next.customMlPerServing = null
       next.weightUnit = 'g'
-    } else if (option?.ml && Number.isFinite(option.ml)) {
-      next.customMlPerServing = option.ml
+    } else if (optionMl) {
+      next.customMlPerServing = optionMl
       next.customGramsPerServing = null
       next.weightUnit = 'ml'
     }
     next.selectedServingId = option?.id || next.selectedServingId
-    const baseWeight = getBaseWeightPerServing(next)
-    if (baseWeight && baseWeight > 0) {
+    const updatedBaseWeight = getBaseWeightPerServing(next)
+    if (updatedBaseWeight && updatedBaseWeight > 0) {
       const unit = next?.weightUnit === 'ml' ? 'ml' : next?.weightUnit === 'oz' ? 'oz' : 'g'
-      const computed = baseWeight * (next.servings || 1)
+      const computed = updatedBaseWeight * (next.servings || 1)
       const precision = unit === 'oz' ? 100 : 1000
       next.weightAmount = Math.round(computed * precision) / precision
     }

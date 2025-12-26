@@ -249,12 +249,14 @@ const extractUsdaNutrients = (food: UsdaFood) => {
     return Number(n.value)
   }
   const energyKcal = findVal('Energy', ['KCAL']) ?? findVal('Energy', ['kcal'])
+  const energyKj = findVal('Energy', ['KJ']) ?? findVal('Energy', ['kJ'])
+  const energy = energyKcal ?? (energyKj ? energyKj / 4.184 : null)
   const protein = findVal('Protein', ['G', 'g'])
   const carbs = findVal('Carbohydrate, by difference', ['G', 'g'])
   const fat = findVal('Total lipid (fat)', ['G', 'g'])
   const fiber = findVal('Fiber, total dietary', ['G', 'g'])
   const sugar = findVal('Sugars, total including NLEA', ['G', 'g']) ?? findVal('Sugars, total', ['G', 'g'])
-  return { energyKcal, protein, carbs, fat, fiber, sugar }
+  return { energyKcal: energy, protein, carbs, fat, fiber, sugar }
 }
 
 function normalizeUsdaFood(food: UsdaFood): NormalizedFoodItem | null {
