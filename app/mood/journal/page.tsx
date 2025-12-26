@@ -187,16 +187,103 @@ export default function MoodJournalPage() {
     }
   }
 
+  const insertHtmlAtSelection = (html: string) => {
+    const el = editorRef.current
+    if (!el) return false
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return false
+    const range = sel.getRangeAt(0)
+    range.deleteContents()
+    const temp = document.createElement('div')
+    temp.innerHTML = html
+    const frag = document.createDocumentFragment()
+    let node: ChildNode | null = null
+    let lastNode: ChildNode | null = null
+    while ((node = temp.firstChild)) {
+      lastNode = frag.appendChild(node)
+    }
+    range.insertNode(frag)
+    if (lastNode) {
+      range.setStartAfter(lastNode)
+      range.collapse(true)
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+    return true
+  }
+
+  const wrapSelection = (tag: 'strong' | 'em' | 'u') => {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return false
+    const range = sel.getRangeAt(0)
+    const wrapper = document.createElement(tag)
+    const selectedText = range.toString()
+    range.deleteContents()
+    if (selectedText) {
+      wrapper.textContent = selectedText
+      range.insertNode(wrapper)
+      range.setStartAfter(wrapper)
+      range.collapse(true)
+    } else {
+      const zwsp = document.createTextNode('\u200B')
+      wrapper.appendChild(zwsp)
+      range.insertNode(wrapper)
+      range.setStart(zwsp, 1)
+      range.collapse(true)
+    }
+    sel.removeAllRanges()
+    sel.addRange(range)
+    return true
+  }
+
+  const insertListElement = (ordered: boolean) => {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return false
+    const range = sel.getRangeAt(0)
+    range.deleteContents()
+    const list = document.createElement(ordered ? 'ol' : 'ul')
+    const li = document.createElement('li')
+    li.appendChild(document.createElement('br'))
+    list.appendChild(li)
+    range.insertNode(list)
+    range.setStart(li, 0)
+    range.collapse(true)
+    sel.removeAllRanges()
+    sel.addRange(range)
+    return true
+  }
+
+  const insertLineBreak = () => {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return false
+    const range = sel.getRangeAt(0)
+    range.deleteContents()
+    const br = document.createElement('br')
+    range.insertNode(br)
+    range.setStartAfter(br)
+    range.collapse(true)
+    sel.removeAllRanges()
+    sel.addRange(range)
+    return true
+  }
+
   const handleCommand = (command: string) => {
     const el = editorRef.current
     if (!el) return
     ensureEditorSelection()
-    const ok = document.execCommand(command)
+    let ok = document.execCommand(command)
+    if (!ok) {
+      if (command === 'bold') ok = wrapSelection('strong')
+      if (command === 'italic') ok = wrapSelection('em')
+      if (command === 'underline') ok = wrapSelection('u')
+      if (command === 'insertUnorderedList') ok = insertListElement(false)
+      if (command === 'insertOrderedList') ok = insertListElement(true)
+    }
     if (!ok) {
       if (command === 'insertUnorderedList') {
-        insertHtml('<ul><li><br></li></ul>')
+        insertHtmlAtSelection('<ul><li><br></li></ul>')
       } else if (command === 'insertOrderedList') {
-        insertHtml('<ol><li><br></li></ol>')
+        insertHtmlAtSelection('<ol><li><br></li></ol>')
       }
     }
     setContentHtml(el.innerHTML)
@@ -207,7 +294,7 @@ export default function MoodJournalPage() {
     if (!el) return
     ensureEditorSelection()
     const ok = document.execCommand('insertHTML', false, html)
-    if (!ok) {
+    if (!ok && !insertHtmlAtSelection(html)) {
       el.innerHTML = `${el.innerHTML}${html}`
     }
     setContentHtml(el.innerHTML)
@@ -644,6 +731,21 @@ export default function MoodJournalPage() {
               contentEditable
               suppressContentEditableWarning
               onInput={() => setContentHtml(editorRef.current?.innerHTML || '')}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return
+                ensureEditorSelection()
+                const handled =
+                  document.execCommand('insertParagraph') ||
+                  document.execCommand('insertLineBreak') ||
+                  insertLineBreak()
+                if (handled) {
+                  setContentHtml(editorRef.current?.innerHTML || '')
+                  e.preventDefault()
+                }
+              }}
+              role="textbox"
+              aria-multiline="true"
+              tabIndex={0}
               className="min-h-[140px] text-sm text-gray-900 dark:text-gray-100 focus:outline-none break-words whitespace-pre-wrap max-w-full"
             />
           </div>
