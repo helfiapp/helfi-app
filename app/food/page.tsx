@@ -2730,11 +2730,11 @@ export default function FoodDiary() {
     if (!hasBase) return []
 
     const sizes = [
-      { id: 'egg:small', label: 'small — 38g', grams: 38 },
-      { id: 'egg:medium', label: 'medium — 44g', grams: 44 },
-      { id: 'egg:large', label: 'large — 50g', grams: 50 },
-      { id: 'egg:extra-large', label: 'extra large — 56g', grams: 56 },
-      { id: 'egg:jumbo', label: 'jumbo — 63g', grams: 63 },
+      { id: 'egg:small', label: '1 egg (small) — 38g', grams: 38 },
+      { id: 'egg:medium', label: '1 egg (medium) — 44g', grams: 44 },
+      { id: 'egg:large', label: '1 egg (large) — 50g', grams: 50 },
+      { id: 'egg:extra-large', label: '1 egg (extra large) — 56g', grams: 56 },
+      { id: 'egg:jumbo', label: '1 egg (jumbo) — 63g', grams: 63 },
     ]
 
     const roundMacro = (value: number, factor: number, decimals: number) => {
