@@ -2705,6 +2705,12 @@ export default function FoodDiary() {
     if (!q.includes('skin') && name.includes('meat and skin')) score -= 12
     if (!q.includes('dark') && name.includes('dark meat')) score -= 6
     if (!q.includes('light') && name.includes('light meat')) score -= 4
+    if (!q.includes('dried') && !q.includes('powder')) {
+      if (name.includes('dried')) score -= 30
+      if (name.includes('powder')) score -= 30
+    }
+    if (!q.includes('white') && !q.includes('whites') && (name.includes('white') || name.includes('whites'))) score -= 20
+    if (!q.includes('yolk') && !q.includes('yolks') && (name.includes('yolk') || name.includes('yolks'))) score -= 20
     return score
   }
 
@@ -2856,6 +2862,10 @@ export default function FoodDiary() {
       if (!query || query.length < 2) continue
 
       const candidateQueries = [query]
+      if (hasEgg && !analysisHasEggDish) {
+        candidateQueries.unshift('egg whole raw')
+        candidateQueries.unshift('egg whole')
+      }
       if (query.includes('whole ')) {
         candidateQueries.push(query.replace(/\bwhole\s+/g, '').trim())
       }
@@ -2889,11 +2899,19 @@ export default function FoodDiary() {
 
       if (!results.length) continue
       if (hasEgg && !analysisHasEggDish) {
+        const avoidEggTerms: string[] = []
+        if (!analysisHas('dried') && !analysisHas('powder')) {
+          avoidEggTerms.push('dried', 'powder', 'powdered')
+        }
+        if (!analysisHas('white') && !analysisHas('whites')) avoidEggTerms.push('white', 'whites')
+        if (!analysisHas('yolk') && !analysisHas('yolks')) avoidEggTerms.push('yolk', 'yolks')
+        if (!analysisHas('liquid')) avoidEggTerms.push('liquid')
         const filtered = results.filter((r: any) => {
           const name = normalizeDbQuery(r?.name || '')
           if (!name.includes('egg')) return false
           if (eggDishKeywords.some((kw) => name.includes(kw))) return false
-          return name.includes('whole') || name.includes('egg')
+          if (avoidEggTerms.some((kw) => name.includes(kw))) return false
+          return true
         })
         if (filtered.length > 0) {
           results = filtered
