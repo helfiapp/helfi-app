@@ -928,8 +928,11 @@ const quickParseServingSize = (servingSize: string | null | undefined) => {
 const piecesMultiplierForServing = (item: any) => {
   const pieces = Number((item as any)?.piecesPerServing)
   if (!Number.isFinite(pieces) || pieces <= 1) return 1
-  const meta = parseServingUnitMetadata(String(item?.serving_size || item?.name || ''))
-  const declaredQty = meta && Number.isFinite(meta.quantity) && meta.quantity > 0 ? Number(meta.quantity) : 1
+  const servingMeta = parseServingUnitMetadata(String(item?.serving_size || ''))
+  const declaredQty =
+    servingMeta && isDiscreteUnitLabel(servingMeta.unitLabel) && Number.isFinite(servingMeta.quantity)
+      ? Number(servingMeta.quantity)
+      : 1
   return declaredQty <= 1 ? pieces : 1
 }
 
@@ -986,6 +989,24 @@ const normalizeDiscreteItem = (item: any) => {
 const defaultGramsForItem = (item: any): number | null => {
   const name = String(item?.name || '').toLowerCase()
   if (!name) return null
+  const curated: Array<{ keywords: string[]; grams: number }> = [
+    { keywords: ['egg', 'eggs'], grams: 50 },
+    { keywords: ['bacon', 'rasher', 'rashers', 'strip', 'strips'], grams: 15 },
+    { keywords: ['sausage', 'sausages', 'link', 'links'], grams: 80 },
+    { keywords: ['carrot', 'carrots'], grams: 61 },
+    { keywords: ['zucchini', 'zucchinis', 'courgette', 'courgettes'], grams: 200 },
+    { keywords: ['banana', 'bananas'], grams: 118 },
+    { keywords: ['apple', 'apples'], grams: 182 },
+    { keywords: ['tomato', 'tomatoes'], grams: 123 },
+    { keywords: ['pancake', 'pancakes'], grams: 40 },
+    { keywords: ['hash brown', 'hashbrown'], grams: 70 },
+    { keywords: ['wing', 'wings'], grams: 30 },
+    { keywords: ['nugget', 'nuggets'], grams: 20 },
+    { keywords: ['meatball', 'meatballs'], grams: 20 },
+  ]
+  for (const entry of curated) {
+    if (entry.keywords.some((k) => name.includes(k))) return entry.grams
+  }
   if (name.includes('patty')) return 115 // ~4 oz patty
   if (name.includes('bacon')) return 15 // one slice cooked
   if (name.includes('cheese')) return 25 // one slice
@@ -3690,7 +3711,12 @@ const applyStructuredItems = (
   itemsFromApi: any[] | null | undefined,
   totalFromApi: any,
   analysisText: string | null | undefined,
-  options?: { allowTextFallback?: boolean; barcodeTag?: { barcode: string; source?: string }; analysisSeq?: number },
+  options?: {
+    allowTextFallback?: boolean
+    barcodeTag?: { barcode: string; source?: string }
+    analysisSeq?: number
+    autoMatchEnabled?: boolean
+  },
 ) => {
   let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
   let finalTotal = sanitizeNutritionTotals(totalFromApi)
@@ -3698,6 +3724,7 @@ const applyStructuredItems = (
   const isPackagedAnalysis = analysisMode === 'packaged'
   const barcodeTag = options?.barcodeTag
   const analysisSeq = options?.analysisSeq ?? null
+  const autoMatchEnabled = options?.autoMatchEnabled ?? false
 
   console.log('🔍 applyStructuredItems called:', {
     itemsFromApiCount: Array.isArray(itemsFromApi) ? itemsFromApi.length : 0,
@@ -3939,7 +3966,7 @@ const applyStructuredItems = (
   }
 
   setAnalyzedItems(scrubbedItems)
-  if (analysisSeq) {
+  if (analysisSeq && autoMatchEnabled) {
     autoMatchItemsToDatabase(scrubbedItems, analysisSeq, analysisText)
   }
 
@@ -4905,7 +4932,7 @@ const applyStructuredItems = (
     if (analyzedItems && analyzedItems.length > 0) return
     const allowTextFallback = editingEntry ? !editingEntry?.nutrition : true
     const analysisSeq = ++analysisSequenceRef.current
-    applyStructuredItems(null, null, aiDescription, { allowTextFallback, analysisSeq })
+    applyStructuredItems(null, null, aiDescription, { allowTextFallback, analysisSeq, autoMatchEnabled: false })
   }, [aiDescription, analyzedItems, editingEntry])
 
   // Reset USDA fallback attempt when starting a fresh analysis session
@@ -6122,6 +6149,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
           barcodeTag,
           allowTextFallback: false,
           analysisSeq,
+          autoMatchEnabled: false,
         });
         // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
@@ -6247,6 +6275,7 @@ Meanwhile, you can describe your food manually:
         applyStructuredItems(result.items, result.total, result.analysis, {
           allowTextFallback: false,
           analysisSeq,
+          autoMatchEnabled: false,
         });
         // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
@@ -6559,7 +6588,7 @@ Please add nutritional information manually if needed.`);
           setAnalysisPhase('building');
           setAiDescription(result.analysis);
           const analysisSeq = ++analysisSequenceRef.current
-          applyStructuredItems(result.items, result.total, result.analysis, { analysisSeq });
+          applyStructuredItems(result.items, result.total, result.analysis, { analysisSeq, autoMatchEnabled: false });
           setHealthWarning(result.healthWarning || null);
           setHealthAlternatives(result.alternatives || null);
           setDietWarning(result.dietWarning || null);
