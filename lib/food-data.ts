@@ -14,6 +14,22 @@ export interface NormalizedFoodItem {
   sugar_g?: number | null
 }
 
+export interface ServingOption {
+  id: string
+  label: string
+  serving_size: string
+  grams?: number | null
+  ml?: number | null
+  unit?: 'g' | 'ml' | 'oz'
+  calories?: number | null
+  protein_g?: number | null
+  carbs_g?: number | null
+  fat_g?: number | null
+  fiber_g?: number | null
+  sugar_g?: number | null
+  source: 'usda' | 'fatsecret'
+}
+
 const OPENFOODFACTS_BASE_URL =
   process.env.OPENFOODFACTS_BASE_URL || 'https://world.openfoodfacts.org'
 
@@ -214,12 +230,16 @@ interface UsdaFood {
   description: string
   brandName?: string
   foodNutrients?: UsdaFoodNutrient[]
+  foodPortions?: Array<{
+    gramWeight?: number
+    modifier?: string
+    portionDescription?: string
+    measureUnit?: { name?: string }
+  }>
 }
 
-function normalizeUsdaFood(food: UsdaFood): NormalizedFoodItem | null {
-  if (!food || !food.description) return null
+const extractUsdaNutrients = (food: UsdaFood) => {
   const nutrients = food.foodNutrients || []
-
   const findVal = (name: string, units?: string[]): number | null => {
     const n = nutrients.find(
       (n) => n.nutrientName?.toLowerCase() === name.toLowerCase() && (!units || units.includes(n.unitName || '')),
@@ -228,13 +248,18 @@ function normalizeUsdaFood(food: UsdaFood): NormalizedFoodItem | null {
     if (!Number.isFinite(Number(n.value))) return null
     return Number(n.value)
   }
-
   const energyKcal = findVal('Energy', ['KCAL']) ?? findVal('Energy', ['kcal'])
   const protein = findVal('Protein', ['G', 'g'])
   const carbs = findVal('Carbohydrate, by difference', ['G', 'g'])
   const fat = findVal('Total lipid (fat)', ['G', 'g'])
   const fiber = findVal('Fiber, total dietary', ['G', 'g'])
   const sugar = findVal('Sugars, total including NLEA', ['G', 'g']) ?? findVal('Sugars, total', ['G', 'g'])
+  return { energyKcal, protein, carbs, fat, fiber, sugar }
+}
+
+function normalizeUsdaFood(food: UsdaFood): NormalizedFoodItem | null {
+  if (!food || !food.description) return null
+  const { energyKcal, protein, carbs, fat, fiber, sugar } = extractUsdaNutrients(food)
 
   return {
     source: 'usda',
@@ -248,6 +273,98 @@ function normalizeUsdaFood(food: UsdaFood): NormalizedFoodItem | null {
     fat_g: fat,
     fiber_g: fiber,
     sugar_g: sugar,
+  }
+}
+
+export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOption[]> {
+  if (!USDA_API_KEY) {
+    console.warn('USDA_API_KEY not configured; skipping USDA serving lookup')
+    return []
+  }
+  if (!fdcId) return []
+
+  const url = `https://api.nal.usda.gov/fdc/v1/food/${encodeURIComponent(fdcId)}?api_key=${USDA_API_KEY}`
+  try {
+    const res = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+      next: { revalidate: 0 },
+      timeoutMs: 3500,
+    })
+
+    if (!res.ok) {
+      console.warn('USDA food detail failed', res.status, await res.text())
+      return []
+    }
+
+    const food: UsdaFood = await res.json()
+    const { energyKcal, protein, carbs, fat, fiber, sugar } = extractUsdaNutrients(food)
+    const base = {
+      calories: energyKcal,
+      protein_g: protein,
+      carbs_g: carbs,
+      fat_g: fat,
+      fiber_g: fiber,
+      sugar_g: sugar,
+    }
+
+    const options: ServingOption[] = []
+    if (Number.isFinite(Number(base.calories))) {
+      options.push({
+        id: `usda:${fdcId}:100g`,
+        label: '100 g',
+        serving_size: '100 g',
+        grams: 100,
+        unit: 'g',
+        calories: base.calories ?? null,
+        protein_g: base.protein_g ?? null,
+        carbs_g: base.carbs_g ?? null,
+        fat_g: base.fat_g ?? null,
+        fiber_g: base.fiber_g ?? null,
+        sugar_g: base.sugar_g ?? null,
+        source: 'usda',
+      })
+    }
+
+    const portions = Array.isArray(food.foodPortions) ? food.foodPortions : []
+    portions.forEach((portion, idx) => {
+      const grams = Number(portion?.gramWeight ?? 0)
+      if (!Number.isFinite(grams) || grams <= 0) return
+      const labelBase =
+        portion?.portionDescription ||
+        portion?.modifier ||
+        portion?.measureUnit?.name ||
+        'Serving'
+      const label = `${labelBase} — ${Math.round(grams)}g`
+      const factor = grams / 100
+      options.push({
+        id: `usda:${fdcId}:${idx}`,
+        label,
+        serving_size: label,
+        grams,
+        unit: 'g',
+        calories: base.calories != null ? Math.round(base.calories * factor) : null,
+        protein_g: base.protein_g != null ? Math.round(base.protein_g * factor * 10) / 10 : null,
+        carbs_g: base.carbs_g != null ? Math.round(base.carbs_g * factor * 10) / 10 : null,
+        fat_g: base.fat_g != null ? Math.round(base.fat_g * factor * 10) / 10 : null,
+        fiber_g: base.fiber_g != null ? Math.round(base.fiber_g * factor * 10) / 10 : null,
+        sugar_g: base.sugar_g != null ? Math.round(base.sugar_g * factor * 10) / 10 : null,
+        source: 'usda',
+      })
+    })
+
+    const deduped = new Map<string, ServingOption>()
+    options.forEach((opt) => {
+      const key = `${opt.serving_size}|${opt.grams || ''}`
+      if (!deduped.has(key)) deduped.set(key, opt)
+    })
+    return Array.from(deduped.values())
+  } catch (err) {
+    console.warn('USDA serving lookup error', err)
+    return []
   }
 }
 
@@ -349,6 +466,10 @@ interface FatSecretSearchResponse {
     max_results?: string
     page_number?: string
   }
+}
+
+interface FatSecretFoodDetail {
+  food?: FatSecretFood | null
 }
 
 function normalizeFatSecretFood(food: FatSecretFood): NormalizedFoodItem | null {
@@ -495,6 +616,87 @@ async function getFatSecretAccessToken(): Promise<string | null> {
   } catch (err) {
     console.warn('FatSecret token error', err)
     return null
+  }
+}
+
+export async function fetchFatSecretServingOptions(foodId: string): Promise<ServingOption[]> {
+  if (!foodId) return []
+  const accessToken = await getFatSecretAccessToken()
+  if (!accessToken) return []
+
+  try {
+    const params = new URLSearchParams({
+      method: 'food.get.v2',
+      food_id: String(foodId),
+      format: 'json',
+    })
+    const url = `https://platform.fatsecret.com/rest/server.api?${params.toString()}`
+
+    const res = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+      next: { revalidate: 0 },
+      timeoutMs: 3500,
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      console.warn('FatSecret food.get.v2 failed', res.status, text.substring(0, 200))
+      return []
+    }
+
+    const data: FatSecretFoodDetail = await res.json()
+    const food = data.food
+    if (!food || !food.servings || !food.servings.serving) return []
+
+    const servings = Array.isArray(food.servings.serving)
+      ? food.servings.serving
+      : [food.servings.serving]
+
+    const options: ServingOption[] = []
+    servings.forEach((serving: any, idx: number) => {
+      const metricAmount = Number(serving?.metric_serving_amount)
+      const metricUnit = String(serving?.metric_serving_unit || '').toLowerCase()
+      const measurement = String(serving?.measurement_description || serving?.serving_description || 'Serving')
+      const hasMetric = Number.isFinite(metricAmount) && metricAmount > 0 && metricUnit
+
+      const grams = hasMetric && metricUnit === 'g' ? metricAmount : null
+      const ml = hasMetric && metricUnit === 'ml' ? metricAmount : null
+      const unit: 'g' | 'ml' | 'oz' | undefined =
+        metricUnit === 'g' ? 'g' : metricUnit === 'ml' ? 'ml' : metricUnit === 'oz' ? 'oz' : undefined
+
+      const label = hasMetric ? `${measurement} — ${metricAmount} ${metricUnit}` : measurement
+      const parseValue = (val: string | undefined): number | null => {
+        if (!val) return null
+        const num = parseFloat(val)
+        return Number.isFinite(num) ? num : null
+      }
+
+      options.push({
+        id: `fatsecret:${foodId}:${serving?.serving_id ?? idx}`,
+        label,
+        serving_size: label,
+        grams,
+        ml,
+        unit,
+        calories: parseValue(serving?.calories),
+        protein_g: parseValue(serving?.protein),
+        carbs_g: parseValue(serving?.carbohydrate),
+        fat_g: parseValue(serving?.fat),
+        fiber_g: parseValue(serving?.fiber),
+        sugar_g: parseValue(serving?.sugar),
+        source: 'fatsecret',
+      })
+    })
+
+    return options
+  } catch (err) {
+    console.warn('FatSecret serving lookup error', err)
+    return []
   }
 }
 

@@ -1823,6 +1823,8 @@ export default function FoodDiary() {
   const officialSearchAbortRef = useRef<AbortController | null>(null)
   const officialSearchSeqRef = useRef(0)
   const officialSearchDebounceRef = useRef<any>(null)
+  const analysisSequenceRef = useRef(0)
+  const autoDbMatchAbortRef = useRef<AbortController | null>(null)
   const [officialLastRequest, setOfficialLastRequest] = useState<{
     query: string
     mode: 'packaged' | 'single'
@@ -2674,6 +2676,200 @@ export default function FoodDiary() {
     setAnalyzedTotal(convertTotalsForStorage(recalculated))
   }
 
+  const isPreparedFoodName = (value: string) =>
+    /\b(roast|roasted|rotisserie|fried|grilled|baked|bbq|barbecue|smoked|whole|cooked)\b/i.test(value || '')
+
+  const normalizeDbQuery = (value: string) =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/^\s*\d+(?:\.\d+)?\s+/, '')
+      .replace(/[^a-z0-9\s]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const scoreDbMatch = (query: string, candidateName: string) => {
+    const q = normalizeDbQuery(query)
+    const name = normalizeDbQuery(candidateName)
+    if (!q || !name) return 0
+    let score = 0
+    if (name === q) score += 100
+    if (name.startsWith(q)) score += 60
+    if (name.includes(q)) score += 40
+    const qTokens = q.split(' ').filter(Boolean)
+    if (qTokens.length) {
+      const hitCount = qTokens.filter((t) => name.includes(t)).length
+      score += hitCount * 8
+    }
+    if (q.includes('whole') && name.includes('whole')) score += 20
+    if (q.includes('roast') && name.includes('roast')) score += 15
+    if (q.includes('roasted') && name.includes('roasted')) score += 15
+    if (q.includes('chicken') && name.includes('chicken')) score += 10
+    return score
+  }
+
+  const applyServingOptionToItem = (item: any, option: any) => {
+    const next = { ...item }
+    next.serving_size = option?.serving_size || option?.label || next.serving_size
+    if (option?.calories != null) next.calories = option.calories
+    if (option?.protein_g != null) next.protein_g = option.protein_g
+    if (option?.carbs_g != null) next.carbs_g = option.carbs_g
+    if (option?.fat_g != null) next.fat_g = option.fat_g
+    if (option?.fiber_g != null) next.fiber_g = option.fiber_g
+    if (option?.sugar_g != null) next.sugar_g = option.sugar_g
+    if (option?.grams && Number.isFinite(option.grams)) {
+      next.customGramsPerServing = option.grams
+      next.customMlPerServing = null
+      next.weightUnit = 'g'
+    } else if (option?.ml && Number.isFinite(option.ml)) {
+      next.customMlPerServing = option.ml
+      next.customGramsPerServing = null
+      next.weightUnit = 'ml'
+    }
+    next.selectedServingId = option?.id || next.selectedServingId
+    const baseWeight = getBaseWeightPerServing(next)
+    if (baseWeight && baseWeight > 0) {
+      const unit = next?.weightUnit === 'ml' ? 'ml' : next?.weightUnit === 'oz' ? 'oz' : 'g'
+      const computed = baseWeight * (next.servings || 1)
+      const precision = unit === 'oz' ? 100 : 1000
+      next.weightAmount = Math.round(computed * precision) / precision
+    }
+    return next
+  }
+
+  const handleServingOptionSelect = (index: number, optionId: string) => {
+    const itemsCopy = [...analyzedItems]
+    const item = itemsCopy[index]
+    if (!item) return
+    const options = Array.isArray(item?.servingOptions) ? item.servingOptions : []
+    const selected = options.find((opt: any) => opt?.id === optionId)
+    if (!selected) return
+    const next = applyServingOptionToItem(item, selected)
+    next.selectedServingId = selected.id
+    next.dbLocked = true
+    itemsCopy[index] = next
+    setAnalyzedItems(itemsCopy)
+    applyRecalculatedNutrition(itemsCopy)
+  }
+
+  const autoMatchItemsToDatabase = async (items: any[], seq: number) => {
+    if (!Array.isArray(items) || items.length === 0) return
+    if (analysisMode === 'packaged') return
+
+    try {
+      autoDbMatchAbortRef.current?.abort()
+    } catch {}
+    const controller = new AbortController()
+    autoDbMatchAbortRef.current = controller
+
+    const updated = [...items]
+    for (let idx = 0; idx < items.length; idx += 1) {
+      const item = updated[idx]
+      if (!item || item.dbLocked) continue
+      if (item?.barcode || item?.detectionMethod === 'barcode') continue
+      const query = normalizeDbQuery(item?.name || '')
+      if (!query || query.length < 2) continue
+
+      const preferSource = isPreparedFoodName(query) ? 'fatsecret' : 'usda'
+      const kind = preferSource === 'fatsecret' ? 'packaged' : 'single'
+      const params = new URLSearchParams({
+        source: preferSource,
+        q: query,
+        kind,
+        limit: '8',
+      })
+
+      let results: any[] = []
+      try {
+        const res = await fetch(`/api/food-data?${params.toString()}`, { signal: controller.signal })
+        if (!res.ok) continue
+        const data = await res.json()
+        results = Array.isArray(data.items) ? data.items : []
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return
+        continue
+      }
+
+      if (!results.length) continue
+      const ranked = [...results].sort((a, b) => scoreDbMatch(query, b?.name || '') - scoreDbMatch(query, a?.name || ''))
+      const best = ranked[0]
+      if (!best) continue
+
+      const nextItem = { ...item }
+      const currentWeight = getBaseWeightPerServing(nextItem)
+      const candidateServingInfo = parseServingSizeInfo({ serving_size: best.serving_size || '' })
+      const candidateGrams = candidateServingInfo.gramsPerServing
+
+      if (best.name) nextItem.name = best.name
+      if (best.brand) nextItem.brand = best.brand
+      if (best.serving_size) nextItem.serving_size = best.serving_size
+      if (best.calories != null) nextItem.calories = best.calories
+      if (best.protein_g != null) nextItem.protein_g = best.protein_g
+      if (best.carbs_g != null) nextItem.carbs_g = best.carbs_g
+      if (best.fat_g != null) nextItem.fat_g = best.fat_g
+      if (best.fiber_g != null) nextItem.fiber_g = best.fiber_g
+      if (best.sugar_g != null) nextItem.sugar_g = best.sugar_g
+      nextItem.dbSource = best.source
+      nextItem.dbId = best.id
+
+      if (candidateGrams && candidateGrams > 0) {
+        nextItem.customGramsPerServing = candidateGrams
+        nextItem.weightUnit = 'g'
+        if (currentWeight && currentWeight > 0) {
+          const servings = Math.max(currentWeight / candidateGrams, 0.01)
+          nextItem.servings = Math.round(servings * 100) / 100
+        }
+      }
+
+      let options: any[] = []
+      try {
+        const optParams = new URLSearchParams({
+          source: best.source,
+          id: best.id,
+        })
+        const optRes = await fetch(`/api/food-data/servings?${optParams.toString()}`, { signal: controller.signal })
+        if (optRes.ok) {
+          const optData = await optRes.json()
+          options = Array.isArray(optData.options) ? optData.options : []
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return
+      }
+
+      if (options.length > 0) {
+        nextItem.servingOptions = options
+        const queryHasWhole = query.includes('whole')
+        const wholeMatch = queryHasWhole
+          ? options.find((opt: any) => /\bwhole\b/i.test(opt?.label || opt?.serving_size || ''))
+          : null
+        const match = options.find((opt: any) =>
+          (opt.serving_size || opt.label || '').toLowerCase().includes(String(best.serving_size || '').toLowerCase()),
+        )
+        let selected = wholeMatch || match || null
+        if (!selected && currentWeight && Number.isFinite(Number(currentWeight))) {
+          const withGrams = options.filter((opt: any) => Number.isFinite(Number(opt?.grams)) && Number(opt?.grams) > 0)
+          if (withGrams.length > 0) {
+            withGrams.sort((a: any, b: any) => Math.abs(Number(a.grams) - currentWeight) - Math.abs(Number(b.grams) - currentWeight))
+            selected = withGrams[0]
+          }
+        }
+        if (!selected) selected = options[0]
+        nextItem.selectedServingId = selected?.id || null
+        if (selected) {
+          const merged = applyServingOptionToItem(nextItem, selected)
+          updated[idx] = merged
+        } else {
+          updated[idx] = nextItem
+        }
+      } else {
+        updated[idx] = nextItem
+      }
+    }
+
+    if (analysisSequenceRef.current !== seq) return
+    setAnalyzedItems(updated)
+    applyRecalculatedNutrition(updated)
+  }
+
   const buildDeleteKey = (entry: any) => {
     if (!entry) return ''
     if ((entry as any)?.dbId) return `db:${(entry as any).dbId}`
@@ -3123,7 +3319,7 @@ export default function FoodDiary() {
     return next
   }
 
-  const replaceIngredientFromOfficial = (item: any, index: number) => {
+  const replaceIngredientFromOfficial = async (item: any, index: number) => {
     if (!item || index === null || index === undefined) return
     const itemsCopy = [...analyzedItems]
     if (!itemsCopy[index]) return
@@ -3132,7 +3328,38 @@ export default function FoodDiary() {
         ? Number(itemsCopy[index]?.servings)
         : 1
     const nextItem = buildOfficialItem(item, currentServings)
-    itemsCopy[index] = nextItem
+    nextItem.dbLocked = true
+    if (item?.source) {
+      nextItem.dbSource = item.source
+    }
+    if (item?.id) {
+      nextItem.dbId = item.id
+    }
+    if (item?.source && item?.id) {
+      try {
+        const params = new URLSearchParams({ source: item.source, id: String(item.id) })
+        const res = await fetch(`/api/food-data/servings?${params.toString()}`)
+        if (res.ok) {
+          const data = await res.json()
+          const options = Array.isArray(data.options) ? data.options : []
+          if (options.length > 0) {
+            nextItem.servingOptions = options
+            const selected = options[0]
+            nextItem.selectedServingId = selected?.id || null
+            const merged = applyServingOptionToItem(nextItem, selected)
+            itemsCopy[index] = merged
+          } else {
+            itemsCopy[index] = nextItem
+          }
+        } else {
+          itemsCopy[index] = nextItem
+        }
+      } catch {
+        itemsCopy[index] = nextItem
+      }
+    } else {
+      itemsCopy[index] = nextItem
+    }
     setAnalyzedItems(itemsCopy)
     applyRecalculatedNutrition(itemsCopy)
     if (editingEntry) {
@@ -3254,13 +3481,14 @@ const applyStructuredItems = (
   itemsFromApi: any[] | null | undefined,
   totalFromApi: any,
   analysisText: string | null | undefined,
-  options?: { allowTextFallback?: boolean; barcodeTag?: { barcode: string; source?: string } },
+  options?: { allowTextFallback?: boolean; barcodeTag?: { barcode: string; source?: string }; analysisSeq?: number },
 ) => {
   let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
   let finalTotal = sanitizeNutritionTotals(totalFromApi)
   const allowTextFallback = options?.allowTextFallback ?? true
   const isPackagedAnalysis = analysisMode === 'packaged'
   const barcodeTag = options?.barcodeTag
+  const analysisSeq = options?.analysisSeq ?? null
 
   console.log('🔍 applyStructuredItems called:', {
     itemsFromApiCount: Array.isArray(itemsFromApi) ? itemsFromApi.length : 0,
@@ -3502,6 +3730,9 @@ const applyStructuredItems = (
   }
 
   setAnalyzedItems(scrubbedItems)
+  if (analysisSeq) {
+    autoMatchItemsToDatabase(scrubbedItems, analysisSeq)
+  }
 
   console.log('📊 Processing totals:', {
     enrichedItemsCount: taggedItems.length,
@@ -4464,7 +4695,8 @@ const applyStructuredItems = (
     if (!aiDescription) return
     if (analyzedItems && analyzedItems.length > 0) return
     const allowTextFallback = editingEntry ? !editingEntry?.nutrition : true
-    applyStructuredItems(null, null, aiDescription, { allowTextFallback })
+    const analysisSeq = ++analysisSequenceRef.current
+    applyStructuredItems(null, null, aiDescription, { allowTextFallback, analysisSeq })
   }, [aiDescription, analyzedItems, editingEntry])
 
   // Reset USDA fallback attempt when starting a fresh analysis session
@@ -5676,7 +5908,12 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         const barcodeTag = barcodeLabelFlow?.barcode
           ? { barcode: barcodeLabelFlow.barcode, source: 'label-photo' }
           : undefined
-        applyStructuredItems(result.items, result.total, result.analysis, { barcodeTag, allowTextFallback: false });
+        const analysisSeq = ++analysisSequenceRef.current
+        applyStructuredItems(result.items, result.total, result.analysis, {
+          barcodeTag,
+          allowTextFallback: false,
+          analysisSeq,
+        });
         // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
@@ -5797,7 +6034,11 @@ Meanwhile, you can describe your food manually:
       if (result.analysis) {
         setAnalysisPhase('building');
         setAiDescription(result.analysis);
-        applyStructuredItems(result.items, result.total, result.analysis, { allowTextFallback: false });
+        const analysisSeq = ++analysisSequenceRef.current
+        applyStructuredItems(result.items, result.total, result.analysis, {
+          allowTextFallback: false,
+          analysisSeq,
+        });
         // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
@@ -6108,7 +6349,8 @@ Please add nutritional information manually if needed.`);
         if (result.success && result.analysis) {
           setAnalysisPhase('building');
           setAiDescription(result.analysis);
-          applyStructuredItems(result.items, result.total, result.analysis);
+          const analysisSeq = ++analysisSequenceRef.current
+          applyStructuredItems(result.items, result.total, result.analysis, { analysisSeq });
           setHealthWarning(result.healthWarning || null);
           setHealthAlternatives(result.alternatives || null);
           setDietWarning(result.dietWarning || null);
@@ -11940,6 +12182,8 @@ Please add nutritional information manually if needed.`);
                           }
                           return servingSizeLabel
                         })()
+                        const servingOptions = Array.isArray(item?.servingOptions) ? item.servingOptions : []
+                        const selectedServingId = item?.selectedServingId || ''
 
                         const isBarcodeItem = Boolean(
                           item?.barcode || item?.barcodeSource || item?.detectionMethod === 'barcode',
@@ -11981,6 +12225,29 @@ Please add nutritional information manually if needed.`);
                                     >
                                       Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
                                     </div>
+                                    {servingOptions.length > 0 && (
+                                      <div className="mt-2">
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                                          Serving size
+                                        </label>
+                                        <select
+                                          value={selectedServingId || servingOptions[0]?.id || ''}
+                                          onChange={(e) => handleServingOptionSelect(index, e.target.value)}
+                                          className="w-full max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                        >
+                                          {servingOptions.map((option: any) => (
+                                            <option key={option.id} value={option.id}>
+                                              {option.label || option.serving_size}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        {item?.dbSource && (
+                                          <div className="mt-1 text-[11px] text-gray-400">
+                                            Data source: {item.dbSource === 'usda' ? 'USDA' : item.dbSource === 'fatsecret' ? 'FatSecret' : 'Database'}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                     {isBarcodeItem && barcodeCode && (
                                       <button
                                         type="button"
