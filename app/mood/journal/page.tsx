@@ -321,7 +321,10 @@ export default function MoodJournalPage() {
     const el = editorRef.current
     if (!el) return
     ensureEditorSelection()
+    const before = el.innerHTML
     let ok = document.execCommand(command)
+    const isListCommand = command === 'insertUnorderedList' || command === 'insertOrderedList'
+    if (isListCommand && before === el.innerHTML) ok = false
     if (!ok) {
       if (command === 'bold') ok = wrapSelection('strong')
       if (command === 'italic') ok = wrapSelection('em')
@@ -664,51 +667,6 @@ export default function MoodJournalPage() {
             className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-helfi-green/10"
           />
 
-          <div className="flex flex-wrap gap-2">
-            {([
-              { cmd: 'bold', label: 'B' },
-              { cmd: 'italic', label: 'I' },
-              { cmd: 'underline', label: 'U' },
-              { cmd: 'insertUnorderedList', label: 'Bullet list' },
-              { cmd: 'insertOrderedList', label: '1. List' },
-            ] as const).map((btn) => (
-                <button
-                  key={btn.cmd}
-                  type="button"
-                  onClick={() => handleCommand(btn.cmd)}
-                  className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
-                >
-                  {btn.label}
-                </button>
-            ))}
-            <button
-              type="button"
-              onClick={handleImagePick}
-              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-helfi-green"
-            >
-              {uploading ? 'Uploading...' : 'Add photo'}
-            </button>
-            <button
-              type="button"
-              onClick={recording ? stopRecording : startRecording}
-              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
-            >
-              {recording ? `Stop ${formatSeconds(recordSeconds)}` : 'Record voice note'}
-            </button>
-            {uploadingAudio && (
-              <span className="text-xs text-gray-500 dark:text-gray-400 self-center">Uploading audio...</span>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              onChange={(e) => handleImages(e.target.files)}
-              className="hidden"
-            />
-          </div>
-
           <div className="space-y-2">
             <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-300">Prompts</div>
             <div className="flex flex-wrap gap-2">
@@ -799,6 +757,51 @@ export default function MoodJournalPage() {
             </div>
           </div>
 
+          <div className="flex flex-wrap gap-2">
+            {([
+              { cmd: 'bold', label: 'B' },
+              { cmd: 'italic', label: 'I' },
+              { cmd: 'underline', label: 'U' },
+              { cmd: 'insertUnorderedList', label: 'Bullet list' },
+              { cmd: 'insertOrderedList', label: '1. List' },
+            ] as const).map((btn) => (
+              <button
+                key={btn.cmd}
+                type="button"
+                onClick={() => handleCommand(btn.cmd)}
+                className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
+              >
+                {btn.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={handleImagePick}
+              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-helfi-green"
+            >
+              {uploading ? 'Uploading...' : 'Add photo'}
+            </button>
+            <button
+              type="button"
+              onClick={recording ? stopRecording : startRecording}
+              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
+            >
+              {recording ? `Stop ${formatSeconds(recordSeconds)}` : 'Record voice note'}
+            </button>
+            {uploadingAudio && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 self-center">Uploading audio...</span>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              onChange={(e) => handleImages(e.target.files)}
+              className="hidden"
+            />
+          </div>
+
           <div className="relative rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 min-h-[180px] overflow-x-hidden">
             {!contentHtml && (
               <div className="pointer-events-none absolute left-4 top-3 text-sm text-gray-400">Start writing...</div>
@@ -819,7 +822,7 @@ export default function MoodJournalPage() {
               role="textbox"
               aria-multiline="true"
               tabIndex={0}
-              className="min-h-[140px] text-sm text-gray-900 dark:text-gray-100 focus:outline-none break-words whitespace-pre-wrap max-w-full"
+              className="journal-editor min-h-[140px] text-sm text-gray-900 dark:text-gray-100 focus:outline-none break-words whitespace-pre-wrap max-w-full"
             />
           </div>
 
