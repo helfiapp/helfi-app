@@ -2676,9 +2676,6 @@ export default function FoodDiary() {
     setAnalyzedTotal(convertTotalsForStorage(recalculated))
   }
 
-  const isPreparedFoodName = (value: string) =>
-    /\b(roast|roasted|rotisserie|fried|grilled|baked|bbq|barbecue|smoked|whole|cooked)\b/i.test(value || '')
-
   const normalizeDbQuery = (value: string) =>
     String(value || '')
       .toLowerCase()
@@ -2704,7 +2701,20 @@ export default function FoodDiary() {
     if (q.includes('roast') && name.includes('roast')) score += 15
     if (q.includes('roasted') && name.includes('roasted')) score += 15
     if (q.includes('chicken') && name.includes('chicken')) score += 10
+    if (!q.includes('skin') && name.includes('meat only')) score += 18
+    if (!q.includes('skin') && name.includes('meat and skin')) score -= 12
+    if (!q.includes('dark') && name.includes('dark meat')) score -= 6
+    if (!q.includes('light') && name.includes('light meat')) score -= 4
     return score
+  }
+
+  const getEdibleYieldFactor = (query: string) => {
+    const q = normalizeDbQuery(query)
+    if (!q.includes('whole')) return 1
+    if (/(chicken|turkey|duck|goose|hen|cornish)/i.test(q)) return 0.55
+    if (/(fish|salmon|trout|snapper|mackerel|sardine)/i.test(q)) return 0.7
+    if (/(lamb|goat|pork|beef)/i.test(q)) return 0.65
+    return 1
   }
 
   const applyServingOptionToItem = (item: any, option: any) => {
@@ -2769,24 +2779,36 @@ export default function FoodDiary() {
       const query = normalizeDbQuery(item?.name || '')
       if (!query || query.length < 2) continue
 
-      const preferSource = isPreparedFoodName(query) ? 'fatsecret' : 'usda'
-      const kind = preferSource === 'fatsecret' ? 'packaged' : 'single'
-      const params = new URLSearchParams({
-        source: preferSource,
-        q: query,
-        kind,
-        limit: '8',
-      })
+      const candidateQueries = [query]
+      if (query.includes('whole ')) {
+        candidateQueries.push(query.replace(/\bwhole\s+/g, '').trim())
+      }
+      if (query.includes('roasted')) {
+        candidateQueries.push(query.replace(/\broasted\b/g, 'roast').trim())
+      }
+      candidateQueries.push(query.replace(/\b(roasted|roast|whole|cooked)\b/g, '').trim())
+      const uniqueQueries = Array.from(new Set(candidateQueries.filter((q) => q.length >= 3)))
 
       let results: any[] = []
-      try {
-        const res = await fetch(`/api/food-data?${params.toString()}`, { signal: controller.signal })
-        if (!res.ok) continue
-        const data = await res.json()
-        results = Array.isArray(data.items) ? data.items : []
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return
-        continue
+      for (const q of uniqueQueries) {
+        try {
+          const params = new URLSearchParams({
+            source: 'auto',
+            q,
+            kind: 'single',
+            limit: '10',
+          })
+          const res = await fetch(`/api/food-data?${params.toString()}`, { signal: controller.signal })
+          if (!res.ok) continue
+          const data = await res.json()
+          const items = Array.isArray(data.items) ? data.items : []
+          if (items.length > 0) {
+            results = items
+            break
+          }
+        } catch (err: any) {
+          if (err?.name === 'AbortError') return
+        }
       }
 
       if (!results.length) continue
@@ -2815,7 +2837,9 @@ export default function FoodDiary() {
         nextItem.customGramsPerServing = candidateGrams
         nextItem.weightUnit = 'g'
         if (currentWeight && currentWeight > 0) {
-          const servings = Math.max(currentWeight / candidateGrams, 0.01)
+          const edibleFactor = getEdibleYieldFactor(query)
+          const effectiveWeight = edibleFactor > 0 ? currentWeight * edibleFactor : currentWeight
+          const servings = Math.max(effectiveWeight / candidateGrams, 0.01)
           nextItem.servings = Math.round(servings * 100) / 100
         }
       }
