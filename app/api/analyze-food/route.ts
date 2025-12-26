@@ -22,7 +22,7 @@ import { consumeRateLimit } from '@/lib/rate-limit';
 import { normalizeDiscreteItems, summarizeDiscreteItemsForLog } from '@/lib/food-normalization';
 
 // Bump this when changing curated nutrition to invalidate old cached images.
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 3;   // stop runaway loops quickly
 const STRICT_AI_ONLY_ITEMS = true;
@@ -944,22 +944,34 @@ const getItemWeightInGrams = (item: any): number | null => {
   return null;
 };
 
-const selectDatabaseCandidate = (query: string, candidates: any[]) => {
+const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: number | null) => {
   if (!Array.isArray(candidates) || candidates.length === 0) return null;
   const queryNorm = normalizeLookupQuery(query);
-  let best: { candidate: any; weight: number; score: number } | null = null;
+  const candidatesWithMetrics: Array<{ candidate: any; weight: number; per100: number; score: number }> = [];
   for (const candidate of candidates) {
     const weight = parseServingWeight(candidate?.serving_size || null);
     if (!weight || weight <= 0 || weight > 5000) continue;
     const calories = Number(candidate?.calories ?? 0);
     if (!Number.isFinite(calories) || calories <= 0) continue;
+    const per100 = (calories / weight) * 100;
+    if (!Number.isFinite(per100) || per100 <= 0) continue;
     const sourceBonus = candidate?.source === 'usda' ? 3 : candidate?.source === 'fatsecret' ? 2 : 1;
     const score = scoreLookupNameMatch(queryNorm, candidate?.name || '') + sourceBonus;
-    if (!best || score > best.score) {
-      best = { candidate, weight, score };
+    candidatesWithMetrics.push({ candidate, weight, per100, score });
+  }
+  if (candidatesWithMetrics.length === 0) return null;
+
+  const aiPer100Safe = Number.isFinite(Number(aiPer100)) ? Number(aiPer100) : null;
+  let pool = candidatesWithMetrics;
+  if (aiPer100Safe && aiPer100Safe > 0) {
+    const lowerOrNear = candidatesWithMetrics.filter((entry) => entry.per100 <= aiPer100Safe * 1.05);
+    if (lowerOrNear.length > 0) {
+      pool = lowerOrNear;
     }
   }
-  return best;
+
+  pool.sort((a, b) => b.score - a.score);
+  return { candidate: pool[0].candidate, weight: pool[0].weight, score: pool[0].score };
 };
 
 // Database-backed calibration for single foods when AI macros look wildly off vs USDA/FatSecret.
@@ -975,6 +987,9 @@ const enrichItemsWithDatabaseIfOutlier = async (
   let checked = 0;
   let changed = false;
   const nextItems = items.map((item) => ({ ...item }));
+
+  const isPreparedFoodName = (name: string) =>
+    /\b(roast|roasted|rotisserie|fried|grilled|baked|bbq|barbecue|smoked|whole|cooked)\b/i.test(name || '');
 
   for (const item of nextItems) {
     if (checked >= MAX_DB_ITEMS) break;
@@ -992,8 +1007,9 @@ const enrichItemsWithDatabaseIfOutlier = async (
 
     let dbResults: any[] = [];
     try {
+      const preferSource = isPreparedFoodName(query) ? 'fatsecret' : 'usda';
       dbResults = await lookupFoodNutrition(query, {
-        preferSource: 'usda',
+        preferSource,
         maxResults: 3,
         usdaDataType: 'generic',
       });
@@ -1002,14 +1018,14 @@ const enrichItemsWithDatabaseIfOutlier = async (
       continue;
     }
 
-    const selected = selectDatabaseCandidate(query, dbResults);
+    const aiPer100 = (calories / weight) * 100;
+    const selected = selectDatabaseCandidate(query, dbResults, aiPer100);
     if (!selected) continue;
 
     const { candidate, weight: candidateWeight } = selected;
     const candidateCalories = Number(candidate?.calories ?? 0);
     if (!Number.isFinite(candidateCalories) || candidateCalories <= 0) continue;
 
-    const aiPer100 = (calories / weight) * 100;
     const dbPer100 = (candidateCalories / candidateWeight) * 100;
     if (!Number.isFinite(aiPer100) || !Number.isFinite(dbPer100) || dbPer100 <= 0) continue;
 
