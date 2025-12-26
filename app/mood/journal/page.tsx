@@ -169,10 +169,25 @@ export default function MoodJournalPage() {
     }
   }, [])
 
-  const handleCommand = (command: string) => {
+  const ensureEditorSelection = () => {
     const el = editorRef.current
     if (!el) return
     el.focus()
+    const sel = window.getSelection()
+    if (!sel) return
+    if (sel.rangeCount === 0 || !el.contains(sel.anchorNode)) {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      range.collapse(false)
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  }
+
+  const handleCommand = (command: string) => {
+    const el = editorRef.current
+    if (!el) return
+    ensureEditorSelection()
     document.execCommand(command)
     setContentHtml(el.innerHTML)
   }
@@ -180,7 +195,7 @@ export default function MoodJournalPage() {
   const insertHtml = (html: string) => {
     const el = editorRef.current
     if (!el) return
-    el.focus()
+    ensureEditorSelection()
     const ok = document.execCommand('insertHTML', false, html)
     if (!ok) {
       el.innerHTML = `${el.innerHTML}${html}`
@@ -196,6 +211,7 @@ export default function MoodJournalPage() {
   const clearEditor = () => {
     setContentHtml('')
     if (editorRef.current) editorRef.current.innerHTML = ''
+    ensureEditorSelection()
   }
 
   const applyTemplate = (template: typeof TEMPLATES[number]) => {
@@ -485,6 +501,7 @@ export default function MoodJournalPage() {
               <button
                 key={btn.cmd}
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleCommand(btn.cmd)}
                 className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
               >
@@ -526,6 +543,7 @@ export default function MoodJournalPage() {
                 <button
                   key={prompt}
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applyPrompt(prompt)}
                   className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                     selectedPrompt === prompt
@@ -546,6 +564,7 @@ export default function MoodJournalPage() {
                 <button
                   key={template.name}
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applyTemplate(template)}
                   className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                     selectedTemplate === template.name
@@ -559,6 +578,7 @@ export default function MoodJournalPage() {
               {selectedTemplate && (
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={clearTemplate}
                   className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600"
                 >
@@ -618,6 +638,22 @@ export default function MoodJournalPage() {
               contentEditable
               suppressContentEditableWarning
               onInput={() => setContentHtml(editorRef.current?.innerHTML || '')}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return
+                const sel = window.getSelection()
+                let node = sel?.anchorNode as HTMLElement | null
+                while (node && node !== editorRef.current) {
+                  if (node.nodeName === 'LI') return
+                  node = node.parentElement
+                }
+                ensureEditorSelection()
+                const ok = document.execCommand('insertLineBreak')
+                if (!ok) {
+                  document.execCommand('insertHTML', false, '<br><br>')
+                }
+                setContentHtml(editorRef.current?.innerHTML || '')
+                e.preventDefault()
+              }}
               className="min-h-[140px] text-sm text-gray-900 dark:text-gray-100 focus:outline-none break-words whitespace-pre-wrap max-w-full"
             />
           </div>
