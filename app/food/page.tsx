@@ -2724,6 +2724,17 @@ export default function FoodDiary() {
       option?.grams && Number.isFinite(Number(option.grams)) ? Number(option.grams) : null
     const optionMl = option?.ml && Number.isFinite(Number(option.ml)) ? Number(option.ml) : null
     const optionWeight = optionGrams ?? optionMl
+    const optionLabel = String(option?.serving_size || option?.label || '').trim()
+    const optionMeta = optionLabel ? parseServingUnitMetadata(optionLabel) : null
+    const optionIsDiscrete =
+      optionMeta && isDiscreteUnitLabel(optionMeta.unitLabel) ? true : false
+    const optionPieces = optionIsDiscrete && optionMeta?.quantity && optionMeta.quantity > 0 ? optionMeta.quantity : 1
+    const piecesPerServing =
+      Number.isFinite(Number(item?.piecesPerServing)) && Number(item.piecesPerServing) > 0
+        ? Number(item.piecesPerServing)
+        : 1
+    const pieceScale =
+      optionIsDiscrete && piecesPerServing > 1 ? Math.max(piecesPerServing / optionPieces, 1) : 1
     next.serving_size = option?.serving_size || option?.label || next.serving_size
     if (option?.calories != null) next.calories = option.calories
     if (option?.protein_g != null) next.protein_g = option.protein_g
@@ -2758,12 +2769,27 @@ export default function FoodDiary() {
         next.sugar_g = scale(item.sugar_g, 1)
       }
     }
+    if (pieceScale > 1) {
+      const scaleMacro = (value: any, decimals: number, isCalories = false) => {
+        if (!Number.isFinite(Number(value))) return null
+        const num = Number(value) * pieceScale
+        if (isCalories) return Math.round(num)
+        const factor = Math.pow(10, decimals)
+        return Math.round(num * factor) / factor
+      }
+      if (Number.isFinite(Number(next.calories))) next.calories = scaleMacro(next.calories, 0, true)
+      if (Number.isFinite(Number(next.protein_g))) next.protein_g = scaleMacro(next.protein_g, 1)
+      if (Number.isFinite(Number(next.carbs_g))) next.carbs_g = scaleMacro(next.carbs_g, 1)
+      if (Number.isFinite(Number(next.fat_g))) next.fat_g = scaleMacro(next.fat_g, 1)
+      if (Number.isFinite(Number(next.fiber_g))) next.fiber_g = scaleMacro(next.fiber_g, 1)
+      if (Number.isFinite(Number(next.sugar_g))) next.sugar_g = scaleMacro(next.sugar_g, 1)
+    }
     if (optionGrams) {
-      next.customGramsPerServing = optionGrams
+      next.customGramsPerServing = pieceScale > 1 ? optionGrams * pieceScale : optionGrams
       next.customMlPerServing = null
       next.weightUnit = 'g'
     } else if (optionMl) {
-      next.customMlPerServing = optionMl
+      next.customMlPerServing = pieceScale > 1 ? optionMl * pieceScale : optionMl
       next.customGramsPerServing = null
       next.weightUnit = 'ml'
     }
@@ -2893,6 +2919,25 @@ export default function FoodDiary() {
 
       if (options.length > 0) {
         nextItem.servingOptions = options
+        const isDiscreteItem =
+          (Number.isFinite(Number(nextItem?.piecesPerServing)) && Number(nextItem.piecesPerServing) > 1) ||
+          (Number.isFinite(Number(nextItem?.pieces)) && Number(nextItem.pieces) > 1) ||
+          isDiscreteUnitLabel(
+            `${String(nextItem?.name || '')} ${String(nextItem?.serving_size || '')}`.toLowerCase(),
+          )
+        const discreteOptions = isDiscreteItem
+          ? options.filter((opt: any) => {
+              const meta = parseServingUnitMetadata(String(opt?.label || opt?.serving_size || ''))
+              return meta && isDiscreteUnitLabel(meta.unitLabel)
+            })
+          : []
+        const singleDiscrete =
+          discreteOptions.length > 0
+            ? discreteOptions.find((opt: any) => {
+                const meta = parseServingUnitMetadata(String(opt?.label || opt?.serving_size || ''))
+                return meta && Number(meta.quantity || 0) <= 1
+              })
+            : null
         const queryHasWhole = query.includes('whole')
         const wholeMatch = queryHasWhole
           ? options.find((opt: any) => /\bwhole\b/i.test(opt?.label || opt?.serving_size || ''))
@@ -2900,7 +2945,7 @@ export default function FoodDiary() {
         const match = options.find((opt: any) =>
           (opt.serving_size || opt.label || '').toLowerCase().includes(String(best.serving_size || '').toLowerCase()),
         )
-        let selected = wholeMatch || match || null
+        let selected = singleDiscrete || (discreteOptions.length > 0 ? discreteOptions[0] : null) || wholeMatch || match || null
         if (!selected && currentWeight && Number.isFinite(Number(currentWeight))) {
           const withGrams = options.filter((opt: any) => Number.isFinite(Number(opt?.grams)) && Number(opt?.grams) > 0)
           if (withGrams.length > 0) {
