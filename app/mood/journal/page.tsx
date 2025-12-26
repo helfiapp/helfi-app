@@ -193,9 +193,19 @@ export default function MoodJournalPage() {
     insertHtml(`<p><strong>${prompt}</strong></p><p><br></p>`)
   }
 
+  const clearEditor = () => {
+    setContentHtml('')
+    if (editorRef.current) editorRef.current.innerHTML = ''
+  }
+
   const applyTemplate = (template: typeof TEMPLATES[number]) => {
     setSelectedTemplate(template.name)
     insertHtml(template.body)
+  }
+
+  const clearTemplate = () => {
+    setSelectedTemplate('')
+    clearEditor()
   }
 
   const handleImagePick = () => {
@@ -546,6 +556,15 @@ export default function MoodJournalPage() {
                   {template.name}
                 </button>
               ))}
+              {selectedTemplate && (
+                <button
+                  type="button"
+                  onClick={clearTemplate}
+                  className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600"
+                >
+                  Clear template
+                </button>
+              )}
             </div>
           </div>
 
