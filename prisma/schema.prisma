@@ -706,6 +706,19 @@ enum AdminRole {
   MODERATOR
 }
 
+model AdminQrLogin {
+  token     String   @id
+  status    String
+  adminId   String?
+  email     String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  approvedAt DateTime?
+
+  @@index([status])
+  @@index([expiresAt])
+}
+
 model EmailTemplate {
   id        String        @id @default(cuid())
   name      String // Display name (e.g., "Welcome New Users")

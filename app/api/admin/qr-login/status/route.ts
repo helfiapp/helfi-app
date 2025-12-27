@@ -4,23 +4,11 @@ import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'helfi-admin-secret-2024'
 
-async function ensureAdminQrLoginTable() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "AdminQrLogin" (
-      token TEXT PRIMARY KEY,
-      status TEXT NOT NULL,
-      adminId TEXT,
-      email TEXT,
-      expiresAt BIGINT NOT NULL,
-      createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
-      approvedAt TIMESTAMP
-    )
-  `)
-}
-
 async function cleanupExpired() {
-  const now = Date.now()
-  await prisma.$executeRawUnsafe(`DELETE FROM "AdminQrLogin" WHERE "expiresAt" < $1`, now)
+  const now = new Date()
+  await prisma.adminQrLogin.deleteMany({
+    where: { expiresAt: { lt: now } }
+  })
 }
 
 export async function GET(request: NextRequest) {
@@ -31,27 +19,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Token required' }, { status: 400 })
     }
 
-    await ensureAdminQrLoginTable()
     await cleanupExpired()
 
-    const rows: Array<{ status: string; adminId: string | null; email: string | null; expiresAt: any }> =
-      await prisma.$queryRawUnsafe(
-        `SELECT status, adminId, email, expiresAt FROM "AdminQrLogin" WHERE token = $1`,
-        token
-      )
+    const entry = await prisma.adminQrLogin.findUnique({
+      where: { token }
+    })
 
-    if (!rows.length) {
+    if (!entry) {
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 404 })
     }
 
-    const entry = rows[0]
-    const expiresAtMs =
-      typeof (entry as any).expiresAt === 'bigint'
-        ? Number((entry as any).expiresAt)
-        : Number((entry as any).expiresAt)
-
-    if (Number.isNaN(expiresAtMs) || expiresAtMs < Date.now()) {
-      await prisma.$executeRawUnsafe(`DELETE FROM "AdminQrLogin" WHERE token = $1`, token)
+    if (!entry.expiresAt || entry.expiresAt.getTime() < Date.now()) {
+      await prisma.adminQrLogin.delete({ where: { token } })
       return NextResponse.json({ error: 'Token expired' }, { status: 410 })
     }
 
@@ -85,7 +64,7 @@ export async function GET(request: NextRequest) {
       { expiresIn: '24h' }
     )
 
-    await prisma.$executeRawUnsafe(`DELETE FROM "AdminQrLogin" WHERE token = $1`, token)
+    await prisma.adminQrLogin.delete({ where: { token } })
 
     return NextResponse.json({
       status: 'APPROVED',
