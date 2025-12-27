@@ -264,29 +264,6 @@ export default function SplashPage() {
               lab reports, and medical images—all in one intelligent platform.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              {status === 'authenticated' ? (
-                <Link
-                  href="/dashboard"
-                  className="btn-primary text-lg px-8 py-4 bg-helfi-green hover:bg-green-600 text-white text-center"
-                >
-                  Go to Dashboard
-                </Link>
-              ) : (
-                <>
-                  <Link
-                    href={signupHref}
-                    className="btn-primary text-lg px-8 py-4 bg-helfi-green hover:bg-green-600 text-white text-center"
-                  >
-                    Create account
-                  </Link>
-                  <Link
-                    href={loginHref}
-                    className="btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white/20 text-center"
-                  >
-                    Log in
-                  </Link>
-                </>
-              )}
               <button 
                 onClick={() => setShowDemoModal(true)}
                 className="btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white/20"
