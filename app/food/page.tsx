@@ -936,6 +936,13 @@ const piecesMultiplierForServing = (item: any) => {
   return declaredQty <= 1 ? pieces : 1
 }
 
+// Macro totals should reflect combined pieces when the serving label doesn't already
+// describe the full multi-piece portion.
+const macroMultiplierForItem = (item: any) => {
+  const multiplier = piecesMultiplierForServing(item)
+  return Number.isFinite(multiplier) && multiplier > 1 ? multiplier : 1
+}
+
 const normalizeDiscreteItem = (item: any) => {
   const normalizedName = replaceWordNumbers(String(item?.name || ''))
   const normalizedServingSize = stripNutritionFromServingSize(
@@ -1452,12 +1459,13 @@ const removeItemsByIndex = (
     const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 }
     nextItems.forEach((it: any) => {
       const servings = it?.servings && Number.isFinite(it.servings) ? Number(it.servings) : 1
-      totals.calories += (Number(it?.calories) || 0) * servings
-      totals.protein += (Number(it?.protein_g) || 0) * servings
-      totals.carbs += (Number(it?.carbs_g) || 0) * servings
-      totals.fat += (Number(it?.fat_g) || 0) * servings
-      totals.fiber += (Number(it?.fiber_g) || 0) * servings
-      totals.sugar += (Number(it?.sugar_g) || 0) * servings
+      const multiplier = macroMultiplierForItem(it)
+      totals.calories += (Number(it?.calories) || 0) * servings * multiplier
+      totals.protein += (Number(it?.protein_g) || 0) * servings * multiplier
+      totals.carbs += (Number(it?.carbs_g) || 0) * servings * multiplier
+      totals.fat += (Number(it?.fat_g) || 0) * servings * multiplier
+      totals.fiber += (Number(it?.fiber_g) || 0) * servings * multiplier
+      totals.sugar += (Number(it?.sugar_g) || 0) * servings * multiplier
     })
     const updatedNutrition = {
       calories: Math.round(totals.calories),
@@ -5972,12 +5980,13 @@ const applyStructuredItems = (
 
     items.forEach((item: any) => {
       const servings = effectiveServings(item)
-      totals.calories += (item.calories || 0) * servings
-      totals.protein += (item.protein_g || 0) * servings
-      totals.carbs += (item.carbs_g || 0) * servings
-      totals.fat += (item.fat_g || 0) * servings
-      totals.fiber += (item.fiber_g || 0) * servings
-      totals.sugar += (item.sugar_g || 0) * servings
+      const multiplier = macroMultiplierForItem(item)
+      totals.calories += (item.calories || 0) * servings * multiplier
+      totals.protein += (item.protein_g || 0) * servings * multiplier
+      totals.carbs += (item.carbs_g || 0) * servings * multiplier
+      totals.fat += (item.fat_g || 0) * servings * multiplier
+      totals.fiber += (item.fiber_g || 0) * servings * multiplier
+      totals.sugar += (item.sugar_g || 0) * servings * multiplier
     })
 
     const round = (value: number, decimals = 1) => {
@@ -9973,12 +9982,13 @@ Please add nutritional information manually if needed.`);
       mergedTotals = mergedItems.reduce(
         (acc: any, it: any) => {
           const servings = Number.isFinite(Number(it?.servings)) ? Number(it.servings) : 1
-          acc.calories += Number(it?.calories || 0) * servings
-          acc.protein += Number(it?.protein_g || 0) * servings
-          acc.carbs += Number(it?.carbs_g || 0) * servings
-          acc.fat += Number(it?.fat_g || 0) * servings
-          acc.fiber += Number(it?.fiber_g || 0) * servings
-          acc.sugar += Number(it?.sugar_g || 0) * servings
+          const multiplier = macroMultiplierForItem(it)
+          acc.calories += Number(it?.calories || 0) * servings * multiplier
+          acc.protein += Number(it?.protein_g || 0) * servings * multiplier
+          acc.carbs += Number(it?.carbs_g || 0) * servings * multiplier
+          acc.fat += Number(it?.fat_g || 0) * servings * multiplier
+          acc.fiber += Number(it?.fiber_g || 0) * servings * multiplier
+          acc.sugar += Number(it?.sugar_g || 0) * servings * multiplier
           return acc
         },
         { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
@@ -12369,12 +12379,13 @@ Please add nutritional information manually if needed.`);
                       </div>
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
-                        const totalCalories = Math.round((item.calories || 0) * servingsCount)
-                        const totalProtein = Math.round(((item.protein_g || 0) * servingsCount) * 10) / 10
-                        const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount) * 10) / 10
-                        const totalFat = Math.round(((item.fat_g || 0) * servingsCount) * 10) / 10
-                        const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount) * 10) / 10
-                        const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount) * 10) / 10
+                        const macroMultiplier = macroMultiplierForItem(item)
+                        const totalCalories = Math.round((item.calories || 0) * servingsCount * macroMultiplier)
+                        const totalProtein = Math.round(((item.protein_g || 0) * servingsCount * macroMultiplier) * 10) / 10
+                        const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount * macroMultiplier) * 10) / 10
+                        const totalFat = Math.round(((item.fat_g || 0) * servingsCount * macroMultiplier) * 10) / 10
+                        const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount * macroMultiplier) * 10) / 10
+                        const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount * macroMultiplier) * 10) / 10
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         const baseWeightPerServing = getBaseWeightPerServing(item)
                         
