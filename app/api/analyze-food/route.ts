@@ -106,11 +106,20 @@ const runGeminiVisionCompletion = async (opts: {
   imageDataUrl: string;
   maxOutputTokens: number;
   temperature?: number;
+  responseMimeType?: string;
 }) => {
-  const { apiKey, model, promptText, imageDataUrl, maxOutputTokens, temperature } = opts;
+  const { apiKey, model, promptText, imageDataUrl, maxOutputTokens, temperature, responseMimeType } = opts;
   const inlineData = parseInlineImageData(imageDataUrl);
   if (!inlineData) {
     throw new Error('Invalid image data for Gemini');
+  }
+
+  const generationConfig: Record<string, any> = {
+    temperature: typeof temperature === 'number' ? temperature : 0,
+    maxOutputTokens,
+  };
+  if (responseMimeType) {
+    generationConfig.responseMimeType = responseMimeType;
   }
 
   const body = {
@@ -128,10 +137,7 @@ const runGeminiVisionCompletion = async (opts: {
         ],
       },
     ],
-    generationConfig: {
-      temperature: typeof temperature === 'number' ? temperature : 0,
-      maxOutputTokens,
-    },
+    generationConfig,
   };
 
   const response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`, {
@@ -2520,6 +2526,7 @@ CRITICAL REQUIREMENTS:
         imageDataUrl: imageDataUrl as string,
         maxOutputTokens,
         temperature: typeof params.temperature === 'number' ? params.temperature : 0,
+        responseMimeType: params.responseMimeType,
       });
     };
 
@@ -2985,6 +2992,7 @@ CRITICAL REQUIREMENTS:
               messages: componentBoundMessages,
               max_tokens: 420,
               temperature: 0,
+              responseMimeType: 'application/json',
             } as any);
           } else {
             try {
@@ -3119,6 +3127,7 @@ CRITICAL REQUIREMENTS:
                 messages: followUpMessages,
                 max_tokens: 360,
                 temperature: 0,
+                responseMimeType: 'application/json',
               } as any)
             : await chatCompletionWithCost(openai, {
                 model: followUpModel,
@@ -3207,6 +3216,7 @@ CRITICAL REQUIREMENTS:
               ],
               max_tokens: 420,
               temperature: 0,
+              responseMimeType: 'application/json',
             } as any)
           : await chatCompletionWithCost(openai, {
               model: 'gpt-4o',
