@@ -2058,9 +2058,6 @@ export default function FoodDiary() {
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
-  const [foodAnalyzerModel, setFoodAnalyzerModel] = useState<'gpt-4o' | 'gpt-5.2'>('gpt-4o')
-  const [foodAnalyzerModelLoading, setFoodAnalyzerModelLoading] = useState(false)
-  const [foodAnalyzerModelError, setFoodAnalyzerModelError] = useState<string | null>(null)
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
@@ -2596,52 +2593,6 @@ export default function FoodDiary() {
       await loadExerciseEntriesForDate(selectedDate, { silent: true })
     } catch (err: any) {
       setExerciseSaveError(err?.message || 'Failed to save exercise')
-    }
-  }
-
-  // User-selectable Food Analyzer model (used for pricing/accuracy comparisons)
-  useEffect(() => {
-    let cancelled = false
-    const loadModel = async () => {
-      setFoodAnalyzerModelLoading(true)
-      setFoodAnalyzerModelError(null)
-      try {
-        const res = await fetch('/api/food-analyzer-model', { method: 'GET' })
-        if (!res.ok) return
-        const data = await res.json().catch(() => ({}))
-        const model = data?.model === 'gpt-5.2' ? 'gpt-5.2' : 'gpt-4o'
-        if (!cancelled) setFoodAnalyzerModel(model)
-      } catch (err: any) {
-        if (!cancelled) setFoodAnalyzerModelError(err?.message || 'Failed to load model')
-      } finally {
-        if (!cancelled) setFoodAnalyzerModelLoading(false)
-      }
-    }
-    loadModel()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const updateFoodAnalyzerModel = async (model: 'gpt-4o' | 'gpt-5.2') => {
-    setFoodAnalyzerModelLoading(true)
-    setFoodAnalyzerModelError(null)
-    try {
-      const res = await fetch('/api/food-analyzer-model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setFoodAnalyzerModelError(data?.error || 'Failed to save model')
-        return
-      }
-      setFoodAnalyzerModel(model)
-    } catch (err: any) {
-      setFoodAnalyzerModelError(err?.message || 'Failed to save model')
-    } finally {
-      setFoodAnalyzerModelLoading(false)
     }
   }
 
@@ -11455,37 +11406,6 @@ Please add nutritional information manually if needed.`);
             <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
             <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
             <p className="text-xs text-gray-600 mt-1">Cost: 15 credits per food analysis.</p>
-            <div className="mt-2 flex items-center justify-between gap-2 text-xs text-gray-600">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-700">Model</span>
-                <span className="text-gray-500">({foodAnalyzerModel === 'gpt-5.2' ? 'Higher accuracy' : 'Standard'})</span>
-              </div>
-              <div className="inline-flex rounded-md border border-gray-200 overflow-hidden bg-white">
-                <button
-                  type="button"
-                  disabled={foodAnalyzerModelLoading}
-                  onClick={() => updateFoodAnalyzerModel('gpt-4o')}
-                  className={`px-3 py-1 text-xs font-semibold ${
-                    foodAnalyzerModel === 'gpt-4o' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-                  } disabled:opacity-60`}
-                >
-                  4o
-                </button>
-                <button
-                  type="button"
-                  disabled={foodAnalyzerModelLoading}
-                  onClick={() => updateFoodAnalyzerModel('gpt-5.2')}
-                  className={`px-3 py-1 text-xs font-semibold ${
-                    foodAnalyzerModel === 'gpt-5.2' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-                  } disabled:opacity-60`}
-                >
-                  5.2
-                </button>
-              </div>
-            </div>
-            {foodAnalyzerModelError && (
-              <div className="mt-2 text-xs text-red-600">{foodAnalyzerModelError}</div>
-            )}
           </div>
 
           {/* Category picker first */}

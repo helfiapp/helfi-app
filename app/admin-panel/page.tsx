@@ -41,12 +41,6 @@ export default function AdminPanel() {
   const [foodBenchmarkLoading, setFoodBenchmarkLoading] = useState(false)
   const [foodBenchmarkError, setFoodBenchmarkError] = useState('')
 
-  // Food analyzer model toggle (per-user override)
-  const [foodModelUserEmail, setFoodModelUserEmail] = useState('')
-  const [foodModelInfo, setFoodModelInfo] = useState<any>(null)
-  const [foodModelLoading, setFoodModelLoading] = useState(false)
-  const [foodModelError, setFoodModelError] = useState('')
-  
   // Additional admin data states
   const [waitlistData, setWaitlistData] = useState<any[]>([])
   const [partnerOutreachData, setPartnerOutreachData] = useState<any[]>([])
@@ -367,67 +361,6 @@ export default function AdminPanel() {
       setFoodBenchmarkError(err?.message || 'Benchmark failed')
     } finally {
       setFoodBenchmarkLoading(false)
-    }
-  }
-
-  const loadFoodAnalyzerModel = async (email?: string) => {
-    const userEmail = (email !== undefined ? email : foodModelUserEmail).trim()
-    setFoodModelUserEmail(userEmail)
-    setFoodModelLoading(true)
-    setFoodModelError('')
-    setFoodModelInfo(null)
-    try {
-      if (!userEmail) {
-        setFoodModelError('Enter a user email first')
-        return
-      }
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
-      const params = new URLSearchParams()
-      params.set('userEmail', userEmail)
-      const res = await fetch(`/api/admin/food-analyzer-model?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setFoodModelError(data?.error || 'Failed to load model')
-        return
-      }
-      setFoodModelInfo(data)
-    } catch (err: any) {
-      setFoodModelError(err?.message || 'Failed to load model')
-    } finally {
-      setFoodModelLoading(false)
-    }
-  }
-
-  const setFoodAnalyzerModel = async (model: string) => {
-    const userEmail = foodModelUserEmail.trim()
-    setFoodModelLoading(true)
-    setFoodModelError('')
-    try {
-      if (!userEmail) {
-        setFoodModelError('Enter a user email first')
-        return
-      }
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
-      const res = await fetch('/api/admin/food-analyzer-model', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userEmail, model }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setFoodModelError(data?.error || 'Failed to set model')
-        return
-      }
-      setFoodModelInfo(data)
-    } catch (err: any) {
-      setFoodModelError(err?.message || 'Failed to set model')
-    } finally {
-      setFoodModelLoading(false)
     }
   }
 
@@ -2662,99 +2595,6 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 </details>
               </>
             )}
-
-            <div className="bg-white rounded-lg shadow p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Food Analyzer Model Toggle</h3>
-                  <p className="text-sm text-gray-600">Sets a per-user override for `/api/analyze-food` so you can test GPT‑5.2 safely.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2">
-                  <label className="block text-sm text-gray-600 mb-1">Target user email</label>
-                  <input
-                    value={foodModelUserEmail}
-                    onChange={(e) => setFoodModelUserEmail(e.target.value)}
-                    onBlur={() => {
-                      if (foodModelUserEmail.trim()) loadFoodAnalyzerModel(foodModelUserEmail)
-                    }}
-                    placeholder="you@domain.com"
-                    className="w-full border-gray-300 rounded-lg text-sm px-3 py-2"
-                  />
-                  <div className="text-xs text-gray-500 mt-1">This does not affect other users.</div>
-                </div>
-
-                <div className="flex items-end gap-2">
-                  <button
-                    onClick={() => loadFoodAnalyzerModel(foodModelUserEmail)}
-                    disabled={foodModelLoading}
-                    className="px-3 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {foodModelLoading ? 'Loading…' : 'Load'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setFoodModelInfo(null)
-                      setFoodModelError('')
-                    }}
-                    className="px-3 py-2 bg-gray-100 text-gray-800 rounded-md text-sm hover:bg-gray-200"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              {foodModelError && (
-                <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm">
-                  {foodModelError}
-                </div>
-              )}
-
-              {foodModelInfo && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                      <div className="text-xs text-gray-500">Default (server)</div>
-                      <div className="text-lg font-semibold text-gray-900">{foodModelInfo.defaultModel}</div>
-                    </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                      <div className="text-xs text-gray-500">Override</div>
-                      <div className="text-lg font-semibold text-gray-900">{foodModelInfo.overrideModel || 'none'}</div>
-                    </div>
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-                      <div className="text-xs text-emerald-700">Effective</div>
-                      <div className="text-lg font-semibold text-emerald-900">{foodModelInfo.effectiveModel}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={() => setFoodAnalyzerModel('default')}
-                      disabled={foodModelLoading}
-                      className="px-3 py-2 bg-gray-100 text-gray-800 rounded-md text-sm hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Use default
-                    </button>
-                    <button
-                      onClick={() => setFoodAnalyzerModel('gpt-4o')}
-                      disabled={foodModelLoading}
-                      className="px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Force gpt-4o
-                    </button>
-                    <button
-                      onClick={() => setFoodAnalyzerModel('gpt-5.2')}
-                      disabled={foodModelLoading}
-                      className="px-3 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Force gpt-5.2
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
 
             <div className="bg-white rounded-lg shadow p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
