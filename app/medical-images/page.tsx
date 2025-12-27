@@ -281,11 +281,12 @@ export default function MedicalImagesPage() {
       <PageHeader title="Medical Image Analyzer" />
 
       {/* Tabs */}
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      <div className="max-w-7xl mx-auto w-full px-4 pt-4">
         <div className="bg-white rounded-t-xl border-b border-gray-200">
           <div className="flex">
             <Link
               href="/medical-images"
+              style={{ width: '100%' }}
               className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
                 pathname !== '/medical-images/history'
                   ? 'text-helfi-green border-b-2 border-helfi-green'
@@ -296,6 +297,7 @@ export default function MedicalImagesPage() {
             </Link>
             <Link
               href="/medical-images/history"
+              style={{ width: '100%' }}
               className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
                 pathname === '/medical-images/history'
                   ? 'text-helfi-green border-b-2 border-helfi-green'
