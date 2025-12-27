@@ -827,7 +827,7 @@ const inferPiecesFromAnalysisForItem = (analysisText: string | null | undefined,
   const label = `${String(item?.name || '')} ${String(item?.serving_size || '')}`.toLowerCase()
   if (!label.trim() || !isDiscreteUnitLabel(label)) return null
 
-  const text = replaceWordNumbers(String(analysisText).toLowerCase())
+  const text = replaceWordNumbers(String(analysisText).toLowerCase()).replace(/\b(a|an)\b/g, '1')
   const rules = [
     {
       keywords: ['egg', 'eggs'],
@@ -907,6 +907,43 @@ const inferPiecesFromAnalysisForItem = (analysisText: string | null | undefined,
       } else {
         return 1
       }
+    }
+  }
+
+  const normalizeTokens = (value: string) =>
+    value
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/[^a-z\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const stopwords = new Set([
+    'fried','grilled','roasted','baked','steamed','sauteed','sautéed','raw','cooked','whole',
+    'small','medium','large','extra','extra-large','xl','mini','fresh','plain','sliced','slice',
+  ])
+  const nameTokens = normalizeTokens(String(item?.name || ''))
+    .split(' ')
+    .filter((token) => token && !stopwords.has(token))
+  if (!nameTokens.length) return null
+
+  const pluralPhrase = nameTokens.join(' ')
+  const singularLast = singularizeUnitLabel(nameTokens[nameTokens.length - 1])
+  const singularPhrase =
+    nameTokens.length > 1 ? `${nameTokens.slice(0, -1).join(' ')} ${singularLast}`.trim() : singularLast
+  const nounPattern = [pluralPhrase, singularPhrase]
+    .filter((p, idx, arr) => p && arr.indexOf(p) === idx)
+    .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|')
+  if (!nounPattern) return null
+
+  const genericMatch = text.match(
+    new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?((?:[a-z-]+\\s+){0,3})(${nounPattern})\\b`),
+  )
+  if (genericMatch) {
+    const between = genericMatch[2] || ''
+    if (!/\b(g|gram|grams|kg|ml|oz|ounce|ounces|lb|pound|pounds)\b/.test(between)) {
+      const n = parseFloat(genericMatch[1])
+      if (Number.isFinite(n) && n > 0) return n
     }
   }
 
