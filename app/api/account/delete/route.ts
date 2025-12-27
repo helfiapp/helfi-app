@@ -21,15 +21,21 @@ export async function POST(request: NextRequest) {
     const userEmail = session.user.email
     console.log('🗑️ Account deletion requested for:', userEmail)
 
-    // Find user with all related data
+    // IMPORTANT:
+    // Do NOT use `include` here because Prisma will select all scalar User columns by default.
+    // If the DB hasn't been migrated yet for newly added fields (e.g., free credits counters),
+    // selecting the full User row will throw "column does not exist". We only select what we need.
     const user = await prisma.user.findUnique({
       where: { email: userEmail },
-      include: {
-        subscription: true,
-        accounts: true,
-        sessions: true,
-        creditTopUps: true,
-      }
+      select: {
+        id: true,
+        email: true,
+        subscription: {
+          select: {
+            stripeSubscriptionId: true,
+          },
+        },
+      },
     })
 
     if (!user) {
