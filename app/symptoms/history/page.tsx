@@ -91,11 +91,12 @@ export default function SymptomHistoryPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <PageHeader title="Symptom Analysis" />
 
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      <div className="max-w-7xl mx-auto w-full px-4 pt-4">
         <div className="bg-white rounded-t-xl border-b border-gray-200">
           <div className="flex">
             <Link
               href="/symptoms"
+              style={{ width: '100%' }}
               className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
                 pathname !== '/symptoms/history'
                   ? 'text-helfi-green border-b-2 border-helfi-green'
@@ -106,6 +107,7 @@ export default function SymptomHistoryPage() {
             </Link>
             <Link
               href="/symptoms/history"
+              style={{ width: '100%' }}
               className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
                 pathname === '/symptoms/history'
                   ? 'text-helfi-green border-b-2 border-helfi-green'
