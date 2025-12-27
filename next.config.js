@@ -1,6 +1,16 @@
 module.exports = {
   images: {
     domains: ['res.cloudinary.com', 'lh3.googleusercontent.com', 'blob.vercel-storage.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.public.blob.vercel-storage.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.blob.vercel-storage.com',
+      },
+    ],
   },
   // Session preservation during development and deployment
   experimental: {
