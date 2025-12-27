@@ -183,10 +183,15 @@ export async function POST(request: NextRequest) {
     // Delete support tickets
     await bestEffort('supportTicket.deleteMany', () => prisma.supportTicket.deleteMany({ where: { userId: user.id } }))
 
-    // Finally, delete the user (this will cascade delete any remaining relationships)
-    await prisma.user.delete({
-      where: { id: user.id }
+    // Finally, delete the user.
+    // IMPORTANT: Use deleteMany() instead of delete() because delete() returns the deleted User record.
+    // When the DB is behind the Prisma schema (missing columns), returning the full record will throw.
+    const deleted = await prisma.user.deleteMany({
+      where: { id: user.id },
     })
+    if (!deleted?.count) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
 
     console.log('✅ Successfully deleted account and all related data for:', userEmail)
 
