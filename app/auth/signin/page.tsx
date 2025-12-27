@@ -7,12 +7,18 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 
 // Separate component for search params handling with Suspense
-function SearchParamsHandler({ setError, setMessage }: { setError: (error: string) => void, setMessage: (message: string) => void }) {
+function SearchParamsHandler({ setError, setMessage, setIsSignUp }: { setError: (error: string) => void, setMessage: (message: string) => void, setIsSignUp: (value: boolean) => void }) {
   const searchParams = useSearchParams()
 
   useEffect(() => {
     const errorParam = searchParams.get('error')
     const messageParam = searchParams.get('message')
+    const planParam = searchParams.get('plan')
+    
+    // If plan parameter exists, show signup form by default
+    if (planParam) {
+      setIsSignUp(true)
+    }
     
     if (errorParam) {
       switch (errorParam) {
@@ -39,7 +45,7 @@ function SearchParamsHandler({ setError, setMessage }: { setError: (error: strin
           setMessage('Status updated.')
       }
     }
-  }, [searchParams, setError, setMessage])
+  }, [searchParams, setError, setMessage, setIsSignUp])
 
   return null
 }
@@ -364,7 +370,7 @@ export default function SignIn() {
     <>
       {/* Wrap search params handler in Suspense */}
       <Suspense fallback={null}>
-        <SearchParamsHandler setError={setError} setMessage={setMessage} />
+        <SearchParamsHandler setError={setError} setMessage={setMessage} setIsSignUp={setIsSignUp} />
       </Suspense>
       
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 p-4">
