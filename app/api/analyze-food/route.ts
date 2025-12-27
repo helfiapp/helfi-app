@@ -56,7 +56,7 @@ function parseItemsJsonRelaxed(raw: string): any | null {
   }
 }
 
-const GEMINI_VISION_MODEL_DEFAULT = 'gemini-3-pro-image-preview';
+const GEMINI_VISION_MODEL_DEFAULT = 'gemini-2.5-flash';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const extractPromptTextFromMessages = (messages: any[]): string => {
@@ -2428,9 +2428,7 @@ CRITICAL REQUIREMENTS:
     // Default is env-controlled; admin can set a per-user override via __FOOD_ANALYZER_MODEL__.
     // Temperature is set to 0 for maximum consistency between runs on the same meal.
     const envModelRaw = (process.env.OPENAI_FOOD_MODEL || '').trim()
-    const geminiModel = (process.env.GEMINI_FOOD_MODEL || GEMINI_VISION_MODEL_DEFAULT).trim()
-    const useGeminiDefault = Boolean(imageDataUrl) && !packagedMode && !labelScan
-    const defaultModel = imageDataUrl ? (useGeminiDefault ? geminiModel : 'gpt-4o') : (envModelRaw || 'gpt-5.2')
+    const defaultModel = imageDataUrl ? 'gpt-4o' : (envModelRaw || 'gpt-5.2')
     let model = defaultModel
     try {
       const goal = await prisma.healthGoal.findFirst({
@@ -3634,6 +3632,96 @@ CRITICAL REQUIREMENTS:
       resp.total = computeTotalsFromItems(resp.items) || resp.total;
     } else {
       resp.total = chooseCanonicalTotal(resp.items, resp.total);
+    }
+
+    // Consistency repair: if totals are implausibly low for a multi-item meal,
+    // run a stricter vision pass to force realistic per-component macros.
+    if (
+      isImageAnalysis &&
+      !packagedMode &&
+      !labelScan &&
+      resp.items &&
+      Array.isArray(resp.items) &&
+      resp.items.length > 0
+    ) {
+      const totalCalories = Number(resp.total?.calories ?? 0);
+      const componentCount = Math.max(listedComponents.length, resp.items.length);
+      const joinedNames = resp.items
+        .map((item: any) => `${item?.name || ''} ${item?.serving_size || ''}`)
+        .join(' ')
+        .toLowerCase();
+      const hasFriedCue = /\b(fried|battered|breaded|crumbed|wedge|wedges|fries|chips|tartar)\b/i.test(joinedNames);
+      const minTotal =
+        componentCount >= 4
+          ? 350
+          : componentCount >= 3
+          ? 250
+          : componentCount >= 2
+          ? 180
+          : 0;
+      const minTotalWithCue = hasFriedCue ? Math.max(minTotal, 300) : minTotal;
+
+      if (Number.isFinite(totalCalories) && totalCalories > 0 && totalCalories < minTotalWithCue) {
+        try {
+          const repairComponents = normalizeComponentList(
+            listedComponents.length > 0
+              ? listedComponents
+              : resp.items.map((item: any) => String(item?.name || '')).filter(Boolean),
+          );
+          const repairHint =
+            repairComponents.length > 0
+              ? `- Components list (include each as its own item): ${repairComponents.join(', ')}.\n`
+              : '';
+          const repairPrompt =
+            'Return JSON only with this shape:\n' +
+            '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],' +
+            '"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+            repairHint +
+            '- Use the image as the primary source of truth.\n' +
+            '- Do NOT underestimate calories for fried/battered items.\n' +
+            '- Use realistic restaurant portion sizes.\n' +
+            '- Return one item per distinct component.\n';
+          console.warn('⚠️ Analyzer: totals too low; running consistency repair pass.');
+          const repair = await chatCompletionWithCost(openai, {
+            model: 'gpt-4o',
+            response_format: { type: 'json_object' } as any,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: repairPrompt },
+                  { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+                ],
+              },
+            ],
+            max_tokens: 420,
+            temperature: 0,
+          } as any);
+
+          totalCostCents += repair.costCents;
+          const text = repair.completion.choices?.[0]?.message?.content?.trim() || '';
+          const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+          const items = Array.isArray(parsed)
+            ? parsed
+            : Array.isArray((parsed as any)?.items)
+            ? (parsed as any).items
+            : [];
+          const total =
+            !Array.isArray(parsed) && typeof (parsed as any)?.total === 'object'
+              ? (parsed as any).total
+              : null;
+          if (items.length > 0 && !itemsResultIsInvalid(items, componentCount > 1)) {
+            resp.items = sanitizeStructuredItems(items);
+            resp.total = total || computeTotalsFromItems(resp.items) || resp.total;
+            itemsSource = itemsSource === 'none' ? 'consistency_repair' : `${itemsSource}+consistency_repair`;
+            itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+            console.log('✅ Consistency repair produced items:', resp.items.length);
+          }
+        } catch (repairErr) {
+          console.warn('Consistency repair failed (non-fatal):', repairErr);
+        }
+      }
     }
 
     // Packaged mode: skip secondary OpenAI per-serving extraction to keep one API call per analysis.
