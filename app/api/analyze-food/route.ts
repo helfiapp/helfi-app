@@ -33,7 +33,7 @@ const STRICT_AI_ONLY_ITEMS = true;
 // asks to pause billing. Do not toggle it off as a "quick fix" for other bugs.
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
-import { costCentsEstimateFromText } from '@/lib/cost-meter';
+import { costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter';
 import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 import { getImageMetadata } from '@/lib/image-metadata';
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets';
@@ -55,6 +55,112 @@ function parseItemsJsonRelaxed(raw: string): any | null {
     }
   }
 }
+
+const GEMINI_VISION_MODEL_DEFAULT = 'gemini-2.5-flash';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+const extractPromptTextFromMessages = (messages: any[]): string => {
+  if (!Array.isArray(messages)) return '';
+  return messages
+    .map((message) => {
+      const content = (message as any)?.content;
+      if (typeof content === 'string') return content;
+      if (Array.isArray(content)) {
+        return content
+          .map((part: any) => {
+            if (typeof part === 'string') return part;
+            if (typeof part?.text === 'string') return part.text;
+            return '';
+          })
+          .filter(Boolean)
+          .join('\n');
+      }
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+};
+
+const parseInlineImageData = (dataUrl: string | null) => {
+  if (!dataUrl) return null;
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mimeType: match[1], data: match[2] };
+};
+
+const extractGeminiText = (payload: any): string | null => {
+  const parts = payload?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return null;
+  const text = parts
+    .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+    .join('')
+    .trim();
+  return text.length ? text : null;
+};
+
+const runGeminiVisionCompletion = async (opts: {
+  apiKey: string;
+  model: string;
+  promptText: string;
+  imageDataUrl: string;
+  maxOutputTokens: number;
+  temperature?: number;
+}) => {
+  const { apiKey, model, promptText, imageDataUrl, maxOutputTokens, temperature } = opts;
+  const inlineData = parseInlineImageData(imageDataUrl);
+  if (!inlineData) {
+    throw new Error('Invalid image data for Gemini');
+  }
+
+  const body = {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { text: promptText },
+          {
+            inlineData: {
+              data: inlineData.data,
+              mimeType: inlineData.mimeType,
+            },
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: typeof temperature === 'number' ? temperature : 0,
+      maxOutputTokens,
+    },
+  };
+
+  const response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Gemini API error (${response.status}): ${text}`);
+  }
+
+  const payload = await response.json();
+  const text = extractGeminiText(payload);
+  const promptTokens = estimateTokensFromText(promptText);
+  const completionTokens = estimateTokensFromText(text || '');
+  const costCents = costCentsEstimateFromText(model, promptText, (text || '').length);
+
+  return {
+    completion: {
+      choices: [{ message: { content: text || '' } }],
+      model,
+    },
+    costCents,
+    promptTokens,
+    completionTokens,
+  };
+};
 
 const computeTotalsFromItems = (items: any[]): any | null => {
   if (!Array.isArray(items) || items.length === 0) {
@@ -2316,7 +2422,9 @@ CRITICAL REQUIREMENTS:
     // Default is env-controlled; admin can set a per-user override via __FOOD_ANALYZER_MODEL__.
     // Temperature is set to 0 for maximum consistency between runs on the same meal.
     const envModelRaw = (process.env.OPENAI_FOOD_MODEL || '').trim()
-    const defaultModel = imageDataUrl ? 'gpt-4o' : (envModelRaw || 'gpt-5.2')
+    const geminiModel = (process.env.GEMINI_FOOD_MODEL || GEMINI_VISION_MODEL_DEFAULT).trim()
+    const useGeminiDefault = Boolean(imageDataUrl) && !packagedMode && !labelScan
+    const defaultModel = imageDataUrl ? (useGeminiDefault ? geminiModel : 'gpt-4o') : (envModelRaw || 'gpt-5.2')
     let model = defaultModel
     try {
       const goal = await prisma.healthGoal.findFirst({
@@ -2326,13 +2434,17 @@ CRITICAL REQUIREMENTS:
       if (goal?.category) {
         const parsed = JSON.parse(goal.category)
         const override = typeof parsed?.model === 'string' ? parsed.model.trim() : ''
-        if (override === 'gpt-4o' || override === 'gpt-5.2') {
+        const isGeminiOverride =
+          override.startsWith('gemini-') && Boolean(imageDataUrl) && !packagedMode && !labelScan
+        if (isGeminiOverride || override === 'gpt-4o' || override === 'gpt-5.2') {
           model = override
         }
       }
     } catch (e) {
       console.warn('Food analyzer model override lookup failed (non-fatal):', e)
     }
+    const useGeminiVision =
+      Boolean(imageDataUrl) && !packagedMode && !labelScan && model.startsWith('gemini-')
 
     const maxTokens = 600;
 
@@ -2381,15 +2493,39 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    console.log('🤖 Calling OpenAI API with:', {
+    console.log('🤖 Calling food analysis model:', {
+      provider: useGeminiVision ? 'Gemini' : 'OpenAI',
       model,
       messageCount: messages.length,
       hasImageContent: messages[0]?.content && Array.isArray(messages[0].content)
     });
 
-    // Call OpenAI API (metered)
+    const runOpenAICompletion = async (params: any) => chatCompletionWithCost(openai, params);
+
+    const runVisionCompletion = async (params: any) => {
+      if (!useGeminiVision) {
+        return runOpenAICompletion(params);
+      }
+      const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+      if (!apiKey) {
+        console.warn('GEMINI_API_KEY missing; falling back to OpenAI for vision.');
+        return runOpenAICompletion({ ...params, model: 'gpt-4o' });
+      }
+      const promptText = extractPromptTextFromMessages(params.messages || []);
+      const maxOutputTokens = Number(params.max_tokens ?? params.max_completion_tokens ?? maxTokens);
+      return runGeminiVisionCompletion({
+        apiKey,
+        model,
+        promptText,
+        imageDataUrl: imageDataUrl as string,
+        maxOutputTokens,
+        temperature: typeof params.temperature === 'number' ? params.temperature : 0,
+      });
+    };
+
+    // Call food analysis model (metered)
     const runCompletion = async (runModel: string) =>
-      chatCompletionWithCost(openai, {
+      runVisionCompletion({
         model: runModel,
         messages,
         ...(runModel.toLowerCase().includes('gpt-5')
@@ -2452,7 +2588,7 @@ CRITICAL REQUIREMENTS:
       }).catch(() => {});
     }
 
-    console.log('📋 OpenAI Response:', {
+    console.log('📋 Model Response:', {
       hasResponse: !!response,
       hasChoices: !!response.choices,
       choicesLength: response.choices?.length || 0,
@@ -2462,12 +2598,12 @@ CRITICAL REQUIREMENTS:
     let analysis = extractAnalysisText(response);
     let totalCostCents = primary.costCents;
 
-    // Rare but real: OpenAI sometimes returns a completion object with no content.
+    // Rare but real: models sometimes return a completion object with no content.
     // To avoid showing the user a blank "failed" screen, retry once and then fall
     // back to gpt-4o for image analysis if needed.
     if (!analysis) {
       try {
-        console.warn('⚠️ OpenAI returned empty content; retrying once...');
+        console.warn('⚠️ Model returned empty content; retrying once...');
         const retry = await runCompletion(model);
         totalCostCents += retry.costCents;
         response = retry.completion;
@@ -2477,40 +2613,75 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    if (!analysis && imageDataUrl && model !== 'gpt-4o') {
-      try {
-        console.warn('⚠️ Empty content after retry; falling back to gpt-4o for image analysis...');
-        const fallback = await runCompletion('gpt-4o');
-        totalCostCents += fallback.costCents;
-        response = fallback.completion;
-        analysis = extractAnalysisText(response);
-        logAiUsageEvent({
-          feature: 'food:image-analysis-fallback',
-          userId: currentUser.id || null,
-          userLabel: currentUser.email || null,
-          scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
-          model: 'gpt-4o',
-          promptTokens: fallback.promptTokens,
-          completionTokens: fallback.completionTokens,
-          costCents: fallback.costCents,
-          image: {
-            width: imageMeta?.width ?? null,
-            height: imageMeta?.height ?? null,
-            bytes: imageBytes,
-            mime: imageMime,
-          },
-          endpoint: '/api/analyze-food',
-          success: true,
-        }).catch(() => {});
-      } catch (fallbackErr) {
-        console.warn('gpt-4o fallback attempt failed (non-fatal):', fallbackErr);
+    if (!analysis && imageDataUrl) {
+      if (useGeminiVision) {
+        try {
+          console.warn('⚠️ Empty content after retry; falling back to gpt-4o for image analysis...');
+          const fallback = await runOpenAICompletion({
+            model: 'gpt-4o',
+            messages,
+            max_tokens: maxTokens,
+            temperature: 0,
+          } as any);
+          totalCostCents += fallback.costCents;
+          response = fallback.completion;
+          analysis = extractAnalysisText(response);
+          logAiUsageEvent({
+            feature: 'food:image-analysis-fallback',
+            userId: currentUser.id || null,
+            userLabel: currentUser.email || null,
+            scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
+            model: 'gpt-4o',
+            promptTokens: fallback.promptTokens,
+            completionTokens: fallback.completionTokens,
+            costCents: fallback.costCents,
+            image: {
+              width: imageMeta?.width ?? null,
+              height: imageMeta?.height ?? null,
+              bytes: imageBytes,
+              mime: imageMime,
+            },
+            endpoint: '/api/analyze-food',
+            success: true,
+          }).catch(() => {});
+        } catch (fallbackErr) {
+          console.warn('gpt-4o fallback attempt failed (non-fatal):', fallbackErr);
+        }
+      } else if (model !== 'gpt-4o') {
+        try {
+          console.warn('⚠️ Empty content after retry; falling back to gpt-4o for image analysis...');
+          const fallback = await runCompletion('gpt-4o');
+          totalCostCents += fallback.costCents;
+          response = fallback.completion;
+          analysis = extractAnalysisText(response);
+          logAiUsageEvent({
+            feature: 'food:image-analysis-fallback',
+            userId: currentUser.id || null,
+            userLabel: currentUser.email || null,
+            scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
+            model: 'gpt-4o',
+            promptTokens: fallback.promptTokens,
+            completionTokens: fallback.completionTokens,
+            costCents: fallback.costCents,
+            image: {
+              width: imageMeta?.width ?? null,
+              height: imageMeta?.height ?? null,
+              bytes: imageBytes,
+              mime: imageMime,
+            },
+            endpoint: '/api/analyze-food',
+            success: true,
+          }).catch(() => {});
+        } catch (fallbackErr) {
+          console.warn('gpt-4o fallback attempt failed (non-fatal):', fallbackErr);
+        }
       }
     }
 
     if (!analysis) {
-      console.log('❌ No analysis received from OpenAI');
+      console.log('❌ No analysis received from model');
       return NextResponse.json(
-        { error: 'No analysis received from OpenAI' },
+        { error: 'No analysis received from model' },
         { status: 500 }
       );
     }
@@ -2808,26 +2979,35 @@ CRITICAL REQUIREMENTS:
           ];
 
           let componentBound: any = null;
-          try {
-            componentBound = await chatCompletionWithCost(openai, {
-              model: 'gpt-4o',
-              response_format: {
-                type: 'json_schema',
-                json_schema: buildComponentBoundSchema(listedComponents),
-              } as any,
+          if (useGeminiVision) {
+            componentBound = await runVisionCompletion({
+              model,
               messages: componentBoundMessages,
               max_tokens: 420,
               temperature: 0,
             } as any);
-          } catch (schemaErr) {
-            console.warn('Component-bound schema follow-up failed; retrying with json_object.', schemaErr);
-            componentBound = await chatCompletionWithCost(openai, {
-              model: 'gpt-4o',
-              response_format: { type: 'json_object' } as any,
-              messages: componentBoundMessages,
-              max_tokens: 420,
-              temperature: 0,
-            } as any);
+          } else {
+            try {
+              componentBound = await chatCompletionWithCost(openai, {
+                model: 'gpt-4o',
+                response_format: {
+                  type: 'json_schema',
+                  json_schema: buildComponentBoundSchema(listedComponents),
+                } as any,
+                messages: componentBoundMessages,
+                max_tokens: 420,
+                temperature: 0,
+              } as any);
+            } catch (schemaErr) {
+              console.warn('Component-bound schema follow-up failed; retrying with json_object.', schemaErr);
+              componentBound = await chatCompletionWithCost(openai, {
+                model: 'gpt-4o',
+                response_format: { type: 'json_object' } as any,
+                messages: componentBoundMessages,
+                max_tokens: 420,
+                temperature: 0,
+              } as any);
+            }
           }
 
           if (componentBound?.completion) {
@@ -2915,7 +3095,7 @@ CRITICAL REQUIREMENTS:
             : '') +
           '\nAnalysis text:\n' +
           analysisTextForFollowUp;
-        const followUpModel = imageDataUrl ? 'gpt-4o' : 'gpt-4o-mini';
+        const followUpModel = imageDataUrl ? (useGeminiVision ? model : 'gpt-4o') : 'gpt-4o-mini';
         const followUpMessages = imageDataUrl
           ? [
               {
@@ -2932,13 +3112,21 @@ CRITICAL REQUIREMENTS:
                 content: followUpPrompt,
               },
             ];
-        const followUp = await chatCompletionWithCost(openai, {
-          model: followUpModel,
-          response_format: { type: 'json_object' } as any,
-          messages: followUpMessages,
-          max_tokens: 360,
-          temperature: 0,
-        } as any);
+        const followUp =
+          imageDataUrl && useGeminiVision
+            ? await runVisionCompletion({
+                model: followUpModel,
+                messages: followUpMessages,
+                max_tokens: 360,
+                temperature: 0,
+              } as any)
+            : await chatCompletionWithCost(openai, {
+                model: followUpModel,
+                response_format: { type: 'json_object' } as any,
+                messages: followUpMessages,
+                max_tokens: 360,
+                temperature: 0,
+              } as any);
 
         totalCostCents += followUp.costCents;
         const text = followUp.completion.choices?.[0]?.message?.content?.trim() || '';
@@ -3005,21 +3193,36 @@ CRITICAL REQUIREMENTS:
           '\nAnalysis text:\n' +
           analysisTextForFollowUp;
         console.warn('⚠️ Analyzer: forcing structured image follow-up (items missing).');
-        const forcedFollowUp = await chatCompletionWithCost(openai, {
-          model: 'gpt-4o',
-          response_format: { type: 'json_object' } as any,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: forcedPrompt },
-                { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+        const forcedFollowUp = useGeminiVision
+          ? await runVisionCompletion({
+              model,
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: forcedPrompt },
+                    { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+                  ],
+                },
               ],
-            },
-          ],
-          max_tokens: 420,
-          temperature: 0,
-        } as any);
+              max_tokens: 420,
+              temperature: 0,
+            } as any)
+          : await chatCompletionWithCost(openai, {
+              model: 'gpt-4o',
+              response_format: { type: 'json_object' } as any,
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: forcedPrompt },
+                    { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+                  ],
+                },
+              ],
+              max_tokens: 420,
+              temperature: 0,
+            } as any);
 
         totalCostCents += forcedFollowUp.costCents;
         const text = forcedFollowUp.completion.choices?.[0]?.message?.content?.trim() || '';
@@ -3659,7 +3862,7 @@ CRITICAL REQUIREMENTS:
     return NextResponse.json(resp);
 
   } catch (error) {
-    console.error('💥 OpenAI API Error:', error);
+    console.error('💥 AI API Error:', error);
     
     // Handle specific OpenAI errors
     if (error instanceof Error) {
