@@ -402,11 +402,6 @@ export default function BillingPage() {
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-6 py-8 pb-8">
-        {/* Test mode note */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-900">
-          Stripe Sandbox is enabled for testing. Use test card 4242 4242 4242 4242, any future expiry, any CVC and ZIP.
-        </div>
-
         {/* Current Subscription */}
         {hasActiveSubscription && subscription && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8 border-2 border-green-500">
