@@ -49,6 +49,9 @@ export default function MedicalImagesPage() {
   const [historyLoading, setHistoryLoading] = useState<boolean>(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [historySaveError, setHistorySaveError] = useState<string | null>(null)
+  const [currentHistorySaving, setCurrentHistorySaving] = useState<boolean>(false)
+  const [currentHistorySaved, setCurrentHistorySaved] = useState<boolean>(false)
+  const [currentHistoryId, setCurrentHistoryId] = useState<string | null>(null)
   const [historyDeletingId, setHistoryDeletingId] = useState<string | null>(null)
   const [historyClearing, setHistoryClearing] = useState<boolean>(false)
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
@@ -99,6 +102,9 @@ export default function MedicalImagesPage() {
       setError('')
       setHistorySaveError(null)
       setHasAnalyzedCurrentImage(false)
+      setCurrentHistorySaved(false)
+      setCurrentHistorySaving(false)
+      setCurrentHistoryId(null)
       // Create preview
       const reader = new FileReader()
       reader.onloadend = () => {
@@ -132,6 +138,67 @@ export default function MedicalImagesPage() {
     loadHistory()
   }, [loadHistory])
 
+  const saveCurrentToHistory = useCallback(async () => {
+    if (!imageFile) {
+      setHistorySaveError('Please upload an image before saving.')
+      return
+    }
+    if (!analysis && !analysisResult) {
+      setHistorySaveError('Please run an analysis before saving.')
+      return
+    }
+    if (currentHistorySaved || currentHistorySaving) return
+
+    try {
+      setCurrentHistorySaving(true)
+      setHistorySaveError(null)
+
+      const payload = {
+        summary: analysisResult?.summary ?? null,
+        possibleCauses: Array.isArray(analysisResult?.possibleCauses)
+          ? analysisResult?.possibleCauses
+          : [],
+        redFlags: Array.isArray(analysisResult?.redFlags) ? analysisResult?.redFlags : [],
+        nextSteps: Array.isArray(analysisResult?.nextSteps) ? analysisResult?.nextSteps : [],
+        disclaimer: analysisResult?.disclaimer ?? null,
+        analysisText: analysis ?? analysisResult?.analysisText ?? null,
+      }
+
+      const formData = new FormData()
+      formData.append('image', imageFile)
+      formData.append('analysis', JSON.stringify(payload))
+
+      const res = await fetch('/api/medical-images/history', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Failed to save scan to history')
+      }
+      const data = await res.json()
+      if (data?.historyItem) {
+        setHistoryItems((prev) => [
+          data.historyItem,
+          ...prev.filter((item) => item.id !== data.historyItem.id),
+        ])
+        setCurrentHistoryId(data.historyItem.id)
+      }
+      setCurrentHistorySaved(true)
+    } catch (err) {
+      setHistorySaveError((err as Error).message || 'Failed to save scan to history')
+    } finally {
+      setCurrentHistorySaving(false)
+    }
+  }, [analysis, analysisResult, currentHistorySaved, currentHistorySaving, imageFile])
+
+  const handleSaveToggle = async (checked: boolean) => {
+    setSaveToHistory(checked)
+    if (checked && (analysisResult || analysis) && !currentHistorySaved && !currentHistorySaving) {
+      await saveCurrentToHistory()
+    }
+  }
+
   const handleDeleteHistoryItem = async (id: string) => {
     if (!window.confirm('Delete this saved scan? This cannot be undone.')) return
     try {
@@ -143,6 +210,10 @@ export default function MedicalImagesPage() {
       }
       setHistoryItems((prev) => prev.filter((item) => item.id !== id))
       setExpandedHistoryId((prev) => (prev === id ? null : prev))
+      if (currentHistoryId === id) {
+        setCurrentHistorySaved(false)
+        setCurrentHistoryId(null)
+      }
     } catch (err) {
       setHistoryError((err as Error).message || 'Failed to delete saved scan')
     } finally {
@@ -161,6 +232,8 @@ export default function MedicalImagesPage() {
       }
       setHistoryItems([])
       setExpandedHistoryId(null)
+      setCurrentHistorySaved(false)
+      setCurrentHistoryId(null)
     } catch (err) {
       setHistoryError((err as Error).message || 'Failed to clear history')
     } finally {
@@ -184,6 +257,9 @@ export default function MedicalImagesPage() {
     setIsAnalyzing(true)
     setHasAnalyzedCurrentImage(false)
     setHistorySaveError(null)
+    setCurrentHistorySaved(false)
+    setCurrentHistorySaving(false)
+    setCurrentHistoryId(null)
 
     try {
       const formData = new FormData()
@@ -260,6 +336,8 @@ export default function MedicalImagesPage() {
               result.historyItem,
               ...prev.filter((item) => item.id !== result.historyItem.id),
             ])
+            setCurrentHistorySaved(true)
+            setCurrentHistoryId(result.historyItem.id || null)
           } else if (result.historyError) {
             setHistorySaveError(result.historyError)
           } else if (!result.historySaved) {
@@ -283,6 +361,9 @@ export default function MedicalImagesPage() {
     setAnalysisResult(null)
     setError('')
     setHasAnalyzedCurrentImage(false)
+    setCurrentHistorySaved(false)
+    setCurrentHistorySaving(false)
+    setCurrentHistoryId(null)
   }
 
   useEffect(() => {
@@ -373,7 +454,7 @@ export default function MedicalImagesPage() {
                 <input
                   type="checkbox"
                   checked={saveToHistory}
-                  onChange={(e) => setSaveToHistory(e.target.checked)}
+                  onChange={(e) => handleSaveToggle(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-helfi-green focus:ring-helfi-green"
                 />
                 Save this scan to my history
@@ -384,6 +465,14 @@ export default function MedicalImagesPage() {
               </p>
               {historySaveError && (
                 <p className="text-xs text-amber-700">{historySaveError}</p>
+              )}
+              {analysisResult && saveToHistory && !currentHistorySaved && !historySaveError && (
+                <p className="text-xs text-gray-500">
+                  {currentHistorySaving ? 'Saving this scan to history...' : 'This scan will be saved to your history.'}
+                </p>
+              )}
+              {analysisResult && saveToHistory && currentHistorySaved && (
+                <p className="text-xs text-emerald-700">Saved to history.</p>
               )}
             </div>
 

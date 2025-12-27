@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { del } from '@vercel/blob'
+import { del, put } from '@vercel/blob'
+
+const contentTypeToExt = (contentType: string) => {
+  if (contentType === 'image/png') return 'png'
+  if (contentType === 'image/webp') return 'webp'
+  if (contentType === 'image/gif') return 'gif'
+  return 'jpg'
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +58,120 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Failed to fetch medical image history',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return NextResponse.json({ error: 'Image storage is not configured' }, { status: 500 })
+    }
+
+    const formData = await request.formData()
+    const imageFile = formData.get('image')
+    const analysisRaw = formData.get('analysis')
+
+    if (!imageFile || typeof imageFile === 'string') {
+      return NextResponse.json({ error: 'No image provided' }, { status: 400 })
+    }
+    if (!analysisRaw || typeof analysisRaw !== 'string') {
+      return NextResponse.json({ error: 'No analysis provided' }, { status: 400 })
+    }
+
+    let analysisPayload: any
+    try {
+      analysisPayload = JSON.parse(analysisRaw)
+    } catch {
+      return NextResponse.json({ error: 'Invalid analysis payload' }, { status: 400 })
+    }
+
+    const ext = contentTypeToExt(imageFile.type || 'image/jpeg')
+    const filename = `${Date.now()}.${ext}`
+    const pathname = `medical-images/${user.id}/${filename}`
+    const buffer = Buffer.from(await imageFile.arrayBuffer())
+
+    const blob = await put(pathname, buffer, {
+      access: 'public',
+      contentType: imageFile.type || 'image/jpeg',
+      addRandomSuffix: true,
+    })
+
+    const fileRecord = await prisma.file.create({
+      data: {
+        originalName: imageFile.name || filename,
+        fileName: blob.pathname,
+        fileSize: imageFile.size || buffer.length,
+        mimeType: imageFile.type || 'image/jpeg',
+        cloudinaryId: blob.pathname,
+        cloudinaryUrl: blob.url,
+        secureUrl: blob.url,
+        uploadedById: user.id,
+        fileType: 'IMAGE',
+        usage: 'MEDICAL_IMAGE',
+        isPublic: true,
+        metadata: {
+          storage: 'vercel-blob',
+          blobPathname: blob.pathname,
+          blobUrl: blob.url,
+          format: ext,
+          originalSize: imageFile.size || buffer.length,
+        },
+      },
+    })
+
+    const analysisData = {
+      summary: analysisPayload?.summary ?? null,
+      possibleCauses: Array.isArray(analysisPayload?.possibleCauses)
+        ? analysisPayload.possibleCauses
+        : [],
+      redFlags: Array.isArray(analysisPayload?.redFlags) ? analysisPayload.redFlags : [],
+      nextSteps: Array.isArray(analysisPayload?.nextSteps) ? analysisPayload.nextSteps : [],
+      disclaimer: analysisPayload?.disclaimer ?? null,
+    }
+
+    const saved = await prisma.medicalImageAnalysis.create({
+      data: {
+        userId: user.id,
+        imageFileId: fileRecord.id,
+        summary: analysisPayload?.summary ?? null,
+        analysisText: analysisPayload?.analysisText ?? null,
+        analysisData,
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      historyItem: {
+        id: saved.id,
+        summary: saved.summary,
+        analysisText: saved.analysisText,
+        analysisData: saved.analysisData,
+        createdAt: saved.createdAt,
+        imageUrl: fileRecord.secureUrl,
+      },
+    })
+  } catch (error) {
+    console.error('Error saving medical image history:', error)
+    return NextResponse.json(
+      {
+        error: 'Failed to save medical image history',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
