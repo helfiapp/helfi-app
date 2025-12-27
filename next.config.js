@@ -1,6 +1,6 @@
 module.exports = {
   images: {
-    domains: ['res.cloudinary.com', 'lh3.googleusercontent.com'],
+    domains: ['res.cloudinary.com', 'lh3.googleusercontent.com', 'blob.vercel-storage.com'],
   },
   // Session preservation during development and deployment
   experimental: {

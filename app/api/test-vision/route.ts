@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { put } from '@vercel/blob';
 import { CreditManager } from '@/lib/credit-system';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { logAiUsageEvent } from '@/lib/ai-usage-logger';
@@ -11,6 +12,13 @@ import { getImageMetadata } from '@/lib/image-metadata';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
+
+const contentTypeToExt = (contentType: string) => {
+  if (contentType === 'image/png') return 'png';
+  if (contentType === 'image/webp') return 'webp';
+  if (contentType === 'image/gif') return 'gif';
+  return 'jpg';
+};
 
 function getOpenAIClient() {
   if (!process.env.OPENAI_API_KEY) {
@@ -61,6 +69,8 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const imageFile = formData.get('image') as File;
+    const saveToHistoryRaw = String(formData.get('saveToHistory') || '').toLowerCase();
+    const saveToHistory = saveToHistoryRaw === 'true' || saveToHistoryRaw === '1' || saveToHistoryRaw === 'yes';
 
     if (!imageFile) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 });
@@ -308,6 +318,88 @@ export async function POST(req: NextRequest) {
           'This analysis is for information only and does not replace a real doctor’s examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
       }
     }
+
+    let historySaved = false;
+    let historyItem: any = null;
+    let historyError: string | null = null;
+
+    if (saveToHistory) {
+      try {
+        if (!process.env.BLOB_READ_WRITE_TOKEN) {
+          throw new Error('Image storage is not configured');
+        }
+
+        const ext = contentTypeToExt(imageFile.type);
+        const filename = `${Date.now()}.${ext}`;
+        const pathname = `medical-images/${user.id}/${filename}`;
+        const buffer = Buffer.from(imageBuffer);
+        const blob = await put(pathname, buffer, {
+          access: 'public',
+          contentType: imageFile.type,
+          addRandomSuffix: true,
+        });
+
+        const fileRecord = await prisma.file.create({
+          data: {
+            originalName: imageFile.name,
+            fileName: blob.pathname,
+            fileSize: imageFile.size,
+            mimeType: imageFile.type,
+            cloudinaryId: blob.pathname,
+            cloudinaryUrl: blob.url,
+            secureUrl: blob.url,
+            uploadedById: user.id,
+            fileType: 'IMAGE',
+            usage: 'MEDICAL_IMAGE',
+            isPublic: true,
+            metadata: {
+              storage: 'vercel-blob',
+              blobPathname: blob.pathname,
+              blobUrl: blob.url,
+              width: imageMeta.width ?? null,
+              height: imageMeta.height ?? null,
+              format: ext,
+              originalSize: imageFile.size,
+            },
+          },
+        });
+
+        const analysisData = {
+          summary: resp.summary ?? null,
+          possibleCauses: Array.isArray(resp.possibleCauses) ? resp.possibleCauses : [],
+          redFlags: Array.isArray(resp.redFlags) ? resp.redFlags : [],
+          nextSteps: Array.isArray(resp.nextSteps) ? resp.nextSteps : [],
+          disclaimer: resp.disclaimer ?? null,
+        };
+
+        const saved = await prisma.medicalImageAnalysis.create({
+          data: {
+            userId: user.id,
+            imageFileId: fileRecord.id,
+            summary: resp.summary ?? null,
+            analysisText: resp.analysis ?? null,
+            analysisData,
+          },
+        });
+
+        historySaved = true;
+        historyItem = {
+          id: saved.id,
+          summary: saved.summary,
+          analysisText: saved.analysisText,
+          analysisData: saved.analysisData,
+          createdAt: saved.createdAt,
+          imageUrl: fileRecord.secureUrl,
+        };
+      } catch (err) {
+        console.warn('Failed to save medical image history:', err);
+        historyError = err instanceof Error ? err.message : 'Failed to save history';
+      }
+    }
+
+    resp.historySaved = historySaved;
+    if (historyItem) resp.historyItem = historyItem;
+    if (historyError) resp.historyError = historyError;
 
     return NextResponse.json(resp);
 

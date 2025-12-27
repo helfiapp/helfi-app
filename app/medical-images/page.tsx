@@ -1,7 +1,7 @@
 'use client'
 import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
@@ -28,6 +28,15 @@ type MedicalAnalysisResult = {
   analysisText?: string
 }
 
+type MedicalHistoryItem = {
+  id: string
+  summary?: string | null
+  analysisText?: string | null
+  analysisData?: MedicalAnalysisResult | null
+  createdAt: string
+  imageUrl?: string | null
+}
+
 export default function MedicalImagesPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -35,6 +44,14 @@ export default function MedicalImagesPage() {
   const [analysis, setAnalysis] = useState<string | null>(null)
   const [analysisResult, setAnalysisResult] = useState<MedicalAnalysisResult | null>(null)
   const [error, setError] = useState<string>('')
+  const [saveToHistory, setSaveToHistory] = useState<boolean>(false)
+  const [historyItems, setHistoryItems] = useState<MedicalHistoryItem[]>([])
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [historySaveError, setHistorySaveError] = useState<string | null>(null)
+  const [historyDeletingId, setHistoryDeletingId] = useState<string | null>(null)
+  const [historyClearing, setHistoryClearing] = useState<boolean>(false)
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null)
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
   const [creditInfo, setCreditInfo] = useState<any>({
     dailyUsed: 0,
@@ -50,6 +67,29 @@ export default function MedicalImagesPage() {
   const [analysisSessionId, setAnalysisSessionId] = useState<number>(0)
   const resultRef = useRef<HTMLDivElement | null>(null)
 
+  const loadHistory = useCallback(async () => {
+    try {
+      setHistoryLoading(true)
+      setHistoryError(null)
+      const res = await fetch('/api/medical-images/history', { cache: 'no-store' as any })
+      if (!res.ok) {
+        throw new Error('Failed to load history')
+      }
+      const data = await res.json()
+      const nextHistory = Array.isArray(data?.history)
+        ? data.history.map((item: any) => ({
+            ...item,
+            analysisData: item?.analysisData && typeof item.analysisData === 'object' ? item.analysisData : null,
+          }))
+        : []
+      setHistoryItems(nextHistory)
+    } catch (err) {
+      setHistoryError((err as Error).message || 'Failed to load history')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -57,6 +97,7 @@ export default function MedicalImagesPage() {
       setAnalysis(null)
       setAnalysisResult(null)
       setError('')
+      setHistorySaveError(null)
       setHasAnalyzedCurrentImage(false)
       // Create preview
       const reader = new FileReader()
@@ -87,6 +128,46 @@ export default function MedicalImagesPage() {
     fetchCreditStatus()
   }, [usageMeterRefresh])
 
+  useEffect(() => {
+    loadHistory()
+  }, [loadHistory])
+
+  const handleDeleteHistoryItem = async (id: string) => {
+    if (!window.confirm('Delete this saved scan? This cannot be undone.')) return
+    try {
+      setHistoryDeletingId(id)
+      setHistoryError(null)
+      const res = await fetch(`/api/medical-images/history/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        throw new Error('Failed to delete saved scan')
+      }
+      setHistoryItems((prev) => prev.filter((item) => item.id !== id))
+      setExpandedHistoryId((prev) => (prev === id ? null : prev))
+    } catch (err) {
+      setHistoryError((err as Error).message || 'Failed to delete saved scan')
+    } finally {
+      setHistoryDeletingId(null)
+    }
+  }
+
+  const handleClearHistory = async () => {
+    if (!window.confirm('Clear all saved scans? This cannot be undone.')) return
+    try {
+      setHistoryClearing(true)
+      setHistoryError(null)
+      const res = await fetch('/api/medical-images/history', { method: 'DELETE' })
+      if (!res.ok) {
+        throw new Error('Failed to clear history')
+      }
+      setHistoryItems([])
+      setExpandedHistoryId(null)
+    } catch (err) {
+      setHistoryError((err as Error).message || 'Failed to clear history')
+    } finally {
+      setHistoryClearing(false)
+    }
+  }
+
   const handleAnalyze = async () => {
     if (!imageFile) {
       setError('Please select an image first')
@@ -102,10 +183,12 @@ export default function MedicalImagesPage() {
     setAnalysisResult(null)
     setIsAnalyzing(true)
     setHasAnalyzedCurrentImage(false)
+    setHistorySaveError(null)
 
     try {
       const formData = new FormData()
       formData.append('image', imageFile)
+      formData.append('saveToHistory', saveToHistory ? 'true' : 'false')
 
       const response = await fetch('/api/test-vision', {
         method: 'POST',
@@ -151,6 +234,19 @@ export default function MedicalImagesPage() {
         // Trigger usage meter refresh after successful analysis
         setUsageMeterRefresh(prev => prev + 1)
         try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
+
+        if (saveToHistory) {
+          if (result.historySaved && result.historyItem) {
+            setHistoryItems((prev) => [
+              result.historyItem,
+              ...prev.filter((item) => item.id !== result.historyItem.id),
+            ])
+          } else if (result.historyError) {
+            setHistorySaveError(result.historyError)
+          } else if (!result.historySaved) {
+            setHistorySaveError('We could not save this scan to your history.')
+          }
+        }
       } else {
         throw new Error('Invalid response from server')
       }
@@ -252,6 +348,24 @@ export default function MedicalImagesPage() {
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-3 mb-4 text-sm">{error}</div>
             )}
+
+            <div className="mb-4 flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <label className="flex items-center gap-2 text-sm text-gray-800">
+                <input
+                  type="checkbox"
+                  checked={saveToHistory}
+                  onChange={(e) => setSaveToHistory(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-helfi-green focus:ring-helfi-green"
+                />
+                Save this scan to my history
+              </label>
+              <p className="text-xs text-gray-500">
+                Saved scans include the image and analysis. Leave this off to keep this scan private.
+              </p>
+              {historySaveError && (
+                <p className="text-xs text-amber-700">{historySaveError}</p>
+              )}
+            </div>
 
             <div className="flex gap-3">
               <button
@@ -437,6 +551,159 @@ export default function MedicalImagesPage() {
                 <MedicalImageChat key={analysisSessionId} analysisResult={analysisResult} />
               </div>
             )}
+
+            {/* History */}
+            <div className="mt-8">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold text-gray-900">History</h2>
+                <div className="flex items-center gap-3 text-xs">
+                  {historyItems.length > 0 && (
+                    <button
+                      onClick={handleClearHistory}
+                      className="text-red-600 hover:text-red-700 disabled:opacity-60"
+                      type="button"
+                      disabled={historyClearing}
+                    >
+                      {historyClearing ? 'Clearing...' : 'Clear all'}
+                    </button>
+                  )}
+                  <button
+                    onClick={loadHistory}
+                    className="text-gray-600 hover:text-gray-900 disabled:opacity-60"
+                    type="button"
+                    disabled={historyLoading}
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Only scans you choose to save appear here.
+              </p>
+
+              {historyLoading && (
+                <div className="mt-3 text-sm text-gray-500">Loading history...</div>
+              )}
+              {historyError && (
+                <div className="mt-3 text-sm text-red-700">{historyError}</div>
+              )}
+              {!historyLoading && !historyError && historyItems.length === 0 && (
+                <div className="mt-3 text-sm text-gray-500">No saved scans yet.</div>
+              )}
+
+              <div className="mt-4 space-y-4">
+                {historyItems.map((item) => {
+                  const analysisData = item.analysisData || null
+                  const possibleCauses = Array.isArray(analysisData?.possibleCauses)
+                    ? analysisData?.possibleCauses
+                    : []
+                  const redFlags = Array.isArray(analysisData?.redFlags) ? analysisData?.redFlags : []
+                  const nextSteps = Array.isArray(analysisData?.nextSteps) ? analysisData?.nextSteps : []
+                  const isExpanded = expandedHistoryId === item.id
+                  const createdAtLabel = item.createdAt
+                    ? new Date(item.createdAt).toLocaleString()
+                    : 'Unknown date'
+
+                  return (
+                    <div key={item.id} className="border border-gray-200 rounded-lg p-4 bg-white">
+                      <div className="flex flex-col gap-4 md:flex-row">
+                        <div className="w-full md:w-36 flex-shrink-0">
+                          {item.imageUrl ? (
+                            <Image
+                              src={item.imageUrl}
+                              alt="Saved medical scan"
+                              width={144}
+                              height={144}
+                              className="h-36 w-full rounded-lg object-cover border border-gray-100"
+                            />
+                          ) : (
+                            <div className="h-36 w-full rounded-lg border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-400">
+                              No image
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs text-gray-500">{createdAtLabel}</div>
+                            <div className="flex items-center gap-3 text-xs">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedHistoryId(isExpanded ? null : item.id)}
+                                className="text-helfi-green hover:text-helfi-green/80"
+                              >
+                                {isExpanded ? 'Hide details' : 'View details'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteHistoryItem(item.id)}
+                                className="text-red-600 hover:text-red-700 disabled:opacity-60"
+                                disabled={historyDeletingId === item.id || historyClearing}
+                              >
+                                {historyDeletingId === item.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </div>
+                          </div>
+                          {item.summary && (
+                            <p className="text-sm text-gray-800">{item.summary}</p>
+                          )}
+                          {!item.summary && item.analysisText && (
+                            <p className="text-sm text-gray-800 whitespace-pre-line">
+                              {item.analysisText}
+                            </p>
+                          )}
+
+                          {isExpanded && (
+                            <div className="pt-2 space-y-3 text-sm text-gray-700">
+                              {possibleCauses.length > 0 && (
+                                <div>
+                                  <div className="font-medium text-gray-900 mb-1">Likely conditions</div>
+                                  <ul className="space-y-1">
+                                    {possibleCauses.map((cause: any, idx: number) => (
+                                      <li key={`${cause.name}-${idx}`} className="flex items-center gap-2">
+                                        <span className="text-gray-900">{cause.name}</span>
+                                        {cause.confidence && (
+                                          <span className="text-xs text-gray-500">({cause.confidence})</span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {redFlags.length > 0 && (
+                                <div>
+                                  <div className="font-medium text-red-700 mb-1">Red-flag signs</div>
+                                  <ul className="list-disc list-inside space-y-1 text-red-800">
+                                    {redFlags.map((flag: string, idx: number) => (
+                                      <li key={idx}>{flag}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {nextSteps.length > 0 && (
+                                <div>
+                                  <div className="font-medium text-gray-900 mb-1">Next steps</div>
+                                  <ul className="list-disc list-inside space-y-1">
+                                    {nextSteps.map((step: string, idx: number) => (
+                                      <li key={idx}>{step}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {item.analysisText && item.summary && (
+                                <div>
+                                  <div className="font-medium text-gray-900 mb-1">Full notes</div>
+                                  <p className="whitespace-pre-line">{item.analysisText}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </main>

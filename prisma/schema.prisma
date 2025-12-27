@@ -74,6 +74,7 @@ model User {
   garminRequestTokens GarminRequestToken[]
   garminWebhookLogs   GarminWebhookLog[]
   foodAnalysisFeedback FoodAnalysisFeedback[]
+  medicalImageAnalyses MedicalImageAnalysis[]
 
   // File relationships (PHASE 2 addition)
   uploadedFiles File[] @relation("UploadedFiles")
@@ -797,6 +798,7 @@ model File {
   supplementFiles Supplement[] @relation("SupplementImages")
   medicationFiles Medication[] @relation("MedicationImages")
   foodLogFiles    FoodLog[]    @relation("FoodLogImages")
+  medicalImageAnalyses MedicalImageAnalysis[]
 }
 
 enum FileType {
@@ -812,8 +814,25 @@ enum FileUsage {
   FOOD_PHOTO
   SUPPLEMENT_IMAGE
   MEDICATION_IMAGE
+  MEDICAL_IMAGE
   DOCUMENT
   OTHER
+}
+
+model MedicalImageAnalysis {
+  id           String   @id @default(cuid())
+  userId       String
+  imageFileId  String?
+  summary      String?
+  analysisText String?
+  analysisData Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imageFile File? @relation(fields: [imageFileId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
 }
 
 model InteractionAnalysis {
