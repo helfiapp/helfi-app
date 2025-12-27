@@ -216,19 +216,38 @@ export default function MedicalImagesPage() {
       }
 
       const result = await response.json()
-      if (result.success && result.analysis) {
-        setAnalysis(result.analysis)
+      if (result.success) {
+        const analysisText = typeof result.analysis === 'string' ? result.analysis : null
+        const possibleCauses = Array.isArray(result.possibleCauses) ? result.possibleCauses : []
+        const redFlags = Array.isArray(result.redFlags) ? result.redFlags : []
+        const nextSteps = Array.isArray(result.nextSteps) ? result.nextSteps : []
+        const hasStructured =
+          Boolean(result.summary) ||
+          possibleCauses.length > 0 ||
+          redFlags.length > 0 ||
+          nextSteps.length > 0
+
+        if (!analysisText && !hasStructured) {
+          throw new Error('Invalid response from server')
+        }
+
+        if (analysisText) {
+          setAnalysis(analysisText)
+        }
+
         const structured: MedicalAnalysisResult = {
           summary: result.summary ?? null,
-          possibleCauses: Array.isArray(result.possibleCauses) ? result.possibleCauses : [],
-          redFlags: Array.isArray(result.redFlags) ? result.redFlags : [],
-          nextSteps: Array.isArray(result.nextSteps) ? result.nextSteps : [],
+          possibleCauses,
+          redFlags,
+          nextSteps,
           disclaimer:
             result.disclaimer ||
             'This analysis is for information only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.',
-          analysisText: result.analysis,
+          analysisText: analysisText ?? undefined,
         }
-        setAnalysisResult(structured)
+        if (analysisText || hasStructured) {
+          setAnalysisResult(structured)
+        }
         setAnalysisSessionId(prev => prev + 1)
         setHasAnalyzedCurrentImage(true)
         // Trigger usage meter refresh after successful analysis
