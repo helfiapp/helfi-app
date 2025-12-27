@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     
     // Delete affiliate data
     await prisma.affiliateReferral.deleteMany({ where: { referredUserId: user.id } })
-    await prisma.affiliateConversion.deleteMany({ where: { convertedUserId: user.id } })
+    await prisma.affiliateConversion.deleteMany({ where: { referredUserId: user.id } })
     await prisma.affiliateApplication.deleteMany({ where: { userId: user.id } })
     // Delete affiliate record if user is an affiliate
     await prisma.affiliate.deleteMany({ where: { userId: user.id } }).catch(() => {
