@@ -718,6 +718,7 @@ const isDiscreteUnitLabel = (label: string) => {
   'cracker','crackers','chip','chips',
   'bacon','rasher','rashers','strip','strips',
   'sausage','sausages','link','links',
+  'hashbrown','hashbrowns','hash brown','hash browns',
   // whole-vegetable / whole-fruit pieces
   'zucchini','zucchinis','courgette','courgettes',
   'carrot','carrots','cucumber','cucumbers',
@@ -871,6 +872,20 @@ const inferPiecesFromAnalysisForItem = (analysisText: string | null | undefined,
     {
       keywords: ['piece', 'pieces'],
       patterns: [/\b(\d+(?:\.\d+)?)\s*pieces?\b/, /\b(?:a|an|one)\s+piece\b/],
+    },
+    {
+      keywords: ['zucchini', 'zucchinis', 'courgette', 'courgettes'],
+      patterns: [
+        /\b(\d+(?:\.\d+)?)\s*(?:x\s*)?(?:small|medium|large)?\s*(?:zucchinis?|courgettes?)\b/,
+        /\b(?:a|an|one)\s+(?:small|medium|large)?\s*(?:zucchini|courgette)\b/,
+      ],
+    },
+    {
+      keywords: ['hashbrown', 'hashbrowns', 'hash brown', 'hash browns'],
+      patterns: [
+        /\b(\d+(?:\.\d+)?)\s*(?:hash\s*browns?)\b/,
+        /\b(?:a|an|one)\s+(?:hash\s*brown)\b/,
+      ],
     },
   ]
 
