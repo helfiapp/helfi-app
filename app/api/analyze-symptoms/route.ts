@@ -237,9 +237,10 @@ Return two parts:
     }
 
     // Build response
+    const analysisText = content.replace(/<STRUCTURED_JSON>[\s\S]*?<\/STRUCTURED_JSON>/i, '').trim()
     const resp: any = {
       success: true,
-      analysisText: content.replace(/<STRUCTURED_JSON>[\s\S]*?<\/STRUCTURED_JSON>/i, '').trim(),
+      analysisText,
     }
     if (structured && typeof structured === 'object') {
       resp.summary = structured.summary || null
@@ -250,6 +251,38 @@ Return two parts:
     } else {
       // Always ensure a disclaimer is present
       resp.disclaimer = 'This is not medical advice. If you have concerning or worsening symptoms, contact a licensed medical professional or emergency services.'
+    }
+
+    try {
+      const analysisData = structured && typeof structured === 'object'
+        ? {
+            summary: resp.summary ?? null,
+            possibleCauses: resp.possibleCauses ?? [],
+            redFlags: resp.redFlags ?? [],
+            nextSteps: resp.nextSteps ?? [],
+            disclaimer: resp.disclaimer ?? null,
+          }
+        : {
+            summary: resp.summary ?? null,
+            possibleCauses: [],
+            redFlags: [],
+            nextSteps: [],
+            disclaimer: resp.disclaimer ?? null,
+          }
+
+      await prisma.symptomAnalysis.create({
+        data: {
+          userId: refreshedUser.id,
+          symptoms: symptomsList,
+          duration: duration ? String(duration).trim() : null,
+          notes: notes ? String(notes).trim() : null,
+          summary: resp.summary ?? null,
+          analysisText: analysisText || null,
+          analysisData,
+        },
+      })
+    } catch (historyError) {
+      console.warn('Failed to save symptom analysis history:', historyError)
     }
 
     return NextResponse.json(resp)
@@ -265,6 +298,5 @@ Return two parts:
     return NextResponse.json({ error: 'Failed to analyze symptoms' }, { status: 500 })
   }
 }
-
 
 

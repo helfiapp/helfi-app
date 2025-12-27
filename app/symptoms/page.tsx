@@ -3,7 +3,7 @@ import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import SymptomChat from './SymptomChat'
@@ -23,6 +23,7 @@ type AnalysisResult = {
 }
 
 export default function SymptomAnalysisPage() {
+  const pathname = usePathname()
   const [symptomInput, setSymptomInput] = useState<string>('')
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([])
   const [duration, setDuration] = useState<string>('')
@@ -171,6 +172,34 @@ export default function SymptomAnalysisPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <PageHeader title="Symptom Analysis" />
+
+      {/* Tabs */}
+      <div className="max-w-7xl mx-auto px-4 pt-4">
+        <div className="bg-white rounded-t-xl border-b border-gray-200">
+          <div className="flex">
+            <Link
+              href="/symptoms"
+              className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
+                pathname !== '/symptoms/history'
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Symptom Analysis
+            </Link>
+            <Link
+              href="/symptoms/history"
+              className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
+                pathname === '/symptoms/history'
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              History
+            </Link>
+          </div>
+        </div>
+      </div>
 
       {/* Content */}
       <main className="flex-1">
