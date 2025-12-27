@@ -56,7 +56,7 @@ function parseItemsJsonRelaxed(raw: string): any | null {
   }
 }
 
-const GEMINI_VISION_MODEL_DEFAULT = 'gemini-2.5-flash';
+const GEMINI_VISION_MODEL_DEFAULT = 'gemini-3-pro-image-preview';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const extractPromptTextFromMessages = (messages: any[]): string => {
