@@ -881,6 +881,13 @@ const inferPiecesFromAnalysisForItem = (analysisText: string | null | undefined,
       ],
     },
     {
+      keywords: ['carrot', 'carrots'],
+      patterns: [
+        /\b(\d+(?:\.\d+)?)\s*(?:x\s*)?(?:whole|small|medium|large)?\s*carrots?\b/,
+        /\b(?:a|an|one)\s+(?:whole|small|medium|large)?\s*carrot\b/,
+      ],
+    },
+    {
       keywords: ['hashbrown', 'hashbrowns', 'hash brown', 'hash browns'],
       patterns: [
         /\b(\d+(?:\.\d+)?)\s*(?:hash\s*browns?)\b/,
