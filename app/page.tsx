@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useSession } from 'next-auth/react'
 import HeroCarousel from '@/components/HeroCarousel'
 // Back to Top Button Component
 function BackToTopButton() {
@@ -44,6 +45,7 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
+  const { data: session, status } = useSession()
   const [showInfoModal, setShowInfoModal] = useState(false)
   const [showWaitlistModal, setShowWaitlistModal] = useState(false)
   const [showDemoModal, setShowDemoModal] = useState(false)
@@ -54,11 +56,58 @@ export default function SplashPage() {
   const [videoLoaded, setVideoLoaded] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  const handleWaitlistCta = () => {
-    setShowInfoModal(true)
+  // Handle subscription plan selection
+  const handlePlanSelection = async (planId: string) => {
+    // If user is authenticated, go directly to checkout
+    if (status === 'authenticated' && session) {
+      try {
+        const res = await fetch('/api/billing/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: planId }),
+        })
+        if (res.ok) {
+          const { url } = await res.json()
+          if (url) {
+            window.location.href = url
+            return
+          }
+        }
+      } catch (error) {
+        console.error('Checkout error:', error)
+      }
+    }
+    // If not authenticated, redirect to signin with plan parameter
+    window.location.href = `/auth/signin?plan=${encodeURIComponent(planId)}`
   }
 
-  const handleCreditPurchase = () => {
+  // Handle credit purchase
+  const handleCreditPurchase = async (planId: string) => {
+    // If user is authenticated, go directly to checkout
+    if (status === 'authenticated' && session) {
+      try {
+        const res = await fetch('/api/billing/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: planId }),
+        })
+        if (res.ok) {
+          const { url } = await res.json()
+          if (url) {
+            window.location.href = url
+            return
+          }
+        }
+      } catch (error) {
+        console.error('Checkout error:', error)
+      }
+    }
+    // If not authenticated, redirect to signin with plan parameter
+    window.location.href = `/auth/signin?plan=${encodeURIComponent(planId)}`
+  }
+
+  // Legacy waitlist handler (kept for "Join Waitlist" buttons in nav/footer)
+  const handleWaitlistCta = () => {
     setShowInfoModal(true)
   }
 
@@ -626,7 +675,7 @@ export default function SplashPage() {
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
                 </ul>
-                <button onClick={handleWaitlistCta} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                <button onClick={() => handlePlanSelection('plan_10_monthly')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Choose $10 Plan
                 </button>
               </div>
@@ -641,7 +690,7 @@ export default function SplashPage() {
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
                 </ul>
-                <button onClick={handleWaitlistCta} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                <button onClick={() => handlePlanSelection('plan_20_monthly')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Choose $20 Plan
                 </button>
               </div>
@@ -659,7 +708,7 @@ export default function SplashPage() {
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
                 </ul>
-                <button onClick={handleWaitlistCta} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                <button onClick={() => handlePlanSelection('plan_30_monthly')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Choose $30 Plan
                 </button>
               </div>
@@ -674,7 +723,7 @@ export default function SplashPage() {
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
                 </ul>
-                <button onClick={handleWaitlistCta} className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors" type="button">
+                <button onClick={() => handlePlanSelection('plan_50_monthly')} className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors" type="button">
                   Choose $50 Plan
                 </button>
               </div>
@@ -688,21 +737,21 @@ export default function SplashPage() {
               <div className="border border-gray-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (250 credits)</h3>
                 <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
-                <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                <button onClick={() => handleCreditPurchase('credits_250')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Buy $5 Credits
                 </button>
               </div>
               <div className="border border-gray-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (500 credits)</h3>
                 <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
-                <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                <button onClick={() => handleCreditPurchase('credits_500')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Buy $10 Credits
                 </button>
               </div>
               <div className="border border-gray-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (1,000 credits)</h3>
                 <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
-                <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                <button onClick={() => handleCreditPurchase('credits_1000')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Buy $20 Credits
                 </button>
               </div>
@@ -947,7 +996,7 @@ export default function SplashPage() {
       {/* Footer */}
       <footer className="bg-helfi-black text-white px-4 py-12">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
             <div className="md:col-span-2">
               <div className="text-2xl font-bold mb-4">
                 <span className="text-helfi-green">Helfi</span>
@@ -991,6 +1040,25 @@ export default function SplashPage() {
                   >
                     FAQ
                   </button>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-4">Affiliates</h4>
+              <p className="text-gray-400 mb-3 text-sm">
+                Earn by sharing Helfi. The affiliate program launches with the public release.
+              </p>
+              <ul className="space-y-2 text-gray-400 text-sm">
+                <li>
+                  <button onClick={handleWaitlistCta} className="hover:text-white text-left">
+                    Join the affiliate waitlist
+                  </button>
+                </li>
+                <li>
+                  <Link href="/affiliate/terms" className="hover:text-white">
+                    Affiliate Terms
+                  </Link>
                 </li>
               </ul>
             </div>

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import { UserIcon } from '@heroicons/react/24/outline'
@@ -18,6 +18,7 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
   const { data: session } = useSession()
   const { profileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null)
 
   const hasProfileImage = !!(profileImage || session?.user?.image)
   const userImage = (profileImage || session?.user?.image || '') as string
@@ -39,6 +40,39 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
     }
     await signOut({ callbackUrl: '/auth/signin' })
   }
+
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setAffiliateMenu(null)
+      return
+    }
+    let cancelled = false
+    setAffiliateMenu({ label: 'Become an Affiliate', href: '/affiliate/apply' })
+    const load = async () => {
+      try {
+        const res = await fetch('/api/affiliate/application', { cache: 'no-store' })
+        const data = await res.json().catch(() => ({} as any))
+        if (!res.ok) return
+
+        const hasAffiliate = !!data?.affiliate
+        const hasApplication = !!data?.application
+
+        const menu = hasAffiliate
+          ? { label: 'Affiliate Portal', href: '/affiliate' }
+          : hasApplication
+            ? { label: 'Affiliate Application', href: '/affiliate/apply' }
+            : { label: 'Become an Affiliate', href: '/affiliate/apply' }
+
+        if (!cancelled) setAffiliateMenu(menu)
+      } catch {
+        // ignore
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [session?.user?.email])
 
   return (
     <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
@@ -141,6 +175,15 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
               >
                 Subscription & Billing
               </Link>
+              {affiliateMenu && (
+                <Link
+                  href={affiliateMenu.href}
+                  className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  onClick={() => setDropdownOpen(false)}
+                >
+                  {affiliateMenu.label}
+                </Link>
+              )}
               <Link
                 href="/notifications"
                 className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -183,7 +226,5 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
     </nav>
   )
 }
-
-
 
 

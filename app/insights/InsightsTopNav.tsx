@@ -20,6 +20,7 @@ interface InsightsTopNavProps {
 export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
   const { profileImage: providerProfileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null)
 
   const hasProfileImage = useMemo(
     () => !!(providerProfileImage || sessionUser.image),
@@ -41,6 +42,36 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
       return () => document.removeEventListener('mousedown', handleClick)
     }
   }, [dropdownOpen])
+
+  useEffect(() => {
+    if (!sessionUser?.email) {
+      setAffiliateMenu(null)
+      return
+    }
+    let cancelled = false
+    setAffiliateMenu({ label: 'Become an Affiliate', href: '/affiliate/apply' })
+    const loadAffiliateMenu = async () => {
+      try {
+        const res = await fetch('/api/affiliate/application', { cache: 'no-store' })
+        const data = await res.json().catch(() => ({} as any))
+        if (!res.ok) return
+        const hasAffiliate = !!data?.affiliate
+        const hasApplication = !!data?.application
+        const menu = hasAffiliate
+          ? { label: 'Affiliate Portal', href: '/affiliate' }
+          : hasApplication
+            ? { label: 'Affiliate Application', href: '/affiliate/apply' }
+            : { label: 'Become an Affiliate', href: '/affiliate/apply' }
+        if (!cancelled) setAffiliateMenu(menu)
+      } catch {
+        // ignore
+      }
+    }
+    loadAffiliateMenu()
+    return () => {
+      cancelled = true
+    }
+  }, [sessionUser?.email])
 
   return (
     <nav className="bg-white border-b border-gray-200 px-4 py-3">
@@ -95,6 +126,11 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
               <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
               <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
               <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+              {affiliateMenu && (
+                <Link href={affiliateMenu.href} className="block px-4 py-2 text-gray-700 hover:bg-gray-50">
+                  {affiliateMenu.label}
+                </Link>
+              )}
               <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
               <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
               <button
@@ -110,4 +146,3 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
     </nav>
   )
 }
-

@@ -27,8 +27,9 @@ const TEST_PRICE_IDS = {
   STRIPE_PRICE_CREDITS_1000: 'price_1SQfraFFFsf6Yn8z8uipLLdg',
 };
 
-// Live mode Price IDs (from stripe-live-products-created.json)
+// Live mode Price IDs (fetched from Stripe API)
 const LIVE_PRICE_IDS = {
+  STRIPE_PRICE_10_MONTHLY: 'price_1SW9atFFFsf6Yn8zj88ffFkJ',
   STRIPE_PRICE_20_MONTHLY: 'price_1SQjscFFFsf6Yn8zZivYYd8P',
   STRIPE_PRICE_30_MONTHLY: 'price_1SQjsdFFFsf6Yn8zM9H2lWS2',
   STRIPE_PRICE_50_MONTHLY: 'price_1SQjsdFFFsf6Yn8z9yhDZn9O',
@@ -140,6 +141,7 @@ async function main() {
   console.log(`   Org ID: ${ORG_ID}`);
 
   const envVars = [
+    'STRIPE_PRICE_10_MONTHLY',
     'STRIPE_PRICE_20_MONTHLY',
     'STRIPE_PRICE_30_MONTHLY',
     'STRIPE_PRICE_50_MONTHLY',

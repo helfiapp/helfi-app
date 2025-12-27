@@ -8,6 +8,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '20
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
 
+async function getBalanceTransactionForPaymentIntent(paymentIntentId: string) {
+  const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
+    expand: ['charges.data.balance_transaction'],
+  })
+  const charge = (pi as any)?.charges?.data?.[0] as Stripe.Charge | undefined
+  const balanceTx = (charge as any)?.balance_transaction as Stripe.BalanceTransaction | undefined
+  return { charge, balanceTx }
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d
+}
+
 export async function POST(request: NextRequest) {
   const sig = request.headers.get('stripe-signature') || ''
   const rawBody = await request.text()
@@ -198,6 +213,118 @@ export async function POST(request: NextRequest) {
         }
         break
       }
+      case 'account.updated': {
+        const acct = event.data.object as Stripe.Account
+        const accountId = acct.id
+        await prisma.affiliate
+          .update({
+            where: { stripeConnectAccountId: accountId },
+            data: {
+              stripeConnectDetailsSubmitted: !!acct.details_submitted,
+              stripeConnectChargesEnabled: !!acct.charges_enabled,
+              stripeConnectPayoutsEnabled: !!acct.payouts_enabled,
+              stripeConnectOnboardedAt: acct.details_submitted ? new Date() : undefined,
+            },
+          })
+          .catch(() => {})
+        break
+      }
+      case 'invoice.paid': {
+        const invoice = event.data.object as Stripe.Invoice
+
+        // Only pay commission on the initial subscription payment (first invoice)
+        if (invoice.billing_reason !== 'subscription_create') break
+
+        const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+        if (!subscriptionId) break
+
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+        const affCode = (subscription.metadata as any)?.helfi_aff_code || (invoice.metadata as any)?.helfi_aff_code
+        const affClickId = (subscription.metadata as any)?.helfi_aff_click || (invoice.metadata as any)?.helfi_aff_click
+
+        if (!affCode || !affClickId) break
+
+        const affiliate = await prisma.affiliate.findUnique({
+          where: { code: String(affCode).toLowerCase() },
+          select: { id: true, status: true },
+        })
+        if (!affiliate || affiliate.status !== 'ACTIVE') break
+
+        const click = await prisma.affiliateClick.findUnique({
+          where: { id: String(affClickId) },
+          select: { id: true, affiliateId: true, createdAt: true },
+        })
+        if (!click || click.affiliateId !== affiliate.id) break
+
+        const occurredAt = invoice.status_transitions?.paid_at
+          ? new Date(invoice.status_transitions.paid_at * 1000)
+          : new Date()
+        // Enforce 30-day attribution window from click to conversion
+        if (occurredAt.getTime() - click.createdAt.getTime() > 30 * 24 * 60 * 60 * 1000) break
+
+        const paymentIntentId = typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id
+        if (!paymentIntentId) break
+
+        const { charge, balanceTx } = await getBalanceTransactionForPaymentIntent(paymentIntentId)
+        if (!charge || !balanceTx) break
+
+        const currency = String(balanceTx.currency || charge.currency || invoice.currency || 'aud').toLowerCase()
+        const gross = Number(balanceTx.amount || 0)
+        const fee = Number(balanceTx.fee || 0)
+        const net = Number(balanceTx.net || 0)
+        const chargeId = charge.id
+
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
+        let customerEmail: string | null = null
+        if (customerId) {
+          try {
+            const customer = await stripe.customers.retrieve(customerId)
+            customerEmail = (customer as Stripe.Customer)?.email?.toLowerCase() || null
+          } catch {}
+        }
+        const referredUser = customerEmail
+          ? await prisma.user.findUnique({ where: { email: customerEmail }, select: { id: true } }).catch(() => null)
+          : null
+
+        const conversion = await prisma.affiliateConversion
+          .create({
+            data: {
+              affiliateId: affiliate.id,
+              clickId: click.id,
+              referredUserId: referredUser?.id || null,
+              type: 'SUBSCRIPTION_INITIAL',
+              stripeEventId: event.id,
+              stripeCheckoutSessionId: null,
+              stripePaymentIntentId: paymentIntentId,
+              stripeChargeId: chargeId,
+              stripeInvoiceId: invoice.id,
+              currency,
+              amountGrossCents: gross,
+              stripeFeeCents: fee,
+              amountNetCents: net,
+              occurredAt,
+            },
+            select: { id: true },
+          })
+          .catch(() => null)
+
+        if (!conversion) break
+
+        const commissionCents = Math.floor(net / 2)
+        await prisma.affiliateCommission.create({
+          data: {
+            affiliateId: affiliate.id,
+            conversionId: conversion.id,
+            status: 'PENDING',
+            currency,
+            netRevenueCents: net,
+            commissionCents,
+            payableAt: addDays(occurredAt, 30),
+          },
+        })
+
+        break
+      }
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         
@@ -236,6 +363,99 @@ export async function POST(request: NextRequest) {
             })
           }
         }
+
+        // Affiliate attribution for top-ups (one-time payments)
+        if (session.mode === 'payment' && session.payment_status === 'paid') {
+          const affCode = (session.metadata as any)?.helfi_aff_code
+          const affClickId = (session.metadata as any)?.helfi_aff_click
+          if (!affCode || !affClickId) break
+
+          const affiliate = await prisma.affiliate.findUnique({
+            where: { code: String(affCode).toLowerCase() },
+            select: { id: true, status: true },
+          })
+          if (!affiliate || affiliate.status !== 'ACTIVE') break
+
+          const click = await prisma.affiliateClick.findUnique({
+            where: { id: String(affClickId) },
+            select: { id: true, affiliateId: true, createdAt: true },
+          })
+          if (!click || click.affiliateId !== affiliate.id) break
+
+          const occurredAt = session.created ? new Date(session.created * 1000) : new Date()
+          if (occurredAt.getTime() - click.createdAt.getTime() > 30 * 24 * 60 * 60 * 1000) break
+
+          const paymentIntentId =
+            typeof session.payment_intent === 'string' ? session.payment_intent : (session.payment_intent as any)?.id
+          if (!paymentIntentId) break
+
+          const { charge, balanceTx } = await getBalanceTransactionForPaymentIntent(paymentIntentId)
+          if (!charge || !balanceTx) break
+
+          const currency = String(balanceTx.currency || charge.currency || session.currency || 'aud').toLowerCase()
+          const gross = Number(balanceTx.amount || 0)
+          const fee = Number(balanceTx.fee || 0)
+          const net = Number(balanceTx.net || 0)
+          const chargeId = charge.id
+
+          const customerEmail = (session.customer_details?.email || session.customer_email || '').toLowerCase()
+          const referredUser = customerEmail
+            ? await prisma.user.findUnique({ where: { email: customerEmail }, select: { id: true } }).catch(() => null)
+            : null
+
+          const conversion = await prisma.affiliateConversion
+            .create({
+              data: {
+                affiliateId: affiliate.id,
+                clickId: click.id,
+                referredUserId: referredUser?.id || null,
+                type: 'TOPUP',
+                stripeEventId: event.id,
+                stripeCheckoutSessionId: session.id,
+                stripePaymentIntentId: paymentIntentId,
+                stripeChargeId: chargeId,
+                stripeInvoiceId: null,
+                currency,
+                amountGrossCents: gross,
+                stripeFeeCents: fee,
+                amountNetCents: net,
+                occurredAt,
+              },
+              select: { id: true },
+            })
+            .catch(() => null)
+
+          if (!conversion) break
+
+          const commissionCents = Math.floor(net / 2)
+          await prisma.affiliateCommission.create({
+            data: {
+              affiliateId: affiliate.id,
+              conversionId: conversion.id,
+              status: 'PENDING',
+              currency,
+              netRevenueCents: net,
+              commissionCents,
+              payableAt: addDays(occurredAt, 30),
+            },
+          })
+        }
+        break
+      }
+      case 'charge.refunded':
+      case 'charge.dispute.created': {
+        const charge = event.data.object as Stripe.Charge
+        const conversion = await prisma.affiliateConversion.findFirst({
+          where: { stripeChargeId: charge.id },
+          select: { id: true, commission: { select: { id: true, status: true, payableAt: true } } },
+        })
+        if (!conversion?.commission) break
+        if (conversion.commission.status !== 'PENDING') break
+
+        await prisma.affiliateCommission.update({
+          where: { id: conversion.commission.id },
+          data: { status: 'VOIDED' },
+        })
         break
       }
 

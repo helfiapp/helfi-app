@@ -1,12 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
+import { getAffiliateCookieData, isAffiliateAttributionFresh } from '@/lib/affiliate-cookies'
 
 // POST /api/billing/create-checkout-session
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const secretKey = process.env.STRIPE_SECRET_KEY
     if (!secretKey) {
@@ -54,6 +55,19 @@ export async function POST(request: Request) {
     // Get user email from session if available
     const session = await getServerSession(authOptions)
     const customerEmail = session?.user?.email || undefined
+
+    const affiliateCookie = getAffiliateCookieData(request)
+    const hasFreshAffiliateAttribution =
+      affiliateCookie && isAffiliateAttributionFresh(affiliateCookie.clickedAtMs)
+        ? true
+        : false
+    const affiliateMetadata = hasFreshAffiliateAttribution
+      ? {
+          helfi_aff_code: affiliateCookie!.code,
+          helfi_aff_click: affiliateCookie!.clickId,
+          helfi_aff_ts: String(affiliateCookie!.clickedAtMs),
+        }
+      : undefined
 
     // Check if user already has an active subscription (only for subscription plans, not credit top-ups)
     if (!isCredits && customerEmail) {
@@ -107,6 +121,14 @@ export async function POST(request: Request) {
       customer_email: customerEmail,
       allow_promotion_codes: true,
       payment_method_collection: 'always',
+      ...(affiliateMetadata ? { metadata: affiliateMetadata } : {}),
+      ...(isCredits
+        ? affiliateMetadata
+          ? { payment_intent_data: { metadata: affiliateMetadata } }
+          : {}
+        : affiliateMetadata
+          ? { subscription_data: { metadata: affiliateMetadata } }
+          : {}),
       // No trial period - subscriptions start immediately
     })
 

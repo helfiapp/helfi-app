@@ -6554,6 +6554,7 @@ export default function Onboarding() {
   // Removed forced remount to avoid infinite loops
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [profileImage, setProfileImage] = useState<string>('');
@@ -6634,6 +6635,36 @@ export default function Onboarding() {
   const hasProfileImage = !!(providerProfileImage || profileImage || session?.user?.image)
   const userImage = (providerProfileImage || profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
+
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setAffiliateMenu(null);
+      return;
+    }
+    let cancelled = false;
+    setAffiliateMenu({ label: 'Become an Affiliate', href: '/affiliate/apply' });
+    const loadAffiliateMenu = async () => {
+      try {
+        const res = await fetch('/api/affiliate/application', { cache: 'no-store' });
+        const data = await res.json().catch(() => ({} as any));
+        if (!res.ok) return;
+        const hasAffiliate = !!data?.affiliate;
+        const hasApplication = !!data?.application;
+        const menu = hasAffiliate
+          ? { label: 'Affiliate Portal', href: '/affiliate' }
+          : hasApplication
+            ? { label: 'Affiliate Application', href: '/affiliate/apply' }
+            : { label: 'Become an Affiliate', href: '/affiliate/apply' };
+        if (!cancelled) setAffiliateMenu(menu);
+      } catch {
+        // ignore
+      }
+    };
+    loadAffiliateMenu();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.email]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -7144,6 +7175,11 @@ export default function Onboarding() {
                     <Link href="/account" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Account Settings</Link>
                     <Link href="/profile/image" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Upload/Change Profile Photo</Link>
                     <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Subscription & Billing</Link>
+                    {affiliateMenu && (
+                      <Link href={affiliateMenu.href} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                        {affiliateMenu.label}
+                      </Link>
+                    )}
                     <Link href="/notifications" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
                     <Link href="/privacy" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Privacy Settings</Link>
                     <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>

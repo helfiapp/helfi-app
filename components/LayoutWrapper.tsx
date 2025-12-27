@@ -215,7 +215,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const [silentRestoreAttempted, setSilentRestoreAttempted] = useState(false)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
-  const publicPages = ['/', '/healthapp', '/auth/signin', '/auth/verify', '/auth/check-email', '/onboarding', '/privacy', '/terms', '/help', '/faq']
+  const publicPages = ['/', '/healthapp', '/auth/signin', '/auth/verify', '/auth/check-email', '/onboarding', '/privacy', '/terms', '/help', '/faq', '/affiliate/terms']
   
   // Admin panel paths should never show user sidebar
   const isAdminPanelPath =

@@ -61,6 +61,7 @@ export default function SignIn() {
   // the main app instead of making them log in again. Respect Health Setup:
   // - If Health Setup is incomplete, always go to /onboarding (existing behaviour).
   // - If complete, resume last in-app page when possible, otherwise go to dashboard.
+  // - If plan parameter exists, redirect to checkout after auth.
   useEffect(() => {
     if (status !== 'authenticated') return
     if (typeof window === 'undefined') {
@@ -69,6 +70,31 @@ export default function SignIn() {
     }
 
     const resume = async () => {
+      // Check for plan parameter - if exists, redirect to checkout
+      const searchParams = new URLSearchParams(window.location.search)
+      const planParam = searchParams.get('plan')
+      
+      if (planParam) {
+        // User came from homepage with a plan selected - redirect to checkout
+        try {
+          const res = await fetch('/api/billing/create-checkout-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: planParam }),
+          })
+          if (res.ok) {
+            const { url } = await res.json()
+            if (url) {
+              window.location.href = url
+              return
+            }
+          }
+        } catch (error) {
+          console.error('Checkout redirect error:', error)
+          // Fall through to normal redirect
+        }
+      }
+
       // First, check Health Setup status without changing its existing rules.
       try {
         const res = await fetch('/api/health-setup-status', { method: 'GET' })
@@ -120,7 +146,11 @@ export default function SignIn() {
 
   const handleGoogleAuth = async () => {
     setLoading(true)
-    await signIn('google', { callbackUrl: '/onboarding' })
+    // Check for plan parameter to preserve it through OAuth flow
+    const searchParams = new URLSearchParams(window.location.search)
+    const planParam = searchParams.get('plan')
+    const callbackUrl = planParam ? `/auth/signin?plan=${encodeURIComponent(planParam)}` : '/onboarding'
+    await signIn('google', { callbackUrl })
   }
 
   const persistRememberState = (remember: boolean, emailValue: string) => {
@@ -183,7 +213,16 @@ export default function SignIn() {
         if (!response.ok) {
           setError(data.error || 'Failed to create account. Please try again.')
         } else {
-          // Success - redirect to check email page
+          // Success - check for plan parameter to preserve it
+          const searchParams = new URLSearchParams(window.location.search)
+          const planParam = searchParams.get('plan')
+          if (planParam) {
+            // Store plan in sessionStorage to retrieve after email verification
+            try {
+              sessionStorage.setItem('helfi:signupPlan', planParam)
+            } catch {}
+          }
+          // Redirect to check email page
           window.location.href = `/auth/check-email?email=${encodeURIComponent(email)}`
         }
       } catch (error) {
@@ -198,6 +237,27 @@ export default function SignIn() {
         if (directResult.success) {
           persistRememberState(true, normalizedEmail)
           setLoading(false)
+          // Check for plan parameter - if exists, redirect to checkout
+          const searchParams = new URLSearchParams(window.location.search)
+          const planParam = searchParams.get('plan')
+          if (planParam) {
+            try {
+              const res = await fetch('/api/billing/create-checkout-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan: planParam }),
+              })
+              if (res.ok) {
+                const { url } = await res.json()
+                if (url) {
+                  window.location.href = url
+                  return
+                }
+              }
+            } catch (error) {
+              console.error('Checkout redirect error:', error)
+            }
+          }
           window.location.href = '/onboarding'
           return
         }
@@ -205,14 +265,60 @@ export default function SignIn() {
           setError(directResult.message)
         }
 
-        const res = await signIn('credentials', { email, password, callbackUrl: '/onboarding', redirect: false })
+        // Check for plan parameter to preserve it through auth flow
+        const searchParams = new URLSearchParams(window.location.search)
+        const planParam = searchParams.get('plan')
+        const callbackUrl = planParam ? `/auth/signin?plan=${encodeURIComponent(planParam)}` : '/onboarding'
+        
+        const res = await signIn('credentials', { email, password, callbackUrl, redirect: false })
         if (res?.ok) {
           // If they wanted a longer session, reissue via direct path to extend the cookie, but don't block redirect
           const extendResult = await attemptDirectSignin(true, normalizedEmail)
           if (extendResult.success) {
             persistRememberState(true, normalizedEmail)
+            setLoading(false)
+            // Redirect to checkout if plan parameter exists
+            if (planParam) {
+              try {
+                const checkoutRes = await fetch('/api/billing/create-checkout-session', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ plan: planParam }),
+                })
+                if (checkoutRes.ok) {
+                  const { url } = await checkoutRes.json()
+                  if (url) {
+                    window.location.href = url
+                    return
+                  }
+                }
+              } catch (error) {
+                console.error('Checkout redirect error:', error)
+              }
+            }
+            window.location.href = '/onboarding'
+            return
           }
           setLoading(false)
+          // Redirect to checkout if plan parameter exists
+          if (planParam) {
+            try {
+              const checkoutRes = await fetch('/api/billing/create-checkout-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan: planParam }),
+              })
+              if (checkoutRes.ok) {
+                const { url } = await checkoutRes.json()
+                if (url) {
+                  window.location.href = url
+                  return
+                }
+              }
+            } catch (error) {
+              console.error('Checkout redirect error:', error)
+            }
+          }
           window.location.href = '/onboarding'
           return
         } else {
@@ -220,6 +326,25 @@ export default function SignIn() {
           if (fallback.success) {
             persistRememberState(true, normalizedEmail)
             setLoading(false)
+            // Redirect to checkout if plan parameter exists
+            if (planParam) {
+              try {
+                const checkoutRes = await fetch('/api/billing/create-checkout-session', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ plan: planParam }),
+                })
+                if (checkoutRes.ok) {
+                  const { url } = await checkoutRes.json()
+                  if (url) {
+                    window.location.href = url
+                    return
+                  }
+                }
+              } catch (error) {
+                console.error('Checkout redirect error:', error)
+              }
+            }
             window.location.href = '/onboarding'
             return
           } else {

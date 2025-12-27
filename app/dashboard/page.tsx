@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null)
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [deviceInterest, setDeviceInterest] = useState<{ appleWatch?: boolean; fitbit?: boolean; garmin?: boolean; samsung?: boolean; googleFit?: boolean; oura?: boolean; polar?: boolean }>({})
   const [savingInterest, setSavingInterest] = useState<string | null>(null)
@@ -54,6 +55,36 @@ export default function Dashboard() {
       return () => document.removeEventListener('mousedown', handleClick);
     }
   }, [dropdownOpen]);
+
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setAffiliateMenu(null)
+      return
+    }
+    let cancelled = false
+    setAffiliateMenu({ label: 'Become an Affiliate', href: '/affiliate/apply' })
+    const loadAffiliateMenu = async () => {
+      try {
+        const res = await fetch('/api/affiliate/application', { cache: 'no-store' })
+        const data = await res.json().catch(() => ({} as any))
+        if (!res.ok) return
+        const hasAffiliate = !!data?.affiliate
+        const hasApplication = !!data?.application
+        const menu = hasAffiliate
+          ? { label: 'Affiliate Portal', href: '/affiliate' }
+          : hasApplication
+            ? { label: 'Affiliate Application', href: '/affiliate/apply' }
+            : { label: 'Become an Affiliate', href: '/affiliate/apply' }
+        if (!cancelled) setAffiliateMenu(menu)
+      } catch {
+        // ignore
+      }
+    }
+    loadAffiliateMenu()
+    return () => {
+      cancelled = true
+    }
+  }, [session?.user?.email])
 
   // Load existing data from database (cross-device sync)
   useEffect(() => {
@@ -461,6 +492,11 @@ export default function Dashboard() {
                     <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
                     <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
                     <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                    {affiliateMenu && (
+                      <Link href={affiliateMenu.href} className="block px-4 py-2 text-gray-700 hover:bg-gray-50">
+                        {affiliateMenu.label}
+                      </Link>
+                    )}
                     <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
                     <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                     <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
@@ -556,6 +592,11 @@ export default function Dashboard() {
                     <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
                     <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
                     <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                    {affiliateMenu && (
+                      <Link href={affiliateMenu.href} className="block px-4 py-2 text-gray-700 hover:bg-gray-50">
+                        {affiliateMenu.label}
+                      </Link>
+                    )}
                     <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
                     <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                     <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
