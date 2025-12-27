@@ -12299,8 +12299,8 @@ Please add nutritional information manually if needed.`);
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
-                    <div className="mb-6 space-y-3">
-                      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="mb-6 space-y-2">
+                      <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
                         <div className="flex items-center justify-between gap-3 sm:justify-end">
                           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -12461,9 +12461,10 @@ Please add nutritional information manually if needed.`);
                         const barcodeCode = item?.barcode ? String(item.barcode) : ''
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
+                        const isCollapsed = isMultiIngredient && !isExpanded
                         
                         const cardPaddingClass =
-                          isMultiIngredient && !isExpanded ? 'py-2 px-3' : 'p-4'
+                          isCollapsed ? 'py-2 px-3' : 'p-4'
 
                         return (
                           <div
@@ -12472,9 +12473,31 @@ Please add nutritional information manually if needed.`);
                             className={`bg-white rounded-xl border border-gray-200 shadow-sm ${cardPaddingClass}`}
                           >
                             {/* Header row with actions, title, and description */}
-                            <div className={`flex flex-col ${isMultiIngredient && !isExpanded ? 'mb-0.5' : 'mb-2'}`}>
-                              <div className="flex items-center justify-end gap-1">
-                                {(!isMultiIngredient || isExpanded) && (
+                            {isCollapsed ? (
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="font-semibold text-gray-900 text-base leading-tight">
+                                  {displayName}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setExpandedItemIndex(expandedItemIndex === index ? null : index)
+                                  }}
+                                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                  title="Expand"
+                                >
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col mb-2">
+                                <div className="flex items-center justify-end gap-1">
                                   <div className="flex items-center gap-1">
                                     <button
                                       type="button"
@@ -12514,113 +12537,105 @@ Please add nutritional information manually if needed.`);
                                       <HandThumbDownIcon className="w-5 h-5" />
                                     </button>
                                   </div>
-                                )}
-                                {(!isMultiIngredient || isExpanded) && (
-                                  <>
-                                    <button
-                                      onClick={() => {
-                                        setEditingItemIndex(index);
-                                        setShowItemEditModal(true);
-                                      }}
-                                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                      title="Adjust details"
-                                    >
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                      </svg>
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteItem(index)}
-                                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                      title="Delete ingredient"
-                                    >
-                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-7 0l1 12a2 2 0 002 2h2a2 2 0 002-2l1-12" />
-                                      </svg>
-                                    </button>
-                                  </>
-                                )}
-                                {isMultiIngredient && (
                                   <button
                                     onClick={() => {
-                                      setExpandedItemIndex(expandedItemIndex === index ? null : index)
+                                      setEditingItemIndex(index);
+                                      setShowItemEditModal(true);
                                     }}
-                                    className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                                    title={isExpanded ? 'Collapse' : 'Expand'}
+                                    className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                    title="Adjust details"
                                   >
-                                    <svg
-                                      className={`w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteItem(index)}
+                                    className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Delete ingredient"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-7 0l1 12a2 2 0 002 2h2a2 2 0 002-2l1-12" />
+                                    </svg>
+                                  </button>
+                                  {isMultiIngredient && (
+                                    <button
+                                      onClick={() => {
+                                        setExpandedItemIndex(expandedItemIndex === index ? null : index)
+                                      }}
+                                      className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                      title={isExpanded ? 'Collapse' : 'Expand'}
+                                    >
+                                      <svg
+                                        className={`w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="font-semibold text-gray-900 text-base mt-1">
+                                  {displayName}
+                                </div>
+                                {item.brand && (
+                                  <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
+                                )}
+                                <div 
+                                  className="text-sm text-gray-500 mt-1 md:cursor-default cursor-pointer active:opacity-70"
+                                  onClick={() => {
+                                    // On mobile, clicking serving size focuses weight input
+                                    if (window.innerWidth < 768) {
+                                      focusWeightInput()
+                                    }
+                                  }}
+                                >
+                                  Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
+                                </div>
+                                {servingOptions.length > 0 && (
+                                  <div className="mt-2">
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                                      Serving size
+                                    </label>
+                                    <select
+                                      value={selectedServingId || servingOptions[0]?.id || ''}
+                                      onChange={(e) => handleServingOptionSelect(index, e.target.value)}
+                                      className="w-full max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    >
+                                      {servingOptions.map((option: any) => (
+                                        <option key={option.id} value={option.id}>
+                                          {option.label || option.serving_size}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {item?.dbSource && (
+                                      <div className="mt-1 text-[11px] text-gray-400">
+                                        Data source: {item.dbSource === 'usda' ? 'USDA' : item.dbSource === 'fatsecret' ? 'FatSecret' : 'Database'}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {isBarcodeItem && barcodeCode && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setBarcodeLabelFlow({
+                                        barcode: barcodeCode,
+                                        reason: 'report',
+                                        productName: item?.name || null,
+                                        brand: item?.brand || null,
+                                      })
+                                      setShowBarcodeLabelPrompt(true)
+                                    }}
+                                    className="mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline"
+                                  >
+                                    Report incorrect nutrition
                                   </button>
                                 )}
                               </div>
-                              <div className={`font-semibold text-gray-900 text-base ${isMultiIngredient && !isExpanded ? 'mt-0.5' : 'mt-1'}`}>
-                                {displayName}
-                              </div>
-                              {(!isMultiIngredient || isExpanded) && (
-                                <>
-                                  {item.brand && (
-                                    <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
-                                  )}
-                                  <div 
-                                    className="text-sm text-gray-500 mt-1 md:cursor-default cursor-pointer active:opacity-70"
-                                    onClick={() => {
-                                      // On mobile, clicking serving size focuses weight input
-                                      if (window.innerWidth < 768) {
-                                        focusWeightInput()
-                                      }
-                                    }}
-                                  >
-                                    Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
-                                  </div>
-                                  {servingOptions.length > 0 && (
-                                    <div className="mt-2">
-                                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                                        Serving size
-                                      </label>
-                                      <select
-                                        value={selectedServingId || servingOptions[0]?.id || ''}
-                                        onChange={(e) => handleServingOptionSelect(index, e.target.value)}
-                                        className="w-full max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                      >
-                                        {servingOptions.map((option: any) => (
-                                          <option key={option.id} value={option.id}>
-                                            {option.label || option.serving_size}
-                                          </option>
-                                        ))}
-                                      </select>
-                                      {item?.dbSource && (
-                                        <div className="mt-1 text-[11px] text-gray-400">
-                                          Data source: {item.dbSource === 'usda' ? 'USDA' : item.dbSource === 'fatsecret' ? 'FatSecret' : 'Database'}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  {isBarcodeItem && barcodeCode && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setBarcodeLabelFlow({
-                                          barcode: barcodeCode,
-                                          reason: 'report',
-                                          productName: item?.name || null,
-                                          brand: item?.brand || null,
-                                        })
-                                        setShowBarcodeLabelPrompt(true)
-                                      }}
-                                      className="mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline"
-                                    >
-                                      Report incorrect nutrition
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                            </div>
+                            )}
                             
                             {/* Portion controls: servings + optional weight editor (keeps servings/pieces/weight in sync). */}
                             {isExpanded && (
