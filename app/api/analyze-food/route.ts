@@ -477,7 +477,42 @@ const extractComponentsFromDelimitedText = (raw: string | null | undefined): str
     )
     .filter((part) => part.length >= 3);
 
-  const filtered = parts.filter((part) => {
+  const mergeSaladComponents = (items: string[]) => {
+    const merged: string[] = [];
+    const veggieHints = [
+      'lettuce','cucumber','tomato','carrot','carrots','onion','pepper','peppers','capsicum','spinach','rocket','arugula','greens','shredded',
+    ];
+    const stopHints = ['portion','sauce','fish','shrimp','prawn','wedges','fries','steak','chicken','pork','rice','potato','tartar'];
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i];
+      const lower = item.toLowerCase();
+      if (lower.includes('salad') && lower.includes('with')) {
+        const parts: string[] = [item];
+        let j = i + 1;
+        while (j < items.length) {
+          const next = items[j];
+          const nextLower = next.toLowerCase();
+          if (stopHints.some((h) => nextLower.includes(h))) break;
+          const wordCount = nextLower.split(/\s+/).filter(Boolean).length;
+          if (wordCount <= 2 || veggieHints.some((h) => nextLower.includes(h))) {
+            parts.push(next);
+            j += 1;
+            continue;
+          }
+          break;
+        }
+        merged.push(parts.join(', '));
+        i = j - 1;
+        continue;
+      }
+      merged.push(item);
+    }
+    return merged;
+  };
+
+  const mergedParts = mergeSaladComponents(parts);
+
+  const filtered = mergedParts.filter((part) => {
     if (/^component\s*\d+$/i.test(part)) return false;
     return !/nutrition|breakdown|estimated|calories?|protein|carbs?|fat|fiber|fibre|sugar/i.test(part);
   });
@@ -528,7 +563,42 @@ const extractComponentsFromAnalysis = (analysis: string | null | undefined): str
     )
     .filter((part) => part.length >= 3);
 
-  const filtered = parts.filter((part) => {
+  const mergeSaladComponents = (items: string[]) => {
+    const merged: string[] = [];
+    const veggieHints = [
+      'lettuce','cucumber','tomato','carrot','carrots','onion','pepper','peppers','capsicum','spinach','rocket','arugula','greens','shredded',
+    ];
+    const stopHints = ['portion','sauce','fish','shrimp','prawn','wedges','fries','steak','chicken','pork','rice','potato','tartar'];
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i];
+      const lower = item.toLowerCase();
+      if (lower.includes('salad') && lower.includes('with')) {
+        const parts: string[] = [item];
+        let j = i + 1;
+        while (j < items.length) {
+          const next = items[j];
+          const nextLower = next.toLowerCase();
+          if (stopHints.some((h) => nextLower.includes(h))) break;
+          const wordCount = nextLower.split(/\s+/).filter(Boolean).length;
+          if (wordCount <= 2 || veggieHints.some((h) => nextLower.includes(h))) {
+            parts.push(next);
+            j += 1;
+            continue;
+          }
+          break;
+        }
+        merged.push(parts.join(', '));
+        i = j - 1;
+        continue;
+      }
+      merged.push(item);
+    }
+    return merged;
+  };
+
+  const mergedParts = mergeSaladComponents(parts);
+
+  const filtered = mergedParts.filter((part) => {
     if (/^component\s*\d+$/i.test(part)) return false;
     return !/nutrition|breakdown|estimated|calories?|protein|carbs?|fat|fiber|fibre|sugar/i.test(part);
   });
