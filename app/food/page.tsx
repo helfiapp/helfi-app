@@ -12463,7 +12463,7 @@ Please add nutritional information manually if needed.`);
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
                         
                         const cardPaddingClass =
-                          isMultiIngredient && !isExpanded ? 'py-2.5 px-4' : 'p-4'
+                          isMultiIngredient && !isExpanded ? 'py-2 px-3' : 'p-4'
 
                         return (
                           <div
@@ -12472,47 +12472,49 @@ Please add nutritional information manually if needed.`);
                             className={`bg-white rounded-xl border border-gray-200 shadow-sm ${cardPaddingClass}`}
                           >
                             {/* Header row with actions, title, and description */}
-                            <div className={`flex flex-col ${isMultiIngredient && !isExpanded ? 'mb-1' : 'mb-2'}`}>
+                            <div className={`flex flex-col ${isMultiIngredient && !isExpanded ? 'mb-0.5' : 'mb-2'}`}>
                               <div className="flex items-center justify-end gap-1">
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (analysisFeedbackItems[index]) return
-                                      setAnalysisFeedbackItems((prev) => ({ ...prev, [index]: 'up' }))
-                                      submitFoodAnalysisFeedback({ scope: 'item', rating: 'up', itemIndex: index })
-                                      showQuickToast('Thanks for the feedback!')
-                                    }}
-                                    className={`p-1 rounded-md transition-colors ${
-                                      analysisFeedbackItems[index] === 'up'
-                                        ? 'text-emerald-600 bg-emerald-50'
-                                        : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
-                                    }`}
-                                    title="Thumbs up"
-                                    disabled={analysisFeedbackItems[index] !== undefined}
-                                  >
-                                    <HandThumbUpIcon className="w-5 h-5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (analysisFeedbackItems[index]) return
-                                      setFeedbackPrompt({ scope: 'item', itemIndex: index })
-                                      setFeedbackReasons([])
-                                      setFeedbackComment('')
-                                      setFeedbackError(null)
-                                    }}
-                                    className={`p-1 rounded-md transition-colors ${
-                                      analysisFeedbackItems[index] === 'down'
-                                        ? 'text-red-600 bg-red-50'
-                                        : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
-                                    }`}
-                                    title="Thumbs down"
-                                    disabled={analysisFeedbackItems[index] !== undefined}
-                                  >
-                                    <HandThumbDownIcon className="w-5 h-5" />
-                                  </button>
-                                </div>
+                                {(!isMultiIngredient || isExpanded) && (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (analysisFeedbackItems[index]) return
+                                        setAnalysisFeedbackItems((prev) => ({ ...prev, [index]: 'up' }))
+                                        submitFoodAnalysisFeedback({ scope: 'item', rating: 'up', itemIndex: index })
+                                        showQuickToast('Thanks for the feedback!')
+                                      }}
+                                      className={`p-1 rounded-md transition-colors ${
+                                        analysisFeedbackItems[index] === 'up'
+                                          ? 'text-emerald-600 bg-emerald-50'
+                                          : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
+                                      }`}
+                                      title="Thumbs up"
+                                      disabled={analysisFeedbackItems[index] !== undefined}
+                                    >
+                                      <HandThumbUpIcon className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (analysisFeedbackItems[index]) return
+                                        setFeedbackPrompt({ scope: 'item', itemIndex: index })
+                                        setFeedbackReasons([])
+                                        setFeedbackComment('')
+                                        setFeedbackError(null)
+                                      }}
+                                      className={`p-1 rounded-md transition-colors ${
+                                        analysisFeedbackItems[index] === 'down'
+                                          ? 'text-red-600 bg-red-50'
+                                          : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                                      }`}
+                                      title="Thumbs down"
+                                      disabled={analysisFeedbackItems[index] !== undefined}
+                                    >
+                                      <HandThumbDownIcon className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                )}
                                 {(!isMultiIngredient || isExpanded) && (
                                   <>
                                     <button
@@ -12557,7 +12559,7 @@ Please add nutritional information manually if needed.`);
                                   </button>
                                 )}
                               </div>
-                              <div className="font-semibold text-gray-900 text-base mt-1">
+                              <div className={`font-semibold text-gray-900 text-base ${isMultiIngredient && !isExpanded ? 'mt-0.5' : 'mt-1'}`}>
                                 {displayName}
                               </div>
                               {(!isMultiIngredient || isExpanded) && (
