@@ -2875,6 +2875,83 @@ CRITICAL REQUIREMENTS:
       }
     }
 
+    // Final safety net for image analyses: if we still have no usable items,
+    // force a structured follow-up using the image + analysis text.
+    if (
+      wantStructured &&
+      isImageAnalysis &&
+      !packagedMode &&
+      (!resp.items ||
+        resp.items.length === 0 ||
+        looksLikeSingleGenericItem(resp.items) ||
+        looksLikeMultiIngredientSummary(resp.items))
+    ) {
+      try {
+        const forcedComponents =
+          listedComponents.length > 1
+            ? listedComponents
+            : extractComponentsFromDelimitedText(analysisTextForFollowUp);
+        const requireMultiple = forcedComponents.length > 1 || analysisLooksMulti;
+        const forcedHint =
+          forcedComponents.length > 0
+            ? `- Components list (include each as its own item): ${forcedComponents.join(', ')}.\n`
+            : '';
+        const forcedRequirement = requireMultiple ? `- Return at least ${Math.max(forcedComponents.length, 2)} items.\n` : '';
+        const forcedPrompt =
+          'Return JSON only with this shape:\n' +
+          '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],' +
+          '"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+          forcedHint +
+          forcedRequirement +
+          '- Use the image as the primary source of truth.\n' +
+          '- Do NOT return a single summary item for a multi-ingredient meal.\n' +
+          '- Use realistic per-serving values for each ingredient.\n' +
+          '\nAnalysis text:\n' +
+          analysisTextForFollowUp;
+        console.warn('⚠️ Analyzer: forcing structured image follow-up (items missing).');
+        const forcedFollowUp = await chatCompletionWithCost(openai, {
+          model: 'gpt-4o',
+          response_format: { type: 'json_object' } as any,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: forcedPrompt },
+                { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+              ],
+            },
+          ],
+          max_tokens: 420,
+          temperature: 0,
+        } as any);
+
+        totalCostCents += forcedFollowUp.costCents;
+        const text = forcedFollowUp.completion.choices?.[0]?.message?.content?.trim() || '';
+        const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+        if (parsed) {
+          const items = Array.isArray(parsed)
+            ? parsed
+            : Array.isArray((parsed as any).items)
+            ? (parsed as any).items
+            : [];
+          const total =
+            !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
+              ? (parsed as any).total
+              : null;
+          if (items.length > 0 && !looksLikeSingleGenericItem(items)) {
+            resp.items = sanitizeStructuredItems(items);
+            resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
+            itemsSource = itemsSource === 'none' ? 'forced_image_followup' : `${itemsSource}+forced_image_followup`;
+            itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+            console.log('✅ Forced image follow-up produced items:', resp.items.length);
+          }
+        }
+      } catch (forcedErr) {
+        console.warn('Forced image follow-up failed (non-fatal):', forcedErr);
+      }
+    }
+
     // If the analysis text clearly lists components that are missing from ITEMS_JSON,
     // backfill those components so the user can edit/remove them.
     if (wantStructured && preferMultiDetect && !componentBoundApplied) {
