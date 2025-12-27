@@ -1630,12 +1630,18 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       return
     }
 
+    const authToken = sessionStorage.getItem('adminToken') || adminToken
+    if (!authToken) {
+      alert('Session expired. Please log in again and retry.')
+      return
+    }
+
     try {
       const response = await fetch('/api/admin/management', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminToken}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           action: 'change_password',
@@ -1651,8 +1657,13 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
         setNewPassword('')
         setConfirmPassword('')
       } else {
-        const error = await response.json()
-        alert(`Failed to change password: ${error.message}`)
+        const error = await response.json().catch(() => ({}))
+        const message = error?.error || error?.message || 'Unable to change password'
+        if (response.status === 401) {
+          alert('Session expired. Please log out, log back in, and try again.')
+          return
+        }
+        alert(`Failed to change password: ${message}`)
       }
     } catch (error) {
       console.error('Error changing password:', error)
