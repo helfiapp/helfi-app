@@ -2952,6 +2952,77 @@ CRITICAL REQUIREMENTS:
       }
     }
 
+    // Absolute last resort: if we still have no usable items, run a text-only
+    // structured extractor so the UI never falls back to a summary-only card.
+    if (
+      wantStructured &&
+      !packagedMode &&
+      analysisTextForFollowUp &&
+      (!resp.items ||
+        resp.items.length === 0 ||
+        looksLikeSingleGenericItem(resp.items) ||
+        looksLikeMultiIngredientSummary(resp.items))
+    ) {
+      try {
+        const fallbackComponents = extractComponentsFromDelimitedText(analysisTextForFollowUp);
+        const requireMultiple = fallbackComponents.length > 1 || analysisLooksMulti;
+        const fallbackHint =
+          fallbackComponents.length > 0
+            ? `- Components list (include each as its own item): ${fallbackComponents.join(', ')}.\n`
+            : '';
+        const fallbackRequirement = requireMultiple
+          ? `- Return at least ${Math.max(fallbackComponents.length, 2)} items.\n`
+          : '';
+        console.warn('⚠️ Analyzer: running final text-only structured fallback.');
+        const fallback = await chatCompletionWithCost(openai, {
+          model: 'gpt-4o-mini',
+          response_format: { type: 'json_object' } as any,
+          messages: [
+            {
+              role: 'user',
+              content:
+                'Return JSON only with this shape:\n' +
+                '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],' +
+                '"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+                fallbackHint +
+                fallbackRequirement +
+                '- Use realistic per-serving values.\n' +
+                '- Do NOT collapse multiple foods into a single summary item.\n' +
+                '\nAnalysis text:\n' +
+                analysisTextForFollowUp,
+            },
+          ],
+          max_tokens: 360,
+          temperature: 0,
+        } as any);
+
+        totalCostCents += fallback.costCents;
+        const text = fallback.completion.choices?.[0]?.message?.content?.trim() || '';
+        const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+        if (parsed) {
+          const items = Array.isArray(parsed)
+            ? parsed
+            : Array.isArray((parsed as any).items)
+            ? (parsed as any).items
+            : [];
+          const total =
+            !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
+              ? (parsed as any).total
+              : null;
+          if (items.length > 0 && !looksLikeSingleGenericItem(items)) {
+            resp.items = sanitizeStructuredItems(items);
+            resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
+            itemsSource = itemsSource === 'none' ? 'text_only_fallback' : `${itemsSource}+text_only_fallback`;
+            itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+            console.log('✅ Text-only fallback produced items:', resp.items.length);
+          }
+        }
+      } catch (fallbackErr) {
+        console.warn('Text-only fallback failed (non-fatal):', fallbackErr);
+      }
+    }
+
     // If the analysis text clearly lists components that are missing from ITEMS_JSON,
     // backfill those components so the user can edit/remove them.
     if (wantStructured && preferMultiDetect && !componentBoundApplied) {
