@@ -24,6 +24,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   const [creditsTotal, setCreditsTotal] = useState<number | null>(null)
   const [creditsDailyRemaining, setCreditsDailyRemaining] = useState<number | null>(null)
   const [creditsAdditionalRemaining, setCreditsAdditionalRemaining] = useState<number | null>(null)
+  const [creditData, setCreditData] = useState<any>(null) // Store full API response for free credits check
   // Listen for global refresh events so sidebar meter updates immediately after charges
   const [eventTick, setEventTick] = useState(0)
   useEffect(() => {
@@ -81,6 +82,8 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
             if (typeof data.credits.dailyRemaining === 'number') setCreditsDailyRemaining(data.credits.dailyRemaining)
             if (typeof data.credits.additionalRemaining === 'number') setCreditsAdditionalRemaining(data.credits.additionalRemaining)
           }
+          // Store full data for free credits check
+          setCreditData(data)
         } else {
           setHasAccess(false)
         }
@@ -120,9 +123,14 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   const displayPercentRemainingInline = Number(clampedRemaining.toFixed(1))
   const displayPercentRemaining = Math.round(clampedRemaining)
 
+  // Get free credits status from API response
+  const exhaustedFreeCredits = creditData?.exhaustedFreeCredits ?? false
+  const freeCreditsTotal = creditData?.freeCredits?.total ?? 0
+
   // Low credits: show red when remaining is genuinely low.
+  // BUT: Only show warning if free credits are exhausted AND wallet credits are low
   const lowCreditsThreshold = Math.max(5, Math.ceil(monthlyCapCents > 0 ? monthlyCapCents * 0.05 : 0))
-  const isLowCredits = creditsRemaining <= lowCreditsThreshold
+  const isLowCredits = creditsRemaining <= lowCreditsThreshold && exhaustedFreeCredits
 
   if (inline) {
     // Inline version for AI feature pages - credits remaining with green bar (reverse fill)
@@ -137,6 +145,11 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
             {creditsDisplayInline?.toLocaleString()}
           </span>
         </div>
+        {freeCreditsTotal > 0 && !exhaustedFreeCredits && (
+          <div className="mb-2 text-xs text-green-600 font-medium">
+            {freeCreditsTotal} free credit{freeCreditsTotal !== 1 ? 's' : ''} remaining
+          </div>
+        )}
         <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden relative">
           {/* Background bar - shows remaining (green) */}
           <div
@@ -146,7 +159,8 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
             style={{ width: `${Math.min(100, Math.max(0, creditsRemainingPercent))}%` }}
           />
         </div>
-        {creditsDisplayInline !== null && creditsDisplayInline <= 5 && (
+        {/* Only show warning if free credits are exhausted AND wallet credits are low */}
+        {creditsDisplayInline !== null && creditsDisplayInline <= 5 && exhaustedFreeCredits && (
           <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2">
             <p className="text-xs text-red-800 font-medium mb-1">⚠️ Low Credits Warning</p>
             <p className="text-xs text-red-700 mb-2">

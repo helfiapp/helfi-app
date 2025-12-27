@@ -46,10 +46,13 @@ model User {
   monthlyMedicalImageAnalysisUsed Int @default(0) // Medical image analyses used this month
   monthlyInsightsGenerationUsed   Int @default(0) // Insights generations used this month
 
-  // One-time free use tracking (one free use per AI feature)
-  hasUsedFreeFoodAnalysis        Boolean @default(false) // Has used free food analysis
-  hasUsedFreeInteractionAnalysis Boolean @default(false) // Has used free interaction analysis
-  hasUsedFreeMedicalAnalysis     Boolean @default(false) // Has used free medical image analysis
+  // Free credits tracking (granted once on signup)
+  freeFoodAnalysisRemaining       Int @default(5) // 5 free food image analyses
+  freeSymptomAnalysisRemaining    Int @default(2) // 2 free symptom analyses
+  freeMedicalAnalysisRemaining    Int @default(2) // 2 free medical image analyses
+  freeInteractionAnalysisRemaining Int @default(2) // 2 free supplement/medication interaction analyses
+  freeHealthIntakeRemaining       Int @default(1) // 1 free full health intake analysis (on page 11 complete)
+  freeInsightsUpdateRemaining     Int @default(3) // 3 free insights updates (when changing health setup)
 
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
+import { getFreeCreditsStatus, hasExhaustedFreeCredits } from '@/lib/free-credits'
 import { prisma } from '@/lib/prisma'
 
 // ABSOLUTE GUARD RAIL:
@@ -121,6 +122,13 @@ export async function GET(_req: NextRequest) {
             startDate: true,
           },
         },
+        // Free credits
+        freeFoodAnalysisRemaining: true,
+        freeSymptomAnalysisRemaining: true,
+        freeMedicalAnalysisRemaining: true,
+        freeInteractionAnalysisRemaining: true,
+        freeHealthIntakeRemaining: true,
+        freeInsightsUpdateRemaining: true,
         creditTopUps: {
           select: {
             id: true,
@@ -182,6 +190,10 @@ export async function GET(_req: NextRequest) {
     debugStage = 'compute-reset'
     const refreshAt = computeNextResetAt(user.subscription?.startDate ?? null)
 
+    // Get free credits status
+    const freeCreditsStatus = await getFreeCreditsStatus(user.id)
+    const exhaustedFreeCredits = await hasExhaustedFreeCredits(user.id)
+
     return NextResponse.json({
       schemaVersion: 2,
       debugStage: 'success',
@@ -205,6 +217,8 @@ export async function GET(_req: NextRequest) {
         dailyRemaining: showLegacy ? dailyRemainingLegacy : 0,
         additionalRemaining: additionalAvailable,
       },
+      freeCredits: freeCreditsStatus,
+      exhaustedFreeCredits,
     })
   } catch (err: any) {
     console.error('Error in /api/credit/status:', err)

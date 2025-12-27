@@ -17,6 +17,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { lookupFoodNutrition, searchFatSecretFoods } from '@/lib/food-data';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
+import { hasFreeCredits, consumeFreeCredit, type FreeCreditType } from '@/lib/free-credits';
 import crypto from 'crypto';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { normalizeDiscreteItems, summarizeDiscreteItemsForLog } from '@/lib/food-normalization';
@@ -2167,25 +2168,26 @@ CRITICAL REQUIREMENTS:
       (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
     );
     
-    // Check if user has used their free food analysis
-    const hasUsedFreeFood = (currentUser as any).hasUsedFreeFoodAnalysis || false;
+    // Check if user has free credits remaining
+    const hasFreeFoodCredits = await hasFreeCredits(currentUser.id, 'FOOD_ANALYSIS');
     
     // Billing is now stable again – enforce credit checks for Food Analysis.
-    // This controls wallet pre-checks and charges; free trial logic still applies.
+    // This controls wallet pre-checks and charges; free credits are consumed first.
     const BILLING_ENFORCED = true;
 
-    // Allow if: Premium subscription OR has purchased credits OR hasn't used free use yet
+    // Allow if: Premium subscription OR has purchased credits OR has free credits remaining
     let allowViaFreeUse = false;
-    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeFood && !isReanalysis) {
-      // First time use - allow free
+    if (!isPremium && !hasPurchasedCredits && hasFreeFoodCredits && !isReanalysis) {
+      // Has free credits - allow free use
       allowViaFreeUse = true;
-    } else if (BILLING_ENFORCED && !isPremium && !hasPurchasedCredits) {
-      // No subscription, no credits, and already used free - require payment
+    } else if (BILLING_ENFORCED && !isPremium && !hasPurchasedCredits && !hasFreeFoodCredits) {
+      // No subscription, no credits, and no free credits - require payment
       return NextResponse.json(
         { 
           error: 'Payment required',
-          message: 'You\'ve used your free food analysis. Subscribe to a monthly plan or purchase credits to continue.',
-          requiresPayment: true
+          message: 'You\'ve used all your free food analyses. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true,
+          exhaustedFreeCredits: true
         },
         { status: 402 }
       );
@@ -2439,22 +2441,9 @@ CRITICAL REQUIREMENTS:
     
     // Note: Charging happens after health compatibility check to include all costs
 
-    // Update counters and mark free use as used
+    // Consume free credit if this was a free use
     if (allowViaFreeUse && !isReanalysis) {
-      // Mark free use as used (safe if column doesn't exist yet - migration pending)
-      try {
-        await prisma.user.update({
-          where: { id: currentUser.id },
-          data: {
-            hasUsedFreeFoodAnalysis: true,
-          } as any
-        })
-      } catch (e: any) {
-        // Ignore if column doesn't exist yet (migration pending)
-        if (!e.message?.includes('does not exist')) {
-          console.warn('Failed to update hasUsedFreeFoodAnalysis:', e)
-        }
-      }
+      await consumeFreeCredit(currentUser.id, 'FOOD_ANALYSIS');
     }
     // Update counters (for all users, not just premium)
     await prisma.user.update({

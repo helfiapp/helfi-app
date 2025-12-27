@@ -106,12 +106,19 @@ export async function POST(request: NextRequest) {
     console.log('👤 Creating new UNVERIFIED user via direct signup:', email)
     
     // Create user but DON'T verify email yet
+    // Grant free credits: 5 food, 2 symptom, 2 medical, 2 interaction, 1 health intake, 3 insights
     const user = await prisma.user.create({
       data: {
         email: email.toLowerCase(),
         name: email.split('@')[0],
         emailVerified: null, // CRITICAL: User is NOT verified
-      }
+        freeFoodAnalysisRemaining: 5,
+        freeSymptomAnalysisRemaining: 2,
+        freeMedicalAnalysisRemaining: 2,
+        freeInteractionAnalysisRemaining: 2,
+        freeHealthIntakeRemaining: 1,
+        freeInsightsUpdateRemaining: 3,
+      } as any
     })
     
     // Generate verification token

@@ -515,13 +515,31 @@ export default function AccountPage() {
                   if (deleteConfirmText === 'DELETE') {
                     setIsDeleting(true)
                     try {
-                      // Delete account logic here
-                      alert('Account deletion functionality coming soon!')
+                      const response = await fetch('/api/account/delete', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                      })
+
+                      if (!response.ok) {
+                        const error = await response.json()
+                        throw new Error(error.message || 'Failed to delete account')
+                      }
+
+                      // Account deleted successfully - sign out and redirect
                       setShowDeleteConfirm(false)
                       setDeleteConfirmText('')
-                    } catch (error) {
+                      
+                      // Show success message briefly, then sign out and redirect
+                      alert('Your account has been permanently deleted. You will be signed out now.')
+                      
+                      // Sign out and redirect to homepage
+                      // Clear session and redirect
+                      window.location.href = '/api/auth/signout?callbackUrl=/&message=Account deleted successfully'
+                    } catch (error: any) {
                       console.error('Deletion failed:', error)
-                      alert('Account deletion failed. Please try again.')
+                      alert(error.message || 'Account deletion failed. Please try again.')
                     } finally {
                       setIsDeleting(false)
                     }
