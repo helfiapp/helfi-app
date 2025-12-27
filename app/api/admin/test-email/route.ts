@@ -1,35 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import bcrypt from 'bcryptjs'
-import { PrismaClient } from '@prisma/client'
+import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { getEmailFooter } from '@/lib/email-footer'
-
-const prisma = new PrismaClient()
 
 export async function POST(request: NextRequest) {
   try {
     // Verify admin token
     const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-
-    // Accept temporary admin token used by the admin panel for tests
-    if (token !== 'temp-admin-token') {
-      // Check admin authentication using raw query
-      const adminUsers = await prisma.$queryRaw`
-        SELECT * FROM "AdminUser" 
-        WHERE email = 'info@sonicweb.com.au' 
-        AND "isActive" = true 
-        LIMIT 1
-      ` as any[]
-      
-      const adminUser = adminUsers[0]
-      if (!adminUser || !bcrypt.compareSync(token, adminUser.password)) {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-      }
     }
 
     const { testEmail } = await request.json()

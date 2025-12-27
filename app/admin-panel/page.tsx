@@ -5,12 +5,17 @@ import Image from 'next/image'
 
 export default function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [adminToken, setAdminToken] = useState('')
   const [adminUser, setAdminUser] = useState<any>(null)
+  const [totpSetupUrl, setTotpSetupUrl] = useState<string | null>(null)
+  const [totpQrData, setTotpQrData] = useState<string | null>(null)
+  const [needsOtp, setNeedsOtp] = useState(false)
   
   // Analytics data states
   const [analyticsData, setAnalyticsData] = useState<any[]>([])
@@ -210,31 +215,75 @@ export default function AdminPanel() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setTotpSetupUrl(null)
+    setTotpQrData(null)
 
-    // Password-only authentication for admin panel
-    const entered = password.trim()
-    const expected = (process.env.NEXT_PUBLIC_ADMIN_PANEL_PASSWORD || 'gX8#bQ3!Vr9zM2@kLf1T').trim()
+    try {
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password.trim(),
+          otp: otp.trim() || undefined,
+        }),
+      })
 
-    if (entered === expected) {
-      const mockAdmin = {
-        id: 'temp-admin-id',
-        email: 'admin@helfi.ai',
-        name: 'Helfi Admin',
-        role: 'SUPER_ADMIN'
+      const data = await response.json().catch(() => ({}))
+
+      if (data?.setupRequired && data?.otpauthUrl) {
+        setNeedsOtp(true)
+        setError('')
+        setTotpSetupUrl(data.otpauthUrl)
+        try {
+          const QRCode = (await import('qrcode')).default
+          const qrImageData = await QRCode.toDataURL(data.otpauthUrl, {
+            width: 220,
+            margin: 1,
+          })
+          setTotpQrData(qrImageData)
+        } catch (qrError) {
+          console.error('QR setup generation failed:', qrError)
+          setError('Unable to render the setup code. Please refresh and try again.')
+        }
+        setLoading(false)
+        return
       }
-      
-      setAdminToken('temp-admin-token')
-      setAdminUser(mockAdmin)
+
+      if (!response.ok) {
+        if (data?.code === 'OTP_REQUIRED') {
+          setNeedsOtp(true)
+          setError('Enter your 6-digit authenticator code to continue.')
+          setLoading(false)
+          return
+        }
+        setError(data?.error || 'Authentication failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      if (!data?.token || !data?.admin) {
+        setError('Authentication failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      setAdminToken(data.token)
+      setAdminUser(data.admin)
       setIsAuthenticated(true)
-      sessionStorage.setItem('adminToken', 'temp-admin-token')
-      sessionStorage.setItem('adminUser', JSON.stringify(mockAdmin))
+      sessionStorage.setItem('adminToken', data.token)
+      sessionStorage.setItem('adminUser', JSON.stringify(data.admin))
       loadAnalyticsData()
-      loadWaitlistData('temp-admin-token')
-      loadUserStats('temp-admin-token')
+      loadWaitlistData(data.token)
+      loadUserStats(data.token)
+      setOtp('')
+      setNeedsOtp(false)
+      setTotpSetupUrl(null)
+      setTotpQrData(null)
       setLoading(false)
-      return
-    } else {
-      setError('Invalid password. Please try again.')
+    } catch (loginError) {
+      console.error('Admin login error:', loginError)
+      setError('Authentication failed. Please try again.')
       setLoading(false)
     }
   }
@@ -244,8 +293,12 @@ export default function AdminPanel() {
     sessionStorage.removeItem('adminToken')
     sessionStorage.removeItem('adminUser')
     setPassword('')
+    setOtp('')
     setAdminToken('')
     setAdminUser(null)
+    setTotpSetupUrl(null)
+    setTotpQrData(null)
+    setNeedsOtp(false)
     setAnalyticsData([])
     setAnalyticsSummary(null)
     setAiInsights('')
@@ -1919,6 +1972,20 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Admin Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                placeholder="Enter admin email"
+                required
+              />
+            </div>
+            <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Admin Password
               </label>
@@ -1950,6 +2017,40 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 </button>
               </div>
             </div>
+
+            {totpSetupUrl && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-center">
+                <p className="text-sm text-emerald-900 font-medium mb-3">
+                  Scan this setup code with your authenticator app.
+                </p>
+                {totpQrData ? (
+                  <img src={totpQrData} alt="Authenticator setup QR" className="mx-auto border border-emerald-200 rounded-lg" />
+                ) : (
+                  <p className="text-xs text-emerald-700">Loading setup code…</p>
+                )}
+                <p className="text-xs text-emerald-700 mt-3">
+                  After scanning, enter the 6-digit code below to finish setup.
+                </p>
+              </div>
+            )}
+
+            {(needsOtp || totpSetupUrl) && (
+              <div>
+                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+                  Authenticator Code
+                </label>
+                <input
+                  type="text"
+                  id="otp"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Enter 6-digit code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                />
+              </div>
+            )}
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">

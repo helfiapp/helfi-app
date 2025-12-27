@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
-    if (!admin && authHeader !== 'Bearer temp-admin-token') {
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

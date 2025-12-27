@@ -20,6 +20,7 @@ export default function DevicesPage() {
   const [garminCheckingStatus, setGarminCheckingStatus] = useState(false)
   const [loadingDemo, setLoadingDemo] = useState(false)
   const [clearingDemo, setClearingDemo] = useState(false)
+  const [adminToken, setAdminToken] = useState<string | null>(null)
   const popupRef = useRef<Window | null>(null)
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const closedCheckRef = useRef<NodeJS.Timeout | null>(null)
@@ -30,6 +31,15 @@ export default function DevicesPage() {
   useEffect(() => {
     checkFitbitStatus()
     checkGarminStatus()
+
+    try {
+      const storedAdminToken = sessionStorage.getItem('adminToken')
+      if (storedAdminToken) {
+        setAdminToken(storedAdminToken)
+      }
+    } catch (error) {
+      console.warn('Admin token lookup skipped:', error)
+    }
     
     // Check URL params for Fitbit connection result
     const params = new URLSearchParams(window.location.search)
@@ -442,6 +452,10 @@ export default function DevicesPage() {
   }
 
   const handleLoadDemoData = async () => {
+    if (!adminToken) {
+      alert('Admin access required to load demo data.')
+      return
+    }
     if (!confirm('This will create 30 days of demo Fitbit data for testing. Continue?')) {
       return
     }
@@ -452,7 +466,7 @@ export default function DevicesPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer temp-admin-token',
+          'Authorization': `Bearer ${adminToken}`,
         },
       })
       
@@ -477,6 +491,10 @@ export default function DevicesPage() {
   }
 
   const handleClearDemoData = async () => {
+    if (!adminToken) {
+      alert('Admin access required to clear demo data.')
+      return
+    }
     if (!confirm('This will delete all Fitbit demo data. Continue?')) {
       return
     }
@@ -486,7 +504,7 @@ export default function DevicesPage() {
       const response = await fetch('/api/fitbit/demo/seed', {
         method: 'DELETE',
         headers: {
-          'Authorization': 'Bearer temp-admin-token',
+          'Authorization': `Bearer ${adminToken}`,
         },
       })
       
@@ -649,29 +667,30 @@ export default function DevicesPage() {
                 </button>
               </div>
 
-              {/* Developer Demo Data Section - Show even when not connected */}
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Developer Tools (Test UI without connecting):</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleLoadDemoData}
-                    disabled={loadingDemo}
-                    className="flex-1 px-3 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                  >
-                    {loadingDemo ? 'Loading...' : 'Load Demo Data'}
-                  </button>
-                  <button
-                    onClick={handleClearDemoData}
-                    disabled={clearingDemo}
-                    className="flex-1 px-3 py-1.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-md hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                  >
-                    {clearingDemo ? 'Clearing...' : 'Clear Demo Data'}
-                  </button>
+              {adminToken && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Developer Tools (Test UI without connecting):</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleLoadDemoData}
+                      disabled={loadingDemo}
+                      className="flex-1 px-3 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {loadingDemo ? 'Loading...' : 'Load Demo Data'}
+                    </button>
+                    <button
+                      onClick={handleClearDemoData}
+                      disabled={clearingDemo}
+                      className="flex-1 px-3 py-1.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-md hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {clearingDemo ? 'Clearing...' : 'Clear Demo Data'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                    💡 Tip: Load demo data to see how Fitbit data displays without connecting a real account.
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                  💡 Tip: Load demo data to see how Fitbit data displays without connecting a real account.
-                </p>
-              </div>
+              )}
             </div>
           )}
         </div>

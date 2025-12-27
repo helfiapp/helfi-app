@@ -19,8 +19,7 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
     
-    // Allow temporary admin token during transition
-    if (!admin && authHeader !== 'Bearer temp-admin-token') {
+    if (!admin) {
       return NextResponse.json(
         { error: 'Unauthorized - Admin access required' },
         { status: 401 }
@@ -367,8 +366,7 @@ export async function DELETE(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
     
-    // Allow temporary admin token during transition
-    if (!admin && authHeader !== 'Bearer temp-admin-token') {
+    if (!admin) {
       return NextResponse.json(
         { error: 'Unauthorized - Admin access required' },
         { status: 401 }
@@ -420,4 +418,3 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
-

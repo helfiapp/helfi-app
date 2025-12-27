@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const admin = extractAdminFromHeaders(authHeader)
     
     // Allow temporary admin token during transition
-    if (!admin && authHeader !== 'Bearer temp-admin-token') {
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

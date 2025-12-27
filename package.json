@@ -44,6 +44,7 @@
     "next-auth": "^4.24.5",
     "oauth-1.0a": "^2.2.6",
     "openai": "^5.7.0",
+    "otplib": "^12.0.1",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.394",
     "playwright": "^1.53.2",

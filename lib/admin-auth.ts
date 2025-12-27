@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'helfi-admin-secret-2024'
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'helfi-admin-secret-2024'
 
 export interface AdminTokenPayload {
   adminId: string

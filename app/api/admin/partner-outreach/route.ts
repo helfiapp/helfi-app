@@ -10,10 +10,10 @@ const normalizeEmail = (email?: string | null) => {
 const ensureAdmin = (request: NextRequest) => {
   const authHeader = request.headers.get('authorization')
   const admin = extractAdminFromHeaders(authHeader)
-  if (!admin && authHeader !== 'Bearer temp-admin-token') {
+  if (!admin) {
     return null
   }
-  return admin || { id: 'temp-admin-id' }
+  return admin
 }
 
 const ensurePartnerOutreachSchema = async () => {

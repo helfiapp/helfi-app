@@ -34,8 +34,7 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
     
-    // Allow temporary admin token during transition
-    if (!admin && authHeader !== 'Bearer temp-admin-token') {
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -171,15 +170,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // JWT authentication check
-    const authHeader = request.headers.get('authorization')
-    const admin = extractAdminFromHeaders(authHeader)
-    
-    // Allow temporary admin token during transition
-    if (!admin && authHeader !== 'Bearer temp-admin-token') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     // Check database schema first
     const schemaCheck = await ensureDatabaseSchema()
     if (!schemaCheck.success && schemaCheck.needsSchema) {
@@ -191,6 +181,14 @@ export async function POST(request: NextRequest) {
     }
 
     const { action, ticketId, ...data } = await request.json()
+
+    if (action !== 'create') {
+      const authHeader = request.headers.get('authorization')
+      const admin = extractAdminFromHeaders(authHeader)
+      if (!admin) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
 
     switch (action) {
       case 'create':

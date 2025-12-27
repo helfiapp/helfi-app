@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
     
-    if (!admin && authHeader !== 'Bearer temp-admin-token') {
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

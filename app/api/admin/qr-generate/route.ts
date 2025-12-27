@@ -4,53 +4,14 @@ import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'helfi-admin-secret-2024'
-
-function getFallbackAdminEmail(authHeader: string | null) {
-  if (authHeader && authHeader.includes('temp-admin-token')) {
-    return (process.env.OWNER_EMAIL || 'admin@helfi.ai').toLowerCase()
-  }
-  return null
-}
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'helfi-admin-secret-2024'
 
 async function resolveAdminInfo(authHeader: string | null) {
   const admin = extractAdminFromHeaders(authHeader)
   if (admin) {
     return { adminId: admin.adminId, email: admin.email.toLowerCase() }
   }
-
-  const fallbackEmail = getFallbackAdminEmail(authHeader)
-  if (!fallbackEmail) {
-    console.log('[QR-GEN] No fallback email found for auth header:', authHeader?.substring(0, 20))
-    return null
-  }
-
-  console.log('[QR-GEN] Looking up admin user with email:', fallbackEmail)
-  
-  // Try to find admin user
-  let adminUser = await prisma.adminUser.findFirst({
-    where: { email: fallbackEmail }
-  })
-
-  // If no admin user exists, try to find or create a regular User account
-  if (!adminUser) {
-    console.log('[QR-GEN] No AdminUser found, checking User table')
-    const regularUser = await prisma.user.findUnique({
-      where: { email: fallbackEmail },
-      select: { id: true, email: true }
-    })
-    
-    if (regularUser) {
-      // Use the user's ID as adminId for QR token storage
-      // This allows QR login to work even without AdminUser record
-      return { adminId: regularUser.id, email: regularUser.email.toLowerCase() }
-    }
-    
-    console.log('[QR-GEN] No user found with email:', fallbackEmail)
-    return null
-  }
-
-  return { adminId: adminUser.id, email: adminUser.email.toLowerCase() }
+  return null
 }
 
 // Ensure QR tokens table exists
@@ -198,8 +159,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Token expired' }, { status: 401 })
     }
 
-    // Get admin user details - try AdminUser first, then fall back to User
-    let adminUser = await prisma.adminUser.findUnique({
+    // Get admin user details
+    const adminUser = await prisma.adminUser.findUnique({
       where: { id: qrData.adminId },
       select: {
         id: true,
@@ -209,29 +170,6 @@ export async function POST(request: NextRequest) {
         isActive: true
       }
     })
-
-    // If not found in AdminUser, check User table (for legacy login)
-    if (!adminUser) {
-      const regularUser = await prisma.user.findUnique({
-        where: { id: qrData.adminId },
-        select: {
-          id: true,
-          email: true,
-          name: true
-        }
-      })
-      
-      if (regularUser) {
-        // Create a mock admin user object for QR login
-        adminUser = {
-          id: regularUser.id,
-          email: regularUser.email,
-          name: regularUser.name || 'Admin',
-          role: 'ADMIN' as any,
-          isActive: true
-        }
-      }
-    }
 
     if (!adminUser || (adminUser as any).isActive === false) {
       return NextResponse.json({ error: 'Admin user not found or inactive' }, { status: 404 })
@@ -252,15 +190,10 @@ export async function POST(request: NextRequest) {
     await prisma.$executeRawUnsafe(`DELETE FROM QRTokens WHERE token = $1`, token)
 
     // Update last login (only if AdminUser exists, not for regular User accounts)
-    try {
-      await prisma.adminUser.update({
-        where: { id: adminUser.id },
-        data: { lastLogin: new Date() }
-      })
-    } catch (e) {
-      // Ignore if AdminUser doesn't exist (using regular User account)
-      console.log('[QR-VERIFY] Skipping lastLogin update for regular User account')
-    }
+    await prisma.adminUser.update({
+      where: { id: adminUser.id },
+      data: { lastLogin: new Date() }
+    })
 
     return NextResponse.json({
       success: true,
@@ -277,4 +210,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to verify token' }, { status: 500 })
   }
 }
-

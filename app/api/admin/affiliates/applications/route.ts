@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const admin = extractAdminFromHeaders(authHeader)
-  if (!admin && authHeader !== 'Bearer temp-admin-token') {
+  if (!admin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const admin = extractAdminFromHeaders(authHeader)
-  if (!admin && authHeader !== 'Bearer temp-admin-token') {
+  if (!admin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

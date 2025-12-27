@@ -3,13 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { mergeSubscriptionList, normalizeSubscriptionList } from '@/lib/push-subscriptions'
 
-function getFallbackAdminEmail(authHeader: string | null) {
-  if (authHeader && authHeader.includes('temp-admin-token')) {
-    return (process.env.OWNER_EMAIL || 'admin@helfi.ai').toLowerCase()
-  }
-  return null
-}
-
 async function ensurePushSubscriptionsTable() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS PushSubscriptions (
@@ -28,13 +21,12 @@ export async function POST(req: NextRequest) {
     // Verify admin authentication
     const authHeader = req.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
-    const fallbackEmail = getFallbackAdminEmail(authHeader)
     
-    if (!admin && !fallbackEmail) {
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const adminEmail = (admin?.email || fallbackEmail!).toLowerCase()
+    const adminEmail = admin.email.toLowerCase()
 
     const { subscription } = await req.json()
     if (!subscription) {
@@ -90,13 +82,12 @@ export async function GET(req: NextRequest) {
     // Verify admin authentication
     const authHeader = req.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
-    const fallbackEmail = getFallbackAdminEmail(authHeader)
     
-    if (!admin && !fallbackEmail) {
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const adminEmail = (admin?.email || fallbackEmail!).toLowerCase()
+    const adminEmail = admin.email.toLowerCase()
 
     // Find User account for admin
     const user = await prisma.user.findUnique({
@@ -133,13 +124,12 @@ export async function DELETE(req: NextRequest) {
     // Verify admin authentication
     const authHeader = req.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
-    const fallbackEmail = getFallbackAdminEmail(authHeader)
     
-    if (!admin && !fallbackEmail) {
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const adminEmail = (admin?.email || fallbackEmail!).toLowerCase()
+    const adminEmail = admin.email.toLowerCase()
 
     // Find User account for admin
     const user = await prisma.user.findUnique({

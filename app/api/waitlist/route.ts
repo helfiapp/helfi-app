@@ -320,12 +320,11 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // JWT authentication check (with temporary token support)
+    // JWT authentication check
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
     
-    // Allow temporary admin token during transition
-    if (!admin && authHeader !== 'Bearer temp-admin-token') {
+    if (!admin) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -388,12 +387,11 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    // JWT authentication check (with temporary token support)
+    // JWT authentication check
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
     
-    // Allow temporary admin token during transition
-    if (!admin && authHeader !== 'Bearer temp-admin-token') {
+    if (!admin) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

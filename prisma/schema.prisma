@@ -683,6 +683,8 @@ model AdminUser {
   id        String    @id @default(cuid())
   email     String    @unique
   password  String // Hashed password
+  totpSecret String?
+  totpEnabled Boolean @default(false)
   name      String
   role      AdminRole @default(ADMIN)
   isActive  Boolean   @default(true)

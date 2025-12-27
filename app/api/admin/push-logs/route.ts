@@ -2,19 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 
-function getFallbackAdminEmail(authHeader: string | null) {
-  if (authHeader && authHeader.includes('temp-admin-token')) {
-    return (process.env.OWNER_EMAIL || 'admin@helfi.ai').toLowerCase()
-  }
-  return null
-}
-
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
-    const fallbackEmail = getFallbackAdminEmail(authHeader)
-    if (!admin && !fallbackEmail) {
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -45,5 +37,4 @@ export async function GET(req: NextRequest) {
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
 

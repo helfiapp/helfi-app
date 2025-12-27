@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: 'Bearer temp-admin-token',
+      ...(expected ? { Authorization: `Bearer ${expected}` } : {}),
     },
     body: JSON.stringify({
       currency: 'usd',

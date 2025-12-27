@@ -1,28 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcryptjs'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { extractAdminFromHeaders } from '@/lib/admin-auth'
 
 // GET - Fetch all email templates
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    
-    // Verify admin token (basic check - in production you'd verify JWT properly)
-    const adminUser = await prisma.adminUser.findFirst({
-      where: { 
-        email: 'info@sonicweb.com.au',
-        isActive: true 
-      }
-    })
-
-    if (!adminUser || !bcrypt.compareSync(token, adminUser.password)) {
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
@@ -47,21 +32,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    
-    // Verify admin token
-    const adminUser = await prisma.adminUser.findFirst({
-      where: { 
-        email: 'info@sonicweb.com.au',
-        isActive: true 
-      }
-    })
-
-    if (!adminUser || !bcrypt.compareSync(token, adminUser.password)) {
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
@@ -79,7 +51,7 @@ export async function POST(request: NextRequest) {
         subject,
         content,
         isBuiltIn: false,
-        createdBy: adminUser.id
+        createdBy: admin.adminId
       }
     })
 
@@ -94,21 +66,8 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    
-    // Verify admin token
-    const adminUser = await prisma.adminUser.findFirst({
-      where: { 
-        email: 'info@sonicweb.com.au',
-        isActive: true 
-      }
-    })
-
-    if (!adminUser || !bcrypt.compareSync(token, adminUser.password)) {
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
@@ -141,21 +100,8 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    
-    // Verify admin token
-    const adminUser = await prisma.adminUser.findFirst({
-      where: { 
-        email: 'info@sonicweb.com.au',
-        isActive: true 
-      }
-    })
-
-    if (!adminUser || !bcrypt.compareSync(token, adminUser.password)) {
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
