@@ -36,22 +36,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Cancel Stripe subscription if exists
+    // Cancel Stripe subscription (and derive customer id from subscription, since we don't store it in DB)
+    let stripeCustomerId: string | null = null
     if (stripe && user.subscription?.stripeSubscriptionId) {
+      const subId = user.subscription.stripeSubscriptionId
       try {
-        await stripe.subscriptions.cancel(user.subscription.stripeSubscriptionId)
-        console.log('✅ Cancelled Stripe subscription:', user.subscription.stripeSubscriptionId)
+        const sub = await stripe.subscriptions.retrieve(subId)
+        const customer = (sub as any)?.customer
+        stripeCustomerId = typeof customer === 'string' ? customer : (customer?.id ?? null)
+      } catch (error: any) {
+        console.warn('⚠️ Failed to retrieve Stripe subscription (non-blocking):', error?.message || error)
+      }
+
+      try {
+        await stripe.subscriptions.cancel(subId)
+        console.log('✅ Cancelled Stripe subscription:', subId)
       } catch (error: any) {
         // Log but don't fail - subscription might already be cancelled
         console.warn('⚠️ Failed to cancel Stripe subscription (may already be cancelled):', error.message)
       }
     }
 
-    // Delete Stripe customer if exists
-    if (stripe && user.subscription?.stripeCustomerId) {
+    // Delete Stripe customer if we could resolve it from the subscription
+    if (stripe && stripeCustomerId) {
       try {
-        await stripe.customers.del(user.subscription.stripeCustomerId)
-        console.log('✅ Deleted Stripe customer:', user.subscription.stripeCustomerId)
+        await stripe.customers.del(stripeCustomerId)
+        console.log('✅ Deleted Stripe customer:', stripeCustomerId)
       } catch (error: any) {
         // Log but don't fail - customer might already be deleted
         console.warn('⚠️ Failed to delete Stripe customer (may already be deleted):', error.message)
