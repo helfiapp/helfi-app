@@ -360,7 +360,8 @@ export default function MedicalImagesPage() {
                 Save this scan to my history
               </label>
               <p className="text-xs text-gray-500">
-                Saved scans include the image and analysis. Leave this off to keep this scan private.
+                Saved scans include the image and analysis. Stored in Vercel Blob (AES-256 at rest, HTTPS in transit) and tied to your account.
+                You can delete them anytime. Leave this off to keep this scan private.
               </p>
               {historySaveError && (
                 <p className="text-xs text-amber-700">{historySaveError}</p>
