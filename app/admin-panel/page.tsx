@@ -1659,6 +1659,10 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       } else {
         const error = await response.json().catch(() => ({}))
         const message = error?.error || error?.message || 'Unable to change password'
+        if (response.status === 401 && message.toLowerCase().includes('current password')) {
+          alert('Current password is incorrect. Please try again.')
+          return
+        }
         if (response.status === 401) {
           alert('Session expired. Please log out, log back in, and try again.')
           return
