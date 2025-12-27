@@ -176,7 +176,7 @@ export default function SplashPage() {
               <div className="flex items-center gap-3">
                 <Link
                   href={loginHref}
-                  className="btn-secondary hover:bg-gray-100 transition-colors text-lg"
+                  className="btn-secondary text-lg px-6 py-3 text-helfi-green hover:bg-helfi-green hover:text-white transition-colors"
                 >
                   Log in
                 </Link>
@@ -203,7 +203,7 @@ export default function SplashPage() {
               <>
                 <Link
                   href={loginHref}
-                  className="btn-secondary hover:bg-gray-100 transition-colors text-base px-3 py-2"
+                  className="btn-secondary text-base px-3 py-2 text-helfi-green hover:bg-helfi-green hover:text-white transition-colors"
                 >
                   Log in
                 </Link>
