@@ -4,9 +4,11 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-06-20',
-})
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-06-20',
+    })
+  : null
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Cancel Stripe subscription if exists
-    if (user.subscription?.stripeSubscriptionId) {
+    if (stripe && user.subscription?.stripeSubscriptionId) {
       try {
         await stripe.subscriptions.cancel(user.subscription.stripeSubscriptionId)
         console.log('✅ Cancelled Stripe subscription:', user.subscription.stripeSubscriptionId)
@@ -46,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete Stripe customer if exists
-    if (user.subscription?.stripeCustomerId) {
+    if (stripe && user.subscription?.stripeCustomerId) {
       try {
         await stripe.customers.del(user.subscription.stripeCustomerId)
         console.log('✅ Deleted Stripe customer:', user.subscription.stripeCustomerId)
