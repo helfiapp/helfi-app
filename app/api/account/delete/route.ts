@@ -3,12 +3,47 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
+import { Prisma } from '@prisma/client'
 
 const stripe = process.env.STRIPE_SECRET_KEY 
   ? new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: '2024-06-20',
     })
   : null
+
+function isMissingDbObjectError(err: unknown): boolean {
+  const anyErr = err as any
+  const code = anyErr?.code as string | undefined
+  const msg = String(anyErr?.message || '')
+
+  // Prisma known request errors:
+  // - P2021: table does not exist
+  // - P2022: column does not exist
+  if (code === 'P2021' || code === 'P2022') return true
+
+  // Fallback string checks (covers some prisma engines / postgres phrasing)
+  return (
+    /does not exist/i.test(msg) ||
+    /Unknown column/i.test(msg) ||
+    /column .* does not exist/i.test(msg) ||
+    /relation .* does not exist/i.test(msg)
+  )
+}
+
+async function bestEffort(label: string, fn: () => Promise<unknown>) {
+  try {
+    await fn()
+  } catch (err: any) {
+    // If production DB is behind schema, ignore missing table/column errors so deletion can proceed.
+    if (isMissingDbObjectError(err) || err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (isMissingDbObjectError(err)) {
+        console.warn(`⚠️ Account deletion cleanup skipped (${label}):`, err?.message || err)
+        return
+      }
+    }
+    throw err
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,70 +113,75 @@ export async function POST(request: NextRequest) {
     // But we'll explicitly delete some to be safe and clear
     
     // Delete OAuth accounts (Fitbit, Garmin, etc.)
-    await prisma.account.deleteMany({
-      where: { userId: user.id }
-    })
+    await bestEffort('account.deleteMany', () =>
+      prisma.account.deleteMany({
+        where: { userId: user.id },
+      })
+    )
 
     // Delete sessions
-    await prisma.session.deleteMany({
-      where: { userId: user.id }
-    })
+    await bestEffort('session.deleteMany', () =>
+      prisma.session.deleteMany({
+        where: { userId: user.id },
+      })
+    )
 
     // Delete verification tokens
-    await prisma.verificationToken.deleteMany({
-      where: { identifier: user.email }
-    })
+    await bestEffort('verificationToken.deleteMany', () =>
+      prisma.verificationToken.deleteMany({
+        where: { identifier: user.email },
+      })
+    )
 
     // Delete credit top-ups
-    await prisma.creditTopUp.deleteMany({
-      where: { userId: user.id }
-    })
+    await bestEffort('creditTopUp.deleteMany', () =>
+      prisma.creditTopUp.deleteMany({
+        where: { userId: user.id },
+      })
+    )
 
     // Delete subscription (if not already deleted)
-    await prisma.subscription.deleteMany({
-      where: { userId: user.id }
-    }).catch(() => {
-      // Ignore if already deleted
-    })
+    await bestEffort('subscription.deleteMany', () =>
+      prisma.subscription.deleteMany({
+        where: { userId: user.id },
+      })
+    )
 
     // Delete all health-related data
-    await prisma.healthGoal.deleteMany({ where: { userId: user.id } })
-    await prisma.supplement.deleteMany({ where: { userId: user.id } })
-    await prisma.medication.deleteMany({ where: { userId: user.id } })
-    await prisma.healthLog.deleteMany({ where: { userId: user.id } })
-    await prisma.foodLog.deleteMany({ where: { userId: user.id } })
-    await prisma.exerciseLog.deleteMany({ where: { userId: user.id } })
-    await prisma.exerciseEntry.deleteMany({ where: { userId: user.id } })
+    await bestEffort('healthGoal.deleteMany', () => prisma.healthGoal.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('supplement.deleteMany', () => prisma.supplement.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('medication.deleteMany', () => prisma.medication.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('healthLog.deleteMany', () => prisma.healthLog.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('foodLog.deleteMany', () => prisma.foodLog.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('exerciseLog.deleteMany', () => prisma.exerciseLog.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('exerciseEntry.deleteMany', () => prisma.exerciseEntry.deleteMany({ where: { userId: user.id } }))
     
     // Delete AI analysis data
-    await prisma.interactionAnalysis.deleteMany({ where: { userId: user.id } })
-    await prisma.symptomAnalysis.deleteMany({ where: { userId: user.id } })
-    await prisma.medicalImageAnalysis.deleteMany({ where: { userId: user.id } })
-    await prisma.foodAnalysisFeedback.deleteMany({ where: { userId: user.id } })
+    await bestEffort('interactionAnalysis.deleteMany', () => prisma.interactionAnalysis.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('symptomAnalysis.deleteMany', () => prisma.symptomAnalysis.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('medicalImageAnalysis.deleteMany', () => prisma.medicalImageAnalysis.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('foodAnalysisFeedback.deleteMany', () => prisma.foodAnalysisFeedback.deleteMany({ where: { userId: user.id } }))
     
     // Delete device data
-    await prisma.fitbitData.deleteMany({ where: { userId: user.id } })
-    await prisma.garminRequestToken.deleteMany({ where: { userId: user.id } })
-    await prisma.garminWebhookLog.deleteMany({ where: { userId: user.id } })
+    await bestEffort('fitbitData.deleteMany', () => prisma.fitbitData.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('garminRequestToken.deleteMany', () => prisma.garminRequestToken.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('garminWebhookLog.deleteMany', () => prisma.garminWebhookLog.deleteMany({ where: { userId: user.id } }))
     
     // Delete files (File model uses uploadedById, not userId)
-    await prisma.file.deleteMany({ where: { uploadedById: user.id } })
+    await bestEffort('file.deleteMany', () => prisma.file.deleteMany({ where: { uploadedById: user.id } }))
     
     // Delete reports
-    await prisma.report.deleteMany({ where: { userId: user.id } })
-    await prisma.consentRecord.deleteMany({ where: { userId: user.id } })
+    await bestEffort('report.deleteMany', () => prisma.report.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('consentRecord.deleteMany', () => prisma.consentRecord.deleteMany({ where: { userId: user.id } }))
     
     // Delete affiliate data
-    await prisma.affiliateReferral.deleteMany({ where: { referredUserId: user.id } })
-    await prisma.affiliateConversion.deleteMany({ where: { referredUserId: user.id } })
-    await prisma.affiliateApplication.deleteMany({ where: { userId: user.id } })
-    // Delete affiliate record if user is an affiliate
-    await prisma.affiliate.deleteMany({ where: { userId: user.id } }).catch(() => {
-      // Ignore if not an affiliate
-    })
+    await bestEffort('affiliateReferral.deleteMany', () => prisma.affiliateReferral.deleteMany({ where: { referredUserId: user.id } }))
+    await bestEffort('affiliateConversion.deleteMany', () => prisma.affiliateConversion.deleteMany({ where: { referredUserId: user.id } }))
+    await bestEffort('affiliateApplication.deleteMany', () => prisma.affiliateApplication.deleteMany({ where: { userId: user.id } }))
+    await bestEffort('affiliate.deleteMany', () => prisma.affiliate.deleteMany({ where: { userId: user.id } }))
     
     // Delete support tickets
-    await prisma.supportTicket.deleteMany({ where: { userId: user.id } })
+    await bestEffort('supportTicket.deleteMany', () => prisma.supportTicket.deleteMany({ where: { userId: user.id } }))
 
     // Finally, delete the user (this will cascade delete any remaining relationships)
     await prisma.user.delete({
