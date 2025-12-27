@@ -390,6 +390,20 @@ const normalizeComponentName = (value: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const cleanComponentLabel = (value: string) => {
+  return String(value || '')
+    .replace(/^(a|an|one)\s+/i, '')
+    .replace(/^(small|medium|large)\s+portion\s+of\s+/i, '')
+    .replace(/^portion\s+of\s+/i, '')
+    .replace(/^(small|medium|large)\s+/i, '')
+    .trim();
+};
+
+const normalizeComponentList = (items: string[]) =>
+  items
+    .map((item) => cleanComponentLabel(item))
+    .filter((item) => item && item.length >= 3);
+
 const buildComponentBoundSchema = (components: string[]) => ({
   name: 'food_component_items',
   schema: {
@@ -1591,6 +1605,13 @@ const looksLikeMultiIngredientSummary = (items: any[] | null | undefined): boole
   return hasListDelimiters && wordCount >= 6;
 };
 
+const itemsResultIsInvalid = (items: any[] | null | undefined, requireMultiple: boolean): boolean => {
+  if (!Array.isArray(items) || items.length === 0) return true;
+  if (looksLikeSingleGenericItem(items) || looksLikeMultiIngredientSummary(items)) return true;
+  if (requireMultiple && items.length < 2) return true;
+  return false;
+};
+
 const splitAnalysisIntoComponents = (analysis: string | null | undefined): string[] => {
   if (!analysis) return [];
   const cleaned = analysis.replace(/\s+/g, ' ').trim();
@@ -2590,6 +2611,8 @@ CRITICAL REQUIREMENTS:
       if (listedComponents.length === 0 && analysisComponents.length > 0) {
         listedComponents = analysisComponents;
       }
+      listedComponents = normalizeComponentList(listedComponents);
+      analysisComponents = normalizeComponentList(analysisComponents);
       if (
         listedComponents.length === 0 &&
         resp.items &&
@@ -2597,6 +2620,7 @@ CRITICAL REQUIREMENTS:
       ) {
         const summaryLabel = `${resp.items?.[0]?.name || ''} ${resp.items?.[0]?.serving_size || ''}`;
         listedComponents = extractComponentsFromDelimitedText(summaryLabel);
+        listedComponents = normalizeComponentList(listedComponents);
       }
       analysisLooksMulti =
         analysisComponents.length > 1 || (resp.items ? looksLikeMultiIngredientSummary(resp.items) : false);
@@ -2833,7 +2857,8 @@ CRITICAL REQUIREMENTS:
                 })
                 .filter(Boolean) as any[];
 
-              if (orderedItems.length === listedComponents.length) {
+              const requireMultiple = listedComponents.length > 1;
+              if (orderedItems.length === listedComponents.length && !itemsResultIsInvalid(orderedItems, requireMultiple)) {
                 resp.items = sanitizeStructuredItems(orderedItems);
                 resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
                 itemsSource = itemsSource === 'none' ? 'component_bound' : `${itemsSource}+component_bound`;
@@ -2957,10 +2982,11 @@ CRITICAL REQUIREMENTS:
         looksLikeMultiIngredientSummary(resp.items))
     ) {
       try {
-        const forcedComponents =
+        const forcedComponents = normalizeComponentList(
           listedComponents.length > 1
             ? listedComponents
-            : extractComponentsFromDelimitedText(analysisTextForFollowUp);
+            : extractComponentsFromDelimitedText(analysisTextForFollowUp),
+        );
         const requireMultiple = forcedComponents.length > 1 || analysisLooksMulti;
         const forcedHint =
           forcedComponents.length > 0
@@ -3009,7 +3035,7 @@ CRITICAL REQUIREMENTS:
             !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
               ? (parsed as any).total
               : null;
-          if (items.length > 0 && !looksLikeSingleGenericItem(items)) {
+          if (!itemsResultIsInvalid(items, requireMultiple)) {
             resp.items = sanitizeStructuredItems(items);
             resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
             itemsSource = itemsSource === 'none' ? 'forced_image_followup' : `${itemsSource}+forced_image_followup`;
@@ -3034,7 +3060,9 @@ CRITICAL REQUIREMENTS:
         looksLikeMultiIngredientSummary(resp.items))
     ) {
       try {
-        const fallbackComponents = extractComponentsFromDelimitedText(analysisTextForFollowUp);
+        const fallbackComponents = normalizeComponentList(
+          extractComponentsFromDelimitedText(analysisTextForFollowUp),
+        );
         const requireMultiple = fallbackComponents.length > 1 || analysisLooksMulti;
         const fallbackHint =
           fallbackComponents.length > 0
@@ -3080,7 +3108,7 @@ CRITICAL REQUIREMENTS:
             !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
               ? (parsed as any).total
               : null;
-          if (items.length > 0 && !looksLikeSingleGenericItem(items)) {
+          if (!itemsResultIsInvalid(items, requireMultiple)) {
             resp.items = sanitizeStructuredItems(items);
             resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
             itemsSource = itemsSource === 'none' ? 'text_only_fallback' : `${itemsSource}+text_only_fallback`;
