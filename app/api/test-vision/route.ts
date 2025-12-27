@@ -290,11 +290,21 @@ export async function POST(req: NextRequest) {
         structured.disclaimer ||
         'This analysis is for information only and does not replace a real doctor’s examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
     } else {
-      // If the model refused to analyse the image (for example, for a possibly serious lesion),
-      // replace the unhelpful refusal text with a clear, safety-focused message.
+      const refusalPatterns = [
+        /i['’]m sorry[, ]+i can['’]t assist/i,
+        /i['’]m sorry[, ]+i cannot assist/i,
+        /i can['’]t assist with that/i,
+        /i cannot assist with that/i,
+        /i can['’]t help with that/i,
+        /i cannot help with that/i,
+        /i can['’]t help with this/i,
+        /i cannot help with this/i,
+        /unable to assist/i,
+        /not able to help/i,
+      ];
       const refusal =
         typeof cleanAnalysis === 'string' &&
-        /i['’]m sorry[, ]+i can['’]t assist with this request/i.test(cleanAnalysis);
+        refusalPatterns.some((pattern) => pattern.test(cleanAnalysis));
 
       if (refusal) {
         resp.summary =
