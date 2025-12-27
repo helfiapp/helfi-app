@@ -14,9 +14,15 @@ function SearchParamsHandler({ setError, setMessage, setIsSignUp }: { setError: 
     const errorParam = searchParams.get('error')
     const messageParam = searchParams.get('message')
     const planParam = searchParams.get('plan')
+    const modeParam = searchParams.get('mode')
     
     // If plan parameter exists, show signup form by default
     if (planParam) {
+      setIsSignUp(true)
+    }
+
+    // If explicitly requested, show signup form by default
+    if (modeParam === 'signup') {
       setIsSignUp(true)
     }
     

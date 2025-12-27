@@ -46,13 +46,7 @@ function BackToTopButton() {
 
 export default function SplashPage() {
   const { data: session, status } = useSession()
-  const [showInfoModal, setShowInfoModal] = useState(false)
-  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
   const [showDemoModal, setShowDemoModal] = useState(false)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const [showErrorModal, setShowErrorModal] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
   const [videoLoaded, setVideoLoaded] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -106,69 +100,12 @@ export default function SplashPage() {
     window.location.href = `/auth/signin?plan=${encodeURIComponent(planId)}`
   }
 
-  // Legacy waitlist handler (kept for "Join Waitlist" buttons in nav/footer)
-  const handleWaitlistCta = () => {
-    setShowInfoModal(true)
-  }
-
-  const handleInfoModalSubscribe = () => {
-    setShowInfoModal(false)
-    setShowWaitlistModal(true)
-  }
-
-  const handleInfoModalClose = () => {
-    setShowInfoModal(false)
-  }
-
-  const handleWaitlistModalClose = () => {
-    setShowWaitlistModal(false)
-  }
-
   const handleDemoModalClose = () => {
     setShowDemoModal(false)
   }
 
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false)
-    setSuccessMessage('')
-  }
-
-  const handleErrorModalClose = () => {
-    setShowErrorModal(false)
-    setErrorMessage('')
-  }
-
-  const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    const email = String(formData.get('email') || '').trim().toLowerCase()
-    const name = String(formData.get('name') || '').trim()
-
-    try {
-      const res = await fetch('/api/waitlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name })
-      })
-      const data = await res.json().catch(() => ({}))
-      if (res.ok && data?.success) {
-        setSuccessMessage(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.')
-        setShowWaitlistModal(false)
-        setShowSuccessModal(true)
-        ;(e.target as HTMLFormElement).reset()
-      } else if (res.status === 409) {
-        setSuccessMessage('You\'re already on the waitlist. We\'ll notify you when we go live.')
-        setShowWaitlistModal(false)
-        setShowSuccessModal(true)
-      } else {
-        setErrorMessage(data?.error || 'Something went wrong. Please try again.')
-        setShowErrorModal(true)
-      }
-    } catch {
-      setErrorMessage('Something went wrong. Please try again.')
-      setShowErrorModal(true)
-    }
-  }
+  const loginHref = '/auth/signin'
+  const signupHref = '/auth/signin?mode=signup'
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
       {/* Medical Disclaimer Banner */}
@@ -228,22 +165,56 @@ export default function SplashPage() {
             >
               FAQ
             </button>
-            <button 
-              onClick={() => setShowWaitlistModal(true)}
-              className="btn-secondary hover:bg-gray-100 transition-colors text-lg"
-            >
-              Join Waitlist
-            </button>
+            {status === 'authenticated' ? (
+              <Link
+                href="/dashboard"
+                className="btn-primary text-lg px-6 py-3 bg-helfi-green hover:bg-green-600 text-white"
+              >
+                Go to Dashboard
+              </Link>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link
+                  href={loginHref}
+                  className="btn-secondary hover:bg-gray-100 transition-colors text-lg"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href={signupHref}
+                  className="btn-primary text-lg px-6 py-3 bg-helfi-green hover:bg-green-600 text-white"
+                >
+                  Create account
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Mobile Menu */}
           <div className="md:hidden flex items-center space-x-3">
-            <button 
-              onClick={() => setShowWaitlistModal(true)}
-              className="btn-secondary hover:bg-gray-100 transition-colors text-base px-3 py-2"
-            >
-              Join Waitlist
-            </button>
+            {status === 'authenticated' ? (
+              <Link
+                href="/dashboard"
+                className="btn-primary text-base px-3 py-2 bg-helfi-green hover:bg-green-600 text-white"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href={loginHref}
+                  className="btn-secondary hover:bg-gray-100 transition-colors text-base px-3 py-2"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href={signupHref}
+                  className="btn-primary text-base px-3 py-2 bg-helfi-green hover:bg-green-600 text-white"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -293,12 +264,29 @@ export default function SplashPage() {
               lab reports, and medical images—all in one intelligent platform.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button 
-                onClick={() => setShowWaitlistModal(true)}
-                className="btn-primary text-lg px-8 py-4 bg-helfi-green hover:bg-green-600 text-white"
-              >
-                Join the Waitlist
-              </button>
+              {status === 'authenticated' ? (
+                <Link
+                  href="/dashboard"
+                  className="btn-primary text-lg px-8 py-4 bg-helfi-green hover:bg-green-600 text-white text-center"
+                >
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href={signupHref}
+                    className="btn-primary text-lg px-8 py-4 bg-helfi-green hover:bg-green-600 text-white text-center"
+                  >
+                    Create account
+                  </Link>
+                  <Link
+                    href={loginHref}
+                    className="btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white/20 text-center"
+                  >
+                    Log in
+                  </Link>
+                </>
+              )}
               <button 
                 onClick={() => setShowDemoModal(true)}
                 className="btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white/20"
@@ -919,80 +907,6 @@ export default function SplashPage() {
         </div>
       </section>
 
-      {/* Waitlist Signup Section */}
-      <section id="waitlist-signup" className="px-8 md:px-48 lg:px-64 py-20 bg-helfi-green">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-white mb-4">
-            Be the first to know when we launch!
-          </h2>
-          <p className="text-xl text-green-100 mb-8">
-            Join our exclusive waitlist and get early access to Helfi when we're ready. 
-            Plus, get health optimization tips delivered to your inbox.
-          </p>
-          
-          <div className="bg-white rounded-2xl p-8 shadow-2xl">
-            <form className="space-y-4" onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              const email = String(formData.get('email') || '').trim().toLowerCase();
-              const name = String(formData.get('name') || '').trim();
-
-              fetch('/api/waitlist', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, name })
-              }).then(async (res) => {
-                const data = await res.json().catch(() => ({}));
-                if (res.ok && data?.success) {
-                  setSuccessMessage(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.');
-                  setShowSuccessModal(true);
-                  (e.target as HTMLFormElement).reset();
-                } else if (res.status === 409) {
-                  // Fallback in case older deployments still return 409
-                  setSuccessMessage('You\'re already on the waitlist. We\'ll notify you when we go live.');
-                  setShowSuccessModal(true);
-                } else {
-                  setErrorMessage(data?.error || 'Something went wrong. Please try again.');
-                  setShowErrorModal(true);
-                }
-              }).catch(() => {
-                setErrorMessage('Something went wrong. Please try again.');
-                setShowErrorModal(true);
-              });
-            }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Your name"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-helfi-green focus:ring-2 focus:ring-helfi-green/20 outline-none"
-                />
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="your@email.com"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-helfi-green focus:ring-2 focus:ring-helfi-green/20 outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-helfi-green text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-green-700 transition-colors"
-              >
-                Join the Waitlist
-              </button>
-            </form>
-            
-            <div className="mt-6 text-sm text-gray-600">
-              <p>✨ Early access when we launch</p>
-              <p>📧 Health tips and platform updates</p>
-              <p>🎯 No spam, unsubscribe anytime</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="bg-helfi-black text-white px-4 py-12">
         <div className="max-w-6xl mx-auto">
@@ -1047,13 +961,13 @@ export default function SplashPage() {
             <div>
               <h4 className="font-semibold mb-4">Affiliates</h4>
               <p className="text-gray-400 mb-3 text-sm">
-                Earn by sharing Helfi. The affiliate program launches with the public release.
+                Earn by sharing Helfi.
               </p>
               <ul className="space-y-2 text-gray-400 text-sm">
                 <li>
-                  <button onClick={handleWaitlistCta} className="hover:text-white text-left">
-                    Join the affiliate waitlist
-                  </button>
+                  <Link href="/affiliate/apply" className="hover:text-white">
+                    Apply to the affiliate program
+                  </Link>
                 </li>
                 <li>
                   <Link href="/affiliate/terms" className="hover:text-white">
@@ -1082,91 +996,6 @@ export default function SplashPage() {
       {/* Back to Top Button */}
       <BackToTopButton />
 
-      {/* Info Modal */}
-      {showInfoModal && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={handleInfoModalClose}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Coming Soon</h3>
-            <p className="text-gray-600 mb-6">
-              We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={handleInfoModalClose}
-                className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Maybe Later
-              </button>
-              <button
-                onClick={handleInfoModalSubscribe}
-                className="bg-helfi-green text-white px-6 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
-              >
-                Subscribe Now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Waitlist Form Modal */}
-      {showWaitlistModal && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={handleWaitlistModalClose}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-2xl font-bold text-gray-900">Join the Waitlist</h3>
-              <button
-                onClick={handleWaitlistModalClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label="Close"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Be the first to know when we launch! Join our exclusive waitlist and get early access to Helfi when we're ready.
-            </p>
-            <form onSubmit={handleWaitlistSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Your name"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-helfi-green focus:ring-2 focus:ring-helfi-green/20 outline-none"
-                />
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="your@email.com"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-helfi-green focus:ring-2 focus:ring-helfi-green/20 outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-helfi-green text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-helfi-green/90 transition-colors"
-              >
-                Join the Waitlist
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Demo Modal */}
       {showDemoModal && (
         <div 
@@ -1185,7 +1014,7 @@ export default function SplashPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900">Coming Soon!</h3>
+                <h3 className="text-2xl font-bold text-gray-900">Demo Video</h3>
               </div>
               <button
                 onClick={handleDemoModalClose}
@@ -1199,7 +1028,7 @@ export default function SplashPage() {
             </div>
             <div className="mb-6">
               <p className="text-gray-600 text-lg leading-relaxed mb-4">
-                We're working on an exciting demo video to show you all the amazing features of Helfi.
+                We're finalizing an updated demo video to show you all the amazing features of Helfi.
               </p>
               <p className="text-gray-600 leading-relaxed">
                 Stay tuned for a comprehensive walkthrough of how our AI-powered health intelligence platform can transform your wellness journey!
@@ -1212,114 +1041,23 @@ export default function SplashPage() {
               >
                 Got it
               </button>
-              <button
-                onClick={() => {
-                  setShowDemoModal(false)
-                  setShowWaitlistModal(true)
-                }}
-                className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
-              >
-                Join Waitlist
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={handleSuccessModalClose}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-start mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-helfi-green/20 to-green-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900">Success!</h3>
-              </div>
-              <button
-                onClick={handleSuccessModalClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label="Close"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="mb-6">
-              <p className="text-gray-600 text-lg leading-relaxed">
-                {successMessage}
-              </p>
-            </div>
-            <button
-              onClick={handleSuccessModalClose}
-              className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Error Modal */}
-      {showErrorModal && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={handleErrorModalClose}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-start mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-red-100 to-orange-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900">Oops!</h3>
-              </div>
-              <button
-                onClick={handleErrorModalClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label="Close"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="mb-6">
-              <p className="text-gray-600 text-lg leading-relaxed">
-                {errorMessage}
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handleErrorModalClose}
-                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => {
-                  setShowErrorModal(false)
-                  setShowWaitlistModal(true)
-                }}
-                className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
-              >
-                Try Again
-              </button>
+              {status === 'authenticated' ? (
+                <Link
+                  href="/dashboard"
+                  onClick={() => setShowDemoModal(false)}
+                  className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium text-center"
+                >
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <Link
+                  href={signupHref}
+                  onClick={() => setShowDemoModal(false)}
+                  className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium text-center"
+                >
+                  Create account
+                </Link>
+              )}
             </div>
           </div>
         </div>
