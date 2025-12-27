@@ -126,6 +126,9 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   // Get free credits status from API response
   const exhaustedFreeCredits = creditData?.exhaustedFreeCredits ?? false
   const freeCreditsTotal = creditData?.freeCredits?.total ?? 0
+  const isPremiumPlan = creditData?.plan === 'PREMIUM' || monthlyCapCents > 0
+  const hasPaidCredits = totalAvailableCents > 0 || (creditsAdditionalRemaining ?? 0) > 0
+  const showFreeCredits = !isPremiumPlan && !hasPaidCredits && freeCreditsTotal > 0 && !exhaustedFreeCredits
 
   // Low credits: show red when remaining is genuinely low.
   // BUT: Only show warning if free credits are exhausted AND wallet credits are low
@@ -145,7 +148,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
             {creditsDisplayInline?.toLocaleString()}
           </span>
         </div>
-        {freeCreditsTotal > 0 && !exhaustedFreeCredits && (
+        {showFreeCredits && (
           <div className="mb-2 text-xs text-green-600 font-medium">
             {freeCreditsTotal} free credit{freeCreditsTotal !== 1 ? 's' : ''} remaining
           </div>
