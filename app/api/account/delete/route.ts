@@ -118,8 +118,8 @@ export async function POST(request: NextRequest) {
     await prisma.garminRequestToken.deleteMany({ where: { userId: user.id } })
     await prisma.garminWebhookLog.deleteMany({ where: { userId: user.id } })
     
-    // Delete files
-    await prisma.file.deleteMany({ where: { userId: user.id } })
+    // Delete files (File model uses uploadedById, not userId)
+    await prisma.file.deleteMany({ where: { uploadedById: user.id } })
     
     // Delete reports
     await prisma.report.deleteMany({ where: { userId: user.id } })
