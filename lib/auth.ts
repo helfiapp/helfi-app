@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 
 // Initialize Resend for welcome emails
 function getResend() {

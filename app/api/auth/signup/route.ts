@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
 
