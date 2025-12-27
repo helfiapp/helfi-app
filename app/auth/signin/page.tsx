@@ -7,7 +7,17 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 
 // Separate component for search params handling with Suspense
-function SearchParamsHandler({ setError, setMessage, setIsSignUp }: { setError: (error: string) => void, setMessage: (message: string) => void, setIsSignUp: (value: boolean) => void }) {
+function SearchParamsHandler({
+  setError,
+  setMessage,
+  setIsSignUp,
+  setShowResendVerification,
+}: {
+  setError: (error: string) => void
+  setMessage: (message: string) => void
+  setIsSignUp: (value: boolean) => void
+  setShowResendVerification: (value: boolean) => void
+}) {
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -31,6 +41,10 @@ function SearchParamsHandler({ setError, setMessage, setIsSignUp }: { setError: 
         case 'CredentialsSignin':
           setError('Invalid email or password. Please try again.')
           break
+        case 'EMAIL_NOT_VERIFIED':
+          setError('Please verify your email before signing in. Check your inbox or resend the verification email.')
+          setShowResendVerification(true)
+          break
         case 'OAuthSignin':
           setError('Error signing in with Google. Please try again.')
           break
@@ -47,11 +61,14 @@ function SearchParamsHandler({ setError, setMessage, setIsSignUp }: { setError: 
         case 'signout':
           setMessage('You have been signed out successfully.')
           break
+        case 'reset_success':
+          setMessage('Your password has been updated. Please sign in.')
+          break
         default:
           setMessage('Status updated.')
       }
     }
-  }, [searchParams, setError, setMessage, setIsSignUp])
+  }, [searchParams, setError, setMessage, setIsSignUp, setShowResendVerification])
 
   return null
 }
@@ -67,6 +84,7 @@ export default function SignIn() {
   const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
+  const [showResendVerification, setShowResendVerification] = useState(false)
 
   // If the user is already logged in and somehow lands on the sign-in page
   // (for example, via the iOS Home Screen icon), immediately send them into
@@ -191,25 +209,6 @@ export default function SignIn() {
     }
   }
 
-  const attemptDirectSignin = async (remember: boolean, emailOverride?: string) => {
-    const normalizedEmail = (emailOverride ?? email).trim().toLowerCase()
-    try {
-      const response = await fetch('/api/auth/signin-direct', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail, password, rememberMe: remember })
-      })
-      const data = await response.json().catch(()=>({}))
-      if (response.ok) {
-        return { success: true, token: data?.token, tokenExpiresAtMs: data?.tokenExpiresAtMs }
-      }
-      return { success: false, message: data?.error || data?.message || 'Sign in failed. Please try again.' }
-    } catch (err) {
-      console.error('Signin-direct error:', err)
-      return { success: false, message: 'Sign in failed. Please try again.' }
-    }
-  }
-
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !password) return
@@ -219,6 +218,7 @@ export default function SignIn() {
     setLoading(true)
     setError('')
     setMessage('')
+    setShowResendVerification(false)
     
     if (isSignUp) {
       // Handle signup via direct API (no NextAuth flash)
@@ -253,86 +253,21 @@ export default function SignIn() {
         setError('Failed to create account. Please try again.')
       }
     } else {
-      // Handle signin - Try NextAuth credentials first (most stable), then direct API
+      // Handle signin via NextAuth credentials
       try {
-        // Try direct sign-in first so we can honor the "keep me signed in" setting immediately
-        const directResult = await attemptDirectSignin(rememberMe)
-        if (directResult.success) {
-          persistRememberState(true, normalizedEmail)
-          setLoading(false)
-          // Check for plan parameter - first from URL, then from sessionStorage
-          const searchParams = new URLSearchParams(window.location.search)
-          let planParam = searchParams.get('plan')
-          
-          // If no plan in URL, check sessionStorage (stored during signup)
-          if (!planParam) {
-            try {
-              planParam = sessionStorage.getItem('helfi:signupPlan')
-              if (planParam) {
-                sessionStorage.removeItem('helfi:signupPlan')
-              }
-            } catch {}
-          }
-          
-          if (planParam) {
-            try {
-              const res = await fetch('/api/billing/create-checkout-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan: planParam }),
-              })
-              if (res.ok) {
-                const { url } = await res.json()
-                if (url) {
-                  window.location.href = url
-                  return
-                }
-              }
-            } catch (error) {
-              console.error('Checkout redirect error:', error)
-            }
-          }
-          window.location.href = '/onboarding'
-          return
-        }
-        if (directResult.message) {
-          setError(directResult.message)
-        }
-
         // Check for plan parameter to preserve it through auth flow
         const searchParams = new URLSearchParams(window.location.search)
         const planParam = searchParams.get('plan')
         const callbackUrl = planParam ? `/auth/signin?plan=${encodeURIComponent(planParam)}` : '/onboarding'
         
-        const res = await signIn('credentials', { email, password, callbackUrl, redirect: false })
+        const res = await signIn('credentials', {
+          email: normalizedEmail,
+          password,
+          callbackUrl,
+          redirect: false,
+        })
         if (res?.ok) {
-          // If they wanted a longer session, reissue via direct path to extend the cookie, but don't block redirect
-          const extendResult = await attemptDirectSignin(true, normalizedEmail)
-          if (extendResult.success) {
-            persistRememberState(true, normalizedEmail)
-            setLoading(false)
-            // Redirect to checkout if plan parameter exists
-            if (planParam) {
-              try {
-                const checkoutRes = await fetch('/api/billing/create-checkout-session', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ plan: planParam }),
-                })
-                if (checkoutRes.ok) {
-                  const { url } = await checkoutRes.json()
-                  if (url) {
-                    window.location.href = url
-                    return
-                  }
-                }
-              } catch (error) {
-                console.error('Checkout redirect error:', error)
-              }
-            }
-            window.location.href = '/onboarding'
-            return
-          }
+          persistRememberState(rememberMe, normalizedEmail)
           setLoading(false)
           // Check for plan parameter - first from URL, then from sessionStorage
           let planParamToUse = planParam
@@ -367,44 +302,13 @@ export default function SignIn() {
           window.location.href = '/onboarding'
           return
         } else {
-          const fallback = await attemptDirectSignin(false)
-          if (fallback.success) {
-            persistRememberState(true, normalizedEmail)
+          if (res?.error === 'EMAIL_NOT_VERIFIED') {
+            setError('Please verify your email before signing in. Check your inbox or resend the verification email.')
+            setShowResendVerification(true)
             setLoading(false)
-            // Check for plan parameter - first from URL, then from sessionStorage
-            let planParamToUse = planParam
-            if (!planParamToUse) {
-              try {
-                planParamToUse = sessionStorage.getItem('helfi:signupPlan')
-                if (planParamToUse) {
-                  sessionStorage.removeItem('helfi:signupPlan')
-                }
-              } catch {}
-            }
-            // Redirect to checkout if plan parameter exists
-            if (planParamToUse) {
-              try {
-                const checkoutRes = await fetch('/api/billing/create-checkout-session', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ plan: planParamToUse }),
-                })
-                if (checkoutRes.ok) {
-                  const { url } = await checkoutRes.json()
-                  if (url) {
-                    window.location.href = url
-                    return
-                  }
-                }
-              } catch (error) {
-                console.error('Checkout redirect error:', error)
-              }
-            }
-            window.location.href = '/onboarding'
             return
-          } else {
-            setError(fallback.message || 'Invalid email or password')
           }
+          setError('Invalid email or password')
         }
       } catch (error) {
         console.error('Signin error:', error)
@@ -419,7 +323,12 @@ export default function SignIn() {
     <>
       {/* Wrap search params handler in Suspense */}
       <Suspense fallback={null}>
-        <SearchParamsHandler setError={setError} setMessage={setMessage} setIsSignUp={setIsSignUp} />
+        <SearchParamsHandler
+          setError={setError}
+          setMessage={setMessage}
+          setIsSignUp={setIsSignUp}
+          setShowResendVerification={setShowResendVerification}
+        />
       </Suspense>
       
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 p-4">
@@ -536,6 +445,13 @@ export default function SignIn() {
                     )}
                   </button>
                 </div>
+                {!isSignUp && (
+                  <div className="mt-2 text-right">
+                    <Link href="/auth/forgot-password" className="text-sm text-helfi-green hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-start justify-between gap-3">
@@ -555,6 +471,32 @@ export default function SignIn() {
 
               {error && (
                 <div className="text-red-600 text-sm">{error}</div>
+              )}
+              {showResendVerification && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/auth/resend-verification', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+                      })
+                      const data = await res.json().catch(() => ({}))
+                      if (!res.ok) {
+                        setError(data?.error || 'Failed to resend verification email.')
+                        return
+                      }
+                      setMessage('Verification email sent. Please check your inbox.')
+                      setShowResendVerification(false)
+                    } catch {
+                      setError('Failed to resend verification email. Please try again.')
+                    }
+                  }}
+                  className="text-sm text-helfi-green hover:underline"
+                >
+                  Resend verification email
+                </button>
               )}
 
               {message && (

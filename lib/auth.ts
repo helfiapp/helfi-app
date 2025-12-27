@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
+import bcrypt from 'bcrypt'
 
 // Initialize Resend for welcome emails
 function getResend() {
@@ -233,50 +234,36 @@ export const authOptions: NextAuthOptions = {
         }
 
         const email = credentials.email.toLowerCase()
-        // Ensure DB has new columns used by the app (forward-compatible, no-op if exists)
-        // try {
-        //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsAccepted" BOOLEAN DEFAULT false')
-        // } catch (e) {
-        //   console.warn('termsAccepted column ensure failed (safe to ignore if already exists):', e)
-        // }
-        // // Ensure wallet metering columns exist to prevent Prisma SELECT errors during login
-        // try {
-        //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
-        // } catch (e) {
-        //   console.warn('walletMonthlyUsedCents ensure failed (safe to ignore if already exists):', e)
-        // }
-        // try {
-        //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyResetAt" TIMESTAMP(3)')
-        // } catch (e) {
-        //   console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
-        // }
-        // Find or create user deterministically; do not return null on transient DB issues
-        let user = await prisma.user.findUnique({ where: { email } }).catch((e) => {
-          console.error('⚠️ prisma.user.findUnique failed:', e)
-          return null
-        })
+        const user = await prisma.user
+          .findUnique({
+            where: { email },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              image: true,
+              passwordHash: true,
+              emailVerified: true,
+            },
+          })
+          .catch((e) => {
+            console.error('⚠️ prisma.user.findUnique failed:', e)
+            return null
+          })
 
-        if (!user) {
-          user = await prisma.user
-            .create({
-              data: {
-                email,
-                name: email.split('@')[0],
-                emailVerified: new Date(),
-              },
-            })
-            .catch(async (e) => {
-              console.error('⚠️ prisma.user.create failed (race or constraint). Retrying read:', e)
-              // In case of a race/unique constraint, try to read again
-              return await prisma.user.findUnique({ where: { email } }).catch((err) => {
-                console.error('❌ Second read failed:', err)
-                return null
-              })
-            })
+        if (!user || !user.passwordHash) {
+          console.log('❌ No password set for user:', email)
+          return null
         }
 
-        if (!user) {
-          console.error('❌ Could not get or create user; returning CredentialsSignin')
+        if (!user.emailVerified) {
+          console.log('❌ Email not verified for user:', email)
+          throw new Error('EMAIL_NOT_VERIFIED')
+        }
+
+        const match = await bcrypt.compare(credentials.password, user.passwordHash)
+        if (!match) {
+          console.log('❌ Invalid password for user:', email)
           return null
         }
 

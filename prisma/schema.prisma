@@ -10,6 +10,7 @@ datasource db {
 model User {
   id                     String    @id @default(cuid())
   email                  String    @unique
+  passwordHash           String?
   emailVerified          DateTime?
   name                   String?
   image                  String?
@@ -121,6 +122,16 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  tokenHash String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
 }
 
 model HealthGoal {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcrypt'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
 
@@ -91,6 +92,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (String(password).length < 8) {
+      return NextResponse.json(
+        { error: 'Password must be at least 8 characters long' },
+        { status: 400 }
+      )
+    }
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email: email.toLowerCase() }
@@ -104,6 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('👤 Creating new UNVERIFIED user via direct signup:', email)
+    const passwordHash = await bcrypt.hash(String(password), 12)
     
     // Create user but DON'T verify email yet
     // Grant free credits: 5 food, 2 symptom, 2 medical, 2 interaction, 1 health intake, 3 insights
@@ -112,6 +121,7 @@ export async function POST(request: NextRequest) {
         email: email.toLowerCase(),
         name: email.split('@')[0],
         emailVerified: null, // CRITICAL: User is NOT verified
+        passwordHash,
         freeFoodAnalysisRemaining: 5,
         freeSymptomAnalysisRemaining: 2,
         freeMedicalAnalysisRemaining: 2,
