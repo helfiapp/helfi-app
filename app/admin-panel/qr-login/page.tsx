@@ -38,6 +38,12 @@ function QRLoginContent() {
         if (response.status === 401) {
           sessionStorage.removeItem('adminToken')
           sessionStorage.removeItem('adminUser')
+          try {
+            localStorage.removeItem('adminToken')
+            localStorage.removeItem('adminUser')
+          } catch (storageError) {
+            console.warn('Unable to clear saved admin token', storageError)
+          }
           setStatus('needs-login')
           return
         }
@@ -61,7 +67,9 @@ function QRLoginContent() {
       return
     }
 
-    const existingToken = sessionStorage.getItem('adminToken')
+    const existingToken =
+      sessionStorage.getItem('adminToken') ||
+      (typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null)
     if (existingToken) {
       void approveLogin(existingToken)
     } else {
@@ -128,6 +136,12 @@ function QRLoginContent() {
 
       sessionStorage.setItem('adminToken', data.token)
       sessionStorage.setItem('adminUser', JSON.stringify(data.admin))
+      try {
+        localStorage.setItem('adminToken', data.token)
+        localStorage.setItem('adminUser', JSON.stringify(data.admin))
+      } catch (storageError) {
+        console.warn('Unable to persist admin token locally', storageError)
+      }
       setOtp('')
       setNeedsOtp(false)
       setTotpSetupUrl(null)
