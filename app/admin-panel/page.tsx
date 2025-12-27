@@ -16,6 +16,13 @@ export default function AdminPanel() {
   const [totpSetupUrl, setTotpSetupUrl] = useState<string | null>(null)
   const [totpQrData, setTotpQrData] = useState<string | null>(null)
   const [needsOtp, setNeedsOtp] = useState(false)
+  const [useQrLogin, setUseQrLogin] = useState(true)
+  const [qrLoginToken, setQrLoginToken] = useState<string | null>(null)
+  const [qrLoginUrl, setQrLoginUrl] = useState<string | null>(null)
+  const [qrLoginImage, setQrLoginImage] = useState<string | null>(null)
+  const [qrLoginStatus, setQrLoginStatus] = useState<'idle' | 'loading' | 'pending' | 'approved'>('idle')
+  const [qrLoginError, setQrLoginError] = useState('')
+  const qrLoginIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   // Analytics data states
   const [analyticsData, setAnalyticsData] = useState<any[]>([])
@@ -211,6 +218,102 @@ export default function AdminPanel() {
     }
   }, [])
 
+  const applyAdminSession = (tokenValue: string, adminValue: any) => {
+    setAdminToken(tokenValue)
+    setAdminUser(adminValue)
+    setIsAuthenticated(true)
+    sessionStorage.setItem('adminToken', tokenValue)
+    sessionStorage.setItem('adminUser', JSON.stringify(adminValue))
+    loadAnalyticsData()
+    loadWaitlistData(tokenValue)
+    loadUserStats(tokenValue)
+  }
+
+  const stopQrPolling = () => {
+    if (qrLoginIntervalRef.current) {
+      clearInterval(qrLoginIntervalRef.current)
+      qrLoginIntervalRef.current = null
+    }
+  }
+
+  const pollQrLoginStatus = async (tokenValue: string) => {
+    try {
+      const response = await fetch(`/api/admin/qr-login/status?token=${encodeURIComponent(tokenValue)}`)
+      if (response.status === 404 || response.status === 410) {
+        stopQrPolling()
+        setQrLoginStatus('idle')
+        setQrLoginError('QR code expired. Please generate a new one.')
+        return
+      }
+      const data = await response.json().catch(() => ({}))
+      if (data?.status === 'APPROVED' && data?.token && data?.admin) {
+        stopQrPolling()
+        setQrLoginStatus('approved')
+        applyAdminSession(data.token, data.admin)
+      }
+    } catch (error) {
+      console.error('QR login status error:', error)
+    }
+  }
+
+  const startQrLogin = async () => {
+    stopQrPolling()
+    setQrLoginStatus('loading')
+    setQrLoginError('')
+    setQrLoginImage(null)
+    setQrLoginUrl(null)
+    setQrLoginToken(null)
+
+    try {
+      const response = await fetch('/api/admin/qr-login/start')
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.token || !data?.url) {
+        setQrLoginStatus('idle')
+        setQrLoginError(data?.error || 'Failed to generate QR login')
+        return
+      }
+
+      setQrLoginToken(data.token)
+      setQrLoginUrl(data.url)
+      setQrLoginStatus('pending')
+
+      try {
+        const QRCode = (await import('qrcode')).default
+        const qrImageData = await QRCode.toDataURL(data.url, {
+          width: 240,
+          margin: 1
+        })
+        setQrLoginImage(qrImageData)
+      } catch (qrError) {
+        console.error('QR login image error:', qrError)
+        setQrLoginError('Unable to render QR code. Please refresh and try again.')
+      }
+
+      qrLoginIntervalRef.current = setInterval(() => {
+        void pollQrLoginStatus(data.token)
+      }, 2500)
+    } catch (error) {
+      console.error('QR login start error:', error)
+      setQrLoginStatus('idle')
+      setQrLoginError('Failed to generate QR login')
+    }
+  }
+
+  useEffect(() => {
+    if (isAuthenticated || !useQrLogin) {
+      stopQrPolling()
+      return
+    }
+
+    if (!qrLoginToken) {
+      void startQrLogin()
+    }
+
+    return () => {
+      stopQrPolling()
+    }
+  }, [isAuthenticated, useQrLogin, qrLoginToken])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -268,18 +371,12 @@ export default function AdminPanel() {
         return
       }
 
-      setAdminToken(data.token)
-      setAdminUser(data.admin)
-      setIsAuthenticated(true)
-      sessionStorage.setItem('adminToken', data.token)
-      sessionStorage.setItem('adminUser', JSON.stringify(data.admin))
-      loadAnalyticsData()
-      loadWaitlistData(data.token)
-      loadUserStats(data.token)
+      applyAdminSession(data.token, data.admin)
       setOtp('')
       setNeedsOtp(false)
       setTotpSetupUrl(null)
       setTotpQrData(null)
+      setError('')
       setLoading(false)
     } catch (loginError) {
       console.error('Admin login error:', loginError)
@@ -292,6 +389,7 @@ export default function AdminPanel() {
     setIsAuthenticated(false)
     sessionStorage.removeItem('adminToken')
     sessionStorage.removeItem('adminUser')
+    stopQrPolling()
     setPassword('')
     setOtp('')
     setAdminToken('')
@@ -299,6 +397,12 @@ export default function AdminPanel() {
     setTotpSetupUrl(null)
     setTotpQrData(null)
     setNeedsOtp(false)
+    setUseQrLogin(true)
+    setQrLoginToken(null)
+    setQrLoginUrl(null)
+    setQrLoginImage(null)
+    setQrLoginStatus('idle')
+    setQrLoginError('')
     setAnalyticsData([])
     setAnalyticsSummary(null)
     setAiInsights('')
@@ -1784,19 +1888,15 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   const generateQRCode = async () => {
     setIsGeneratingQR(true)
     try {
-      const response = await fetch('/api/admin/qr-generate', {
-        headers: {
-          'Authorization': `Bearer ${adminToken}`
-        }
-      })
+      const response = await fetch('/api/admin/qr-login/start')
 
       if (response.ok) {
         const data = await response.json()
-        setQrCodeUrl(data.qrData.url)
+        setQrCodeUrl(data.url)
         
         // Generate QR code image using qrcode library
         const QRCode = (await import('qrcode')).default
-        const qrImageData = await QRCode.toDataURL(data.qrData.url, {
+        const qrImageData = await QRCode.toDataURL(data.url, {
           width: 300,
           margin: 2
         })
@@ -1985,102 +2085,199 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             <p className="text-gray-600 mt-2">Enter credentials to access analytics dashboard</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Admin Email
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                placeholder="Enter admin email"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Admin Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  id="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Enter admin password"
-                  required
-                />
+          <div className="flex items-center justify-center gap-2 text-xs mb-6">
+            <button
+              type="button"
+              onClick={() => {
+                setUseQrLogin(true)
+                setQrLoginToken(null)
+                setQrLoginError('')
+              }}
+              className={`px-3 py-1 rounded-full border ${useQrLogin ? 'bg-emerald-100 border-emerald-200 text-emerald-700' : 'bg-gray-100 border-gray-200 text-gray-600'}`}
+            >
+              QR Login
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUseQrLogin(false)
+                setQrLoginError('')
+              }}
+              className={`px-3 py-1 rounded-full border ${!useQrLogin ? 'bg-emerald-100 border-emerald-200 text-emerald-700' : 'bg-gray-100 border-gray-200 text-gray-600'}`}
+            >
+              Email + Authenticator
+            </button>
+          </div>
+
+          {useQrLogin ? (
+            <div className="space-y-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                <p className="text-sm text-gray-700 font-medium">
+                  Scan this QR code with your phone to approve the login.
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  This uses your phone&apos;s existing admin session.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-center space-y-3">
+                {qrLoginImage ? (
+                  <img src={qrLoginImage} alt="Admin QR login" className="border border-gray-200 rounded-lg" />
+                ) : (
+                  <div className="w-60 h-60 border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-xs text-gray-500">
+                    {qrLoginStatus === 'loading' ? 'Generating QR code…' : 'QR code loading…'}
+                  </div>
+                )}
+                {qrLoginStatus === 'pending' && (
+                  <p className="text-xs text-gray-500">Waiting for phone approval…</p>
+                )}
+                {qrLoginError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm w-full text-center">
+                    {qrLoginError}
+                  </div>
+                )}
+                {qrLoginUrl && (
+                  <a
+                    href={qrLoginUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 underline break-all"
+                  >
+                    {qrLoginUrl}
+                  </a>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={startQrLogin}
+                  className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  {showPassword ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
+                  Refresh QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUseQrLogin(false)
+                    setQrLoginError('')
+                  }}
+                  className="flex-1 bg-emerald-500 text-white py-2 px-4 rounded-lg hover:bg-emerald-600 transition-colors"
+                >
+                  Use Email Login
                 </button>
               </div>
             </div>
-
-            {totpSetupUrl && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-center">
-                <p className="text-sm text-emerald-900 font-medium mb-3">
-                  Scan this setup code with your authenticator app.
-                </p>
-                {totpQrData ? (
-                  <img src={totpQrData} alt="Authenticator setup QR" className="mx-auto border border-emerald-200 rounded-lg" />
-                ) : (
-                  <p className="text-xs text-emerald-700">Loading setup code…</p>
-                )}
-                <p className="text-xs text-emerald-700 mt-3">
-                  After scanning, enter the 6-digit code below to finish setup.
-                </p>
-              </div>
-            )}
-
-            {(needsOtp || totpSetupUrl) && (
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-6">
               <div>
-                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
-                  Authenticator Code
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Admin Email
                 </label>
                 <input
-                  type="text"
-                  id="otp"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Enter 6-digit code"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
+                  placeholder="Enter admin email"
+                  required
                 />
               </div>
-            )}
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                {error}
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  Admin Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="Enter admin password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-emerald-500 text-white py-3 px-4 rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-            >
-              {loading ? 'Authenticating...' : 'Access Dashboard'}
-            </button>
-          </form>
+              {totpSetupUrl && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-center">
+                  <p className="text-sm text-emerald-900 font-medium mb-3">
+                    Scan this setup code with your authenticator app.
+                  </p>
+                  {totpQrData ? (
+                    <img src={totpQrData} alt="Authenticator setup QR" className="mx-auto border border-emerald-200 rounded-lg" />
+                  ) : (
+                    <p className="text-xs text-emerald-700">Loading setup code…</p>
+                  )}
+                  <p className="text-xs text-emerald-700 mt-3">
+                    After scanning, enter the 6-digit code below to finish setup.
+                  </p>
+                </div>
+              )}
+
+              {(needsOtp || totpSetupUrl) && (
+                <div>
+                  <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+                    Authenticator Code
+                  </label>
+                  <input
+                    type="text"
+                    id="otp"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="Enter 6-digit code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                  />
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-emerald-500 text-white py-3 px-4 rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              >
+                {loading ? 'Authenticating...' : 'Access Dashboard'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setUseQrLogin(true)
+                  setQrLoginToken(null)
+                  setQrLoginError('')
+                }}
+                className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Use QR Login Instead
+              </button>
+            </form>
+          )}
 
           <p className="text-xs text-gray-500 text-center mt-6">
             Authorized access only. Contact support if you need assistance.
@@ -5337,14 +5534,14 @@ The Helfi Team`,
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">📱 QR Code Login</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Generate a QR code to log into the admin panel on your phone. Scan the QR code with your phone's camera to instantly log in.
+                Generate a QR code to approve a desktop admin login. Scan it with your phone to confirm the session.
               </p>
               
               {qrCodeData ? (
                 <div className="flex flex-col items-center space-y-4">
                   <img src={qrCodeData} alt="QR Code" className="border-2 border-gray-200 rounded-lg" />
                   <p className="text-sm text-gray-600 text-center">
-                    Scan this QR code with your phone to log into the admin panel
+                    Scan this QR code with your phone to approve a desktop login
                   </p>
                   <p className="text-xs text-gray-500 text-center">
                     Or visit: <a href={qrCodeUrl || '#'} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{qrCodeUrl}</a>

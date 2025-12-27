@@ -1,295 +1,274 @@
 'use client'
 
-import React, { useEffect, useState, useRef, Suspense } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
-import { useRouter, useSearchParams } from 'next/navigation'
+import React, { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 function QRLoginContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const [scanning, setScanning] = useState(false)
+  const tokenFromUrl = (searchParams.get('token') || '').trim()
+  const [status, setStatus] = useState<'idle' | 'approving' | 'approved' | 'needs-login' | 'error'>('idle')
   const [error, setError] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
-  const [status, setStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle')
-  const scannerRef = useRef<Html5Qrcode | null>(null)
-  const verifyingRef = useRef<boolean>(false) // Prevent multiple simultaneous verifications
-  const qrCodeRegionId = 'qr-reader'
+  const [needsOtp, setNeedsOtp] = useState(false)
+  const [totpSetupUrl, setTotpSetupUrl] = useState<string | null>(null)
+  const [totpQrData, setTotpQrData] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
 
-  // Check if token is in URL (direct link from QR code)
-  const tokenFromUrl = searchParams.get('token')
-
-  useEffect(() => {
-    // If token is in URL, verify it directly (no camera needed)
-    if (tokenFromUrl && !verifyingRef.current) {
-      handleTokenVerification(tokenFromUrl)
-      return
-    }
-
-    // Don't auto-start scanner - let user click button to start
-    // This prevents permission issues on mobile
-    
-    return () => {
-      stopScanner()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tokenFromUrl])
-
-  const startScanner = async () => {
-    try {
-      setScanning(true)
-      setStatus('scanning')
-      setError('')
-
-      // Request camera permissions first (especially important on mobile)
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
-        })
-        // Stop the stream immediately - html5-qrcode will start its own
-        stream.getTracks().forEach(track => track.stop())
-      } catch (permError: any) {
-        console.error('Camera permission error:', permError)
-        setError('Camera permission denied. Please allow camera access in your browser settings and try again.')
-        setStatus('error')
-        setScanning(false)
-        return
-      }
-
-      const html5QrCode = new Html5Qrcode(qrCodeRegionId)
-      scannerRef.current = html5QrCode
-
-      await html5QrCode.start(
-        { facingMode: 'environment' }, // Use back camera on mobile
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 }
-        },
-        (decodedText) => {
-          // QR code scanned successfully
-          handleQRCodeScanned(decodedText)
-        },
-        (errorMessage) => {
-          // Ignore scan errors (they're frequent during scanning)
-        }
-      )
-    } catch (err: any) {
-      console.error('Scanner error:', err)
-      let errorMsg = 'Failed to start camera. '
-      if (err?.message?.includes('permission')) {
-        errorMsg += 'Please allow camera access in your browser settings.'
-      } else if (err?.message?.includes('not found') || err?.message?.includes('not available')) {
-        errorMsg += 'Camera not found. Make sure your device has a camera.'
-      } else {
-        errorMsg += 'Please check permissions and try again.'
-      }
-      setError(errorMsg)
-      setStatus('error')
-      setScanning(false)
-    }
-  }
-
-  const stopScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().then(() => {
-        scannerRef.current = null
-        setScanning(false)
-      }).catch((err) => {
-        console.error('Error stopping scanner:', err)
-      })
-    }
-  }
-
-  const handleQRCodeScanned = (qrData: string) => {
-    // Prevent multiple scans from triggering multiple verifications
-    if (verifyingRef.current) {
-      console.log('[QR-SCAN] Already verifying, ignoring duplicate scan')
-      return
-    }
-
-    stopScanner()
-    
-    console.log('[QR-SCAN] Scanned QR data:', qrData.substring(0, 100))
-    
-    // Extract token from URL if it's a full URL
-    let token = qrData
-    if (qrData.includes('token=')) {
-      const match = qrData.match(/token=([^&?#]+)/)
-      if (match && match[1]) {
-        token = match[1]
-        console.log('[QR-SCAN] Extracted token:', token.substring(0, 20) + '...')
-      } else {
-        console.error('[QR-SCAN] Failed to extract token from URL')
-        setError('Failed to extract token from QR code. Please try scanning again.')
-        setStatus('error')
-        setScanning(false)
-        return
-      }
-    } else if (qrData.includes('/admin-panel/qr-login')) {
-      // Try to extract from path
-      const urlMatch = qrData.match(/qr-login[?&]token=([^&?#]+)/)
-      if (urlMatch && urlMatch[1]) {
-        token = urlMatch[1]
-        console.log('[QR-SCAN] Extracted token from path:', token.substring(0, 20) + '...')
-      } else {
-        console.error('[QR-SCAN] Failed to extract token from path')
-        setError('Failed to extract token from QR code. Please try scanning again.')
-        setStatus('error')
-        setScanning(false)
-        return
-      }
-    }
-
-    // Normalize token
-    token = (token || '').trim()
-
-    if (!token || token.length < 10) {
-      console.error('[QR-SCAN] Invalid token extracted:', token)
-      setError('Invalid QR code format. Please scan a fresh QR code from your desktop.')
-      setStatus('error')
-      setScanning(false)
-      return
-    }
-
-    console.log('[QR-SCAN] Final token to verify:', token.substring(0, 20) + '...')
-    handleTokenVerification(token)
-  }
-
-  const handleTokenVerification = async (token: string) => {
-    // Prevent multiple simultaneous verification attempts
-    if (verifyingRef.current) {
-      console.log('[QR-VERIFY] Already verifying, ignoring duplicate request')
-      return
-    }
-
-    verifyingRef.current = true
-    setLoading(true)
-    setStatus('idle')
+  const approveLogin = async (adminToken: string) => {
+    if (!tokenFromUrl) return
+    setStatus('approving')
     setError('')
-
-    // Normalize token
-    token = (token || '').trim()
-    console.log('[QR-VERIFY] Verifying token:', token.substring(0, 20) + '...')
-
     try {
-      const response = await fetch('/api/admin/qr-generate', {
+      const response = await fetch('/api/admin/qr-login/approve', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token: tokenFromUrl })
       })
 
-      const data = await response.json()
-      console.log('[QR-VERIFY] Response status:', response.status, 'Data:', data)
-
+      const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to verify QR code')
+        if (response.status === 401) {
+          sessionStorage.removeItem('adminToken')
+          sessionStorage.removeItem('adminUser')
+          setStatus('needs-login')
+          return
+        }
+        setStatus('error')
+        setError(data?.error || 'Unable to approve login. Please try again.')
+        return
       }
 
-      // Store admin session
+      setStatus('approved')
+    } catch (err) {
+      console.error('QR approve error:', err)
+      setStatus('error')
+      setError('Unable to approve login. Please try again.')
+    }
+  }
+
+  useEffect(() => {
+    if (!tokenFromUrl) {
+      setStatus('error')
+      setError('Missing login token. Please scan the QR code from your desktop.')
+      return
+    }
+
+    const existingToken = sessionStorage.getItem('adminToken')
+    if (existingToken) {
+      void approveLogin(existingToken)
+    } else {
+      setStatus('needs-login')
+    }
+  }, [tokenFromUrl])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    setTotpSetupUrl(null)
+    setTotpQrData(null)
+
+    try {
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password.trim(),
+          otp: otp.trim() || undefined,
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (data?.setupRequired && data?.otpauthUrl) {
+        setNeedsOtp(true)
+        setError('')
+        setTotpSetupUrl(data.otpauthUrl)
+        try {
+          const QRCode = (await import('qrcode')).default
+          const qrImageData = await QRCode.toDataURL(data.otpauthUrl, {
+            width: 220,
+            margin: 1,
+          })
+          setTotpQrData(qrImageData)
+        } catch (qrError) {
+          console.error('QR setup generation failed:', qrError)
+          setError('Unable to render the setup code. Please refresh and try again.')
+        }
+        setLoading(false)
+        return
+      }
+
+      if (!response.ok) {
+        if (data?.code === 'OTP_REQUIRED') {
+          setNeedsOtp(true)
+          setError('Enter your 6-digit authenticator code to continue.')
+          setLoading(false)
+          return
+        }
+        setError(data?.error || 'Sign-in failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      if (!data?.token || !data?.admin) {
+        setError('Sign-in failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
       sessionStorage.setItem('adminToken', data.token)
       sessionStorage.setItem('adminUser', JSON.stringify(data.admin))
-
-      setStatus('success')
+      setOtp('')
+      setNeedsOtp(false)
+      setTotpSetupUrl(null)
+      setTotpQrData(null)
+      await approveLogin(data.token)
       setLoading(false)
-      
-      // Redirect to admin panel after short delay
-      setTimeout(() => {
-        router.push('/admin-panel')
-      }, 1500)
-    } catch (err: any) {
-      console.error('[QR-VERIFY] Verification error:', err)
-      setError(err.message || 'Failed to verify QR code. Please try scanning a fresh QR code.')
-      setStatus('error')
+    } catch (loginError) {
+      console.error('Admin login error:', loginError)
+      setError('Sign-in failed. Please try again.')
       setLoading(false)
-      verifyingRef.current = false
-      // DO NOT auto-restart scanner - let user manually retry
     }
   }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
-        <h1 className="text-2xl font-bold text-center mb-6">Admin Panel Login</h1>
-        
-        {status === 'success' && (
-          <div className="text-center py-8">
-            <div className="text-green-500 text-5xl mb-4">✓</div>
-            <p className="text-lg font-semibold text-gray-800">Login Successful!</p>
-            <p className="text-sm text-gray-600 mt-2">Redirecting to admin panel...</p>
+        <h1 className="text-2xl font-bold text-center mb-2">Approve Admin Login</h1>
+        <p className="text-sm text-center text-gray-600 mb-6">
+          Opened from the QR code on your desktop.
+        </p>
+
+        {status === 'approved' && (
+          <div className="text-center py-6">
+            <p className="text-lg font-semibold text-gray-800">Login approved.</p>
+            <p className="text-sm text-gray-600 mt-2">You can return to your desktop now.</p>
+          </div>
+        )}
+
+        {status === 'approving' && (
+          <div className="text-center py-6">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <p className="mt-3 text-sm text-gray-600">Approving login...</p>
           </div>
         )}
 
         {status === 'error' && (
-          <div className="text-center py-8">
-            <div className="text-red-500 text-5xl mb-4">✗</div>
-            <p className="text-lg font-semibold text-gray-800">Login Failed</p>
-            <p className="text-sm text-gray-600 mt-2">{error}</p>
-            <button
-              onClick={() => {
-                setError('')
-                setStatus('idle')
-                verifyingRef.current = false
-                startScanner()
-              }}
-              className="w-full bg-gray-900 text-white py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors mt-4"
-            >
-              Try Again
-            </button>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm text-center">
+            {error}
           </div>
         )}
 
-        {(status === 'idle' || status === 'scanning') && (
-          <>
-            <p className="text-center text-gray-600 mb-6">
-              Scan the QR code from your desktop admin panel
-            </p>
-            
-            {!scanning && !error && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-blue-800 text-center">
-                  <strong>Tip:</strong> When you click "Start Scanner", your browser will ask for camera permission. Please allow it to scan the QR code.
+        {status === 'needs-login' && (
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-sm text-gray-700">
+              Sign in to approve this desktop login.
+            </div>
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Admin Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                placeholder="Enter admin email"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                Admin Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Enter admin password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showPassword ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {totpSetupUrl && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-center">
+                <p className="text-sm text-emerald-900 font-medium mb-3">
+                  Scan this setup code with your authenticator app.
+                </p>
+                {totpQrData ? (
+                  <img src={totpQrData} alt="Authenticator setup QR" className="mx-auto border border-emerald-200 rounded-lg" />
+                ) : (
+                  <p className="text-xs text-emerald-700">Loading setup code...</p>
+                )}
+                <p className="text-xs text-emerald-700 mt-3">
+                  After scanning, enter the 6-digit code below to finish setup.
                 </p>
               </div>
             )}
-            
-            <div id={qrCodeRegionId} className="w-full mb-4" style={{ minHeight: scanning ? '300px' : '0px' }}></div>
-            
-            {loading && (
-              <div className="text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                <p className="mt-2 text-sm text-gray-600">Verifying...</p>
+
+            {(needsOtp || totpSetupUrl) && (
+              <div>
+                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+                  Authenticator Code
+                </label>
+                <input
+                  type="text"
+                  id="otp"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Enter 6-digit code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                />
               </div>
             )}
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-red-800 mb-2">{error}</p>
-                <p className="text-xs text-red-600 mt-2">
-                  <strong>Alternative:</strong> You can also manually visit the URL shown below the QR code on your desktop.
-                </p>
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
               </div>
             )}
 
             <button
-              onClick={() => {
-                if (scanning) {
-                  stopScanner()
-                } else {
-                  setError('')
-                  setStatus('idle')
-                  verifyingRef.current = false
-                  startScanner()
-                }
-              }}
-              className="w-full bg-gray-900 text-white py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors"
+              type="submit"
               disabled={loading}
+              className="w-full bg-emerald-500 text-white py-3 px-4 rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              {scanning ? 'Stop Scanner' : 'Start Scanner'}
+              {loading ? 'Signing in...' : 'Approve Login'}
             </button>
-          </>
+          </form>
         )}
       </div>
     </div>
@@ -310,4 +289,3 @@ export default function QRLoginPage() {
     </Suspense>
   )
 }
-
