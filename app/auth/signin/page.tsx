@@ -76,9 +76,20 @@ export default function SignIn() {
     }
 
     const resume = async () => {
-      // Check for plan parameter - if exists, redirect to checkout
+      // Check for plan parameter - first from URL, then from sessionStorage (for post-verification flow)
       const searchParams = new URLSearchParams(window.location.search)
-      const planParam = searchParams.get('plan')
+      let planParam = searchParams.get('plan')
+      
+      // If no plan in URL, check sessionStorage (stored during signup)
+      if (!planParam) {
+        try {
+          planParam = sessionStorage.getItem('helfi:signupPlan')
+          if (planParam) {
+            // Clear it after retrieving
+            sessionStorage.removeItem('helfi:signupPlan')
+          }
+        } catch {}
+      }
       
       if (planParam) {
         // User came from homepage with a plan selected - redirect to checkout
@@ -243,9 +254,20 @@ export default function SignIn() {
         if (directResult.success) {
           persistRememberState(true, normalizedEmail)
           setLoading(false)
-          // Check for plan parameter - if exists, redirect to checkout
+          // Check for plan parameter - first from URL, then from sessionStorage
           const searchParams = new URLSearchParams(window.location.search)
-          const planParam = searchParams.get('plan')
+          let planParam = searchParams.get('plan')
+          
+          // If no plan in URL, check sessionStorage (stored during signup)
+          if (!planParam) {
+            try {
+              planParam = sessionStorage.getItem('helfi:signupPlan')
+              if (planParam) {
+                sessionStorage.removeItem('helfi:signupPlan')
+              }
+            } catch {}
+          }
+          
           if (planParam) {
             try {
               const res = await fetch('/api/billing/create-checkout-session', {
@@ -306,13 +328,24 @@ export default function SignIn() {
             return
           }
           setLoading(false)
+          // Check for plan parameter - first from URL, then from sessionStorage
+          let planParamToUse = planParam
+          if (!planParamToUse) {
+            try {
+              planParamToUse = sessionStorage.getItem('helfi:signupPlan')
+              if (planParamToUse) {
+                sessionStorage.removeItem('helfi:signupPlan')
+              }
+            } catch {}
+          }
+          
           // Redirect to checkout if plan parameter exists
-          if (planParam) {
+          if (planParamToUse) {
             try {
               const checkoutRes = await fetch('/api/billing/create-checkout-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan: planParam }),
+                body: JSON.stringify({ plan: planParamToUse }),
               })
               if (checkoutRes.ok) {
                 const { url } = await checkoutRes.json()
@@ -332,13 +365,23 @@ export default function SignIn() {
           if (fallback.success) {
             persistRememberState(true, normalizedEmail)
             setLoading(false)
+            // Check for plan parameter - first from URL, then from sessionStorage
+            let planParamToUse = planParam
+            if (!planParamToUse) {
+              try {
+                planParamToUse = sessionStorage.getItem('helfi:signupPlan')
+                if (planParamToUse) {
+                  sessionStorage.removeItem('helfi:signupPlan')
+                }
+              } catch {}
+            }
             // Redirect to checkout if plan parameter exists
-            if (planParam) {
+            if (planParamToUse) {
               try {
                 const checkoutRes = await fetch('/api/billing/create-checkout-session', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ plan: planParam }),
+                  body: JSON.stringify({ plan: planParamToUse }),
                 })
                 if (checkoutRes.ok) {
                   const { url } = await checkoutRes.json()

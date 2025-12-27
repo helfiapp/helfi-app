@@ -90,12 +90,24 @@ function VerifyContent() {
               <h2 className="text-2xl font-bold text-helfi-black">Email Verified!</h2>
               <p className="text-gray-600">{message}</p>
               <div className="space-y-3">
-                <Link
-                  href="/auth/signin"
-                  className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green-dark transition-colors font-medium inline-block"
-                >
-                  Continue to Sign In
-                </Link>
+                {(() => {
+                  // Check for stored plan parameter from signup
+                  let signinUrl = '/auth/signin'
+                  try {
+                    const storedPlan = sessionStorage.getItem('helfi:signupPlan')
+                    if (storedPlan) {
+                      signinUrl = `/auth/signin?plan=${encodeURIComponent(storedPlan)}`
+                    }
+                  } catch {}
+                  return (
+                    <Link
+                      href={signinUrl}
+                      className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green-dark transition-colors font-medium inline-block"
+                    >
+                      Continue to Sign In
+                    </Link>
+                  )
+                })()}
                 <p className="text-sm text-gray-500">
                   You can now sign in to your Helfi account and start your health journey.
                 </p>
