@@ -288,10 +288,6 @@ export default function AdminPanel() {
         console.error('QR login image error:', qrError)
         setQrLoginError('Unable to render QR code. Please refresh and try again.')
       }
-
-      qrLoginIntervalRef.current = setInterval(() => {
-        void pollQrLoginStatus(data.token)
-      }, 2500)
     } catch (error) {
       console.error('QR login start error:', error)
       setQrLoginStatus('idle')
@@ -308,6 +304,19 @@ export default function AdminPanel() {
     if (!qrLoginToken) {
       void startQrLogin()
     }
+  }, [isAuthenticated, useQrLogin, qrLoginToken])
+
+  useEffect(() => {
+    if (isAuthenticated || !useQrLogin || !qrLoginToken) {
+      stopQrPolling()
+      return
+    }
+
+    stopQrPolling()
+    void pollQrLoginStatus(qrLoginToken)
+    qrLoginIntervalRef.current = setInterval(() => {
+      void pollQrLoginStatus(qrLoginToken)
+    }, 2500)
 
     return () => {
       stopQrPolling()
