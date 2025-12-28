@@ -1145,6 +1145,55 @@ const getItemWeightInGrams = (item: any): number | null => {
   return null;
 };
 
+const FRIED_SEAFOOD_KCAL_PER_100G_FLOOR = 180;
+const isFriedOrBatteredLabel = (label: string) =>
+  /\b(fried|battered|breaded|crumbed|tempura|beer\b)\b/i.test(label || '');
+const isSeafoodLabel = (label: string) =>
+  /\b(fish|fillet|seafood|shrimp|prawn|calamari|squid|scallop|crab|lobster)\b/i.test(label || '');
+
+const applyFriedSeafoodCalorieFloor = (items: any[]): { items: any[]; changed: boolean } => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { items, changed: false };
+  }
+
+  let changed = false;
+  const nextItems = items.map((item) => {
+    const label = `${item?.name || ''} ${item?.serving_size || ''}`.trim();
+    if (!label) return item;
+    if (!isFriedOrBatteredLabel(label) || !isSeafoodLabel(label)) return item;
+
+    const weight = getItemWeightInGrams(item);
+    if (!Number.isFinite(weight) || !weight || weight <= 0) return item;
+
+    const calories = Number(item?.calories ?? 0);
+    if (!Number.isFinite(calories) || calories <= 0) return item;
+
+    const per100 = (calories / weight) * 100;
+    if (!Number.isFinite(per100) || per100 >= FRIED_SEAFOOD_KCAL_PER_100G_FLOOR) return item;
+
+    const targetCalories = Math.round((weight * FRIED_SEAFOOD_KCAL_PER_100G_FLOOR) / 100);
+    const scale = targetCalories / calories;
+    const scaleMacro = (value: any, decimals = 1) => {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return value;
+      const factor = Math.pow(10, decimals);
+      return Math.round(num * scale * factor) / factor;
+    };
+
+    const next = { ...item };
+    next.calories = targetCalories;
+    if (next.protein_g != null) next.protein_g = scaleMacro(next.protein_g);
+    if (next.carbs_g != null) next.carbs_g = scaleMacro(next.carbs_g);
+    if (next.fat_g != null) next.fat_g = scaleMacro(next.fat_g);
+    if (next.fiber_g != null) next.fiber_g = scaleMacro(next.fiber_g);
+    if (next.sugar_g != null) next.sugar_g = scaleMacro(next.sugar_g);
+    changed = true;
+    return next;
+  });
+
+  return { items: nextItems, changed };
+};
+
 const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: number | null) => {
   if (!Array.isArray(candidates) || candidates.length === 0) return null;
   const queryNorm = normalizeLookupQuery(query);
@@ -3529,6 +3578,14 @@ CRITICAL REQUIREMENTS:
         resp.total = harmonized.total;
       } else if (!resp.total) {
         resp.total = computeTotalsFromItems(resp.items);
+      }
+    }
+
+    if (!packagedMode && !labelScan && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+      const friedFloor = applyFriedSeafoodCalorieFloor(resp.items);
+      if (friedFloor.changed) {
+        resp.items = friedFloor.items;
+        resp.total = computeTotalsFromItems(resp.items) || resp.total;
       }
     }
 
