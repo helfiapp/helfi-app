@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma';
 import { del, head } from '@vercel/blob';
 import { processPDF } from '@/lib/pdf-processor';
 import { encryptFieldsBatch, verifyPasswordHash } from '@/lib/encryption';
+import { decryptBuffer } from '@/lib/file-encryption';
 import { createAuditEvent } from '@/lib/audit';
 import { AuditEventType, ReportStatus } from '@prisma/client';
 
@@ -144,7 +145,11 @@ export async function POST(
         throw new Error(`Failed to fetch PDF from blob: ${blobResponse.statusText}`);
       }
 
-      const pdfBuffer = Buffer.from(await blobResponse.arrayBuffer());
+      let pdfBuffer = Buffer.from(await blobResponse.arrayBuffer());
+      const reportMeta = (report.metadata || {}) as any;
+      if (reportMeta?.encrypted === true) {
+        pdfBuffer = decryptBuffer(pdfBuffer, reportMeta?.encryption?.iv, reportMeta?.encryption?.tag);
+      }
 
       // Process PDF
       const processingResult = await processPDF(

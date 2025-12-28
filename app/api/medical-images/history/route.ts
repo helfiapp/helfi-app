@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { del, put } from '@vercel/blob'
+import { encryptBuffer } from '@/lib/file-encryption'
+import { createSignedFileToken } from '@/lib/signed-file'
 
 const contentTypeToExt = (contentType: string) => {
   if (contentType === 'image/png') return 'png'
@@ -37,20 +39,31 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         imageFile: {
           select: {
-            secureUrl: true,
+            id: true,
+            uploadedById: true,
           },
         },
       },
     })
 
-    const history = analyses.map((item) => ({
+    const history = analyses.map((item) => {
+      const fileId = item.imageFile?.id
+      const ownerId = item.imageFile?.uploadedById || user.id
+      const imageUrl = fileId
+        ? `/api/medical-images/file?token=${encodeURIComponent(
+            createSignedFileToken({ fileId, userId: ownerId, usage: 'MEDICAL_IMAGE' })
+          )}`
+        : null
+
+      return {
       id: item.id,
       summary: item.summary,
       analysisText: item.analysisText,
       analysisData: item.analysisData,
       createdAt: item.createdAt,
-      imageUrl: item.imageFile?.secureUrl || null,
-    }))
+      imageUrl,
+    }
+  })
 
     return NextResponse.json({ success: true, history })
   } catch (error) {
@@ -106,10 +119,11 @@ export async function POST(request: NextRequest) {
     const filename = `${Date.now()}.${ext}`
     const pathname = `medical-images/${user.id}/${filename}`
     const buffer = Buffer.from(await imageFile.arrayBuffer())
+    const encryptedPayload = encryptBuffer(buffer)
 
-    const blob = await put(pathname, buffer, {
+    const blob = await put(pathname, encryptedPayload.encrypted, {
       access: 'public',
-      contentType: imageFile.type || 'image/jpeg',
+      contentType: 'application/octet-stream',
       addRandomSuffix: true,
     })
 
@@ -125,11 +139,17 @@ export async function POST(request: NextRequest) {
         uploadedById: user.id,
         fileType: 'IMAGE',
         usage: 'MEDICAL_IMAGE',
-        isPublic: true,
+        isPublic: false,
         metadata: {
           storage: 'vercel-blob',
           blobPathname: blob.pathname,
           blobUrl: blob.url,
+          encrypted: true,
+          encryption: {
+            algorithm: 'aes-256-gcm',
+            iv: encryptedPayload.iv,
+            tag: encryptedPayload.tag,
+          },
           format: ext,
           originalSize: imageFile.size || buffer.length,
         },
@@ -164,7 +184,9 @@ export async function POST(request: NextRequest) {
         analysisText: saved.analysisText,
         analysisData: saved.analysisData,
         createdAt: saved.createdAt,
-        imageUrl: fileRecord.secureUrl,
+        imageUrl: `/api/medical-images/file?token=${encodeURIComponent(
+          createSignedFileToken({ fileId: fileRecord.id, userId: user.id, usage: 'MEDICAL_IMAGE' })
+        )}`,
       },
     })
   } catch (error) {

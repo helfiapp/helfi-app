@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { put } from '@vercel/blob';
 import { createAuditEvent } from '@/lib/audit';
 import { AuditEventType } from '@prisma/client';
+import { encryptBuffer } from '@/lib/file-encryption';
 
 export async function POST(
   request: NextRequest,
@@ -56,8 +57,12 @@ export async function POST(
 
     // Upload to Vercel Blob
     // Note: 'public' access still requires API token for retrieval via our API routes
-    const blob = await put(report.s3Key, file, {
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const encryptedPayload = encryptBuffer(fileBuffer);
+
+    const blob = await put(report.s3Key, encryptedPayload.encrypted, {
       access: 'public',
+      contentType: 'application/octet-stream',
       addRandomSuffix: false, // Use our custom path
     });
 
@@ -68,8 +73,16 @@ export async function POST(
         s3Key: blob.pathname, // Store blob pathname for deletion
         // Store blob URL in metadata for retrieval
         metadata: {
+          ...(report.metadata as any),
           blobUrl: blob.url,
           blobPathname: blob.pathname,
+          encrypted: true,
+          encryption: {
+            algorithm: 'aes-256-gcm',
+            iv: encryptedPayload.iv,
+            tag: encryptedPayload.tag,
+          },
+          originalMimeType: report.mimeType || 'application/pdf',
         },
       },
     });
@@ -101,4 +114,3 @@ export async function POST(
     );
   }
 }
-

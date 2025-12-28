@@ -9,6 +9,8 @@ import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { logAiUsageEvent } from '@/lib/ai-usage-logger';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { getImageMetadata } from '@/lib/image-metadata';
+import { encryptBuffer } from '@/lib/file-encryption';
+import { createSignedFileToken } from '@/lib/signed-file';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
@@ -343,9 +345,10 @@ export async function POST(req: NextRequest) {
         const filename = `${Date.now()}.${ext}`;
         const pathname = `medical-images/${user.id}/${filename}`;
         const buffer = Buffer.from(imageBuffer);
-        const blob = await put(pathname, buffer, {
+        const encryptedPayload = encryptBuffer(buffer);
+        const blob = await put(pathname, encryptedPayload.encrypted, {
           access: 'public',
-          contentType: imageFile.type,
+          contentType: 'application/octet-stream',
           addRandomSuffix: true,
         });
 
@@ -361,13 +364,19 @@ export async function POST(req: NextRequest) {
             uploadedById: user.id,
             fileType: 'IMAGE',
             usage: 'MEDICAL_IMAGE',
-            isPublic: true,
+            isPublic: false,
             metadata: {
               storage: 'vercel-blob',
               blobPathname: blob.pathname,
               blobUrl: blob.url,
               width: imageMeta.width ?? null,
               height: imageMeta.height ?? null,
+              encrypted: true,
+              encryption: {
+                algorithm: 'aes-256-gcm',
+                iv: encryptedPayload.iv,
+                tag: encryptedPayload.tag,
+              },
               format: ext,
               originalSize: imageFile.size,
             },
@@ -399,7 +408,9 @@ export async function POST(req: NextRequest) {
           analysisText: saved.analysisText,
           analysisData: saved.analysisData,
           createdAt: saved.createdAt,
-          imageUrl: fileRecord.secureUrl,
+          imageUrl: `/api/medical-images/file?token=${encodeURIComponent(
+            createSignedFileToken({ fileId: fileRecord.id, userId: user.id, usage: 'MEDICAL_IMAGE' })
+          )}`,
         };
       } catch (err) {
         console.warn('Failed to save medical image history:', err);
