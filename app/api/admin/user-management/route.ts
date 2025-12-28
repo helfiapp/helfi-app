@@ -477,6 +477,55 @@ export async function POST(request: NextRequest) {
         }
         break
 
+      case 'refund_latest_payment': {
+        if (!process.env.STRIPE_SECRET_KEY) {
+          return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
+        }
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true },
+        })
+        if (!user?.email) {
+          return NextResponse.json({ error: 'User email not found' }, { status: 404 })
+        }
+
+        const customers = await stripe.customers.list({ email: user.email.toLowerCase(), limit: 1 })
+        if (!customers.data.length) {
+          return NextResponse.json({ error: 'Stripe customer not found' }, { status: 404 })
+        }
+        const customer = customers.data[0]
+        const charges = await stripe.charges.list({ customer: customer.id, limit: 10 })
+        const charge = charges.data.find(
+          (c) => c.paid && c.status === 'succeeded' && (c.amount - c.amount_refunded) > 0
+        )
+        if (!charge) {
+          return NextResponse.json({ error: 'No refundable payments found' }, { status: 404 })
+        }
+
+        const remaining = charge.amount - charge.amount_refunded
+        const requestedAmount = data?.amountCents ? Number(data.amountCents) : null
+        if (requestedAmount != null && (Number.isNaN(requestedAmount) || requestedAmount <= 0)) {
+          return NextResponse.json({ error: 'Invalid refund amount' }, { status: 400 })
+        }
+        if (requestedAmount != null && requestedAmount > remaining) {
+          return NextResponse.json({ error: 'Refund amount exceeds remaining balance' }, { status: 400 })
+        }
+
+        const refund = await stripe.refunds.create({
+          charge: charge.id,
+          ...(requestedAmount ? { amount: requestedAmount } : {}),
+        })
+
+        return NextResponse.json({
+          success: true,
+          refundId: refund.id,
+          refundedAmountCents: refund.amount,
+          currency: refund.currency,
+          chargeId: charge.id,
+          remainingAmountCents: Math.max(0, remaining - refund.amount),
+        })
+      }
+
       case 'reset_daily_quota':
         // Reset daily analysis quota using new credit system
         await CreditManager.resetDailyQuota(userId)

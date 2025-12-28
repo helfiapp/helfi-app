@@ -936,7 +936,15 @@ https://www.helfi.ai`)
           setShowUserModal(false)
           setSelectedUser(null)
         }
-        alert(`User ${action} completed successfully`)
+        if (action === 'refund_latest_payment') {
+          const amountCents = typeof result?.refundedAmountCents === 'number' ? result.refundedAmountCents : null
+          const currency = typeof result?.currency === 'string' ? result.currency.toUpperCase() : 'AUD'
+          const amountText = amountCents != null ? `${currency} ${(amountCents / 100).toFixed(2)}` : 'the payment'
+          alert(`Refund started for ${amountText}. Access and credits will be removed automatically.`)
+        } else {
+          const successMessage = result?.message || `User ${action} completed successfully`
+          alert(successMessage)
+        }
       } else {
         const errorMessage = result.error || 'Action failed. Please try again.'
         console.error('API Error:', result)
@@ -4702,7 +4710,7 @@ The Helfi Team`,
                        )}
                      </div>
                      
-                     <div className="mt-4 grid grid-cols-3 gap-3">
+                   <div className="mt-4 grid grid-cols-3 gap-3">
                        <button
                          onClick={() => {
                            const credits = prompt('Enter number of credits to add:')
@@ -4738,6 +4746,37 @@ The Helfi Team`,
                          🔄 Reset Daily
                        </button>
                      </div>
+                   </div>
+
+                   {/* Refunds */}
+                   <div className="bg-yellow-50 rounded-lg p-4 mb-6 border-l-4 border-yellow-500">
+                     <h4 className="font-medium text-gray-900 mb-2">Refunds</h4>
+                     <p className="text-xs text-gray-600 mb-3">
+                       Refund the most recent payment for this user. Access and credits are removed automatically.
+                     </p>
+                     <button
+                       onClick={() => {
+                         const raw = prompt('Refund amount in dollars (leave blank for full refund):')
+                         if (raw === null) return
+                         const trimmed = raw.trim()
+                         let amountCents: number | null = null
+                         if (trimmed) {
+                           const parsed = Number(trimmed)
+                           if (!Number.isFinite(parsed) || parsed <= 0) {
+                             alert('Please enter a valid amount.')
+                             return
+                           }
+                           amountCents = Math.round(parsed * 100)
+                         }
+                         const amountLabel = amountCents ? `$${(amountCents / 100).toFixed(2)}` : 'the full amount'
+                         if (confirm(`Refund ${amountLabel} from the most recent payment for ${selectedUser.email}?`)) {
+                           handleUserAction('refund_latest_payment', selectedUser.id, { amountCents })
+                         }
+                       }}
+                       className="bg-yellow-600 text-white px-3 py-2 rounded text-sm hover:bg-yellow-700 transition-colors"
+                     >
+                       ↩️ Refund Latest Payment
+                     </button>
                    </div>
 
                    {/* Actions */}
