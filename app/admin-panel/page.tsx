@@ -42,6 +42,10 @@ export default function AdminPanel() {
   const [foodCostSim, setFoodCostSim] = useState<any>(null)
   const [foodCostSimLoading, setFoodCostSimLoading] = useState(false)
   const [foodCostSimError, setFoodCostSimError] = useState('')
+  const [foodServerUsageRange, setFoodServerUsageRange] = useState(30)
+  const [foodServerUsage, setFoodServerUsage] = useState<any>(null)
+  const [foodServerUsageLoading, setFoodServerUsageLoading] = useState(false)
+  const [foodServerUsageError, setFoodServerUsageError] = useState('')
   const [foodBenchmarkImageUrl, setFoodBenchmarkImageUrl] = useState('')
   const [foodBenchmarkModels, setFoodBenchmarkModels] = useState<Record<string, boolean>>({
     'gpt-4o': true,
@@ -499,6 +503,27 @@ export default function AdminPanel() {
       setFoodCostSimError(err?.message || 'Failed to load food cost simulation')
     } finally {
       setFoodCostSimLoading(false)
+    }
+  }
+
+  const loadFoodServerUsage = async (range?: number) => {
+    const days = range ?? foodServerUsageRange
+    setFoodServerUsageRange(days)
+    setFoodServerUsageLoading(true)
+    setFoodServerUsageError('')
+    try {
+      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      if (!authToken) return
+      const res = await fetch(`/api/admin/food-analysis-usage?rangeDays=${days}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to load food analysis usage')
+      setFoodServerUsage(data)
+    } catch (err: any) {
+      setFoodServerUsageError(err?.message || 'Failed to load food analysis usage')
+    } finally {
+      setFoodServerUsageLoading(false)
     }
   }
 
@@ -1095,6 +1120,11 @@ https://www.helfi.ai`)
     }
     if (activeTab === 'partner-outreach') {
       loadPartnerOutreachData()
+    }
+    if (activeTab === 'usage') {
+      loadVisionUsage(visionUsageRange)
+      loadFoodCostSim(foodCostSimRange)
+      loadFoodServerUsage(foodServerUsageRange)
     }
   }
 
@@ -2383,6 +2413,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   if (item.id === 'usage' && !foodCostSim) {
                     loadFoodCostSim(foodCostSimRange)
                   }
+                  if (item.id === 'usage' && !foodServerUsage) {
+                    loadFoodServerUsage(foodServerUsageRange)
+                  }
                   if (item.id === 'settings') {
                     checkPushNotificationStatus()
                   }
@@ -2434,6 +2467,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   }
                   if (tab.id === 'usage' && !foodCostSim) {
                     loadFoodCostSim(foodCostSimRange)
+                  }
+                  if (tab.id === 'usage' && !foodServerUsage) {
+                    loadFoodServerUsage(foodServerUsageRange)
                   }
                   if (tab.id === 'management') {
                     loadUserManagement(userSearch, userFilter, currentPage)
@@ -2612,6 +2648,80 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   Refresh
                 </button>
               </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-gray-900">Food analysis server usage (estimate)</div>
+                  <div className="text-xs text-gray-500">
+                    Based on food analysis logs. Estimate assumes 1 analysis call + 1 save + 1 refresh.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500">Range</label>
+                  <select
+                    value={foodServerUsageRange}
+                    onChange={(e) => loadFoodServerUsage(Number(e.target.value))}
+                    className="border-gray-300 rounded-lg text-sm"
+                  >
+                    <option value={1}>Last 24h</option>
+                    <option value={7}>Last 7d</option>
+                    <option value={30}>Last 30d</option>
+                    <option value={90}>Last 90d</option>
+                  </select>
+                  <button
+                    onClick={() => loadFoodServerUsage(foodServerUsageRange)}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {foodServerUsageError && (
+                <div className="mt-3 bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm">
+                  {foodServerUsageError}
+                </div>
+              )}
+
+              {foodServerUsageLoading && (
+                <div className="mt-3 text-sm text-gray-600">Loading food analysis usage...</div>
+              )}
+
+              {!foodServerUsageLoading && foodServerUsage && (
+                <>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="text-[11px] text-gray-500 uppercase">Food Analyses</div>
+                      <div className="text-xl font-semibold text-gray-900">
+                        {foodServerUsage.analysisCount || 0}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="text-[11px] text-gray-500 uppercase">Estimated Calls Per Analysis</div>
+                      <div className="text-xl font-semibold text-gray-900">
+                        {foodServerUsage.estimatedCallsPerAnalysis || 0}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="text-[11px] text-gray-500 uppercase">Estimated Server Calls</div>
+                      <div className="text-xl font-semibold text-gray-900">
+                        {foodServerUsage.estimatedTotalServerCalls || 0}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="text-[11px] text-gray-500 uppercase">Fallback Reruns</div>
+                      <div className="text-xl font-semibold text-gray-900">
+                        {foodServerUsage.fallbackCount || 0}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500">
+                    Estimate math: analyses x calls per analysis. Use this for rough 1000-user planning.
+                  </div>
+                </>
+              )}
             </div>
 
             {visionUsageError && (
