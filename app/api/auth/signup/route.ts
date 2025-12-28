@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
+import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
 
 // This API route uses dynamic data and should not be statically generated
 export const runtime = 'nodejs'
@@ -157,6 +158,13 @@ export async function POST(request: NextRequest) {
       userName: user.name || undefined,
     }).catch(error => {
       console.error('❌ Owner notification failed (non-blocking):', error)
+    })
+
+    sendOwnerSignupEmail({
+      userEmail: user.email,
+      userName: user.name || undefined,
+    }).catch(error => {
+      console.error('❌ Signup email alert failed (non-blocking):', error)
     })
 
     console.log('✅ Direct signup successful:', { id: user.id, email: user.email })

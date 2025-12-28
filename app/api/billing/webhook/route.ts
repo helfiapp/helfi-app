@@ -3,10 +3,12 @@ import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { notifyOwner } from '@/lib/owner-notifications'
+import { getEmailFooter } from '@/lib/email-footer'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
+const SUBSCRIBER_MILESTONE_INTERVAL = 20
 
 async function getBalanceTransactionForPaymentIntent(paymentIntentId: string) {
   const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
@@ -37,6 +39,88 @@ function addDays(date: Date, days: number): Date {
   const d = new Date(date)
   d.setUTCDate(d.getUTCDate() + days)
   return d
+}
+
+async function ensureSubscriberMilestonesTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS SubscriberMilestones (
+      id TEXT PRIMARY KEY,
+      total_count INT NOT NULL DEFAULT 0,
+      last_notified_count INT NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO SubscriberMilestones (id, total_count, last_notified_count)
+    VALUES ('global', 0, 0)
+    ON CONFLICT (id) DO NOTHING
+  `)
+}
+
+async function incrementSubscriberMilestoneCounter(): Promise<{
+  totalCount: number
+  shouldNotify: boolean
+}> {
+  await ensureSubscriberMilestonesTable()
+
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRawUnsafe<
+      Array<{ total_count: number; last_notified_count: number }>
+    >(`SELECT total_count, last_notified_count FROM SubscriberMilestones WHERE id = 'global' FOR UPDATE`)
+    const currentCount = rows[0]?.total_count ?? 0
+    const lastNotified = rows[0]?.last_notified_count ?? 0
+    const totalCount = currentCount + 1
+    const shouldNotify =
+      totalCount % SUBSCRIBER_MILESTONE_INTERVAL === 0 && totalCount > lastNotified
+    const nextNotified = shouldNotify ? totalCount : lastNotified
+
+    await tx.$executeRawUnsafe(
+      `UPDATE SubscriberMilestones
+       SET total_count = $1, last_notified_count = $2, updated_at = NOW()
+       WHERE id = 'global'`,
+      totalCount,
+      nextNotified
+    )
+
+    return { totalCount, shouldNotify }
+  })
+}
+
+async function sendSubscriberMilestoneEmail(options: {
+  recipientEmail: string
+  totalCount: number
+  latestSubscriberEmail: string
+}) {
+  if (!resend) {
+    console.log('📧 Resend API not configured, skipping subscriber milestone email')
+    return
+  }
+
+  const { recipientEmail, totalCount, latestSubscriberEmail } = options
+  const subject = `Helfi milestone reached: ${totalCount} paid subscribers`
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h2 style="margin: 0 0 16px 0;">Subscriber milestone reached</h2>
+      <p style="margin: 0 0 8px 0;"><strong>Total paid subscribers:</strong> ${totalCount}</p>
+      <p style="margin: 0 0 16px 0;"><strong>Latest subscriber:</strong> ${latestSubscriberEmail}</p>
+      <p style="margin: 0 0 16px 0;">You asked to be notified every ${SUBSCRIBER_MILESTONE_INTERVAL} new subscribers.</p>
+      ${getEmailFooter({
+        recipientEmail,
+        emailType: 'admin',
+        reasonText: 'You received this email because you requested subscriber milestone alerts.'
+      })}
+    </div>
+  `
+
+  const emailResponse = await resend.emails.send({
+    from: 'Helfi Alerts <support@helfi.ai>',
+    to: recipientEmail,
+    subject,
+    html,
+  })
+
+  console.log(`✅ [SUBSCRIBER MILESTONE] Sent to ${recipientEmail} with ID: ${emailResponse.data?.id}`)
 }
 
 export async function POST(request: NextRequest) {
@@ -192,6 +276,26 @@ export async function POST(request: NextRequest) {
               monthlyInsightsGenerationUsed: 0,
             } as any
           })
+        }
+
+        if (isNewSubscription) {
+          let milestoneResult: { totalCount: number; shouldNotify: boolean } | null = null
+          try {
+            milestoneResult = await incrementSubscriberMilestoneCounter()
+          } catch (error) {
+            console.error('❌ Subscriber milestone counter failed:', error)
+          }
+          if (milestoneResult?.shouldNotify) {
+            const milestoneRecipient =
+              (process.env.OWNER_EMAIL || 'louie@helfi.ai').trim() || 'louie@helfi.ai'
+            sendSubscriberMilestoneEmail({
+              recipientEmail: milestoneRecipient,
+              totalCount: milestoneResult.totalCount,
+              latestSubscriberEmail: email,
+            }).catch((error) => {
+              console.error('❌ Subscriber milestone email failed (non-blocking):', error)
+            })
+          }
         }
 
         // Notify owner of subscription purchase (don't await to avoid blocking webhook)

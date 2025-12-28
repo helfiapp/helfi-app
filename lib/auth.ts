@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
+import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
 import bcrypt from 'bcryptjs'
 
 // Initialize Resend for welcome emails
@@ -349,6 +350,13 @@ export const authOptions: NextAuthOptions = {
               userName: dbUser.name || undefined,
             }).catch(error => {
               console.error('❌ Owner notification failed (non-blocking):', error)
+            })
+
+            sendOwnerSignupEmail({
+              userEmail: dbUser.email,
+              userName: dbUser.name || undefined,
+            }).catch(error => {
+              console.error('❌ Signup email alert failed (non-blocking):', error)
             })
           }
           

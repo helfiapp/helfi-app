@@ -46,6 +46,10 @@ export default function AdminPanel() {
   const [foodServerUsage, setFoodServerUsage] = useState<any>(null)
   const [foodServerUsageLoading, setFoodServerUsageLoading] = useState(false)
   const [foodServerUsageError, setFoodServerUsageError] = useState('')
+  const [foodCostEstimatorUsers, setFoodCostEstimatorUsers] = useState(1000)
+  const [foodCostEstimatorAnalysesPerUser, setFoodCostEstimatorAnalysesPerUser] = useState(1)
+  const [foodCostEstimatorCallsPerAnalysis, setFoodCostEstimatorCallsPerAnalysis] = useState(3)
+  const [foodCostEstimatorCostPer1kCalls, setFoodCostEstimatorCostPer1kCalls] = useState(0.00146)
   const [foodBenchmarkImageUrl, setFoodBenchmarkImageUrl] = useState('')
   const [foodBenchmarkModels, setFoodBenchmarkModels] = useState<Record<string, boolean>>({
     'gpt-4o': true,
@@ -2127,6 +2131,19 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     return outputArray
   }
 
+  const safeNumber = (value: number) => (Number.isFinite(value) ? value : 0)
+  const formatDollars = (value: number, digits = 2) => `$${safeNumber(value).toFixed(digits)}`
+  const costEstimatorUsers = Math.max(0, safeNumber(foodCostEstimatorUsers))
+  const costEstimatorAnalysesPerUser = Math.max(0, safeNumber(foodCostEstimatorAnalysesPerUser))
+  const costEstimatorCallsPerAnalysis = Math.max(0, safeNumber(foodCostEstimatorCallsPerAnalysis))
+  const costEstimatorCostPer1kCalls = Math.max(0, safeNumber(foodCostEstimatorCostPer1kCalls))
+  const costEstimatorDailyAnalyses = costEstimatorUsers * costEstimatorAnalysesPerUser
+  const costEstimatorDailyCalls = costEstimatorDailyAnalyses * costEstimatorCallsPerAnalysis
+  const costEstimatorDailyCost = (costEstimatorDailyCalls / 1000) * costEstimatorCostPer1kCalls
+  const costEstimatorMonthlyCost = costEstimatorDailyCost * 30
+  const costEstimatorCostPerAnalysis =
+    (costEstimatorCallsPerAnalysis / 1000) * costEstimatorCostPer1kCalls
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -2722,6 +2739,105 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   </div>
                 </>
               )}
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <div className="font-semibold text-gray-900">Server cost estimator (food analysis)</div>
+                  <div className="text-xs text-gray-500">
+                    Uses server calls only. Set your cost per 1,000 calls from Vercel usage.
+                  </div>
+                </div>
+                {foodServerUsage?.estimatedCallsPerAnalysis ? (
+                  <button
+                    onClick={() =>
+                      setFoodCostEstimatorCallsPerAnalysis(foodServerUsage.estimatedCallsPerAnalysis)
+                    }
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md text-xs hover:bg-gray-200"
+                  >
+                    Use current estimate ({foodServerUsage.estimatedCallsPerAnalysis})
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500">Users</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={foodCostEstimatorUsers}
+                    onChange={(e) => setFoodCostEstimatorUsers(Number(e.target.value))}
+                    className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500">Analyses per user per day</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={foodCostEstimatorAnalysesPerUser}
+                    onChange={(e) => setFoodCostEstimatorAnalysesPerUser(Number(e.target.value))}
+                    className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500">Calls per analysis</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={foodCostEstimatorCallsPerAnalysis}
+                    onChange={(e) => setFoodCostEstimatorCallsPerAnalysis(Number(e.target.value))}
+                    className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500">Cost per 1,000 calls ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.0001}
+                    value={foodCostEstimatorCostPer1kCalls}
+                    onChange={(e) => setFoodCostEstimatorCostPer1kCalls(Number(e.target.value))}
+                    className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="text-[11px] text-gray-500 uppercase">Analyses per day</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {costEstimatorDailyAnalyses.toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="text-[11px] text-gray-500 uppercase">Server calls per day</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {costEstimatorDailyCalls.toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="text-[11px] text-gray-500 uppercase">Estimated cost per day</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {formatDollars(costEstimatorDailyCost, 4)}
+                  </div>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="text-[11px] text-gray-500 uppercase">Estimated cost per 30 days</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {formatDollars(costEstimatorMonthlyCost, 2)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-2 text-xs text-gray-500">
+                Cost per analysis: {formatDollars(costEstimatorCostPerAnalysis, 6)}. This excludes AI model costs.
+              </div>
             </div>
 
             {visionUsageError && (
