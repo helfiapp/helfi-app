@@ -1,13 +1,17 @@
 import jwt from 'jsonwebtoken'
 
-const SIGNING_SECRET =
-  process.env.FILE_URL_SIGNING_SECRET ||
-  process.env.NEXTAUTH_SECRET ||
-  process.env.JWT_SECRET
+const SIGNING_SECRET = (() => {
+  const secret =
+    process.env.FILE_URL_SIGNING_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    process.env.JWT_SECRET
 
-if (!SIGNING_SECRET) {
-  throw new Error('FILE_URL_SIGNING_SECRET or NEXTAUTH_SECRET is required')
-}
+  if (!secret) {
+    throw new Error('FILE_URL_SIGNING_SECRET or NEXTAUTH_SECRET is required')
+  }
+
+  return secret
+})()
 
 export type SignedFilePayload = {
   fileId: string
