@@ -2158,7 +2158,7 @@ export async function POST(req: NextRequest) {
     // Quick rate limit to stop accidental loops or repeated triggers
     const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown';
     const rateKey = user.id ? `user:${user.id}` : `ip:${clientIp}`;
-    const rateCheck = consumeRateLimit('food-analyzer', rateKey, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
+    const rateCheck = await consumeRateLimit('food-analyzer', rateKey, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
     if (!rateCheck.allowed) {
       const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000));
       return NextResponse.json(

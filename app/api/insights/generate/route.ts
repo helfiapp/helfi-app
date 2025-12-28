@@ -197,7 +197,7 @@ export async function POST(request: Request) {
 
   const clientIp = (request.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown'
   const rateKey = profile?.id ? `user:${profile.id}` : `ip:${clientIp}`
-  const rateCheck = consumeRateLimit('insights-generate', rateKey, INSIGHTS_RATE_MAX, INSIGHTS_RATE_WINDOW_MS)
+  const rateCheck = await consumeRateLimit('insights-generate', rateKey, INSIGHTS_RATE_MAX, INSIGHTS_RATE_WINDOW_MS)
   if (!rateCheck.allowed) {
     const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000))
     return NextResponse.json(

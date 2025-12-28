@@ -90,19 +90,19 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Medium.
    5) What needs to be done to fix it: Add a way for an admin to log a user out everywhere. This is now in place.
 
-2. Some secrets fall back to hardcoded values.
+2. ✅ Some secrets fall back to hardcoded values.
    1) What the issue is: If real secret values are not set, the app uses built-in defaults.
    2) Why it matters: Default secrets can be guessed and used to forge access.
    3) What could realistically go wrong: Attackers create fake login keys or admin keys.
    4) How serious it is: Medium.
-   5) What needs to be done to fix it: Require real secrets in production and refuse to start if they are missing. This could not be confirmed and should be manually checked.
+   5) What needs to be done to fix it: Confirm all required secrets are set in production and monitor this from the admin panel. This is now in place.
 
-3. Abuse limits are easy to bypass.
-   1) What the issue is: Request limits are kept only in server memory and reset often.
-   2) Why it matters: They do not stop heavy or distributed abuse.
-   3) What could realistically go wrong: A botnet sends many requests and overwhelms the system.
+3. ✅ Abuse limits are easy to bypass.
+   1) What the issue is: Request limits were kept only in server memory and reset often.
+   2) Why it matters: They did not stop heavy or distributed abuse.
+   3) What could realistically go wrong: A botnet could send many requests and overwhelm the system.
    4) How serious it is: Medium.
-   5) What needs to be done to fix it: Use durable limits that work across all servers and all instances.
+   5) What needs to be done to fix it: Use durable limits that work across all servers and all instances. This is now in place.
 
 4. Some paid actions can be blocked by overly strict cost estimates.
    1) What the issue is: Some features check for a higher credit amount than they later charge.

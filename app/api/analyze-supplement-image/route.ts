@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown';
-    const rateCheck = consumeRateLimit('supplement-image', `ip:${clientIp}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    const rateCheck = await consumeRateLimit('supplement-image', `ip:${clientIp}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
     if (!rateCheck.allowed) {
       const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000));
       return NextResponse.json(

@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, context: { params: { code: strin
   const visitorId = getOrCreateVisitorId(request)
   const ip = getClientIp(request)
   const limiterKey = ip || visitorId
-  const rateLimit = consumeRateLimit('affiliate_click', limiterKey, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS)
+  const rateLimit = await consumeRateLimit('affiliate_click', limiterKey, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS)
   if (!rateLimit.allowed) {
     return NextResponse.redirect(new URL(destinationPath, request.url))
   }

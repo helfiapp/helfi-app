@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
 
     const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown';
     const rateKey = user.id ? `user:${user.id}` : `ip:${clientIp}`;
-    const rateCheck = consumeRateLimit('medical-image', rateKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    const rateCheck = await consumeRateLimit('medical-image', rateKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
     if (!rateCheck.allowed) {
       const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000));
       return NextResponse.json(
