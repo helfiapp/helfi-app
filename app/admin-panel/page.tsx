@@ -191,24 +191,22 @@ export default function AdminPanel() {
       const checkHashAndLoadData = () => {
         const queryTab = new URLSearchParams(window.location.search).get('tab')
         if (queryTab) {
-          setActiveTab(queryTab)
-          if (queryTab === 'management') {
-            loadUserManagement(userSearch, userFilter, currentPage)
-            loadEmailTemplates()
-          }
-          if (queryTab === 'usage') {
-            loadVisionUsage(visionUsageRange)
-            loadFoodCostSim(foodCostSimRange)
-            loadFoodServerUsage(foodServerUsageRange)
-            loadServerCallUsage(serverCallUsageRange)
-          }
-          if (queryTab === 'settings') {
-            checkPushNotificationStatus()
-          }
+          handleTabChange(queryTab, token)
+          return
         }
         if (window.location.hash === '#tickets') {
-          setActiveTab('tickets')
-          loadSupportTickets()
+          handleTabChange('tickets', token)
+          return
+        }
+        const storedTab = (() => {
+          try {
+            return localStorage.getItem('adminActiveTab')
+          } catch {
+            return null
+          }
+        })()
+        if (storedTab) {
+          handleTabChange(storedTab, token)
         }
       }
       
@@ -223,16 +221,14 @@ export default function AdminPanel() {
       const handleVisibilityChange = () => {
         if (!document.hidden && window.location.hash === '#tickets') {
           // Auto-load tickets when returning to visible tab with tickets hash
-          setActiveTab('tickets')
-          loadSupportTickets()
+          handleTabChange('tickets', token)
         }
       }
       
       // New: Add focus detection for returning via back button
       const handleWindowFocus = () => {
         if (window.location.hash === '#tickets') {
-          setActiveTab('tickets')
-          loadSupportTickets()
+          handleTabChange('tickets', token)
         }
       }
       
@@ -952,9 +948,10 @@ https://www.helfi.ai`)
     setIsLoadingUsers(false)
   }
 
-  const loadUserManagement = async (search = '', filter = 'all', page = 1) => {
+  const loadUserManagement = async (search = '', filter = 'all', page = 1, tokenOverride?: string) => {
     setIsLoadingManagement(true)
     try {
+      const authToken = tokenOverride || adminToken
       const params = new URLSearchParams({
         search,
         plan: filter,
@@ -964,7 +961,7 @@ https://www.helfi.ai`)
       
       const response = await fetch(`/api/admin/user-management?${params}`, {
         headers: {
-          'Authorization': `Bearer ${adminToken}`
+          'Authorization': `Bearer ${authToken}`
         }
       })
       
@@ -1132,6 +1129,61 @@ https://www.helfi.ai`)
       setPayoutError(err?.message || 'Payout run failed')
     } finally {
       setPayoutLoading(false)
+    }
+  }
+
+  const persistActiveTab = (tabId: string) => {
+    try {
+      localStorage.setItem('adminActiveTab', tabId)
+    } catch {
+      // Ignore storage errors
+    }
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', tabId)
+    if (tabId === 'tickets') {
+      url.hash = '#tickets'
+    } else {
+      url.hash = ''
+    }
+    window.history.replaceState({}, '', url.toString())
+  }
+
+  const handleTabChange = (tabId: string, tokenOverride?: string) => {
+    setActiveTab(tabId)
+    persistActiveTab(tabId)
+    if (tabId === 'insights' && !aiInsights) {
+      loadAiInsights()
+    }
+    if (tabId === 'usage' && !visionUsage) {
+      loadVisionUsage(visionUsageRange)
+    }
+    if (tabId === 'usage' && !foodCostSim) {
+      loadFoodCostSim(foodCostSimRange)
+    }
+    if (tabId === 'usage' && !foodServerUsage) {
+      loadFoodServerUsage(foodServerUsageRange)
+    }
+    if (tabId === 'usage' && !serverCallUsage) {
+      loadServerCallUsage(serverCallUsageRange)
+    }
+    if (tabId === 'management') {
+      loadUserManagement(userSearch, userFilter, currentPage, tokenOverride)
+      loadEmailTemplates()
+    }
+    if (tabId === 'affiliates') {
+      loadAffiliateApplications('PENDING_REVIEW')
+    }
+    if (tabId === 'templates') {
+      loadEmailTemplates()
+    }
+    if (tabId === 'tickets') {
+      loadSupportTickets()
+    }
+    if (tabId === 'partner-outreach') {
+      loadPartnerOutreachData()
+    }
+    if (tabId === 'settings') {
+      checkPushNotificationStatus()
     }
   }
 
@@ -2492,29 +2544,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               <button
                 key={item.id}
                 onClick={() => {
-                  setActiveTab(item.id)
+                  handleTabChange(item.id)
                   setMobileMenuOpen(false)
-                  if (item.id === 'usage' && !visionUsage) {
-                    loadVisionUsage(visionUsageRange)
-                  }
-                  if (item.id === 'usage' && !foodCostSim) {
-                    loadFoodCostSim(foodCostSimRange)
-                  }
-                  if (item.id === 'usage' && !foodServerUsage) {
-                    loadFoodServerUsage(foodServerUsageRange)
-                  }
-                  if (item.id === 'usage' && !serverCallUsage) {
-                    loadServerCallUsage(serverCallUsageRange)
-                  }
-                  if (item.id === 'settings') {
-                    checkPushNotificationStatus()
-                  }
-                  if (item.id === 'affiliates') {
-                    loadAffiliateApplications('PENDING_REVIEW')
-                  }
-                  if (item.id === 'partner-outreach') {
-                    loadPartnerOutreachData()
-                  }
                 }}
                 className={`w-full py-2 rounded-lg border text-sm ${
                   activeTab === item.id ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-700'
@@ -2547,43 +2578,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id)
-                  if (tab.id === 'insights' && !aiInsights) {
-                    loadAiInsights()
-                  }
-                  if (tab.id === 'usage' && !visionUsage) {
-                    loadVisionUsage(visionUsageRange)
-                  }
-                  if (tab.id === 'usage' && !foodCostSim) {
-                    loadFoodCostSim(foodCostSimRange)
-                  }
-                  if (tab.id === 'usage' && !foodServerUsage) {
-                    loadFoodServerUsage(foodServerUsageRange)
-                  }
-                  if (tab.id === 'usage' && !serverCallUsage) {
-                    loadServerCallUsage(serverCallUsageRange)
-                  }
-                  if (tab.id === 'management') {
-                    loadUserManagement(userSearch, userFilter, currentPage)
-                    loadEmailTemplates() // Load templates for email campaigns
-                  }
-                  if (tab.id === 'affiliates') {
-                    loadAffiliateApplications('PENDING_REVIEW')
-                  }
-                  if (tab.id === 'templates') {
-                    loadEmailTemplates()
-                  }
-                  if (tab.id === 'tickets') {
-                    loadSupportTickets()
-                  }
-                  if (tab.id === 'partner-outreach') {
-                    loadPartnerOutreachData()
-                  }
-                  if (tab.id === 'settings') {
-                    checkPushNotificationStatus()
-                  }
-                }}
+                onClick={() => handleTabChange(tab.id)}
                 className={`py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs sm:text-sm min-w-fit ${
                   activeTab === tab.id
                     ? 'border-emerald-500 text-emerald-600'
