@@ -6,6 +6,7 @@ import { Resend } from 'resend'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
 import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
+import { getSessionRevokedAt } from '@/lib/session-revocation'
 import bcrypt from 'bcryptjs'
 
 // Initialize Resend for welcome emails
@@ -430,6 +431,19 @@ export const authOptions: NextAuthOptions = {
             }
           }
           
+          const revokedAt = await getSessionRevokedAt(dbUser.id)
+          if (revokedAt) {
+            const tokenIssuedAt =
+              typeof token?.iat === 'number' ? new Date(token.iat * 1000) : null
+            if (!tokenIssuedAt || revokedAt > tokenIssuedAt) {
+              console.log('🚫 Session revoked by admin:', token.email)
+              return {
+                expires: session.expires,
+                user: undefined
+              }
+            }
+          }
+
           session.user = {
             id: token.id as string,
             email: token.email as string,

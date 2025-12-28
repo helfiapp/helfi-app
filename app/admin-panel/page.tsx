@@ -55,6 +55,7 @@ export default function AdminPanel() {
   const [foodCostEstimatorAnalysesPerUser, setFoodCostEstimatorAnalysesPerUser] = useState(1)
   const [foodCostEstimatorCallsPerAnalysis, setFoodCostEstimatorCallsPerAnalysis] = useState(3)
   const [foodCostEstimatorCostPer1kCalls, setFoodCostEstimatorCostPer1kCalls] = useState(0.00146)
+  const [foodEstimatorAutoCalls, setFoodEstimatorAutoCalls] = useState(true)
   const [foodBenchmarkImageUrl, setFoodBenchmarkImageUrl] = useState('')
   const [foodBenchmarkModels, setFoodBenchmarkModels] = useState<Record<string, boolean>>({
     'gpt-4o': true,
@@ -2188,6 +2189,26 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   const costEstimatorCostPerAnalysis =
     (costEstimatorCallsPerAnalysis / 1000) * costEstimatorCostPer1kCalls
 
+  const liveFoodCallsPerAnalysis = (() => {
+    const serverRow = serverCallUsage?.features?.find((row: any) => row.feature === 'foodAnalysis')
+    if (serverRow?.callsPerAnalysis && Number.isFinite(serverRow.callsPerAnalysis)) {
+      return Number(serverRow.callsPerAnalysis)
+    }
+    if (foodServerUsage?.estimatedCallsPerAnalysis && Number.isFinite(foodServerUsage.estimatedCallsPerAnalysis)) {
+      return Number(foodServerUsage.estimatedCallsPerAnalysis)
+    }
+    return null
+  })()
+
+  useEffect(() => {
+    if (!foodEstimatorAutoCalls) return
+    if (liveFoodCallsPerAnalysis == null) return
+    const normalized = Number(liveFoodCallsPerAnalysis.toFixed(2))
+    if (Number.isFinite(normalized) && normalized > 0) {
+      setFoodCostEstimatorCallsPerAnalysis(normalized)
+    }
+  }, [foodEstimatorAutoCalls, liveFoodCallsPerAnalysis])
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -2799,14 +2820,18 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     Uses server calls only. Set your cost per 1,000 calls from Vercel usage.
                   </div>
                 </div>
-                {foodServerUsage?.estimatedCallsPerAnalysis ? (
+                {liveFoodCallsPerAnalysis != null || foodServerUsage?.estimatedCallsPerAnalysis ? (
                   <button
-                    onClick={() =>
-                      setFoodCostEstimatorCallsPerAnalysis(foodServerUsage.estimatedCallsPerAnalysis)
-                    }
+                    onClick={() => {
+                      const next = liveFoodCallsPerAnalysis ?? foodServerUsage.estimatedCallsPerAnalysis
+                      if (typeof next === 'number' && Number.isFinite(next)) {
+                        setFoodCostEstimatorCallsPerAnalysis(Number(next.toFixed(2)))
+                        setFoodEstimatorAutoCalls(true)
+                      }
+                    }}
                     className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md text-xs hover:bg-gray-200"
                   >
-                    Use current estimate ({foodServerUsage.estimatedCallsPerAnalysis})
+                    Use current estimate ({liveFoodCallsPerAnalysis?.toFixed?.(2) ?? foodServerUsage.estimatedCallsPerAnalysis})
                   </button>
                 ) : null}
               </div>
@@ -2841,7 +2866,10 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     min={0}
                     step={1}
                     value={foodCostEstimatorCallsPerAnalysis}
-                    onChange={(e) => setFoodCostEstimatorCallsPerAnalysis(Number(e.target.value))}
+                    onChange={(e) => {
+                      setFoodCostEstimatorCallsPerAnalysis(Number(e.target.value))
+                      setFoodEstimatorAutoCalls(false)
+                    }}
                     className="border border-gray-300 rounded-md px-2 py-1 text-sm"
                   />
                 </div>
@@ -5150,6 +5178,24 @@ The Helfi Team`,
                        className="bg-yellow-600 text-white px-3 py-2 rounded text-sm hover:bg-yellow-700 transition-colors"
                      >
                        ↩️ Refund Latest Payment
+                     </button>
+                   </div>
+
+                   {/* Account Security */}
+                   <div className="bg-gray-50 rounded-lg p-4 mb-6 border-l-4 border-gray-400">
+                     <h4 className="font-medium text-gray-900 mb-2">Account Security</h4>
+                     <p className="text-xs text-gray-600 mb-3">
+                       Log the user out everywhere (useful if their phone is lost or they can’t log out themselves).
+                     </p>
+                     <button
+                       onClick={() => {
+                         if (confirm(`Log ${selectedUser.email} out of all devices now?`)) {
+                           handleUserAction('revoke_sessions', selectedUser.id)
+                         }
+                       }}
+                       className="bg-gray-700 text-white px-3 py-2 rounded text-sm hover:bg-gray-800 transition-colors"
+                     >
+                       🔒 Log Out Everywhere
                      </button>
                    </div>
 

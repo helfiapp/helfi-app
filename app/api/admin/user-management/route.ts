@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { CreditManager } from '@/lib/credit-system'
+import { revokeUserSessions } from '@/lib/session-revocation'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
@@ -257,6 +258,18 @@ export async function POST(request: NextRequest) {
           data: { dailyAnalysisCredits: 30 }
         })
         break
+
+      case 'revoke_sessions': {
+        const revokedAt = await revokeUserSessions(userId)
+        if (!revokedAt) {
+          return NextResponse.json({ error: 'Failed to revoke sessions' }, { status: 500 })
+        }
+        return NextResponse.json({
+          success: true,
+          message: 'User sessions revoked. They will be logged out on their next request.',
+          revokedAt,
+        })
+      }
 
       case 'grant_subscription':
         // Grant subscription with specific tier ($10, $20, $30, or $50)
