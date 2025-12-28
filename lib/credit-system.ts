@@ -82,8 +82,8 @@ export class CreditManager {
     return Math.floor(monthlyPriceCents * CreditManager.walletPercentOfPlan());
   }
 
-  private async ensureMonthlyReset(now = new Date()): Promise<void> {
-    const user = await prisma.user.findUnique({ 
+  private async ensureMonthlyReset(now = new Date(), db: any = prisma): Promise<void> {
+    const user = await db.user.findUnique({ 
       where: { id: this.userId },
       include: { subscription: true }
     });
@@ -142,7 +142,7 @@ export class CreditManager {
     }
     
     if (shouldReset) {
-      await prisma.user.update({
+      await db.user.update({
         where: { id: this.userId },
         data: {
           walletMonthlyUsedCents: 0,
@@ -233,87 +233,90 @@ export class CreditManager {
    */
   async chargeCents(costCents: number): Promise<boolean> {
     if (costCents <= 0) return true;
-    await this.ensureMonthlyReset();
+    return prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${this.userId}))`;
+      await this.ensureMonthlyReset(new Date(), tx);
 
-    const user = await prisma.user.findUnique({
-      where: { id: this.userId },
-      include: { subscription: true },
-    });
-    if (!user) throw new Error('User not found');
+      const user = await tx.user.findUnique({
+        where: { id: this.userId },
+        include: { subscription: true },
+      });
+      if (!user) throw new Error('User not found');
 
-    const hasActiveSubscription = isSubscriptionActive(user.subscription);
-    const plan = hasActiveSubscription ? user.subscription?.plan || null : null;
-    const additionalAvailable = Math.max(0, (user as any).additionalCredits || 0);
-    
-    // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
-    let monthlyCapCents = 0;
-    if (plan && user.subscription && hasActiveSubscription) {
-      if (user.subscription.monthlyPriceCents) {
-        // Use direct credit mapping (e.g., $30 → 1,700 credits)
-        monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
-      } else {
-        monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+      const hasActiveSubscription = isSubscriptionActive(user.subscription);
+      const plan = hasActiveSubscription ? user.subscription?.plan || null : null;
+      const additionalAvailable = Math.max(0, (user as any).additionalCredits || 0);
+      
+      // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
+      let monthlyCapCents = 0;
+      if (plan && user.subscription && hasActiveSubscription) {
+        if (user.subscription.monthlyPriceCents) {
+          // Use direct credit mapping (e.g., $30 → 1,700 credits)
+          monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
+        } else {
+          monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+        }
       }
-    }
-    
-    const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
-    let remainingMonthly = Math.max(0, monthlyCapCents - monthlyUsedCents);
+      
+      const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
+      let remainingMonthly = Math.max(0, monthlyCapCents - monthlyUsedCents);
 
-    // Early insufficient check (monthly + all top-ups)
-    const now = new Date();
-    const topUps = await prisma.creditTopUp.findMany({
-      where: { userId: user.id, expiresAt: { gt: now } },
-      orderBy: { expiresAt: 'asc' },
-    });
-    const topUpsAvailable = topUps.reduce((sum, t) => sum + Math.max(0, t.amountCents - t.usedCents), 0);
-    if (remainingMonthly + additionalAvailable + topUpsAvailable < costCents) {
-      return false;
-    }
-
-    let toCharge = costCents;
-
-    // 1) Consume monthly allowance
-    const fromMonthly = Math.min(toCharge, remainingMonthly);
-    if (fromMonthly > 0) {
-      await prisma.user.update({
-        where: { id: this.userId },
-        data: { walletMonthlyUsedCents: (monthlyUsedCents + fromMonthly) as any },
+      // Early insufficient check (monthly + all top-ups)
+      const now = new Date();
+      const topUps = await tx.creditTopUp.findMany({
+        where: { userId: user.id, expiresAt: { gt: now } },
+        orderBy: { expiresAt: 'asc' },
       });
-      toCharge -= fromMonthly;
-    }
+      const topUpsAvailable = topUps.reduce((sum, t) => sum + Math.max(0, t.amountCents - t.usedCents), 0);
+      if (remainingMonthly + additionalAvailable + topUpsAvailable < costCents) {
+        return false;
+      }
 
-    if (toCharge <= 0) return true;
+      let toCharge = costCents;
 
-    // 1b) Consume manual additional credits (non-expiring)
-    const fromAdditional = Math.min(toCharge, additionalAvailable);
-    if (fromAdditional > 0) {
-      await prisma.user.update({
-        where: { id: this.userId },
-        data: {
-          additionalCredits: {
-            decrement: fromAdditional,
+      // 1) Consume monthly allowance
+      const fromMonthly = Math.min(toCharge, remainingMonthly);
+      if (fromMonthly > 0) {
+        await tx.user.update({
+          where: { id: this.userId },
+          data: { walletMonthlyUsedCents: (monthlyUsedCents + fromMonthly) as any },
+        });
+        toCharge -= fromMonthly;
+      }
+
+      if (toCharge <= 0) return true;
+
+      // 1b) Consume manual additional credits (non-expiring)
+      const fromAdditional = Math.min(toCharge, additionalAvailable);
+      if (fromAdditional > 0) {
+        await tx.user.update({
+          where: { id: this.userId },
+          data: {
+            additionalCredits: {
+              decrement: fromAdditional,
+            },
           },
-        },
-      });
-      toCharge -= fromAdditional;
-    }
+        });
+        toCharge -= fromAdditional;
+      }
 
-    if (toCharge <= 0) return true;
+      if (toCharge <= 0) return true;
 
-    // 2) Consume FIFO from top-ups
-    for (const tu of topUps) {
-      const available = Math.max(0, tu.amountCents - tu.usedCents);
-      if (available <= 0) continue;
-      const consume = Math.min(available, toCharge);
-      await prisma.creditTopUp.update({
-        where: { id: tu.id },
-        data: { usedCents: tu.usedCents + consume },
-      });
-      toCharge -= consume;
-      if (toCharge <= 0) break;
-    }
+      // 2) Consume FIFO from top-ups
+      for (const tu of topUps) {
+        const available = Math.max(0, tu.amountCents - tu.usedCents);
+        if (available <= 0) continue;
+        const consume = Math.min(available, toCharge);
+        await tx.creditTopUp.update({
+          where: { id: tu.id },
+          data: { usedCents: tu.usedCents + consume },
+        });
+        toCharge -= consume;
+        if (toCharge <= 0) break;
+      }
 
-    return toCharge <= 0;
+      return toCharge <= 0;
+    });
   }
 
   /**
@@ -326,43 +329,66 @@ export class CreditManager {
     const top = Math.max(0, Math.round(topUpCredits || 0));
     if (sub === 0 && top === 0) return true;
 
-    await this.ensureMonthlyReset();
-    const status = await this.getWalletStatus();
-    const monthlyRemaining = Math.max(0, status.monthlyRemainingCents || 0);
-    const topUpsAvailable =
-      (status.topUps || []).reduce((sum, t) => sum + Math.max(0, t.availableCents || 0), 0) || 0;
+    return prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${this.userId}))`;
+      await this.ensureMonthlyReset(new Date(), tx);
 
-    // Guard rails: do not silently dip into top-ups for the subscription portion
-    if (sub > monthlyRemaining) return false;
-    if (top > topUpsAvailable) return false;
+      const user = await tx.user.findUnique({
+        where: { id: this.userId },
+        include: { subscription: true },
+      });
+      if (!user) throw new Error('User not found');
 
-    if (sub > 0) {
-      const okSub = await this.chargeCents(sub);
-      if (!okSub) return false;
-    }
+      const hasActiveSubscription = isSubscriptionActive(user.subscription);
+      const plan = hasActiveSubscription ? user.subscription?.plan || null : null;
+      let monthlyCapCents = 0;
+      if (plan && user.subscription && hasActiveSubscription) {
+        if (user.subscription.monthlyPriceCents) {
+          monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
+        } else {
+          monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+        }
+      }
+      const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
+      const monthlyRemaining = Math.max(0, monthlyCapCents - monthlyUsedCents);
 
-    if (top > 0) {
-      let remainingTopUp = top;
       const now = new Date();
-      const topUps = await prisma.creditTopUp.findMany({
+      const topUps = await tx.creditTopUp.findMany({
         where: { userId: this.userId, expiresAt: { gt: now } },
         orderBy: { expiresAt: 'asc' },
       });
-      for (const tu of topUps) {
-        const available = Math.max(0, tu.amountCents - tu.usedCents);
-        if (available <= 0) continue;
-        const consume = Math.min(available, remainingTopUp);
-        await prisma.creditTopUp.update({
-          where: { id: tu.id },
-          data: { usedCents: tu.usedCents + consume },
-        });
-        remainingTopUp -= consume;
-        if (remainingTopUp <= 0) break;
-      }
-      if (remainingTopUp > 0) return false;
-    }
+      const topUpsAvailable =
+        topUps.reduce((sum, t) => sum + Math.max(0, t.amountCents - t.usedCents), 0) || 0;
 
-    return true;
+      // Guard rails: do not silently dip into top-ups for the subscription portion
+      if (sub > monthlyRemaining) return false;
+      if (top > topUpsAvailable) return false;
+
+      if (sub > 0) {
+        await tx.user.update({
+          where: { id: this.userId },
+          data: { walletMonthlyUsedCents: (monthlyUsedCents + sub) as any },
+        });
+      }
+
+      if (top > 0) {
+        let remainingTopUp = top;
+        for (const tu of topUps) {
+          const available = Math.max(0, tu.amountCents - tu.usedCents);
+          if (available <= 0) continue;
+          const consume = Math.min(available, remainingTopUp);
+          await tx.creditTopUp.update({
+            where: { id: tu.id },
+            data: { usedCents: tu.usedCents + consume },
+          });
+          remainingTopUp -= consume;
+          if (remainingTopUp <= 0) break;
+        }
+        if (remainingTopUp > 0) return false;
+      }
+
+      return true;
+    });
   }
 
   // Check if user has enough credits for a feature

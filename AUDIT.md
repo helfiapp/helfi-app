@@ -54,7 +54,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Track refunds and remove credits and access tied to refunded payments.
 
-3. Credit balances can be overspent under fast repeat requests.
+3. ✅ Credit balances can be overspent under fast repeat requests.
    1) What the issue is: Credit checks and deductions are not locked, so two fast requests can both spend the same credits.
    2) Why it matters: Credits can drop below zero and usage can exceed what was paid for.
    3) What could realistically go wrong: A user opens two tabs or a bot sends bursts and gets extra usage for free.
@@ -169,7 +169,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Revoke credits and access after refunds.
 
-6. Credit balance races allow extra usage.
+6. ✅ Credit balance races allow extra usage.
    1) What the issue is: Two fast requests can both spend the same credits.
    2) Why it matters: Usage can exceed paid limits.
    3) What could realistically go wrong: Credits go below zero and costs exceed revenue.
