@@ -351,7 +351,7 @@ export default function HealthTipsPage() {
 
           {/* Credits usage for Health Tips */}
           <div className="mb-4">
-            <UsageMeter inline={true} />
+            <UsageMeter inline={true} feature="healthTips" />
             <FeatureUsageDisplay featureName="healthTips" featureLabel="Health Tips" />
           </div>
 

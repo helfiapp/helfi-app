@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { getFreeCreditsStatus, hasExhaustedFreeCredits } from '@/lib/free-credits'
 import { prisma } from '@/lib/prisma'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { logServerCall } from '@/lib/server-call-tracker'
 
 // ABSOLUTE GUARD RAIL:
 // This endpoint powers the "Credits remaining" bar. Do NOT change credit
@@ -81,6 +82,8 @@ function computeNextResetAt(subscriptionStart: Date | null): string | null {
 export async function GET(_req: NextRequest) {
   let debugStage = 'start'
   try {
+    const url = new URL(_req.url)
+    const featureParam = (url.searchParams.get('feature') || '').trim()
     // 1) Resolve current user (session or JWT fallback)
     debugStage = 'resolve-session'
     let session = await getServerSession(authOptions)
@@ -144,6 +147,16 @@ export async function GET(_req: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    if (featureParam) {
+      logServerCall({
+        feature: featureParam,
+        endpoint: '/api/credit/status',
+        kind: 'credit_status',
+      }).catch((error) => {
+        console.error('❌ Failed to log credit status call:', error)
+      })
     }
 
     const now = new Date()

@@ -39,7 +39,7 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
     const fetchUsage = async () => {
       setLoading(true)
       try {
-        const res = await fetch('/api/credit/feature-usage', { cache: 'no-store' })
+        const res = await fetch(`/api/credit/feature-usage?feature=${encodeURIComponent(featureName)}`, { cache: 'no-store' })
         if (res.ok) {
           const data: FeatureUsageData = await res.json()
           const value = data.featureUsage[featureName]
@@ -83,4 +83,3 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
     </div>
   )
 }
-

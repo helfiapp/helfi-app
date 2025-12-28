@@ -12,6 +12,7 @@ import { getImageMetadata } from '@/lib/image-metadata';
 import { encryptBuffer } from '@/lib/file-encryption';
 import { createSignedFileToken } from '@/lib/signed-file';
 import { isSubscriptionActive } from '@/lib/subscription-utils';
+import { logServerCall } from '@/lib/server-call-tracker';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
@@ -42,6 +43,14 @@ export async function POST(req: NextRequest) {
       include: { subscription: true, creditTopUps: true }
     });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    logServerCall({
+      feature: 'medicalImageAnalysis',
+      endpoint: '/api/test-vision',
+      kind: 'analysis',
+    }).catch((error) => {
+      console.error('❌ Failed to log medical analysis call:', error);
+    });
     
     // PREMIUM/CREDITS/FREE USE GATING
     const isPremium = isSubscriptionActive(user.subscription);

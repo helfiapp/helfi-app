@@ -8,6 +8,7 @@ import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
 import { logAIUsage } from '@/lib/ai-usage-logger';
 import { isSubscriptionActive } from '@/lib/subscription-utils';
+import { logServerCall } from '@/lib/server-call-tracker';
 
 // Lazily initialize OpenAI to avoid build-time env requirements
 function getOpenAIClient() {
@@ -40,6 +41,14 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+
+    logServerCall({
+      feature: 'interactionAnalysis',
+      endpoint: '/api/analyze-interactions',
+      kind: 'analysis',
+    }).catch((error) => {
+      console.error('❌ Failed to log interaction analysis call:', error);
+    });
 
     // PREMIUM/CREDITS/FREE USE GATING
     const isPremium = isSubscriptionActive(user.subscription);

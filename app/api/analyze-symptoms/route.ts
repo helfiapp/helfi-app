@@ -9,6 +9,7 @@ import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { costCentsEstimateFromText } from '@/lib/cost-meter'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { logServerCall } from '@/lib/server-call-tracker'
 
 // Initialize OpenAI client only when API key is available (same pattern as analyze-food)
 const getOpenAIClient = () => {
@@ -65,6 +66,14 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
+
+    logServerCall({
+      feature: 'symptomAnalysis',
+      endpoint: '/api/analyze-symptoms',
+      kind: 'analysis',
+    }).catch((error) => {
+      console.error('❌ Failed to log symptom analysis call:', error)
+    })
 
     // PREMIUM/CREDITS/FREE USE GATING
     const isPremium = isSubscriptionActive(user.subscription)
@@ -299,4 +308,3 @@ Return two parts:
     return NextResponse.json({ error: 'Failed to analyze symptoms' }, { status: 500 })
   }
 }
-

@@ -445,7 +445,7 @@ export default function MedicalImagesPage() {
                   Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
                 </div>
               )}
-              <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+              <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="medicalImageAnalysis" />
               <FeatureUsageDisplay featureName="medicalImageAnalysis" featureLabel="Medical Image Analysis" refreshTrigger={usageMeterRefresh} />
             </div>
 

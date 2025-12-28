@@ -1747,7 +1747,7 @@ export default function MealBuilderClient() {
             />
           </div>
 
-          <UsageMeter inline className="mt-1" />
+          <UsageMeter inline className="mt-1" feature="foodAnalysis" />
 
           {photoPreviewUrl && (
             <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">

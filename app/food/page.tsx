@@ -11550,7 +11550,7 @@ Please add nutritional information manually if needed.`);
 
           {/* Credits usage meter for Food Analysis (visible on initial load) */}
           <div className="mt-2">
-            <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+            <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="foodAnalysis" />
             <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
             <p className="text-xs text-gray-600 mt-1">Cost: 10 credits per food analysis.</p>
           </div>
@@ -11953,7 +11953,7 @@ Please add nutritional information manually if needed.`);
                         Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
                       </div>
                     )}
-                    <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+                    <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="foodAnalysis" />
                     <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
                   </div>
                   

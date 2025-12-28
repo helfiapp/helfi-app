@@ -458,7 +458,7 @@ export default function AddIngredientClient() {
             <div className="text-sm text-gray-600">Take a clear photo of the food or package.</div>
 
             <div>
-              <UsageMeter inline={true} />
+              <UsageMeter inline={true} feature="foodAnalysis" />
             </div>
 
             {photoPreviewUrl && (

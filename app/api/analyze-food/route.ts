@@ -22,6 +22,7 @@ import crypto from 'crypto';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { normalizeDiscreteItems, summarizeDiscreteItemsForLog } from '@/lib/food-normalization';
 import { isSubscriptionActive } from '@/lib/subscription-utils';
+import { logServerCall } from '@/lib/server-call-tracker';
 
 // Bump this when changing curated nutrition to invalidate old cached images.
 const CACHE_VERSION = 'v5';
@@ -2036,6 +2037,16 @@ export async function POST(req: NextRequest) {
 
     // Find user
     const user = await findOrCreateUser({ subscription: true });
+
+    if (user?.id) {
+      logServerCall({
+        feature: 'foodAnalysis',
+        endpoint: '/api/analyze-food',
+        kind: 'analysis',
+      }).catch((error) => {
+        console.error('❌ Failed to log food analysis call:', error);
+      });
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

@@ -304,7 +304,7 @@ export default function SymptomAnalysisPage() {
                   Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
                 </div>
               )}
-              <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+              <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="symptomAnalysis" />
               <FeatureUsageDisplay featureName="symptomAnalysis" featureLabel="Symptom Analysis" refreshTrigger={usageMeterRefresh} />
               <p className="text-xs text-gray-600 mt-1">Cost: 6 credits per symptom analysis.</p>
             </div>

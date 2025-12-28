@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { logServerCall } from '@/lib/server-call-tracker'
 
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX = 3
@@ -43,6 +44,14 @@ export async function POST(req: NextRequest) {
     include: { subscription: true, creditTopUps: true },
   })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  logServerCall({
+    feature: 'packagedFoodLabel',
+    endpoint: '/api/analyze-packaged',
+    kind: 'analysis',
+  }).catch((error) => {
+    console.error('❌ Failed to log packaged label call:', error)
+  })
 
   const isPremium = isSubscriptionActive(user.subscription)
   const now = new Date()

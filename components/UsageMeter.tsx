@@ -9,9 +9,10 @@ interface UsageMeterProps {
   inline?: boolean // Inline version next to typical cost (reverse mode)
   className?: string // Additional CSS classes
   refreshTrigger?: number // When this changes, force a refresh
+  feature?: string // Optional feature tag for server call tracking
 }
 
-export default function UsageMeter({ compact = false, showResetDate = false, inline = false, className = '', refreshTrigger = 0 }: UsageMeterProps) {
+export default function UsageMeter({ compact = false, showResetDate = false, inline = false, className = '', refreshTrigger = 0, feature }: UsageMeterProps) {
   const { data: session } = useSession()
   const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(null)
   const [walletRefreshAt, setWalletRefreshAt] = useState<string | null>(null)
@@ -46,8 +47,11 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
       }
       try {
         // Add timestamp to prevent caching when refreshTrigger changes
-        const cacheBuster = refreshTrigger > 0 ? `?t=${Date.now()}` : ''
-        const res = await fetch(`/api/credit/status${cacheBuster}`, { 
+        const featureParam = feature ? `feature=${encodeURIComponent(feature)}` : ''
+        const cacheParam = refreshTrigger > 0 ? `t=${Date.now()}` : ''
+        const queryParts = [featureParam, cacheParam].filter(Boolean)
+        const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : ''
+        const res = await fetch(`/api/credit/status${queryString}`, { 
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',

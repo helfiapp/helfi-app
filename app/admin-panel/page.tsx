@@ -46,6 +46,10 @@ export default function AdminPanel() {
   const [foodServerUsage, setFoodServerUsage] = useState<any>(null)
   const [foodServerUsageLoading, setFoodServerUsageLoading] = useState(false)
   const [foodServerUsageError, setFoodServerUsageError] = useState('')
+  const [serverCallUsageRange, setServerCallUsageRange] = useState(30)
+  const [serverCallUsage, setServerCallUsage] = useState<any>(null)
+  const [serverCallUsageLoading, setServerCallUsageLoading] = useState(false)
+  const [serverCallUsageError, setServerCallUsageError] = useState('')
   const [foodCostEstimatorUsers, setFoodCostEstimatorUsers] = useState(1000)
   const [foodCostEstimatorAnalysesPerUser, setFoodCostEstimatorAnalysesPerUser] = useState(1)
   const [foodCostEstimatorCallsPerAnalysis, setFoodCostEstimatorCallsPerAnalysis] = useState(3)
@@ -528,6 +532,27 @@ export default function AdminPanel() {
       setFoodServerUsageError(err?.message || 'Failed to load food analysis usage')
     } finally {
       setFoodServerUsageLoading(false)
+    }
+  }
+
+  const loadServerCallUsage = async (range?: number) => {
+    const days = range ?? serverCallUsageRange
+    setServerCallUsageRange(days)
+    setServerCallUsageLoading(true)
+    setServerCallUsageError('')
+    try {
+      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      if (!authToken) return
+      const res = await fetch(`/api/admin/server-call-usage?rangeDays=${days}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to load server call usage')
+      setServerCallUsage(data)
+    } catch (err: any) {
+      setServerCallUsageError(err?.message || 'Failed to load server call usage')
+    } finally {
+      setServerCallUsageLoading(false)
     }
   }
 
@@ -1129,6 +1154,7 @@ https://www.helfi.ai`)
       loadVisionUsage(visionUsageRange)
       loadFoodCostSim(foodCostSimRange)
       loadFoodServerUsage(foodServerUsageRange)
+      loadServerCallUsage(serverCallUsageRange)
     }
   }
 
@@ -2433,6 +2459,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   if (item.id === 'usage' && !foodServerUsage) {
                     loadFoodServerUsage(foodServerUsageRange)
                   }
+                  if (item.id === 'usage' && !serverCallUsage) {
+                    loadServerCallUsage(serverCallUsageRange)
+                  }
                   if (item.id === 'settings') {
                     checkPushNotificationStatus()
                   }
@@ -2487,6 +2516,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   }
                   if (tab.id === 'usage' && !foodServerUsage) {
                     loadFoodServerUsage(foodServerUsageRange)
+                  }
+                  if (tab.id === 'usage' && !serverCallUsage) {
+                    loadServerCallUsage(serverCallUsageRange)
                   }
                   if (tab.id === 'management') {
                     loadUserManagement(userSearch, userFilter, currentPage)
@@ -2838,6 +2870,93 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               <div className="mt-2 text-xs text-gray-500">
                 Cost per analysis: {formatDollars(costEstimatorCostPerAnalysis, 6)}. This excludes AI model costs.
               </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <div className="font-semibold text-gray-900">Calls per analysis (by feature)</div>
+                  <div className="text-xs text-gray-500">
+                    Counts analysis calls plus credit meter refreshes that were tagged to a feature.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500">Range</label>
+                  <select
+                    value={serverCallUsageRange}
+                    onChange={(e) => loadServerCallUsage(Number(e.target.value))}
+                    className="border-gray-300 rounded-lg text-sm"
+                  >
+                    <option value={1}>Last 24h</option>
+                    <option value={7}>Last 7d</option>
+                    <option value={30}>Last 30d</option>
+                    <option value={90}>Last 90d</option>
+                  </select>
+                  <button
+                    onClick={() => loadServerCallUsage(serverCallUsageRange)}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {serverCallUsageError && (
+                <div className="mt-3 bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm">
+                  {serverCallUsageError}
+                </div>
+              )}
+
+              {serverCallUsageLoading && (
+                <div className="mt-3 text-sm text-gray-600">Loading server call usage...</div>
+              )}
+
+              {!serverCallUsageLoading && serverCallUsage && (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="min-w-full text-sm text-left">
+                    <thead>
+                      <tr className="text-xs uppercase text-gray-500 border-b">
+                        <th className="py-2 pr-4">Feature</th>
+                        <th className="py-2 pr-4">Analyses</th>
+                        <th className="py-2 pr-4">Extra Calls</th>
+                        <th className="py-2 pr-4">Total Calls</th>
+                        <th className="py-2">Calls / Analysis</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(serverCallUsage.features || []).map((row: any) => {
+                        const labelMap: Record<string, string> = {
+                          foodAnalysis: 'Food analysis',
+                          packagedFoodLabel: 'Packaged food label',
+                          symptomAnalysis: 'Symptom analysis',
+                          medicalImageAnalysis: 'Medical image analysis',
+                          interactionAnalysis: 'Interaction analysis',
+                          healthTips: 'Health tips',
+                        }
+                        const label = labelMap[row.feature] || row.feature
+                        const callsPerAnalysis =
+                          row.callsPerAnalysis == null ? '—' : row.callsPerAnalysis.toFixed(2)
+                        return (
+                          <tr key={row.feature} className="border-b last:border-b-0">
+                            <td className="py-2 pr-4 font-medium text-gray-900">{label}</td>
+                            <td className="py-2 pr-4">{row.analysisCalls || 0}</td>
+                            <td className="py-2 pr-4">{row.extraCalls || 0}</td>
+                            <td className="py-2 pr-4">{row.totalCalls || 0}</td>
+                            <td className="py-2">{callsPerAnalysis}</td>
+                          </tr>
+                        )
+                      })}
+                      {(!serverCallUsage.features || serverCallUsage.features.length === 0) && (
+                        <tr>
+                          <td colSpan={5} className="py-3 text-gray-500">
+                            No call data yet. Trigger a few analyses and refresh.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {visionUsageError && (
