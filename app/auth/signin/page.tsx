@@ -64,6 +64,10 @@ function SearchParamsHandler({
         case 'reset_success':
           setMessage('Your password has been updated. Please sign in.')
           break
+        case 'verified':
+          setMessage('Your email is verified. Please sign in.')
+          setIsSignUp(false)
+          break
         default:
           setMessage('Status updated.')
       }
