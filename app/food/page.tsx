@@ -6085,7 +6085,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
 
   const analyzePhoto = async (
     fileOverride?: File,
-    options?: { feedbackRescan?: boolean; feedbackReasons?: string[] },
+    options?: { feedbackRescan?: boolean; feedbackReasons?: string[]; feedbackFocusItem?: string | null },
   ) => {
     const isFeedbackRescan = Boolean(options?.feedbackRescan)
     const fileToAnalyze = fileOverride || photoFile
@@ -6153,6 +6153,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       const feedbackReasons = Array.isArray(options?.feedbackReasons)
         ? options?.feedbackReasons.filter(Boolean)
         : []
+      const feedbackFocusItem = String(options?.feedbackFocusItem || '').trim()
       if (feedbackRescan) {
         formData.append('feedbackDown', '1')
         if (feedbackReasons.length > 0) {
@@ -6164,9 +6165,12 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         }
         const feedbackItems = Array.from(
           new Set(
-            (analyzedItems || [])
-              .map((item: any) => String(item?.name || '').trim())
-              .filter(Boolean),
+            [
+              ...(analyzedItems || [])
+                .map((item: any) => String(item?.name || '').trim())
+                .filter(Boolean),
+              feedbackFocusItem,
+            ].filter(Boolean),
           ),
         )
         if (feedbackItems.length > 0) {
@@ -7061,7 +7065,7 @@ Please add nutritional information manually if needed.`);
     }
   }
 
-  const triggerFeedbackRescan = async (reasons: string[]) => {
+  const triggerFeedbackRescan = async (reasons: string[], focusItem?: string | null) => {
     if (isAnalyzing) return
     if (!photoFile) return
     if (analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)) return
@@ -7069,7 +7073,11 @@ Please add nutritional information manually if needed.`);
       ? 'Rechecking for missing ingredients…'
       : 'Rechecking analysis…'
     showQuickToast(message)
-    await analyzePhoto(photoFile, { feedbackRescan: true, feedbackReasons: reasons })
+    await analyzePhoto(photoFile, {
+      feedbackRescan: true,
+      feedbackReasons: reasons,
+      feedbackFocusItem: focusItem || null,
+    })
   }
 
   const resetAnalysisFeedbackState = () => {
@@ -13769,6 +13777,12 @@ Please add nutritional information manually if needed.`);
                           showQuickToast('Thanks for the feedback!')
                           if (scope === 'overall') {
                             await triggerFeedbackRescan(reasonsSnapshot)
+                          } else if (scope === 'item') {
+                            const focusName =
+                              feedbackPrompt.itemIndex !== null && feedbackPrompt.itemIndex !== undefined
+                                ? String(analyzedItems[feedbackPrompt.itemIndex]?.name || '').trim()
+                                : ''
+                            await triggerFeedbackRescan(reasonsSnapshot, focusName)
                           }
                         }}
                         className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
