@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import OpenAI from 'openai';
-import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
+import { logAiUsageEvent } from '@/lib/ai-usage-logger';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { getImageMetadata } from '@/lib/image-metadata';
+import { prisma } from '@/lib/prisma';
+import { CreditManager } from '@/lib/credit-system';
+import { costCentsEstimateFromText } from '@/lib/cost-meter';
+import { chatCompletionWithCost } from '@/lib/metered-openai';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
@@ -16,6 +22,11 @@ function getOpenAIClient() {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const formData = await req.formData();
     const imageFile = formData.get('image') as File;
 
@@ -44,20 +55,20 @@ export async function POST(req: NextRequest) {
       size: imageFile.size
     });
 
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: { subscription: true, creditTopUps: true },
+    });
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
     // Analyze image to extract supplement name
     const openai = getOpenAIClient();
     if (!openai) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
-    const response: any = await runChatCompletionWithLogging(openai, {
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Analyze this supplement/medication bottle or package image and extract the main product name. 
+    const promptText = `Analyze this supplement/medication bottle or package image and extract the main product name. 
 
 CRITICAL INSTRUCTIONS:
 1. Look for the PRIMARY product name on the label (e.g., "Vitamin E", "Magnesium", "Omega-3", "Ibuprofen")
@@ -75,8 +86,23 @@ Examples of good responses:
 - "Ibuprofen"
 - "Fish Oil"
 
-Return only the product name, no explanations or additional text.`
-            },
+Return only the product name, no explanations or additional text.`;
+
+    const model = "gpt-4o";
+    const cm = new CreditManager(user.id);
+    const estimateCents = costCentsEstimateFromText(model, promptText, 50 * 4);
+    const wallet = await cm.getWalletStatus();
+    if (wallet.totalAvailableCents < estimateCents) {
+      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+    }
+
+    const wrapped = await chatCompletionWithCost(openai, {
+      model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: promptText },
             {
               type: "image_url",
               image_url: {
@@ -89,26 +115,24 @@ Return only the product name, no explanations or additional text.`
       ],
       max_tokens: 50,
       temperature: 0.1
-    }, { feature: 'supplements:image-name' }, {
-      image: {
-        width: meta.width,
-        height: meta.height,
-        bytes: imageBuffer.byteLength,
-        mime: imageFile.type || null
-      }
-    });
+    } as any);
+
+    const ok = await cm.chargeCents(wrapped.costCents);
+    if (!ok) {
+      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+    }
 
     // Persist usage (vision)
     logAiUsageEvent({
       feature: 'supplements:image-name',
       endpoint: '/api/analyze-supplement-image',
-      userId: null,
-      userLabel: clientIp ? `ip:${clientIp}` : null,
+      userId: user.id,
+      userLabel: user.email || (clientIp ? `ip:${clientIp}` : null),
       scanId: `supplement-${Date.now()}`,
-      model: "gpt-4o",
-      promptTokens: (response as any)?.promptTokens || 0,
-      completionTokens: (response as any)?.completionTokens || 0,
-      costCents: (response as any)?.costCents || 0,
+      model,
+      promptTokens: wrapped.promptTokens,
+      completionTokens: wrapped.completionTokens,
+      costCents: wrapped.costCents,
       image: {
         width: meta.width,
         height: meta.height,
@@ -118,7 +142,7 @@ Return only the product name, no explanations or additional text.`
       success: true,
     }).catch(() => {});
 
-    const supplementName = response.choices[0]?.message?.content?.trim() || 'Unknown Supplement';
+    const supplementName = wrapped.completion.choices?.[0]?.message?.content?.trim() || 'Unknown Supplement';
     
     console.log('Extracted supplement name:', supplementName);
 

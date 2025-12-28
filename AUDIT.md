@@ -18,7 +18,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Critical.
    5) What needs to be done to fix it: Move admin login to the server, require real admin accounts, and remove the shared hardcoded key.
 
-3. Health files are stored with public links.
+3. ✅ Health files are stored with public links.
    1) What the issue is: Medical images, lab reports, and meal photos are uploaded to public file storage and return public links.
    2) Why it matters: Anyone with the link can view these files without logging in.
    3) What could realistically go wrong: A link is shared or leaked, and private health images and reports are exposed.
@@ -184,7 +184,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    5) What needs to be done to fix it: Manually verify real AI costs, pricing settings, and margins with recent usage. This could not be confirmed and should be manually checked.
 
 ## Security & Privacy Risks
-1. Public links expose sensitive health files.
+1. ✅ Public links expose sensitive health files.
    1) What the issue is: Medical images, lab reports, and meal photos are stored with public links.
    2) Why it matters: Anyone with the link can view private health data.
    3) What could realistically go wrong: A leak or shared link exposes medical images and reports.

@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   try {
     const contentType = req.headers.get('content-type');
     
     console.log('=== FOOD UPLOAD DEBUG ===');
     console.log('Content-Type:', contentType);
     console.log('OpenAI API Key exists:', !!process.env.OPENAI_API_KEY);
-    console.log('OpenAI API Key preview:', process.env.OPENAI_API_KEY?.substring(0, 20) + '...');
     
     if (contentType?.includes('multipart/form-data')) {
       const formData = await req.formData();
@@ -22,7 +25,6 @@ export async function POST(req: NextRequest) {
         success: true,
         debug: {
           hasApiKey: !!process.env.OPENAI_API_KEY,
-          apiKeyPreview: process.env.OPENAI_API_KEY?.substring(0, 20) + '...',
           imageReceived: !!imageFile,
           imageName: imageFile?.name,
           imageSize: imageFile?.size,

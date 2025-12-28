@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
+import { logAIUsage } from '@/lib/ai-usage-logger'
+import { CreditManager } from '@/lib/credit-system'
+import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { chatCompletionWithCost } from '@/lib/metered-openai'
 
 // Lazy OpenAI import to avoid build-time env requirements
 let _openai: any = null
@@ -96,13 +99,40 @@ export async function POST(request: NextRequest) {
       ? clientMessages.map((m: any) => ({ role: String(m.role || 'user'), content: String(m.content || '') })).slice(-12)
       : (question ? [{ role: 'user', content: String(question) }] : [])
 
-    const resp: any = await runChatCompletionWithLogging(openai, {
-      model: 'gpt-4o-mini',
+    const model = 'gpt-4o-mini'
+    const promptText = [baseSystem, ...history].map((m) => m.content).join('\n')
+    const cm = new CreditManager(userId)
+    const estimateCents = costCentsEstimateFromText(model, promptText, 400 * 4)
+    const wallet = await cm.getWalletStatus()
+    if (wallet.totalAvailableCents < estimateCents) {
+      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    }
+
+    const wrapped = await chatCompletionWithCost(openai, {
+      model,
       messages: [baseSystem, ...history],
       temperature: 0.2,
       max_tokens: 400,
-    }, { feature: 'insights:ask', userId })
-    const text = resp.choices?.[0]?.message?.content || ''
+    } as any)
+
+    const ok = await cm.chargeCents(wrapped.costCents)
+    if (!ok) {
+      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    }
+
+    try {
+      await logAIUsage({
+        context: { feature: 'insights:ask', userId },
+        model,
+        promptTokens: wrapped.promptTokens,
+        completionTokens: wrapped.completionTokens,
+        costCents: wrapped.costCents,
+      })
+    } catch {
+      // Ignore logging failures
+    }
+
+    const text = wrapped.completion.choices?.[0]?.message?.content || ''
     return NextResponse.json({ messages: [...history, { role: 'assistant', content: text }], preview: false }, { status: 200 })
   } catch (e) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })

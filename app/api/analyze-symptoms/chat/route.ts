@@ -93,64 +93,49 @@ export async function POST(req: NextRequest) {
     ]
 
     if (wantsStream) {
-      // Wallet pre-check using a conservative estimate (max_tokens)
       const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
-      {
-        const cm = new CreditManager(user.id)
-        const estimateCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, 800 * 4)
-        const wallet = await cm.getWalletStatus()
-        if (wallet.totalAvailableCents < estimateCents) {
-          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
-        }
+      const promptText = `${systemPrompt}\n${question}`
+      const cm = new CreditManager(user.id)
+      const estimateCents = costCentsEstimateFromText(model, promptText, 800 * 4)
+      const wallet = await cm.getWalletStatus()
+      if (wallet.totalAvailableCents < estimateCents) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
       }
 
+      const wrapped = await chatCompletionWithCost(openai, {
+        model,
+        temperature: 0.2,
+        max_tokens: 800,
+        messages: chatMessages as any,
+      } as any)
+
+      const ok = await cm.chargeCents(wrapped.costCents)
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      }
+
+      try {
+        await logAIUsage({
+          context: { feature: 'symptoms:chat', userId: user.id },
+          model,
+          promptTokens: wrapped.promptTokens,
+          completionTokens: wrapped.completionTokens,
+          costCents: wrapped.costCents,
+        })
+      } catch {
+        // Ignore logging failures
+      }
+
+      const text = wrapped.completion.choices?.[0]?.message?.content || ''
       const enc = new TextEncoder()
+      const chunks = text.match(/[\s\S]{1,200}/g) || ['']
       const stream = new ReadableStream({
-        async start(controller) {
-          let full = ''
-          try {
-            const completion = await openai.chat.completions.create({
-              model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
-              temperature: 0.2,
-              max_tokens: 800,
-              stream: true,
-              messages: chatMessages as any,
-            })
-            for await (const part of completion) {
-              const token = part.choices?.[0]?.delta?.content || ''
-              if (token) {
-                full += token
-                controller.enqueue(enc.encode(`data: ${token}\n\n`))
-              }
-            }
-            // After stream completes, charge actual cost estimated from output length
-            try {
-              const cm = new CreditManager(user.id)
-              const actualCents = costCentsEstimateFromText(
-                model,
-                `${systemPrompt}\n${question}`,
-                full.length
-              )
-              await cm.chargeCents(actualCents)
-              // Log estimated usage for cost visibility
-              const promptTokens = estimateTokensFromText(`${systemPrompt}\n${question}`)
-              const completionTokens = Math.ceil(full.length / 4)
-              await logAIUsage({
-                context: { feature: 'symptoms:chat', userId: user.id },
-                model,
-                promptTokens,
-                completionTokens,
-                costCents: actualCents,
-              })
-            } catch {
-              // Do not interrupt the finished stream; just swallow errors
-            }
-            controller.enqueue(enc.encode('event: end\n\n'))
-            controller.close()
-          } catch (err) {
-            controller.enqueue(enc.encode('event: error\n\n'))
-            controller.close()
+        start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(enc.encode(`data: ${chunk}\n\n`))
           }
+          controller.enqueue(enc.encode('event: end\n\n'))
+          controller.close()
         },
       })
       return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } })
@@ -174,10 +159,10 @@ export async function POST(req: NextRequest) {
         max_tokens: 800,
         messages: chatMessages as any,
       } as any)
-      try {
-        const cm = new CreditManager(user.id)
-        await cm.chargeCents(wrapped.costCents)
-      } catch {}
+      const ok = await cm.chargeCents(wrapped.costCents)
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      }
 
       // Log AI usage for non-streaming symptom chat
       try {

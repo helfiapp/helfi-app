@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
+import { logAIUsage } from '@/lib/ai-usage-logger'
 import { consumeRateLimit } from '@/lib/rate-limit'
+import { CreditManager } from '@/lib/credit-system'
+import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { chatCompletionWithCost } from '@/lib/metered-openai'
 
 const INSIGHTS_RATE_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
 const INSIGHTS_RATE_MAX = 2
@@ -188,6 +191,10 @@ export async function POST(request: Request) {
   }
 
   // Real AI generation (also allowed in preview to bypass flag safely)
+  if (preview) {
+    return NextResponse.json({ enabled: enabled || preview, items: fallback(), preview: true }, { status: 200 })
+  }
+
   const clientIp = (request.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown'
   const rateKey = profile?.id ? `user:${profile.id}` : `ip:${clientIp}`
   const rateCheck = consumeRateLimit('insights-generate', rateKey, INSIGHTS_RATE_MAX, INSIGHTS_RATE_WINDOW_MS)
@@ -237,13 +244,39 @@ Nutrition guidance rules:
 Keep each insight skimmable but substantive. Do not return prose outside of the JSON array.
 
 Profile: ${profileText}`
-        const resp: any = await runChatCompletionWithLogging(openai, {
-          model: 'gpt-4o-mini',
+        const model = 'gpt-4o-mini'
+        const cm = new CreditManager(profile.id)
+        const estimateCents = costCentsEstimateFromText(model, prompt, 1000 * 4)
+        const wallet = await cm.getWalletStatus()
+        if (wallet.totalAvailableCents < estimateCents) {
+          return NextResponse.json({ enabled: true, items: fallback(), ai: false, requiresPayment: true }, { status: 200 })
+        }
+
+        const wrapped = await chatCompletionWithCost(openai, {
+          model,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.2,
           max_tokens: 1000,
-        }, { feature: 'insights:landing-generate', userId: profile.id })
-        const text = resp.choices?.[0]?.message?.content || ''
+        } as any)
+
+        const ok = await cm.chargeCents(wrapped.costCents)
+        if (!ok) {
+          return NextResponse.json({ enabled: true, items: fallback(), ai: false, requiresPayment: true }, { status: 200 })
+        }
+
+        try {
+          await logAIUsage({
+            context: { feature: 'insights:landing-generate', userId: profile.id },
+            model,
+            promptTokens: wrapped.promptTokens,
+            completionTokens: wrapped.completionTokens,
+            costCents: wrapped.costCents,
+          })
+        } catch {
+          // Ignore logging failures
+        }
+
+        const text = wrapped.completion.choices?.[0]?.message?.content || ''
         // Try to extract JSON array
         const jsonMatch = text.match(/\[([\s\S]*?)\]/)
         const items = jsonMatch ? JSON.parse(jsonMatch[0]) : fallback()

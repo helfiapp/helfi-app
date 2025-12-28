@@ -368,59 +368,56 @@ export async function POST(req: NextRequest) {
     }
 
     if (wantsStream) {
+      const wrapped = await chatCompletionWithCost(openai, {
+        model,
+        messages: chatMessages,
+        max_tokens: 1000,
+        temperature: 0.4,
+      } as any)
+
+      const assistantMessage =
+        wrapped.completion.choices?.[0]?.message?.content ||
+        'I apologize, but I could not generate a response.'
+
+      const actualUserCostCents = wrapped.costCents * 2
+      const ok = await cm.chargeCents(actualUserCostCents)
+      if (!ok) {
+        return NextResponse.json(
+          {
+            error: 'Insufficient credits',
+            estimatedCost: actualUserCostCents,
+            availableCredits: wallet.totalAvailableCents,
+          },
+          { status: 402 }
+        )
+      }
+
+      // Save assistant message
+      await appendMessage(threadId, 'assistant', assistantMessage)
+
+      // Log usage for visibility
+      try {
+        await logAIUsage({
+          context: { feature: 'voice:chat', userId: user.id },
+          model,
+          promptTokens: wrapped.promptTokens,
+          completionTokens: wrapped.completionTokens,
+          costCents: actualUserCostCents,
+        })
+      } catch {
+        // Ignore logging failures
+      }
+
       const enc = new TextEncoder()
+      const chunks = assistantMessage.match(/[\s\S]{1,200}/g) || ['']
       const stream = new ReadableStream({
-        async start(controller) {
-          let full = ''
-          try {
-            const completion = await openai.chat.completions.create({
-              model,
-              temperature: 0.4,
-              max_tokens: 1000,
-              stream: true,
-              messages: chatMessages as any,
-            })
-
-            for await (const part of completion) {
-              const token = part.choices?.[0]?.delta?.content || ''
-              if (token) {
-                full += token
-                // Send JSON payload so newlines are preserved safely over SSE
-                const payload = JSON.stringify({ token })
-                controller.enqueue(enc.encode(`data: ${payload}\n\n`))
-              }
-            }
-
-            // Save assistant message
-            await appendMessage(threadId, 'assistant', full)
-
-            // Charge actual cost (2x)
-            try {
-              const actualCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, full.length * 4)
-              const actualUserCostCents = actualCents * 2
-              await cm.chargeCents(actualUserCostCents)
-              // Log estimated usage for visibility
-              const promptTokens = estimateTokensFromText(`${systemPrompt}\n${question}`)
-              const completionTokens = Math.ceil(full.length / 4)
-              await logAIUsage({
-                context: { feature: 'voice:chat', userId: user.id },
-                model,
-                promptTokens,
-                completionTokens,
-                costCents: actualUserCostCents,
-              })
-            } catch (err) {
-              console.error('[voice-chat] Failed to charge wallet:', err)
-            }
-
-            controller.enqueue(enc.encode('event: end\n\n'))
-            controller.close()
-          } catch (err: any) {
-            console.error('[voice-chat] Stream error:', err)
-            controller.enqueue(enc.encode(`data: Error: ${err.message || 'Unknown error'}\n\n`))
-            controller.enqueue(enc.encode('event: end\n\n'))
-            controller.close()
+        start(controller) {
+          for (const chunk of chunks) {
+            const payload = JSON.stringify({ token: chunk })
+            controller.enqueue(enc.encode(`data: ${payload}\n\n`))
           }
+          controller.enqueue(enc.encode('event: end\n\n'))
+          controller.close()
         },
       })
 
@@ -442,7 +439,17 @@ export async function POST(req: NextRequest) {
 
       // Charge user (2x cost)
       const userCostCents = wrapped.costCents * 2
-      await cm.chargeCents(userCostCents)
+      const ok = await cm.chargeCents(userCostCents)
+      if (!ok) {
+        return NextResponse.json(
+          {
+            error: 'Insufficient credits',
+            estimatedCost: userCostCents,
+            availableCredits: wallet.totalAvailableCents,
+          },
+          { status: 402 }
+        )
+      }
 
       // Log AI usage for cost tracking (voice chat, non-streaming)
       try {
