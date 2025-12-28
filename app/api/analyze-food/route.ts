@@ -90,6 +90,39 @@ const parseInlineImageData = (dataUrl: string | null) => {
   return { mimeType: match[1], data: match[2] };
 };
 
+const parseFeedbackList = (raw: any): string[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => String(item || '').replace(/[\r\n]+/g, ' ').trim())
+      .filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => String(item || '').replace(/[\r\n]+/g, ' ').trim())
+          .filter(Boolean);
+      }
+    } catch {}
+    return trimmed
+      .split(',')
+      .map((item) => String(item || '').replace(/[\r\n]+/g, ' ').trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const sanitizeFeedbackItems = (items: string[], limit = 12): string[] => {
+  return items
+    .map((item) => String(item || '').replace(/[\r\n]+/g, ' ').trim())
+    .filter(Boolean)
+    .slice(0, limit);
+};
+
 const extractGeminiText = (payload: any): string | null => {
   const parts = payload?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) return null;
@@ -1271,16 +1304,27 @@ const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: nu
   return { candidate: pool[0].candidate, weight: pool[0].weight, score: pool[0].score };
 };
 
+type DbOutlierOptions = {
+  maxItems?: number;
+  outlierRatio?: number;
+  allowIncrease?: boolean;
+  preferSource?: 'usda' | 'fatsecret' | 'auto';
+};
+
 // Database-backed calibration for single foods when AI macros look wildly off vs USDA/FatSecret.
 const enrichItemsWithDatabaseIfOutlier = async (
   items: any[],
+  options: DbOutlierOptions = {},
 ): Promise<{ items: any[]; total: any | null; changed: boolean }> => {
   if (!Array.isArray(items) || items.length === 0) {
     return { items, total: null, changed: false };
   }
 
-  const MAX_DB_ITEMS = 1;
-  const OUTLIER_RATIO = 0.2;
+  const maxItemsRaw = Number(options?.maxItems);
+  const maxItems = Number.isFinite(maxItemsRaw) && maxItemsRaw > 0 ? Math.floor(maxItemsRaw) : 1;
+  const outlierRatioRaw = Number(options?.outlierRatio);
+  const OUTLIER_RATIO = Number.isFinite(outlierRatioRaw) && outlierRatioRaw > 0 ? outlierRatioRaw : 0.2;
+  const allowIncrease = options?.allowIncrease === true;
   let checked = 0;
   let changed = false;
   const nextItems = items.map((item) => ({ ...item }));
@@ -1289,7 +1333,7 @@ const enrichItemsWithDatabaseIfOutlier = async (
     /\b(roast|roasted|rotisserie|fried|grilled|baked|bbq|barbecue|smoked|whole|cooked)\b/i.test(name || '');
 
   for (const item of nextItems) {
-    if (checked >= MAX_DB_ITEMS) break;
+    if (checked >= maxItems) break;
 
     const weight = getItemWeightInGrams(item);
     if (!weight || weight < 15) continue;
@@ -1304,7 +1348,12 @@ const enrichItemsWithDatabaseIfOutlier = async (
 
     let dbResults: any[] = [];
     try {
-      const preferSource = isPreparedFoodName(query) ? 'fatsecret' : 'usda';
+      const preferSource =
+        options?.preferSource && options.preferSource !== 'auto'
+          ? options.preferSource
+          : isPreparedFoodName(query)
+          ? 'fatsecret'
+          : 'usda';
       dbResults = await lookupFoodNutrition(query, {
         preferSource,
         maxResults: 3,
@@ -1330,9 +1379,11 @@ const enrichItemsWithDatabaseIfOutlier = async (
     const dbScaledCalories = Math.round(candidateCalories * (weight / candidateWeight));
     const calorieDiff = Math.abs(calories - dbScaledCalories);
     if (ratio < OUTLIER_RATIO && calorieDiff < 180) continue;
-    const aiIsGuess = item?.isGuess === true;
-    const aiHigherThanDb = aiPer100 > dbPer100;
-    if (!aiIsGuess && !aiHigherThanDb) continue;
+    if (!allowIncrease) {
+      const aiIsGuess = item?.isGuess === true;
+      const aiHigherThanDb = aiPer100 > dbPer100;
+      if (!aiIsGuess && !aiHigherThanDb) continue;
+    }
 
     const scale = weight / candidateWeight;
     const scaleMacro = (value: any, decimals = 1) => {
@@ -2061,6 +2112,10 @@ export async function POST(req: NextRequest) {
     let forceFresh = false;
     let packagedEmphasisBlock = '';
     let analysisHint = '';
+    let feedbackDown = false;
+    let feedbackReasons: string[] = [];
+    let feedbackMissing = false;
+    let feedbackItems: string[] = [];
 
     const setAnalysisMode = (modeRaw: any) => {
       const normalized = String(modeRaw || 'auto').toLowerCase();
@@ -2105,6 +2160,12 @@ PACKAGED MODE SELECTED:
       labelScan = Boolean(labelScanFlag);
       forceFresh = Boolean(forceFreshFlag);
       analysisHint = typeof bodyHint === 'string' ? bodyHint : '';
+      feedbackReasons = parseFeedbackList((body as any)?.feedbackReasons);
+      feedbackDown = Boolean((body as any)?.feedbackDown) || feedbackReasons.length > 0;
+      feedbackMissing =
+        Boolean((body as any)?.feedbackMissing) ||
+        feedbackReasons.some((reason) => /missing ingredients/i.test(String(reason)));
+      feedbackItems = sanitizeFeedbackItems(parseFeedbackList((body as any)?.feedbackItems));
       console.log('📝 Text analysis mode:', { textDescription, foodType });
 
       if (!textDescription) {
@@ -2119,11 +2180,22 @@ PACKAGED MODE SELECTED:
         cleanedHint && !packagedMode
           ? `\nUSER HINT (optional): ${cleanedHint}\n- Use this only to disambiguate a tricky item.\n- Do NOT ignore other foods mentioned in the description.\n- Do NOT invent items that are not described.\n`
           : '';
+      const feedbackBlock = feedbackDown
+        ? `\nFEEDBACK (user reported issues): ${
+            feedbackReasons.length ? feedbackReasons.join(', ') : 'Thumbs down'
+          }\n${feedbackMissing ? '- Missing ingredients were reported. Re-check for small sides, sauces, and toppings.\n' : ''}${
+            feedbackItems.length
+              ? `- Previously detected items (include if described/visible, and add anything missing): ${feedbackItems.join(
+                  ', ',
+                )}.\n`
+              : ''
+          }- Ensure the final Components line includes every item you list.\n`
+        : '';
 
       messages = [
         {
           role: "user",
-          content: `Analyze this food description and provide accurate nutrition information based on the EXACT portion size specified. Be precise about size differences.${hintBlock}
+          content: `Analyze this food description and provide accurate nutrition information based on the EXACT portion size specified. Be precise about size differences.${hintBlock}${feedbackBlock}
 
 CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - If the description mentions multiple distinct foods (e.g., plate with protein, vegetables, grains, salads, soups, stews, sandwiches with multiple fillings, bowls with toppings), you MUST:
@@ -2220,6 +2292,12 @@ CRITICAL REQUIREMENTS:
       labelScan = String(formData.get('labelScan') || '') === '1';
       forceFresh = String(formData.get('forceFresh') || '') === '1';
       analysisHint = String(formData.get('analysisHint') || '');
+      feedbackReasons = parseFeedbackList(formData.get('feedbackReasons'));
+      feedbackDown = String(formData.get('feedbackDown') || '') === '1' || feedbackReasons.length > 0;
+      feedbackMissing =
+        String(formData.get('feedbackMissing') || '') === '1' ||
+        feedbackReasons.some((reason) => /missing ingredients/i.test(String(reason)));
+      feedbackItems = sanitizeFeedbackItems(parseFeedbackList(formData.get('feedbackItems')));
       
       console.log('📊 Image file info:', {
         hasImageFile: !!imageFile,
@@ -2263,6 +2341,15 @@ CRITICAL REQUIREMENTS:
         cleanedHint && !packagedMode
           ? `\nUSER HINT (optional): ${cleanedHint}\n- Use this only to disambiguate a tricky item.\n- Do NOT ignore other visible foods.\n- Do NOT invent foods not visible in the photo.\n`
           : '';
+      const feedbackBlock = feedbackDown
+        ? `\nFEEDBACK (user reported issues): ${
+            feedbackReasons.length ? feedbackReasons.join(', ') : 'Thumbs down'
+          }\n${feedbackMissing ? '- Missing ingredients were reported. Re-check for small sides, sauces, and toppings.\n' : ''}${
+            feedbackItems.length
+              ? `- Previously detected items (include if visible, and add anything missing): ${feedbackItems.join(', ')}.\n`
+              : ''
+          }- Ensure the final Components line includes every item you list.\n`
+        : '';
 
       messages = [
         {
@@ -2270,7 +2357,7 @@ CRITICAL REQUIREMENTS:
           content: [
             {
               type: "text",
-              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences.${hintBlock}
+              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences.${hintBlock}${feedbackBlock}
 
 CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - If the image contains multiple distinct foods (e.g., plate with protein, vegetables, grains, salads, soups, stews, sandwiches with multiple fillings, bowls with toppings), you MUST:
@@ -2546,7 +2633,7 @@ CRITICAL REQUIREMENTS:
     const useGeminiVision =
       Boolean(imageDataUrl) && !packagedMode && !labelScan && model.startsWith('gemini-')
 
-    const maxTokens = 600;
+    const maxTokens = feedbackDown ? 800 : 600;
 
     // Wallet pre-check (skip if allowed via free use OR billing checks are disabled)
     if (BILLING_ENFORCED && !allowViaFreeUse) {
@@ -2885,6 +2972,11 @@ CRITICAL REQUIREMENTS:
       }
       listedComponents = normalizeComponentList(listedComponents);
       analysisComponents = normalizeComponentList(analysisComponents);
+      const feedbackComponents = normalizeComponentList(feedbackItems);
+      if (feedbackComponents.length > 0) {
+        listedComponents = normalizeComponentList([...listedComponents, ...feedbackComponents]);
+        analysisComponents = normalizeComponentList([...analysisComponents, ...feedbackComponents]);
+      }
       if (
         listedComponents.length === 0 &&
         resp.items &&
@@ -3750,7 +3842,11 @@ CRITICAL REQUIREMENTS:
     }
 
     if (!labelScan && !packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
-      const calibrated = await enrichItemsWithDatabaseIfOutlier(resp.items);
+      const calibrated = await enrichItemsWithDatabaseIfOutlier(resp.items, {
+        maxItems: feedbackDown ? Math.min(resp.items.length, 6) : 1,
+        outlierRatio: feedbackDown ? 0.15 : 0.2,
+        allowIncrease: feedbackDown,
+      });
       if (calibrated.changed) {
         resp.items = calibrated.items;
         resp.total = calibrated.total || resp.total || computeTotalsFromItems(calibrated.items);

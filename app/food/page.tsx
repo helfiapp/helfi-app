@@ -6083,7 +6083,11 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     return `${rounded}${unit}`
   }
 
-  const analyzePhoto = async (fileOverride?: File) => {
+  const analyzePhoto = async (
+    fileOverride?: File,
+    options?: { feedbackRescan?: boolean; feedbackReasons?: string[] },
+  ) => {
+    const isFeedbackRescan = Boolean(options?.feedbackRescan)
     const fileToAnalyze = fileOverride || photoFile
     if (!fileToAnalyze) return;
     
@@ -6144,6 +6148,33 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       const trimmedHint = analysisHint.trim()
       if (trimmedHint && analysisMode !== 'packaged') {
         formData.append('analysisHint', trimmedHint)
+      }
+      const feedbackRescan = Boolean(options?.feedbackRescan)
+      const feedbackReasons = Array.isArray(options?.feedbackReasons)
+        ? options?.feedbackReasons.filter(Boolean)
+        : []
+      if (feedbackRescan) {
+        formData.append('feedbackDown', '1')
+        if (feedbackReasons.length > 0) {
+          formData.append('feedbackReasons', JSON.stringify(feedbackReasons))
+          const isMissing = feedbackReasons.some((reason) => /missing ingredients/i.test(String(reason)))
+          if (isMissing) {
+            formData.append('feedbackMissing', '1')
+          }
+        }
+        const feedbackItems = Array.from(
+          new Set(
+            (analyzedItems || [])
+              .map((item: any) => String(item?.name || '').trim())
+              .filter(Boolean),
+          ),
+        )
+        if (feedbackItems.length > 0) {
+          formData.append('feedbackItems', JSON.stringify(feedbackItems))
+        }
+        if (analysisId) {
+          formData.append('feedbackScanId', String(analysisId))
+        }
       }
       console.log('✅ FormData created successfully');
 
@@ -6246,27 +6277,31 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         stack: error instanceof Error ? error.stack?.substring(0, 200) : 'No stack trace'
       });
       
-      // More specific error messages based on error type
-      let fallbackMessage = `🤖 Photo analysis failed: ${errorMessage}`;
-      
-      if (errorMessage.includes('fetch')) {
-        fallbackMessage = `🌐 Network error occurred while analyzing photo. Please check your connection and try again.`;
-      } else if (errorMessage.includes('HTTP 401')) {
-        fallbackMessage = `🔑 Authentication error. The AI service is temporarily unavailable.`;
-      } else if (errorMessage.includes('HTTP 429')) {
-        fallbackMessage = `⏰ AI service is busy. Please wait a moment and try again.`;
-      } else if (errorMessage.includes('HTTP 5')) {
-        fallbackMessage = `🛠️ Server error occurred. Please try again in a moment.`;
-      }
-      
-      setAiDescription(fallbackMessage + `
-      
+      if (!isFeedbackRescan) {
+        // More specific error messages based on error type
+        let fallbackMessage = `🤖 Photo analysis failed: ${errorMessage}`;
+        
+        if (errorMessage.includes('fetch')) {
+          fallbackMessage = `🌐 Network error occurred while analyzing photo. Please check your connection and try again.`;
+        } else if (errorMessage.includes('HTTP 401')) {
+          fallbackMessage = `🔑 Authentication error. The AI service is temporarily unavailable.`;
+        } else if (errorMessage.includes('HTTP 429')) {
+          fallbackMessage = `⏰ AI service is busy. Please wait a moment and try again.`;
+        } else if (errorMessage.includes('HTTP 5')) {
+          fallbackMessage = `🛠️ Server error occurred. Please try again in a moment.`;
+        }
+        
+        setAiDescription(fallbackMessage + `
+        
 Meanwhile, you can describe your food manually:
 - What foods do you see?
 - How was it prepared?
 - Approximate portion size`);
-      setAnalyzedNutrition(null);
-      setShowAiResult(true);
+        setAnalyzedNutrition(null);
+        setShowAiResult(true);
+      } else {
+        showQuickToast('Rescan failed. Keeping your current results.')
+      }
     } finally {
       setIsAnalyzing(false);
       setAnalysisPhase('idle');
@@ -7024,6 +7059,17 @@ Please add nutritional information manually if needed.`);
       console.warn('Feedback submission failed', err)
       showQuickToast('Could not send feedback. Please try again.')
     }
+  }
+
+  const triggerFeedbackRescan = async (reasons: string[]) => {
+    if (isAnalyzing) return
+    if (!photoFile) return
+    if (analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)) return
+    const message = reasons.some((reason) => /missing ingredients/i.test(String(reason)))
+      ? 'Rechecking for missing ingredients…'
+      : 'Rechecking analysis…'
+    showQuickToast(message)
+    await analyzePhoto(photoFile, { feedbackRescan: true, feedbackReasons: reasons })
   }
 
   const resetAnalysisFeedbackState = () => {
@@ -13700,6 +13746,8 @@ Please add nutritional information manually if needed.`);
                             setFeedbackError('Please select at least one reason.')
                             return
                           }
+                          const reasonsSnapshot = [...feedbackReasons]
+                          const scope = feedbackPrompt.scope
                           setFeedbackSubmitting(true)
                           await submitFoodAnalysisFeedback({
                             scope: feedbackPrompt.scope,
@@ -13708,7 +13756,7 @@ Please add nutritional information manually if needed.`);
                             reasons: feedbackReasons,
                             comment: feedbackComment,
                           })
-                          if (feedbackPrompt.scope === 'overall') {
+                          if (scope === 'overall') {
                             setAnalysisFeedbackOverall('down')
                           } else if (feedbackPrompt.itemIndex !== null && feedbackPrompt.itemIndex !== undefined) {
                             setAnalysisFeedbackItems((prev) => ({ ...prev, [feedbackPrompt.itemIndex as number]: 'down' }))
@@ -13719,6 +13767,9 @@ Please add nutritional information manually if needed.`);
                           setFeedbackError(null)
                           setFeedbackSubmitting(false)
                           showQuickToast('Thanks for the feedback!')
+                          if (scope === 'overall') {
+                            await triggerFeedbackRescan(reasonsSnapshot)
+                          }
                         }}
                         className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
                         disabled={feedbackSubmitting}
