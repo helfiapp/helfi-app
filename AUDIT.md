@@ -25,7 +25,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Critical.
    5) What needs to be done to fix it: Store files as private, serve them only through signed links, and remove public access.
 
-4. A public troubleshooting tool reveals part of the AI secret key.
+4. ✅ A public troubleshooting tool reveals part of the AI secret key.
    1) What the issue is: A debug feature returns a preview of the AI service key without any login.
    2) Why it matters: That key can be used to run up AI costs or probe the AI service.
    3) What could realistically go wrong: A stranger uses the key to create large charges and disrupt service.
