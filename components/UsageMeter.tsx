@@ -110,10 +110,23 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   // - active top-ups
   // - non-expiring additional credits (admin grants)
   const creditsRemaining = creditsTotal ?? Math.round(totalAvailableCents)
+
+  // Get free credits status from API response
+  const exhaustedFreeCredits = creditData?.exhaustedFreeCredits ?? false
+  const freeCreditsTotal = creditData?.freeCredits?.total ?? 0
+  const isPremiumPlan = creditData?.plan === 'PREMIUM' || monthlyCapCents > 0
+  const hasPaidCredits = totalAvailableCents > 0 || (creditsAdditionalRemaining ?? 0) > 0
+  const showFreeCredits = !isPremiumPlan && !hasPaidCredits && freeCreditsTotal > 0 && !exhaustedFreeCredits
+
+  const freeCreditsBaseline = Math.max(15, freeCreditsTotal)
+  const effectiveCreditsRemaining = showFreeCredits ? freeCreditsTotal : creditsRemaining
+
   // We anchor percent remaining to the subscription cap when present, but never allow
   // additional credits to incorrectly trigger "low credits" UI.
   const percentRemainingPrecise =
-    monthlyCapCents > 0
+    showFreeCredits
+      ? (effectiveCreditsRemaining / Math.max(1, freeCreditsBaseline)) * 100
+      : monthlyCapCents > 0
       ? (creditsRemaining / Math.max(1, monthlyCapCents)) * 100
       : creditsRemaining > 0
       ? 100
@@ -123,27 +136,22 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   const displayPercentRemainingInline = Number(clampedRemaining.toFixed(1))
   const displayPercentRemaining = Math.round(clampedRemaining)
 
-  // Get free credits status from API response
-  const exhaustedFreeCredits = creditData?.exhaustedFreeCredits ?? false
-  const freeCreditsTotal = creditData?.freeCredits?.total ?? 0
-  const isPremiumPlan = creditData?.plan === 'PREMIUM' || monthlyCapCents > 0
-  const hasPaidCredits = totalAvailableCents > 0 || (creditsAdditionalRemaining ?? 0) > 0
-  const showFreeCredits = !isPremiumPlan && !hasPaidCredits && freeCreditsTotal > 0 && !exhaustedFreeCredits
-
   // Low credits: show red when remaining is genuinely low.
   // BUT: Only show warning if free credits are exhausted AND wallet credits are low
   const lowCreditsThreshold = Math.max(5, Math.ceil(monthlyCapCents > 0 ? monthlyCapCents * 0.05 : 0))
-  const isLowCredits = creditsRemaining <= lowCreditsThreshold && exhaustedFreeCredits
+  const isLowCredits = effectiveCreditsRemaining <= lowCreditsThreshold && exhaustedFreeCredits
 
   if (inline) {
     // Inline version for AI feature pages - credits remaining with green bar (reverse fill)
-    const creditsDisplayInline = creditsRemaining
+    const creditsDisplayInline = effectiveCreditsRemaining
     const creditsRemainingPercent = displayPercentRemainingInline
     
     return (
       <div className={`mt-2 ${className}`}>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-gray-500">Credits remaining</span>
+          <span className="text-xs text-gray-500">
+            {showFreeCredits ? 'Free uses remaining' : 'Credits remaining'}
+          </span>
           <span className={`text-xs font-semibold ${isLowCredits ? 'text-red-600' : 'text-gray-700'}`}>
             {creditsDisplayInline?.toLocaleString()}
           </span>
@@ -192,7 +200,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
 
   if (compact) {
     // Compact version for headers - credits remaining with green bar (reverse fill)
-    const creditsDisplay = creditsRemaining
+    const creditsDisplay = effectiveCreditsRemaining
     const creditsRemainingPercent = displayPercentRemaining
     
     return (
@@ -205,7 +213,9 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
             style={{ width: `${Math.min(100, Math.max(0, creditsRemainingPercent))}%` }}
           />
         </div>
-        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Credits remaining</span>
+        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          {showFreeCredits ? 'Free uses remaining' : 'Credits remaining'}
+        </span>
         <span className="text-sm font-semibold text-gray-900 dark:text-white">
           {creditsDisplay?.toLocaleString()}
         </span>
@@ -214,13 +224,15 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   }
 
   // Full version for sidebar - credits remaining with green bar (reverse fill)
-  const creditsDisplay = creditsRemaining
+  const creditsDisplay = effectiveCreditsRemaining
   const creditsRemainingPercent = displayPercentRemaining
   
   return (
     <div className={`px-4 py-3 ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-white">Credits remaining</span>
+        <span className="text-xs font-medium text-white">
+          {showFreeCredits ? 'Free uses remaining' : 'Credits remaining'}
+        </span>
         <span className="text-xs font-semibold text-white">
           {creditsDisplay?.toLocaleString()}
         </span>
@@ -233,7 +245,12 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
           style={{ width: `${Math.min(100, Math.max(0, creditsRemainingPercent))}%` }}
         />
       </div>
-      {showResetDate && walletRefreshAt && (
+      {showFreeCredits && (
+        <p className="text-xs text-gray-200 mt-1.5">
+          {freeCreditsTotal} free use{freeCreditsTotal !== 1 ? 's' : ''} left
+        </p>
+      )}
+      {showResetDate && walletRefreshAt && !showFreeCredits && (
         <p className="text-xs text-gray-200 mt-1.5">
           Resets {new Date(walletRefreshAt).toLocaleDateString()}
         </p>
