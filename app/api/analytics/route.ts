@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const hasInternalSecret = !!internalSecret && authHeader === `Bearer ${internalSecret}`
     let sessionEmail = ''
     if (!admin && !hasInternalSecret) {
-      const session = await getServerSession(authOptions as any)
+      const session = (await getServerSession(authOptions as any)) as { user?: { email?: string } } | null
       sessionEmail = String(session?.user?.email || '').toLowerCase()
       if (!sessionEmail) {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
