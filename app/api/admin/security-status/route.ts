@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       {
         id: 'storage-key',
         label: 'File storage key',
-        status: hasValue(process.env.VERCEL_BLOB_READ_WRITE_TOKEN) ? 'set' : 'missing',
+        status: hasValue(process.env.BLOB_READ_WRITE_TOKEN) || hasValue(process.env.VERCEL_BLOB_READ_WRITE_TOKEN) ? 'set' : 'missing',
       },
       {
         id: 'encryption-key',
