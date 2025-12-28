@@ -7,6 +7,7 @@ import { assertGarminConfigured } from '@/lib/garmin-oauth'
 import { extractGarminWorkouts } from '@/lib/exercise/garmin-workouts'
 import { ingestExerciseEntry } from '@/lib/exercise/ingest'
 import { ensureGarminSchema } from '@/lib/garmin-db'
+import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 
 function collectGarminUserIdsAndCallbacks(payload: unknown) {
   const userIds = new Set<string>()
@@ -73,11 +74,8 @@ export async function POST(req: NextRequest) {
       await ensureGarminSchema()
     } catch {}
 
-    // Optional simple verification: require Upstash signature header if configured
-    const requireSignature = !!process.env.QSTASH_REQUIRE_SIGNATURE
-    if (requireSignature) {
-      const sig = req.headers.get('Upstash-Signature')
-      if (!sig) return NextResponse.json({ error: 'missing_signature' }, { status: 401 })
+    if (!isSchedulerAuthorized(req)) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
 
     const body = (await req.json().catch(() => ({}))) as { logId?: string }

@@ -9,6 +9,7 @@ import { costCentsEstimateFromText } from '@/lib/cost-meter'
 import { scheduleHealthTipWithQStash } from '@/lib/qstash'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -383,13 +384,8 @@ function extractTipJson(raw: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const requireSignature = !!process.env.QSTASH_REQUIRE_SIGNATURE
-    if (requireSignature) {
-      const sig = req.headers.get('Upstash-Signature')
-      if (!sig) {
-        return NextResponse.json({ error: 'missing_signature' }, { status: 401 })
-      }
-      // Full signature verification can be added later with @upstash/qstash
+    if (!isSchedulerAuthorized(req)) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
 
     const body = (await req.json().catch(() => ({}))) as Partial<DispatchPayload>

@@ -4,6 +4,7 @@ import webpush from 'web-push'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { scheduleAllMoodReminders, scheduleMoodReminderWithQStash } from '@/lib/qstash'
 import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -40,12 +41,8 @@ function localDateForTimezone(now: Date, timezone: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const requireSignature = !!process.env.QSTASH_REQUIRE_SIGNATURE
-    if (requireSignature) {
-      const sig = req.headers.get('Upstash-Signature')
-      if (!sig) {
-        return NextResponse.json({ error: 'missing_signature' }, { status: 401 })
-      }
+    if (!isSchedulerAuthorized(req)) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
 
     const body = (await req.json().catch(() => ({}))) as Partial<DispatchPayload>

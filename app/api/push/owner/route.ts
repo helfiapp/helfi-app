@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
 import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 
 // Upstash QStash will POST here. This simply reuses our notifyOwner pathway,
 // which resolves owner's subscription and performs the web-push delivery.
 export async function POST(req: NextRequest) {
   try {
+    if (!isSchedulerAuthorized(req)) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json().catch(() => ({}))
     const { event, userEmail, userName, amount, currency, planName, creditAmount } = body || {}
     if (!event || !userEmail) {
@@ -125,4 +130,3 @@ export async function POST(req: NextRequest) {
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-

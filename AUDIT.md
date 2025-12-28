@@ -61,7 +61,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Make credit checks and deductions atomic so only one request can spend a given balance.
 
-4. Background job routes can be triggered by anyone.
+4. ✅ Background job routes can be triggered by anyone.
    1) What the issue is: Several scheduled message routes accept requests without proof that they come from the scheduler.
    2) Why it matters: Anyone can trigger messages and credit spending.
    3) What could realistically go wrong: Attackers spam users with notifications or drain their credits.
@@ -219,7 +219,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Require admin login to access activity data.
 
-6. Background job routes can be called by anyone.
+6. ✅ Background job routes can be called by anyone.
    1) What the issue is: Scheduled message routes do not verify the sender.
    2) Why it matters: They read user data to build messages.
    3) What could realistically go wrong: Unauthorized calls use private health data to generate content.

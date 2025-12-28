@@ -128,6 +128,7 @@ async function scheduleWithQStash(
 ): Promise<{ scheduled: boolean; reason?: string; status?: number; responseBody?: string }> {
   const { userId, timeHHMM, timeZone, callbackPath } = target
   const token = process.env.QSTASH_TOKEN || ''
+  const schedulerSecret = process.env.SCHEDULER_SECRET || ''
   const deltaMinutes = minutesUntilNext(timeHHMM, timeZone)
   const notBeforeEpochSeconds = Math.floor((Date.now() + deltaMinutes * 60_000) / 1000)
 
@@ -181,13 +182,17 @@ async function scheduleWithQStash(
   let status: number | undefined
 
   try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Upstash-Not-Before': String(notBeforeEpochSeconds),
+    }
+    if (schedulerSecret) {
+      headers['Upstash-Forward-Authorization'] = `Bearer ${schedulerSecret}`
+    }
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Upstash-Not-Before': String(notBeforeEpochSeconds),
-      },
+      headers,
       body,
     })
 
@@ -284,6 +289,7 @@ export async function publishWithQStash(
   payload: unknown
 ): Promise<{ ok: boolean; reason?: string; status?: number; responseBody?: string; callbackUrl?: string }> {
   const token = process.env.QSTASH_TOKEN || ''
+  const schedulerSecret = process.env.SCHEDULER_SECRET || ''
   if (!token) return { ok: false, reason: 'missing_qstash_token' }
 
   let base =
@@ -301,12 +307,16 @@ export async function publishWithQStash(
   const url = `https://qstash.upstash.io/v2/publish/${callbackUrl}`
 
   try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
+    if (schedulerSecret) {
+      headers['Upstash-Forward-Authorization'] = `Bearer ${schedulerSecret}`
+    }
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(payload ?? {}),
     })
     const responseBody = await res.text()

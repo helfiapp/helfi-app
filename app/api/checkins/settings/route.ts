@@ -163,15 +163,20 @@ export async function POST(req: NextRequest) {
         if (frequency >= 1) candidates.push(time1)
         if (frequency >= 2) candidates.push(time2)
         if (frequency >= 3) candidates.push(time3)
+        const schedulerSecret = process.env.SCHEDULER_SECRET || ''
         for (const t of candidates) {
           const [hh, mm] = t.split(':').map(v => parseInt(v, 10))
           const target = hh * 60 + mm
           let diff = currentTotal - target
           if (diff < 0) diff += 1440
           if (diff >= 0 && diff <= sendWindowMinutes) {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+            if (schedulerSecret) {
+              headers.Authorization = `Bearer ${schedulerSecret}`
+            }
             await fetch(`${base}/api/push/dispatch`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers,
               body: JSON.stringify({ userId: user.id, reminderTime: t, timezone }),
             }).catch(() => {})
             break
@@ -187,5 +192,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save settings', detail: message }, { status: 500 })
   }
 }
-
 

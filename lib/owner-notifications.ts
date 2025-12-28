@@ -156,6 +156,7 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
     // 1) Attempt to deliver via Upstash QStash (same infra used for reminders)
     //    This gives us retries and decouples from the request that triggered the event.
     const qstashToken = process.env.QSTASH_TOKEN || ''
+    const schedulerSecret = process.env.SCHEDULER_SECRET || ''
     let base =
       process.env.PUBLIC_BASE_URL ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
@@ -171,12 +172,16 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
     if (qstashToken && base) {
       try {
         const callbackUrl = `${base}/api/push/owner`
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${qstashToken}`,
+          'Content-Type': 'application/json',
+        }
+        if (schedulerSecret) {
+          headers['Upstash-Forward-Authorization'] = `Bearer ${schedulerSecret}`
+        }
         const res = await fetch(`https://qstash.upstash.io/v2/publish/${callbackUrl}`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${qstashToken}`,
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify(options),
         })
         // If QStash accepted the message, we can return early and let it handle retries/delivery
