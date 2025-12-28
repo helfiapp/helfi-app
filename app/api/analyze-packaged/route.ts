@@ -6,6 +6,9 @@ import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { logAiUsageEvent } from '@/lib/ai-usage-logger'
 import { consumeRateLimit } from '@/lib/rate-limit'
 import { getImageMetadata } from '@/lib/image-metadata'
+import { prisma } from '@/lib/prisma'
+import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX = 3
@@ -34,6 +37,34 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { subscription: true, creditTopUps: true },
+  })
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  const isPremium = user.subscription?.plan === 'PREMIUM'
+  const now = new Date()
+  const hasPurchasedCredits = user.creditTopUps.some(
+    (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+  )
+  const hasFreeFoodCredits = await hasFreeCredits(user.id, 'FOOD_ANALYSIS')
+
+  let allowViaFreeUse = false
+  if (!isPremium && !hasPurchasedCredits && hasFreeFoodCredits) {
+    allowViaFreeUse = true
+  } else if (!isPremium && !hasPurchasedCredits && !hasFreeFoodCredits) {
+    return NextResponse.json(
+      {
+        error: 'Payment required',
+        message: 'You\'ve used all your free food analyses. Subscribe to a monthly plan or purchase credits to continue.',
+        requiresPayment: true,
+        exhaustedFreeCredits: true,
+      },
+      { status: 402 }
+    )
+  }
+
   let promptText = ''
   let imageDataUrl: string | null = null
   let imageMeta: ReturnType<typeof getImageMetadata> | null = null
@@ -54,6 +85,18 @@ export async function POST(req: NextRequest) {
     imageMeta = getImageMetadata(buf)
     imageBytes = buf.byteLength
     imageMime = image.type || null
+  }
+
+  if (!allowViaFreeUse) {
+    const cm = new CreditManager(user.id)
+    const wallet = await cm.getWalletStatus()
+    if (wallet.totalAvailableCents < CREDIT_COSTS.FOOD_ANALYSIS) {
+      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    }
+    const ok = await cm.chargeCents(CREDIT_COSTS.FOOD_ANALYSIS)
+    if (!ok) {
+      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    }
   }
 
   // Ask the model to extract per-portion nutrition from either text or image
@@ -86,7 +129,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 400,
       temperature: 0,
     },
-    { feature: 'food:analyze-packaged', userId: (session.user as any)?.id ?? null },
+    { feature: 'food:analyze-packaged', userId: user.id },
     imageDataUrl
       ? {
           image: {
@@ -103,8 +146,8 @@ export async function POST(req: NextRequest) {
     logAiUsageEvent({
       feature: 'food:analyze-packaged',
       endpoint: '/api/analyze-packaged',
-      userId: (session.user as any)?.id ?? null,
-      userLabel: (session.user as any)?.email || null,
+      userId: user.id,
+      userLabel: user.email || null,
       scanId: `packaged-${Date.now()}`,
       model: 'gpt-4o-mini',
       promptTokens: (result as any)?.promptTokens || 0,
@@ -122,8 +165,8 @@ export async function POST(req: NextRequest) {
     logAiUsageEvent({
       feature: 'food:analyze-packaged',
       endpoint: '/api/analyze-packaged',
-      userId: (session.user as any)?.id ?? null,
-      userLabel: (session.user as any)?.email || null,
+      userId: user.id,
+      userLabel: user.email || null,
       scanId: `packaged-${Date.now()}`,
       model: 'gpt-4o-mini',
       promptTokens: (result as any)?.promptTokens || 0,
@@ -139,6 +182,10 @@ export async function POST(req: NextRequest) {
     try {
       parsed = JSON.parse(m[1])
     } catch {}
+  }
+
+  if (allowViaFreeUse) {
+    await consumeFreeCredit(user.id, 'FOOD_ANALYSIS')
   }
 
   return NextResponse.json({ success: true, raw: content.trim(), parsed })

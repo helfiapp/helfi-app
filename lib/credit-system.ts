@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 //
 // Credit costs for different features
 export const CREDIT_COSTS = {
-  FOOD_ANALYSIS: 1,
+  FOOD_ANALYSIS: 10,
   INTERACTION_ANALYSIS: 3,
   MEDICAL_IMAGE_ANALYSIS: 2,
   FOOD_REANALYSIS: 1,

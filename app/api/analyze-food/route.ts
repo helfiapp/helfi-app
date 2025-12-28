@@ -2580,7 +2580,7 @@ CRITICAL REQUIREMENTS:
     if (BILLING_ENFORCED && !allowViaFreeUse) {
       try {
         const cm = new CreditManager(currentUser.id);
-        const immediate = CREDIT_COSTS.FOOD_ANALYSIS; // 1 credit upfront
+        const immediate = CREDIT_COSTS.FOOD_ANALYSIS; // fixed price upfront
         const okPre = await cm.chargeCents(immediate);
         if (!okPre) {
           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
@@ -3991,13 +3991,12 @@ CRITICAL REQUIREMENTS:
       console.warn('⚠️ Diet compatibility section skipped due to error:', dietError)
     }
 
-    // Charge wallet for all costs (food analysis + health checks)
+    // Fixed per-use price is charged upfront; no remainder charge here.
     // Skip if allowed via free use OR when billing checks are disabled.
     if (BILLING_ENFORCED && !allowViaFreeUse) {
       try {
         const cm = new CreditManager(currentUser.id);
-        // Charge the remainder after the upfront 1-credit pre-charge
-        const remainder = Math.max(0, totalCostCents - prechargedCents);
+        const remainder = 0;
         const ok = await cm.chargeCents(remainder);
         if (!ok) {
           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
