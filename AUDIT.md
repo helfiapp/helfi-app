@@ -32,7 +32,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Critical.
    5) What needs to be done to fix it: Remove the debug feature from production and never expose secrets in responses.
 
-5. Several AI features let users get results without paying credits.
+5. ✅ Several AI features let users get results without paying credits.
    1) What the issue is: Some AI features do not charge credits at all, and several chat-style features send results before charging and ignore charge failures.
    2) Why it matters: Credits can be bypassed, and paid limits do not protect costs.
    3) What could realistically go wrong: Users or bots can make unlimited AI requests while paying nothing.
