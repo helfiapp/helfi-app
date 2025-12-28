@@ -95,9 +95,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     }
     loadStatus()
     
-    // Refresh every 30 seconds to keep usage meter updated
-    const interval = setInterval(loadStatus, 30000)
-    return () => clearInterval(interval)
+    return () => {}
   }, [session, refreshTrigger, eventTick]) // include eventTick for global refresh
 
   // Don't render if not authenticated, still loading, or no access

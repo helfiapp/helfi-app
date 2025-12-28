@@ -2069,6 +2069,10 @@ export default function FoodDiary() {
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
+  const [isDiaryRefreshing, setIsDiaryRefreshing] = useState<boolean>(false)
+  const diaryRefreshingRef = useRef<boolean>(false)
+  const [pullOffset, setPullOffset] = useState<number>(0)
+  const pullStartYRef = useRef<number | null>(null)
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
@@ -5278,8 +5282,7 @@ const applyStructuredItems = (
   };
 
   // Cross-device sync:
-  // - Poll the server while /food is open (keeps desktop + mobile aligned)
-  // - Also refresh when the tab/app becomes active again
+  // - Refresh on focus or manual action (keeps desktop + mobile aligned without constant polling)
   const syncInFlightRef = useRef(false)
   const syncPausedRef = useRef(false)
   const diaryMutationCountRef = useRef(0)
@@ -5296,36 +5299,69 @@ const applyStructuredItems = (
   useEffect(() => {
     syncPausedRef.current = Boolean(isSavingEntry || isAnalyzing || isDiaryMutating)
   }, [isSavingEntry, isAnalyzing, isDiaryMutating])
+  const refreshDiaryNow = async () => {
+    if (diaryRefreshingRef.current) return
+    if (syncInFlightRef.current || syncPausedRef.current) return
+    syncInFlightRef.current = true
+    diaryRefreshingRef.current = true
+    setIsDiaryRefreshing(true)
+    try {
+      await refreshEntriesFromServer()
+    } finally {
+      syncInFlightRef.current = false
+      diaryRefreshingRef.current = false
+      setIsDiaryRefreshing(false)
+    }
+  }
+  const PULL_REFRESH_THRESHOLD = 70
+  const PULL_REFRESH_MAX = 120
+  const handlePullStart = (e: React.TouchEvent) => {
+    if (typeof window === 'undefined') return
+    if (window.scrollY > 0) return
+    if (syncPausedRef.current || diaryRefreshingRef.current) return
+    pullStartYRef.current = e.touches[0]?.clientY ?? null
+  }
+  const handlePullMove = (e: React.TouchEvent) => {
+    if (pullStartYRef.current === null) return
+    if (typeof window !== 'undefined' && window.scrollY > 0) {
+      pullStartYRef.current = null
+      setPullOffset(0)
+      return
+    }
+    const currentY = e.touches[0]?.clientY ?? 0
+    const delta = currentY - (pullStartYRef.current || 0)
+    if (delta <= 0) {
+      setPullOffset(0)
+      return
+    }
+    setPullOffset(Math.min(PULL_REFRESH_MAX, delta))
+  }
+  const handlePullEnd = async () => {
+    if (pullStartYRef.current === null) return
+    const shouldRefresh = pullOffset >= PULL_REFRESH_THRESHOLD
+    pullStartYRef.current = null
+    setPullOffset(0)
+    if (shouldRefresh) {
+      await refreshDiaryNow()
+    }
+  }
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!diaryHydrated) return
     if (editingEntry) return
 
-    const syncNow = async () => {
-      if (syncInFlightRef.current) return
-      if (syncPausedRef.current) return
-      syncInFlightRef.current = true
-      try {
-        await refreshEntriesFromServer()
-      } finally {
-        syncInFlightRef.current = false
-      }
-    }
-
-    const onFocus = () => syncNow()
+    const onFocus = () => refreshDiaryNow()
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') syncNow()
+      if (document.visibilityState === 'visible') refreshDiaryNow()
     }
 
     // Initial sync shortly after mount/date switch
-    const initial = window.setTimeout(syncNow, 600)
-    const interval = window.setInterval(syncNow, 12000)
+    const initial = window.setTimeout(refreshDiaryNow, 600)
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
 
     return () => {
       window.clearTimeout(initial)
-      window.clearInterval(interval)
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
     }
@@ -10454,8 +10490,32 @@ Please add nutritional information manually if needed.`);
 
   return (
     <DiaryErrorBoundary>
-      <div ref={pageTopRef} className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+      <div
+        ref={pageTopRef}
+        className="flex-1 flex flex-col overflow-hidden bg-gray-50"
+        onTouchStart={handlePullStart}
+        onTouchMove={handlePullMove}
+        onTouchEnd={handlePullEnd}
+        onTouchCancel={handlePullEnd}
+      >
         <div className="w-full max-w-6xl mx-auto flex-1 flex flex-col px-3 sm:px-4 lg:px-6">
+      {(isDiaryRefreshing || pullOffset > 0) && (
+        <div
+          className="flex items-center justify-center text-sm text-gray-500 transition-all duration-150"
+          style={{ height: isDiaryRefreshing ? 48 : Math.min(pullOffset, 80) }}
+        >
+          {isDiaryRefreshing ? (
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refreshing...
+            </span>
+          ) : (
+            <span>{pullOffset >= PULL_REFRESH_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}</span>
+          )}
+        </div>
+      )}
       {/* Saved Toast (brief confirmation) */}
       {showSavedToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
@@ -11296,6 +11356,28 @@ Please add nutritional information manually if needed.`);
               className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm"
             >
               Next ▶︎
+            </button>
+            <button
+              type="button"
+              onClick={() => refreshDiaryNow()}
+              disabled={isDiaryRefreshing}
+              className={`px-3 py-1 rounded-lg border text-sm flex items-center gap-2 ${
+                isDiaryRefreshing
+                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+              }`}
+              aria-label="Refresh diary"
+            >
+              {isDiaryRefreshing ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refreshing
+                </>
+              ) : (
+                'Refresh'
+              )}
             </button>
           </div>
         </div>
