@@ -68,7 +68,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Require a strong proof of sender and reject any request without it.
 
-5. Credit purchases can be applied to the wrong account if a paid receipt link is reused.
+5. ✅ Credit purchases can be applied to the wrong account if a paid receipt link is reused.
    1) What the issue is: The credit confirmation step accepts a paid receipt link and applies credits to the current logged-in user without matching the buyer.
    2) Why it matters: Credits can be claimed by the wrong person.
    3) What could realistically go wrong: Someone gets a receipt link and applies the credits to their own account.

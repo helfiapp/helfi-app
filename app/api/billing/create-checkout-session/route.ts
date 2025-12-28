@@ -61,13 +61,18 @@ export async function POST(request: NextRequest) {
       affiliateCookie && isAffiliateAttributionFresh(affiliateCookie.clickedAtMs)
         ? true
         : false
-    const affiliateMetadata = hasFreshAffiliateAttribution
-      ? {
-          helfi_aff_code: affiliateCookie!.code,
-          helfi_aff_click: affiliateCookie!.clickId,
-          helfi_aff_ts: String(affiliateCookie!.clickedAtMs),
-        }
-      : undefined
+    const baseMetadata: Record<string, string> = {}
+    if (hasFreshAffiliateAttribution) {
+      baseMetadata.helfi_aff_code = affiliateCookie!.code
+      baseMetadata.helfi_aff_click = affiliateCookie!.clickId
+      baseMetadata.helfi_aff_ts = String(affiliateCookie!.clickedAtMs)
+    }
+    if (session?.user?.id) {
+      baseMetadata.helfi_user_id = String(session.user.id)
+    }
+    if (customerEmail) {
+      baseMetadata.helfi_user_email = String(customerEmail).toLowerCase()
+    }
 
     // Check if user already has an active subscription (only for subscription plans, not credit top-ups)
     if (!isCredits && customerEmail) {
@@ -121,13 +126,13 @@ export async function POST(request: NextRequest) {
       customer_email: customerEmail,
       allow_promotion_codes: true,
       payment_method_collection: 'always',
-      ...(affiliateMetadata ? { metadata: affiliateMetadata } : {}),
+      ...(Object.keys(baseMetadata).length ? { metadata: baseMetadata } : {}),
       ...(isCredits
-        ? affiliateMetadata
-          ? { payment_intent_data: { metadata: affiliateMetadata } }
+        ? Object.keys(baseMetadata).length
+          ? { payment_intent_data: { metadata: baseMetadata } }
           : {}
-        : affiliateMetadata
-          ? { subscription_data: { metadata: affiliateMetadata } }
+        : Object.keys(baseMetadata).length
+          ? { subscription_data: { metadata: baseMetadata } }
           : {}),
       // No trial period - subscriptions start immediately
     })

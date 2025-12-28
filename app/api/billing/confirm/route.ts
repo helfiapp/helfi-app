@@ -28,20 +28,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'not_paid' }, { status: 400 })
     }
 
-    // Determine the user
     const serverSession = (await getServerSession(authOptions as any)) as any
-    const email = (serverSession?.user?.email as string) || (checkout.customer_details?.email ?? checkout.customer_email ?? '')
-    if (!email) {
-      return NextResponse.json({ error: 'user_email_missing' }, { status: 400 })
+    const sessionUserId = (serverSession?.user?.id as string) || ''
+    const sessionEmail = ((serverSession?.user?.email as string) || '').toLowerCase()
+    const metadata = (checkout.metadata || {}) as Record<string, string>
+    const metaUserId = String(metadata.helfi_user_id || '').trim()
+    const metaEmail = String(metadata.helfi_user_email || '').toLowerCase().trim()
+    const checkoutEmail = String(checkout.customer_details?.email || checkout.customer_email || '').toLowerCase().trim()
+    const expectedUserId = metaUserId
+    const expectedEmail = metaEmail || checkoutEmail
+
+    if ((sessionUserId || sessionEmail) && (expectedUserId || expectedEmail)) {
+      const matchesId = expectedUserId && sessionUserId && expectedUserId === sessionUserId
+      const matchesEmail = expectedEmail && sessionEmail && expectedEmail === sessionEmail
+      if (!matchesId && !matchesEmail) {
+        return NextResponse.json({ error: 'user_mismatch' }, { status: 403 })
+      }
     }
-    const user = await prisma.user.findUnique({ where: { email } })
+
+    let user = null as { id: string; email: string; name: string | null } | null
+    if (expectedUserId) {
+      user = await prisma.user.findUnique({ where: { id: expectedUserId }, select: { id: true, email: true, name: true } })
+    } else if (expectedEmail) {
+      user = await prisma.user.findUnique({ where: { email: expectedEmail }, select: { id: true, email: true, name: true } })
+    } else if (sessionEmail) {
+      user = await prisma.user.findUnique({ where: { email: sessionEmail }, select: { id: true, email: true, name: true } })
+    }
+
     if (!user) {
       return NextResponse.json({ error: 'user_not_found' }, { status: 404 })
     }
 
     // Only process one time
     const existing = await prisma.creditTopUp.findFirst({
-      where: { userId: user.id, source: `stripe:${checkout.id}` },
+      where: { source: `stripe:${checkout.id}` },
     })
     if (existing) {
       return NextResponse.json({ ok: true, alreadyProcessed: true })
