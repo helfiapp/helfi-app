@@ -41,6 +41,7 @@ export default function SymptomAnalysisPage() {
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
   const resultRef = useRef<HTMLDivElement | null>(null)
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
+  const [creditRefreshTick, setCreditRefreshTick] = useState<number>(0)
 
   // Progress phases shown while analyzing
   const phases = useMemo(() => [
@@ -69,9 +70,19 @@ export default function SymptomAnalysisPage() {
   }, [isAnalyzing])
 
   useEffect(() => {
+    const handler = () => setCreditRefreshTick((v) => v + 1)
+    try {
+      window.addEventListener('credits:refresh', handler)
+      return () => window.removeEventListener('credits:refresh', handler)
+    } catch {
+      return () => {}
+    }
+  }, [])
+
+  useEffect(() => {
     const fetchCreditStatus = async () => {
       try {
-        const res = await fetch(`/api/credit/status?t=${Date.now()}`, { cache: 'no-store' })
+        const res = await fetch(`/api/credit/status`, { cache: 'no-store' })
         if (!res.ok) return
         const data = await res.json()
         const isPremium = data?.plan === 'PREMIUM'
@@ -86,7 +97,7 @@ export default function SymptomAnalysisPage() {
       }
     }
     fetchCreditStatus()
-  }, [usageMeterRefresh])
+  }, [creditRefreshTick])
 
   const quickTags = [
     'Fever','Headache','Cough','Sore throat','Runny nose','Nasal congestion','Sneezing','Fatigue','Body aches','Chills','Night sweats',
@@ -150,7 +161,6 @@ export default function SymptomAnalysisPage() {
       const data: AnalysisResult = await res.json()
       setResult(data)
       // Trigger usage meter refresh after successful analysis
-      setUsageMeterRefresh(prev => prev + 1)
       try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
     } catch (e: any) {
       setError(e?.message || 'Something went wrong')

@@ -2069,6 +2069,7 @@ export default function FoodDiary() {
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
+  const [creditRefreshTick, setCreditRefreshTick] = useState<number>(0)
   const [isDiaryRefreshing, setIsDiaryRefreshing] = useState<boolean>(false)
   const diaryRefreshingRef = useRef<boolean>(false)
   const [pullOffset, setPullOffset] = useState<number>(0)
@@ -6301,7 +6302,6 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         setDietAlternatives(result.dietAlternatives || null);
         setShowAiResult(true);
         // Trigger usage meter refresh after successful analysis
-        setUsageMeterRefresh(prev => prev + 1);
         try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
       } else {
         console.error('❌ Invalid API response format:', result);
@@ -6740,7 +6740,6 @@ Please add nutritional information manually if needed.`);
           setHealthAlternatives(result.alternatives || null);
           setDietWarning(result.dietWarning || null);
           setDietAlternatives(result.dietAlternatives || null);
-          setUsageMeterRefresh(prev => prev + 1);
           try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
         } else {
           console.error('Re-analysis failed:', result.error || 'Unknown error');
@@ -10459,9 +10458,19 @@ Please add nutritional information manually if needed.`);
   }, [showAddFood, showAiResult, isEditingDescription, editingEntry, todaysFoods.length]);
 
   useEffect(() => {
+    const handler = () => setCreditRefreshTick((v) => v + 1)
+    try {
+      window.addEventListener('credits:refresh', handler)
+      return () => window.removeEventListener('credits:refresh', handler)
+    } catch {
+      return () => {}
+    }
+  }, [])
+
+  useEffect(() => {
     const fetchCreditStatus = async () => {
       try {
-        const res = await fetch(`/api/credit/status?t=${Date.now()}`, { cache: 'no-store' })
+        const res = await fetch(`/api/credit/status`, { cache: 'no-store' })
         if (res.ok) {
           const data = await res.json()
           const isPremium = data?.plan === 'PREMIUM'
@@ -10477,7 +10486,7 @@ Please add nutritional information manually if needed.`);
       }
     }
     fetchCreditStatus()
-  }, [usageMeterRefresh])
+  }, [creditRefreshTick])
 
   useEffect(() => {
     if (!isEditingDescription) return;

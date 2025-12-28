@@ -12,6 +12,47 @@ interface UsageMeterProps {
   feature?: string // Optional feature tag for server call tracking
 }
 
+type CreditStatusCacheEntry = {
+  data?: any
+  inFlight?: Promise<any>
+  fetchedAt?: number
+}
+
+const creditStatusCache: Record<string, CreditStatusCacheEntry> = {}
+const CREDIT_STATUS_TTL_MS = 2000
+
+async function fetchCreditStatus(feature?: string, forceRefresh?: boolean): Promise<any | null> {
+  const key = feature || 'all'
+  const now = Date.now()
+  const cached = creditStatusCache[key]
+  if (!forceRefresh && cached?.data && cached.fetchedAt && now - cached.fetchedAt < CREDIT_STATUS_TTL_MS) {
+    return cached.data
+  }
+  if (cached?.inFlight) {
+    return cached.inFlight
+  }
+  const featureParam = feature ? `feature=${encodeURIComponent(feature)}` : ''
+  const queryString = featureParam ? `?${featureParam}` : ''
+  const request = fetch(`/api/credit/status${queryString}`, {
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    }
+  })
+    .then(async (res) => {
+      if (!res.ok) return null
+      return await res.json()
+    })
+    .catch(() => null)
+
+  creditStatusCache[key] = { ...cached, inFlight: request }
+  const data = await request
+  creditStatusCache[key] = { data: data ?? cached?.data, fetchedAt: Date.now() }
+  return data
+}
+
 export default function UsageMeter({ compact = false, showResetDate = false, inline = false, className = '', refreshTrigger = 0, feature }: UsageMeterProps) {
   const { data: session } = useSession()
   const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(null)
@@ -46,21 +87,9 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
         return
       }
       try {
-        // Add timestamp to prevent caching when refreshTrigger changes
-        const featureParam = feature ? `feature=${encodeURIComponent(feature)}` : ''
-        const cacheParam = refreshTrigger > 0 ? `t=${Date.now()}` : ''
-        const queryParts = [featureParam, cacheParam].filter(Boolean)
-        const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : ''
-        const res = await fetch(`/api/credit/status${queryString}`, { 
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          }
-        })
-        if (res.ok) {
-          const data = await res.json()
+        const forceRefresh = Boolean((refreshTrigger || 0) > 0 || eventTick > 0)
+        const data = await fetchCreditStatus(feature, forceRefresh)
+        if (data) {
           // Treat any successful status response for a logged‑in user as
           // sufficient to show the meter. Billing enforcement lives in the
           // analyzer APIs; this meter is purely a visibility/UX layer.

@@ -54,6 +54,7 @@ export default function MedicalImagesPage() {
   const [hasAnalyzedCurrentImage, setHasAnalyzedCurrentImage] = useState<boolean>(false)
   const [analysisSessionId, setAnalysisSessionId] = useState<number>(0)
   const resultRef = useRef<HTMLDivElement | null>(null)
+  const [creditRefreshTick, setCreditRefreshTick] = useState<number>(0)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -76,9 +77,19 @@ export default function MedicalImagesPage() {
   }
 
   useEffect(() => {
+    const handler = () => setCreditRefreshTick((v) => v + 1)
+    try {
+      window.addEventListener('credits:refresh', handler)
+      return () => window.removeEventListener('credits:refresh', handler)
+    } catch {
+      return () => {}
+    }
+  }, [])
+
+  useEffect(() => {
     const fetchCreditStatus = async () => {
       try {
-        const res = await fetch(`/api/credit/status?t=${Date.now()}`, { cache: 'no-store' })
+        const res = await fetch(`/api/credit/status`, { cache: 'no-store' })
         if (!res.ok) return
         const data = await res.json()
         const isPremium = data?.plan === 'PREMIUM'
@@ -93,7 +104,7 @@ export default function MedicalImagesPage() {
       }
     }
     fetchCreditStatus()
-  }, [usageMeterRefresh])
+  }, [creditRefreshTick])
 
   const saveCurrentToHistory = useCallback(async () => {
     if (!imageFile) {
@@ -234,7 +245,6 @@ export default function MedicalImagesPage() {
         setAnalysisSessionId(prev => prev + 1)
         setHasAnalyzedCurrentImage(true)
         // Trigger usage meter refresh after successful analysis
-        setUsageMeterRefresh(prev => prev + 1)
         try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
 
         if (saveToHistory) {
