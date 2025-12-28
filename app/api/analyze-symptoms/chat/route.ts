@@ -144,9 +144,9 @@ export async function POST(req: NextRequest) {
     // Non-streaming fallback
     {
       const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+      const cm = new CreditManager(user.id)
       // Pre-check
       {
-        const cm = new CreditManager(user.id)
         const estimateCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, 800 * 4)
         const wallet = await cm.getWalletStatus()
         if (wallet.totalAvailableCents < estimateCents) {
