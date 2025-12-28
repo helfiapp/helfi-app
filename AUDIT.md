@@ -4,14 +4,14 @@
 Overall risk is very high. There are multiple paths that allow account takeover, admin takeover, and public exposure of health files. The credit system can be bypassed in several places, and payments do not always control access. This should not go live until the critical items are fixed.
 
 ## Critical Issues
-1. Anyone can sign in as any email without a password or verification.
+1. ✅ Anyone can sign in as any email without a password or verification.
    1) What the issue is: There is a sign-in path that accepts only an email address and creates a login session.
    2) Why it matters: It removes identity checks for every account.
    3) What could realistically go wrong: A stranger can log in as any customer and see or change their health data.
    4) How serious it is: Critical.
    5) What needs to be done to fix it: Remove this path or lock it to private testing only, and require normal sign-in with verified email.
 
-2. Admin access is protected only by a public password and a shared hardcoded access key.
+2. ✅ Admin access is protected only by a public password and a shared hardcoded access key.
    1) What the issue is: The admin dashboard checks a password only in the browser and then uses the same fixed key for admin actions.
    2) Why it matters: Anyone who views the site code can get in as admin.
    3) What could realistically go wrong: A stranger can access the full admin dashboard, read user data, change plans, and send emails.
