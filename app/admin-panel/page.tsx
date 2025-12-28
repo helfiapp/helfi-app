@@ -50,6 +50,7 @@ export default function AdminPanel() {
   const [serverCallUsage, setServerCallUsage] = useState<any>(null)
   const [serverCallUsageLoading, setServerCallUsageLoading] = useState(false)
   const [serverCallUsageError, setServerCallUsageError] = useState('')
+  const [vercelWebhookTestLoading, setVercelWebhookTestLoading] = useState(false)
   const [foodCostEstimatorUsers, setFoodCostEstimatorUsers] = useState(1000)
   const [foodCostEstimatorAnalysesPerUser, setFoodCostEstimatorAnalysesPerUser] = useState(1)
   const [foodCostEstimatorCallsPerAnalysis, setFoodCostEstimatorCallsPerAnalysis] = useState(3)
@@ -2119,6 +2120,23 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       alert('✅ Test notification enqueued (via Upstash).')
     } catch (e: any) {
       alert(`Test notification failed: ${e?.message || e}`)
+    }
+  }
+
+  const sendVercelWebhookTest = async () => {
+    setVercelWebhookTestLoading(true)
+    try {
+      const res = await fetch('/api/admin/vercel-spend-test', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to send test webhook')
+      alert('✅ Vercel spend webhook test sent. Check your email.')
+    } catch (e: any) {
+      alert(`Webhook test failed: ${e?.message || e}`)
+    } finally {
+      setVercelWebhookTestLoading(false)
     }
   }
 
@@ -6069,6 +6087,21 @@ The Helfi Team`,
                   Add to Home Screen and then enable notifications here.
                 </p>
               </div>
+            </div>
+
+            {/* Vercel Spend Webhook Test */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">📨 Vercel Spend Webhook</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Send a test webhook to confirm the spend alert email is working.
+              </p>
+              <button
+                onClick={sendVercelWebhookTest}
+                disabled={vercelWebhookTestLoading}
+                className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {vercelWebhookTestLoading ? 'Sending...' : 'Send Test Webhook'}
+              </button>
             </div>
           </div>
         )}
