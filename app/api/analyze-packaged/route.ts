@@ -9,6 +9,7 @@ import { getImageMetadata } from '@/lib/image-metadata'
 import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX = 3
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
   })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  const isPremium = user.subscription?.plan === 'PREMIUM'
+  const isPremium = isSubscriptionActive(user.subscription)
   const now = new Date()
   const hasPurchasedCredits = user.creditTopUps.some(
     (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0

@@ -17,6 +17,10 @@ async function getBalanceTransactionForPaymentIntent(paymentIntentId: string) {
   return { charge, balanceTx }
 }
 
+function isStripeSubscriptionActive(subscription: Stripe.Subscription): boolean {
+  return subscription.status === 'active' || subscription.status === 'trialing'
+}
+
 function addDays(date: Date, days: number): Date {
   const d = new Date(date)
   d.setUTCDate(d.getUTCDate() + days)
@@ -68,6 +72,22 @@ export async function POST(request: NextRequest) {
           where: { email: email.toLowerCase() },
           include: { subscription: true }
         })
+
+        const isActive = isStripeSubscriptionActive(sub)
+        if (!isActive) {
+          if (existingUser?.subscription) {
+            await prisma.subscription.update({
+              where: { userId: existingUser.id },
+              data: {
+                stripeSubscriptionId: sub.id,
+                monthlyPriceCents: amountCents,
+                endDate: new Date(),
+              },
+            })
+          }
+          console.log(`[Webhook] Subscription ${sub.id} for ${email} is ${sub.status}. Access paused.`)
+          break
+        }
         
         const existingSub = existingUser?.subscription
         const isNewSubscription = !existingSub
@@ -440,6 +460,37 @@ export async function POST(request: NextRequest) {
             },
           })
         }
+        break
+      }
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
+        const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+        let email: string | undefined
+        if (customerId) {
+          try {
+            const customer = await stripe.customers.retrieve(customerId)
+            if ((customer as Stripe.Customer).email) {
+              email = (customer as Stripe.Customer).email as string
+            }
+          } catch {}
+        }
+        if (!email) break
+
+        const user = await prisma.user.findUnique({
+          where: { email: email.toLowerCase() },
+          include: { subscription: true },
+        })
+        if (!user?.subscription) break
+
+        await prisma.subscription.update({
+          where: { userId: user.id },
+          data: {
+            stripeSubscriptionId: subscriptionId || user.subscription.stripeSubscriptionId,
+            endDate: new Date(),
+          },
+        })
+        console.log(`[Webhook] Payment failed for ${email}. Access paused.`)
         break
       }
       case 'charge.refunded':

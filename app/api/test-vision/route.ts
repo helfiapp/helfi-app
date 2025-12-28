@@ -11,6 +11,7 @@ import { consumeRateLimit } from '@/lib/rate-limit';
 import { getImageMetadata } from '@/lib/image-metadata';
 import { encryptBuffer } from '@/lib/file-encryption';
 import { createSignedFileToken } from '@/lib/signed-file';
+import { isSubscriptionActive } from '@/lib/subscription-utils';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
     
     // PREMIUM/CREDITS/FREE USE GATING
-    const isPremium = user.subscription?.plan === 'PREMIUM';
+    const isPremium = isSubscriptionActive(user.subscription);
     
     // Check if user has purchased credits (non-expired)
     const now = new Date();

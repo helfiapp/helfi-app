@@ -40,7 +40,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    5) What needs to be done to fix it: Require a successful charge before any AI result is returned and remove all free AI paths that are not meant to be free.
 
 ## High Priority Issues
-1. Access is not shut off when subscription payments fail.
+1. ✅ Access is not shut off when subscription payments fail.
    1) What the issue is: The system grants paid access on subscription updates without checking if payment actually succeeded.
    2) Why it matters: Users can keep premium access without paying.
    3) What could realistically go wrong: A large number of overdue users keep using paid features, reducing revenue.
@@ -155,7 +155,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Price this feature based on actual AI usage or restrict it.
 
-4. Paid access continues after failed payments.
+4. ✅ Paid access continues after failed payments.
    1) What the issue is: Access is not tied to confirmed payment success.
    2) Why it matters: Revenue is lost while costs continue.
    3) What could realistically go wrong: A meaningful share of users use paid features for free.

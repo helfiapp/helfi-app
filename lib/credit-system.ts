@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { isSubscriptionActive } from '@/lib/subscription-utils';
 
 // ABSOLUTE GUARD RAIL:
 // `CreditManager` is the single source of truth for wallet credits and costs.
@@ -90,11 +91,13 @@ export class CreditManager {
     
     const last = (user as any).walletMonthlyResetAt as Date | null;
     
+    const hasActiveSubscription = isSubscriptionActive(user.subscription, now);
+
     // Check if reset is needed based on subscription start date (if subscription exists)
     // Otherwise fall back to calendar month
     let shouldReset = false;
     
-    if (user.subscription?.startDate) {
+    if (hasActiveSubscription && user.subscription?.startDate) {
       // Reset based on subscription start date (same calendar day each month)
       const subStartDate = new Date(user.subscription.startDate);
       const startYear = subStartDate.getUTCFullYear();
@@ -162,11 +165,12 @@ export class CreditManager {
       include: { subscription: true },
     });
     if (!user) throw new Error('User not found');
-    const plan = user.subscription?.plan || null;
+    const hasActiveSubscription = isSubscriptionActive(user.subscription);
+    const plan = hasActiveSubscription ? user.subscription?.plan || null : null;
     
     // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
     let monthlyCapCents = 0;
-    if (plan && user.subscription) {
+    if (plan && user.subscription && hasActiveSubscription) {
       if (user.subscription.monthlyPriceCents) {
         // Use direct credit mapping (e.g., $30 → 1,700 credits)
         monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
@@ -237,12 +241,13 @@ export class CreditManager {
     });
     if (!user) throw new Error('User not found');
 
-    const plan = user.subscription?.plan || null;
+    const hasActiveSubscription = isSubscriptionActive(user.subscription);
+    const plan = hasActiveSubscription ? user.subscription?.plan || null : null;
     const additionalAvailable = Math.max(0, (user as any).additionalCredits || 0);
     
     // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
     let monthlyCapCents = 0;
-    if (plan && user.subscription) {
+    if (plan && user.subscription && hasActiveSubscription) {
       if (user.subscription.monthlyPriceCents) {
         // Use direct credit mapping (e.g., $30 → 1,700 credits)
         monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
@@ -409,7 +414,7 @@ export class CreditManager {
     const hasCredits = totalCreditsRemaining >= creditCost;
 
     // Calculate daily limits based on plan
-    const isPremium = user.subscription?.plan === 'PREMIUM';
+    const isPremium = isSubscriptionActive(user.subscription);
     const dailyFoodLimit = isPremium ? 30 : 3;
     const dailyMedicalLimit = isPremium ? 15 : 0;
     const monthlyInteractionLimit = isPremium ? 30 : 0;
@@ -558,7 +563,7 @@ export class CreditManager {
         },
       },
       lastReset: user.lastAnalysisResetDate,
-      plan: user.subscription?.plan || null,
+      plan: isSubscriptionActive(user.subscription) ? user.subscription?.plan || null : null,
     };
   }
 } 

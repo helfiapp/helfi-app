@@ -8,6 +8,7 @@ import OpenAI from 'openai'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { costCentsEstimateFromText } from '@/lib/cost-meter'
 import { logAIUsage } from '@/lib/ai-usage-logger'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 // Initialize OpenAI client only when API key is available (same pattern as analyze-food)
 const getOpenAIClient = () => {
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
     }
 
     // PREMIUM/CREDITS/FREE USE GATING
-    const isPremium = user.subscription?.plan === 'PREMIUM'
+    const isPremium = isSubscriptionActive(user.subscription)
     
     // Check if user has purchased credits (non-expired)
     const now = new Date()
@@ -298,5 +299,4 @@ Return two parts:
     return NextResponse.json({ error: 'Failed to analyze symptoms' }, { status: 500 })
   }
 }
-
 

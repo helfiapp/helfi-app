@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_COSTS } from '@/lib/credit-system'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 // Guard rail: this endpoint is for diagnostics/admin use only. It should not be
 // changed to "patch over" wallet bugs; fix the underlying credit logic instead.
@@ -33,6 +34,7 @@ export async function GET(_req: NextRequest) {
           select: {
             plan: true,
             startDate: true,
+            endDate: true,
           },
         },
         creditTopUps: {
@@ -54,7 +56,8 @@ export async function GET(_req: NextRequest) {
     // Calculate the start date for monthly counting (same logic as feature-usage)
     let monthlyStartDate: Date | null = null
     
-    if (user.subscription?.plan === 'PREMIUM' && user.subscription?.startDate) {
+    const hasActiveSubscription = isSubscriptionActive(user.subscription)
+    if (hasActiveSubscription && user.subscription?.startDate) {
       const subStartDate = new Date(user.subscription.startDate)
       const now = new Date()
       
@@ -208,4 +211,3 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
-

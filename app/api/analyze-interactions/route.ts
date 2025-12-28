@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
 import { logAIUsage } from '@/lib/ai-usage-logger';
+import { isSubscriptionActive } from '@/lib/subscription-utils';
 
 // Lazily initialize OpenAI to avoid build-time env requirements
 function getOpenAIClient() {
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // PREMIUM/CREDITS/FREE USE GATING
-    const isPremium = user.subscription?.plan === 'PREMIUM';
+    const isPremium = isSubscriptionActive(user.subscription);
     
     // Check if user has purchased credits (non-expired)
     const now = new Date();

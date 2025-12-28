@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { getFreeCreditsStatus, hasExhaustedFreeCredits } from '@/lib/free-credits'
 import { prisma } from '@/lib/prisma'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 // ABSOLUTE GUARD RAIL:
 // This endpoint powers the "Credits remaining" bar. Do NOT change credit
@@ -37,7 +38,7 @@ function creditsForSubscriptionPrice(monthlyPriceCents: number | null | undefine
 }
 
 function monthlyCapFromSubscription(sub: any | null | undefined): number {
-  if (!sub?.plan) return 0
+  if (!isSubscriptionActive(sub)) return 0
   if (sub.monthlyPriceCents != null) {
     return creditsForSubscriptionPrice(sub.monthlyPriceCents)
   }
@@ -120,6 +121,7 @@ export async function GET(_req: NextRequest) {
             plan: true,
             monthlyPriceCents: true,
             startDate: true,
+            endDate: true,
           },
         },
         // Free credits
@@ -145,7 +147,7 @@ export async function GET(_req: NextRequest) {
     }
 
     const now = new Date()
-    const isPremium = user.subscription?.plan === 'PREMIUM'
+    const isPremium = isSubscriptionActive(user.subscription)
 
   // 3) Wallet‑style credits (subscription + top‑ups + manual additional credits)
   debugStage = 'wallet-calc'
@@ -188,7 +190,7 @@ export async function GET(_req: NextRequest) {
     const creditsTotal = showLegacy ? legacyTotal : totalAvailableCents
 
     debugStage = 'compute-reset'
-    const refreshAt = computeNextResetAt(user.subscription?.startDate ?? null)
+    const refreshAt = computeNextResetAt(isPremium ? user.subscription?.startDate ?? null : null)
 
     // Get free credits status
     const freeCreditsStatus = await getFreeCreditsStatus(user.id)
@@ -199,7 +201,7 @@ export async function GET(_req: NextRequest) {
       debugStage: 'success',
       percentUsed,
       refreshAt,
-      plan: user.subscription?.plan ?? null,
+      plan: isPremium ? user.subscription?.plan ?? null : null,
       // Any authenticated user can see the meter; billing enforcement happens in
       // the analyzer APIs.
       hasAccess: true,

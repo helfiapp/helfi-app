@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_COSTS } from '@/lib/credit-system'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 // ABSOLUTE GUARD RAIL:
 // This endpoint powers the "This AI feature has been used X times…" text.
@@ -43,6 +44,7 @@ export async function GET(_req: NextRequest) {
         subscription: {
           select: {
             plan: true,
+            endDate: true,
           },
         },
       },
@@ -52,7 +54,7 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const hasSubscription = user.subscription?.plan === 'PREMIUM'
+    const hasSubscription = isSubscriptionActive(user.subscription)
 
     debugStage = 'prepare-counts'
     const foodMonthly = user.monthlyFoodAnalysisUsed || 0

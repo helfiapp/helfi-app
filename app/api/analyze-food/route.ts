@@ -21,6 +21,7 @@ import { hasFreeCredits, consumeFreeCredit, type FreeCreditType } from '@/lib/fr
 import crypto from 'crypto';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { normalizeDiscreteItems, summarizeDiscreteItemsForLog } from '@/lib/food-normalization';
+import { isSubscriptionActive } from '@/lib/subscription-utils';
 
 // Bump this when changing curated nutrition to invalidate old cached images.
 const CACHE_VERSION = 'v5';
@@ -2458,7 +2459,7 @@ CRITICAL REQUIREMENTS:
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const isPremium = currentUser.subscription?.plan === 'PREMIUM';
+    const isPremium = isSubscriptionActive(currentUser.subscription);
     
     // Check if user has purchased credits (non-expired)
     const now = new Date();
