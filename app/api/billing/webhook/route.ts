@@ -21,6 +21,18 @@ function isStripeSubscriptionActive(subscription: Stripe.Subscription): boolean 
   return subscription.status === 'active' || subscription.status === 'trialing'
 }
 
+async function findCheckoutSessionForPaymentIntent(paymentIntentId: string): Promise<Stripe.Checkout.Session | null> {
+  try {
+    const sessions = await stripe.checkout.sessions.list({
+      payment_intent: paymentIntentId,
+      limit: 1,
+    })
+    return sessions.data[0] ?? null
+  } catch {
+    return null
+  }
+}
+
 function addDays(date: Date, days: number): Date {
   const d = new Date(date)
   d.setUTCDate(d.getUTCDate() + days)
@@ -500,13 +512,74 @@ export async function POST(request: NextRequest) {
           where: { stripeChargeId: charge.id },
           select: { id: true, commission: { select: { id: true, status: true, payableAt: true } } },
         })
-        if (!conversion?.commission) break
-        if (conversion.commission.status !== 'PENDING') break
+        if (conversion?.commission && conversion.commission.status === 'PENDING') {
+          await prisma.affiliateCommission.update({
+            where: { id: conversion.commission.id },
+            data: { status: 'VOIDED' },
+          })
+        }
 
-        await prisma.affiliateCommission.update({
-          where: { id: conversion.commission.id },
-          data: { status: 'VOIDED' },
-        })
+        const now = new Date()
+
+        // Revoke subscription access for refunded/charged-back invoices.
+        const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : charge.invoice?.id
+        if (invoiceId) {
+          try {
+            const invoice = await stripe.invoices.retrieve(invoiceId)
+            const subscriptionId =
+              typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+            if (subscriptionId) {
+              const updated = await prisma.subscription.updateMany({
+                where: { stripeSubscriptionId: subscriptionId },
+                data: { endDate: now },
+              })
+              if (!updated.count) {
+                const customerId = typeof charge.customer === 'string' ? charge.customer : charge.customer?.id
+                let email: string | undefined
+                if (customerId) {
+                  try {
+                    const customer = await stripe.customers.retrieve(customerId)
+                    if ((customer as Stripe.Customer).email) {
+                      email = (customer as Stripe.Customer).email as string
+                    }
+                  } catch {}
+                }
+                if (email) {
+                  const user = await prisma.user.findUnique({
+                    where: { email: email.toLowerCase() },
+                    select: { id: true },
+                  })
+                  if (user) {
+                    await prisma.subscription.updateMany({
+                      where: { userId: user.id },
+                      data: { endDate: now },
+                    })
+                  }
+                }
+              }
+            }
+          } catch {}
+        }
+
+        // Revoke top-up credits linked to the refunded/charged-back payment.
+        const paymentIntentId =
+          typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
+        if (paymentIntentId) {
+          const session = await findCheckoutSessionForPaymentIntent(paymentIntentId)
+          if (session?.id) {
+            const source = `stripe:${session.id}`
+            const topUps = await prisma.creditTopUp.findMany({ where: { source } })
+            if (topUps.length) {
+              for (const topUp of topUps) {
+                const nextUsed = Math.max(topUp.usedCents, topUp.amountCents)
+                await prisma.creditTopUp.update({
+                  where: { id: topUp.id },
+                  data: { usedCents: nextUsed },
+                })
+              }
+            }
+          }
+        }
         break
       }
 

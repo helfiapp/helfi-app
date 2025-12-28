@@ -47,7 +47,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Only grant paid access when payment is confirmed and remove access on failed or overdue payments.
 
-2. Refunds and chargebacks do not remove credits or access.
+2. ✅ Refunds and chargebacks do not remove credits or access.
    1) What the issue is: There is no reversal of credits or access after a refund or chargeback.
    2) Why it matters: Revenue is lost but usage continues.
    3) What could realistically go wrong: Users request refunds and keep using credits they did not pay for.
@@ -162,7 +162,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Lock access when payments fail or are overdue.
 
-5. Refunds do not claw back credits.
+5. ✅ Refunds do not claw back credits.
    1) What the issue is: Credits remain even after refunds or chargebacks.
    2) Why it matters: Refunds erase revenue but not usage.
    3) What could realistically go wrong: Users request refunds and still use paid credits.
