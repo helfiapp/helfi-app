@@ -395,6 +395,17 @@ const formatNumberInputValue = (value: any) => {
   return value
 }
 
+const formatPieceDisplay = (value: number | null | undefined) => {
+  if (value === null || value === undefined) return ''
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return ''
+  const rounded = Math.round(numeric * 100) / 100
+  if (Math.abs(rounded - Math.round(rounded)) <= 0.01) {
+    return String(Math.round(rounded))
+  }
+  return String(rounded)
+}
+
 const normalizeAllCapsLabel = (value: string) => {
   const trimmed = value.trim()
   if (!trimmed) return trimmed
@@ -12423,6 +12434,8 @@ Please add nutritional information manually if needed.`);
                           piecesPerServing && piecesPerServing > 0
                             ? Math.max(0, Math.round(servingsCount * piecesPerServing * 1000) / 1000)
                             : null
+                        const pieceCountDisplay =
+                          pieceCount !== null ? formatPieceDisplay(pieceCount) : ''
 
                         const cleanBaseName = (() => {
                           const raw = String(item.name || 'Unknown Food')
@@ -12440,8 +12453,8 @@ Please add nutritional information manually if needed.`);
                           return trimmed || 'Unknown Food'
                         })()
                         const displayName =
-                          piecesPerServing && piecesPerServing > 1
-                            ? `${formatNumberInputValue(piecesPerServing)} ${cleanBaseName}`.trim()
+                          piecesPerServing && piecesPerServing > 0 && pieceCountDisplay
+                            ? `${pieceCountDisplay} ${cleanBaseName}`.trim()
                             : cleanBaseName
                         const servingSizeDisplayLabel = (() => {
                           if (piecesDisplayMultiplier && servingSizeLabel) {
@@ -12727,32 +12740,66 @@ Please add nutritional information manually if needed.`);
                                         return 'Pieces:'
                                       })()}
                                     </span>
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        onClick={() => {
-                                          const current = analyzedItems[index]?.servings || 1
-                                          const currentPieces = Math.round(current * piecesPerServing)
-                                          const newPieces = Math.max(0, currentPieces - 1)
-                                          const newServings = newPieces / piecesPerServing
-                                          updateItemField(index, 'servings', newServings)
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => {
+                                        const current = analyzedItems[index]?.servings || 1
+                                        const currentPieces = pieceCount ?? current * piecesPerServing
+                                        const newPieces = Math.max(0, currentPieces - 1)
+                                        const newServings = newPieces / piecesPerServing
+                                        updateItemField(index, 'servings', newServings)
+                                      }}
+                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                    >
+                                      -
+                                    </button>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min={0}
+                                        step={0.01}
+                                        value={(() => {
+                                          const key = `ai:card:${index}:pieces`
+                                          return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                                            ? numericInputDrafts[key]
+                                            : pieceCountDisplay
+                                        })()}
+                                        onFocus={() => {
+                                          const key = `ai:card:${index}:pieces`
+                                          setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
                                         }}
-                                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                      >
-                                        -
-                                      </button>
-                                      <div className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center bg-gray-50">
-                                        {pieceCount !== null ? Math.round(pieceCount) : Math.round(servingsCount * piecesPerServing)}
-                                      </div>
+                                        onChange={(e) => {
+                                          const key = `ai:card:${index}:pieces`
+                                          const v = e.target.value
+                                          setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                          if (String(v).trim() !== '') {
+                                            const parsed = Number(v)
+                                            if (Number.isFinite(parsed)) {
+                                              const newServings = parsed / piecesPerServing
+                                              updateItemField(index, 'servings', newServings)
+                                            }
+                                          }
+                                        }}
+                                        onBlur={() => {
+                                          const key = `ai:card:${index}:pieces`
+                                          setNumericInputDrafts((prev) => {
+                                            const next = { ...prev }
+                                            delete next[key]
+                                            return next
+                                          })
+                                        }}
+                                        className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      />
                                       <button
                                         onClick={() => {
                                           const current = analyzedItems[index]?.servings || 1
-                                          const currentPieces = Math.round(current * piecesPerServing)
+                                          const currentPieces = pieceCount ?? current * piecesPerServing
                                           const newPieces = currentPieces + 1
                                           const newServings = newPieces / piecesPerServing
                                           updateItemField(index, 'servings', newServings)
                                         }}
                                         className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                      >
+                                    >
                                         +
                                       </button>
                                     </div>
