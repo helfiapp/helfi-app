@@ -75,7 +75,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Tie the paid receipt to the buyer’s account and only apply credits to that same account.
 
-6. User activity data can be read or written without login.
+6. ✅ User activity data can be read or written without login.
    1) What the issue is: The analytics feed accepts and returns data without any login checks.
    2) Why it matters: User activity data can be viewed or tampered with by anyone.
    3) What could realistically go wrong: A stranger pulls user activity data or poisons reports with fake events.
@@ -212,7 +212,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Critical.
    5) What needs to be done to fix it: Remove the route or lock it behind admin access.
 
-5. User activity data is exposed.
+5. ✅ User activity data is exposed.
    1) What the issue is: Activity tracking data can be read without login.
    2) Why it matters: It reveals user behavior and usage patterns.
    3) What could realistically go wrong: A third party downloads user activity data.

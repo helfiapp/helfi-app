@@ -421,8 +421,11 @@ export default function AdminPanel() {
 
   const loadAnalyticsData = async () => {
     try {
+      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      if (!authToken) return
+      const headers = { Authorization: `Bearer ${authToken}` }
       // Load raw data
-      const dataResponse = await fetch('/api/analytics')
+      const dataResponse = await fetch('/api/analytics', { headers })
       if (dataResponse.ok) {
         const dataResult = await dataResponse.json()
         setAnalyticsData(dataResult.data || [])
@@ -430,7 +433,7 @@ export default function AdminPanel() {
 
       // Load summary (non-blocking)
       try {
-        const summaryResponse = await fetch('/api/analytics?action=summary')
+        const summaryResponse = await fetch('/api/analytics?action=summary', { headers })
         if (summaryResponse.ok) {
           const summaryResult = await summaryResponse.json()
           setAnalyticsSummary(summaryResult.summary)
@@ -966,7 +969,15 @@ https://www.helfi.ai`)
   const loadAiInsights = async () => {
     setLoadingInsights(true)
     try {
-      const response = await fetch('/api/analytics?action=insights')
+      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      if (!authToken) {
+        setAiInsights('Admin login required to view insights.')
+        setLoadingInsights(false)
+        return
+      }
+      const response = await fetch('/api/analytics?action=insights', {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
       if (response.ok) {
         const result = await response.json()
         setAiInsights(result.insights || 'No insights available yet.')

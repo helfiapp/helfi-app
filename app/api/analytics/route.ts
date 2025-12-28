@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { extractAdminFromHeaders } from '@/lib/admin-auth'
 
 // Initialize OpenAI only when needed to avoid build-time errors
 function getOpenAI() {
@@ -17,7 +20,23 @@ let analyticsData: any[] = []
 
 export async function POST(request: NextRequest) {
   try {
+    const authHeader = request.headers.get('authorization')
+    const admin = extractAdminFromHeaders(authHeader)
+    const internalSecret = process.env.SCHEDULER_SECRET || ''
+    const hasInternalSecret = !!internalSecret && authHeader === `Bearer ${internalSecret}`
+    let sessionEmail = ''
+    if (!admin && !hasInternalSecret) {
+      const session = await getServerSession(authOptions as any)
+      sessionEmail = String(session?.user?.email || '').toLowerCase()
+      if (!sessionEmail) {
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+      }
+    }
+
     const data = await request.json()
+    if (sessionEmail) {
+      data.userId = sessionEmail
+    }
     
     // Store the analytics event
     const analyticsEvent = {
@@ -56,6 +75,12 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const authHeader = request.headers.get('authorization')
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
     const url = new URL(request.url)
     const action = url.searchParams.get('action')
     
