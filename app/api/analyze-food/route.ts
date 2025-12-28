@@ -1865,6 +1865,63 @@ const looksLikeMultiIngredientSummary = (items: any[] | null | undefined): boole
   return hasListDelimiters && wordCount >= 6;
 };
 
+const normalizeSummaryLabel = (value: string): string => {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const hasSummaryDelimiter = (label: string): boolean => {
+  return /,|\band\b|\bwith\b|\bplus\b|&/.test(label || '');
+};
+
+const isSubstantiveItem = (item: any): boolean => {
+  const calories = Number(item?.calories ?? 0);
+  if (Number.isFinite(calories) && calories >= 50) return true;
+  const protein = Number(item?.protein_g ?? 0);
+  const carbs = Number(item?.carbs_g ?? 0);
+  const fat = Number(item?.fat_g ?? 0);
+  return (
+    (Number.isFinite(protein) && protein >= 5) ||
+    (Number.isFinite(carbs) && carbs >= 5) ||
+    (Number.isFinite(fat) && fat >= 5)
+  );
+};
+
+const removeSummaryDuplicateItems = (
+  items: any[],
+): { items: any[]; removed: number } => {
+  if (!Array.isArray(items) || items.length < 2) return { items, removed: 0 };
+  const normalized = items.map((item) => {
+    const name = normalizeSummaryLabel(item?.name || '');
+    const label = normalizeSummaryLabel(`${item?.name || ''} ${item?.serving_size || ''}`);
+    return { item, name, label };
+  });
+  const removeIndices = new Set<number>();
+  normalized.forEach((entry, idx) => {
+    if (!entry.label || !hasSummaryDelimiter(entry.label)) return;
+    let hasSubstantiveMatch = false;
+    for (let j = 0; j < normalized.length; j += 1) {
+      if (j === idx) continue;
+      const other = normalized[j];
+      if (!other.name || other.name.length < 4) continue;
+      if (!entry.label.includes(other.name)) continue;
+      if (isSubstantiveItem(other.item)) {
+        hasSubstantiveMatch = true;
+        break;
+      }
+    }
+    if (hasSubstantiveMatch) {
+      removeIndices.add(idx);
+    }
+  });
+  if (removeIndices.size === 0) return { items, removed: 0 };
+  const filtered = items.filter((_, idx) => !removeIndices.has(idx));
+  return { items: filtered, removed: removeIndices.size };
+};
+
 const itemsResultIsInvalid = (items: any[] | null | undefined, requireMultiple: boolean): boolean => {
   if (!Array.isArray(items) || items.length === 0) return true;
   if (looksLikeSingleGenericItem(items) || looksLikeMultiIngredientSummary(items)) return true;
@@ -3864,6 +3921,17 @@ CRITICAL REQUIREMENTS:
         itemsSource = `${itemsSource}+db_calibrate`;
         itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
         console.log('ℹ️ Applied database calibration for outlier macros.');
+      }
+    }
+
+    if (!labelScan && !packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 1) {
+      const deduped = removeSummaryDuplicateItems(resp.items);
+      if (deduped.removed > 0) {
+        resp.items = deduped.items;
+        resp.total = computeTotalsFromItems(resp.items) || resp.total;
+        itemsSource = `${itemsSource}+summary_dedupe`;
+        itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+        console.log('ℹ️ Removed summary duplicate items.', { removed: deduped.removed });
       }
     }
 
