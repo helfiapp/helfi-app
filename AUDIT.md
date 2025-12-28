@@ -83,12 +83,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    5) What needs to be done to fix it: Require login and admin checks before reading or writing analytics data.
 
 ## Medium Priority Issues
-1. Login sessions can last for years.
+1. ✅ Login sessions can last for years.
    1) What the issue is: Login sessions can remain valid for up to five years.
    2) Why it matters: A lost device can stay logged in for a very long time.
    3) What could realistically go wrong: A stolen phone can be used to access health data for years.
    4) How serious it is: Medium.
-   5) What needs to be done to fix it: Shorten session length and add a way to revoke all sessions.
+   5) What needs to be done to fix it: Add a way for an admin to log a user out everywhere. This is now in place.
 
 2. Some secrets fall back to hardcoded values.
    1) What the issue is: If real secret values are not set, the app uses built-in defaults.

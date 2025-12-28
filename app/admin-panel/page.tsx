@@ -173,6 +173,9 @@ export default function AdminPanel() {
   })
   const [pushLogs, setPushLogs] = useState<Array<{createdAt: string; event: string; userEmail: string; status: string; info?: string}>>([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [securityStatus, setSecurityStatus] = useState<Array<{ id: string; label: string; status: 'set' | 'missing' }>>([])
+  const [securityStatusLoading, setSecurityStatusLoading] = useState(false)
+  const [securityStatusError, setSecurityStatusError] = useState('')
 
   // Check for URL hash to set active tab and load data
   useEffect(() => {
@@ -254,6 +257,17 @@ export default function AdminPanel() {
     loadAnalyticsData()
     loadWaitlistData(tokenValue)
     loadUserStats(tokenValue)
+    const queryTab = new URLSearchParams(window.location.search).get('tab')
+    const storedTab = (() => {
+      try {
+        return localStorage.getItem('adminActiveTab')
+      } catch {
+        return null
+      }
+    })()
+    if (queryTab || storedTab) {
+      handleTabChange(queryTab || storedTab || 'overview', tokenValue)
+    }
   }
 
   const stopQrPolling = () => {
@@ -1184,6 +1198,7 @@ https://www.helfi.ai`)
     }
     if (tabId === 'settings') {
       checkPushNotificationStatus()
+      loadSecurityStatus(tokenOverride)
     }
   }
 
@@ -2195,6 +2210,29 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       alert(`Webhook test failed: ${e?.message || e}`)
     } finally {
       setVercelWebhookTestLoading(false)
+    }
+  }
+
+  const loadSecurityStatus = async (tokenOverride?: string) => {
+    const authToken = tokenOverride || adminToken
+    if (!authToken) return
+    setSecurityStatusLoading(true)
+    setSecurityStatusError('')
+    try {
+      const response = await fetch('/api/admin/security-status', {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setSecurityStatus(result.items || [])
+      } else {
+        setSecurityStatusError('Unable to load security status.')
+      }
+    } catch (error) {
+      console.error('Error loading security status:', error)
+      setSecurityStatusError('Unable to load security status.')
+    } finally {
+      setSecurityStatusLoading(false)
     }
   }
 
@@ -5593,6 +5631,56 @@ The Helfi Team`,
               >
                 Change Password
               </button>
+            </div>
+
+            {/* Security Status */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">🛡️ Security Status</h3>
+                  <p className="text-sm text-gray-600">
+                    Shows if required secrets are set. This does not show any secret values.
+                  </p>
+                </div>
+                <button
+                  onClick={() => loadSecurityStatus()}
+                  className="text-sm text-emerald-600 hover:text-emerald-700"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {securityStatusLoading ? (
+                <div className="text-sm text-gray-500">Checking security settings…</div>
+              ) : securityStatusError ? (
+                <div className="text-sm text-red-600">{securityStatusError}</div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {securityStatus.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center justify-between rounded-lg border px-4 py-3 ${
+                        item.status === 'set'
+                          ? 'border-emerald-200 bg-emerald-50'
+                          : 'border-red-200 bg-red-50'
+                      }`}
+                    >
+                      <div className="text-sm font-medium text-gray-800">{item.label}</div>
+                      <div
+                        className={`text-xs font-semibold ${
+                          item.status === 'set' ? 'text-emerald-700' : 'text-red-700'
+                        }`}
+                      >
+                        {item.status === 'set' ? 'Set' : 'Missing'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500 mt-4">
+                Missing items should be set in your hosting settings for the Production environment.
+              </p>
             </div>
 
             {/* QR Code Login Section */}
