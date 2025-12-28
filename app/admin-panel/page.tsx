@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 
 export default function AdminPanel() {
+  const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -82,8 +84,6 @@ export default function AdminPanel() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [isLoadingManagement, setIsLoadingManagement] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<any>(null)
-  const [showUserModal, setShowUserModal] = useState(false)
   const [actionInFlight, setActionInFlight] = useState<Record<string, boolean>>({})
   const actionInFlightRef = useRef<Record<string, boolean>>({})
 
@@ -187,8 +187,25 @@ export default function AdminPanel() {
       loadWaitlistData(token)
       loadUserStats(token)
       
-      // Check for URL hash to set active tab
+      // Check for URL hash or query to set active tab
       const checkHashAndLoadData = () => {
+        const queryTab = new URLSearchParams(window.location.search).get('tab')
+        if (queryTab) {
+          setActiveTab(queryTab)
+          if (queryTab === 'management') {
+            loadUserManagement(userSearch, userFilter, currentPage)
+            loadEmailTemplates()
+          }
+          if (queryTab === 'usage') {
+            loadVisionUsage(visionUsageRange)
+            loadFoodCostSim(foodCostSimRange)
+            loadFoodServerUsage(foodServerUsageRange)
+            loadServerCallUsage(serverCallUsageRange)
+          }
+          if (queryTab === 'settings') {
+            checkPushNotificationStatus()
+          }
+        }
         if (window.location.hash === '#tickets') {
           setActiveTab('tickets')
           loadSupportTickets()
@@ -983,18 +1000,6 @@ https://www.helfi.ai`)
       if (response.ok) {
         // Reload the user list to show updated data
         await loadUserManagement(userSearch, userFilter, currentPage)
-        // Refresh selected user if modal is open
-        if (selectedUser && showUserModal) {
-          const refreshedUsers = await fetch(`/api/admin/user-management?search=${selectedUser.email}&plan=all&page=1&limit=1`, {
-            headers: { 'Authorization': `Bearer ${adminToken}` }
-          }).then(r => r.json())
-          if (refreshedUsers.users && refreshedUsers.users.length > 0) {
-            setSelectedUser(refreshedUsers.users[0])
-          }
-        } else {
-          setShowUserModal(false)
-          setSelectedUser(null)
-        }
         if (action === 'refund_latest_payment') {
           const amountCents = typeof result?.refundedAmountCents === 'number' ? result.refundedAmountCents : null
           const currency = typeof result?.currency === 'string' ? result.currency.toUpperCase() : 'AUD'
@@ -4845,10 +4850,7 @@ The Helfi Team`,
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-2">
                                 <button
-                                  onClick={() => {
-                                    setSelectedUser(user)
-                                    setShowUserModal(true)
-                                  }}
+                                  onClick={() => router.push(`/admin-panel/user/${user.id}`)}
                                   className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition-colors"
                                 >
                                   Manage
@@ -4926,406 +4928,6 @@ The Helfi Team`,
                 </div>
               )}
             </div>
-
-                         {/* User Management Modal */}
-             {showUserModal && selectedUser && (
-               <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center py-8">
-                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto">
-                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                     Manage User: {selectedUser.name || selectedUser.email}
-                   </h3>
-                   
-                   {/* Current Subscription Status */}
-                   <div className="bg-gray-50 rounded-lg p-4 mb-6 border-l-4 border-blue-500">
-                     <h4 className="font-medium text-gray-900 mb-2">Current Subscription Status</h4>
-                     <div className="space-y-2">
-                       <div className="flex justify-between items-center">
-                         <span className="text-sm text-gray-600">Plan:</span>
-                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                           selectedUser.subscription?.plan === 'PREMIUM' 
-                             ? 'bg-emerald-100 text-emerald-800' 
-                             : 'bg-gray-100 text-gray-800'
-                         }`}>
-                           {selectedUser.subscription?.plan || 'No Subscription'}
-                         </span>
-                       </div>
-                       
-                       {selectedUser.subscription?.plan === 'PREMIUM' && selectedUser.subscription?.monthlyPriceCents && (
-                         <div className="flex justify-between items-center">
-                           <span className="text-sm text-gray-600">Subscription Tier:</span>
-                           <span className="text-sm font-semibold text-emerald-700">
-                             {selectedUser.subscription.endDate ? (
-                              // Temporary access - show duration and credits
-                              (() => {
-                                const endDate = new Date(selectedUser.subscription.endDate)
-                                const startDate = new Date(selectedUser.subscription.startDate)
-                                // Calculate total subscription duration in days (from start to end)
-                                const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-                                const credits = Math.floor(selectedUser.subscription.monthlyPriceCents * 0.5) // 50% of price = credits
-                                if (totalDays > 90) {
-                                  return `Permanent (${credits} credits/month)`
-                                } else {
-                                  return `${totalDays}-Day Access (${credits} credits)`
-                                }
-                              })()
-                             ) : (
-                               // Permanent subscription - show monthly tier
-                              selectedUser.subscription.monthlyPriceCents === 1000 ? '$10/month (700 credits)' :
-                              selectedUser.subscription.monthlyPriceCents === 2000 ? '$20/month (1,400 credits)' :
-                              selectedUser.subscription.monthlyPriceCents === 3000 ? '$30/month (2,100 credits)' :
-                              selectedUser.subscription.monthlyPriceCents === 5000 ? '$50/month (3,500 credits)' :
-                               `$${(selectedUser.subscription.monthlyPriceCents / 100).toFixed(0)}/month`
-                             )}
-                           </span>
-                         </div>
-                       )}
-                       
-                       {selectedUser.subscription?.endDate && (
-                         <div className="flex justify-between items-center">
-                           <span className="text-sm text-gray-600">Access Type:</span>
-                           <span className="text-sm font-medium">
-                             {new Date(selectedUser.subscription.endDate).getFullYear() > 2050 
-                               ? '🎉 Permanent Access' 
-                               : `⏰ Expires ${new Date(selectedUser.subscription.endDate).toLocaleDateString()}`
-                             }
-                           </span>
-                         </div>
-                       )}
-                       
-                       {selectedUser.subscription?.plan === 'PREMIUM' && !selectedUser.subscription?.endDate && (
-                         <div className="flex justify-between items-center">
-                           <span className="text-sm text-gray-600">Access Type:</span>
-                           <span className="text-sm font-medium text-green-600">💳 Active Premium Subscription</span>
-                         </div>
-                       )}
-                       
-                       {!selectedUser.subscription && (
-                         <div className="flex justify-between items-center">
-                           <span className="text-sm text-gray-600">Access Type:</span>
-                           <span className="text-sm font-medium text-gray-600">👤 No Subscription</span>
-                         </div>
-                       )}
-                       
-                       {selectedUser.subscription && (
-                         <>
-                           <div className="flex justify-between items-center">
-                             <span className="text-sm text-gray-600">Subscription Started:</span>
-                             <span className="text-sm font-medium">
-                               {selectedUser.subscription.startDate 
-                                 ? new Date(selectedUser.subscription.startDate).toLocaleDateString()
-                                 : 'Unknown'}
-                             </span>
-                           </div>
-                           
-                           {selectedUser.subscription.startDate && !selectedUser.subscription.endDate && (
-                             <div className="flex justify-between items-center">
-                               <span className="text-sm text-gray-600">Next Renewal:</span>
-                               <span className="text-sm font-medium">
-                                 {(() => {
-                                   const startDate = new Date(selectedUser.subscription.startDate)
-                                   const now = new Date()
-                                   const startYear = startDate.getUTCFullYear()
-                                   const startMonth = startDate.getUTCMonth()
-                                   const startDay = startDate.getUTCDate()
-                                   
-                                   const currentYear = now.getUTCFullYear()
-                                   const currentMonth = now.getUTCMonth()
-                                   const currentDay = now.getUTCDate()
-                                   
-                                   let monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth)
-                                   if (currentDay < startDay) {
-                                     monthsSinceStart--
-                                   }
-                                   
-                                   const nextRenewal = new Date(Date.UTC(startYear, startMonth + monthsSinceStart + 1, startDay, 0, 0, 0, 0))
-                                   return nextRenewal.toLocaleDateString()
-                                 })()}
-                               </span>
-                             </div>
-                           )}
-                         </>
-                       )}
-                       
-                       <div className="flex justify-between items-center">
-                         <span className="text-sm text-gray-600">Member since:</span>
-                         <span className="text-sm">{new Date(selectedUser.createdAt).toLocaleDateString()}</span>
-                       </div>
-                     </div>
-                   </div>
-                   
-                   {/* Credit Management */}
-                   <div className="bg-green-50 rounded-lg p-4 mb-6 border-l-4 border-green-500">
-                     <h4 className="font-medium text-gray-900 mb-3">📊 Credit Management</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Additional Credits:</span>
-                        <span className="text-sm font-medium text-green-600">
-                          {selectedUser.totalAvailableCredits !== undefined 
-                            ? `${selectedUser.totalAvailableCredits} credits`
-                            : (selectedUser.additionalCredits || 0) + ' credits'}
-                        </span>
-                      </div>
-                       <div className="flex justify-between items-center">
-                         <span className="text-sm text-gray-600">Total Analyses:</span>
-                         <span className="text-sm font-medium">
-                           {selectedUser.totalAnalysisCount || 0} lifetime
-                         </span>
-                       </div>
-                       
-                       {/* Feature-specific usage */}
-                       <div className="pt-2 border-t border-gray-200">
-                         <div className="text-xs text-gray-500 mb-2">Monthly Feature Usage:</div>
-                         <div className="grid grid-cols-2 gap-2 text-xs">
-                           <div className="flex justify-between">
-                             <span>Food Analysis:</span>
-                             <span className="font-medium">{selectedUser.dailyFoodAnalysisUsed || 0}</span>
-                           </div>
-                           <div className="flex justify-between">
-                             <span>Food Reanalysis:</span>
-                             <span className="font-medium">{selectedUser.dailyFoodReanalysisUsed || 0}</span>
-                           </div>
-                           <div className="flex justify-between">
-                             <span>Medical Image:</span>
-                             <span className="font-medium">{selectedUser.monthlyMedicalImageAnalysisUsed || 0}</span>
-                           </div>
-                           <div className="flex justify-between">
-                             <span>Interaction Analysis:</span>
-                             <span className="font-medium">{selectedUser.dailyInteractionAnalysisUsed || 0}</span>
-                           </div>
-                           <div className="flex justify-between">
-                             <span>Symptom Analysis:</span>
-                             <span className="font-medium">{selectedUser.monthlySymptomAnalysisUsed || 0}</span>
-                           </div>
-                           <div className="flex justify-between">
-                             <span>Insights Generation:</span>
-                             <span className="font-medium">{selectedUser.monthlyInsightsGenerationUsed || 0}</span>
-                           </div>
-                         </div>
-                       </div>
-                       {selectedUser.lastAnalysisResetDate && (
-                         <div className="flex justify-between items-center">
-                           <span className="text-sm text-gray-600">Last Reset:</span>
-                           <span className="text-sm">
-                             {new Date(selectedUser.lastAnalysisResetDate).toLocaleDateString()}
-                           </span>
-                         </div>
-                       )}
-                     </div>
-                     
-                   <div className="mt-4 grid grid-cols-3 gap-3">
-                       <button
-                         onClick={() => {
-                           const credits = prompt('Enter number of credits to add:')
-                           if (credits && !isNaN(parseInt(credits)) && parseInt(credits) > 0) {
-                             handleUserAction('add_credits', selectedUser.id, { creditAmount: parseInt(credits) })
-                           }
-                         }}
-                         className="bg-green-500 text-white px-3 py-2 rounded text-sm hover:bg-green-600 transition-colors"
-                       >
-                         💳 Add Credits
-                       </button>
-                       <button
-                         onClick={() => {
-                           const credits = prompt('Enter number of credits to remove:')
-                           if (credits && !isNaN(parseInt(credits)) && parseInt(credits) > 0) {
-                             if (confirm(`Are you sure you want to remove ${credits} credits?`)) {
-                               handleUserAction('remove_credits', selectedUser.id, { creditAmount: parseInt(credits) })
-                             }
-                           }
-                         }}
-                         className="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors"
-                       >
-                         ➖ Remove Credits
-                       </button>
-                       <button
-                         onClick={() => {
-                           if (confirm('Reset daily quota for this user?')) {
-                             handleUserAction('reset_daily_quota', selectedUser.id)
-                           }
-                         }}
-                         className="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600 transition-colors"
-                       >
-                         🔄 Reset Daily
-                       </button>
-                     </div>
-                   </div>
-
-                   {/* Refunds */}
-                   <div className="bg-yellow-50 rounded-lg p-4 mb-6 border-l-4 border-yellow-500">
-                     <h4 className="font-medium text-gray-900 mb-2">Refunds</h4>
-                     <p className="text-xs text-gray-600 mb-3">
-                       Refund the most recent payment for this user. Access and credits are removed automatically.
-                     </p>
-                     <button
-                       onClick={() => {
-                         const raw = prompt('Refund amount in dollars (leave blank for full refund):')
-                         if (raw === null) return
-                         const trimmed = raw.trim()
-                         let amountCents: number | null = null
-                         if (trimmed) {
-                           const parsed = Number(trimmed)
-                           if (!Number.isFinite(parsed) || parsed <= 0) {
-                             alert('Please enter a valid amount.')
-                             return
-                           }
-                           amountCents = Math.round(parsed * 100)
-                         }
-                         const amountLabel = amountCents ? `$${(amountCents / 100).toFixed(2)}` : 'the full amount'
-                         if (confirm(`Refund ${amountLabel} from the most recent payment for ${selectedUser.email}?`)) {
-                           handleUserAction('refund_latest_payment', selectedUser.id, { amountCents })
-                         }
-                       }}
-                       className="bg-yellow-600 text-white px-3 py-2 rounded text-sm hover:bg-yellow-700 transition-colors"
-                     >
-                       ↩️ Refund Latest Payment
-                     </button>
-                   </div>
-
-                   {/* Account Security */}
-                   <div className="bg-gray-50 rounded-lg p-4 mb-6 border-l-4 border-gray-400">
-                     <h4 className="font-medium text-gray-900 mb-2">Account Security</h4>
-                     <p className="text-xs text-gray-600 mb-3">
-                       Log the user out everywhere (useful if their phone is lost or they can’t log out themselves).
-                     </p>
-                     <button
-                       onClick={() => {
-                         if (confirm(`Log ${selectedUser.email} out of all devices now?`)) {
-                           handleUserAction('revoke_sessions', selectedUser.id)
-                         }
-                       }}
-                       className="bg-gray-700 text-white px-3 py-2 rounded text-sm hover:bg-gray-800 transition-colors"
-                     >
-                       🔒 Log Out Everywhere
-                     </button>
-                   </div>
-
-                   {/* Actions */}
-                   <div className="space-y-4">
-                     <h4 className="font-medium text-gray-900">Grant Subscription</h4>
-                     
-                     {/* Subscription Tiers - matching billing page */}
-                     <div className="grid grid-cols-4 gap-2 mb-3">
-                       <button
-                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '10' })}
-                         className="bg-emerald-400 text-white px-3 py-2 rounded hover:bg-emerald-500 transition-colors text-xs"
-                       >
-                         $10/month<br/>(700 credits)
-                       </button>
-                       <button
-                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '20' })}
-                         className="bg-emerald-500 text-white px-3 py-2 rounded hover:bg-emerald-600 transition-colors text-xs"
-                       >
-                         $20/month<br/>(1,400 credits)
-                       </button>
-                       <button
-                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '30' })}
-                         className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-700 transition-colors text-xs font-semibold"
-                       >
-                         $30/month<br/>(2,100 credits)
-                       </button>
-                       <button
-                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '50' })}
-                         className="bg-gray-900 text-white px-3 py-2 rounded hover:bg-gray-800 transition-colors text-xs"
-                       >
-                         $50/month<br/>(3,500 credits)
-                       </button>
-                     </div>
-                     
-                     {/* Temporary Access */}
-                     <div className="border-t pt-3">
-                       <h5 className="text-sm font-medium text-gray-700 mb-2">Temporary Access</h5>
-                       <div className="grid grid-cols-2 gap-2">
-                         <button
-                           onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
-                           className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-xs"
-                         >
-                           7-Day Premium<br/>(250 credits)
-                         </button>
-                         <button
-                           onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
-                           className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-xs"
-                         >
-                           30-Day Premium<br/>(1,400 credits)
-                         </button>
-                       </div>
-                     </div>
-                     
-                     {/* Credit Packages */}
-                     <div className="border-t pt-4">
-                       <h4 className="font-medium text-gray-900 mb-3">Grant Credits</h4>
-                       <div className="grid grid-cols-3 gap-2">
-                         <button
-                           onClick={() => handleUserAction('add_credits', selectedUser.id, { creditPackage: '250' })}
-                           className="bg-purple-500 text-white px-3 py-2 rounded hover:bg-purple-600 transition-colors text-xs"
-                         >
-                           250 Credits ($5)
-                         </button>
-                         <button
-                           onClick={() => handleUserAction('add_credits', selectedUser.id, { creditPackage: '500' })}
-                           className="bg-purple-500 text-white px-3 py-2 rounded hover:bg-purple-600 transition-colors text-xs"
-                         >
-                           500 Credits ($10)
-                         </button>
-                         <button
-                           onClick={() => handleUserAction('add_credits', selectedUser.id, { creditPackage: '1000' })}
-                           className="bg-purple-500 text-white px-3 py-2 rounded hover:bg-purple-600 transition-colors text-xs"
-                         >
-                           1000 Credits ($20)
-                         </button>
-                       </div>
-                     </div>
-                     
-                     {/* Plan Controls */}
-                     <div className="border-t pt-4">
-                       <h4 className="font-medium text-gray-900 mb-3">Plan Controls</h4>
-                       <div className="grid grid-cols-2 gap-3">
-                         {selectedUser.subscription?.plan === 'PREMIUM' ? (
-                           <button
-                             onClick={() => handleUserAction('deactivate', selectedUser.id)}
-                             className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition-colors text-sm"
-                           >
-                             ⬇️ Remove Subscription
-                           </button>
-                         ) : (
-                           <button
-                             onClick={() => handleUserAction('activate', selectedUser.id)}
-                             className="bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
-                           >
-                             ⬆️ Upgrade to Premium
-                           </button>
-                         )}
-                         
-                         <button
-                           onClick={() => {
-                             if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-                               handleUserAction('delete_user', selectedUser.id)
-                             }
-                           }}
-                           className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors text-sm"
-                         >
-                           🗑️ Delete User
-                         </button>
-                       </div>
-                     </div>
-                     
-                     <div className="border-t pt-4">
-                       <button
-                         onClick={() => {
-                           setShowUserModal(false)
-                           setSelectedUser(null)
-                         }}
-                         className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition-colors text-sm"
-                       >
-                         Close
-                       </button>
-                     </div>
-                   </div>
-                 </div>
-               </div>
-             )}
-
-
-
 
           </div>
         )}

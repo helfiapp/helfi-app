@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
+    const userId = searchParams.get('userId')
     const status = searchParams.get('status') || 'all'
     const plan = searchParams.get('plan') || 'all'
     const page = parseInt(searchParams.get('page') || '1')
@@ -27,14 +28,16 @@ export async function GET(request: NextRequest) {
     // Build filter conditions
     const where: any = {}
     
-    if (search) {
+    if (userId) {
+      where.id = userId
+    } else if (search) {
       where.OR = [
         { email: { contains: search, mode: 'insensitive' } },
         { name: { contains: search, mode: 'insensitive' } }
       ]
     }
 
-    if (plan !== 'all') {
+    if (!userId && plan !== 'all') {
       if (plan === 'premium') {
         where.subscription = {
           plan: 'PREMIUM'
@@ -70,6 +73,7 @@ export async function GET(request: NextRequest) {
         dailyFoodReanalysisUsed: true,
         dailyMedicalAnalysisUsed: true,
         dailyInteractionAnalysisUsed: true,
+        lastAnalysisResetDate: true,
         monthlyInsightsGenerationUsed: true,
         monthlyMedicalImageAnalysisUsed: true,
         monthlySymptomAnalysisUsed: true,
