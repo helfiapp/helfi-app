@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'File is unavailable' }, { status: 404 })
     }
 
-    let buffer = Buffer.from(await blobResponse.arrayBuffer())
+    let buffer: Buffer = Buffer.from(await blobResponse.arrayBuffer())
     const isEncrypted = metadata?.encrypted === true
 
     if (isEncrypted) {
