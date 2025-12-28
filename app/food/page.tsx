@@ -7100,6 +7100,19 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const clearOverallFeedback = () => {
+    setAnalysisFeedbackOverall(null)
+  }
+
+  const clearItemFeedback = (index: number) => {
+    setAnalysisFeedbackItems((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, index)) return prev
+      const next = { ...prev }
+      delete next[index]
+      return next
+    })
+  }
+
   const triggerFeedbackRescan = async (reasons: string[], focusItem?: string | null) => {
     if (isAnalyzing) return
     if (!photoFile) return
@@ -12464,7 +12477,11 @@ Please add nutritional information manually if needed.`);
                             <button
                               type="button"
                               onClick={() => {
-                                if (analysisFeedbackOverall) return
+                                if (analysisFeedbackOverall === 'up') {
+                                  clearOverallFeedback()
+                                  showQuickToast('Feedback removed.')
+                                  return
+                                }
                                 setAnalysisFeedbackOverall('up')
                                 submitFoodAnalysisFeedback({ scope: 'overall', rating: 'up' })
                                 showQuickToast('Thanks for the feedback!')
@@ -12475,14 +12492,17 @@ Please add nutritional information manually if needed.`);
                                   : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
                               }`}
                               title="Thumbs up"
-                              disabled={analysisFeedbackOverall !== null}
                             >
                               <HandThumbUpIcon className="w-5 h-5" />
                             </button>
                             <button
                               type="button"
                               onClick={() => {
-                                if (analysisFeedbackOverall) return
+                                if (analysisFeedbackOverall === 'down') {
+                                  clearOverallFeedback()
+                                  showQuickToast('Feedback removed.')
+                                  return
+                                }
                                 setFeedbackPrompt({ scope: 'overall' })
                                 setFeedbackReasons([])
                                 setFeedbackComment('')
@@ -12494,7 +12514,6 @@ Please add nutritional information manually if needed.`);
                                   : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
                               }`}
                               title="Thumbs down"
-                              disabled={analysisFeedbackOverall !== null}
                             >
                               <HandThumbDownIcon className="w-5 h-5" />
                             </button>
@@ -12660,7 +12679,11 @@ Please add nutritional information manually if needed.`);
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        if (analysisFeedbackItems[index]) return
+                                        if (analysisFeedbackItems[index] === 'up') {
+                                          clearItemFeedback(index)
+                                          showQuickToast('Feedback removed.')
+                                          return
+                                        }
                                         setAnalysisFeedbackItems((prev) => ({ ...prev, [index]: 'up' }))
                                         submitFoodAnalysisFeedback({ scope: 'item', rating: 'up', itemIndex: index })
                                         showQuickToast('Thanks for the feedback!')
@@ -12671,14 +12694,17 @@ Please add nutritional information manually if needed.`);
                                           : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
                                       }`}
                                       title="Thumbs up"
-                                      disabled={analysisFeedbackItems[index] !== undefined}
                                     >
                                       <HandThumbUpIcon className="w-5 h-5" />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        if (analysisFeedbackItems[index]) return
+                                        if (analysisFeedbackItems[index] === 'down') {
+                                          clearItemFeedback(index)
+                                          showQuickToast('Feedback removed.')
+                                          return
+                                        }
                                         setFeedbackPrompt({ scope: 'item', itemIndex: index })
                                         setFeedbackReasons([])
                                         setFeedbackComment('')
@@ -12690,7 +12716,6 @@ Please add nutritional information manually if needed.`);
                                           : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
                                       }`}
                                       title="Thumbs down"
-                                      disabled={analysisFeedbackItems[index] !== undefined}
                                     >
                                       <HandThumbDownIcon className="w-5 h-5" />
                                     </button>
