@@ -1146,10 +1146,13 @@ const getItemWeightInGrams = (item: any): number | null => {
 };
 
 const FRIED_SEAFOOD_KCAL_PER_100G_FLOOR = 180;
+const ROASTED_CHICKEN_KCAL_PER_100G_FLOOR = 150;
 const isFriedOrBatteredLabel = (label: string) =>
   /\b(fried|battered|breaded|crumbed|tempura|beer\b)\b/i.test(label || '');
 const isSeafoodLabel = (label: string) =>
   /\b(fish|fillet|seafood|shrimp|prawn|calamari|squid|scallop|crab|lobster)\b/i.test(label || '');
+const isRoastedChickenLabel = (label: string) =>
+  /\b(chicken|rotisserie)\b/i.test(label || '') && /\b(roasted|grilled|baked|rotisserie)\b/i.test(label || '');
 
 const applyFriedSeafoodCalorieFloor = (items: any[]): { items: any[]; changed: boolean } => {
   if (!Array.isArray(items) || items.length === 0) {
@@ -1172,6 +1175,49 @@ const applyFriedSeafoodCalorieFloor = (items: any[]): { items: any[]; changed: b
     if (!Number.isFinite(per100) || per100 >= FRIED_SEAFOOD_KCAL_PER_100G_FLOOR) return item;
 
     const targetCalories = Math.round((weight * FRIED_SEAFOOD_KCAL_PER_100G_FLOOR) / 100);
+    const scale = targetCalories / calories;
+    const scaleMacro = (value: any, decimals = 1) => {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return value;
+      const factor = Math.pow(10, decimals);
+      return Math.round(num * scale * factor) / factor;
+    };
+
+    const next = { ...item };
+    next.calories = targetCalories;
+    if (next.protein_g != null) next.protein_g = scaleMacro(next.protein_g);
+    if (next.carbs_g != null) next.carbs_g = scaleMacro(next.carbs_g);
+    if (next.fat_g != null) next.fat_g = scaleMacro(next.fat_g);
+    if (next.fiber_g != null) next.fiber_g = scaleMacro(next.fiber_g);
+    if (next.sugar_g != null) next.sugar_g = scaleMacro(next.sugar_g);
+    changed = true;
+    return next;
+  });
+
+  return { items: nextItems, changed };
+};
+
+const applyRoastedChickenCalorieFloor = (items: any[]): { items: any[]; changed: boolean } => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { items, changed: false };
+  }
+
+  let changed = false;
+  const nextItems = items.map((item) => {
+    const label = `${item?.name || ''} ${item?.serving_size || ''}`.trim();
+    if (!label) return item;
+    if (!isRoastedChickenLabel(label)) return item;
+
+    const weight = getItemWeightInGrams(item);
+    if (!Number.isFinite(weight) || !weight || weight <= 0) return item;
+
+    const calories = Number(item?.calories ?? 0);
+    if (!Number.isFinite(calories) || calories <= 0) return item;
+
+    const per100 = (calories / weight) * 100;
+    if (!Number.isFinite(per100) || per100 >= ROASTED_CHICKEN_KCAL_PER_100G_FLOOR) return item;
+
+    const targetCalories = Math.round((weight * ROASTED_CHICKEN_KCAL_PER_100G_FLOOR) / 100);
     const scale = targetCalories / calories;
     const scaleMacro = (value: any, decimals = 1) => {
       const num = Number(value);
@@ -3401,27 +3447,55 @@ CRITICAL REQUIREMENTS:
 
         if (missingComponents.length > 0) {
           try {
-            const followUp = await chatCompletionWithCost(openai, {
-              model: 'gpt-4o-mini',
-              response_format: { type: 'json_object' } as any,
-              messages: [
-                {
-                  role: 'user',
-                  content:
-                    'Return JSON only with this shape:\n' +
-                    '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0,"isGuess":false}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
-                    `- Include ONLY these components, exactly as listed: ${listedComponents.join(', ')}.\n` +
-                    '- Do not omit any component. Do not add extras.\n' +
-                    '- Do not omit small items (radish, cucumber, seaweed, kimchi).\n' +
-                    '- Keep servings at 1 and use simple serving sizes ("1 serving", "1/4 cup").\n' +
-                    '- If uncertain, set isGuess: true and keep macros conservative.\n' +
-                    '\nAnalysis text:\n' +
-                    analysisTextForFollowUp,
-                },
-              ],
-              max_tokens: 360,
-              temperature: 0,
-            } as any);
+            const followUp = isImageAnalysis
+              ? await chatCompletionWithCost(openai, {
+                  model: 'gpt-4o',
+                  response_format: { type: 'json_object' } as any,
+                  messages: [
+                    {
+                      role: 'user',
+                      content: [
+                        {
+                          type: 'text',
+                          text:
+                            'Return JSON only with this shape:\n' +
+                            '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0,"isGuess":false}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+                            `- Include ONLY these components, exactly as listed: ${listedComponents.join(', ')}.\n` +
+                            '- Do not omit any component. Do not add extras.\n' +
+                            '- Do not omit small items (radish, cucumber, seaweed, kimchi).\n' +
+                            '- Keep servings at 1 and use simple serving sizes ("1 serving", "1/4 cup").\n' +
+                            '- If uncertain, set isGuess: true and keep macros conservative.\n' +
+                            '\nAnalysis text:\n' +
+                            analysisTextForFollowUp,
+                        },
+                        { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+                      ],
+                    },
+                  ],
+                  max_tokens: 360,
+                  temperature: 0,
+                } as any)
+              : await chatCompletionWithCost(openai, {
+                  model: 'gpt-4o-mini',
+                  response_format: { type: 'json_object' } as any,
+                  messages: [
+                    {
+                      role: 'user',
+                      content:
+                        'Return JSON only with this shape:\n' +
+                        '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0,"isGuess":false}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+                        `- Include ONLY these components, exactly as listed: ${listedComponents.join(', ')}.\n` +
+                        '- Do not omit any component. Do not add extras.\n' +
+                        '- Do not omit small items (radish, cucumber, seaweed, kimchi).\n' +
+                        '- Keep servings at 1 and use simple serving sizes ("1 serving", "1/4 cup").\n' +
+                        '- If uncertain, set isGuess: true and keep macros conservative.\n' +
+                        '\nAnalysis text:\n' +
+                        analysisTextForFollowUp,
+                    },
+                  ],
+                  max_tokens: 360,
+                  temperature: 0,
+                } as any);
 
             totalCostCents += followUp.costCents;
             const text = followUp.completion.choices?.[0]?.message?.content?.trim() || '';
@@ -3583,8 +3657,9 @@ CRITICAL REQUIREMENTS:
 
     if (!packagedMode && !labelScan && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
       const friedFloor = applyFriedSeafoodCalorieFloor(resp.items);
-      if (friedFloor.changed) {
-        resp.items = friedFloor.items;
+      const chickenFloor = applyRoastedChickenCalorieFloor(friedFloor.items);
+      if (friedFloor.changed || chickenFloor.changed) {
+        resp.items = chickenFloor.items;
         resp.total = computeTotalsFromItems(resp.items) || resp.total;
       }
     }
