@@ -198,12 +198,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Critical.
    5) What needs to be done to fix it: Remove this path and enforce verified login for all access. This direct sign-in path is now disabled in production.
 
-3. Admin access can be guessed or copied.
+3. ✅ Admin access can be guessed or copied.
    1) What the issue is: Admin access relies on a public browser-only password and a shared access key.
    2) Why it matters: Admin data includes every user’s health data.
    3) What could realistically go wrong: Full data exposure and harmful account changes.
    4) How serious it is: Critical.
-   5) What needs to be done to fix it: Use server-side admin login and remove any shared key.
+   5) What needs to be done to fix it: Use server-side admin login and remove any shared key. The shared browser password gate is removed and admin login now requires the server secret.
 
 4. A public debug tool exposes the AI secret key.
    1) What the issue is: A troubleshooting route shows part of the AI key.

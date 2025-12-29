@@ -4,7 +4,7 @@ import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'helfi-admin-secret-2024'
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
 
 async function resolveAdminInfo(authHeader: string | null) {
   const admin = extractAdminFromHeaders(authHeader)
@@ -38,6 +38,9 @@ async function cleanupExpiredTokens() {
 
 export async function GET(request: NextRequest) {
   try {
+    if (!JWT_SECRET) {
+      return NextResponse.json({ error: 'Admin login secret not configured' }, { status: 500 })
+    }
     // Verify admin is authenticated (support legacy desktop token)
     const authHeader = request.headers.get('authorization')
     console.log('[QR-GEN] Received request with auth header:', authHeader ? 'Bearer ***' : 'none')
@@ -106,6 +109,9 @@ export async function GET(request: NextRequest) {
 // Endpoint to verify QR token and get admin info
 export async function POST(request: NextRequest) {
   try {
+    if (!JWT_SECRET) {
+      return NextResponse.json({ error: 'Admin login secret not configured' }, { status: 500 })
+    }
     const body = await request.json()
     const token = typeof body?.token === 'string' ? body.token.trim() : ''
 

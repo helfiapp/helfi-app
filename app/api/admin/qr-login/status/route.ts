@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'helfi-admin-secret-2024'
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
 
 async function cleanupExpired() {
   const now = new Date()
@@ -13,6 +13,9 @@ async function cleanupExpired() {
 
 export async function GET(request: NextRequest) {
   try {
+    if (!JWT_SECRET) {
+      return NextResponse.json({ error: 'Admin login secret not configured' }, { status: 500 })
+    }
     const { searchParams } = new URL(request.url)
     const token = (searchParams.get('token') || '').trim()
     if (!token) {

@@ -4,11 +4,14 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { authenticator } from 'otplib'
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'helfi-admin-secret-2024'
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
 authenticator.options = { window: 1 }
 
 export async function POST(request: NextRequest) {
   try {
+    if (!JWT_SECRET) {
+      return NextResponse.json({ error: 'Admin login secret not configured' }, { status: 500 })
+    }
     const { email, password, otp } = await request.json()
 
     if (!email || !password) {

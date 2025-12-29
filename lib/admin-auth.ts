@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'helfi-admin-secret-2024'
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
 
 export interface AdminTokenPayload {
   adminId: string
@@ -9,6 +9,7 @@ export interface AdminTokenPayload {
 }
 
 export function verifyAdminToken(token: string): AdminTokenPayload | null {
+  if (!JWT_SECRET) return null
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AdminTokenPayload
     return decoded
