@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
-import { costCentsEstimateFromText } from '@/lib/cost-meter';
+import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { logAIUsage } from '@/lib/ai-usage-logger';
 import { isSubscriptionActive } from '@/lib/subscription-utils';
 import { logServerCall } from '@/lib/server-call-tracker';
@@ -167,14 +167,16 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
 
     const model = reanalysis ? "gpt-4o-mini" : "gpt-4";
 
+    let maxTokens = 2000;
     // Wallet pre-check (skip if allowed via free use)
     if (!allowViaFreeUse) {
       const cm = new CreditManager(user.id);
-      const estimateCents = costCentsEstimateFromText(model, prompt, 2000 * 4);
       const wallet = await cm.getWalletStatus();
-      if (wallet.totalAvailableCents < estimateCents) {
+      const cappedMaxTokens = capMaxTokensToBudget(model, prompt, maxTokens, wallet.totalAvailableCents);
+      if (cappedMaxTokens <= 0) {
         return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
       }
+      maxTokens = cappedMaxTokens;
     }
 
     // Immediate pre-charge (interaction analysis typical cost = CREDIT_COSTS.INTERACTION_ANALYSIS)
@@ -206,7 +208,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
         }
       ],
       temperature: 0.3,
-      max_tokens: 2000,
+      max_tokens: maxTokens,
     } as any);
 
     const analysisText = wrapped.completion.choices[0].message.content;

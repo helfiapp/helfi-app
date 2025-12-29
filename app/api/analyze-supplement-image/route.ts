@@ -7,7 +7,7 @@ import { consumeRateLimit } from '@/lib/rate-limit';
 import { getImageMetadata } from '@/lib/image-metadata';
 import { prisma } from '@/lib/prisma';
 import { CreditManager } from '@/lib/credit-system';
-import { costCentsEstimateFromText } from '@/lib/cost-meter';
+import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -90,9 +90,9 @@ Return only the product name, no explanations or additional text.`;
 
     const model = "gpt-4o";
     const cm = new CreditManager(user.id);
-    const estimateCents = costCentsEstimateFromText(model, promptText, 50 * 4);
     const wallet = await cm.getWalletStatus();
-    if (wallet.totalAvailableCents < estimateCents) {
+    const maxTokens = capMaxTokensToBudget(model, promptText, 50, wallet.totalAvailableCents);
+    if (maxTokens <= 0) {
       return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
@@ -113,7 +113,7 @@ Return only the product name, no explanations or additional text.`;
           ]
         }
       ],
-      max_tokens: 50,
+      max_tokens: maxTokens,
       temperature: 0.1
     } as any);
 

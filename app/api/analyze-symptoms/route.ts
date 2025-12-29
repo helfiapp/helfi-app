@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import OpenAI from 'openai'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
-import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
 import { logServerCall } from '@/lib/server-call-tracker'
@@ -149,13 +149,15 @@ Return two parts:
     // Wallet pre-check (skip when allowed via one-time free use)
     const model = 'gpt-4o'
     const promptText = messages.map((m) => (typeof (m as any).content === 'string' ? (m as any).content : '')).join('\n')
-    const estimateCents = costCentsEstimateFromText(model, promptText, 1200 * 4)
+    let maxTokens = 1200
     if (!allowViaFreeUse) {
       const cm = new CreditManager(refreshedUser.id)
       const wallet = await cm.getWalletStatus()
-      if (wallet.totalAvailableCents < estimateCents) {
+      const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, wallet.totalAvailableCents)
+      if (cappedMaxTokens <= 0) {
         return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
       }
+      maxTokens = cappedMaxTokens
     }
 
     // Immediate pre-charge (1 credit) before calling the model (skip for free trial)
@@ -178,7 +180,7 @@ Return two parts:
     const wrapped = await chatCompletionWithCost(openai, {
       model,
       messages,
-      max_tokens: 1200,
+      max_tokens: maxTokens,
       temperature: 0.4,
     } as any)
 

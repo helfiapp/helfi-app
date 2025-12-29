@@ -5,7 +5,7 @@ import OpenAI from 'openai'
 import crypto from 'crypto'
 import { CreditManager } from '@/lib/credit-system'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
-import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { scheduleHealthTipWithQStash } from '@/lib/qstash'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
@@ -539,13 +539,13 @@ export async function POST(req: NextRequest) {
       },
     ]
 
-    // Wallet pre-check using a conservative estimate, then we will charge 2x the real cost
-    const estimatedModelCostCents = costCentsEstimateFromText(model, prompt, 800 * 4)
-    const estimatedChargeCents = estimatedModelCostCents * 2
+    // Wallet pre-check using a budget-aware max token cap
     const creditManager = new CreditManager(user.id)
     const walletStatus = await creditManager.getWalletStatus()
 
-    if (walletStatus.totalAvailableCents < estimatedChargeCents) {
+    let maxTokens = 800
+    const cappedMaxTokens = capMaxTokensToBudget(model, prompt, maxTokens, walletStatus.totalAvailableCents)
+    if (cappedMaxTokens <= 0) {
       // Not enough credits – send a gentle notification that links to billing instead of a tip
     const payload = JSON.stringify({
         title: 'Top up credits to keep AI health tips coming',
@@ -585,12 +585,13 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({ skipped: 'insufficient_credits' })
     }
+    maxTokens = cappedMaxTokens
 
     // Generate the health tip with OpenAI
     const wrapped = await chatCompletionWithCost(openai, {
       model,
       messages,
-      max_tokens: 800,
+      max_tokens: maxTokens,
       temperature: 0.4,
     } as any)
 

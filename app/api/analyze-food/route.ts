@@ -35,7 +35,7 @@ const STRICT_AI_ONLY_ITEMS = true;
 // asks to pause billing. Do not toggle it off as a "quick fix" for other bugs.
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
-import { costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter';
+import { capMaxTokensToBudget, costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter';
 import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 import { getImageMetadata } from '@/lib/image-metadata';
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets';
@@ -2701,7 +2701,7 @@ CRITICAL REQUIREMENTS:
     const useGeminiVision =
       Boolean(imageDataUrl) && !packagedMode && !labelScan && model.startsWith('gemini-')
 
-    const maxTokens = feedbackDown ? 800 : 600;
+    let maxTokens = feedbackDown ? 800 : 600;
 
     // Wallet pre-check (skip if allowed via free use OR billing checks are disabled)
     if (BILLING_ENFORCED && !allowViaFreeUse) {
@@ -2720,14 +2720,12 @@ CRITICAL REQUIREMENTS:
             })
             .join('\n')
         : '';
-      const estimateCents = costCentsEstimateFromText(model, promptText, maxTokens * 4);
       const wallet = await cm.getWalletStatus();
-      if (wallet.totalAvailableCents < estimateCents) {
-        return NextResponse.json(
-          { error: 'Insufficient credits' },
-          { status: 402 }
-        );
+      const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, wallet.totalAvailableCents);
+      if (cappedMaxTokens <= 0) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
       }
+      maxTokens = cappedMaxTokens;
     }
 
     // Pre-charge a minimal credit immediately upon analysis start (skip for free trial

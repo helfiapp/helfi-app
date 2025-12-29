@@ -15,7 +15,7 @@ import {
 import type { IssueSectionKey } from '@/lib/insights/issue-engine'
 import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
-import { costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter'
+import { capMaxTokensToBudget, estimateTokensFromText } from '@/lib/cost-meter'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 
@@ -158,16 +158,16 @@ export async function POST(
       const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
       const promptText = [system, ...history.map((m) => m.content)].join('\n')
       const cm = new CreditManager(session.user.id)
-      const estimateCents = costCentsEstimateFromText(model, promptText, 500 * 4)
       const wallet = await cm.getWalletStatus()
-      if (wallet.totalAvailableCents < estimateCents) {
+      const maxTokens = capMaxTokensToBudget(model, promptText, 500, wallet.totalAvailableCents)
+      if (maxTokens <= 0) {
         return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
       }
 
       const wrapped = await chatCompletionWithCost(openai, {
         model,
         temperature: 0.2,
-        max_tokens: 500,
+        max_tokens: maxTokens,
         messages: chatMessages as any,
       } as any)
 
@@ -210,15 +210,15 @@ export async function POST(
     const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
     const cm = new CreditManager(session.user.id)
     const promptText = [system, ...history.map((m) => m.content)].join('\n')
-    const estimateCents = costCentsEstimateFromText(model, promptText, 500 * 4)
     const wallet = await cm.getWalletStatus()
-    if (wallet.totalAvailableCents < estimateCents) {
+    let maxTokens = capMaxTokensToBudget(model, promptText, 500, wallet.totalAvailableCents)
+    if (maxTokens <= 0) {
       return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
     }
     const wrapped = await chatCompletionWithCost(openai, {
       model,
       temperature: 0.2,
-      max_tokens: 500,
+      max_tokens: maxTokens,
       messages: chatMessages as any,
     } as any)
     const ok = await cm.chargeCents(wrapped.costCents)

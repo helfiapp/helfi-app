@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
-import { costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter'
+import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 
@@ -121,16 +121,16 @@ export async function POST(req: NextRequest) {
       const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
       const promptText = `${systemPrompt}\n${question}`
       const cm = new CreditManager(user.id)
-      const estimateCents = costCentsEstimateFromText(model, promptText, 800 * 4)
       const wallet = await cm.getWalletStatus()
-      if (wallet.totalAvailableCents < estimateCents) {
+      const maxTokens = capMaxTokensToBudget(model, promptText, 800, wallet.totalAvailableCents)
+      if (maxTokens <= 0) {
         return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
       }
 
       const wrapped = await chatCompletionWithCost(openai, {
         model,
         temperature: 0.2,
-        max_tokens: 800,
+        max_tokens: maxTokens,
         messages: chatMessages as any,
       } as any)
 
@@ -169,19 +169,26 @@ export async function POST(req: NextRequest) {
     // Non-streaming fallback
     {
       const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+      let maxTokens = 800
       // Pre-check
       {
         const cm = new CreditManager(user.id)
-        const estimateCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, 800 * 4)
         const wallet = await cm.getWalletStatus()
-        if (wallet.totalAvailableCents < estimateCents) {
+        const cappedMaxTokens = capMaxTokensToBudget(
+          model,
+          `${systemPrompt}\n${question}`,
+          maxTokens,
+          wallet.totalAvailableCents
+        )
+        if (cappedMaxTokens <= 0) {
           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
         }
+        maxTokens = cappedMaxTokens
       }
       const wrapped = await chatCompletionWithCost(openai, {
         model,
         temperature: 0.2,
-        max_tokens: 800,
+        max_tokens: maxTokens,
         messages: chatMessages as any,
       } as any)
       const cm = new CreditManager(user.id)

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
-import { costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter'
+import { capMaxTokensToBudget, costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { ensureTalkToAITables, listMessages, appendMessage, createThread, updateThreadTitle, listThreads } from '@/lib/talk-to-ai-chat-store'
@@ -341,7 +341,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Estimate cost (2x for user)
-    const estimateCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, 1000 * 4)
+    const promptText = `${systemPrompt}\n${question}`
+    const estimateCents = costCentsEstimateFromText(model, promptText, 1000 * 4)
     const userCostCents = estimateCents * 2 // Double the cost for user
 
     // Check wallet
@@ -356,7 +357,10 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (wallet.totalAvailableCents < userCostCents) {
+    let maxTokens = 1000
+    const budgetCents = Math.floor(wallet.totalAvailableCents / 2)
+    const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, budgetCents)
+    if (cappedMaxTokens <= 0) {
       return NextResponse.json(
         {
           error: 'Insufficient credits',
@@ -366,12 +370,13 @@ export async function POST(req: NextRequest) {
         { status: 402 }
       )
     }
+    maxTokens = cappedMaxTokens
 
     if (wantsStream) {
       const wrapped = await chatCompletionWithCost(openai, {
         model,
         messages: chatMessages,
-        max_tokens: 1000,
+        max_tokens: maxTokens,
         temperature: 0.4,
       } as any)
 
@@ -433,7 +438,7 @@ export async function POST(req: NextRequest) {
       const wrapped = await chatCompletionWithCost(openai, {
         model,
         messages: chatMessages,
-        max_tokens: 1000,
+        max_tokens: maxTokens,
         temperature: 0.4,
       })
 

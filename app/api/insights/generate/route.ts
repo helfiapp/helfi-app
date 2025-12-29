@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { consumeRateLimit } from '@/lib/rate-limit'
 import { CreditManager } from '@/lib/credit-system'
-import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 
 const INSIGHTS_RATE_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
@@ -246,9 +246,9 @@ Keep each insight skimmable but substantive. Do not return prose outside of the 
 Profile: ${profileText}`
         const model = 'gpt-4o-mini'
         const cm = new CreditManager(profile.id)
-        const estimateCents = costCentsEstimateFromText(model, prompt, 1000 * 4)
         const wallet = await cm.getWalletStatus()
-        if (wallet.totalAvailableCents < estimateCents) {
+        const maxTokens = capMaxTokensToBudget(model, prompt, 1000, wallet.totalAvailableCents)
+        if (maxTokens <= 0) {
           return NextResponse.json({ enabled: true, items: fallback(), ai: false, requiresPayment: true }, { status: 200 })
         }
 
@@ -256,7 +256,7 @@ Profile: ${profileText}`
           model,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.2,
-          max_tokens: 1000,
+          max_tokens: maxTokens,
         } as any)
 
         const ok = await cm.chargeCents(wrapped.costCents)

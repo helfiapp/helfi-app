@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { CreditManager } from '@/lib/credit-system'
-import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 
 // Lazy OpenAI import to avoid build-time env requirements
@@ -102,9 +102,9 @@ export async function POST(request: NextRequest) {
     const model = 'gpt-4o-mini'
     const promptText = [baseSystem, ...history].map((m) => m.content).join('\n')
     const cm = new CreditManager(userId)
-    const estimateCents = costCentsEstimateFromText(model, promptText, 400 * 4)
     const wallet = await cm.getWalletStatus()
-    if (wallet.totalAvailableCents < estimateCents) {
+    const maxTokens = capMaxTokensToBudget(model, promptText, 400, wallet.totalAvailableCents)
+    if (maxTokens <= 0) {
       return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
     }
 
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       model,
       messages: [baseSystem, ...history],
       temperature: 0.2,
-      max_tokens: 400,
+      max_tokens: maxTokens,
     } as any)
 
     const ok = await cm.chargeCents(wrapped.costCents)

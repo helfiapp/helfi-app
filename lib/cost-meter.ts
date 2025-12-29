@@ -131,6 +131,23 @@ export function costCentsEstimateFromText(
   return costCentsForTokens(model, { promptTokens, completionTokens });
 }
 
+export function capMaxTokensToBudget(
+  model: string,
+  promptText: string,
+  desiredMaxTokens: number,
+  budgetCents: number,
+  safetyMargin: number = 0.9
+): number {
+  if (!Number.isFinite(budgetCents) || budgetCents <= 0) return 0;
+  const promptTokens = estimateTokensFromText(promptText);
+  const { inputCentsPer1k, outputCentsPer1k } = getModelPrices(model);
+  const markup = getBillingMarkupMultiplier();
+  const promptCost = (promptTokens / 1000) * inputCentsPer1k * markup;
+  const usableBudget = budgetCents * safetyMargin - promptCost;
+  if (!Number.isFinite(usableBudget) || usableBudget <= 0) return 0;
+  const maxCompletionTokens = Math.floor((usableBudget / (outputCentsPer1k * markup)) * 1000);
+  return Math.max(0, Math.min(desiredMaxTokens, maxCompletionTokens));
+}
 
 
 
