@@ -29,7 +29,7 @@ type SupportAiResult = {
 type SupportAutomationInput = {
   ticketId: string
   latestUserMessage?: string | null
-  source?: 'app_ticket' | 'app_reply' | 'email_ticket' | 'email_reply' | 'web_ticket' | 'admin_reply'
+  source?: 'app_ticket' | 'app_reply' | 'email_ticket' | 'email_reply' | 'web_ticket' | 'web_chat' | 'admin_reply'
 }
 
 function getOpenAIClient(): OpenAI | null {
@@ -742,7 +742,10 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
     },
   })
 
-  const isEmailChannel = !ticket.userId || input.source === 'email_reply' || input.source === 'email_ticket' || input.source === 'web_ticket'
+  const isEmailChannel =
+    input.source === 'email_reply' ||
+    input.source === 'email_ticket' ||
+    input.source === 'web_ticket'
   if (isEmailChannel) {
     await sendSupportResponseEmail({
       ticket,

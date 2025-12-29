@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { MouseEvent, ReactNode, useEffect, useState } from 'react'
 import UsageMeter from '@/components/UsageMeter'
+import SupportChatWidget from '@/components/support/SupportChatWidget'
 
 // Desktop Sidebar Navigation Component  
 function DesktopSidebar({
@@ -492,6 +493,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
             </div>
           )}
           {children}
+          <SupportChatWidget />
         </div>
       </div>
     )
@@ -501,6 +503,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
     <div className="min-h-screen">
       {children}
+      <SupportChatWidget />
     </div>
   )
 } 

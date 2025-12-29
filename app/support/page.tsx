@@ -80,6 +80,13 @@ export default function SupportPage() {
     }
   }, [session, loadActiveTicket])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (activeTicket && session?.user?.email) {
+      window.localStorage.setItem('helfi:support:widget:open', 'true')
+    }
+  }, [activeTicket, session?.user?.email])
+
   const splitMessageAttachments = (message: string) => {
     const markerIndex = message.indexOf(ATTACHMENTS_MARKER)
     if (markerIndex === -1) {
