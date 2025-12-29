@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { notifyOwner } from '@/lib/owner-notifications'
 import { getEmailFooter } from '@/lib/email-footer'
+import { reportCriticalError } from '@/lib/error-reporter'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
@@ -693,6 +694,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true })
   } catch (e) {
+    reportCriticalError({
+      source: 'billing.webhook',
+      error: e,
+      details: {
+        eventType: event?.type,
+        eventId: event?.id,
+      },
+    })
     console.error('Stripe webhook error', e)
     return NextResponse.json({ error: 'Webhook handler failure' }, { status: 500 })
   }

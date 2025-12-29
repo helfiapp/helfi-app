@@ -83,3 +83,45 @@ export async function sendVercelSpendAlertEmail(options: {
 
   console.log(`✅ [VERCEL SPEND ALERT] Sent to ${recipientEmail} with ID: ${emailResponse.data?.id}`)
 }
+
+export async function sendOwnerErrorAlertEmail(options: {
+  source: string
+  message: string
+  userId?: string
+  userEmail?: string
+  details?: string
+  count?: number
+}) {
+  const resend = getResendClient()
+  if (!resend) return
+
+  const recipientEmail = getOwnerEmail()
+  const countText = typeof options.count === 'number' ? `${options.count}` : '1'
+  const subject = `Helfi error alert: ${options.source}`
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h2 style="margin: 0 0 12px 0;">Automatic error alert</h2>
+      <p style="margin: 0 0 6px 0;"><strong>Source:</strong> ${options.source}</p>
+      <p style="margin: 0 0 6px 0;"><strong>Message:</strong> ${options.message}</p>
+      <p style="margin: 0 0 6px 0;"><strong>Count (since last alert):</strong> ${countText}</p>
+      ${options.userEmail ? `<p style="margin: 0 0 6px 0;"><strong>User email:</strong> ${options.userEmail}</p>` : ''}
+      ${options.userId ? `<p style="margin: 0 0 12px 0;"><strong>User ID:</strong> ${options.userId}</p>` : ''}
+      ${options.details ? `<pre style="background:#f3f4f6; padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap;">${options.details}</pre>` : ''}
+      ${getEmailFooter({
+        recipientEmail,
+        emailType: 'admin',
+        reasonText: 'You received this email because automatic error alerts are enabled.'
+      })}
+    </div>
+  `
+
+  const emailResponse = await resend.emails.send({
+    from: 'Helfi Alerts <support@helfi.ai>',
+    to: recipientEmail,
+    subject,
+    html,
+  })
+
+  console.log(`✅ [ERROR ALERT] Sent to ${recipientEmail} with ID: ${emailResponse.data?.id}`)
+}

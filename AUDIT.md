@@ -112,12 +112,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    5) What needs to be done to fix it: Cap the response size to fit the user’s available credits so requests are not blocked by worst‑case estimates. This is now in place.
 
 ## Low Priority / Improvements
-1. Error reporting is mostly manual.
+1. ✅ Error reporting is mostly manual.
    1) What the issue is: Most errors are only written to logs.
    2) Why it matters: Serious problems can go unnoticed until users report them.
    3) What could realistically go wrong: An outage or data issue persists for hours without detection.
    4) How serious it is: Low.
-   5) What needs to be done to fix it: Add automatic error alerts and dashboards for key failures.
+   5) What needs to be done to fix it: Send automatic error alerts for critical failures so problems are seen quickly without watching logs. This is now in place.
 
 2. Analytics data can be lost on restarts.
    1) What the issue is: Analytics data is stored in memory only.

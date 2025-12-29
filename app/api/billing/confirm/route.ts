@@ -4,14 +4,16 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 import { notifyOwner } from '@/lib/owner-notifications'
+import { reportCriticalError } from '@/lib/error-reporter'
 
 // Force dynamic so this route isn't considered for static optimization at build time
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function GET(request: NextRequest) {
+  let sessionParam: string | null = null
   try {
-    const sessionParam = new URL(request.url).searchParams.get('session_id')
+    sessionParam = new URL(request.url).searchParams.get('session_id')
     if (!sessionParam) {
       return NextResponse.json({ error: 'missing_session_id' }, { status: 400 })
     }
@@ -110,6 +112,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (err) {
+    reportCriticalError({
+      source: 'billing.confirm',
+      error: err,
+      details: {
+        sessionId: sessionParam || undefined,
+      },
+    })
     console.error('[billing.confirm] error', err)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
