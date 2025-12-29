@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -35,6 +35,14 @@ export default function SupportPage() {
   const [feedbackComment, setFeedbackComment] = useState('')
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [optimisticMessages, setOptimisticMessages] = useState<Array<{
+    id: string
+    message: string
+    attachments: SupportAttachment[]
+    isAdminResponse: boolean
+    createdAt: string
+  }>>([])
+  const chatEndRef = useRef<HTMLDivElement | null>(null)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -65,7 +73,12 @@ export default function SupportPage() {
       const response = await fetch('/api/support/tickets?activeOnly=1')
       if (response.ok) {
         const result = await response.json()
-        setActiveTicket(result.ticket || null)
+        const clearedTicketId = typeof window !== 'undefined' ? window.localStorage.getItem('helfi:support:cleared-ticket') || '' : ''
+        const isClearedClosed =
+          clearedTicketId &&
+          result.ticket?.id === clearedTicketId &&
+          ['RESOLVED', 'CLOSED'].includes(result.ticket?.status)
+        setActiveTicket(isClearedClosed ? null : (result.ticket || null))
         setFeedbackSubmitted(Boolean(result.ticket?.responses?.some((res: any) => String(res.message || '').startsWith('[FEEDBACK]'))))
       }
     } catch (error) {
@@ -86,6 +99,14 @@ export default function SupportPage() {
       window.localStorage.setItem('helfi:support:widget:open', 'true')
     }
   }, [activeTicket, session?.user?.email])
+
+  useEffect(() => {
+    if (!activeTicket) return
+    const timer = window.setTimeout(() => {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [activeTicket?.id, activeTicket?.responses?.length, optimisticMessages.length])
 
   const splitMessageAttachments = (message: string) => {
     const markerIndex = message.indexOf(ATTACHMENTS_MARKER)
@@ -271,9 +292,25 @@ export default function SupportPage() {
 
   const sendChatMessage = async () => {
     if (!activeTicket || (!chatMessage.trim() && chatAttachments.length === 0)) return
+    if (isChatClosed) return
+    const trimmedMessage = chatMessage.trim()
+    const outgoingAttachments = chatAttachments
+    const optimisticId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    setOptimisticMessages((prev) => [
+      ...prev,
+      {
+        id: optimisticId,
+        message: trimmedMessage,
+        attachments: outgoingAttachments,
+        isAdminResponse: false,
+        createdAt: new Date().toISOString()
+      }
+    ])
+    setChatMessage('')
+    setChatAttachments([])
     setIsSendingChat(true)
     try {
-      const messageWithAttachments = serializeMessageWithAttachments(chatMessage.trim(), chatAttachments)
+      const messageWithAttachments = serializeMessageWithAttachments(trimmedMessage, outgoingAttachments)
       const response = await fetch('/api/support/tickets', {
         method: 'POST',
         headers: {
@@ -289,13 +326,24 @@ export default function SupportPage() {
       if (response.ok) {
         const result = await response.json()
         setActiveTicket(result.ticket || null)
-        setChatMessage('')
-        setChatAttachments([])
+        setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
+      }
+      if (!response.ok) {
+        setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
       }
     } catch (error) {
       console.error('Error sending support message:', error)
+      setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
     }
     setIsSendingChat(false)
+  }
+
+  const handleChatKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+    event.preventDefault()
+    if (!isChatClosed && !isSendingChat) {
+      sendChatMessage()
+    }
   }
 
   const startNewTicket = () => {
@@ -303,10 +351,27 @@ export default function SupportPage() {
     setSubmitStatus('idle')
     setChatAttachments([])
     setFormAttachments([])
+    setOptimisticMessages([])
     setFeedbackRating(0)
     setFeedbackComment('')
     setFeedbackSubmitted(false)
     setAttachmentError('')
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('helfi:support:cleared-ticket')
+    }
+  }
+
+  const clearChat = () => {
+    if (typeof window !== 'undefined' && activeTicket?.id) {
+      window.localStorage.setItem('helfi:support:cleared-ticket', activeTicket.id)
+    }
+    setActiveTicket(null)
+    setChatMessage('')
+    setChatAttachments([])
+    setOptimisticMessages([])
+    setFeedbackRating(0)
+    setFeedbackComment('')
+    setFeedbackSubmitted(false)
   }
 
   const endChat = async () => {
@@ -392,6 +457,7 @@ export default function SupportPage() {
           })
       ]
     : []
+  const combinedConversationItems = [...conversationItems, ...optimisticMessages]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -471,10 +537,10 @@ export default function SupportPage() {
                     This chat is closed. If you need more help, start a new ticket below.
                   </div>
                 )}
-                {conversationItems.length === 0 && (
+                {combinedConversationItems.length === 0 && (
                   <div className="text-sm text-gray-500 text-center">No messages yet.</div>
                 )}
-                {conversationItems.map((item) => (
+                {combinedConversationItems.map((item) => (
                   <div
                     key={item.id}
                     className={`rounded-lg p-4 ${item.isAdminResponse ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'bg-gray-50 border-l-4 border-gray-300'}`}
@@ -533,6 +599,7 @@ export default function SupportPage() {
                     )}
                   </div>
                 ))}
+                <div ref={chatEndRef} />
               </div>
             )}
 
@@ -547,6 +614,7 @@ export default function SupportPage() {
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
                 onPaste={(e) => handlePasteUpload(e, setChatAttachments, setIsUploadingChatAttachment)}
+                onKeyDown={handleChatKeyDown}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-helfi-green focus:border-helfi-green"
                 placeholder="Describe the issue or add more details..."
                 disabled={isChatClosed}
@@ -599,14 +667,31 @@ export default function SupportPage() {
                   >
                     End chat
                   </button>
+                  {isChatClosed && (
+                    <button
+                      type="button"
+                      onClick={clearChat}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Clear chat
+                    </button>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={sendChatMessage}
                   disabled={isChatClosed || isUploadingChatAttachment || (!chatMessage.trim() && chatAttachments.length === 0) || isSendingChat}
-                  className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center w-11 h-11 bg-helfi-green text-white rounded-full hover:bg-helfi-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Send message"
+                  title="Send"
                 >
-                  {isSendingChat || isUploadingChatAttachment ? 'Sending...' : 'Send Message'}
+                  {isSendingChat || isUploadingChatAttachment ? (
+                    <span className="text-xs">...</span>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>

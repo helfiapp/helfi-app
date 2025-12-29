@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -37,6 +37,13 @@ export default function SupportChatWidget() {
   const [attachments, setAttachments] = useState<SupportAttachment[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [attachmentError, setAttachmentError] = useState('')
+  const [optimisticMessages, setOptimisticMessages] = useState<Array<{
+    id: string
+    message: string
+    attachments: SupportAttachment[]
+    isAdminResponse: boolean
+    createdAt: string
+  }>>([])
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
   const [guestToken, setGuestToken] = useState('')
@@ -44,6 +51,7 @@ export default function SupportChatWidget() {
   const [feedbackRating, setFeedbackRating] = useState(0)
   const [feedbackComment, setFeedbackComment] = useState('')
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   const isChatClosed = ticket && ['RESOLVED', 'CLOSED'].includes(ticket.status)
   const shouldHideWidget = pathname === '/support' || pathname.startsWith('/admin-panel') || pathname.startsWith('/main-admin')
@@ -132,7 +140,7 @@ export default function SupportChatWidget() {
   }
 
   const conversationItems = useMemo(() => {
-    if (!ticket) return []
+    if (!ticket) return [...optimisticMessages]
     const initial = splitMessageAttachments(String(ticket.message || ''))
     const base = [
       {
@@ -158,8 +166,16 @@ export default function SupportChatWidget() {
           createdAt: response.createdAt,
         }
       })
-    return [...base, ...responses]
-  }, [ticket])
+    return [...base, ...responses, ...optimisticMessages]
+  }, [ticket, optimisticMessages])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const timer = window.setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [isOpen, conversationItems.length])
 
   const loadTicket = useCallback(async () => {
     if (!isOpen) return
@@ -251,8 +267,8 @@ export default function SupportChatWidget() {
     }
   }
 
-  const createGuestChat = async () => {
-    if (!guestEmail.trim() || !message.trim()) return
+  const createGuestChat = async (payloadMessage: string, payloadAttachments: SupportAttachment[], optimisticId: string) => {
+    if (!guestEmail.trim() || (!payloadMessage.trim() && payloadAttachments.length === 0)) return
     setIsLoading(true)
     try {
       const response = await fetch('/api/support/inquiry', {
@@ -262,7 +278,7 @@ export default function SupportChatWidget() {
           action: 'create',
           name: guestName.trim(),
           email: guestEmail.trim(),
-          message: serializeMessageWithAttachments(message.trim(), attachments),
+          message: serializeMessageWithAttachments(payloadMessage.trim(), payloadAttachments),
         }),
       })
       if (response.ok) {
@@ -270,17 +286,38 @@ export default function SupportChatWidget() {
         setTicket(result.ticket || null)
         setGuestToken(result.token || '')
         setGuestTicketId(result.ticket?.id || '')
-        setMessage('')
-        setAttachments([])
+        setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
+      }
+      if (!response.ok) {
+        setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
       }
     } catch (error) {
       console.error('Error starting inquiry chat:', error)
+      setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
     }
     setIsLoading(false)
   }
 
   const sendMessage = async () => {
-    if (!message.trim() && attachments.length === 0) return
+    const trimmedMessage = message.trim()
+    const outgoingAttachments = attachments
+    if (!trimmedMessage && outgoingAttachments.length === 0) return
+    if (isChatClosed || isLoading || isUploading) return
+    if (!ticket && !isLoggedIn && !guestEmail.trim()) return
+
+    const optimisticId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    setOptimisticMessages((prev) => [
+      ...prev,
+      {
+        id: optimisticId,
+        message: trimmedMessage,
+        attachments: outgoingAttachments,
+        isAdminResponse: false,
+        createdAt: new Date().toISOString(),
+      },
+    ])
+    setMessage('')
+    setAttachments([])
     if (!ticket) {
       if (isLoggedIn) {
         setIsLoading(true)
@@ -299,15 +336,18 @@ export default function SupportChatWidget() {
           if (response.ok) {
             const result = await response.json()
             setTicket(result.ticket || null)
-            setMessage('')
-            setAttachments([])
+            setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
+          }
+          if (!response.ok) {
+            setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
           }
         } catch (error) {
           console.error('Error creating support chat:', error)
+          setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
         }
         setIsLoading(false)
       } else {
-        await createGuestChat()
+        await createGuestChat(trimmedMessage, outgoingAttachments, optimisticId)
       }
       return
     }
@@ -328,13 +368,24 @@ export default function SupportChatWidget() {
       if (response.ok) {
         const result = await response.json()
         setTicket(result.ticket || null)
-        setMessage('')
-        setAttachments([])
+        setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
+      }
+      if (!response.ok) {
+        setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
       }
     } catch (error) {
       console.error('Error sending support message:', error)
+      setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
     }
     setIsLoading(false)
+  }
+
+  const handleChatKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+    event.preventDefault()
+    if (isChatClosed || isLoading || isUploading) return
+    if (!isLoggedIn && !guestEmail.trim()) return
+    sendMessage()
   }
 
   const endChat = async () => {
@@ -390,6 +441,21 @@ export default function SupportChatWidget() {
     setTicket(null)
     setMessage('')
     setAttachments([])
+    setOptimisticMessages([])
+    setFeedbackRating(0)
+    setFeedbackComment('')
+    setFeedbackSubmitted(false)
+    if (!isLoggedIn) {
+      setGuestToken('')
+      setGuestTicketId('')
+    }
+  }
+
+  const clearChat = () => {
+    setTicket(null)
+    setMessage('')
+    setAttachments([])
+    setOptimisticMessages([])
     setFeedbackRating(0)
     setFeedbackComment('')
     setFeedbackSubmitted(false)
@@ -539,17 +605,27 @@ export default function SupportChatWidget() {
                 )}
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
 
           {ticket && isChatClosed && (
             <div className="px-4 pb-3">
-              <button
-                type="button"
-                onClick={startNewChat}
-                className="mb-3 w-full text-xs border border-gray-300 text-gray-700 rounded-lg px-3 py-2"
-              >
-                Start a new chat
-              </button>
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={startNewChat}
+                  className="w-full text-xs border border-gray-300 text-gray-700 rounded-lg px-3 py-2"
+                >
+                  Start a new chat
+                </button>
+                <button
+                  type="button"
+                  onClick={clearChat}
+                  className="w-full text-xs border border-gray-300 text-gray-700 rounded-lg px-3 py-2"
+                >
+                  Clear chat
+                </button>
+              </div>
               {feedbackSubmitted ? (
                 <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2">
                   Thanks for the feedback.
@@ -614,6 +690,7 @@ export default function SupportChatWidget() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onPaste={handlePasteUpload}
+                onKeyDown={handleChatKeyDown}
                 className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm"
                 placeholder="Type your message..."
               />
@@ -642,9 +719,17 @@ export default function SupportChatWidget() {
                     type="button"
                     onClick={sendMessage}
                     disabled={isUploading || isLoading || (!message.trim() && attachments.length === 0) || (!isLoggedIn && !guestEmail.trim())}
-                    className="text-xs bg-helfi-green text-white rounded-lg px-3 py-1 disabled:opacity-50"
+                    className="inline-flex items-center justify-center w-9 h-9 bg-helfi-green text-white rounded-full disabled:opacity-50"
+                    aria-label="Send message"
+                    title="Send"
                   >
-                    {isLoading || isUploading ? 'Sending...' : 'Send'}
+                    {isLoading || isUploading ? (
+                      <span className="text-[10px]">...</span>
+                    ) : (
+                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                      </svg>
+                    )}
                   </button>
                 </div>
               </div>

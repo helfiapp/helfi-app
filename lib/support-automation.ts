@@ -122,7 +122,11 @@ function buildSupportSystemPrompt(): string {
     '- If verification is pending, ask the user to reply with the 6-digit code we emailed them.',
     '- For troubleshooting, ask for steps to reproduce, device type, OS version, browser/app version, and screenshots when relevant.',
     '- If a bug is likely, tell the user we are investigating and provide clear internal notes for the team.',
+    '- Use the product facts below when answering questions about trials, pricing, credits, or features.',
+    '- If you are not sure about a detail, say you will confirm and loop in the team.',
     `- Sign off with "${SUPPORT_AGENT_NAME} from ${SUPPORT_AGENT_ROLE}".`,
+    '',
+    supportProductFacts(),
     '',
     'Output strict JSON only with these fields:',
     '{ "customerReply": string, "shouldEscalate": boolean, "escalationReason": string, "needsIdentityCheck": boolean, "needsMoreInfo": boolean, "requestedInfo": string[], "internalNotes": string, "suggestedCategory": string, "suggestedPriority": string }',
@@ -145,6 +149,17 @@ function supportCodeMap(): string {
     '- Symptoms: app/symptoms/*, app/api/analyze-symptoms/*',
     '- Insights: app/insights/*, lib/insights/*',
     '- Push notifications: app/api/push/*, lib/push/*',
+  ].join('\n')
+}
+
+function supportProductFacts(): string {
+  return [
+    'PRODUCT FACTS:',
+    '- No free trial. New users can try each AI feature once for free.',
+    '- Non-AI features remain free for all users.',
+    '- Premium plan: $20/month includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 medical image analyses per day, advanced insights, priority support, and export capabilities.',
+    '- Credit packs: $5 for 100 credits or $10 for 150 credits. Credits do not expire and can be used for any analysis.',
+    '- Helfi is a web app that works in the browser on mobile and desktop; no download is required.',
   ].join('\n')
 }
 
@@ -177,6 +192,8 @@ function buildSupportUserPrompt(input: {
     '',
     'Conversation history:',
     input.conversation || '(none)',
+    '',
+    supportProductFacts(),
     '',
     supportCodeMap(),
   ].join('\n')
