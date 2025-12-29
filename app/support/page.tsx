@@ -494,7 +494,7 @@ export default function SupportPage() {
                     <p className="text-gray-700 whitespace-pre-wrap">{item.message}</p>
                     {item.attachments?.length > 0 && (
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {item.attachments.map((att) => (
+                        {item.attachments.map((att: SupportAttachment) => (
                           <a
                             key={`${item.id}-${att.url}`}
                             href={att.url}
