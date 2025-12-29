@@ -131,6 +131,8 @@ export default function AdminPanel() {
   const [isLoadingTickets, setIsLoadingTickets] = useState(false)
   const [ticketFilter, setTicketFilter] = useState('all')
   const [ticketsError, setTicketsError] = useState('')
+  const [selectedTicketIds, setSelectedTicketIds] = useState<string[]>([])
+  const [isDeletingTickets, setIsDeletingTickets] = useState(false)
   const [selectedTicket, setSelectedTicket] = useState<any>(null)
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [ticketResponse, setTicketResponse] = useState('')
@@ -1988,6 +1990,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
         setTicketsError(result.schemaStatus?.message || 'Support tickets database is not ready.')
       }
       setSupportTickets(result.tickets || [])
+      setSelectedTicketIds([])
     } catch (error) {
       console.error('Error loading tickets:', error)
       setTicketsError('Unable to load support tickets. Please refresh and try again.')
@@ -2018,6 +2021,54 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       }
     } catch (error) {
       console.error('Error handling ticket action:', error)
+    }
+  }
+
+  const toggleTicketSelection = (ticketId: string) => {
+    setSelectedTicketIds((prev) => (
+      prev.includes(ticketId) ? prev.filter((id) => id !== ticketId) : [...prev, ticketId]
+    ))
+  }
+
+  const toggleSelectAllTickets = () => {
+    if (selectedTicketIds.length === supportTickets.length) {
+      setSelectedTicketIds([])
+      return
+    }
+    setSelectedTicketIds(supportTickets.map((ticket) => ticket.id))
+  }
+
+  const handleDeleteSelectedTickets = async () => {
+    if (selectedTicketIds.length === 0) return
+    if (!confirm(`Delete ${selectedTicketIds.length} ticket(s)? This cannot be undone.`)) return
+    setIsDeletingTickets(true)
+    setTicketsError('')
+    try {
+      const authToken = (sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || adminToken || '').trim()
+      if (!authToken) {
+        setTicketsError('Your admin session expired. Please log in again.')
+        setIsAuthenticated(false)
+        return
+      }
+      await Promise.all(
+        selectedTicketIds.map((ticketId) =>
+          fetch('/api/admin/tickets', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ action: 'delete', ticketId }),
+          })
+        )
+      )
+      setSelectedTicketIds([])
+      loadSupportTickets()
+    } catch (error) {
+      console.error('Error deleting tickets:', error)
+      setTicketsError('Unable to delete selected tickets. Please try again.')
+    } finally {
+      setIsDeletingTickets(false)
     }
   }
 
@@ -5397,6 +5448,13 @@ The Helfi Team`,
                   >
                     🔄 Refresh
                   </button>
+                  <button
+                    onClick={handleDeleteSelectedTickets}
+                    disabled={selectedTicketIds.length === 0 || isDeletingTickets}
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isDeletingTickets ? 'Deleting...' : `Delete (${selectedTicketIds.length})`}
+                  </button>
                 </div>
               </div>
             </div>
@@ -5425,6 +5483,15 @@ The Helfi Team`,
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            aria-label="Select all tickets"
+                            checked={supportTickets.length > 0 && selectedTicketIds.length === supportTickets.length}
+                            onChange={toggleSelectAllTickets}
+                            className="h-4 w-4 text-emerald-600 border-gray-300 rounded"
+                          />
+                        </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Customer
                         </th>
@@ -5451,7 +5518,7 @@ The Helfi Team`,
                     <tbody className="bg-white divide-y divide-gray-200">
                       {supportTickets.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                          <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                             <div className="flex flex-col items-center">
                               <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -5466,6 +5533,15 @@ The Helfi Team`,
                       ) : (
                         supportTickets.map((ticket) => (
                           <tr key={ticket.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ticket ${ticket.subject}`}
+                                checked={selectedTicketIds.includes(ticket.id)}
+                                onChange={() => toggleTicketSelection(ticket.id)}
+                                className="h-4 w-4 text-emerald-600 border-gray-300 rounded"
+                              />
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
                                 <div className="h-10 w-10 flex-shrink-0">
