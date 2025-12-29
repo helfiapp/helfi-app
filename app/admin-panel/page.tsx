@@ -130,6 +130,7 @@ export default function AdminPanel() {
   const [supportTickets, setSupportTickets] = useState<any[]>([])
   const [isLoadingTickets, setIsLoadingTickets] = useState(false)
   const [ticketFilter, setTicketFilter] = useState('all')
+  const [ticketsError, setTicketsError] = useState('')
   const [selectedTicket, setSelectedTicket] = useState<any>(null)
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [ticketResponse, setTicketResponse] = useState('')
@@ -1944,20 +1945,30 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   // Support ticket functions
   const loadSupportTickets = async () => {
     setIsLoadingTickets(true)
+    setTicketsError('')
     try {
       // Get token from sessionStorage directly to avoid state timing issues
       const authToken = sessionStorage.getItem('adminToken') || adminToken
-      const response = await fetch(`/api/admin/tickets?status=${ticketFilter}`, {
+      const response = await fetch(`/api/admin/tickets?status=${encodeURIComponent(ticketFilter)}&ts=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
-        }
+        },
+        cache: 'no-store'
       })
-      if (response.ok) {
-        const result = await response.json()
-        setSupportTickets(result.tickets || [])
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        const message = result?.error || result?.message || 'Unable to load support tickets.'
+        setTicketsError(message)
+        setSupportTickets([])
+        return
       }
+      if (result?.schemaStatus?.ready === false) {
+        setTicketsError(result.schemaStatus?.message || 'Support tickets database is not ready.')
+      }
+      setSupportTickets(result.tickets || [])
     } catch (error) {
       console.error('Error loading tickets:', error)
+      setTicketsError('Unable to load support tickets. Please refresh and try again.')
     }
     setIsLoadingTickets(false)
   }
@@ -5375,6 +5386,12 @@ The Helfi Team`,
                   {isLoadingTickets ? 'Loading...' : `${supportTickets.length} tickets`}
                 </h4>
               </div>
+
+              {ticketsError && (
+                <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {ticketsError}
+                </div>
+              )}
               
               {isLoadingTickets ? (
                 <div className="flex items-center justify-center py-12">

@@ -117,6 +117,7 @@ function buildSupportSystemPrompt(): string {
     '- Use plain English. Keep replies short, warm, and helpful.',
     '- Start with a brief greeting only if this is your first reply in the conversation; otherwise, skip the greeting and continue naturally.',
     '- Focus on app troubleshooting, not medical advice.',
+    '- Do not claim hardware or device integrations that are not currently supported.',
     '- Never ask for passwords, payment card numbers, or full security answers.',
     '- Do not claim you made account changes. Only provide guidance and request verification when needed.',
     '- If the issue involves account access, billing, subscription changes, email change, password change, or deleting data, you MUST require identity verification.',
@@ -165,6 +166,8 @@ function supportProductFacts(): string {
     '- Premium plan: $20/month includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 medical image analyses per day, advanced insights, priority support, and export capabilities.',
     '- Credit packs: $5 for 100 credits or $10 for 150 credits. Credits do not expire and can be used for any analysis.',
     '- Helfi is a web app that works in the browser on mobile and desktop; no download is required.',
+    '- Device integrations available now: Fitbit and Garmin Connect.',
+    '- Apple Watch, Apple Health, Samsung Health, Oura Ring, and Google Fit are not supported yet. These are planned for future iOS/Android apps.',
   ].join('\n')
 }
 
@@ -508,45 +511,79 @@ async function sendEscalationNotice(options: {
   })
 }
 
-function formatTranscriptLines(ticket: any): string {
-  const lines: string[] = []
+type TranscriptEntry = {
+  author: string
+  message: string
+  attachments: SupportAttachment[]
+}
+
+function buildTranscriptEntries(ticket: any): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = []
   if (ticket.message) {
     const parsed = splitAttachmentsFromMessage(String(ticket.message))
-    lines.push(`Customer (${ticket.userEmail}): ${parsed.text}`)
-    if (parsed.attachments.length > 0) {
-      parsed.attachments.forEach((att) => {
-        lines.push(`  Attachment: ${att.name} (${att.type || 'file'}) - ${att.url}`)
-      })
-    }
+    entries.push({
+      author: `Customer (${ticket.userEmail})`,
+      message: parsed.text,
+      attachments: parsed.attachments,
+    })
   }
 
   const responses = Array.isArray(ticket.responses) ? ticket.responses : []
   responses.forEach((response: any) => {
     const parsed = splitAttachmentsFromMessage(String(response.message || ''))
+    if (!parsed.text) return
+    if (parsed.text.startsWith('[SYSTEM]')) return
     const author = response.isAdminResponse ? `${SUPPORT_AGENT_NAME} (AI)` : 'Customer'
-    if (!parsed.text.startsWith(SYSTEM_IDENTITY_MARKER)) {
-      lines.push(`${author}: ${parsed.text}`)
-      if (parsed.attachments.length > 0) {
-        parsed.attachments.forEach((att) => {
-          lines.push(`  Attachment: ${att.name} (${att.type || 'file'}) - ${att.url}`)
-        })
-      }
-    }
+    entries.push({
+      author,
+      message: parsed.text,
+      attachments: parsed.attachments,
+    })
   })
 
-  return lines.join('\n')
+  return entries
 }
 
 function buildTranscriptHtml(options: { ticket: any; transcript: string }): string {
   const subject = escapeHtml(options.ticket.subject || 'Support request')
-  const transcript = escapeHtml(options.transcript)
+  const entries = buildTranscriptEntries(options.ticket)
+  const transcriptHtml = entries
+    .map((entry) => {
+      const safeMessage = escapeHtml(entry.message).replace(/\n/g, '<br />')
+      const attachmentsHtml = entry.attachments.length
+        ? `
+          <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+            ${entry.attachments
+              .map((att) => {
+                const name = escapeHtml(att.name)
+                const type = escapeHtml(att.type || 'file')
+                const url = escapeHtml(att.url)
+                return `<div>Attachment: <a href="${url}" target="_blank" rel="noreferrer">${name}</a> (${type})</div>`
+              })
+              .join('')}
+          </div>
+        `
+        : ''
+      return `
+        <div style="margin: 0 0 16px 0;">
+          <div style="font-size: 13px; color: #111827; margin-bottom: 4px;">
+            <strong>${escapeHtml(entry.author)}</strong>
+          </div>
+          <div style="font-size: 13px; color: #374151;">${safeMessage}</div>
+          ${attachmentsHtml}
+        </div>
+      `
+    })
+    .join('')
   return `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
       <h2 style="margin: 0 0 12px 0;">Support chat transcript</h2>
       <p style="margin: 0 0 6px 0;"><strong>Ticket ID:</strong> ${options.ticket.id}</p>
       <p style="margin: 0 0 6px 0;"><strong>User:</strong> ${options.ticket.userEmail}</p>
       <p style="margin: 0 0 16px 0;"><strong>Subject:</strong> ${subject}</p>
-      <pre style="background:#f3f4f6; padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap;">${transcript}</pre>
+      <div style="background:#f3f4f6; padding:12px; border-radius:8px;">
+        ${transcriptHtml || '<div style="font-size: 13px; color: #6b7280;">No messages recorded.</div>'}
+      </div>
       ${getEmailFooter({
         recipientEmail: SUPPORT_COPY_EMAIL,
         emailType: 'admin',
@@ -568,7 +605,7 @@ export async function sendSupportTranscriptEmail(ticketId: string) {
   const alreadySent = ticket.responses?.some((response) => response.isAdminResponse && response.message?.startsWith(SYSTEM_TRANSCRIPT_MARKER))
   if (alreadySent) return
 
-  const transcript = formatTranscriptLines(ticket)
+  const transcript = ''
   await resend.emails.send({
     from: 'Helfi Support <support@helfi.ai>',
     to: SUPPORT_COPY_EMAIL,
