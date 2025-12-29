@@ -118,6 +118,7 @@ function buildSupportSystemPrompt(): string {
     '- Start with a brief greeting only if this is your first reply in the conversation; otherwise, skip the greeting and continue naturally.',
     '- Focus on app troubleshooting, not medical advice.',
     '- Do not claim hardware or device integrations that are not currently supported.',
+    '- If asked about Apple devices or Apple Watch, explain they are not supported in the web app and are planned for the future native apps.',
     '- Never ask for passwords, payment card numbers, or full security answers.',
     '- Do not claim you made account changes. Only provide guidance and request verification when needed.',
     '- If the issue involves account access, billing, subscription changes, email change, password change, or deleting data, you MUST require identity verification.',
@@ -166,7 +167,7 @@ function supportProductFacts(): string {
     '- Premium plan: $20/month includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 medical image analyses per day, advanced insights, priority support, and export capabilities.',
     '- Credit packs: $5 for 100 credits or $10 for 150 credits. Credits do not expire and can be used for any analysis.',
     '- Helfi is a web app that works in the browser on mobile and desktop; no download is required.',
-    '- Device integrations available now: Fitbit and Garmin Connect.',
+    '- Device integrations: Fitbit is available now. Garmin Connect is in evaluation and may be temporarily unavailable until production approval is granted.',
     '- Apple Watch, Apple Health, Samsung Health, Oura Ring, and Google Fit are not supported yet. These are planned for future iOS/Android apps.',
   ].join('\n')
 }

@@ -180,10 +180,12 @@ export default function AdminPanel() {
 
   // Check for URL hash to set active tab and load data
   useEffect(() => {
-    const token = sessionStorage.getItem('adminToken')
-    const user = sessionStorage.getItem('adminUser')
+    const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
+    const user = sessionStorage.getItem('adminUser') || localStorage.getItem('adminUser')
     
     if (token && user) {
+      sessionStorage.setItem('adminToken', token)
+      sessionStorage.setItem('adminUser', user)
       setAdminToken(token)
       setAdminUser(JSON.parse(user))
       setIsAuthenticated(true)
@@ -255,6 +257,8 @@ export default function AdminPanel() {
     setIsAuthenticated(true)
     sessionStorage.setItem('adminToken', tokenValue)
     sessionStorage.setItem('adminUser', JSON.stringify(adminValue))
+    localStorage.setItem('adminToken', tokenValue)
+    localStorage.setItem('adminUser', JSON.stringify(adminValue))
     loadAnalyticsData()
     loadWaitlistData(tokenValue)
     loadUserStats(tokenValue)
@@ -440,6 +444,8 @@ export default function AdminPanel() {
     setIsAuthenticated(false)
     sessionStorage.removeItem('adminToken')
     sessionStorage.removeItem('adminUser')
+    localStorage.removeItem('adminToken')
+    localStorage.removeItem('adminUser')
     stopQrPolling()
     setPassword('')
     setOtp('')
@@ -1947,8 +1953,14 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     setIsLoadingTickets(true)
     setTicketsError('')
     try {
-      // Get token from sessionStorage directly to avoid state timing issues
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      // Get token from storage directly to avoid state timing issues
+      const authToken = (sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || adminToken || '').trim()
+      if (!authToken) {
+        setTicketsError('Your admin session expired. Please log in again.')
+        setSupportTickets([])
+        setIsAuthenticated(false)
+        return
+      }
       const response = await fetch(`/api/admin/tickets?status=${encodeURIComponent(ticketFilter)}&ts=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
@@ -1956,6 +1968,16 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
         cache: 'no-store'
       })
       const result = await response.json().catch(() => ({}))
+      if (response.status === 401) {
+        setTicketsError('Your admin session expired. Please log in again.')
+        setSupportTickets([])
+        sessionStorage.removeItem('adminToken')
+        sessionStorage.removeItem('adminUser')
+        localStorage.removeItem('adminToken')
+        localStorage.removeItem('adminUser')
+        setIsAuthenticated(false)
+        return
+      }
       if (!response.ok) {
         const message = result?.error || result?.message || 'Unable to load support tickets.'
         setTicketsError(message)
