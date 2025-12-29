@@ -46,10 +46,10 @@ export const deleteFoodPhotosIfUnused = async (
   const stillUsedSet = new Set(
     stillUsed.map((row) => row.imageUrl).filter((url): url is string => typeof url === 'string'),
   )
-  for (const value of stillUsedSet) {
+  Array.from(stillUsedSet).forEach((value) => {
     const path = normalizeFoodPhotoPath(value)
     if (path) stillUsedSet.add(path)
-  }
+  })
 
   const toDelete = candidates.filter((path) => !stillUsedSet.has(path))
   if (toDelete.length === 0) return { deleted: 0, skipped: candidates.length }
