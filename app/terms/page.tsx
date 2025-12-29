@@ -3,8 +3,18 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function TermsPage() {
+  const router = useRouter();
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/dashboard');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Header */}
@@ -26,12 +36,13 @@ export default function TermsPage() {
           
           {/* Back to Home button on the right */}
           <div>
-            <Link 
-              href="/" 
+            <button
+              type="button"
+              onClick={handleBack}
               className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
             >
-              Back to Home
-            </Link>
+              Back
+            </button>
           </div>
         </div>
       </nav>
@@ -48,7 +59,7 @@ export default function TermsPage() {
       <div className="max-w-4xl mx-auto p-8 bg-white mt-8 rounded-lg shadow-sm">
         <div className="prose prose-lg max-w-none">
           <h1 className="text-4xl font-bold text-center mb-2 text-gray-900">Helfi Terms of Use</h1>
-          <p className="text-center text-gray-600 mb-8 text-lg">Effective Date: [Insert Launch Date]</p>
+          <p className="text-center text-gray-600 mb-8 text-lg">Last updated: December 29, 2025</p>
           
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
             <p className="text-gray-700 leading-relaxed">
