@@ -141,12 +141,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Charge credits for every AI feature or remove the feature until billing is added. This is now in place with consistent credit use across all AI features and starter free uses that are still tracked.
 
-2. Streaming chat replies can be delivered without a successful charge.
+2. ✅ Streaming chat replies can be delivered without a successful charge.
    1) What the issue is: Some chat replies are sent before charging, and failed charges are ignored.
    2) Why it matters: Users can keep getting replies even when they are out of credits.
    3) What could realistically go wrong: Cost grows while paid credits do not.
    4) How serious it is: High.
-   5) What needs to be done to fix it: Require a successful charge before completing the reply.
+   5) What needs to be done to fix it: Require a successful charge before completing the reply. This is now enforced so replies are only sent after a successful charge or a valid free use.
 
 3. Full insights regeneration is priced far below likely cost.
    1) What the issue is: The full refresh uses a very low fixed credit price.
