@@ -4,11 +4,48 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { scheduleAllActiveReminders } from '@/lib/qstash'
 
+async function ensureCheckinSettingsTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS CheckinSettings (
+      userId TEXT PRIMARY KEY,
+      enabled BOOLEAN NOT NULL DEFAULT true,
+      time1 TEXT NOT NULL,
+      time2 TEXT NOT NULL,
+      time3 TEXT NOT NULL,
+      timezone TEXT NOT NULL,
+      frequency INTEGER NOT NULL DEFAULT 3
+    )
+  `)
+
+  await prisma
+    .$executeRawUnsafe(
+      `ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true`
+    )
+    .catch(() => {})
+  await prisma
+    .$executeRawUnsafe(
+      `ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '18:30'`
+    )
+    .catch(() => {})
+  await prisma
+    .$executeRawUnsafe(
+      `ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '21:30'`
+    )
+    .catch(() => {})
+  await prisma
+    .$executeRawUnsafe(
+      `ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`
+    )
+    .catch(() => {})
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = await prisma.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  await ensureCheckinSettingsTable()
 
   // Ensure table exists with full schema
   // await prisma.$executeRawUnsafe(`
@@ -28,9 +65,9 @@ export async function GET() {
   // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`).catch(() => {})
 
   // Load user's settings
-  const rows: Array<{ time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
+  const rows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
     await prisma.$queryRawUnsafe(
-      `SELECT time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
+      `SELECT enabled, time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
       user.id
     )
 
@@ -40,6 +77,7 @@ export async function GET() {
 
   // Return defaults if no settings exist
   return NextResponse.json({
+    enabled: true,
     time1: '12:30',
     time2: '18:30',
     time3: '21:30',
@@ -55,7 +93,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const body = await req.json().catch(() => ({}))
-  let { time1, time2, time3, timezone, frequency } = body as any
+  let { enabled, time1, time2, time3, timezone, frequency } = body as any
 
   // Normalize time on the server to avoid client formatting issues
   const normalizeTime = (input?: string, defaultValue: string = '21:00'): string => {
@@ -82,6 +120,7 @@ export async function POST(req: NextRequest) {
     return defaultValue
   }
 
+  enabled = typeof enabled === 'boolean' ? enabled : true
   // Normalize all times with sensible defaults
   time1 = normalizeTime(time1, '12:30')
   time2 = normalizeTime(time2, '18:30')
@@ -91,7 +130,8 @@ export async function POST(req: NextRequest) {
 
   // Auto-create table with full schema
   try {
-    console.log('Saving CheckinSettings for', user.id, { time1, time2, time3, timezone, frequency })
+    await ensureCheckinSettingsTable()
+    console.log('Saving CheckinSettings for', user.id, { enabled, time1, time2, time3, timezone, frequency })
     // await prisma.$executeRawUnsafe(`
     //   CREATE TABLE IF NOT EXISTS CheckinSettings (
     //     userId TEXT PRIMARY KEY,
@@ -119,22 +159,24 @@ export async function POST(req: NextRequest) {
 
     // Save settings
     await prisma.$queryRawUnsafe(
-      `INSERT INTO CheckinSettings (userId, time1, time2, time3, timezone, frequency)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO CheckinSettings (userId, enabled, time1, time2, time3, timezone, frequency)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
        ON CONFLICT (userId) DO UPDATE SET 
+         enabled=EXCLUDED.enabled,
          time1=EXCLUDED.time1, 
          time2=EXCLUDED.time2, 
          time3=EXCLUDED.time3, 
          timezone=EXCLUDED.timezone,
          frequency=EXCLUDED.frequency`,
-      user.id, time1, time2, time3, timezone, frequency
+      user.id, enabled, time1, time2, time3, timezone, frequency
     )
     // Schedule next occurrences for all active reminders and capture outcomes
-    const scheduleResults =
-      await scheduleAllActiveReminders(user.id, { time1, time2, time3, timezone, frequency }).catch((error) => {
-        console.error('[CHECKINS] Failed to schedule reminders via QStash', error)
-        return []
-      })
+    const scheduleResults = enabled
+      ? await scheduleAllActiveReminders(user.id, { time1, time2, time3, timezone, frequency }).catch((error) => {
+          console.error('[CHECKINS] Failed to schedule reminders via QStash', error)
+          return []
+        })
+      : []
 
     const failedSchedules = scheduleResults.filter((result) => !result.scheduled)
     if (failedSchedules.length > 0) {
@@ -143,6 +185,9 @@ export async function POST(req: NextRequest) {
 
     // If user saved shortly after a reminder time, send one immediately to avoid waiting until tomorrow.
     try {
+      if (!enabled) {
+        return NextResponse.json({ success: true, scheduleResults })
+      }
       const base =
         process.env.PUBLIC_BASE_URL ||
         (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
@@ -192,4 +237,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save settings', detail: message }, { status: 500 })
   }
 }
-

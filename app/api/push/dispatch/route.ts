@@ -58,12 +58,15 @@ export async function POST(req: NextRequest) {
     //     frequency INTEGER NOT NULL DEFAULT 3
     //   )
     // `)
-    const settingsRows: Array<{ time1: string; time2: string; time3: string; timezone: string; frequency: number | null }> =
+    const settingsRows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; timezone: string; frequency: number | null }> =
       await prisma.$queryRawUnsafe(
-        `SELECT time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
+        `SELECT enabled, time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
         userId
       )
     const settings = settingsRows[0]
+    if (settings && settings.enabled === false) {
+      return NextResponse.json({ skipped: 'disabled' })
+    }
     const resolvedFrequency = Math.max(1, Math.min(3, settings?.frequency ?? 3))
     const activeTimes: string[] = []
     if (resolvedFrequency >= 1 && settings?.time1) activeTimes.push(settings.time1)

@@ -24,6 +24,7 @@ export async function GET(_req: NextRequest) {
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS CheckinSettings (
         userId TEXT PRIMARY KEY,
+        enabled BOOLEAN NOT NULL DEFAULT true,
         time1 TEXT NOT NULL,
         time2 TEXT NOT NULL,
         time3 TEXT NOT NULL,
@@ -36,8 +37,11 @@ export async function GET(_req: NextRequest) {
       `SELECT subscription FROM PushSubscriptions WHERE userId = $1`,
       user.id
     )
-    const settingsRows: Array<{ time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
-      await prisma.$queryRawUnsafe(`SELECT time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`, user.id)
+    const settingsRows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
+      await prisma.$queryRawUnsafe(
+        `SELECT enabled, time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
+        user.id
+      )
 
     const subscriptionCount = subRows.length ? normalizeSubscriptionList(subRows[0].subscription).length : 0
     const hasSubscription = subscriptionCount > 0
@@ -55,4 +59,3 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'server_error' }, { status: 500 })
   }
 }
-

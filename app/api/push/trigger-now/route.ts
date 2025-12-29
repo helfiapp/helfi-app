@@ -30,17 +30,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Get settings
-    const settingsRows: Array<{ time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
+    const settingsRows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
       await prisma.$queryRawUnsafe(
-        `SELECT time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
+        `SELECT enabled, time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
         user.id
       )
     const settings = settingsRows[0] || {
+      enabled: true,
       time1: '12:30',
       time2: '18:30',
       time3: '21:30',
       timezone: 'Australia/Melbourne',
       frequency: 3
+    }
+    if (settings.enabled === false) {
+      return NextResponse.json({ error: 'Reminders are turned off' }, { status: 400 })
     }
 
     // Configure web-push

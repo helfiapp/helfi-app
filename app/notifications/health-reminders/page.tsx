@@ -36,6 +36,7 @@ function normalizeTime(input: string): string {
 }
 
 export default function HealthReminderSettingsPage() {
+  const [enabled, setEnabled] = useState(true)
   const [time1, setTime1] = useState('12:30')
   const [time2, setTime2] = useState('18:30')
   const [time3, setTime3] = useState('21:30')
@@ -50,6 +51,7 @@ export default function HealthReminderSettingsPage() {
         const res = await fetch('/api/checkins/settings', { cache: 'no-store' as any })
         if (res.ok) {
           const data = await res.json()
+          if (typeof data.enabled === 'boolean') setEnabled(data.enabled)
           if (data.time1) setTime1(normalizeTime(data.time1))
           if (data.time2) setTime2(normalizeTime(data.time2))
           if (data.time3) setTime3(normalizeTime(data.time3))
@@ -71,7 +73,21 @@ export default function HealthReminderSettingsPage() {
       <main className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Daily check-in reminders</h2>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Daily check-in reminders</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Turn reminders on or off.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={enabled}
+                onChange={(e) => setEnabled(e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+            </label>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Set up to 3 reminders per day to complete your check-ins.
@@ -92,6 +108,7 @@ export default function HealthReminderSettingsPage() {
                     value={frequency}
                     onChange={(e) => setFrequency(parseInt(e.target.value, 10))}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    disabled={!enabled}
                   >
                     <option value={1}>1 reminder</option>
                     <option value={2}>2 reminders</option>
@@ -109,6 +126,7 @@ export default function HealthReminderSettingsPage() {
                       value={time1}
                       onChange={(e) => setTime1(e.target.value)}
                       className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      disabled={!enabled}
                     />
                   </div>
                 )}
@@ -123,6 +141,7 @@ export default function HealthReminderSettingsPage() {
                       value={time2}
                       onChange={(e) => setTime2(e.target.value)}
                       className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      disabled={!enabled}
                     />
                   </div>
                 )}
@@ -137,6 +156,7 @@ export default function HealthReminderSettingsPage() {
                       value={time3}
                       onChange={(e) => setTime3(e.target.value)}
                       className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      disabled={!enabled}
                     />
                   </div>
                 )}
@@ -149,6 +169,7 @@ export default function HealthReminderSettingsPage() {
                     value={tz}
                     onChange={(e) => setTz(e.target.value)}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    disabled={!enabled}
                   >
                     {baseTimezones.map((tzOption) => (
                       <option key={tzOption} value={tzOption}>
@@ -166,7 +187,7 @@ export default function HealthReminderSettingsPage() {
                     const res = await fetch('/api/checkins/settings', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ time1, time2, time3, timezone: tz, frequency })
+                      body: JSON.stringify({ enabled, time1, time2, time3, timezone: tz, frequency })
                     })
                     if (res.ok) {
                       alert('Reminder times saved successfully!')

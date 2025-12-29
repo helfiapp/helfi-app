@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
   // Load all users with subscriptions and their reminder settings
   const rows: Array<{
     userId: string | null
+    enabled: boolean
     time1: string
     time2: string
     time3: string
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
   }> = await prisma.$queryRawUnsafe(`
     SELECT DISTINCT 
       p.userId AS "userId", 
+      COALESCE(s.enabled, true) AS enabled,
       COALESCE(s.time1, '12:30') AS time1,
       COALESCE(s.time2, '18:30') AS time2,
       COALESCE(s.time3, '21:30') AS time3,
@@ -148,6 +150,17 @@ export async function POST(req: NextRequest) {
 
   for (const r of rows) {
     try {
+      if (!r.enabled) {
+        debugLog.push({
+          userId: r.userId || 'unknown',
+          timezone: r.timezone || 'UTC',
+          currentTime: 'n/a',
+          reminderTimes: [],
+          matched: false,
+          reason: 'disabled',
+        })
+        continue
+      }
       const tz = r.timezone || 'UTC'
       const fmt = new Intl.DateTimeFormat('en-GB', {
         timeZone: tz,
