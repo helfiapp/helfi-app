@@ -32,9 +32,9 @@ export async function POST(req: NextRequest) {
     }
 
     const response = NextResponse.json({ ok: true })
-    const secure = process.env.NODE_ENV === 'production'
+    const secure = false
     const maxAge = ttlSeconds
-    const sameSite = secure ? 'none' : 'lax'
+    const sameSite = 'lax'
 
     const needsSessionEncode = (decoded as any)?.kind === 'refresh'
     const cookieValue = needsSessionEncode

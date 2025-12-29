@@ -63,8 +63,8 @@ export async function POST(req: NextRequest) {
     })
 
     const response = NextResponse.json({ ok: true, sessionExpiresAt: sessionExp * 1000 })
-    const secure = process.env.NODE_ENV === 'production'
-    const sameSite = secure ? 'none' : 'lax'
+    const secure = false
+    const sameSite = 'lax'
 
     response.cookies.set('__Secure-next-auth.session-token', sessionToken, {
       httpOnly: true,
