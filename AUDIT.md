@@ -191,12 +191,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Critical.
    5) What needs to be done to fix it: Make file storage private and serve files only through secure, time-limited links.
 
-2. Account takeover is possible via direct sign-in.
+2. ✅ Account takeover is possible via direct sign-in.
    1) What the issue is: A sign-in path allows login with only an email.
    2) Why it matters: It bypasses all identity checks.
    3) What could realistically go wrong: Any account can be accessed by a stranger.
    4) How serious it is: Critical.
-   5) What needs to be done to fix it: Remove this path and enforce verified login for all access.
+   5) What needs to be done to fix it: Remove this path and enforce verified login for all access. This direct sign-in path is now disabled in production.
 
 3. Admin access can be guessed or copied.
    1) What the issue is: Admin access relies on a public browser-only password and a shared access key.

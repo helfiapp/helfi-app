@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { decode, encode } from 'next-auth/jwt'
 
-const SECRET = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
+const SECRET = process.env.NEXTAUTH_SECRET
 
 export async function POST(req: NextRequest) {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    if (!SECRET) {
+      return NextResponse.json({ error: 'Auth secret not configured' }, { status: 500 })
+    }
     const { token } = await req.json().catch(() => ({}))
     const headerToken = req.headers.get('x-helfi-refresh-token') || req.headers.get('x-helfi-remember-token')
     const sessionToken = token || headerToken

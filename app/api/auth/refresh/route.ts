@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { decode, encode } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
 
-const SECRET = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
+const SECRET = process.env.NEXTAUTH_SECRET
 const REFRESH_HEADER = 'x-helfi-refresh-token'
 const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60 // 7 days for session cookies; refresh token is long-lived
 
 export async function POST(req: NextRequest) {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    if (!SECRET) {
+      return NextResponse.json({ error: 'Auth secret not configured' }, { status: 500 })
+    }
     const body = await req.json().catch(() => ({}))
     const headerToken = req.headers.get(REFRESH_HEADER)
     const cookieToken = req.cookies.get('__Secure-helfi-refresh-token')?.value
