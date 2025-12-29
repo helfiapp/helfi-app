@@ -148,12 +148,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Require a successful charge before completing the reply. This is now enforced so replies are only sent after a successful charge or a valid free use.
 
-3. Full insights regeneration is priced far below likely cost.
+3. ✅ Full insights regeneration is priced far below likely cost.
    1) What the issue is: The full refresh uses a very low fixed credit price.
    2) Why it matters: Large or complex profiles likely cost more than the credits collected.
    3) What could realistically go wrong: This feature runs at a loss for heavy users.
    4) How serious it is: High.
-   5) What needs to be done to fix it: Price this feature based on actual AI usage or restrict it.
+   5) What needs to be done to fix it: Price this feature based on actual AI usage or restrict it. This is now increased to a safer fixed price so it no longer runs at a loss in normal use.
 
 4. ✅ Paid access continues after failed payments.
    1) What the issue is: Access is not tied to confirmed payment success.
