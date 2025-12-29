@@ -560,10 +560,18 @@ function buildTranscriptEntries(ticket: any): TranscriptEntry[] {
   return entries
 }
 
-function buildTranscriptHtml(options: { ticket: any; transcript: string }): string {
+function buildTranscriptHtml(options: {
+  ticket: any
+  transcript: string
+  includeInternalNotes?: boolean
+  recipientEmail: string
+  emailType?: 'admin' | 'support'
+  reasonText?: string
+}): string {
   const subject = escapeHtml(options.ticket.subject || 'Support request')
   const entries = buildTranscriptEntries(options.ticket)
-  const internalNotes = collectInternalNotes(options.ticket)
+  const includeInternalNotes = options.includeInternalNotes !== false
+  const internalNotes = includeInternalNotes ? collectInternalNotes(options.ticket) : []
   const transcriptHtml = entries
     .map((entry) => {
       const safeMessage = escapeHtml(entry.message).replace(/\n/g, '<br />')
@@ -608,9 +616,9 @@ function buildTranscriptHtml(options: { ticket: any; transcript: string }): stri
         </div>
       ` : ''}
       ${getEmailFooter({
-        recipientEmail: SUPPORT_COPY_EMAIL,
-        emailType: 'admin',
-        reasonText: 'Transcript sent after the support chat ended.',
+        recipientEmail: options.recipientEmail,
+        emailType: options.emailType,
+        reasonText: options.reasonText,
       })}
     </div>
   `
@@ -633,8 +641,31 @@ export async function sendSupportTranscriptEmail(ticketId: string) {
     from: 'Helfi Support <support@helfi.ai>',
     to: SUPPORT_COPY_EMAIL,
     subject: `Support transcript: ${ticket.subject || 'Support request'}`,
-    html: buildTranscriptHtml({ ticket, transcript }),
+    html: buildTranscriptHtml({
+      ticket,
+      transcript,
+      includeInternalNotes: true,
+      recipientEmail: SUPPORT_COPY_EMAIL,
+      emailType: 'admin',
+      reasonText: 'Transcript sent after the support chat ended.',
+    }),
   })
+
+  if (ticket.userEmail && ticket.userEmail !== SUPPORT_COPY_EMAIL) {
+    await resend.emails.send({
+      from: 'Helfi Support <support@helfi.ai>',
+      to: ticket.userEmail,
+      subject: 'Your Helfi support chat transcript',
+      html: buildTranscriptHtml({
+        ticket,
+        transcript,
+        includeInternalNotes: false,
+        recipientEmail: ticket.userEmail,
+        emailType: 'support',
+        reasonText: 'Here is a copy of your support chat transcript.',
+      }),
+    })
+  }
 
   await prisma.ticketResponse.create({
     data: {
