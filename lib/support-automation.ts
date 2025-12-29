@@ -12,6 +12,7 @@ const SUPPORT_VERIFICATION_TTL_MINUTES = 15
 const SUPPORT_AGENT_NAME = 'Maya'
 const SUPPORT_AGENT_ROLE = 'Helfi Support'
 const SYSTEM_IDENTITY_MARKER = '[SYSTEM] Identity verified'
+const SYSTEM_TRANSCRIPT_MARKER = '[SYSTEM] Transcript emailed'
 const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
 
 type SupportAiResult = {
@@ -114,7 +115,7 @@ function buildSupportSystemPrompt(): string {
     '',
     'Rules:',
     '- Use plain English. Keep replies short, warm, and helpful.',
-    '- Start with a brief, friendly greeting and acknowledge the user’s issue.',
+    '- Start with a brief greeting only if this is your first reply in the conversation; otherwise, skip the greeting and continue naturally.',
     '- Focus on app troubleshooting, not medical advice.',
     '- Never ask for passwords, payment card numbers, or full security answers.',
     '- Do not claim you made account changes. Only provide guidance and request verification when needed.',
@@ -155,7 +156,11 @@ function supportCodeMap(): string {
 function supportProductFacts(): string {
   return [
     'PRODUCT FACTS:',
-    '- No free trial. New users can try each AI feature once for free.',
+    '- No free trial. New users get multiple free uses of AI features before needing credits or a subscription.',
+    '- Free AI uses on signup: 5 food photo analyses, 2 symptom analyses, 2 medical image analyses, 2 supplement/medication interaction analyses.',
+    '- Extra free uses on signup: 1 full health intake analysis, 3 insights updates.',
+    '- Free chats on signup: 2 symptom follow-up chats, 2 medical image follow-up chats, 2 insights chats, 2 voice chats.',
+    '- Free re-analyses on signup: 2 food re-analyses, 2 interaction re-analyses.',
     '- Non-AI features remain free for all users.',
     '- Premium plan: $20/month includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 medical image analyses per day, advanced insights, priority support, and export capabilities.',
     '- Credit packs: $5 for 100 credits or $10 for 150 credits. Credits do not expire and can be used for any analysis.',
@@ -170,6 +175,7 @@ function buildSupportUserPrompt(input: {
   identityVerified: boolean
   verificationPending: boolean
   verificationJustCompleted: boolean
+  hasPriorSupportReply: boolean
   conversation: string
 }): string {
   const ticket = input.ticket
@@ -185,6 +191,7 @@ function buildSupportUserPrompt(input: {
     `Identity verified: ${input.identityVerified ? 'yes' : 'no'}`,
     `Verification pending: ${input.verificationPending ? 'yes' : 'no'}`,
     `Verification just completed: ${input.verificationJustCompleted ? 'yes' : 'no'}`,
+    `Has prior support reply: ${input.hasPriorSupportReply ? 'yes' : 'no'}`,
     '',
     'Latest user message:',
     input.latestMessage || '(no new message)',
@@ -255,7 +262,7 @@ function buildConversationHistory(ticket: any): string {
     const parsed = splitAttachmentsFromMessage(String(response.message || ''))
     const text = stripHtml(parsed.text)
     if (!text) continue
-    if (text.startsWith(SYSTEM_IDENTITY_MARKER)) continue
+    if (text.startsWith('[SYSTEM]')) continue
     lines.push(`${response.isAdminResponse ? 'Support' : 'Customer'}: ${text}`)
     if (parsed.attachments.length > 0) {
       lines.push(`Attachments: ${parsed.attachments.map((a) => `${a.name} (${a.type || 'file'})`).join(', ')}`)
@@ -558,6 +565,8 @@ export async function sendSupportTranscriptEmail(ticketId: string) {
     include: { responses: { orderBy: { createdAt: 'asc' } } },
   })
   if (!ticket) return
+  const alreadySent = ticket.responses?.some((response) => response.isAdminResponse && response.message?.startsWith(SYSTEM_TRANSCRIPT_MARKER))
+  if (alreadySent) return
 
   const transcript = formatTranscriptLines(ticket)
   await resend.emails.send({
@@ -565,6 +574,15 @@ export async function sendSupportTranscriptEmail(ticketId: string) {
     to: SUPPORT_COPY_EMAIL,
     subject: `Support transcript: ${ticket.subject || 'Support request'}`,
     html: buildTranscriptHtml({ ticket, transcript }),
+  })
+
+  await prisma.ticketResponse.create({
+    data: {
+      ticketId,
+      message: `${SYSTEM_TRANSCRIPT_MARKER} (${new Date().toISOString()})`,
+      isAdminResponse: true,
+      adminId: null,
+    },
   })
 }
 
@@ -665,6 +683,10 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
   }
 
   const conversation = buildConversationHistory(ticket)
+  const hasPriorSupportReply = (ticket.responses || []).some((response: any) => {
+    const message = String(response.message || '')
+    return response.isAdminResponse && !message.startsWith('[SYSTEM]') && !message.startsWith('[FEEDBACK]')
+  })
   const openai = getOpenAIClient()
   let aiResult: SupportAiResult
 
@@ -679,6 +701,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
       identityVerified,
       verificationPending,
       verificationJustCompleted,
+      hasPriorSupportReply,
       conversation,
     })
 

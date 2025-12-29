@@ -94,7 +94,21 @@ export async function GET(request: NextRequest) {
     }
     
     // Default: Get tickets with pagination
-    const status = searchParams.get('status') || 'all'
+    const rawStatus = String(searchParams.get('status') || 'all').trim()
+    const normalizedStatus = rawStatus.toUpperCase()
+    const allowedStatuses = new Set([
+      'OPEN',
+      'IN_PROGRESS',
+      'AWAITING_RESPONSE',
+      'RESPONDED',
+      'RESOLVED',
+      'CLOSED',
+    ])
+    const status = normalizedStatus === 'ALL' || normalizedStatus === 'ALL TICKETS' || !normalizedStatus
+      ? 'all'
+      : allowedStatuses.has(normalizedStatus)
+        ? normalizedStatus
+        : 'all'
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const skip = (page - 1) * limit
