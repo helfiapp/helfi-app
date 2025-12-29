@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import MoodTabs from '@/components/mood/MoodTabs'
 
 function urlBase64ToUint8Array(base64String: string) {
@@ -259,6 +260,13 @@ export default function MoodPreferencesPage() {
             {banner.message}
           </div>
         )}
+
+        <Link
+          href="/settings#notifications"
+          className="mb-4 inline-flex items-center justify-center w-full rounded-xl border border-helfi-green text-helfi-green font-bold py-3 hover:bg-helfi-green/10 transition-colors"
+        >
+          Set your notifications
+        </Link>
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-gray-700">
           <div className="flex items-center justify-between">

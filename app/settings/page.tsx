@@ -43,6 +43,19 @@ export default function Settings() {
   const [savingTimes, setSavingTimes] = useState(false)
   const [loadingSettings, setLoadingSettings] = useState(true)
   const [showIOSInstructions, setShowIOSInstructions] = useState(false)
+  const [moodEnabled, setMoodEnabled] = useState(false)
+  const [moodFrequency, setMoodFrequency] = useState(1)
+  const [moodTime1, setMoodTime1] = useState('20:00')
+  const [moodTime2, setMoodTime2] = useState('12:00')
+  const [moodTime3, setMoodTime3] = useState('18:00')
+  const [moodTimezone, setMoodTimezone] = useState('UTC')
+  const [moodSaving, setMoodSaving] = useState(false)
+  const [moodLoading, setMoodLoading] = useState(true)
+  const [moodSending, setMoodSending] = useState(false)
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(false)
+  const [quietHoursStart, setQuietHoursStart] = useState('22:00')
+  const [quietHoursEnd, setQuietHoursEnd] = useState('07:00')
+  const [deviceTimezone, setDeviceTimezone] = useState('UTC')
   // Curated timezone list (IANA names)
   const baseTimezones = [
     'UTC','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Stockholm','Europe/Athens',
@@ -92,6 +105,9 @@ export default function Settings() {
       const savedProfileVisibility = localStorage.getItem('profileVisibility')
       const savedDataAnalytics = localStorage.getItem('dataAnalytics')
       const savedHaptics = localStorage.getItem('hapticsEnabled')
+      const savedQuietHoursEnabled = localStorage.getItem('quietHoursEnabled')
+      const savedQuietHoursStart = localStorage.getItem('quietHoursStart')
+      const savedQuietHoursEnd = localStorage.getItem('quietHoursEnd')
       
       if (savedDarkMode !== null) setDarkMode(savedDarkMode === 'true')
       if (savedEmailNotifications !== null) setEmailNotifications(savedEmailNotifications === 'true')
@@ -99,6 +115,9 @@ export default function Settings() {
       if (savedProfileVisibility) setProfileVisibility(savedProfileVisibility)
       if (savedDataAnalytics !== null) setDataAnalytics(savedDataAnalytics === 'true')
       if (savedHaptics !== null) setHapticsEnabled(savedHaptics === 'true')
+      if (savedQuietHoursEnabled !== null) setQuietHoursEnabled(savedQuietHoursEnabled === 'true')
+      if (savedQuietHoursStart) setQuietHoursStart(savedQuietHoursStart)
+      if (savedQuietHoursEnd) setQuietHoursEnd(savedQuietHoursEnd)
     } catch {
       // If storage is blocked/unavailable, keep defaults
     }
@@ -111,6 +130,12 @@ export default function Settings() {
     const standalone = (window.navigator as any).standalone === true || 
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
     setIsInstalled(standalone)
+    try {
+      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      setDeviceTimezone(detectedTimezone)
+    } catch {
+      setDeviceTimezone('UTC')
+    }
     
     // Listen for dark mode changes from other sources
     const handleDarkModeChange = (e: CustomEvent) => {
@@ -152,6 +177,14 @@ export default function Settings() {
     // TODO: Send to backend API to update user preferences
   }, [pushNotifications, localPrefsLoaded])
 
+  // Auto-save quiet hours
+  useEffect(() => {
+    if (!localPrefsLoaded) return
+    localStorage.setItem('quietHoursEnabled', quietHoursEnabled.toString())
+    localStorage.setItem('quietHoursStart', quietHoursStart)
+    localStorage.setItem('quietHoursEnd', quietHoursEnd)
+  }, [quietHoursEnabled, quietHoursStart, quietHoursEnd, localPrefsLoaded])
+
   // Detect existing subscription on load and reflect in UI
   useEffect(() => {
     (async () => {
@@ -189,6 +222,28 @@ export default function Settings() {
       }
     })()
   }, [])
+
+  // Load mood reminder settings from API
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/mood/reminders', { cache: 'no-store' as any })
+        if (res.ok) {
+          const data = await res.json()
+          setMoodEnabled(!!data.enabled)
+          setMoodFrequency(Number(data.frequency) || 1)
+          setMoodTime1(normalizeTime(data.time1 || '20:00'))
+          setMoodTime2(normalizeTime(data.time2 || '12:00'))
+          setMoodTime3(normalizeTime(data.time3 || '18:00'))
+          setMoodTimezone((data.timezone && String(data.timezone).trim()) || deviceTimezone || 'UTC')
+        }
+      } catch (e) {
+        console.error('Failed to load mood reminder settings', e)
+      } finally {
+        setMoodLoading(false)
+      }
+    })()
+  }, [deviceTimezone])
 
   // Detect existing subscription on load
   useEffect(() => {
@@ -450,7 +505,7 @@ export default function Settings() {
                 <Link href="/account" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Account Settings</Link>
                 <Link href="/profile/image" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Upload/Change Profile Photo</Link>
                 <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Subscription & Billing</Link>
-                <Link href="/notifications" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
+                <Link href="/settings#notifications" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
                 <Link href="/privacy" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Privacy Settings</Link>
                 <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>
                 <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
@@ -513,203 +568,605 @@ export default function Settings() {
                   </label>
                 </div>
               )}
+            </div>
+          </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">Email Notifications</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Receive updates via email</p>
+          {/* Notifications */}
+          <div id="notifications" className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 scroll-mt-24">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Notifications</h2>
+              <span className="text-sm text-gray-500 dark:text-gray-400">All alerts in one place</span>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Choose how you want to be notified and set reminder times for each area.
+            </p>
+
+            <div className="space-y-6">
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-gray-900 dark:text-white">Delivery</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Email and push settings for this device.
+                  </p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
-                    checked={emailNotifications}
-                                            onChange={(e) => {
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-white">Email Notifications</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Receive updates via email</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={emailNotifications}
+                        onChange={(e) => {
                           setEmailNotifications(e.target.checked)
                           trackSettingChange('emailNotifications', e.target.checked)
                         }}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
-                </label>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">Push Notifications</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {isIOS && !isInstalled
-                      ? 'On iPhone: Add to Home Screen, then open the app to enable'
-                      : 'Get daily check‑in reminders on this device'}
-                  </p>
-                </div>
-                <label className={`relative inline-flex items-center ${(isIOS && !isInstalled) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
-                    checked={pushNotifications}
-                    disabled={isIOS && !isInstalled}
-                    onChange={(e) => handlePushNotificationToggle(e.target.checked)}
-                  />
-                  <div className={`w-11 h-6 ${(isIOS && !isInstalled) ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${(isIOS && !isInstalled) ? '' : 'peer-checked:bg-helfi-green'} ${(isIOS && !isInstalled) ? 'opacity-50' : ''}`}></div>
-                </label>
-              </div>
-              {pushNotifications && (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white">Test Notification</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Send yourself a test push now</p>
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+                    </label>
                   </div>
-                  <button
-                    onClick={async () => {
-                      try {
-                        // Check notification permission first
-                        if (Notification.permission !== 'granted') {
-                          alert('Notifications are not enabled. Please enable them in your browser settings.')
-                          return
-                        }
-                        
-                        const res = await fetch('/api/push/test', { method: 'POST' })
-                        const data = await res.json().catch(() => ({}))
-                        
-                        if (!res.ok) {
-                          const errorMsg = data.error || 'Failed to send notification'
-                          if (errorMsg.includes('No subscription')) {
-                            alert('No push subscription found. Please toggle notifications off and on again to re-register.')
-                          } else if (errorMsg.includes('VAPID')) {
-                            alert('Server configuration error. Please contact support.')
-                          } else {
-                            alert(`Failed: ${errorMsg}`)
-                          }
-                          return
-                        }
-                        
-                        alert('Test notification sent! Check your browser notifications. If you don\'t see it, check your browser\'s notification settings.')
-                      } catch (e: any) {
-                        alert(`Error: ${e?.message || 'Could not send test notification. Make sure notifications are enabled.'}`)
-                      }
-                    }}
-                    className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
-                  >
-                    Send test
-                  </button>
-                </div>
-              )}
-              {pushNotifications && (
-                <div className="flex items-center justify-between mt-3">
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white">Send reminder now</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Triggers the same path as the scheduler</p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      try {
-                        // Check notification permission first
-                        if (Notification.permission !== 'granted') {
-                          alert('Notifications are not enabled. Please enable them in your browser settings.')
-                          return
-                        }
-                        
-                        const res = await fetch('/api/push/send-reminder-now', { method: 'POST' })
-                        const data = await res.json().catch(() => ({}))
-                        
-                        if (!res.ok) {
-                          const errorMsg = data.error || 'Failed to send reminder'
-                          if (errorMsg.includes('No subscription')) {
-                            alert('No push subscription found. Please toggle notifications off and on again to re-register.')
-                          } else {
-                            alert(`Failed: ${errorMsg}`)
-                          }
-                          return
-                        }
-                        
-                        alert('Reminder sent! Check your browser notifications. Clicking it will open the check-in page.')
-                      } catch (e: any) {
-                        alert(`Error: ${e?.message || 'Could not send reminder.'}`)
-                      }
-                    }}
-                    className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
-                  >
-                    Send
-                  </button>
-                </div>
-              )}
-              {pushNotifications && (
-                <>
-                  {isIOS ? (
-                    <div className="mt-3 p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-lg border-2 border-blue-300 dark:border-blue-700">
-                      <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
-                          Enable Notifications on iPhone
-                        </p>
-                      </div>
-                      
-                      {!isInstalled && (
-                        <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg border border-yellow-300 dark:border-yellow-700">
-                          <p className="text-xs font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                            📱 Step 0: Add to Home Screen First
-                          </p>
-                          <p className="text-xs text-yellow-800 dark:text-yellow-200 leading-relaxed">
-                            In Safari, tap the <span className="font-bold">Share button</span> (square with arrow ↑) → Select <span className="font-bold">"Add to Home Screen"</span> → Tap <span className="font-bold">"Add"</span>. Then open the Helfi app from your home screen.
-                          </p>
-                        </div>
-                      )}
 
-                      <div className="space-y-3 text-sm">
-                        <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
-                          <div className="flex-1">
-                            <p className="font-semibold text-blue-900 dark:text-blue-100">Open Settings</p>
-                            <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">Tap the <span className="font-bold">Settings</span> app icon on your iPhone home screen</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-white">Push Notifications</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {isIOS && !isInstalled
+                          ? 'On iPhone: Add to Home Screen, then open the app to enable'
+                          : 'Get daily check-in reminders on this device'}
+                      </p>
+                    </div>
+                    <label className={`relative inline-flex items-center ${(isIOS && !isInstalled) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={pushNotifications}
+                        disabled={isIOS && !isInstalled}
+                        onChange={(e) => handlePushNotificationToggle(e.target.checked)}
+                      />
+                      <div className={`w-11 h-6 ${(isIOS && !isInstalled) ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${(isIOS && !isInstalled) ? '' : 'peer-checked:bg-helfi-green'} ${(isIOS && !isInstalled) ? 'opacity-50' : ''}`}></div>
+                    </label>
+                  </div>
+                  {pushNotifications && (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white">Test Notification</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Send yourself a test push now</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            if (Notification.permission !== 'granted') {
+                              alert('Notifications are not enabled. Please enable them in your browser settings.')
+                              return
+                            }
+                            
+                            const res = await fetch('/api/push/test', { method: 'POST' })
+                            const data = await res.json().catch(() => ({}))
+                            
+                            if (!res.ok) {
+                              const errorMsg = data.error || 'Failed to send notification'
+                              if (errorMsg.includes('No subscription')) {
+                                alert('No push subscription found. Please toggle notifications off and on again to re-register.')
+                              } else if (errorMsg.includes('VAPID')) {
+                                alert('Server configuration error. Please contact support.')
+                              } else {
+                                alert(`Failed: ${errorMsg}`)
+                              }
+                              return
+                            }
+                            
+                            alert('Test notification sent! Check your browser notifications. If you don\'t see it, check your browser\'s notification settings.')
+                          } catch (e: any) {
+                            alert(`Error: ${e?.message || 'Could not send test notification. Make sure notifications are enabled.'}`)
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
+                      >
+                        Send test
+                      </button>
+                    </div>
+                  )}
+                  {pushNotifications && (
+                    <div className="flex items-center justify-between mt-3">
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white">Send reminder now</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Triggers the same path as the scheduler</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            if (Notification.permission !== 'granted') {
+                              alert('Notifications are not enabled. Please enable them in your browser settings.')
+                              return
+                            }
+                            
+                            const res = await fetch('/api/push/send-reminder-now', { method: 'POST' })
+                            const data = await res.json().catch(() => ({}))
+                            
+                            if (!res.ok) {
+                              const errorMsg = data.error || 'Failed to send reminder'
+                              if (errorMsg.includes('No subscription')) {
+                                alert('No push subscription found. Please toggle notifications off and on again to re-register.')
+                              } else {
+                                alert(`Failed: ${errorMsg}`)
+                              }
+                              return
+                            }
+                            
+                            alert('Reminder sent! Check your browser notifications. Clicking it will open the check-in page.')
+                          } catch (e: any) {
+                            alert(`Error: ${e?.message || 'Could not send reminder.'}`)
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  )}
+                  {pushNotifications && (
+                    <>
+                      {isIOS ? (
+                        <div className="mt-3 p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-lg border-2 border-blue-300 dark:border-blue-700">
+                          <div className="flex items-center gap-2 mb-3">
+                            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+                              Enable Notifications on iPhone
+                            </p>
                           </div>
-                        </div>
-                        
-                        <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">2</span>
-                          <div className="flex-1">
-                            <p className="font-semibold text-blue-900 dark:text-blue-100">Go to Notifications</p>
-                            <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">Scroll down and tap <span className="font-bold">"Notifications"</span></p>
+                          
+                          {!isInstalled && (
+                            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg border border-yellow-300 dark:border-yellow-700">
+                              <p className="text-xs font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                                Step 0: Add to Home Screen First
+                              </p>
+                              <p className="text-xs text-yellow-800 dark:text-yellow-200 leading-relaxed">
+                                In Safari, tap the <span className="font-bold">Share button</span> (square with arrow) and select <span className="font-bold">"Add to Home Screen"</span>. Then open Helfi from your home screen.
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="space-y-3 text-sm">
+                            <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                              <div className="flex-1">
+                                <p className="font-semibold text-blue-900 dark:text-blue-100">Open Settings</p>
+                                <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">Open the Settings app on your iPhone</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                              <div className="flex-1">
+                                <p className="font-semibold text-blue-900 dark:text-blue-100">Go to Notifications</p>
+                                <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">Scroll down and tap "Notifications"</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+                              <div className="flex-1">
+                                <p className="font-semibold text-blue-900 dark:text-blue-100">Find Helfi</p>
+                                <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">
+                                  {isInstalled 
+                                    ? <>Look for <span className="font-bold">"Helfi"</span> and tap it</>
+                                    : <>After adding to Home Screen, look for <span className="font-bold">"Helfi"</span> and tap it</>}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">4</span>
+                              <div className="flex-1">
+                                <p className="font-semibold text-blue-900 dark:text-blue-100">Enable Notifications</p>
+                                <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">Toggle "Allow Notifications" to ON (green)</p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">3</span>
-                          <div className="flex-1">
-                            <p className="font-semibold text-blue-900 dark:text-blue-100">Find Helfi</p>
-                            <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">
-                              {isInstalled 
-                                ? <>Look for <span className="font-bold">"Helfi"</span> in the alphabetical list and tap it</>
-                                : <>After adding to Home Screen, look for <span className="font-bold">"Helfi"</span> in the list and tap it</>}
+
+                          <div className="mt-4 p-3 bg-blue-100 dark:bg-blue-900/40 rounded-lg border border-blue-300 dark:border-blue-700">
+                            <p className="text-xs text-blue-900 dark:text-blue-100 font-medium">
+                              Tip: iOS does not allow apps to open Settings automatically.
                             </p>
                           </div>
                         </div>
-                        
-                        <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">4</span>
-                          <div className="flex-1">
-                            <p className="font-semibold text-blue-900 dark:text-blue-100">Enable Notifications</p>
-                            <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">Toggle <span className="font-bold">"Allow Notifications"</span> to ON (green)</p>
-                          </div>
+                      ) : (
+                        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                          <p className="text-xs text-blue-800 dark:text-blue-200">
+                            <strong>Note:</strong> Notifications may not appear if your browser is in the foreground. Try minimizing the browser window or switching to another app.
+                          </p>
                         </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Health reminders</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Daily check-in reminders</p>
+                  </div>
+                  <Link href="/check-in" className="text-sm text-helfi-green hover:underline font-medium">
+                    Set your notifications →
+                  </Link>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Set up to 3 daily reminders. You can check in multiple times per day to track your health.
+                </p>
+                
+                {loadingSettings ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-helfi-green"></div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Number of reminders per day
+                        </label>
+                        <select
+                          value={frequency}
+                          onChange={(e) => setFrequency(parseInt(e.target.value, 10))}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                          <option value={1}>1 reminder</option>
+                          <option value={2}>2 reminders</option>
+                          <option value={3}>3 reminders</option>
+                        </select>
                       </div>
 
-                      <div className="mt-4 p-3 bg-blue-100 dark:bg-blue-900/40 rounded-lg border border-blue-300 dark:border-blue-700">
-                        <p className="text-xs text-blue-900 dark:text-blue-100 font-medium">
-                          💡 Tip: Follow the steps above to manually open Settings. iOS doesn't allow apps to open Settings automatically for security reasons.
-                        </p>
+                      {frequency >= 1 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Reminder 1
+                          </label>
+                          <input
+                            type="time"
+                            value={time1}
+                            onChange={(e) => setTime1(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                      )}
+
+                      {frequency >= 2 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Reminder 2
+                          </label>
+                          <input
+                            type="time"
+                            value={time2}
+                            onChange={(e) => setTime2(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                      )}
+
+                      {frequency >= 3 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Reminder 3
+                          </label>
+                          <input
+                            type="time"
+                            value={time3}
+                            onChange={(e) => setTime3(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Timezone
+                        </label>
+                        <select
+                          value={tz}
+                          onChange={(e) => setTz(e.target.value)}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                          {baseTimezones.map((tzOption) => (
+                            <option key={tzOption} value={tzOption}>
+                              {tzOption}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  ) : (
-                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <p className="text-xs text-blue-800 dark:text-blue-200">
-                        <strong>Note:</strong> Notifications may not appear if your browser is in the foreground. Try minimizing the browser window or switching to another app.
+
+                    <button
+                      onClick={async () => {
+                        setSavingTimes(true)
+                        try {
+                          const res = await fetch('/api/checkins/settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ time1, time2, time3, timezone: tz, frequency })
+                          })
+                          if (res.ok) {
+                            alert('Reminder times saved successfully!')
+                          } else {
+                            const data = await res.json().catch(() => ({}))
+                            alert(`Failed to save: ${data.error || 'Unknown error'}`)
+                          }
+                        } catch (e) {
+                          alert('Failed to save reminder times. Please try again.')
+                        } finally {
+                          setSavingTimes(false)
+                        }
+                      }}
+                      disabled={savingTimes}
+                      className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
+                    >
+                      {savingTimes ? 'Saving...' : 'Save Reminder Times'}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Mood reminders</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Schedule mood check-ins</p>
+                  </div>
+                  <Link href="/mood/preferences" className="text-sm text-helfi-green hover:underline font-medium">
+                    Set your notifications →
+                  </Link>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Uses push notifications on this device. Enable push above to receive reminders.
+                </p>
+
+                {moodLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-helfi-green"></div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white">Enable mood reminders</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Turn mood reminder notifications on or off</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={moodEnabled}
+                          onChange={(e) => setMoodEnabled(e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+                      </label>
+                    </div>
+
+                    <div className="space-y-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Number of reminders per day
+                        </label>
+                        <select
+                          value={moodFrequency}
+                          onChange={(e) => setMoodFrequency(parseInt(e.target.value, 10))}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          disabled={!moodEnabled}
+                        >
+                          <option value={1}>1 reminder</option>
+                          <option value={2}>2 reminders</option>
+                          <option value={3}>3 reminders</option>
+                        </select>
+                      </div>
+
+                      {moodFrequency >= 1 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Reminder 1
+                          </label>
+                          <input
+                            type="time"
+                            value={moodTime1}
+                            onChange={(e) => setMoodTime1(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            disabled={!moodEnabled}
+                          />
+                        </div>
+                      )}
+
+                      {moodFrequency >= 2 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Reminder 2
+                          </label>
+                          <input
+                            type="time"
+                            value={moodTime2}
+                            onChange={(e) => setMoodTime2(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            disabled={!moodEnabled}
+                          />
+                        </div>
+                      )}
+
+                      {moodFrequency >= 3 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Reminder 3
+                          </label>
+                          <input
+                            type="time"
+                            value={moodTime3}
+                            onChange={(e) => setMoodTime3(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            disabled={!moodEnabled}
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Timezone
+                        </label>
+                        <select
+                          value={moodTimezone}
+                          onChange={(e) => setMoodTimezone(e.target.value)}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          disabled={!moodEnabled}
+                        >
+                          {baseTimezones.map((tzOption) => (
+                            <option key={tzOption} value={tzOption}>
+                              {tzOption}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Detected on this device: {deviceTimezone}
                       </p>
                     </div>
-                  )}
-                </>
-              )}
+
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={async () => {
+                          setMoodSaving(true)
+                          try {
+                            const res = await fetch('/api/mood/reminders', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                enabled: moodEnabled,
+                                frequency: moodFrequency,
+                                time1: moodTime1,
+                                time2: moodTime2,
+                                time3: moodTime3,
+                                timezone: moodTimezone,
+                              }),
+                            })
+                            if (res.ok) {
+                              alert('Mood reminders saved successfully!')
+                            } else {
+                              const data = await res.json().catch(() => ({}))
+                              alert(`Failed to save: ${data.error || 'Unknown error'}`)
+                            }
+                          } catch (e) {
+                            alert('Failed to save mood reminders. Please try again.')
+                          } finally {
+                            setMoodSaving(false)
+                          }
+                        }}
+                        disabled={moodSaving}
+                        className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
+                      >
+                        {moodSaving ? 'Saving...' : 'Save Mood Reminders'}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setMoodSending(true)
+                          try {
+                            if (Notification.permission !== 'granted') {
+                              alert('Notifications are not enabled. Please enable them in your browser settings.')
+                              return
+                            }
+                            const res = await fetch('/api/mood/send-reminder-now', { method: 'POST' })
+                            const data = await res.json().catch(() => ({}))
+                            if (!res.ok) {
+                              alert(data?.error || 'Failed to send reminder')
+                              return
+                            }
+                            alert('Reminder sent. Check your notifications.')
+                          } catch (e: any) {
+                            alert(e?.message || 'Could not send reminder.')
+                          } finally {
+                            setMoodSending(false)
+                          }
+                        }}
+                        disabled={moodSending}
+                        className="w-full border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
+                      >
+                        {moodSending ? 'Sending...' : 'Send reminder now'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">AI insights</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Health tips and summaries</p>
+                  </div>
+                  <Link href="/health-tips" className="text-sm text-helfi-green hover:underline font-medium">
+                    Set your notifications →
+                  </Link>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+                  Manage the schedule for AI health tips and insight summaries.
+                </p>
+              </div>
+
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Quiet hours</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Pause reminders overnight</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={quietHoursEnabled}
+                      onChange={(e) => setQuietHoursEnabled(e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+                  </label>
+                </div>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Quiet hours start
+                    </label>
+                    <input
+                      type="time"
+                      value={quietHoursStart}
+                      onChange={(e) => setQuietHoursStart(e.target.value)}
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      disabled={!quietHoursEnabled}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Quiet hours end
+                    </label>
+                    <input
+                      type="time"
+                      value={quietHoursEnd}
+                      onChange={(e) => setQuietHoursEnd(e.target.value)}
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      disabled={!quietHoursEnabled}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Stored on this device for now.
+                </p>
+              </div>
+
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white">Account & Security</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  Login and password change alerts are always on for your account.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -827,129 +1284,6 @@ export default function Settings() {
 
         </div>
 
-        {/* Reminder Times */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Reminder Times</h2>
-            <Link href="/check-in" className="text-sm text-helfi-green hover:underline font-medium">
-              Go to Check-In →
-            </Link>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Set up to 3 daily reminders. You can check in multiple times per day to track your health throughout the day.
-          </p>
-          
-          {loadingSettings ? (
-            <div className="flex items-center justify-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-helfi-green"></div>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Number of reminders per day
-                  </label>
-                  <select
-                    value={frequency}
-                    onChange={(e) => setFrequency(parseInt(e.target.value, 10))}
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value={1}>1 reminder</option>
-                    <option value={2}>2 reminders</option>
-                    <option value={3}>3 reminders</option>
-                  </select>
-                </div>
-
-                {frequency >= 1 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Reminder 1
-                    </label>
-                    <input
-                      type="time"
-                      value={time1}
-                      onChange={(e) => setTime1(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                )}
-
-                {frequency >= 2 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Reminder 2
-                    </label>
-                    <input
-                      type="time"
-                      value={time2}
-                      onChange={(e) => setTime2(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                )}
-
-                {frequency >= 3 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Reminder 3
-                    </label>
-                    <input
-                      type="time"
-                      value={time3}
-                      onChange={(e) => setTime3(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Timezone
-                  </label>
-                  <select
-                    value={tz}
-                    onChange={(e) => setTz(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    {baseTimezones.map((tzOption) => (
-                      <option key={tzOption} value={tzOption}>
-                        {tzOption}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <button
-                onClick={async () => {
-                  setSavingTimes(true)
-                  try {
-                    const res = await fetch('/api/checkins/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ time1, time2, time3, timezone: tz, frequency })
-                    })
-                    if (res.ok) {
-                      alert('Reminder times saved successfully!')
-                    } else {
-                      const data = await res.json().catch(() => ({}))
-                      alert(`Failed to save: ${data.error || 'Unknown error'}`)
-                    }
-                  } catch (e) {
-                    alert('Failed to save reminder times. Please try again.')
-                  } finally {
-                    setSavingTimes(false)
-                  }
-                }}
-                disabled={savingTimes}
-                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
-              >
-                {savingTimes ? 'Saving...' : 'Save Reminder Times'}
-              </button>
-            </>
-          )}
-        </div>
       </div>
 
       {/* Mobile Bottom Navigation - with pressed, ripple and active states */}

@@ -185,7 +185,7 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
                 </Link>
               )}
               <Link
-                href="/notifications"
+                href="/settings#notifications"
                 className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                 onClick={() => setDropdownOpen(false)}
               >
@@ -219,4 +219,3 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
     </nav>
   )
 }
-

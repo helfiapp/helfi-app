@@ -7180,7 +7180,7 @@ export default function Onboarding() {
                         {affiliateMenu.label}
                       </Link>
                     )}
-                    <Link href="/notifications" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
+                    <Link href="/settings#notifications" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
                     <Link href="/privacy" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Privacy Settings</Link>
                     <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>
                     <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>

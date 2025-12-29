@@ -339,6 +339,9 @@ export default function HealthTipsPage() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Health tip schedule
             </h2>
+            <Link href="/settings#notifications" className="text-sm text-helfi-green hover:underline font-medium">
+              Set your notifications →
+            </Link>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Choose how many AI health tips you&apos;d like each day and when you&apos;d like to
