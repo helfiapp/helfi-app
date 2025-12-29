@@ -285,8 +285,8 @@ function collectInternalNotes(ticket: any): string[] {
   const responses = Array.isArray(ticket.responses) ? ticket.responses : []
   return responses
     .map((response: any) => String(response.message || ''))
-    .filter((message) => message.startsWith(SYSTEM_INTERNAL_NOTES_MARKER))
-    .map((message) => message.replace(SYSTEM_INTERNAL_NOTES_MARKER, '').trim())
+    .filter((message: string) => message.startsWith(SYSTEM_INTERNAL_NOTES_MARKER))
+    .map((message: string) => message.replace(SYSTEM_INTERNAL_NOTES_MARKER, '').trim())
     .filter(Boolean)
 }
 
