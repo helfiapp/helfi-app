@@ -373,7 +373,7 @@ export default function ProfileImage() {
                     <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
                     <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Upload/Change Profile Photo</Link>
                     <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                    <Link href="/settings#notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                    <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
                     <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                     <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                     <button

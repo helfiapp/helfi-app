@@ -131,7 +131,7 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
                   {affiliateMenu.label}
                 </Link>
               )}
-              <Link href="/settings#notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+              <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
               <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
               <button
                 onClick={() => signOut({ callbackUrl: '/auth/signin' })}

@@ -262,7 +262,7 @@ export default function MoodPreferencesPage() {
         )}
 
         <Link
-          href="/settings#notifications"
+          href="/notifications/mood-reminders"
           className="mb-4 inline-flex items-center justify-center w-full rounded-xl border border-helfi-green text-helfi-green font-bold py-3 hover:bg-helfi-green/10 transition-colors"
         >
           Set your notifications

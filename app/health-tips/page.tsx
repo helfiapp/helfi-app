@@ -218,7 +218,7 @@ export default function HealthTipsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <PageHeader title="Health Tips" backHref="/more" />
+      <PageHeader title="Health Tips" backHref="/notifications/ai-insights" />
 
       {/* Tabs */}
       <div className="max-w-3xl mx-auto px-4 pt-4">
@@ -339,7 +339,7 @@ export default function HealthTipsPage() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Health tip schedule
             </h2>
-            <Link href="/settings#notifications" className="text-sm text-helfi-green hover:underline font-medium">
+            <Link href="/notifications/ai-insights" className="text-sm text-helfi-green hover:underline font-medium">
               Set your notifications →
             </Link>
           </div>

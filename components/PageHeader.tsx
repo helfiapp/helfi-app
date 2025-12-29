@@ -25,11 +25,15 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
   const userName = session?.user?.name || 'User'
 
   const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
+    }
     if (backHref) {
       router.push(backHref)
-    } else {
-      router.back()
+      return
     }
+    router.push('/dashboard')
   }
 
   const handleSignOut = async () => {
@@ -185,7 +189,7 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
                 </Link>
               )}
               <Link
-                href="/settings#notifications"
+                href="/notifications"
                 className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                 onClick={() => setDropdownOpen(false)}
               >
