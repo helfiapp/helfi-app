@@ -63,15 +63,18 @@ export async function POST(request: NextRequest) {
   const pathname = `support/inquiry/${ticketId}/${Date.now()}-${safeName}`
 
   const blob = await put(pathname, buffer, {
-    access: 'private',
+    access: 'public',
     contentType: file.type || 'application/octet-stream',
   })
 
   const signedUrl = buildSignedBlobUrl(blob.pathname, 'support', 60 * 60)
+  if (!signedUrl) {
+    return NextResponse.json({ error: 'Failed to create secure link' }, { status: 500 })
+  }
 
   return NextResponse.json({
     name: file.name || safeName,
-    url: signedUrl || blob.url,
+    url: signedUrl,
     path: blob.pathname,
     type: file.type,
     size: file.size,

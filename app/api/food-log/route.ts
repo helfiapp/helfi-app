@@ -54,7 +54,7 @@ const uploadFoodPhoto = async (userId: string, imageDataUrl: string) => {
   const pathname = `${FOOD_PHOTO_PREFIX}/${userId}/${filename}`
   try {
     const blob = await put(pathname, parsed.buffer, {
-      access: 'private',
+      access: 'public',
       contentType: parsed.contentType,
       addRandomSuffix: true,
     })

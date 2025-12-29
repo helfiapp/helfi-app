@@ -54,14 +54,17 @@ export async function POST(request: NextRequest) {
     const filename = `${Date.now()}-${crypto.randomUUID()}.${ext}`
     const pathname = `mood-journal/${user.id}/images/${filename}`
     const blob = await put(pathname, buffer, {
-      access: 'private',
+      access: 'public',
       contentType: imageFile.type || 'image/jpeg',
       addRandomSuffix: true,
     })
     const signedUrl = buildSignedBlobUrl(blob.pathname, 'mood-journal', 60 * 60)
+    if (!signedUrl) {
+      return NextResponse.json({ error: 'Failed to create secure link' }, { status: 500 })
+    }
 
     return NextResponse.json({
-      url: signedUrl || blob.url,
+      url: signedUrl,
       path: blob.pathname,
     })
   } catch (e) {

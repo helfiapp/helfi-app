@@ -54,11 +54,14 @@ export async function POST(request: NextRequest) {
   const pathname = `support/${userId}/${Date.now()}-${safeName}`
 
   const blob = await put(pathname, buffer, {
-    access: 'private',
+    access: 'public',
     contentType: file.type || 'application/octet-stream',
   })
 
   const signedUrl = buildSignedBlobUrl(blob.pathname, 'support', 60 * 60)
+  if (!signedUrl) {
+    return NextResponse.json({ error: 'Failed to create secure link' }, { status: 500 })
+  }
 
   const fileType = file.type.startsWith('image/') ? 'IMAGE' : 'DOCUMENT'
   const usage = file.type.startsWith('image/') ? 'OTHER' : 'DOCUMENT'
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
         storage: 'vercel-blob',
         blobUrl: blob.url,
         blobPathname: blob.pathname,
-        access: 'private',
+        access: 'public',
       },
     },
   })
@@ -87,7 +90,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     fileId: fileRecord.id,
     name: fileRecord.originalName,
-    url: signedUrl || blob.url,
+    url: signedUrl,
     path: blob.pathname,
     type: fileRecord.mimeType,
     size: fileRecord.fileSize,

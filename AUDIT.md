@@ -245,7 +245,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    2) Why it matters: Anyone who gets the link can view the file without logging in.
    3) What could realistically go wrong: A link is shared or guessed and private files are exposed.
    4) How serious it is: High.
-   5) What needs to be done to fix it: These uploads are now stored privately and only shared through short‑lived secure links.
+   5) What needs to be done to fix it: These uploads are no longer shared by public links and are now only shown through short‑lived secure links.
 
 ## Final Go-Live Recommendation
 NO
@@ -254,7 +254,7 @@ NO
 ### Verification Results
 - All previously fixed items were re‑checked and are still fixed.
 - Storage encryption status is confirmed in the admin Security Status.
-- Food photos, mood journal media, and support attachments are now private and shared through short‑lived secure links.
+- Food photos, mood journal media, and support attachments are no longer shared by public links and are only shown through short‑lived secure links.
 
 ### New Issues Found
 None.
