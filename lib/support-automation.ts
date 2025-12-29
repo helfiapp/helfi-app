@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { TicketCategory, TicketPriority } from '@prisma/client'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { getEmailFooter } from '@/lib/email-footer'
+import { buildSupportCodeContext } from '@/lib/support-code-search'
 
 const SUPPORT_AI_MODEL = process.env.SUPPORT_AI_MODEL || 'gpt-4o-mini'
 const SUPPORT_COPY_EMAIL = 'support@helfi.ai'
@@ -13,6 +14,7 @@ const SUPPORT_AGENT_NAME = 'Maya'
 const SUPPORT_AGENT_ROLE = 'Helfi Support'
 const SYSTEM_IDENTITY_MARKER = '[SYSTEM] Identity verified'
 const SYSTEM_TRANSCRIPT_MARKER = '[SYSTEM] Transcript emailed'
+const SYSTEM_INTERNAL_NOTES_MARKER = '[SYSTEM] Internal notes'
 const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
 
 type SupportAiResult = {
@@ -119,6 +121,7 @@ function buildSupportSystemPrompt(): string {
     '- Focus on app troubleshooting, not medical advice.',
     '- Do not claim hardware or device integrations that are not currently supported.',
     '- If asked about Apple devices or Apple Watch, explain they are not supported in the web app and are planned for the future native apps.',
+    '- Never mention code or internal details in the customer reply.',
     '- Never ask for passwords, payment card numbers, or full security answers.',
     '- Do not claim you made account changes. Only provide guidance and request verification when needed.',
     '- If the issue involves account access, billing, subscription changes, email change, password change, or deleting data, you MUST require identity verification.',
@@ -180,6 +183,7 @@ function buildSupportUserPrompt(input: {
   verificationPending: boolean
   verificationJustCompleted: boolean
   hasPriorSupportReply: boolean
+  codeContext: string
   conversation: string
 }): string {
   const ticket = input.ticket
@@ -200,6 +204,8 @@ function buildSupportUserPrompt(input: {
     'Latest user message:',
     input.latestMessage || '(no new message)',
     input.latestAttachments.length > 0 ? `Attachments: ${input.latestAttachments.map((a) => `${a.name} (${a.type || 'file'})`).join(', ')}` : '',
+    '',
+    input.codeContext ? `Code context:\n${input.codeContext}` : 'Code context: (none)',
     '',
     'Conversation history:',
     input.conversation || '(none)',
@@ -273,6 +279,15 @@ function buildConversationHistory(ticket: any): string {
     }
   }
   return lines.slice(-12).join('\n')
+}
+
+function collectInternalNotes(ticket: any): string[] {
+  const responses = Array.isArray(ticket.responses) ? ticket.responses : []
+  return responses
+    .map((response: any) => String(response.message || ''))
+    .filter((message) => message.startsWith(SYSTEM_INTERNAL_NOTES_MARKER))
+    .map((message) => message.replace(SYSTEM_INTERNAL_NOTES_MARKER, '').trim())
+    .filter(Boolean)
 }
 
 async function hasPendingVerification(ticketId: string, userEmail: string): Promise<boolean> {
@@ -548,6 +563,7 @@ function buildTranscriptEntries(ticket: any): TranscriptEntry[] {
 function buildTranscriptHtml(options: { ticket: any; transcript: string }): string {
   const subject = escapeHtml(options.ticket.subject || 'Support request')
   const entries = buildTranscriptEntries(options.ticket)
+  const internalNotes = collectInternalNotes(options.ticket)
   const transcriptHtml = entries
     .map((entry) => {
       const safeMessage = escapeHtml(entry.message).replace(/\n/g, '<br />')
@@ -585,6 +601,12 @@ function buildTranscriptHtml(options: { ticket: any; transcript: string }): stri
       <div style="background:#f3f4f6; padding:12px; border-radius:8px;">
         ${transcriptHtml || '<div style="font-size: 13px; color: #6b7280;">No messages recorded.</div>'}
       </div>
+      ${internalNotes.length > 0 ? `
+        <div style="margin-top: 18px;">
+          <h3 style="margin: 0 0 8px 0; font-size: 14px;">AI internal notes</h3>
+          <pre style="background:#111827; color:#f9fafb; padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap;">${escapeHtml(internalNotes.join('\n\n'))}</pre>
+        </div>
+      ` : ''}
       ${getEmailFooter({
         recipientEmail: SUPPORT_COPY_EMAIL,
         emailType: 'admin',
@@ -732,6 +754,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
     aiResult = fallbackSupportReply()
   } else {
     const systemPrompt = buildSupportSystemPrompt()
+    const codeContext = buildSupportCodeContext([ticket.subject, latestMessage].filter(Boolean).join(' '))
     const userPrompt = buildSupportUserPrompt({
       ticket,
       latestMessage,
@@ -740,6 +763,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
       verificationPending,
       verificationJustCompleted,
       hasPriorSupportReply,
+      codeContext,
       conversation,
     })
 
@@ -811,6 +835,19 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
       adminId: null,
     },
   })
+
+  const internalNotes = aiResult.internalNotes?.trim()
+  if (internalNotes) {
+    const trimmedNotes = internalNotes.length > 1800 ? `${internalNotes.slice(0, 1800)}...` : internalNotes
+    await prisma.ticketResponse.create({
+      data: {
+        ticketId: ticket.id,
+        message: `${SYSTEM_INTERNAL_NOTES_MARKER} ${trimmedNotes}`,
+        isAdminResponse: true,
+        adminId: null,
+      },
+    })
+  }
 
   await prisma.supportTicket.update({
     where: { id: ticket.id },
