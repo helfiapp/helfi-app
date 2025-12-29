@@ -104,12 +104,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Medium.
    5) What needs to be done to fix it: Use durable limits that work across all servers and all instances. This is now in place.
 
-4. Some paid actions can be blocked by overly strict cost estimates.
+4. ✅ Some paid actions can be blocked by overly strict cost estimates.
    1) What the issue is: Some features check for a higher credit amount than they later charge.
    2) Why it matters: Paying users can be blocked even though they have enough credits.
    3) What could realistically go wrong: Users see “not enough credits” and stop using the app.
    4) How serious it is: Medium.
-   5) What needs to be done to fix it: Align the pre-check with the final charge so it is fair and predictable.
+   5) What needs to be done to fix it: Cap the response size to fit the user’s available credits so requests are not blocked by worst‑case estimates. This is now in place.
 
 ## Low Priority / Improvements
 1. Error reporting is mostly manual.
