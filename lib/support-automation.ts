@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import crypto from 'crypto'
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
+import { TicketCategory, TicketPriority } from '@prisma/client'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { getEmailFooter } from '@/lib/email-footer'
 
@@ -531,21 +532,21 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
   }
 
   if (aiResult.suggestedCategory && aiResult.suggestedCategory !== ticket.category) {
-    const allowedCategories = ['GENERAL', 'TECHNICAL', 'BILLING', 'ACCOUNT', 'FEATURE_REQUEST', 'BUG_REPORT', 'EMAIL']
-    if (allowedCategories.includes(aiResult.suggestedCategory)) {
+    const allowedCategories: TicketCategory[] = ['GENERAL', 'TECHNICAL', 'BILLING', 'ACCOUNT', 'FEATURE_REQUEST', 'BUG_REPORT', 'EMAIL']
+    if (allowedCategories.includes(aiResult.suggestedCategory as TicketCategory)) {
       await prisma.supportTicket.update({
         where: { id: ticket.id },
-        data: { category: aiResult.suggestedCategory },
+        data: { category: aiResult.suggestedCategory as TicketCategory },
       })
     }
   }
 
   if (aiResult.suggestedPriority && aiResult.suggestedPriority !== ticket.priority) {
-    const allowedPriorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
-    if (allowedPriorities.includes(aiResult.suggestedPriority)) {
+    const allowedPriorities: TicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
+    if (allowedPriorities.includes(aiResult.suggestedPriority as TicketPriority)) {
       await prisma.supportTicket.update({
         where: { id: ticket.id },
-        data: { priority: aiResult.suggestedPriority },
+        data: { priority: aiResult.suggestedPriority as TicketPriority },
       })
     }
   }
