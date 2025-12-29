@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { Resend } from 'resend'
 import { getEmailFooter } from '@/lib/email-footer'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { processSupportTicketAutoReply } from '@/lib/support-automation'
 
 // Check if database tables exist and create them if needed
 async function ensureDatabaseSchema() {
@@ -264,6 +263,16 @@ export async function POST(request: NextRequest) {
         } catch (emailError) {
           console.error('📧 [TICKET ALERT] Failed to send email notification:', emailError)
           // Don't fail the ticket creation if email fails
+        }
+
+        try {
+          await processSupportTicketAutoReply({
+            ticketId: newTicket.id,
+            latestUserMessage: newTicket.message,
+            source: 'ticket_create',
+          })
+        } catch (aiError) {
+          console.error('🤖 [SUPPORT AI] Failed to auto-reply:', aiError)
         }
 
         return NextResponse.json({ ticket: newTicket })

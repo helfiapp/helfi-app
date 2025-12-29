@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { processSupportTicketAutoReply } from '@/lib/support-automation'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +22,10 @@ export async function POST(request: NextRequest) {
     // Parse sender information
     const senderEmail = typeof from === 'string' ? from : from?.email || from?.address
     const senderName = typeof from === 'string' ? from : from?.name || senderEmail
+
+    if (senderEmail && senderEmail.toLowerCase() === 'support@helfi.ai') {
+      return NextResponse.json({ success: true, message: 'Ignored support outbound email' })
+    }
 
     // Check if this is a reply to an existing ticket
     const existingTicket = await prisma.supportTicket.findFirst({
@@ -55,6 +58,16 @@ export async function POST(request: NextRequest) {
         }
       })
 
+      try {
+        await processSupportTicketAutoReply({
+          ticketId: existingTicket.id,
+          latestUserMessage: text || html,
+          source: 'email_reply',
+        })
+      } catch (aiError) {
+        console.error('🤖 [SUPPORT AI] Failed to auto-reply to email reply:', aiError)
+      }
+
       return NextResponse.json({ 
         success: true, 
         message: 'Reply added to existing ticket',
@@ -74,6 +87,16 @@ export async function POST(request: NextRequest) {
           externalMessageId: messageId
         }
       })
+
+      try {
+        await processSupportTicketAutoReply({
+          ticketId: newTicket.id,
+          latestUserMessage: text || html,
+          source: 'ticket_create',
+        })
+      } catch (aiError) {
+        console.error('🤖 [SUPPORT AI] Failed to auto-reply to email ticket:', aiError)
+      }
 
       return NextResponse.json({ 
         success: true, 
