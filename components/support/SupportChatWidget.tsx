@@ -10,6 +10,7 @@ type SupportAttachment = {
   id?: string
   name: string
   url: string
+  path?: string
   type?: string
   size?: number
 }
@@ -126,6 +127,7 @@ export default function SupportChatWidget() {
               id: item?.id ? String(item.id) : undefined,
               name: String(item?.name || ''),
               url: String(item?.url || ''),
+              path: item?.path ? String(item.path) : undefined,
               type: item?.type ? String(item.type) : undefined,
               size: typeof item?.size === 'number' ? item.size : undefined,
             }))
@@ -143,6 +145,7 @@ export default function SupportChatWidget() {
       id: att.id,
       name: att.name,
       url: att.url,
+      path: att.path,
       type: att.type,
       size: att.size,
     }))
@@ -261,6 +264,7 @@ export default function SupportChatWidget() {
             id: result.fileId,
             name: result.name,
             url: result.url,
+            path: result.path,
             type: result.type,
             size: result.size,
           } as SupportAttachment

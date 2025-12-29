@@ -1,13 +1,12 @@
 import { del } from '@vercel/blob'
 import { prisma } from '@/lib/prisma'
+import { extractBlobPathWithPrefixes } from '@/lib/blob-paths'
 
 const FOOD_PHOTO_PREFIX = 'food-photos/'
-const BLOB_HOST = 'blob.vercel-storage.com'
+const FOOD_PHOTO_PREFIXES = [FOOD_PHOTO_PREFIX]
 
-const isFoodPhotoBlobUrl = (value: string) =>
-  typeof value === 'string' &&
-  value.includes(BLOB_HOST) &&
-  value.includes(`/${FOOD_PHOTO_PREFIX}`)
+const normalizeFoodPhotoPath = (value: string) =>
+  extractBlobPathWithPrefixes(value, FOOD_PHOTO_PREFIXES)
 
 const chunk = <T,>(items: T[], size: number) => {
   const result: T[][] = []
@@ -22,26 +21,37 @@ export const deleteFoodPhotosIfUnused = async (
 ) => {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return { deleted: 0, skipped: 0 }
 
-  const candidates = Array.from(
-    new Set(
-      urls
-        .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
-        .map((url) => url.trim())
-        .filter(isFoodPhotoBlobUrl),
-    ),
-  )
+  const parsed = urls
+    .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+    .map((url) => {
+      const trimmed = url.trim()
+      return {
+        raw: trimmed,
+        path: normalizeFoodPhotoPath(trimmed),
+      }
+    })
+    .filter((item) => item.path)
+
+  const candidates = Array.from(new Set(parsed.map((item) => item.path!)))
 
   if (candidates.length === 0) return { deleted: 0, skipped: 0 }
 
+  const usageKeys = Array.from(
+    new Set(parsed.flatMap((item) => (item.raw ? [item.raw, item.path!] : [item.path!]))),
+  )
   const stillUsed = await prisma.foodLog.findMany({
-    where: { imageUrl: { in: candidates } },
+    where: { imageUrl: { in: usageKeys } },
     select: { imageUrl: true },
   })
   const stillUsedSet = new Set(
     stillUsed.map((row) => row.imageUrl).filter((url): url is string => typeof url === 'string'),
   )
+  for (const value of stillUsedSet) {
+    const path = normalizeFoodPhotoPath(value)
+    if (path) stillUsedSet.add(path)
+  }
 
-  const toDelete = candidates.filter((url) => !stillUsedSet.has(url))
+  const toDelete = candidates.filter((path) => !stillUsedSet.has(path))
   if (toDelete.length === 0) return { deleted: 0, skipped: candidates.length }
 
   const batches = chunk(toDelete, 100)

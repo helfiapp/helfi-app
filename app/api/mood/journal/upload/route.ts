@@ -1,20 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { v2 as cloudinary } from 'cloudinary'
 import crypto from 'crypto'
+import { put } from '@vercel/blob'
+import { prisma } from '@/lib/prisma'
+import { buildSignedBlobUrl } from '@/lib/blob-access'
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME?.trim(),
-  api_key: process.env.CLOUDINARY_API_KEY?.trim(),
-  api_secret: process.env.CLOUDINARY_API_SECRET?.trim(),
-})
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024
+
+const contentTypeToExt = (contentType: string) => {
+  if (contentType === 'image/png') return 'png'
+  if (contentType === 'image/webp') return 'webp'
+  if (contentType === 'image/gif') return 'gif'
+  return 'jpg'
+}
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return NextResponse.json({ error: 'Image storage is not configured' }, { status: 503 })
     }
 
     const formData = await request.formData()
@@ -28,35 +44,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File must be an image' }, { status: 400 })
     }
 
-    if (imageFile.size > 6 * 1024 * 1024) {
+    if (imageFile.size > MAX_IMAGE_BYTES) {
       return NextResponse.json({ error: 'File size must be less than 6MB' }, { status: 400 })
     }
 
     const imageBuffer = await imageFile.arrayBuffer()
     const buffer = Buffer.from(imageBuffer)
-
-    const uploadResult = await new Promise<any>((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
-        {
-          resource_type: 'image',
-          folder: 'helfi/mood-journal',
-          public_id: `journal_${crypto.randomUUID()}`,
-          transformation: [
-            { width: 1600, height: 1600, crop: 'limit' },
-            { quality: 'auto', fetch_format: 'auto' },
-          ],
-        },
-        (error, result) => {
-          if (error) return reject(error)
-          resolve(result)
-        },
-      ).end(buffer)
+    const ext = contentTypeToExt(imageFile.type || 'image/jpeg')
+    const filename = `${Date.now()}-${crypto.randomUUID()}.${ext}`
+    const pathname = `mood-journal/${user.id}/images/${filename}`
+    const blob = await put(pathname, buffer, {
+      access: 'private',
+      contentType: imageFile.type || 'image/jpeg',
+      addRandomSuffix: true,
     })
+    const signedUrl = buildSignedBlobUrl(blob.pathname, 'mood-journal', 60 * 60)
 
     return NextResponse.json({
-      url: uploadResult.secure_url,
-      width: uploadResult.width,
-      height: uploadResult.height,
+      url: signedUrl || blob.url,
+      path: blob.pathname,
     })
   } catch (e) {
     console.error('mood journal image upload error', e)

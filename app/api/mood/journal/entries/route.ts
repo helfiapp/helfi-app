@@ -4,8 +4,31 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { ensureMoodTables } from '@/app/api/mood/_db'
+import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
 
 export const dynamic = 'force-dynamic'
+
+const MOOD_MEDIA_SCOPE = 'mood-journal'
+const MOOD_MEDIA_URL_TTL_SECONDS = 60 * 60
+
+function coerceMediaList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry ?? '').trim()).filter(Boolean)
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return []
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        return parsed.map((entry) => String(entry ?? '').trim()).filter(Boolean)
+      }
+    } catch {
+      return [trimmed]
+    }
+  }
+  return []
+}
 
 function asLocalDate(value: unknown): string | null {
   const s = String(value ?? '').trim()
@@ -20,13 +43,13 @@ function clampInt(value: unknown, min: number, max: number, fallback: number) {
   return Math.max(min, Math.min(max, Math.round(n)))
 }
 
-function normalizeImages(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
+function normalizeMediaList(value: unknown): string[] {
   const cleaned: string[] = []
-  for (const raw of value) {
+  for (const raw of coerceMediaList(value)) {
     const url = String(raw ?? '').trim()
     if (!url) continue
-    cleaned.push(url)
+    const blobPath = extractScopedBlobPath(url, MOOD_MEDIA_SCOPE)
+    cleaned.push(blobPath || url)
     if (cleaned.length >= 12) break
   }
   return cleaned
@@ -46,6 +69,18 @@ function normalizeTags(value: unknown): string[] {
 
 function normalizeText(value: unknown, max: number) {
   return String(value ?? '').trim().slice(0, max)
+}
+
+function mapSignedMedia(value: unknown): string[] {
+  const result: string[] = []
+  for (const raw of coerceMediaList(value)) {
+    const url = String(raw ?? '').trim()
+    if (!url) continue
+    const signed = mapToSignedBlobUrl(url, MOOD_MEDIA_SCOPE, MOOD_MEDIA_URL_TTL_SECONDS)
+    result.push(signed || url)
+    if (result.length >= 12) break
+  }
+  return result
 }
 
 export async function GET(req: NextRequest) {
@@ -95,7 +130,12 @@ export async function GET(req: NextRequest) {
         limit,
       )
     }
-    return NextResponse.json({ entries: rows })
+    const entries = rows.map((entry) => ({
+      ...entry,
+      images: mapSignedMedia(entry.images),
+      audio: mapSignedMedia(entry.audio),
+    }))
+    return NextResponse.json({ entries })
   } catch (e) {
     console.error('mood journal get error', e)
     return NextResponse.json({ error: 'Failed to load journal entries' }, { status: 500 })
@@ -111,9 +151,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as any))
   const title = normalizeText(body?.title, 120)
   const content = normalizeText(body?.content, 20000)
-  const images = normalizeImages(body?.images)
+  const images = normalizeMediaList(body?.images)
   const tags = normalizeTags(body?.tags)
-  const audio = normalizeImages(body?.audio)
+  const audio = normalizeMediaList(body?.audio)
   const prompt = normalizeText(body?.prompt, 200)
   const template = normalizeText(body?.template, 200)
   const localDate = asLocalDate(body?.localDate) ?? new Date().toISOString().slice(0, 10)

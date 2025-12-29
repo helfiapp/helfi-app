@@ -7,8 +7,11 @@ import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-servi
 import { Prisma } from '@prisma/client'
 import { put } from '@vercel/blob'
 import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
+import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
 
 const FOOD_PHOTO_PREFIX = 'food-photos'
+const FOOD_PHOTO_SCOPE = 'food-photo'
+const FOOD_PHOTO_URL_TTL_SECONDS = 60 * 60
 
 const isDataUrl = (value: string) => /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(value)
 const isRemoteUrl = (value: string) => /^https?:\/\//i.test(value)
@@ -28,6 +31,17 @@ const contentTypeToExt = (contentType: string) => {
   return 'jpg'
 }
 
+const withSignedFoodPhoto = <T extends { imageUrl?: any }>(log: T): T => {
+  const raw = typeof log?.imageUrl === 'string' ? log.imageUrl : ''
+  const signed = raw
+    ? mapToSignedBlobUrl(raw, FOOD_PHOTO_SCOPE, FOOD_PHOTO_URL_TTL_SECONDS)
+    : null
+  return {
+    ...log,
+    imageUrl: signed || raw || null,
+  }
+}
+
 const uploadFoodPhoto = async (userId: string, imageDataUrl: string) => {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     console.warn('⚠️ Food photo upload skipped: BLOB_READ_WRITE_TOKEN missing')
@@ -40,15 +54,28 @@ const uploadFoodPhoto = async (userId: string, imageDataUrl: string) => {
   const pathname = `${FOOD_PHOTO_PREFIX}/${userId}/${filename}`
   try {
     const blob = await put(pathname, parsed.buffer, {
-      access: 'public',
+      access: 'private',
       contentType: parsed.contentType,
       addRandomSuffix: true,
     })
-    return blob.url
+    return blob.pathname
   } catch (error) {
     console.error('❌ Food photo upload failed, keeping original imageUrl', error)
     return imageDataUrl
   }
+}
+
+const normalizeFoodPhotoInput = async (userId: string, imageValue: string) => {
+  const trimmed = imageValue.trim()
+  if (!trimmed) return ''
+  if (isDataUrl(trimmed)) {
+    const uploaded = await uploadFoodPhoto(userId, trimmed)
+    return isDataUrl(uploaded) ? '' : uploaded
+  }
+  const blobPath = extractScopedBlobPath(trimmed, FOOD_PHOTO_SCOPE)
+  if (blobPath) return blobPath
+  if (isRemoteUrl(trimmed)) return trimmed
+  return ''
 }
 
 export const normalizeMealCategory = (raw: any): string | null => {
@@ -140,7 +167,7 @@ export async function GET(request: NextRequest) {
       if (!log || log.userId !== user.id) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 })
       }
-      return NextResponse.json({ success: true, log })
+      return NextResponse.json({ success: true, log: withSignedFoodPhoto(log) })
     }
 
     if (!dateStr) {
@@ -363,7 +390,7 @@ export async function GET(request: NextRequest) {
     }
     
     console.log(`✅ GET /api/food-log - Success: Returning ${uniqueLogs.length} entries for date ${validatedDateStr}`);
-    return NextResponse.json({ success: true, logs: uniqueLogs })
+    return NextResponse.json({ success: true, logs: uniqueLogs.map(withSignedFoodPhoto) })
   } catch (error) {
     console.error('❌ GET /api/food-log - Error:', {
       error,
@@ -515,11 +542,8 @@ export async function POST(request: NextRequest) {
     })
     
     let storedImageUrl = typeof imageUrl === 'string' ? imageUrl.trim() : ''
-    if (storedImageUrl && isDataUrl(storedImageUrl)) {
-      storedImageUrl = await uploadFoodPhoto(user.id, storedImageUrl)
-    }
-    if (storedImageUrl && !isRemoteUrl(storedImageUrl)) {
-      storedImageUrl = ''
+    if (storedImageUrl) {
+      storedImageUrl = await normalizeFoodPhotoInput(user.id, storedImageUrl)
     }
 
     const name = (description || '')
@@ -720,11 +744,8 @@ export async function PUT(request: NextRequest) {
     }
 
     let storedImageUrl = typeof imageUrl === 'string' ? imageUrl.trim() : ''
-    if (storedImageUrl && isDataUrl(storedImageUrl)) {
-      storedImageUrl = await uploadFoodPhoto(user.id, storedImageUrl)
-    }
-    if (storedImageUrl && !isRemoteUrl(storedImageUrl)) {
-      storedImageUrl = ''
+    if (storedImageUrl) {
+      storedImageUrl = await normalizeFoodPhotoInput(user.id, storedImageUrl)
     }
 
     const name = (description || existing.description || existing.name || '')

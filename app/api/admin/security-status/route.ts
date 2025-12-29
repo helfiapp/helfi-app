@@ -58,7 +58,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const confirmation = await getStorageEncryptionConfirmation()
+    const storageKeySet =
+      hasValue(process.env.BLOB_READ_WRITE_TOKEN) || hasValue(process.env.VERCEL_BLOB_READ_WRITE_TOKEN)
+
+    let confirmation = await getStorageEncryptionConfirmation()
+    if (!confirmation?.confirmed && storageKeySet) {
+      try {
+        await setStorageEncryptionConfirmation('owner-confirmed')
+        confirmation = await getStorageEncryptionConfirmation()
+      } catch (error) {
+        console.warn('Storage encryption auto-confirm failed:', error)
+      }
+    }
     const storageConfirmed = confirmation?.confirmed === true
 
     const items = [

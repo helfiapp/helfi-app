@@ -143,8 +143,8 @@ const deleteFoodPhotoBlobs = async (userId: string) => {
   do {
     const result = await list({ prefix, limit: 1000, cursor })
     cursor = result.cursor
-    const urls = result.blobs.map((blob) => blob.url)
-    const batches = chunk(urls, 100)
+    const paths = result.blobs.map((blob) => blob.pathname)
+    const batches = chunk(paths, 100)
     for (const batch of batches) {
       if (!batch.length) continue
       await del(batch)
@@ -301,7 +301,11 @@ export async function POST(request: NextRequest) {
       where: { userId: user.id, imageUrl: { not: null } },
       select: { imageUrl: true },
     })
-    const foodPhotoCount = foodPhotos.filter((entry) => entry.imageUrl && isBlobUrl(entry.imageUrl)).length
+    const foodPhotoCount = foodPhotos.filter(
+      (entry) =>
+        entry.imageUrl &&
+        (isBlobUrl(entry.imageUrl) || isLikelyBlobPath(entry.imageUrl)),
+    ).length
 
     try {
       const moodRows = await prisma.$queryRawUnsafe<Array<{ images: any; audio: any }>>(

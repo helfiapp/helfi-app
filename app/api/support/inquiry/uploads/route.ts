@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { put } from '@vercel/blob'
 import { prisma } from '@/lib/prisma'
+import { buildSignedBlobUrl } from '@/lib/blob-access'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const ALLOWED_TYPES = new Set([
@@ -62,15 +63,17 @@ export async function POST(request: NextRequest) {
   const pathname = `support/inquiry/${ticketId}/${Date.now()}-${safeName}`
 
   const blob = await put(pathname, buffer, {
-    access: 'public',
+    access: 'private',
     contentType: file.type || 'application/octet-stream',
   })
 
+  const signedUrl = buildSignedBlobUrl(blob.pathname, 'support', 60 * 60)
+
   return NextResponse.json({
     name: file.name || safeName,
-    url: blob.url,
+    url: signedUrl || blob.url,
+    path: blob.pathname,
     type: file.type,
     size: file.size,
   })
 }
-

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { put } from '@vercel/blob'
 import { prisma } from '@/lib/prisma'
+import { buildSignedBlobUrl } from '@/lib/blob-access'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const ALLOWED_TYPES = new Set([
@@ -53,9 +54,11 @@ export async function POST(request: NextRequest) {
   const pathname = `support/${userId}/${Date.now()}-${safeName}`
 
   const blob = await put(pathname, buffer, {
-    access: 'public',
+    access: 'private',
     contentType: file.type || 'application/octet-stream',
   })
+
+  const signedUrl = buildSignedBlobUrl(blob.pathname, 'support', 60 * 60)
 
   const fileType = file.type.startsWith('image/') ? 'IMAGE' : 'DOCUMENT'
   const usage = file.type.startsWith('image/') ? 'OTHER' : 'DOCUMENT'
@@ -76,6 +79,7 @@ export async function POST(request: NextRequest) {
         storage: 'vercel-blob',
         blobUrl: blob.url,
         blobPathname: blob.pathname,
+        access: 'private',
       },
     },
   })
@@ -83,7 +87,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     fileId: fileRecord.id,
     name: fileRecord.originalName,
-    url: blob.url,
+    url: signedUrl || blob.url,
+    path: blob.pathname,
     type: fileRecord.mimeType,
     size: fileRecord.fileSize,
     fileType,

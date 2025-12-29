@@ -3,16 +3,39 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
+import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
 
 export const dynamic = 'force-dynamic'
 
-function normalizeImages(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
+const MOOD_MEDIA_SCOPE = 'mood-journal'
+const MOOD_MEDIA_URL_TTL_SECONDS = 60 * 60
+
+function coerceMediaList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry ?? '').trim()).filter(Boolean)
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return []
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        return parsed.map((entry) => String(entry ?? '').trim()).filter(Boolean)
+      }
+    } catch {
+      return [trimmed]
+    }
+  }
+  return []
+}
+
+function normalizeMediaList(value: unknown): string[] {
   const cleaned: string[] = []
-  for (const raw of value) {
+  for (const raw of coerceMediaList(value)) {
     const url = String(raw ?? '').trim()
     if (!url) continue
-    cleaned.push(url)
+    const blobPath = extractScopedBlobPath(url, MOOD_MEDIA_SCOPE)
+    cleaned.push(blobPath || url)
     if (cleaned.length >= 12) break
   }
   return cleaned
@@ -41,6 +64,18 @@ function asLocalDate(value: unknown): string | null {
   return s
 }
 
+function mapSignedMedia(value: unknown): string[] {
+  const result: string[] = []
+  for (const raw of coerceMediaList(value)) {
+    const url = String(raw ?? '').trim()
+    if (!url) continue
+    const signed = mapToSignedBlobUrl(url, MOOD_MEDIA_SCOPE, MOOD_MEDIA_URL_TTL_SECONDS)
+    result.push(signed || url)
+    if (result.length >= 12) break
+  }
+  return result
+}
+
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -58,7 +93,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     )
     const entry = rows[0] ?? null
     if (!entry) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    return NextResponse.json({ entry })
+    return NextResponse.json({
+      entry: {
+        ...entry,
+        images: mapSignedMedia(entry.images),
+        audio: mapSignedMedia(entry.audio),
+      },
+    })
   } catch (e) {
     console.error('mood journal get entry error', e)
     return NextResponse.json({ error: 'Failed to load entry' }, { status: 500 })
@@ -74,9 +115,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const body = await req.json().catch(() => ({} as any))
   const title = normalizeText(body?.title, 120)
   const content = normalizeText(body?.content, 20000)
-  const images = normalizeImages(body?.images)
+  const images = normalizeMediaList(body?.images)
   const tags = normalizeTags(body?.tags)
-  const audio = normalizeImages(body?.audio)
+  const audio = normalizeMediaList(body?.audio)
   const prompt = normalizeText(body?.prompt, 200)
   const template = normalizeText(body?.template, 200)
   const localDate = asLocalDate(body?.localDate) ?? new Date().toISOString().slice(0, 10)

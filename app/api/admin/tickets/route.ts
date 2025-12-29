@@ -4,6 +4,7 @@ import { Resend } from 'resend'
 import { getEmailFooter } from '@/lib/email-footer'
 import { prisma } from '@/lib/prisma'
 import { processSupportTicketAutoReply } from '@/lib/support-automation'
+import { rehydrateSupportTicket } from '@/lib/support-attachments'
 
 // Check if database tables exist and create them if needed
 async function ensureDatabaseSchema() {
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
       }
       
-      return NextResponse.json({ ticket })
+      return NextResponse.json({ ticket: ticket ? rehydrateSupportTicket(ticket) : null })
     }
     
     // Default: Get tickets with pagination
@@ -152,7 +153,7 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({
-      tickets,
+      tickets: tickets.map((ticket) => rehydrateSupportTicket(ticket)),
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(totalTickets / limit),

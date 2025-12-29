@@ -50,19 +50,32 @@ export async function GET(request: NextRequest) {
         cursor,
       })
       cursor = result.cursor
-      const expiredUrls = result.blobs
+      const expiredTargets = result.blobs
         .filter((blob) => {
           scanned += 1
           return blob.uploadedAt.getTime() < cutoffMs
         })
-        .map((blob) => blob.url)
+        .map((blob) => ({
+          path: blob.pathname,
+          url: blob.url,
+        }))
 
-      const batches = chunk(Array.from(new Set(expiredUrls)), 100)
+      const uniquePaths = Array.from(new Set(expiredTargets.map((item) => item.path)))
+      const batches = chunk(uniquePaths, 100)
       for (const batch of batches) {
         if (batch.length === 0) continue
         await del(batch)
+        const batchSet = new Set(batch)
+        const urlsForBatch = expiredTargets
+          .filter((item) => batchSet.has(item.path))
+          .map((item) => item.url)
         await prisma.foodLog.updateMany({
-          where: { imageUrl: { in: batch } },
+          where: {
+            OR: [
+              { imageUrl: { in: batch } },
+              { imageUrl: { in: urlsForBatch } },
+            ],
+          },
           data: { imageUrl: null },
         })
         deleted += batch.length

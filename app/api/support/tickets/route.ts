@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { TicketCategory, TicketPriority } from '@prisma/client'
 import { buildSupportFeedbackPrompt, processSupportTicketAutoReply, sendSupportFeedbackEmail, sendSupportTranscriptEmail } from '@/lib/support-automation'
 import { getSupportAgentForTimestamp } from '@/lib/support-agents'
+import { rehydrateSupportTicket } from '@/lib/support-attachments'
 
 function normalizeCategory(value: string | undefined): TicketCategory {
   const upper = (value || '').toUpperCase()
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
     },
   })
 
-  return NextResponse.json({ ticket })
+  return NextResponse.json({ ticket: ticket ? rehydrateSupportTicket(ticket) : null })
 }
 
 export async function POST(request: NextRequest) {
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
       include: { responses: { orderBy: { createdAt: 'asc' } } },
     })
 
-    return NextResponse.json({ ticket: updatedTicket })
+    return NextResponse.json({ ticket: updatedTicket ? rehydrateSupportTicket(updatedTicket) : updatedTicket })
   }
 
   if (action === 'add_response') {
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
       include: { responses: { orderBy: { createdAt: 'asc' } } },
     })
 
-    return NextResponse.json({ ticket: updatedTicket })
+    return NextResponse.json({ ticket: updatedTicket ? rehydrateSupportTicket(updatedTicket) : updatedTicket })
   }
 
   if (action === 'end_chat') {
@@ -194,7 +195,7 @@ export async function POST(request: NextRequest) {
       include: { responses: { orderBy: { createdAt: 'asc' } } },
     })
 
-    return NextResponse.json({ ticket: updatedTicket })
+    return NextResponse.json({ ticket: updatedTicket ? rehydrateSupportTicket(updatedTicket) : updatedTicket })
   }
 
   if (action === 'submit_feedback') {
@@ -248,7 +249,7 @@ export async function POST(request: NextRequest) {
       include: { responses: { orderBy: { createdAt: 'asc' } } },
     })
 
-    return NextResponse.json({ ticket: updatedTicket })
+    return NextResponse.json({ ticket: updatedTicket ? rehydrateSupportTicket(updatedTicket) : updatedTicket })
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
