@@ -134,12 +134,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    5) What needs to be done to fix it: Use one consistent free-credit system across all AI features so each free use is counted the same way. This is now in place.
 
 ## Profitability Risks
-1. Some AI features are free.
+1. ✅ Some AI features are free.
    1) What the issue is: Several AI features return results without any credit charge.
    2) Why it matters: Each use creates real AI costs with no revenue.
    3) What could realistically go wrong: Heavy usage drives costs above revenue.
    4) How serious it is: High.
-   5) What needs to be done to fix it: Charge credits for every AI feature or remove the feature until billing is added.
+   5) What needs to be done to fix it: Charge credits for every AI feature or remove the feature until billing is added. This is now in place with consistent credit use across all AI features and starter free uses that are still tracked.
 
 2. Streaming chat replies can be delivered without a successful charge.
    1) What the issue is: Some chat replies are sent before charging, and failed charges are ignored.
