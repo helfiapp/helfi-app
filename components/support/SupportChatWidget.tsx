@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { getCurrentSupportAgent, getSupportAgentForTimestamp } from '@/lib/support-agents'
 
 type SupportAttachment = {
   id?: string
@@ -13,9 +14,6 @@ type SupportAttachment = {
   size?: number
 }
 
-const SUPPORT_AGENT_NAME = 'Maya'
-const SUPPORT_AGENT_ROLE = 'Helfi Support'
-const SUPPORT_AGENT_AVATAR = '/support/maya.jpg'
 const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
 
 const STORAGE_KEYS = {
@@ -32,6 +30,7 @@ export default function SupportChatWidget() {
   const isLoggedIn = Boolean(session?.user?.email)
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isAwaitingReply, setIsAwaitingReply] = useState(false)
   const [ticket, setTicket] = useState<any | null>(null)
   const [message, setMessage] = useState('')
   const [attachments, setAttachments] = useState<SupportAttachment[]>([])
@@ -55,6 +54,17 @@ export default function SupportChatWidget() {
 
   const isChatClosed = ticket && ['RESOLVED', 'CLOSED'].includes(ticket.status)
   const shouldHideWidget = pathname === '/support' || pathname.startsWith('/admin-panel') || pathname.startsWith('/main-admin')
+  const agent = useMemo(() => {
+    if (ticket?.createdAt) {
+      return getSupportAgentForTimestamp(new Date(ticket.createdAt))
+    }
+    return getCurrentSupportAgent()
+  }, [ticket?.createdAt])
+  const triggerHaptic = useCallback(() => {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(8)
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -307,6 +317,7 @@ export default function SupportChatWidget() {
       setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
     }
     setIsLoading(false)
+    setIsAwaitingReply(false)
   }
 
   const sendMessage = async () => {
@@ -316,6 +327,8 @@ export default function SupportChatWidget() {
     if (isChatClosed || isLoading || isUploading) return
     if (!ticket && !isLoggedIn && !guestEmail.trim()) return
 
+    triggerHaptic()
+    setIsAwaitingReply(true)
     const optimisticId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`
     setOptimisticMessages((prev) => [
       ...prev,
@@ -357,6 +370,7 @@ export default function SupportChatWidget() {
           setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
         }
         setIsLoading(false)
+        setIsAwaitingReply(false)
       } else {
         await createGuestChat(trimmedMessage, outgoingAttachments, optimisticId)
       }
@@ -389,6 +403,7 @@ export default function SupportChatWidget() {
       setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
     }
     setIsLoading(false)
+    setIsAwaitingReply(false)
   }
 
   const handleChatKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -401,6 +416,7 @@ export default function SupportChatWidget() {
 
   const endChat = async () => {
     if (!ticket) return
+    triggerHaptic()
     setIsLoading(true)
     try {
       const endpoint = isLoggedIn ? '/api/support/tickets' : '/api/support/inquiry'
@@ -421,10 +437,12 @@ export default function SupportChatWidget() {
       console.error('Error ending support chat:', error)
     }
     setIsLoading(false)
+    setIsAwaitingReply(false)
   }
 
   const submitFeedback = async () => {
     if (!ticket || feedbackRating < 1) return
+    triggerHaptic()
     setIsLoading(true)
     try {
       const endpoint = isLoggedIn ? '/api/support/tickets' : '/api/support/inquiry'
@@ -449,6 +467,7 @@ export default function SupportChatWidget() {
   }
 
   const startNewChat = () => {
+    triggerHaptic()
     setTicket(null)
     setMessage('')
     setAttachments([])
@@ -456,6 +475,7 @@ export default function SupportChatWidget() {
     setFeedbackRating(0)
     setFeedbackComment('')
     setFeedbackSubmitted(false)
+    setIsAwaitingReply(false)
     if (!isLoggedIn) {
       setGuestToken('')
       setGuestTicketId('')
@@ -463,6 +483,7 @@ export default function SupportChatWidget() {
   }
 
   const clearChat = () => {
+    triggerHaptic()
     setTicket(null)
     setMessage('')
     setAttachments([])
@@ -471,6 +492,7 @@ export default function SupportChatWidget() {
     setFeedbackComment('')
     setFeedbackSubmitted(false)
     setIsOpen(false)
+    setIsAwaitingReply(false)
     if (!isLoggedIn) {
       setGuestToken('')
       setGuestTicketId('')
@@ -484,42 +506,48 @@ export default function SupportChatWidget() {
     <div className="fixed bottom-5 right-5 z-[60]">
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
-          className="flex items-center gap-3 bg-white border border-gray-200 shadow-lg rounded-full px-4 py-2 hover:shadow-xl transition-shadow"
+          onClick={() => {
+            triggerHaptic()
+            setIsOpen(true)
+          }}
+          className="group flex items-center gap-3 rounded-full border border-emerald-100 bg-white/90 px-4 py-2 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] backdrop-blur"
         >
           <Image
-            src={SUPPORT_AGENT_AVATAR}
-            alt={`${SUPPORT_AGENT_NAME} avatar`}
+            src={agent.avatar}
+            alt={`${agent.name} avatar`}
             width={36}
             height={36}
-            className="rounded-full object-cover"
+            className="rounded-full object-cover ring-2 ring-white"
           />
           <div className="text-left">
-            <div className="text-sm font-semibold text-gray-900">Chat with {SUPPORT_AGENT_NAME}</div>
+            <div className="text-sm font-semibold text-gray-900">Chat with {agent.name}</div>
             <div className="text-xs text-gray-500">Questions? We’re here.</div>
           </div>
         </button>
       )}
 
       {isOpen && (
-        <div className="w-[360px] max-w-[92vw] h-[520px] max-h-[80vh] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="w-[360px] max-w-[92vw] h-[520px] max-h-[80vh] bg-white/95 rounded-2xl shadow-[0_18px_60px_rgba(16,24,40,0.18)] border border-emerald-100 flex flex-col backdrop-blur">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-white rounded-t-2xl">
             <div className="flex items-center gap-3">
               <Image
-                src={SUPPORT_AGENT_AVATAR}
-                alt={`${SUPPORT_AGENT_NAME} avatar`}
+                src={agent.avatar}
+                alt={`${agent.name} avatar`}
                 width={36}
                 height={36}
-                className="rounded-full object-cover"
+                className="rounded-full object-cover ring-2 ring-white"
               />
               <div>
-                <div className="text-sm font-semibold text-gray-900">{SUPPORT_AGENT_NAME}</div>
-                <div className="text-xs text-gray-500">{SUPPORT_AGENT_ROLE}</div>
+                <div className="text-sm font-semibold text-gray-900">{agent.name}</div>
+                <div className="text-xs text-gray-500">{agent.role}</div>
               </div>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
-              className="text-gray-400 hover:text-gray-600"
+              onClick={() => {
+                triggerHaptic()
+                setIsOpen(false)
+              }}
+              className="text-gray-400 hover:text-gray-600 active:scale-95 transition-transform"
               aria-label="Close chat"
             >
               ✕
@@ -534,7 +562,7 @@ export default function SupportChatWidget() {
             {!ticket && !isLoggedIn && (
               <div className="space-y-3">
                 <p className="text-sm text-gray-700">
-                  Hi! I’m {SUPPORT_AGENT_NAME}. Ask me anything about Helfi and I’ll help out.
+                  Hi! I’m {agent.name}. Ask me anything about Helfi and I’ll help out.
                 </p>
                 <input
                   type="text"
@@ -569,13 +597,13 @@ export default function SupportChatWidget() {
                     {item.isAdminResponse ? (
                       <>
                         <Image
-                          src={SUPPORT_AGENT_AVATAR}
-                          alt={`${SUPPORT_AGENT_NAME} avatar`}
+                          src={agent.avatar}
+                          alt={`${agent.name} avatar`}
                           width={18}
                           height={18}
                           className="rounded-full object-cover"
                         />
-                        {SUPPORT_AGENT_NAME}
+                        {agent.name}
                       </>
                     ) : (
                       'You'
@@ -618,6 +646,20 @@ export default function SupportChatWidget() {
                 )}
               </div>
             ))}
+            {isAwaitingReply && !isChatClosed && (
+              <div className="flex items-center gap-2">
+                <Image
+                  src={agent.avatar}
+                  alt={`${agent.name} avatar`}
+                  width={18}
+                  height={18}
+                  className="rounded-full object-cover"
+                />
+                <div className="px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-[11px] text-emerald-700">
+                  <span className="animate-pulse">Typing...</span>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -627,14 +669,14 @@ export default function SupportChatWidget() {
                 <button
                   type="button"
                   onClick={startNewChat}
-                  className="w-full text-xs border border-gray-300 text-gray-700 rounded-lg px-3 py-2"
+                  className="w-full text-xs border border-gray-300 text-gray-700 rounded-lg px-3 py-2 active:scale-[0.98] transition-transform"
                 >
                   Start a new chat
                 </button>
                 <button
                   type="button"
                   onClick={clearChat}
-                  className="w-full text-xs border border-gray-300 text-gray-700 rounded-lg px-3 py-2"
+                  className="w-full text-xs border border-gray-300 text-gray-700 rounded-lg px-3 py-2 active:scale-[0.98] transition-transform"
                 >
                   Clear chat
                 </button>
@@ -651,8 +693,11 @@ export default function SupportChatWidget() {
                       <button
                         key={rating}
                         type="button"
-                        onClick={() => setFeedbackRating(rating)}
-                        className={`px-2 py-1 rounded border text-xs ${feedbackRating === rating ? 'bg-emerald-500 text-white border-emerald-500' : 'border-gray-300 text-gray-700'}`}
+                        onClick={() => {
+                          triggerHaptic()
+                          setFeedbackRating(rating)
+                        }}
+                        className={`px-2 py-1 rounded border text-xs active:scale-[0.98] transition-transform ${feedbackRating === rating ? 'bg-emerald-500 text-white border-emerald-500' : 'border-gray-300 text-gray-700'}`}
                       >
                         {rating}
                       </button>
@@ -669,7 +714,7 @@ export default function SupportChatWidget() {
                     type="button"
                     onClick={submitFeedback}
                     disabled={feedbackRating < 1 || isLoading}
-                    className="w-full bg-helfi-green text-white rounded-lg px-3 py-2 text-xs disabled:opacity-50"
+                    className="w-full bg-helfi-green text-white rounded-lg px-3 py-2 text-xs disabled:opacity-50 active:scale-[0.98] transition-transform"
                   >
                     {isLoading ? 'Submitting...' : 'Submit feedback'}
                   </button>
@@ -688,7 +733,10 @@ export default function SupportChatWidget() {
                       <span className="truncate max-w-[140px]">{att.name}</span>
                       <button
                         type="button"
-                        onClick={() => setAttachments((prev) => prev.filter((item) => item.url !== att.url))}
+                        onClick={() => {
+                          triggerHaptic()
+                          setAttachments((prev) => prev.filter((item) => item.url !== att.url))
+                        }}
                         className="text-gray-500 hover:text-gray-700"
                         aria-label={`Remove ${att.name}`}
                       >
@@ -723,7 +771,7 @@ export default function SupportChatWidget() {
                     <button
                       type="button"
                       onClick={endChat}
-                      className="text-xs border border-emerald-500 text-emerald-700 rounded-lg px-2 py-1"
+                      className="text-xs border border-emerald-500 text-emerald-700 rounded-lg px-2 py-1 active:scale-[0.98] transition-transform"
                     >
                       End chat
                     </button>
@@ -732,7 +780,7 @@ export default function SupportChatWidget() {
                     type="button"
                     onClick={sendMessage}
                     disabled={isUploading || isLoading || (!message.trim() && attachments.length === 0) || (!isLoggedIn && !guestEmail.trim())}
-                    className="inline-flex items-center justify-center w-9 h-9 bg-helfi-green text-white rounded-full disabled:opacity-50"
+                    className="inline-flex items-center justify-center w-9 h-9 bg-helfi-green text-white rounded-full disabled:opacity-50 active:scale-95 transition-transform"
                     aria-label="Send message"
                     title="Send"
                   >

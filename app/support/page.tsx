@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { getCurrentSupportAgent, getSupportAgentForTimestamp } from '@/lib/support-agents'
 
 type SupportAttachment = {
   id?: string
@@ -13,9 +14,6 @@ type SupportAttachment = {
   size?: number
 }
 
-const SUPPORT_AGENT_NAME = 'Maya'
-const SUPPORT_AGENT_ROLE = 'Helfi Support'
-const SUPPORT_AGENT_AVATAR = '/support/maya.jpg'
 const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
 
 export default function SupportPage() {
@@ -26,6 +24,7 @@ export default function SupportPage() {
   const [isLoadingTicket, setIsLoadingTicket] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingChat, setIsSendingChat] = useState(false)
+  const [isAwaitingReply, setIsAwaitingReply] = useState(false)
   const [chatAttachments, setChatAttachments] = useState<SupportAttachment[]>([])
   const [formAttachments, setFormAttachments] = useState<SupportAttachment[]>([])
   const [isUploadingChatAttachment, setIsUploadingChatAttachment] = useState(false)
@@ -44,6 +43,14 @@ export default function SupportPage() {
     createdAt: string
   }>>([])
   const chatEndRef = useRef<HTMLDivElement | null>(null)
+  const agent = activeTicket?.createdAt
+    ? getSupportAgentForTimestamp(new Date(activeTicket.createdAt))
+    : getCurrentSupportAgent()
+  const triggerHaptic = useCallback(() => {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(8)
+    }
+  }, [])
   
   const [formData, setFormData] = useState({
     name: '',
@@ -294,6 +301,7 @@ export default function SupportPage() {
   const sendChatMessage = async () => {
     if (!chatMessage.trim() && chatAttachments.length === 0) return
     if (isChatClosed) return
+    triggerHaptic()
     const trimmedMessage = chatMessage.trim()
     const outgoingAttachments = chatAttachments
     const optimisticId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -310,6 +318,7 @@ export default function SupportPage() {
     setChatMessage('')
     setChatAttachments([])
     setIsSendingChat(true)
+    setIsAwaitingReply(true)
     try {
       const messageWithAttachments = serializeMessageWithAttachments(trimmedMessage, outgoingAttachments)
       const payload = activeTicket
@@ -339,6 +348,7 @@ export default function SupportPage() {
       setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
     }
     setIsSendingChat(false)
+    setIsAwaitingReply(false)
   }
 
   const handleChatKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -350,6 +360,7 @@ export default function SupportPage() {
   }
 
   const startNewTicket = () => {
+    triggerHaptic()
     setActiveTicket(null)
     setSubmitStatus('idle')
     setChatAttachments([])
@@ -359,6 +370,7 @@ export default function SupportPage() {
     setFeedbackComment('')
     setFeedbackSubmitted(false)
     setAttachmentError('')
+    setIsAwaitingReply(false)
     setShowChatComposer(true)
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('helfi:support:cleared-ticket')
@@ -369,6 +381,7 @@ export default function SupportPage() {
     if (typeof window !== 'undefined' && activeTicket?.id) {
       window.localStorage.setItem('helfi:support:cleared-ticket', activeTicket.id)
     }
+    triggerHaptic()
     setActiveTicket(null)
     setChatMessage('')
     setChatAttachments([])
@@ -376,11 +389,13 @@ export default function SupportPage() {
     setFeedbackRating(0)
     setFeedbackComment('')
     setFeedbackSubmitted(false)
+    setIsAwaitingReply(false)
     setShowChatComposer(false)
   }
 
   const endChat = async () => {
     if (!activeTicket) return
+    triggerHaptic()
     setIsSendingChat(true)
     try {
       const response = await fetch('/api/support/tickets', {
@@ -401,10 +416,12 @@ export default function SupportPage() {
       console.error('Error ending support chat:', error)
     }
     setIsSendingChat(false)
+    setIsAwaitingReply(false)
   }
 
   const submitFeedback = async () => {
     if (!activeTicket || feedbackRating < 1) return
+    triggerHaptic()
     setIsSubmittingFeedback(true)
     try {
       const response = await fetch('/api/support/tickets', {
@@ -522,7 +539,10 @@ export default function SupportPage() {
             </div>
             <button
               type="button"
-              onClick={() => setShowChatComposer(true)}
+              onClick={() => {
+                triggerHaptic()
+                setShowChatComposer(true)
+              }}
               className="inline-flex items-center justify-center px-5 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors"
             >
               Start support chat
@@ -537,13 +557,13 @@ export default function SupportPage() {
               <p className="text-gray-600">Chat with our support assistant. Replies appear here right away.</p>
               <div className="mt-4 flex items-center justify-center gap-3 text-sm text-gray-600">
                 <Image
-                  src={SUPPORT_AGENT_AVATAR}
-                  alt={`${SUPPORT_AGENT_NAME} avatar`}
+                  src={agent.avatar}
+                  alt={`${agent.name} avatar`}
                   width={36}
                   height={36}
                   className="rounded-full object-cover"
                 />
-                <span>{SUPPORT_AGENT_NAME} from {SUPPORT_AGENT_ROLE}</span>
+                <span>{agent.name} from {agent.role}</span>
               </div>
             </div>
 
@@ -571,13 +591,13 @@ export default function SupportPage() {
                         {item.isAdminResponse ? (
                           <>
                             <Image
-                              src={SUPPORT_AGENT_AVATAR}
-                              alt={`${SUPPORT_AGENT_NAME} avatar`}
+                              src={agent.avatar}
+                              alt={`${agent.name} avatar`}
                               width={20}
                               height={20}
                               className="rounded-full object-cover"
                             />
-                            {SUPPORT_AGENT_NAME}
+                            {agent.name}
                           </>
                         ) : (
                           'You'
@@ -620,6 +640,20 @@ export default function SupportPage() {
                     )}
                   </div>
                 ))}
+                {isAwaitingReply && !isChatClosed && (
+                  <div className="rounded-lg p-4 bg-emerald-50 border-l-4 border-emerald-500">
+                    <div className="flex items-center gap-2 text-xs text-emerald-700">
+                      <Image
+                        src={agent.avatar}
+                        alt={`${agent.name} avatar`}
+                        width={20}
+                        height={20}
+                        className="rounded-full object-cover"
+                      />
+                      <span className="animate-pulse">Typing...</span>
+                    </div>
+                  </div>
+                )}
                 <div ref={chatEndRef} />
               </div>
             )}
@@ -732,7 +766,10 @@ export default function SupportPage() {
                         <button
                           key={rating}
                           type="button"
-                          onClick={() => setFeedbackRating(rating)}
+                          onClick={() => {
+                            triggerHaptic()
+                            setFeedbackRating(rating)
+                          }}
                           className={`px-3 py-2 rounded-lg border text-sm ${feedbackRating === rating ? 'bg-emerald-500 text-white border-emerald-500' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
                         >
                           {rating}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { buildSupportFeedbackPrompt, processSupportTicketAutoReply, sendSupportFeedbackEmail, sendSupportTranscriptEmail } from '@/lib/support-automation'
+import { getSupportAgentForTimestamp } from '@/lib/support-agents'
 
 function guestTokenPrefix(token: string) {
   return `guest:${token}`
@@ -153,7 +154,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
 
-    const feedbackPrompt = buildSupportFeedbackPrompt(ticket.userName)
+    const agent = getSupportAgentForTimestamp(new Date(ticket.createdAt || Date.now()))
+    const feedbackPrompt = buildSupportFeedbackPrompt(ticket.userName, agent)
     const hasFeedbackPrompt = ticket.responses?.some((response) => response.isAdminResponse && response.message?.includes('rate your support experience'))
     if (!hasFeedbackPrompt) {
       await prisma.ticketResponse.create({
@@ -248,4 +250,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
-

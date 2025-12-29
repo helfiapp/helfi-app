@@ -6,12 +6,11 @@ import { TicketCategory, TicketPriority } from '@prisma/client'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { getEmailFooter } from '@/lib/email-footer'
 import { buildSupportCodeContext } from '@/lib/support-code-search'
+import { getSupportAgentForTimestamp } from '@/lib/support-agents'
 
 const SUPPORT_AI_MODEL = process.env.SUPPORT_AI_MODEL || 'gpt-4o-mini'
 const SUPPORT_COPY_EMAIL = 'support@helfi.ai'
 const SUPPORT_VERIFICATION_TTL_MINUTES = 15
-const SUPPORT_AGENT_NAME = 'Maya'
-const SUPPORT_AGENT_ROLE = 'Helfi Support'
 const SYSTEM_IDENTITY_MARKER = '[SYSTEM] Identity verified'
 const SYSTEM_TRANSCRIPT_MARKER = '[SYSTEM] Transcript emailed'
 const SYSTEM_INTERNAL_NOTES_MARKER = '[SYSTEM] Internal notes'
@@ -110,9 +109,9 @@ function isIdentityVerified(responses: Array<{ message: string; isAdminResponse:
   return responses.some((r) => r.isAdminResponse && r.message?.startsWith(SYSTEM_IDENTITY_MARKER))
 }
 
-function buildSupportSystemPrompt(): string {
+function buildSupportSystemPrompt(agentName: string, agentRole: string): string {
   return [
-    `You are ${SUPPORT_AGENT_NAME}, a careful and friendly support agent for ${SUPPORT_AGENT_ROLE}.`,
+    `You are ${agentName}, a careful and friendly support agent for ${agentRole}.`,
     'Your goal is to troubleshoot app issues, ask for missing details, and keep the user safe.',
     '',
     'Rules:',
@@ -130,7 +129,7 @@ function buildSupportSystemPrompt(): string {
     '- If a bug is likely, tell the user we are investigating and provide clear internal notes for the team.',
     '- Use the product facts below when answering questions about trials, pricing, credits, or features.',
     '- If you are not sure about a detail, say you will confirm and loop in the team.',
-    `- Sign off with "${SUPPORT_AGENT_NAME} from ${SUPPORT_AGENT_ROLE}".`,
+    `- Sign off with "${agentName} from ${agentRole}".`,
     '',
     supportProductFacts(),
     '',
@@ -535,6 +534,7 @@ type TranscriptEntry = {
 
 function buildTranscriptEntries(ticket: any): TranscriptEntry[] {
   const entries: TranscriptEntry[] = []
+  const agent = getSupportAgentForTimestamp(new Date(ticket.createdAt || Date.now()))
   if (ticket.message) {
     const parsed = splitAttachmentsFromMessage(String(ticket.message))
     entries.push({
@@ -549,7 +549,7 @@ function buildTranscriptEntries(ticket: any): TranscriptEntry[] {
     const parsed = splitAttachmentsFromMessage(String(response.message || ''))
     if (!parsed.text) return
     if (parsed.text.startsWith('[SYSTEM]')) return
-    const author = response.isAdminResponse ? `${SUPPORT_AGENT_NAME} (AI)` : 'Customer'
+    const author = response.isAdminResponse ? `${agent.name} (AI)` : 'Customer'
     entries.push({
       author,
       message: parsed.text,
@@ -646,12 +646,17 @@ export async function sendSupportTranscriptEmail(ticketId: string) {
   })
 }
 
-export function buildSupportFeedbackPrompt(userName?: string | null) {
+export function buildSupportFeedbackPrompt(
+  userName?: string | null,
+  agent?: { name: string; role: string }
+) {
   const name = userName?.trim() ? userName.trim().split(' ')[0] : 'there'
+  const agentName = agent?.name || 'Helfi Support'
+  const agentRole = agent?.role || 'Helfi Support'
   return [
     `Thanks ${name} — I’m glad we could help.`,
     'If you have a moment, could you rate your support experience and leave a quick comment? It helps us improve.',
-    `\n${SUPPORT_AGENT_NAME} from ${SUPPORT_AGENT_ROLE}`,
+    `\n${agentName} from ${agentRole}`,
   ].join('\n')
 }
 
@@ -718,6 +723,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
 
   if (!ticket) return
   if (!ticket.userEmail) return
+  const agent = getSupportAgentForTimestamp(new Date(ticket.createdAt || Date.now()))
 
   const rawLatest = String(input.latestUserMessage || ticket.message || '').trim()
   const parsedLatest = splitAttachmentsFromMessage(rawLatest)
@@ -753,7 +759,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
   if (!openai) {
     aiResult = fallbackSupportReply()
   } else {
-    const systemPrompt = buildSupportSystemPrompt()
+    const systemPrompt = buildSupportSystemPrompt(agent.name, agent.role)
     const codeContext = buildSupportCodeContext([ticket.subject, latestMessage].filter(Boolean).join(' '))
     const userPrompt = buildSupportUserPrompt({
       ticket,

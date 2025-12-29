@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { TicketCategory, TicketPriority } from '@prisma/client'
 import { buildSupportFeedbackPrompt, processSupportTicketAutoReply, sendSupportFeedbackEmail, sendSupportTranscriptEmail } from '@/lib/support-automation'
+import { getSupportAgentForTimestamp } from '@/lib/support-agents'
 
 function normalizeCategory(value: string | undefined): TicketCategory {
   const upper = (value || '').toUpperCase()
@@ -160,7 +161,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
 
-    const feedbackPrompt = buildSupportFeedbackPrompt(ticket.userName)
+    const agent = getSupportAgentForTimestamp(new Date(ticket.createdAt || Date.now()))
+    const feedbackPrompt = buildSupportFeedbackPrompt(ticket.userName, agent)
     const hasFeedbackPrompt = ticket.responses?.some((response) => response.isAdminResponse && response.message?.includes('rate your support experience'))
     if (!hasFeedbackPrompt) {
       await prisma.ticketResponse.create({
