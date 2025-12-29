@@ -119,12 +119,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Low.
    5) What needs to be done to fix it: Send automatic error alerts for critical failures so problems are seen quickly without watching logs. This is now in place.
 
-2. Analytics data can be lost on restarts.
+2. ✅ Analytics data can be lost on restarts.
    1) What the issue is: Analytics data is stored in memory only.
    2) Why it matters: Data disappears when the server restarts.
    3) What could realistically go wrong: Business reports are incomplete or misleading.
    4) How serious it is: Low.
-   5) What needs to be done to fix it: Store analytics in a durable data store.
+   5) What needs to be done to fix it: Store analytics in a durable data store so restarts do not erase history. This is now in place.
 
 3. Free credit rules are inconsistent across features.
    1) What the issue is: Some features use free-credit counters, while others use one-time flags.

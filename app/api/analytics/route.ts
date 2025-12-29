@@ -4,6 +4,7 @@ import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
+import { prisma } from '@/lib/prisma'
 
 // Initialize OpenAI only when needed to avoid build-time errors
 function getOpenAI() {
@@ -15,8 +16,57 @@ function getOpenAI() {
   })
 }
 
-// In-memory storage for demo (in production, use a database)
-let analyticsData: any[] = []
+async function ensureAnalyticsTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "AnalyticsEvent" (
+      id TEXT PRIMARY KEY,
+      "timestamp" TIMESTAMPTZ NOT NULL,
+      "action" TEXT,
+      "type" TEXT,
+      "userId" TEXT,
+      payload JSONB NOT NULL
+    )
+  `)
+}
+
+function normalizePayload(value: any): any {
+  if (!value) return {}
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return { raw: value }
+    }
+  }
+  return value
+}
+
+async function fetchRecentEvents(limit: number): Promise<any[]> {
+  await ensureAnalyticsTable()
+  const rows = await prisma.$queryRawUnsafe<Array<{ payload: any }>>(
+    `SELECT payload FROM "AnalyticsEvent" ORDER BY "timestamp" DESC LIMIT $1`,
+    limit
+  )
+  return rows.map((row) => normalizePayload(row.payload))
+}
+
+async function fetchTotalEvents(): Promise<number> {
+  await ensureAnalyticsTable()
+  const rows = await prisma.$queryRawUnsafe<Array<{ count: any }>>(
+    `SELECT COUNT(*)::int AS count FROM "AnalyticsEvent"`
+  )
+  return Number(rows?.[0]?.count ?? 0)
+}
+
+async function fetchTimeRange(): Promise<{ oldest: string | null; newest: string | null }> {
+  await ensureAnalyticsTable()
+  const rows = await prisma.$queryRawUnsafe<Array<{ oldest: Date | null; newest: Date | null }>>(
+    `SELECT MIN("timestamp") AS oldest, MAX("timestamp") AS newest FROM "AnalyticsEvent"`
+  )
+  const oldest = rows?.[0]?.oldest ? new Date(rows[0].oldest).toISOString() : null
+  const newest = rows?.[0]?.newest ? new Date(rows[0].newest).toISOString() : null
+  return { oldest, newest }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,19 +88,26 @@ export async function POST(request: NextRequest) {
       data.userId = sessionEmail
     }
     
-    // Store the analytics event
+    await ensureAnalyticsTable()
+
+    const now = new Date()
+    const eventId = `${now.getTime()}-${Math.random().toString(36).slice(2, 10)}`
     const analyticsEvent = {
       ...data,
-      timestamp: new Date().toISOString(),
-      id: Date.now() + Math.random()
+      timestamp: now.toISOString(),
+      id: eventId
     }
     
-    analyticsData.push(analyticsEvent)
-    
-    // Keep only last 1000 events to prevent memory issues
-    if (analyticsData.length > 1000) {
-      analyticsData = analyticsData.slice(-1000)
-    }
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "AnalyticsEvent" (id, "timestamp", "action", "type", "userId", payload)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+      analyticsEvent.id,
+      now,
+      analyticsEvent.action ?? null,
+      analyticsEvent.type ?? null,
+      analyticsEvent.userId ?? null,
+      JSON.stringify(analyticsEvent)
+    )
     
     console.log('📊 Analytics Event Recorded:', {
       action: data.action,
@@ -58,10 +115,11 @@ export async function POST(request: NextRequest) {
       timestamp: analyticsEvent.timestamp
     })
     
+    const totalEvents = await fetchTotalEvents()
     return NextResponse.json({ 
       success: true, 
       message: 'Analytics data recorded',
-      totalEvents: analyticsData.length 
+      totalEvents
     })
     
   } catch (error) {
@@ -86,7 +144,7 @@ export async function GET(request: NextRequest) {
     
     if (action === 'insights') {
       // Lightweight: return recent timing and cache stats + aggregated p50/p95 for first byte
-      const recent = analyticsData.slice(-200)
+      const recent = await fetchRecentEvents(200)
       const events = recent.filter(e => e?.type === 'insights-timing')
       const timings = events.slice(-50).map(e => ({
         section: e.section,
@@ -120,15 +178,20 @@ export async function GET(request: NextRequest) {
     
     if (action === 'summary') {
       // Return analytics summary
-      const summary = generateSummary()
+      const totalEvents = await fetchTotalEvents()
+      const recentEvents = await fetchRecentEvents(100)
+      const timeRange = await fetchTimeRange()
+      const summary = generateSummary(recentEvents, totalEvents, timeRange)
       return NextResponse.json({ success: true, summary })
     }
     
     // Return raw data (last 100 events)
+    const totalEvents = await fetchTotalEvents()
+    const recentEvents = await fetchRecentEvents(100)
     return NextResponse.json({ 
       success: true, 
-      data: analyticsData.slice(-100),
-      totalEvents: analyticsData.length 
+      data: recentEvents,
+      totalEvents 
     })
     
   } catch (error) {
@@ -140,14 +203,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function generateInsights() {
-  if (analyticsData.length < 10) {
+async function generateInsights(events: any[]) {
+  if (events.length < 10) {
     return "Not enough data to generate insights yet. Need at least 10 user interactions."
   }
   
   try {
     // Prepare analytics data for AI analysis
-    const recentEvents = analyticsData.slice(-100)
+    const recentEvents = events.slice(-100)
     const summary = {
       totalEvents: recentEvents.length,
       uniqueUsers: Array.from(new Set(recentEvents.map(e => e.userId))).length,
@@ -191,22 +254,19 @@ Keep response concise but actionable for app developers.
   }
 }
 
-function generateSummary() {
-  if (analyticsData.length === 0) {
+function generateSummary(events: any[], totalEvents: number, timeRange: { oldest: string | null; newest: string | null }) {
+  if (totalEvents === 0) {
     return { message: "No analytics data available yet." }
   }
   
-  const recentEvents = analyticsData.slice(-100)
+  const recentEvents = events.slice(-100)
   
   return {
-    totalEvents: analyticsData.length,
+    totalEvents,
     recentEvents: recentEvents.length,
     uniqueUsers: Array.from(new Set(recentEvents.map(e => e.userId))).length,
     topActions: getTopActions(recentEvents),
-    timeRange: {
-      oldest: analyticsData[0]?.timestamp,
-      newest: analyticsData[analyticsData.length - 1]?.timestamp
-    }
+    timeRange
   }
 }
 
