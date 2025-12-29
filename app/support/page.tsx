@@ -35,6 +35,7 @@ export default function SupportPage() {
   const [feedbackComment, setFeedbackComment] = useState('')
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [showChatComposer, setShowChatComposer] = useState(false)
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{
     id: string
     message: string
@@ -291,7 +292,7 @@ export default function SupportPage() {
   }
 
   const sendChatMessage = async () => {
-    if (!activeTicket || (!chatMessage.trim() && chatAttachments.length === 0)) return
+    if (!chatMessage.trim() && chatAttachments.length === 0) return
     if (isChatClosed) return
     const trimmedMessage = chatMessage.trim()
     const outgoingAttachments = chatAttachments
@@ -311,21 +312,23 @@ export default function SupportPage() {
     setIsSendingChat(true)
     try {
       const messageWithAttachments = serializeMessageWithAttachments(trimmedMessage, outgoingAttachments)
+      const payload = activeTicket
+        ? { action: 'add_response', ticketId: activeTicket.id, message: messageWithAttachments }
+        : { action: 'create', subject: 'Support chat', message: messageWithAttachments, category: 'TECHNICAL', priority: 'MEDIUM' }
       const response = await fetch('/api/support/tickets', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          action: 'add_response',
-          ticketId: activeTicket.id,
-          message: messageWithAttachments
-        })
+        body: JSON.stringify(payload)
       })
 
       if (response.ok) {
         const result = await response.json()
         setActiveTicket(result.ticket || null)
+        if (result.ticket) {
+          setShowChatComposer(true)
+        }
         setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
       }
       if (!response.ok) {
@@ -356,6 +359,7 @@ export default function SupportPage() {
     setFeedbackComment('')
     setFeedbackSubmitted(false)
     setAttachmentError('')
+    setShowChatComposer(true)
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('helfi:support:cleared-ticket')
     }
@@ -372,6 +376,7 @@ export default function SupportPage() {
     setFeedbackRating(0)
     setFeedbackComment('')
     setFeedbackSubmitted(false)
+    setShowChatComposer(false)
   }
 
   const endChat = async () => {
@@ -508,9 +513,25 @@ export default function SupportPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-2xl mx-auto p-8">
-        {session && activeTicket && (
-          <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
+      <div className="max-w-6xl mx-auto px-6 md:px-10 py-8">
+        {session && !activeTicket && !showChatComposer && (
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Need help right now?</h2>
+              <p className="text-sm text-gray-600">Start a support chat and we’ll assist you straight away.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowChatComposer(true)}
+              className="inline-flex items-center justify-center px-5 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors"
+            >
+              Start support chat
+            </button>
+          </div>
+        )}
+
+        {session && (activeTicket || showChatComposer) && (
+          <div className="mb-10">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Support Chat</h2>
               <p className="text-gray-600">Chat with our support assistant. Replies appear here right away.</p>
@@ -742,8 +763,8 @@ export default function SupportPage() {
           </div>
         )}
 
-        {(!session || !activeTicket) && (
-          <div className="bg-white rounded-lg shadow-sm p-8">
+        {(!session || (!activeTicket && !showChatComposer)) && (
+          <div className="mt-6">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Contact Support</h2>
             <p className="text-gray-600">
