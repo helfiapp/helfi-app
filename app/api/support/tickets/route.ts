@@ -2,18 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { TicketCategory, TicketPriority } from '@prisma/client'
 import { processSupportTicketAutoReply } from '@/lib/support-automation'
 
-function normalizeCategory(value: string | undefined) {
+function normalizeCategory(value: string | undefined): TicketCategory {
   const upper = (value || '').toUpperCase()
-  const allowed = ['GENERAL', 'TECHNICAL', 'BILLING', 'ACCOUNT', 'FEATURE_REQUEST', 'BUG_REPORT', 'EMAIL']
-  return allowed.includes(upper) ? upper : 'GENERAL'
+  const allowed: TicketCategory[] = ['GENERAL', 'TECHNICAL', 'BILLING', 'ACCOUNT', 'FEATURE_REQUEST', 'BUG_REPORT', 'EMAIL']
+  return allowed.includes(upper as TicketCategory) ? (upper as TicketCategory) : 'GENERAL'
 }
 
-function normalizePriority(value: string | undefined) {
+function normalizePriority(value: string | undefined): TicketPriority {
   const upper = (value || '').toUpperCase()
-  const allowed = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
-  return allowed.includes(upper) ? upper : 'MEDIUM'
+  const allowed: TicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
+  return allowed.includes(upper as TicketPriority) ? (upper as TicketPriority) : 'MEDIUM'
 }
 
 export async function GET(request: NextRequest) {
@@ -147,4 +148,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
-
