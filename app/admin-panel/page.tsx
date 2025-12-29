@@ -179,6 +179,7 @@ export default function AdminPanel() {
   const [securityStatus, setSecurityStatus] = useState<Array<{ id: string; label: string; status: 'set' | 'missing' }>>([])
   const [securityStatusLoading, setSecurityStatusLoading] = useState(false)
   const [securityStatusError, setSecurityStatusError] = useState('')
+  const [storageEncryptionUpdating, setStorageEncryptionUpdating] = useState(false)
 
   // Check for URL hash to set active tab and load data
   useEffect(() => {
@@ -2320,6 +2321,30 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     }
   }
 
+  const confirmStorageEncryption = async () => {
+    if (!adminToken) return
+    setStorageEncryptionUpdating(true)
+    try {
+      const response = await fetch('/api/admin/security-status', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'confirm-storage-encryption' }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data?.error || 'Failed to confirm storage encryption')
+      }
+      await loadSecurityStatus()
+    } catch (error: any) {
+      alert(error?.message || 'Failed to confirm storage encryption')
+    } finally {
+      setStorageEncryptionUpdating(false)
+    }
+  }
+
   const loadPushLogs = async () => {
     try {
       const res = await fetch('/api/admin/push-logs', {
@@ -2357,6 +2382,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
 
   const safeNumber = (value: number) => (Number.isFinite(value) ? value : 0)
   const formatDollars = (value: number, digits = 2) => `$${safeNumber(value).toFixed(digits)}`
+  const storageEncryptionConfirmed =
+    securityStatus.find((item) => item.id === 'storage-encryption-confirmed')?.status === 'set'
   const costEstimatorUsers = Math.max(0, safeNumber(foodCostEstimatorUsers))
   const costEstimatorAnalysesPerUser = Math.max(0, safeNumber(foodCostEstimatorAnalysesPerUser))
   const costEstimatorCallsPerAnalysis = Math.max(0, safeNumber(foodCostEstimatorCallsPerAnalysis))
@@ -5790,6 +5817,32 @@ The Helfi Team`,
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {!securityStatusLoading && !securityStatusError && (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div>
+                    <div className="text-sm font-medium text-gray-800">Storage encryption confirmation</div>
+                    <div className="text-xs text-gray-500">
+                      Mark this after you have verified your storage provider encrypts data at rest.
+                    </div>
+                  </div>
+                  <button
+                    onClick={confirmStorageEncryption}
+                    disabled={storageEncryptionConfirmed || storageEncryptionUpdating}
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                      storageEncryptionConfirmed
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                    } ${storageEncryptionUpdating ? 'opacity-60' : ''}`}
+                  >
+                    {storageEncryptionConfirmed
+                      ? 'Confirmed'
+                      : storageEncryptionUpdating
+                      ? 'Confirming...'
+                      : 'Mark confirmed'}
+                  </button>
                 </div>
               )}
 

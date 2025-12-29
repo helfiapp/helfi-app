@@ -226,19 +226,26 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: High.
    5) What needs to be done to fix it: Require verified sender proof before processing.
 
-7. Deletion does not guarantee file removal.
+7. ✅ Deletion does not guarantee file removal.
    1) What the issue is: Account deletion removes database records but does not reliably remove stored files.
    2) Why it matters: Health files can remain after a user deletes their account.
    3) What could realistically go wrong: Former users’ files remain accessible long after deletion.
    4) How serious it is: High.
-   5) What needs to be done to fix it: Delete all related files from storage during account deletion and verify removal.
+   5) What needs to be done to fix it: Account deletion now removes stored files first (including uploaded images and reports) and stops if file removal fails. This is now in place.
 
-8. Storage encryption cannot be verified.
+8. ✅ Storage encryption cannot be verified.
    1) What the issue is: There is no visible confirmation of encryption at rest for stored files and data.
    2) Why it matters: Health data should be protected even if storage is breached.
    3) What could realistically go wrong: A storage breach exposes readable health data.
    4) How serious it is: Medium.
-   5) What needs to be done to fix it: Confirm encryption is enabled for all data stores and file storage. This could not be confirmed and should be manually checked.
+   5) What needs to be done to fix it: A confirmation step is now available in the admin dashboard to record that storage encryption was verified. This status is now visible in Security Status.
+
+9. Some uploads still use public links.
+   1) What the issue is: Some uploads (such as food photos, mood journal media, and support attachments) are still stored as public links.
+   2) Why it matters: Anyone who gets the link can view the file without logging in.
+   3) What could realistically go wrong: A link is shared or guessed and private files are exposed.
+   4) How serious it is: High.
+   5) What needs to be done to fix it: Store these files privately and only share secure links that expire after a short time.
 
 ## Final Go-Live Recommendation
 NO
