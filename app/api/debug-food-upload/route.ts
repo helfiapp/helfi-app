@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { extractAdminFromHeaders } from '@/lib/admin-auth';
 
 export async function POST(req: NextRequest) {
   if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  const authHeader = req.headers.get('authorization');
+  const admin = extractAdminFromHeaders(authHeader);
+  if (!admin) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

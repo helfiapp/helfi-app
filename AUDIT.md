@@ -205,12 +205,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Critical.
    5) What needs to be done to fix it: Use server-side admin login and remove any shared key. The shared browser password gate is removed and admin login now requires the server secret.
 
-4. A public debug tool exposes the AI secret key.
+4. ✅ A public debug tool exposes the AI secret key.
    1) What the issue is: A troubleshooting route shows part of the AI key.
    2) Why it matters: It can be used to run unauthorized AI requests.
    3) What could realistically go wrong: Costs spike and service is abused.
    4) How serious it is: Critical.
-   5) What needs to be done to fix it: Remove the route or lock it behind admin access.
+   5) What needs to be done to fix it: Remove the route or lock it behind admin access. This route is now restricted so it is not publicly accessible.
 
 5. ✅ User activity data is exposed.
    1) What the issue is: Activity tracking data can be read without login.
