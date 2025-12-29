@@ -9,7 +9,10 @@ import { getEmailFooter } from '@/lib/email-footer'
 const SUPPORT_AI_MODEL = process.env.SUPPORT_AI_MODEL || 'gpt-4o-mini'
 const SUPPORT_COPY_EMAIL = 'support@helfi.ai'
 const SUPPORT_VERIFICATION_TTL_MINUTES = 15
+const SUPPORT_AGENT_NAME = 'Maya'
+const SUPPORT_AGENT_ROLE = 'Helfi Support'
 const SYSTEM_IDENTITY_MARKER = '[SYSTEM] Identity verified'
+const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
 
 type SupportAiResult = {
   customerReply: string
@@ -26,7 +29,7 @@ type SupportAiResult = {
 type SupportAutomationInput = {
   ticketId: string
   latestUserMessage?: string | null
-  source?: 'ticket_create' | 'user_reply' | 'email_reply' | 'app_reply'
+  source?: 'app_ticket' | 'app_reply' | 'email_ticket' | 'email_reply' | 'web_ticket' | 'admin_reply'
 }
 
 function getOpenAIClient(): OpenAI | null {
@@ -46,6 +49,41 @@ function escapeHtml(input: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+}
+
+type SupportAttachment = {
+  name: string
+  url: string
+  type?: string
+  size?: number
+}
+
+function splitAttachmentsFromMessage(message: string): { text: string; attachments: SupportAttachment[] } {
+  const markerIndex = message.indexOf(ATTACHMENTS_MARKER)
+  if (markerIndex === -1) {
+    return { text: message, attachments: [] }
+  }
+
+  const text = message.slice(0, markerIndex).trim()
+  const raw = message.slice(markerIndex + ATTACHMENTS_MARKER.length).trim()
+  if (!raw) {
+    return { text, attachments: [] }
+  }
+
+  try {
+    const parsed = JSON.parse(raw)
+    const attachments = Array.isArray(parsed)
+      ? parsed.map((item) => ({
+          name: String(item?.name || ''),
+          url: String(item?.url || ''),
+          type: item?.type ? String(item.type) : undefined,
+          size: typeof item?.size === 'number' ? item.size : undefined,
+        })).filter((item) => item.name && item.url)
+      : []
+    return { text, attachments }
+  } catch {
+    return { text: message, attachments: [] }
+  }
 }
 
 function stripHtml(input: string): string {
@@ -71,11 +109,12 @@ function isIdentityVerified(responses: Array<{ message: string; isAdminResponse:
 
 function buildSupportSystemPrompt(): string {
   return [
-    'You are Helfi Support, a careful and friendly support agent.',
+    `You are ${SUPPORT_AGENT_NAME}, a careful and friendly support agent for ${SUPPORT_AGENT_ROLE}.`,
     'Your goal is to troubleshoot app issues, ask for missing details, and keep the user safe.',
     '',
     'Rules:',
-    '- Use plain English. Keep replies short and helpful.',
+    '- Use plain English. Keep replies short, warm, and helpful.',
+    '- Start with a brief, friendly greeting and acknowledge the user’s issue.',
     '- Focus on app troubleshooting, not medical advice.',
     '- Never ask for passwords, payment card numbers, or full security answers.',
     '- Do not claim you made account changes. Only provide guidance and request verification when needed.',
@@ -83,6 +122,7 @@ function buildSupportSystemPrompt(): string {
     '- If verification is pending, ask the user to reply with the 6-digit code we emailed them.',
     '- For troubleshooting, ask for steps to reproduce, device type, OS version, browser/app version, and screenshots when relevant.',
     '- If a bug is likely, tell the user we are investigating and provide clear internal notes for the team.',
+    `- Sign off with "${SUPPORT_AGENT_NAME} from ${SUPPORT_AGENT_ROLE}".`,
     '',
     'Output strict JSON only with these fields:',
     '{ "customerReply": string, "shouldEscalate": boolean, "escalationReason": string, "needsIdentityCheck": boolean, "needsMoreInfo": boolean, "requestedInfo": string[], "internalNotes": string, "suggestedCategory": string, "suggestedPriority": string }',
@@ -111,6 +151,7 @@ function supportCodeMap(): string {
 function buildSupportUserPrompt(input: {
   ticket: any
   latestMessage: string
+  latestAttachments: SupportAttachment[]
   identityVerified: boolean
   verificationPending: boolean
   verificationJustCompleted: boolean
@@ -132,6 +173,7 @@ function buildSupportUserPrompt(input: {
     '',
     'Latest user message:',
     input.latestMessage || '(no new message)',
+    input.latestAttachments.length > 0 ? `Attachments: ${input.latestAttachments.map((a) => `${a.name} (${a.type || 'file'})`).join(', ')}` : '',
     '',
     'Conversation history:',
     input.conversation || '(none)',
@@ -184,14 +226,23 @@ function safeParseSupportJson(text: string): SupportAiResult | null {
 function buildConversationHistory(ticket: any): string {
   const lines: string[] = []
   if (ticket.message) {
-    lines.push(`Customer: ${stripHtml(String(ticket.message))}`)
+    const parsed = splitAttachmentsFromMessage(String(ticket.message))
+    const base = stripHtml(parsed.text)
+    lines.push(`Customer: ${base}`)
+    if (parsed.attachments.length > 0) {
+      lines.push(`Attachments: ${parsed.attachments.map((a) => `${a.name} (${a.type || 'file'})`).join(', ')}`)
+    }
   }
   const responses = Array.isArray(ticket.responses) ? ticket.responses : []
   for (const response of responses) {
-    const text = stripHtml(String(response.message || ''))
+    const parsed = splitAttachmentsFromMessage(String(response.message || ''))
+    const text = stripHtml(parsed.text)
     if (!text) continue
     if (text.startsWith(SYSTEM_IDENTITY_MARKER)) continue
     lines.push(`${response.isAdminResponse ? 'Support' : 'Customer'}: ${text}`)
+    if (parsed.attachments.length > 0) {
+      lines.push(`Attachments: ${parsed.attachments.map((a) => `${a.name} (${a.type || 'file'})`).join(', ')}`)
+    }
   }
   return lines.slice(-12).join('\n')
 }
@@ -362,6 +413,8 @@ async function sendSupportResponseEmail(options: {
   message: string
   internalNotes?: string
   latestUserMessage?: string
+  sendUserEmail?: boolean
+  sendSupportCopy?: boolean
 }) {
   const resend = getResendClient()
   if (!resend) return
@@ -369,15 +422,19 @@ async function sendSupportResponseEmail(options: {
   const subject = options.ticket.subject || 'Support request'
   const userEmail = options.ticket.userEmail
   const copyEmail = SUPPORT_COPY_EMAIL
+  const sendUserEmail = options.sendUserEmail ?? true
+  const sendSupportCopy = options.sendSupportCopy ?? false
 
-  await resend.emails.send({
-    from: 'Helfi Support <support@helfi.ai>',
-    to: userEmail,
-    subject: `Re: ${subject}`,
-    html: buildSupportResponseHtml({ subject, message: options.message }),
-  })
+  if (sendUserEmail) {
+    await resend.emails.send({
+      from: 'Helfi Support <support@helfi.ai>',
+      to: userEmail,
+      subject: `Re: ${subject}`,
+      html: buildSupportResponseHtml({ subject, message: options.message }),
+    })
+  }
 
-  if (copyEmail && userEmail.toLowerCase() !== copyEmail.toLowerCase()) {
+  if (sendSupportCopy && copyEmail && userEmail.toLowerCase() !== copyEmail.toLowerCase()) {
     await resend.emails.send({
       from: 'Helfi Support <support@helfi.ai>',
       to: copyEmail,
@@ -427,6 +484,120 @@ async function sendEscalationNotice(options: {
   })
 }
 
+function formatTranscriptLines(ticket: any): string {
+  const lines: string[] = []
+  if (ticket.message) {
+    const parsed = splitAttachmentsFromMessage(String(ticket.message))
+    lines.push(`Customer (${ticket.userEmail}): ${parsed.text}`)
+    if (parsed.attachments.length > 0) {
+      parsed.attachments.forEach((att) => {
+        lines.push(`  Attachment: ${att.name} (${att.type || 'file'}) - ${att.url}`)
+      })
+    }
+  }
+
+  const responses = Array.isArray(ticket.responses) ? ticket.responses : []
+  responses.forEach((response: any) => {
+    const parsed = splitAttachmentsFromMessage(String(response.message || ''))
+    const author = response.isAdminResponse ? `${SUPPORT_AGENT_NAME} (AI)` : 'Customer'
+    if (!parsed.text.startsWith(SYSTEM_IDENTITY_MARKER)) {
+      lines.push(`${author}: ${parsed.text}`)
+      if (parsed.attachments.length > 0) {
+        parsed.attachments.forEach((att) => {
+          lines.push(`  Attachment: ${att.name} (${att.type || 'file'}) - ${att.url}`)
+        })
+      }
+    }
+  })
+
+  return lines.join('\n')
+}
+
+function buildTranscriptHtml(options: { ticket: any; transcript: string }): string {
+  const subject = escapeHtml(options.ticket.subject || 'Support request')
+  const transcript = escapeHtml(options.transcript)
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h2 style="margin: 0 0 12px 0;">Support chat transcript</h2>
+      <p style="margin: 0 0 6px 0;"><strong>Ticket ID:</strong> ${options.ticket.id}</p>
+      <p style="margin: 0 0 6px 0;"><strong>User:</strong> ${options.ticket.userEmail}</p>
+      <p style="margin: 0 0 16px 0;"><strong>Subject:</strong> ${subject}</p>
+      <pre style="background:#f3f4f6; padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap;">${transcript}</pre>
+      ${getEmailFooter({
+        recipientEmail: SUPPORT_COPY_EMAIL,
+        emailType: 'admin',
+        reasonText: 'Transcript sent after the support chat ended.',
+      })}
+    </div>
+  `
+}
+
+export async function sendSupportTranscriptEmail(ticketId: string) {
+  const resend = getResendClient()
+  if (!resend) return
+
+  const ticket = await prisma.supportTicket.findUnique({
+    where: { id: ticketId },
+    include: { responses: { orderBy: { createdAt: 'asc' } } },
+  })
+  if (!ticket) return
+
+  const transcript = formatTranscriptLines(ticket)
+  await resend.emails.send({
+    from: 'Helfi Support <support@helfi.ai>',
+    to: SUPPORT_COPY_EMAIL,
+    subject: `Support transcript: ${ticket.subject || 'Support request'}`,
+    html: buildTranscriptHtml({ ticket, transcript }),
+  })
+}
+
+export function buildSupportFeedbackPrompt(userName?: string | null) {
+  const name = userName?.trim() ? userName.trim().split(' ')[0] : 'there'
+  return [
+    `Thanks ${name} — I’m glad we could help.`,
+    'If you have a moment, could you rate your support experience and leave a quick comment? It helps us improve.',
+    `\n${SUPPORT_AGENT_NAME} from ${SUPPORT_AGENT_ROLE}`,
+  ].join('\n')
+}
+
+export async function sendSupportFeedbackEmail(options: {
+  ticketId: string
+  rating: number
+  comment?: string
+}) {
+  const resend = getResendClient()
+  if (!resend) return
+
+  const ticket = await prisma.supportTicket.findUnique({
+    where: { id: options.ticketId },
+  })
+  if (!ticket) return
+
+  const comment = options.comment?.trim() ? escapeHtml(options.comment.trim()) : 'No comment provided.'
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h2 style="margin: 0 0 12px 0;">Support feedback received</h2>
+      <p style="margin: 0 0 6px 0;"><strong>Ticket ID:</strong> ${ticket.id}</p>
+      <p style="margin: 0 0 6px 0;"><strong>User:</strong> ${ticket.userEmail}</p>
+      <p style="margin: 0 0 6px 0;"><strong>Rating:</strong> ${options.rating}/5</p>
+      <p style="margin: 12px 0 0 0;"><strong>Comment:</strong></p>
+      <p style="margin: 6px 0 0 0;">${comment}</p>
+      ${getEmailFooter({
+        recipientEmail: SUPPORT_COPY_EMAIL,
+        emailType: 'admin',
+        reasonText: 'Support feedback submitted after a chat ended.',
+      })}
+    </div>
+  `
+
+  await resend.emails.send({
+    from: 'Helfi Support <support@helfi.ai>',
+    to: SUPPORT_COPY_EMAIL,
+    subject: `Support feedback: ${ticket.subject || 'Support request'}`,
+    html,
+  })
+}
+
 function fallbackSupportReply(): SupportAiResult {
   return {
     customerReply: 'Thanks for reaching out. I am unable to access the support assistant right now. I have flagged your request for a human review and will follow up as soon as possible.',
@@ -453,7 +624,9 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
   if (!ticket) return
   if (!ticket.userEmail) return
 
-  let latestMessage = stripHtml(String(input.latestUserMessage || ticket.message || '').trim())
+  const rawLatest = String(input.latestUserMessage || ticket.message || '').trim()
+  const parsedLatest = splitAttachmentsFromMessage(rawLatest)
+  let latestMessage = stripHtml(parsedLatest.text)
   const rawLatestMessage = latestMessage
 
   let identityVerified = isIdentityVerified(ticket.responses || []) || Boolean(ticket.userId)
@@ -485,6 +658,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
     const userPrompt = buildSupportUserPrompt({
       ticket,
       latestMessage,
+      latestAttachments: parsedLatest.attachments,
       identityVerified,
       verificationPending,
       verificationJustCompleted,
@@ -568,12 +742,17 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
     },
   })
 
-  await sendSupportResponseEmail({
-    ticket,
-    message: aiResult.customerReply,
-    internalNotes: aiResult.internalNotes || '',
-    latestUserMessage: rawLatestMessage,
-  })
+  const isEmailChannel = !ticket.userId || input.source === 'email_reply' || input.source === 'email_ticket' || input.source === 'web_ticket'
+  if (isEmailChannel) {
+    await sendSupportResponseEmail({
+      ticket,
+      message: aiResult.customerReply,
+      internalNotes: aiResult.internalNotes || '',
+      latestUserMessage: rawLatestMessage,
+      sendUserEmail: true,
+      sendSupportCopy: false,
+    })
+  }
 
   if (aiResult.shouldEscalate) {
     await sendEscalationNotice({

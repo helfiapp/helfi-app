@@ -1,9 +1,22 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
+
+type SupportAttachment = {
+  id?: string
+  name: string
+  url: string
+  type?: string
+  size?: number
+}
+
+const SUPPORT_AGENT_NAME = 'Maya'
+const SUPPORT_AGENT_ROLE = 'Helfi Support'
+const SUPPORT_AGENT_AVATAR = '/support/maya.jpg'
+const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
 
 export default function SupportPage() {
   const { data: session } = useSession()
@@ -13,6 +26,15 @@ export default function SupportPage() {
   const [isLoadingTicket, setIsLoadingTicket] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingChat, setIsSendingChat] = useState(false)
+  const [chatAttachments, setChatAttachments] = useState<SupportAttachment[]>([])
+  const [formAttachments, setFormAttachments] = useState<SupportAttachment[]>([])
+  const [isUploadingChatAttachment, setIsUploadingChatAttachment] = useState(false)
+  const [isUploadingFormAttachment, setIsUploadingFormAttachment] = useState(false)
+  const [attachmentError, setAttachmentError] = useState('')
+  const [feedbackRating, setFeedbackRating] = useState(0)
+  const [feedbackComment, setFeedbackComment] = useState('')
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -36,7 +58,7 @@ export default function SupportPage() {
     }
   }, [session])
 
-  const loadActiveTicket = async () => {
+  const loadActiveTicket = useCallback(async () => {
     if (!session?.user?.email) return
     setIsLoadingTicket(true)
     try {
@@ -44,18 +66,121 @@ export default function SupportPage() {
       if (response.ok) {
         const result = await response.json()
         setActiveTicket(result.ticket || null)
+        setFeedbackSubmitted(Boolean(result.ticket?.responses?.some((res: any) => String(res.message || '').startsWith('[FEEDBACK]'))))
       }
     } catch (error) {
       console.error('Error loading support ticket:', error)
     }
     setIsLoadingTicket(false)
-  }
+  }, [session?.user?.email])
 
   useEffect(() => {
     if (session?.user?.email) {
       loadActiveTicket()
     }
-  }, [session])
+  }, [session, loadActiveTicket])
+
+  const splitMessageAttachments = (message: string) => {
+    const markerIndex = message.indexOf(ATTACHMENTS_MARKER)
+    if (markerIndex === -1) {
+      return { text: message, attachments: [] as SupportAttachment[] }
+    }
+    const text = message.slice(0, markerIndex).trim()
+    const raw = message.slice(markerIndex + ATTACHMENTS_MARKER.length).trim()
+    if (!raw) {
+      return { text, attachments: [] as SupportAttachment[] }
+    }
+    try {
+      const parsed = JSON.parse(raw)
+      const attachments = Array.isArray(parsed)
+        ? parsed
+            .map((item) => ({
+              id: item?.id ? String(item.id) : undefined,
+              name: String(item?.name || ''),
+              url: String(item?.url || ''),
+              type: item?.type ? String(item.type) : undefined,
+              size: typeof item?.size === 'number' ? item.size : undefined
+            }))
+            .filter((item) => item.name && item.url)
+        : []
+      return { text, attachments }
+    } catch {
+      return { text: message, attachments: [] as SupportAttachment[] }
+    }
+  }
+
+  const serializeMessageWithAttachments = (text: string, attachments: SupportAttachment[]) => {
+    if (!attachments.length) return text
+    const payload = attachments.map((att) => ({
+      id: att.id,
+      name: att.name,
+      url: att.url,
+      type: att.type,
+      size: att.size
+    }))
+    return `${text}\n\n${ATTACHMENTS_MARKER}\n${JSON.stringify(payload)}`
+  }
+
+  const uploadSupportFile = async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await fetch('/api/support/uploads', {
+      method: 'POST',
+      body: formData
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error?.error || 'Upload failed')
+    }
+    return response.json()
+  }
+
+  const handleUploadFiles = async (
+    files: File[],
+    setAttachments: React.Dispatch<React.SetStateAction<SupportAttachment[]>>,
+    setUploading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    if (!files.length) return
+    setAttachmentError('')
+    setUploading(true)
+    try {
+      const uploads = await Promise.all(
+        files.map(async (file) => {
+          const result = await uploadSupportFile(file)
+          return {
+            id: result.fileId,
+            name: result.name,
+            url: result.url,
+            type: result.type,
+            size: result.size
+          } as SupportAttachment
+        })
+      )
+      setAttachments((prev) => [...prev, ...uploads])
+    } catch (error: any) {
+      setAttachmentError(error?.message || 'Failed to upload file')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handlePasteUpload = async (
+    event: React.ClipboardEvent<HTMLTextAreaElement>,
+    setAttachments: React.Dispatch<React.SetStateAction<SupportAttachment[]>>,
+    setUploading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    const items = event.clipboardData?.items || []
+    const imageFiles: File[] = []
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) imageFiles.push(file)
+      }
+    }
+    if (imageFiles.length > 0) {
+      await handleUploadFiles(imageFiles, setAttachments, setUploading)
+    }
+  }
 
   const inquiryTypes = [
     { value: 'account', label: 'Account/Login Issue' },
@@ -81,19 +206,20 @@ export default function SupportPage() {
     setSubmitStatus('idle')
 
     try {
+      const messageWithAttachments = serializeMessageWithAttachments(formData.message, formAttachments)
       const endpoint = session ? '/api/support/tickets' : '/api/admin/tickets'
       const payload = session
         ? {
             action: 'create',
             subject: formData.subject || `${formData.inquiryType} - ${inquiryTypes.find(t => t.value === formData.inquiryType)?.label}`,
-            message: formData.message,
+            message: messageWithAttachments,
             category: formData.inquiryType.toUpperCase(),
             priority: formData.inquiryType === 'account' || formData.inquiryType === 'billing' ? 'HIGH' : 'MEDIUM'
           }
         : {
             action: 'create',
             subject: formData.subject || `${formData.inquiryType} - ${inquiryTypes.find(t => t.value === formData.inquiryType)?.label}`,
-            message: formData.message,
+            message: messageWithAttachments,
             userEmail: formData.inquiryType === 'account' ? formData.registeredEmail : formData.email,
             userName: formData.name,
             category: formData.inquiryType.toUpperCase(),
@@ -114,6 +240,7 @@ export default function SupportPage() {
         if (session) {
           await loadActiveTicket()
         }
+        setFormAttachments([])
         // Reset form
         setFormData({
           name: session?.user?.name || '',
@@ -136,9 +263,10 @@ export default function SupportPage() {
   }
 
   const sendChatMessage = async () => {
-    if (!activeTicket || !chatMessage.trim()) return
+    if (!activeTicket || (!chatMessage.trim() && chatAttachments.length === 0)) return
     setIsSendingChat(true)
     try {
+      const messageWithAttachments = serializeMessageWithAttachments(chatMessage.trim(), chatAttachments)
       const response = await fetch('/api/support/tickets', {
         method: 'POST',
         headers: {
@@ -147,7 +275,7 @@ export default function SupportPage() {
         body: JSON.stringify({
           action: 'add_response',
           ticketId: activeTicket.id,
-          message: chatMessage.trim()
+          message: messageWithAttachments
         })
       })
 
@@ -155,6 +283,7 @@ export default function SupportPage() {
         const result = await response.json()
         setActiveTicket(result.ticket || null)
         setChatMessage('')
+        setChatAttachments([])
       }
     } catch (error) {
       console.error('Error sending support message:', error)
@@ -165,26 +294,95 @@ export default function SupportPage() {
   const startNewTicket = () => {
     setActiveTicket(null)
     setSubmitStatus('idle')
+    setChatAttachments([])
+    setFormAttachments([])
+    setFeedbackRating(0)
+    setFeedbackComment('')
+    setFeedbackSubmitted(false)
+    setAttachmentError('')
+  }
+
+  const endChat = async () => {
+    if (!activeTicket) return
+    setIsSendingChat(true)
+    try {
+      const response = await fetch('/api/support/tickets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'end_chat',
+          ticketId: activeTicket.id
+        })
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setActiveTicket(result.ticket || null)
+      }
+    } catch (error) {
+      console.error('Error ending support chat:', error)
+    }
+    setIsSendingChat(false)
+  }
+
+  const submitFeedback = async () => {
+    if (!activeTicket || feedbackRating < 1) return
+    setIsSubmittingFeedback(true)
+    try {
+      const response = await fetch('/api/support/tickets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'submit_feedback',
+          ticketId: activeTicket.id,
+          rating: feedbackRating,
+          comment: feedbackComment.trim()
+        })
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setActiveTicket(result.ticket || null)
+        setFeedbackSubmitted(true)
+      }
+    } catch (error) {
+      console.error('Error submitting feedback:', error)
+    }
+    setIsSubmittingFeedback(false)
   }
 
   const shouldShowRegisteredEmail = formData.inquiryType === 'account' && !session
-  const shouldShowExtraFields = formData.isRegisteredUser || session
+  const isChatClosed = activeTicket && ['RESOLVED', 'CLOSED'].includes(activeTicket.status)
+  const hasFeedback = feedbackSubmitted || Boolean(activeTicket?.responses?.some((res: any) => String(res.message || '').startsWith('[FEEDBACK]')))
   const conversationItems = activeTicket
     ? [
-        {
-          id: `ticket-${activeTicket.id}`,
-          message: activeTicket.message,
-          isAdminResponse: false,
-          createdAt: activeTicket.createdAt
-        },
+        (() => {
+          const parsed = splitMessageAttachments(String(activeTicket.message || ''))
+          return {
+            id: `ticket-${activeTicket.id}`,
+            message: parsed.text,
+            attachments: parsed.attachments,
+            isAdminResponse: false,
+            createdAt: activeTicket.createdAt
+          }
+        })(),
         ...(activeTicket.responses || [])
-          .filter((response: any) => !String(response.message || '').startsWith('[SYSTEM]'))
-          .map((response: any) => ({
-            id: response.id,
-            message: response.message,
-            isAdminResponse: response.isAdminResponse,
-            createdAt: response.createdAt
-          }))
+          .filter((response: any) => {
+            const msg = String(response.message || '')
+            return !msg.startsWith('[SYSTEM]') && !msg.startsWith('[FEEDBACK]')
+          })
+          .map((response: any) => {
+            const parsed = splitMessageAttachments(String(response.message || ''))
+            return {
+              id: response.id,
+              message: parsed.text,
+              attachments: parsed.attachments,
+              isAdminResponse: response.isAdminResponse,
+              createdAt: response.createdAt
+            }
+          })
       ]
     : []
 
@@ -242,7 +440,17 @@ export default function SupportPage() {
           <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Support Chat</h2>
-              <p className="text-gray-600">Chat with our support assistant. Replies are also sent to your email.</p>
+              <p className="text-gray-600">Chat with our support assistant. Replies appear here right away.</p>
+              <div className="mt-4 flex items-center justify-center gap-3 text-sm text-gray-600">
+                <Image
+                  src={SUPPORT_AGENT_AVATAR}
+                  alt={`${SUPPORT_AGENT_NAME} avatar`}
+                  width={36}
+                  height={36}
+                  className="rounded-full object-cover"
+                />
+                <span>{SUPPORT_AGENT_NAME} from {SUPPORT_AGENT_ROLE}</span>
+              </div>
             </div>
 
             {isLoadingTicket && (
@@ -251,6 +459,11 @@ export default function SupportPage() {
 
             {!isLoadingTicket && (
               <div className="space-y-4">
+                {isChatClosed && (
+                  <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    This chat is closed. If you need more help, start a new ticket below.
+                  </div>
+                )}
                 {conversationItems.length === 0 && (
                   <div className="text-sm text-gray-500 text-center">No messages yet.</div>
                 )}
@@ -260,10 +473,57 @@ export default function SupportPage() {
                     className={`rounded-lg p-4 ${item.isAdminResponse ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'bg-gray-50 border-l-4 border-gray-300'}`}
                   >
                     <div className="flex items-center justify-between mb-2 text-xs text-gray-500">
-                      <span>{item.isAdminResponse ? 'Helfi Support' : 'You'}</span>
+                      <span className="flex items-center gap-2">
+                        {item.isAdminResponse ? (
+                          <>
+                            <Image
+                              src={SUPPORT_AGENT_AVATAR}
+                              alt={`${SUPPORT_AGENT_NAME} avatar`}
+                              width={20}
+                              height={20}
+                              className="rounded-full object-cover"
+                            />
+                            {SUPPORT_AGENT_NAME}
+                          </>
+                        ) : (
+                          'You'
+                        )}
+                      </span>
                       <span>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</span>
                     </div>
                     <p className="text-gray-700 whitespace-pre-wrap">{item.message}</p>
+                    {item.attachments?.length > 0 && (
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {item.attachments.map((att) => (
+                          <a
+                            key={`${item.id}-${att.url}`}
+                            href={att.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="border border-gray-200 rounded-lg p-2 bg-white hover:bg-gray-50 transition-colors"
+                          >
+                            {att.type?.startsWith('image/') ? (
+                              <div className="space-y-2">
+                                <div className="relative w-full h-32">
+                                  <Image
+                                    src={att.url}
+                                    alt={att.name}
+                                    fill
+                                    className="object-cover rounded-md"
+                                  />
+                                </div>
+                                <div className="text-xs text-gray-600 truncate">{att.name}</div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-700">
+                                <div className="font-medium">{att.name}</div>
+                                <div className="text-xs text-gray-500">{att.type || 'Document'}</div>
+                              </div>
+                            )}
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -279,27 +539,114 @@ export default function SupportPage() {
                 rows={4}
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
+                onPaste={(e) => handlePasteUpload(e, setChatAttachments, setIsUploadingChatAttachment)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-helfi-green focus:border-helfi-green"
                 placeholder="Describe the issue or add more details..."
+                disabled={isChatClosed}
               />
+              {attachmentError && (
+                <p className="mt-2 text-sm text-red-600">{attachmentError}</p>
+              )}
+              {chatAttachments.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {chatAttachments.map((att) => (
+                    <div key={att.url} className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-xs">
+                      <span className="truncate max-w-[160px]">{att.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setChatAttachments((prev) => prev.filter((item) => item.url !== att.url))}
+                        className="text-gray-500 hover:text-gray-700"
+                        aria-label={`Remove ${att.name}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center justify-between mt-4">
-                <button
-                  type="button"
-                  onClick={startNewTicket}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Start a new ticket
-                </button>
+                <div className="flex items-center gap-2">
+                  <label className={`px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${isChatClosed ? 'opacity-50 pointer-events-none' : ''}`}>
+                    Attach files
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="hidden"
+                      onChange={(e) => handleUploadFiles(Array.from(e.target.files || []), setChatAttachments, setIsUploadingChatAttachment)}
+                      disabled={isChatClosed}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={startNewTicket}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Start a new ticket
+                  </button>
+                  <button
+                    type="button"
+                    onClick={endChat}
+                    disabled={isChatClosed || isSendingChat}
+                    className="px-4 py-2 border border-emerald-500 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    End chat
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={sendChatMessage}
-                  disabled={!chatMessage.trim() || isSendingChat}
+                  disabled={isChatClosed || isUploadingChatAttachment || (!chatMessage.trim() && chatAttachments.length === 0) || isSendingChat}
                   className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSendingChat ? 'Sending...' : 'Send Message'}
+                  {isSendingChat || isUploadingChatAttachment ? 'Sending...' : 'Send Message'}
                 </button>
               </div>
             </div>
+
+            {isChatClosed && (
+              <div className="mt-8 border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">How was your support experience?</h3>
+                <p className="text-sm text-gray-600 mb-4">A quick rating helps us improve.</p>
+                {hasFeedback ? (
+                  <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                    Thanks for the feedback — we really appreciate it.
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2 mb-4">
+                      {[1, 2, 3, 4, 5].map((rating) => (
+                        <button
+                          key={rating}
+                          type="button"
+                          onClick={() => setFeedbackRating(rating)}
+                          className={`px-3 py-2 rounded-lg border text-sm ${feedbackRating === rating ? 'bg-emerald-500 text-white border-emerald-500' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                        >
+                          {rating}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={feedbackComment}
+                      onChange={(e) => setFeedbackComment(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-helfi-green focus:border-helfi-green"
+                      placeholder="Optional comment..."
+                    />
+                    <div className="flex justify-end mt-4">
+                      <button
+                        type="button"
+                        onClick={submitFeedback}
+                        disabled={feedbackRating < 1 || isSubmittingFeedback}
+                        className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -464,19 +811,57 @@ export default function SupportPage() {
                 rows={6}
                 value={formData.message}
                 onChange={handleInputChange}
+                onPaste={(e) => {
+                  if (session) handlePasteUpload(e, setFormAttachments, setIsUploadingFormAttachment)
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-helfi-green focus:border-helfi-green"
                 placeholder="Please provide as much detail as possible about your issue or question..."
               />
+              {session && (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <label className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm">
+                    Attach files
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="hidden"
+                      onChange={(e) => handleUploadFiles(Array.from(e.target.files || []), setFormAttachments, setIsUploadingFormAttachment)}
+                    />
+                  </label>
+                  {isUploadingFormAttachment && <span className="text-xs text-gray-500">Uploading...</span>}
+                </div>
+              )}
+              {formAttachments.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {formAttachments.map((att) => (
+                    <div key={att.url} className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-xs">
+                      <span className="truncate max-w-[160px]">{att.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormAttachments((prev) => prev.filter((item) => item.url !== att.url))}
+                        className="text-gray-500 hover:text-gray-700"
+                        aria-label={`Remove ${att.name}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {attachmentError && (
+                <p className="mt-2 text-sm text-red-600">{attachmentError}</p>
+              )}
             </div>
 
             {/* Submit Button */}
             <div>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingFormAttachment}
                 className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg font-medium hover:bg-helfi-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Submitting...' : 'Send Message'}
+                {isSubmitting || isUploadingFormAttachment ? 'Submitting...' : 'Send Message'}
               </button>
             </div>
           </form>

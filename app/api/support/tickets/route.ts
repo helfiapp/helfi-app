@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { TicketCategory, TicketPriority } from '@prisma/client'
-import { processSupportTicketAutoReply } from '@/lib/support-automation'
+import { buildSupportFeedbackPrompt, processSupportTicketAutoReply, sendSupportFeedbackEmail, sendSupportTranscriptEmail } from '@/lib/support-automation'
 
 function normalizeCategory(value: string | undefined): TicketCategory {
   const upper = (value || '').toUpperCase()
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       await processSupportTicketAutoReply({
         ticketId: ticket.id,
         latestUserMessage: message,
-        source: 'ticket_create',
+        source: 'app_ticket',
       })
     } catch (aiError) {
       console.error('🤖 [SUPPORT AI] Failed to auto-reply to in-app ticket:', aiError)
@@ -136,6 +136,109 @@ export async function POST(request: NextRequest) {
       })
     } catch (aiError) {
       console.error('🤖 [SUPPORT AI] Failed to auto-reply to in-app reply:', aiError)
+    }
+
+    const updatedTicket = await prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+      include: { responses: { orderBy: { createdAt: 'asc' } } },
+    })
+
+    return NextResponse.json({ ticket: updatedTicket })
+  }
+
+  if (action === 'end_chat') {
+    const ticketId = String(body?.ticketId || '').trim()
+    if (!ticketId) {
+      return NextResponse.json({ error: 'ticketId is required' }, { status: 400 })
+    }
+
+    const ticket = await prisma.supportTicket.findFirst({
+      where: { id: ticketId, userEmail: email },
+      include: { responses: { orderBy: { createdAt: 'asc' } } },
+    })
+    if (!ticket) {
+      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+    }
+
+    const feedbackPrompt = buildSupportFeedbackPrompt(ticket.userName)
+    const hasFeedbackPrompt = ticket.responses?.some((response) => response.isAdminResponse && response.message?.includes('rate your support experience'))
+    if (!hasFeedbackPrompt) {
+      await prisma.ticketResponse.create({
+        data: {
+          ticketId: ticket.id,
+          message: feedbackPrompt,
+          isAdminResponse: true,
+          adminId: null,
+        },
+      })
+    }
+
+    await prisma.supportTicket.update({
+      where: { id: ticket.id },
+      data: {
+        status: 'RESOLVED',
+        updatedAt: new Date(),
+      },
+    })
+
+    try {
+      await sendSupportTranscriptEmail(ticket.id)
+    } catch (emailError) {
+      console.error('📧 [SUPPORT TRANSCRIPT] Failed to send transcript:', emailError)
+    }
+
+    const updatedTicket = await prisma.supportTicket.findUnique({
+      where: { id: ticket.id },
+      include: { responses: { orderBy: { createdAt: 'asc' } } },
+    })
+
+    return NextResponse.json({ ticket: updatedTicket })
+  }
+
+  if (action === 'submit_feedback') {
+    const ticketId = String(body?.ticketId || '').trim()
+    const rating = Number(body?.rating || 0)
+    const comment = String(body?.comment || '').trim()
+    if (!ticketId) {
+      return NextResponse.json({ error: 'ticketId is required' }, { status: 400 })
+    }
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+      return NextResponse.json({ error: 'rating must be between 1 and 5' }, { status: 400 })
+    }
+
+    const ticket = await prisma.supportTicket.findFirst({
+      where: { id: ticketId, userEmail: email },
+    })
+    if (!ticket) {
+      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+    }
+
+    const feedbackMessage = [
+      `[FEEDBACK] Rating: ${rating}/5`,
+      comment ? `Comment: ${comment}` : 'Comment: (none)',
+    ].join('\n')
+
+    await prisma.ticketResponse.create({
+      data: {
+        ticketId,
+        message: feedbackMessage,
+        isAdminResponse: false,
+        userEmail: email,
+      },
+    })
+
+    await prisma.supportTicket.update({
+      where: { id: ticketId },
+      data: {
+        status: 'CLOSED',
+        updatedAt: new Date(),
+      },
+    })
+
+    try {
+      await sendSupportFeedbackEmail({ ticketId, rating, comment })
+    } catch (emailError) {
+      console.error('📧 [SUPPORT FEEDBACK] Failed to send feedback email:', emailError)
     }
 
     const updatedTicket = await prisma.supportTicket.findUnique({

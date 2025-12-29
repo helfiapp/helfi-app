@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         await processSupportTicketAutoReply({
           ticketId: newTicket.id,
           latestUserMessage: text || html,
-          source: 'ticket_create',
+          source: 'email_ticket',
         })
       } catch (aiError) {
         console.error('🤖 [SUPPORT AI] Failed to auto-reply to email ticket:', aiError)
