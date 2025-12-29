@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/protect-regions.js",
+    "prebuild": "node scripts/protect-regions.js && node scripts/build-support-code-index.js",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
