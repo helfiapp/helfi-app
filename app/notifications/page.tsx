@@ -52,9 +52,6 @@ export default function Notifications() {
             <Link href="/insights" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
               AI Insights
             </Link>
-            <Link href="/reports" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Reports
-            </Link>
             <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
               Health Info
             </Link>

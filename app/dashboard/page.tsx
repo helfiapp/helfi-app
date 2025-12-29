@@ -501,7 +501,6 @@ export default function Dashboard() {
                     <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                     <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                     <div className="border-t border-gray-100 my-2"></div>
-                    <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
                     <button 
                       onClick={handleSignOut}
                       className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
@@ -601,7 +600,6 @@ export default function Dashboard() {
                     <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                     <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                     <div className="border-t border-gray-100 my-2"></div>
-                    <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
                     <button 
                       onClick={handleSignOut}
                       className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
@@ -681,15 +679,6 @@ export default function Dashboard() {
               </div>
               </Link>
 
-              <Link href="/reports" className="block">
-              <div className="bg-white md:bg-purple-50 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-purple-200 hover:md:border-purple-300 shadow-sm md:shadow-none transition-colors">
-                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">📊 Reports</h3>
-                <p className="text-[13px] text-gray-600">Weekly health analysis and trends</p>
-                <div className="mt-3">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-600">Coming Soon</span>
-                </div>
-              </div>
-              </Link>
             </div>
 
             {/* Fitbit Mini Summary */}

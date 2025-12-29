@@ -206,13 +206,6 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
                 Help & Support
               </Link>
               <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
-              <Link
-                href="/reports"
-                className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                onClick={() => setDropdownOpen(false)}
-              >
-                Reports
-              </Link>
               <button
                 onClick={handleSignOut}
                 className="block w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold"
@@ -226,5 +219,4 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
     </nav>
   )
 }
-
 
