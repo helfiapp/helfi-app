@@ -177,16 +177,22 @@ export default function SupportChatWidget() {
     return () => window.clearTimeout(timer)
   }, [isOpen, conversationItems.length])
 
-  const loadTicket = useCallback(async () => {
-    if (!isOpen) return
+  const loadTicket = useCallback(async (forceLoad = false) => {
+    if (!forceLoad && !isOpen) return
     setIsLoading(true)
     try {
       if (isLoggedIn) {
         const response = await fetch('/api/support/tickets?activeOnly=1')
         if (response.ok) {
           const result = await response.json()
-          setTicket(result.ticket || null)
+          const nextTicket = result.ticket || null
+          setTicket(nextTicket)
           setFeedbackSubmitted(Boolean(result.ticket?.responses?.some((res: any) => String(res.message || '').startsWith('[FEEDBACK]'))))
+          if (nextTicket) {
+            setIsOpen(true)
+          } else {
+            setIsOpen(false)
+          }
         }
       } else if (guestTicketId && guestToken) {
         const response = await fetch(`/api/support/inquiry?ticketId=${guestTicketId}&token=${guestToken}`)
@@ -207,6 +213,11 @@ export default function SupportChatWidget() {
       loadTicket()
     }
   }, [isOpen, loadTicket])
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+    loadTicket(true)
+  }, [isLoggedIn, loadTicket])
 
   const uploadSupportFile = async (file: File) => {
     const formData = new FormData()
@@ -459,6 +470,7 @@ export default function SupportChatWidget() {
     setFeedbackRating(0)
     setFeedbackComment('')
     setFeedbackSubmitted(false)
+    setIsOpen(false)
     if (!isLoggedIn) {
       setGuestToken('')
       setGuestTicketId('')
@@ -466,6 +478,7 @@ export default function SupportChatWidget() {
   }
 
   if (shouldHideWidget) return null
+  if (isLoggedIn && !ticket) return null
 
   return (
     <div className="fixed bottom-5 right-5 z-[60]">
