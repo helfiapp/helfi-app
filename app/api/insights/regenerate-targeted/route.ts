@@ -9,6 +9,8 @@ import { getRunCostCents } from '@/lib/ai-usage-runs'
 import { getBillingMarkupMultiplier, getModelPriceInfo } from '@/lib/cost-meter'
 import type { RunContext } from '@/lib/run-context'
 import { getInsightsLlmStatus } from '@/lib/insights/llm'
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 // Allow longer runtime so the full regeneration completes without a gateway timeout
 export const maxDuration = 120
@@ -110,6 +112,29 @@ export async function POST(request: NextRequest) {
         ? body.runId
         : randomUUID()
 
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { subscription: true, creditTopUps: true },
+    })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const isPremium = isSubscriptionActive(user.subscription)
+    const now = new Date()
+    const hasPurchasedCredits = user.creditTopUps?.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    )
+    const hasFreeInsightsCredits = await hasFreeCredits(session.user.id, 'INSIGHTS_UPDATE')
+    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && hasFreeInsightsCredits
+    if (!isPremium && !hasPurchasedCredits && !hasFreeInsightsCredits) {
+      return NextResponse.json({
+        success: false,
+        message: 'You\'ve used all your free insights updates. Please purchase credits or subscribe.',
+        exhaustedFreeCredits: true,
+      }, { status: 402 })
+    }
+
     // Log visible goals to diagnose missing-goal cases without blocking the request
     const goals = await prisma.healthGoal.findMany({
       where: {
@@ -192,7 +217,7 @@ export async function POST(request: NextRequest) {
       const walletStatus = await cm.getWalletStatus()
       const plan = calculateChargePlan(costCents, walletStatus)
 
-      if (!plan.canAfford) {
+      if (!allowViaFreeUse && !plan.canAfford) {
         return {
           success: false as const,
           status: 402 as const,
@@ -240,33 +265,40 @@ export async function POST(request: NextRequest) {
       }
 
       let chargedCredits = 0
-      if (plan.totalCredits > 0) {
-        const chargedOk = await cm.chargeSplitCredits(plan.subscriptionCredits, plan.topUpCredits)
-        if (!chargedOk) {
-          return {
-            success: false as const,
-            status: 402 as const,
-            body: {
-              success: false,
-              message: 'Unable to charge credits for this insights refresh.',
-              runId,
-              sectionsTriggered: sectionsForCharge,
-              affectedSections: affectedUnique,
-              costCents,
-              usageEvents: count,
-              promptTokens,
-              completionTokens,
-            },
+      if (!allowViaFreeUse) {
+        if (plan.totalCredits > 0) {
+          const chargedOk = await cm.chargeSplitCredits(plan.subscriptionCredits, plan.topUpCredits)
+          if (!chargedOk) {
+            return {
+              success: false as const,
+              status: 402 as const,
+              body: {
+                success: false,
+                message: 'Unable to charge credits for this insights refresh.',
+                runId,
+                sectionsTriggered: sectionsForCharge,
+                affectedSections: affectedUnique,
+                costCents,
+                usageEvents: count,
+                promptTokens,
+                completionTokens,
+              },
+            }
           }
+          chargedCredits = plan.totalCredits
         }
-        chargedCredits = plan.totalCredits
-        await prisma.user.update({
-          where: { id: session.user.id },
-          data: {
-            monthlyInsightsGenerationUsed: { increment: 1 },
-          } as any,
-        })
       }
+
+      if (allowViaFreeUse) {
+        await consumeFreeCredit(session.user.id, 'INSIGHTS_UPDATE')
+      }
+
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: {
+          monthlyInsightsGenerationUsed: { increment: 1 },
+        } as any,
+      })
 
       console.log('[insights.regenerate-targeted] charge summary', {
         runId,
@@ -286,6 +318,8 @@ export async function POST(request: NextRequest) {
           message:
             chargedCredits > 0
               ? `Charged ${chargedCredits} credits based on actual AI usage.`
+              : allowViaFreeUse
+              ? 'Used a free insights update.'
               : 'Targeted insights regeneration completed.',
           changeTypes: Array.from(new Set(effectiveChangeTypes)),
           sectionsTriggered: sectionsForCharge,
@@ -296,8 +330,8 @@ export async function POST(request: NextRequest) {
           promptTokens,
           completionTokens,
           chargedCredits,
-          subscriptionCreditsCharged: plan.subscriptionCredits,
-          topUpCreditsCharged: plan.topUpCredits,
+          subscriptionCreditsCharged: allowViaFreeUse ? 0 : plan.subscriptionCredits,
+          topUpCreditsCharged: allowViaFreeUse ? 0 : plan.topUpCredits,
           modelPrice,
           markupMultiplier,
         },

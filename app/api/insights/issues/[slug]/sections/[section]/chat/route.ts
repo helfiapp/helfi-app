@@ -18,6 +18,8 @@ import { CreditManager } from '@/lib/credit-system'
 import { capMaxTokensToBudget, estimateTokensFromText } from '@/lib/cost-meter'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 const rateMap = new Map<string, number>()
 const MIN_INTERVAL_MS = 1500
@@ -127,6 +129,32 @@ export async function POST(
     const wantsStream = accept.includes('text/event-stream')
     const openai = getOpenAIClient()
     const system = await buildSystemPrompt(session.user.id, context.params.slug, section)
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { subscription: true, creditTopUps: true },
+    })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const isPremium = isSubscriptionActive(user.subscription)
+    const now = new Date()
+    const hasPurchasedCredits = user.creditTopUps?.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    )
+    const hasFreeChatCredits = await hasFreeCredits(user.id, 'INSIGHTS_CHAT')
+    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && hasFreeChatCredits
+    if (!isPremium && !hasPurchasedCredits && !hasFreeChatCredits) {
+      return NextResponse.json(
+        {
+          error: 'Payment required',
+          message: 'You\'ve used all your free insights chat uses. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true,
+          exhaustedFreeCredits: true,
+        },
+        { status: 402 }
+      )
+    }
 
     if (!openai) {
       // Fallback without OpenAI: echo guidance
@@ -157,11 +185,15 @@ export async function POST(
       // Wallet pre-check using conservative estimate (max_tokens)
       const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
       const promptText = [system, ...history.map((m) => m.content)].join('\n')
-      const cm = new CreditManager(session.user.id)
-      const wallet = await cm.getWalletStatus()
-      const maxTokens = capMaxTokensToBudget(model, promptText, 500, wallet.totalAvailableCents)
-      if (maxTokens <= 0) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      let maxTokens = 500
+      if (!allowViaFreeUse) {
+        const cm = new CreditManager(session.user.id)
+        const wallet = await cm.getWalletStatus()
+        const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, wallet.totalAvailableCents)
+        if (cappedMaxTokens <= 0) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+        }
+        maxTokens = cappedMaxTokens
       }
 
       const wrapped = await chatCompletionWithCost(openai, {
@@ -171,9 +203,14 @@ export async function POST(
         messages: chatMessages as any,
       } as any)
 
-      const ok = await cm.chargeCents(wrapped.costCents)
-      if (!ok) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      if (!allowViaFreeUse) {
+        const cm = new CreditManager(session.user.id)
+        const ok = await cm.chargeCents(wrapped.costCents)
+        if (!ok) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+        }
+      } else {
+        await consumeFreeCredit(session.user.id, 'INSIGHTS_CHAT')
       }
 
       try {
@@ -208,12 +245,16 @@ export async function POST(
     // Non-streaming fallback
   {
     const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
-    const cm = new CreditManager(session.user.id)
     const promptText = [system, ...history.map((m) => m.content)].join('\n')
-    const wallet = await cm.getWalletStatus()
-    let maxTokens = capMaxTokensToBudget(model, promptText, 500, wallet.totalAvailableCents)
-    if (maxTokens <= 0) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    let maxTokens = 500
+    if (!allowViaFreeUse) {
+      const cm = new CreditManager(session.user.id)
+      const wallet = await cm.getWalletStatus()
+      const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, wallet.totalAvailableCents)
+      if (cappedMaxTokens <= 0) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      }
+      maxTokens = cappedMaxTokens
     }
     const wrapped = await chatCompletionWithCost(openai, {
       model,
@@ -221,9 +262,14 @@ export async function POST(
       max_tokens: maxTokens,
       messages: chatMessages as any,
     } as any)
-    const ok = await cm.chargeCents(wrapped.costCents)
-    if (!ok) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    if (!allowViaFreeUse) {
+      const cm = new CreditManager(session.user.id)
+      const ok = await cm.chargeCents(wrapped.costCents)
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      }
+    } else {
+      await consumeFreeCredit(session.user.id, 'INSIGHTS_CHAT')
     }
 
     // Log AI usage for non-streaming section chat

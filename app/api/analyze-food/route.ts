@@ -2624,6 +2624,7 @@ CRITICAL REQUIREMENTS:
     
     // Check if user has free credits remaining
     const hasFreeFoodCredits = await hasFreeCredits(currentUser.id, 'FOOD_ANALYSIS');
+    const hasFreeFoodReanalysisCredits = await hasFreeCredits(currentUser.id, 'FOOD_REANALYSIS');
     
     // Billing is now stable again – enforce credit checks for Food Analysis.
     // This controls wallet pre-checks and charges; free credits are consumed first.
@@ -2631,20 +2632,36 @@ CRITICAL REQUIREMENTS:
 
     // Allow if: Premium subscription OR has purchased credits OR has free credits remaining
     let allowViaFreeUse = false;
-    if (!isPremium && !hasPurchasedCredits && hasFreeFoodCredits && !isReanalysis) {
-      // Has free credits - allow free use
-      allowViaFreeUse = true;
-    } else if (BILLING_ENFORCED && !isPremium && !hasPurchasedCredits && !hasFreeFoodCredits) {
-      // No subscription, no credits, and no free credits - require payment
-      return NextResponse.json(
-        { 
-          error: 'Payment required',
-          message: 'You\'ve used all your free food analyses. Subscribe to a monthly plan or purchase credits to continue.',
-          requiresPayment: true,
-          exhaustedFreeCredits: true
-        },
-        { status: 402 }
-      );
+    if (!isPremium && !hasPurchasedCredits) {
+      if (isReanalysis) {
+        if (hasFreeFoodReanalysisCredits) {
+          allowViaFreeUse = true;
+        } else if (BILLING_ENFORCED) {
+          return NextResponse.json(
+            { 
+              error: 'Payment required',
+              message: 'You\'ve used all your free food re-analyses. Subscribe to a monthly plan or purchase credits to continue.',
+              requiresPayment: true,
+              exhaustedFreeCredits: true
+            },
+            { status: 402 }
+          );
+        }
+      } else if (hasFreeFoodCredits) {
+        // Has free credits - allow free use
+        allowViaFreeUse = true;
+      } else if (BILLING_ENFORCED) {
+        // No subscription, no credits, and no free credits - require payment
+        return NextResponse.json(
+          { 
+            error: 'Payment required',
+            message: 'You\'ve used all your free food analyses. Subscribe to a monthly plan or purchase credits to continue.',
+            requiresPayment: true,
+            exhaustedFreeCredits: true
+          },
+          { status: 402 }
+        );
+      }
     }
 
     const lastReset = currentUser.lastAnalysisResetDate;
@@ -2958,8 +2975,8 @@ CRITICAL REQUIREMENTS:
     // Note: Charging happens after health compatibility check to include all costs
 
     // Consume free credit if this was a free use
-    if (allowViaFreeUse && !isReanalysis) {
-      await consumeFreeCredit(currentUser.id, 'FOOD_ANALYSIS');
+    if (allowViaFreeUse) {
+      await consumeFreeCredit(currentUser.id, isReanalysis ? 'FOOD_REANALYSIS' : 'FOOD_ANALYSIS');
     }
     // Update counters (for all users, not just premium)
     await prisma.user.update({

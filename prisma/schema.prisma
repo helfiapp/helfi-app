@@ -54,6 +54,12 @@ model User {
   freeInteractionAnalysisRemaining Int @default(2) // 2 free supplement/medication interaction analyses
   freeHealthIntakeRemaining       Int @default(1) // 1 free full health intake analysis (on page 11 complete)
   freeInsightsUpdateRemaining     Int @default(3) // 3 free insights updates (when changing health setup)
+  freeSymptomChatRemaining        Int @default(0) // Free symptom follow-up chats (granted on signup)
+  freeMedicalChatRemaining        Int @default(0) // Free medical image follow-up chats (granted on signup)
+  freeInsightsChatRemaining       Int @default(0) // Free insights chats (granted on signup)
+  freeVoiceChatRemaining          Int @default(0) // Free voice chat uses (granted on signup)
+  freeFoodReanalysisRemaining     Int @default(0) // Free food re-analyses (granted on signup)
+  freeInteractionReanalysisRemaining Int @default(0) // Free interaction re-analyses (granted on signup)
 
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt

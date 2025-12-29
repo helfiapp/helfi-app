@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits';
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { capMaxTokensToBudget } from '@/lib/cost-meter';
@@ -59,24 +60,39 @@ export async function POST(request: NextRequest) {
       (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
     );
     
-    // Check if user has used their free interaction analysis
-    const hasUsedFreeInteraction = (user as any).hasUsedFreeInteractionAnalysis || false;
+    const hasFreeInteractionCredits = await hasFreeCredits(user.id, 'INTERACTION_ANALYSIS');
+    const hasFreeInteractionReanalysis = await hasFreeCredits(user.id, 'INTERACTION_REANALYSIS');
     
-    // Allow if: Premium subscription OR has purchased credits OR hasn't used free use yet
+    // Allow if: Premium subscription OR has purchased credits OR has free credits
     let allowViaFreeUse = false;
-    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeInteraction && !reanalysis) {
-      // First time use - allow free
-      allowViaFreeUse = true;
-    } else if (!isPremium && !hasPurchasedCredits) {
-      // No subscription, no credits, and already used free - require payment
-      return NextResponse.json(
-        { 
-          error: 'Payment required',
-          message: 'You\'ve used your free interaction analysis. Subscribe to a monthly plan or purchase credits to continue.',
-          requiresPayment: true
-        },
-        { status: 402 }
-      );
+    if (!isPremium && !hasPurchasedCredits) {
+      if (reanalysis) {
+        if (hasFreeInteractionReanalysis) {
+          allowViaFreeUse = true;
+        } else {
+          return NextResponse.json(
+            {
+              error: 'Payment required',
+              message: 'You\'ve used all your free interaction re-analyses. Subscribe to a monthly plan or purchase credits to continue.',
+              requiresPayment: true,
+              exhaustedFreeCredits: true,
+            },
+            { status: 402 }
+          );
+        }
+      } else if (hasFreeInteractionCredits) {
+        allowViaFreeUse = true;
+      } else {
+        return NextResponse.json(
+          { 
+            error: 'Payment required',
+            message: 'You\'ve used all your free interaction analyses. Subscribe to a monthly plan or purchase credits to continue.',
+            requiresPayment: true,
+            exhaustedFreeCredits: true,
+          },
+          { status: 402 }
+        );
+      }
     }
     // Use optional chaining to avoid type errors if field not present in client types
     const lastMonthlyReset = (user as any).lastMonthlyResetDate as Date | null;
@@ -292,22 +308,9 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     }
 
-    // Update counters and mark free use as used
-    if (allowViaFreeUse && !reanalysis) {
-      // Mark free use as used (safe if column doesn't exist yet - migration pending)
-      try {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            hasUsedFreeInteractionAnalysis: true,
-          } as any
-        })
-      } catch (e: any) {
-        // Ignore if column doesn't exist yet (migration pending)
-        if (!e.message?.includes('does not exist')) {
-          console.warn('Failed to update hasUsedFreeInteractionAnalysis:', e)
-        }
-      }
+    // Update counters and consume free credits
+    if (allowViaFreeUse) {
+      await consumeFreeCredit(user.id, reanalysis ? 'INTERACTION_REANALYSIS' : 'INTERACTION_ANALYSIS');
     }
     // Update counters (for all users, not just premium)
     await prisma.user.update({

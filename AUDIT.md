@@ -126,12 +126,12 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    4) How serious it is: Low.
    5) What needs to be done to fix it: Store analytics in a durable data store so restarts do not erase history. This is now in place.
 
-3. Free credit rules are inconsistent across features.
+3. ✅ Free credit rules are inconsistent across features.
    1) What the issue is: Some features use free-credit counters, while others use one-time flags.
    2) Why it matters: Users may see confusing or unfair limits.
    3) What could realistically go wrong: Support requests increase because “free credits” do not behave as promised.
    4) How serious it is: Low.
-   5) What needs to be done to fix it: Use one consistent free-credit system across all AI features.
+   5) What needs to be done to fix it: Use one consistent free-credit system across all AI features so each free use is counted the same way. This is now in place.
 
 ## Profitability Risks
 1. Some AI features are free.

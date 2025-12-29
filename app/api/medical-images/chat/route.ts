@@ -7,6 +7,8 @@ import { CreditManager } from '@/lib/credit-system'
 import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { logAIUsage } from '@/lib/ai-usage-logger'
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
@@ -44,10 +46,29 @@ export async function POST(req: NextRequest) {
     }
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { subscription: true },
+      include: { subscription: true, creditTopUps: true },
     })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const isPremium = isSubscriptionActive(user.subscription)
+    const now = new Date()
+    const hasPurchasedCredits = user.creditTopUps?.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    )
+    const hasFreeChatCredits = await hasFreeCredits(user.id, 'MEDICAL_CHAT')
+    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && hasFreeChatCredits
+    if (!isPremium && !hasPurchasedCredits && !hasFreeChatCredits) {
+      return NextResponse.json(
+        {
+          error: 'Payment required',
+          message: 'You\'ve used all your free medical image chat uses. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true,
+          exhaustedFreeCredits: true,
+        },
+        { status: 402 }
+      )
     }
 
     // Build system prompt with medical image analysis context
@@ -120,11 +141,15 @@ export async function POST(req: NextRequest) {
     if (wantsStream) {
       const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
       const promptText = `${systemPrompt}\n${question}`
-      const cm = new CreditManager(user.id)
-      const wallet = await cm.getWalletStatus()
-      const maxTokens = capMaxTokensToBudget(model, promptText, 800, wallet.totalAvailableCents)
-      if (maxTokens <= 0) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      let maxTokens = 800
+      if (!allowViaFreeUse) {
+        const cm = new CreditManager(user.id)
+        const wallet = await cm.getWalletStatus()
+        const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, wallet.totalAvailableCents)
+        if (cappedMaxTokens <= 0) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+        }
+        maxTokens = cappedMaxTokens
       }
 
       const wrapped = await chatCompletionWithCost(openai, {
@@ -134,9 +159,14 @@ export async function POST(req: NextRequest) {
         messages: chatMessages as any,
       } as any)
 
-      const ok = await cm.chargeCents(wrapped.costCents)
-      if (!ok) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      if (!allowViaFreeUse) {
+        const cm = new CreditManager(user.id)
+        const ok = await cm.chargeCents(wrapped.costCents)
+        if (!ok) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+        }
+      } else {
+        await consumeFreeCredit(user.id, 'MEDICAL_CHAT')
       }
 
       try {
@@ -171,7 +201,7 @@ export async function POST(req: NextRequest) {
       const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
       let maxTokens = 800
       // Pre-check
-      {
+      if (!allowViaFreeUse) {
         const cm = new CreditManager(user.id)
         const wallet = await cm.getWalletStatus()
         const cappedMaxTokens = capMaxTokensToBudget(
@@ -191,10 +221,14 @@ export async function POST(req: NextRequest) {
         max_tokens: maxTokens,
         messages: chatMessages as any,
       } as any)
-      const cm = new CreditManager(user.id)
-      const ok = await cm.chargeCents(wrapped.costCents)
-      if (!ok) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      if (!allowViaFreeUse) {
+        const cm = new CreditManager(user.id)
+        const ok = await cm.chargeCents(wrapped.costCents)
+        if (!ok) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+        }
+      } else {
+        await consumeFreeCredit(user.id, 'MEDICAL_CHAT')
       }
 
       // Log AI usage for non-streaming medical image chat

@@ -8,6 +8,8 @@ import { capMaxTokensToBudget, costCentsEstimateFromText, estimateTokensFromText
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { ensureTalkToAITables, listMessages, appendMessage, createThread, updateThreadTitle, listThreads } from '@/lib/talk-to-ai-chat-store'
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
@@ -274,10 +276,29 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      include: { subscription: true },
+      include: { subscription: true, creditTopUps: true },
     })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const isPremium = isSubscriptionActive(user.subscription)
+    const now = new Date()
+    const hasPurchasedCredits = user.creditTopUps?.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    )
+    const hasFreeChatCredits = await hasFreeCredits(user.id, 'VOICE_CHAT')
+    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && hasFreeChatCredits
+    if (!isPremium && !hasPurchasedCredits && !hasFreeChatCredits) {
+      return NextResponse.json(
+        {
+          error: 'Payment required',
+          message: 'You\'ve used all your free voice chat uses. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true,
+          exhaustedFreeCredits: true,
+        },
+        { status: 402 }
+      )
     }
 
     // Get or create thread
@@ -358,19 +379,21 @@ export async function POST(req: NextRequest) {
     }
 
     let maxTokens = 1000
-    const budgetCents = Math.floor(wallet.totalAvailableCents / 2)
-    const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, budgetCents)
-    if (cappedMaxTokens <= 0) {
-      return NextResponse.json(
-        {
-          error: 'Insufficient credits',
-          estimatedCost: userCostCents,
-          availableCredits: wallet.totalAvailableCents,
-        },
-        { status: 402 }
-      )
+    if (!allowViaFreeUse) {
+      const budgetCents = Math.floor(wallet.totalAvailableCents / 2)
+      const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, budgetCents)
+      if (cappedMaxTokens <= 0) {
+        return NextResponse.json(
+          {
+            error: 'Insufficient credits',
+            estimatedCost: userCostCents,
+            availableCredits: wallet.totalAvailableCents,
+          },
+          { status: 402 }
+        )
+      }
+      maxTokens = cappedMaxTokens
     }
-    maxTokens = cappedMaxTokens
 
     if (wantsStream) {
       const wrapped = await chatCompletionWithCost(openai, {
@@ -385,16 +408,20 @@ export async function POST(req: NextRequest) {
         'I apologize, but I could not generate a response.'
 
       const actualUserCostCents = wrapped.costCents * 2
-      const ok = await cm.chargeCents(actualUserCostCents)
-      if (!ok) {
-        return NextResponse.json(
-          {
-            error: 'Insufficient credits',
-            estimatedCost: actualUserCostCents,
-            availableCredits: wallet.totalAvailableCents,
-          },
-          { status: 402 }
-        )
+      if (!allowViaFreeUse) {
+        const ok = await cm.chargeCents(actualUserCostCents)
+        if (!ok) {
+          return NextResponse.json(
+            {
+              error: 'Insufficient credits',
+              estimatedCost: actualUserCostCents,
+              availableCredits: wallet.totalAvailableCents,
+            },
+            { status: 402 }
+          )
+        }
+      } else {
+        await consumeFreeCredit(user.id, 'VOICE_CHAT')
       }
 
       // Save assistant message
@@ -444,16 +471,20 @@ export async function POST(req: NextRequest) {
 
       // Charge user (2x cost)
       const userCostCents = wrapped.costCents * 2
-      const ok = await cm.chargeCents(userCostCents)
-      if (!ok) {
-        return NextResponse.json(
-          {
-            error: 'Insufficient credits',
-            estimatedCost: userCostCents,
-            availableCredits: wallet.totalAvailableCents,
-          },
-          { status: 402 }
-        )
+      if (!allowViaFreeUse) {
+        const ok = await cm.chargeCents(userCostCents)
+        if (!ok) {
+          return NextResponse.json(
+            {
+              error: 'Insufficient credits',
+              estimatedCost: userCostCents,
+              availableCredits: wallet.totalAvailableCents,
+            },
+            { status: 402 }
+          )
+        }
+      } else {
+        await consumeFreeCredit(user.id, 'VOICE_CHAT')
       }
 
       // Log AI usage for cost tracking (voice chat, non-streaming)

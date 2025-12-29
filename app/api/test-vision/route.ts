@@ -13,6 +13,7 @@ import { encryptBuffer } from '@/lib/file-encryption';
 import { createSignedFileToken } from '@/lib/signed-file';
 import { isSubscriptionActive } from '@/lib/subscription-utils';
 import { logServerCall } from '@/lib/server-call-tracker';
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
@@ -61,19 +62,16 @@ export async function POST(req: NextRequest) {
       (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
     );
     
-    // Check if user has used their free medical analysis
-    const hasUsedFreeMedical = (user as any).hasUsedFreeMedicalAnalysis || false;
+    const hasFreeMedicalCredits = await hasFreeCredits(user.id, 'MEDICAL_ANALYSIS');
     
-    // Allow if: Premium subscription OR has purchased credits OR hasn't used free use yet
-    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeMedical) {
-      // First time use - allow free (will mark as used after successful analysis)
-    } else if (!isPremium && !hasPurchasedCredits) {
-      // No subscription, no credits, and already used free - require payment
+    // Allow if: Premium subscription OR has purchased credits OR has free credits remaining
+    if (!isPremium && !hasPurchasedCredits && !hasFreeMedicalCredits) {
       return NextResponse.json(
         { 
           error: 'Payment required',
-          message: 'You\'ve used your free medical image analysis. Subscribe to a monthly plan or purchase credits to continue.',
-          requiresPayment: true
+          message: 'You\'ve used all your free medical image analyses. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true,
+          exhaustedFreeCredits: true,
         },
         { status: 402 }
       );
@@ -118,7 +116,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Immediate pre-charge (2 credits) before calling the model (skip for free trial)
-    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && !hasUsedFreeMedical;
+    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && hasFreeMedicalCredits;
     let prechargedCents = 0;
     if (!allowViaFreeUse) {
       try {
@@ -247,21 +245,9 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // Mark free use as used if this was a free use
+    // Consume free credit if this was a free use
     if (allowViaFreeUse) {
-      try {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            hasUsedFreeMedicalAnalysis: true,
-          } as any
-        })
-      } catch (e: any) {
-        // Ignore if column doesn't exist yet (migration pending)
-        if (!e.message?.includes('does not exist')) {
-          console.warn('Failed to update hasUsedFreeMedicalAnalysis:', e)
-        }
-      }
+      await consumeFreeCredit(user.id, 'MEDICAL_ANALYSIS');
     }
     
     // Update monthly counter (for all users, not just premium)

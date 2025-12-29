@@ -6,6 +6,8 @@ import { logAIUsage } from '@/lib/ai-usage-logger'
 import { CreditManager } from '@/lib/credit-system'
 import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 // Lazy OpenAI import to avoid build-time env requirements
 let _openai: any = null
@@ -43,10 +45,31 @@ export async function POST(request: NextRequest) {
         medications: true,
         healthLogs: { orderBy: { createdAt: 'desc' }, take: 14 },
         foodLogs: { orderBy: { createdAt: 'desc' }, take: 10 },
+        subscription: true,
+        creditTopUps: true,
       },
     })
 
     if (!user) return NextResponse.json({ error: 'user_not_found' }, { status: 404 })
+
+    const isPremium = isSubscriptionActive(user.subscription)
+    const now = new Date()
+    const hasPurchasedCredits = user.creditTopUps?.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    )
+    const hasFreeChatCredits = await hasFreeCredits(userId, 'INSIGHTS_CHAT')
+    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && hasFreeChatCredits
+    if (!isPremium && !hasPurchasedCredits && !hasFreeChatCredits) {
+      return NextResponse.json(
+        {
+          error: 'Payment required',
+          message: 'You\'ve used all your free insights chat uses. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true,
+          exhaustedFreeCredits: true,
+        },
+        { status: 402 }
+      )
+    }
 
     const profile = {
       gender: user.gender,
@@ -101,11 +124,15 @@ export async function POST(request: NextRequest) {
 
     const model = 'gpt-4o-mini'
     const promptText = [baseSystem, ...history].map((m) => m.content).join('\n')
-    const cm = new CreditManager(userId)
-    const wallet = await cm.getWalletStatus()
-    const maxTokens = capMaxTokensToBudget(model, promptText, 400, wallet.totalAvailableCents)
-    if (maxTokens <= 0) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    let maxTokens = 400
+    if (!allowViaFreeUse) {
+      const cm = new CreditManager(userId)
+      const wallet = await cm.getWalletStatus()
+      const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, wallet.totalAvailableCents)
+      if (cappedMaxTokens <= 0) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      }
+      maxTokens = cappedMaxTokens
     }
 
     const wrapped = await chatCompletionWithCost(openai, {
@@ -115,9 +142,14 @@ export async function POST(request: NextRequest) {
       max_tokens: maxTokens,
     } as any)
 
-    const ok = await cm.chargeCents(wrapped.costCents)
-    if (!ok) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    if (!allowViaFreeUse) {
+      const cm = new CreditManager(userId)
+      const ok = await cm.chargeCents(wrapped.costCents)
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      }
+    } else {
+      await consumeFreeCredit(userId, 'INSIGHTS_CHAT')
     }
 
     try {

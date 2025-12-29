@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import OpenAI from 'openai'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { capMaxTokensToBudget } from '@/lib/cost-meter'
@@ -84,18 +85,18 @@ export async function POST(req: NextRequest) {
       (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
     )
     
-    // One‑time free use for symptom analysis (match other AI features)
-    const hasUsedFreeSymptom = (user as any).hasUsedFreeSymptomAnalysis || false
+    const hasFreeSymptomCredits = await hasFreeCredits(user.id, 'SYMPTOM_ANALYSIS')
     let allowViaFreeUse = false
-    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeSymptom) {
+    if (!isPremium && !hasPurchasedCredits && hasFreeSymptomCredits) {
       allowViaFreeUse = true
     } else if (!isPremium && !hasPurchasedCredits) {
-      // No subscription, no credits, and already used free - require payment
+      // No subscription, no credits, and no free credits - require payment
       return NextResponse.json(
-        { 
+        {
           error: 'Payment required',
-          message: 'You\'ve used your free symptom analysis. Subscribe to a monthly plan or purchase credits to continue.',
-          requiresPayment: true
+          message: 'You\'ve used all your free symptom analyses. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true,
+          exhaustedFreeCredits: true,
         },
         { status: 402 }
       )
@@ -219,20 +220,8 @@ Return two parts:
       } as any,
     })
     
-    // Mark free use as used (safe if column doesn't exist yet)
     if (allowViaFreeUse) {
-      try {
-        await prisma.user.update({
-          where: { id: refreshedUser.id },
-          data: {
-            hasUsedFreeSymptomAnalysis: true,
-          } as any
-        })
-      } catch (e: any) {
-        if (!e?.message?.includes('does not exist')) {
-          console.warn('Failed to update hasUsedFreeSymptomAnalysis:', e)
-        }
-      }
+      await consumeFreeCredit(refreshedUser.id, 'SYMPTOM_ANALYSIS')
     }
 
     // Log AI usage for cost tracking (fire-and-forget; does not affect user flow)

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
+import { ensureFreeCreditColumns } from '@/lib/free-credits'
 import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
 
 // This API route uses dynamic data and should not be statically generated
@@ -117,6 +118,8 @@ export async function POST(request: NextRequest) {
     
     // Create user but DON'T verify email yet
     // Grant free credits: 5 food, 2 symptom, 2 medical, 2 interaction, 1 health intake, 3 insights
+    // Plus 2 free uses for chats and re-analyses to let new users try every feature.
+    await ensureFreeCreditColumns()
     const user = await prisma.user.create({
       data: {
         email: email.toLowerCase(),
@@ -129,6 +132,12 @@ export async function POST(request: NextRequest) {
         freeInteractionAnalysisRemaining: 2,
         freeHealthIntakeRemaining: 1,
         freeInsightsUpdateRemaining: 3,
+        freeSymptomChatRemaining: 2,
+        freeMedicalChatRemaining: 2,
+        freeInsightsChatRemaining: 2,
+        freeVoiceChatRemaining: 2,
+        freeFoodReanalysisRemaining: 2,
+        freeInteractionReanalysisRemaining: 2,
       } as any
     })
     

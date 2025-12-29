@@ -6,6 +6,8 @@ import { precomputeIssueSectionsForUser, precomputeQuickSectionsForUser } from '
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { withRunContext } from '@/lib/run-context'
 import { randomUUID } from 'crypto'
+import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,26 +18,53 @@ export async function POST(request: NextRequest) {
 
     const userId = session.user.id
 
-    // Check if user has credits
-    const cm = new CreditManager(userId)
-    const hasCredits = await cm.checkCredits('INSIGHTS_GENERATION')
-    
-    if (!hasCredits.hasCredits) {
-      return NextResponse.json({ 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { subscription: true, creditTopUps: true },
+    })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const isPremium = isSubscriptionActive(user.subscription)
+    const now = new Date()
+    const hasPurchasedCredits = user.creditTopUps?.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    )
+    const hasFreeInsightsCredits = await hasFreeCredits(userId, 'INSIGHTS_UPDATE')
+    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && hasFreeInsightsCredits
+    if (!isPremium && !hasPurchasedCredits && !hasFreeInsightsCredits) {
+      return NextResponse.json({
         error: 'Insufficient credits',
-        message: 'You need credits to regenerate insights. Please purchase credits or subscribe.'
+        message: 'You\'ve used all your free insights updates. Please purchase credits or subscribe.',
+        exhaustedFreeCredits: true,
       }, { status: 402 })
     }
 
-    // Charge credits for insights regeneration
-    const costCents = CREDIT_COSTS.INSIGHTS_GENERATION
-    const charged = await cm.chargeCents(costCents)
-    
-    if (!charged) {
-      return NextResponse.json({ 
-        error: 'Failed to charge credits',
-        message: 'Unable to process payment. Please try again.'
-      }, { status: 402 })
+    if (!allowViaFreeUse) {
+      // Check if user has credits
+      const cm = new CreditManager(userId)
+      const hasCredits = await cm.checkCredits('INSIGHTS_GENERATION')
+      
+      if (!hasCredits.hasCredits) {
+        return NextResponse.json({ 
+          error: 'Insufficient credits',
+          message: 'You need credits to regenerate insights. Please purchase credits or subscribe.'
+        }, { status: 402 })
+      }
+
+      // Charge credits for insights regeneration
+      const costCents = CREDIT_COSTS.INSIGHTS_GENERATION
+      const charged = await cm.chargeCents(costCents)
+      
+      if (!charged) {
+        return NextResponse.json({ 
+          error: 'Failed to charge credits',
+          message: 'Unable to process payment. Please try again.'
+        }, { status: 402 })
+      }
+    } else {
+      await consumeFreeCredit(userId, 'INSIGHTS_UPDATE')
     }
 
     // Update monthly counter
@@ -68,7 +97,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true,
       message: 'Insights regeneration started. This may take a few minutes.',
-      creditsCharged: costCents
+      creditsCharged: allowViaFreeUse ? 0 : CREDIT_COSTS.INSIGHTS_GENERATION
     }, { status: 202 }) // 202 Accepted - processing in background
 
   } catch (error) {
