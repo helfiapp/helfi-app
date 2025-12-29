@@ -169,7 +169,7 @@ export default function SupportPage() {
     setAttachments: React.Dispatch<React.SetStateAction<SupportAttachment[]>>,
     setUploading: React.Dispatch<React.SetStateAction<boolean>>
   ) => {
-    const items = event.clipboardData?.items || []
+    const items = Array.from(event.clipboardData?.items || [])
     const imageFiles: File[] = []
     for (const item of items) {
       if (item.kind === 'file' && item.type.startsWith('image/')) {
