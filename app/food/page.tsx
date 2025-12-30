@@ -7113,6 +7113,43 @@ Please add nutritional information manually if needed.`);
     })
   }
 
+  const handleOverallThumb = (next: 'up' | 'down') => {
+    if (analysisFeedbackOverall === next) {
+      clearOverallFeedback()
+      showQuickToast('Feedback removed.')
+      return
+    }
+    if (next === 'up') {
+      setAnalysisFeedbackOverall('up')
+      submitFoodAnalysisFeedback({ scope: 'overall', rating: 'up' })
+      showQuickToast('Thanks for the feedback!')
+      return
+    }
+    setFeedbackPrompt({ scope: 'overall' })
+    setFeedbackReasons([])
+    setFeedbackComment('')
+    setFeedbackError(null)
+  }
+
+  const handleItemThumb = (index: number, next: 'up' | 'down') => {
+    const current = analysisFeedbackItems[index]
+    if (current === next) {
+      clearItemFeedback(index)
+      showQuickToast('Feedback removed.')
+      return
+    }
+    if (next === 'up') {
+      setAnalysisFeedbackItems((prev) => ({ ...prev, [index]: 'up' }))
+      submitFoodAnalysisFeedback({ scope: 'item', rating: 'up', itemIndex: index })
+      showQuickToast('Thanks for the feedback!')
+      return
+    }
+    setFeedbackPrompt({ scope: 'item', itemIndex: index })
+    setFeedbackReasons([])
+    setFeedbackComment('')
+    setFeedbackError(null)
+  }
+
   const triggerFeedbackRescan = async (reasons: string[], focusItem?: string | null) => {
     if (isAnalyzing) return
     if (!photoFile) return
@@ -12475,19 +12512,10 @@ Please add nutritional information manually if needed.`);
                             <span>Rate this result</span>
                             <button
                               type="button"
-                              onClick={() => {
-                                if (analysisFeedbackOverall === 'up') {
-                                  clearOverallFeedback()
-                                  showQuickToast('Feedback removed.')
-                                  return
-                                }
-                                setAnalysisFeedbackOverall('up')
-                                submitFoodAnalysisFeedback({ scope: 'overall', rating: 'up' })
-                                showQuickToast('Thanks for the feedback!')
-                              }}
+                              onClick={() => handleOverallThumb('up')}
                               className={`p-1 rounded-md transition-colors ${
                                 analysisFeedbackOverall === 'up'
-                                  ? 'text-emerald-600 bg-emerald-50'
+                                  ? 'bg-emerald-600 text-white'
                                   : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
                               }`}
                               title="Thumbs up"
@@ -12496,20 +12524,10 @@ Please add nutritional information manually if needed.`);
                             </button>
                             <button
                               type="button"
-                              onClick={() => {
-                                if (analysisFeedbackOverall === 'down') {
-                                  clearOverallFeedback()
-                                  showQuickToast('Feedback removed.')
-                                  return
-                                }
-                                setFeedbackPrompt({ scope: 'overall' })
-                                setFeedbackReasons([])
-                                setFeedbackComment('')
-                                setFeedbackError(null)
-                              }}
+                              onClick={() => handleOverallThumb('down')}
                               className={`p-1 rounded-md transition-colors ${
                                 analysisFeedbackOverall === 'down'
-                                  ? 'text-red-600 bg-red-50'
+                                  ? 'bg-red-600 text-white'
                                   : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
                               }`}
                               title="Thumbs down"
@@ -12677,19 +12695,10 @@ Please add nutritional information manually if needed.`);
                                   <div className="flex items-center gap-1">
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        if (analysisFeedbackItems[index] === 'up') {
-                                          clearItemFeedback(index)
-                                          showQuickToast('Feedback removed.')
-                                          return
-                                        }
-                                        setAnalysisFeedbackItems((prev) => ({ ...prev, [index]: 'up' }))
-                                        submitFoodAnalysisFeedback({ scope: 'item', rating: 'up', itemIndex: index })
-                                        showQuickToast('Thanks for the feedback!')
-                                      }}
+                                      onClick={() => handleItemThumb(index, 'up')}
                                       className={`p-1 rounded-md transition-colors ${
                                         analysisFeedbackItems[index] === 'up'
-                                          ? 'text-emerald-600 bg-emerald-50'
+                                          ? 'bg-emerald-600 text-white'
                                           : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
                                       }`}
                                       title="Thumbs up"
@@ -12698,20 +12707,10 @@ Please add nutritional information manually if needed.`);
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        if (analysisFeedbackItems[index] === 'down') {
-                                          clearItemFeedback(index)
-                                          showQuickToast('Feedback removed.')
-                                          return
-                                        }
-                                        setFeedbackPrompt({ scope: 'item', itemIndex: index })
-                                        setFeedbackReasons([])
-                                        setFeedbackComment('')
-                                        setFeedbackError(null)
-                                      }}
+                                      onClick={() => handleItemThumb(index, 'down')}
                                       className={`p-1 rounded-md transition-colors ${
                                         analysisFeedbackItems[index] === 'down'
-                                          ? 'text-red-600 bg-red-50'
+                                          ? 'bg-red-600 text-white'
                                           : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
                                       }`}
                                       title="Thumbs down"
