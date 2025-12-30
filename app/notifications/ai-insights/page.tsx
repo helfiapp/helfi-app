@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
 import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
+import { useSaveOnLeave } from '@/lib/use-save-on-leave'
 
 type HealthTipSettings = {
   enabled: boolean
@@ -72,6 +73,19 @@ export default function AiInsightsNotificationsPage() {
   const [focusLifestyle, setFocusLifestyle] = useState(true)
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>(fallbackTimezones)
   const cacheKey = session?.user?.email ? `health-tips-settings:${session.user.email}` : ''
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const settingsSnapshotRef = useRef<string>('')
+  const settingsRef = useRef<HealthTipSettings>({
+    enabled: false,
+    time1: '11:30',
+    time2: '15:30',
+    time3: '20:30',
+    timezone: 'UTC',
+    frequency: 1,
+    focusFood: true,
+    focusSupplements: true,
+    focusLifestyle: true,
+  })
 
   useEffect(() => {
     try {
@@ -133,49 +147,74 @@ export default function AiInsightsNotificationsPage() {
     })()
   }, [cacheKey])
 
-  const handleSave = async () => {
-    setSaving(true)
+  const handleSave = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: HealthTipSettings }) => {
+    const payload = options?.payload ?? {
+      enabled,
+      time1,
+      time2,
+      time3,
+      timezone,
+      frequency,
+      focusFood,
+      focusSupplements,
+      focusLifestyle,
+    }
+    if (!options?.silent) setSaving(true)
     try {
       const res = await fetch('/api/health-tips/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabled,
-          time1,
-          time2,
-          time3,
-          timezone,
-          frequency,
-          focusFood,
-          focusSupplements,
-          focusLifestyle,
-        }),
+        body: JSON.stringify(payload),
+        keepalive: !!options?.keepalive,
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        alert(data?.error || data?.detail || 'Failed to save settings')
+        if (!options?.silent) {
+          alert(data?.error || data?.detail || 'Failed to save settings')
+        }
         return
       }
+      const snapshot = JSON.stringify(payload)
+      settingsSnapshotRef.current = snapshot
+      setHasUnsavedChanges(false)
       if (cacheKey) {
-        writeClientCache(cacheKey, {
-          enabled,
-          time1,
-          time2,
-          time3,
-          timezone,
-          frequency,
-          focusFood,
-          focusSupplements,
-          focusLifestyle,
-        })
+        writeClientCache(cacheKey, payload)
       }
-      alert('AI insights schedule saved.')
+      if (!options?.silent) alert('AI insights schedule saved.')
     } catch {
-      alert('Could not save settings. Please try again.')
+      if (!options?.silent) alert('Could not save settings. Please try again.')
     } finally {
-      setSaving(false)
+      if (!options?.silent) setSaving(false)
     }
-  }
+  }, [cacheKey, enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle])
+
+  useEffect(() => {
+    if (loading) return
+    const nextSettings: HealthTipSettings = {
+      enabled,
+      time1,
+      time2,
+      time3,
+      timezone,
+      frequency,
+      focusFood,
+      focusSupplements,
+      focusLifestyle,
+    }
+    settingsRef.current = nextSettings
+    const snapshot = JSON.stringify(nextSettings)
+    if (!settingsSnapshotRef.current) {
+      settingsSnapshotRef.current = snapshot
+      setHasUnsavedChanges(false)
+      return
+    }
+    setHasUnsavedChanges(snapshot !== settingsSnapshotRef.current)
+  }, [enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle, loading])
+
+  useSaveOnLeave(() => {
+    if (!hasUnsavedChanges) return
+    void handleSave({ silent: true, keepalive: true, payload: settingsRef.current })
+  })
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -183,7 +222,7 @@ export default function AiInsightsNotificationsPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 space-y-6">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">AI insights schedule</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -337,12 +376,17 @@ export default function AiInsightsNotificationsPage() {
               </div>
 
               <button
-                onClick={handleSave}
+                onClick={() => handleSave()}
                 disabled={saving}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
               >
                 {saving ? 'Saving...' : 'Save AI insight schedule'}
               </button>
+              {hasUnsavedChanges && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Changes save automatically when you leave this page.
+                </p>
+              )}
             </>
           )}
         </div>

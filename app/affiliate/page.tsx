@@ -119,7 +119,7 @@ export default function AffiliateDashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Affiliate Portal</h1>
             <p className="text-gray-600 mt-1">Track clicks, sales, and commissions (Net-30).</p>

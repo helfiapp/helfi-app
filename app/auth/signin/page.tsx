@@ -470,7 +470,7 @@ export default function SignIn() {
       {installPromptVisible && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
                 <h3 className="text-xl font-semibold text-gray-900">Add Helfi to your Home Screen</h3>
                 <p className="mt-1 text-sm text-gray-600">

@@ -360,7 +360,7 @@ export default function Settings() {
               )}
 
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div>
                     <h3 className="font-medium text-gray-900 dark:text-white">Add Helfi to your Home Screen</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
