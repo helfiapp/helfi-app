@@ -28,7 +28,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, Component } f
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
@@ -1567,7 +1567,6 @@ export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const isAnalysisRoute = pathname === '/food/analysis'
   const { userData, profileImage, updateUserData } = useUserData()
   const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
@@ -2052,22 +2051,25 @@ export default function FoodDiary() {
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
-  const analysisRouteDate = searchParams?.get('date') || ''
-  const analysisRouteCategory = searchParams?.get('category') || ''
   useEffect(() => {
     if (!isAnalysisRoute) return
-    if (analysisRouteDate && /^\d{4}-\d{2}-\d{2}$/.test(analysisRouteDate)) {
-      setSelectedDate(analysisRouteDate)
-    }
-    if (analysisRouteCategory) {
-      setSelectedAddCategory(normalizeCategory(analysisRouteCategory) as any)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const routeDate = params.get('date') || ''
+      const routeCategory = params.get('category') || ''
+      if (routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate)) {
+        setSelectedDate(routeDate)
+      }
+      if (routeCategory) {
+        setSelectedAddCategory(normalizeCategory(routeCategory) as any)
+      }
     }
     setShowAddFood(true)
     setShowCategoryPicker(false)
     setShowPhotoOptions(false)
     setPhotoOptionsAnchor(null)
     setShowAnalysisModeModal(false)
-  }, [isAnalysisRoute, analysisRouteDate, analysisRouteCategory])
+  }, [isAnalysisRoute])
   const categoryRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const backfillAttemptedRef = useRef<Record<string, boolean>>({})
   const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => {
