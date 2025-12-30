@@ -1,14 +1,22 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSession } from 'next-auth/react'
+import Image from 'next/image'
 import Link from 'next/link'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import PageHeader from '@/components/PageHeader'
 import FitbitSummary from '@/components/devices/FitbitSummary'
 import FitbitCharts from '@/components/devices/FitbitCharts'
 import FitbitCorrelations from '@/components/devices/FitbitCorrelations'
+import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
+
+const USER_DATA_CACHE_TTL_MS = 5 * 60_000
 
 export default function DevicesPage() {
+  const { data: session } = useSession()
+  const userDataCacheKey = session?.user?.email ? `user-data:${session.user.email}` : ''
+  const garminConnectEnabled = process.env.NEXT_PUBLIC_GARMIN_CONNECT_ENABLED === 'true'
   const [fitbitConnected, setFitbitConnected] = useState(false)
   const [fitbitLoading, setFitbitLoading] = useState(false)
   const [syncingFitbit, setSyncingFitbit] = useState(false)
@@ -18,6 +26,8 @@ export default function DevicesPage() {
   const [garminLoading, setGarminLoading] = useState(false)
   const [garminPopupOpen, setGarminPopupOpen] = useState(false)
   const [garminCheckingStatus, setGarminCheckingStatus] = useState(false)
+  const [deviceInterest, setDeviceInterest] = useState<Record<string, boolean>>({})
+  const [savingInterest, setSavingInterest] = useState(false)
   const [loadingDemo, setLoadingDemo] = useState(false)
   const [clearingDemo, setClearingDemo] = useState(false)
   const [adminToken, setAdminToken] = useState<string | null>(null)
@@ -30,7 +40,15 @@ export default function DevicesPage() {
 
   useEffect(() => {
     checkFitbitStatus()
-    checkGarminStatus()
+    if (garminConnectEnabled) {
+      checkGarminStatus()
+    } else {
+      setGarminConnected(false)
+      setGarminLoading(false)
+      setGarminPopupOpen(false)
+      setGarminCheckingStatus(false)
+    }
+    loadDeviceInterest()
 
     try {
       const storedAdminToken = sessionStorage.getItem('adminToken')
@@ -52,11 +70,16 @@ export default function DevicesPage() {
       window.history.replaceState({}, '', '/devices')
     }
     if (params.get('garmin_connected') === 'true') {
-      setGarminConnected(true)
+      if (garminConnectEnabled) setGarminConnected(true)
       window.history.replaceState({}, '', '/devices')
     }
     if (params.get('garmin_error')) {
-      alert('Garmin connection failed: ' + params.get('garmin_error'))
+      const err = params.get('garmin_error')
+      if (err === 'disabled') {
+        alert('Garmin Connect is temporarily unavailable while production access is pending.')
+      } else {
+        alert('Garmin connection failed: ' + err)
+      }
       window.history.replaceState({}, '', '/devices')
     }
 
@@ -69,7 +92,7 @@ export default function DevicesPage() {
         alert('Fitbit connection failed: ' + event.data.error)
         setFitbitLoading(false)
       } else if (event.data?.type === 'GARMIN_CONNECTED' && event.data.success) {
-        checkGarminStatus()
+        if (garminConnectEnabled) checkGarminStatus()
         setGarminLoading(false)
       } else if (event.data?.type === 'GARMIN_ERROR') {
         alert('Garmin connection failed: ' + event.data.error)
@@ -80,6 +103,51 @@ export default function DevicesPage() {
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [])
+
+  const loadDeviceInterest = async () => {
+    try {
+      const cached = userDataCacheKey ? readClientCache<any>(userDataCacheKey) : null
+      if (cached?.data?.deviceInterest && typeof cached.data.deviceInterest === 'object') {
+        setDeviceInterest(cached.data.deviceInterest)
+      }
+      const shouldFetch = !cached || !isCacheFresh(cached, USER_DATA_CACHE_TTL_MS)
+      if (!shouldFetch) return
+
+      const res = await fetch('/api/user-data', { cache: 'no-cache' })
+      if (!res.ok) return
+      const json = await res.json()
+      if (json?.data?.deviceInterest && typeof json.data.deviceInterest === 'object') {
+        setDeviceInterest(json.data.deviceInterest)
+      }
+      if (userDataCacheKey && json?.data) {
+        writeClientCache(userDataCacheKey, json.data)
+      }
+    } catch {}
+  }
+
+  const saveDeviceInterest = async (next: Record<string, boolean>) => {
+    try {
+      setSavingInterest(true)
+      const res = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceInterest: next }),
+      })
+      if (!res.ok) {
+        throw new Error('Device interest update failed')
+      }
+      setDeviceInterest(next)
+    } catch (e) {
+      console.error('Failed to save device interest', e)
+    } finally {
+      setSavingInterest(false)
+    }
+  }
+
+  const toggleInterest = (key: string) => {
+    const next = { ...deviceInterest, [key]: !deviceInterest?.[key] }
+    saveDeviceInterest(next)
+  }
 
   const checkFitbitStatus = async () => {
     try {
@@ -97,6 +165,10 @@ export default function DevicesPage() {
   }
 
   const checkGarminStatus = async () => {
+    if (!garminConnectEnabled) {
+      setGarminConnected(false)
+      return false
+    }
     try {
       const response = await fetch('/api/garmin/status')
       if (response.ok) {
@@ -243,6 +315,10 @@ export default function DevicesPage() {
   }
 
   const handleConnectGarmin = async () => {
+    if (!garminConnectEnabled) {
+      alert('Garmin Connect is temporarily unavailable while production access is pending.')
+      return
+    }
     setGarminLoading(true)
     setGarminPopupOpen(true)
     setGarminCheckingStatus(true)
@@ -699,11 +775,11 @@ export default function DevicesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-4">
-              <div className="text-4xl">💪</div>
+              <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={44} height={44} className="rounded-lg" />
               <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Garmin (beta)</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Garmin Connect</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Connect Garmin to start receiving wellness data via secure webhooks.
+                  Connect Garmin Connect to start receiving wellness data via secure webhooks.
                 </p>
               </div>
             </div>
@@ -715,7 +791,7 @@ export default function DevicesPage() {
             )}
           </div>
 
-          {garminPopupOpen && (
+          {garminPopupOpen && garminConnectEnabled && (
             <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
@@ -747,11 +823,31 @@ export default function DevicesPage() {
             </div>
           )}
 
-          {garminConnected ? (
+          {!garminConnectEnabled ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  Garmin Connect access is temporarily unavailable while production approval is pending.
+                  You can register interest and we’ll notify you when it’s live.
+                </p>
+              </div>
+              <button
+                onClick={() => toggleInterest('garmin')}
+                disabled={savingInterest}
+                className={`w-full sm:w-auto px-4 py-2 rounded-lg font-medium transition-colors ${
+                  deviceInterest.garmin
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                } ${savingInterest ? 'opacity-60 cursor-not-allowed' : ''}`}
+              >
+                {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
+              </button>
+            </div>
+          ) : garminConnected ? (
             <div className="space-y-4">
               <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Garmin is connected. Data will be delivered automatically via webhooks and logged for processing.
+                  Garmin Connect is connected. Data will be delivered automatically via webhooks and logged for processing.
                 </p>
               </div>
 
@@ -773,7 +869,7 @@ export default function DevicesPage() {
             <div className="space-y-3">
               <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-lg">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  Connect your Garmin account to allow Helfi to receive daily, sleep, and activity data directly from Garmin&apos;s Health API.
+                  Connect your Garmin Connect account to allow Helfi to receive daily, sleep, and activity data directly from the Garmin Health API.
                 </p>
                 <button
                   onClick={handleConnectGarmin}
@@ -793,16 +889,20 @@ export default function DevicesPage() {
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                       </svg>
-                      Connect Garmin
+                      Connect Garmin Connect
                     </>
                   )}
                 </button>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                You&apos;ll be redirected to Garmin to approve access. We keep the popup open so you can continue browsing while you authorize.
+                You&apos;ll be redirected to Garmin Connect to approve access. We keep the popup open so you can continue browsing while you authorize.
               </p>
             </div>
           )}
+
+          <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+            Garmin and the Garmin logo are trademarks of Garmin Ltd. or its subsidiaries.
+          </p>
         </div>
 
         {/* Coming Soon Devices */}
@@ -810,14 +910,34 @@ export default function DevicesPage() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Coming Soon</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { icon: '⌚', name: 'Apple Watch' },
-              { icon: '📱', name: 'Samsung Health' },
-              { icon: '💍', name: 'Oura Ring' },
-              { icon: '🏃', name: 'Google Fit' },
+              { key: 'appleWatch', icon: '⌚', name: 'Apple Watch', detail: 'Apple Health sync' },
+              { key: 'samsung', icon: '📱', name: 'Samsung Health', detail: 'Android health data' },
+              { key: 'googleFit', icon: '🏃', name: 'Google Fit', detail: 'Android fitness' },
+              { key: 'oura', icon: '💍', name: 'Oura Ring', detail: 'Recovery & sleep' },
+              { key: 'polar', icon: '🧭', name: 'Polar', detail: 'Training insights' },
             ].map((device) => (
-              <div key={device.name} className="text-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg opacity-50">
+              <div
+                key={device.name}
+                className={`text-center p-4 border rounded-lg transition-colors ${
+                  deviceInterest[device.key]
+                    ? 'border-emerald-300 ring-1 ring-emerald-200 bg-emerald-50/40'
+                    : 'border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800'
+                }`}
+              >
                 <div className="text-3xl mb-2">{device.icon}</div>
-                <div className="text-sm font-medium text-gray-600 dark:text-gray-400">{device.name}</div>
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-200">{device.name}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{device.detail}</div>
+                <button
+                  onClick={() => toggleInterest(device.key)}
+                  disabled={savingInterest}
+                  className={`mt-3 w-full text-center text-[12px] px-3.5 py-1.5 rounded-full ${
+                    deviceInterest[device.key]
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  } ${savingInterest ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  {deviceInterest[device.key] ? 'Interested ✓' : "I'm interested"}
+                </button>
               </div>
             ))}
           </div>

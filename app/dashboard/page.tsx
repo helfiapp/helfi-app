@@ -7,9 +7,12 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FitbitSummary from '@/components/devices/FitbitSummary'
+
+const DASHBOARD_CACHE_TTL_MS = 5 * 60_000
 
 export default function Dashboard() {
   // ⚠️ HEALTH SETUP GUARD RAIL
@@ -23,16 +26,18 @@ export default function Dashboard() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const { profileImage: providerProfileImage } = useUserData()
+  const cacheKey = session?.user?.email ? `dashboard-data:${session.user.email}` : ''
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null)
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [deviceInterest, setDeviceInterest] = useState<{ appleWatch?: boolean; fitbit?: boolean; garmin?: boolean; samsung?: boolean; googleFit?: boolean; oura?: boolean; polar?: boolean }>({})
-  const [savingInterest, setSavingInterest] = useState<string | null>(null)
+  const [savingInterest, setSavingInterest] = useState(false)
   const [fitbitConnected, setFitbitConnected] = useState(false)
   const [fitbitLoading, setFitbitLoading] = useState(false)
   const [garminConnected, setGarminConnected] = useState(false)
+  const garminConnectEnabled = process.env.NEXT_PUBLIC_GARMIN_CONNECT_ENABLED === 'true'
   const popupRef = useRef<Window | null>(null)
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -88,6 +93,66 @@ export default function Dashboard() {
 
   // Load existing data from database (cross-device sync)
   useEffect(() => {
+    const applyUserData = (data: any, allowRedirect: boolean) => {
+      if (!data) return
+
+      console.log('✅ Successfully loaded data from database');
+      console.log('📊 Dashboard Data Summary:', {
+        hasProfileImage: !!data.profileImage,
+        hasHealthGoals: !!data.goals?.length,
+        hasSupplements: !!data.supplements?.length,
+        hasMedications: !!data.medications?.length,
+        dataSize: JSON.stringify(data).length + ' characters'
+      })
+
+      // Define onboarding completion using the same rule as Insights:
+      // 1) basic profile data present, and 2) at least one health goal selected.
+      const hasBasicProfile = !!(data.gender && data.weight && data.height)
+      const hasHealthGoals = !!(data.goals && data.goals.length > 0)
+      const onboardingComplete = hasBasicProfile && hasHealthGoals
+
+      // For truly brand-new users with no meaningful data at all, redirect
+      // into onboarding on first visit, but respect "I'll do it later"
+      // for the current browser session.
+      if (
+        allowRedirect &&
+        !onboardingComplete &&
+        !hasBasicProfile &&
+        !hasHealthGoals &&
+        !data.supplements?.length &&
+        !data.medications?.length
+      ) {
+        const deferred =
+          typeof window !== 'undefined' && sessionStorage.getItem('onboardingDeferredThisSession') === '1'
+        if (!deferred) {
+          console.log('🎯 Brand new user detected - redirecting to onboarding')
+          window.location.href = '/onboarding'
+          return
+        }
+        console.log('⏳ Onboarding deferred this session — staying on dashboard')
+      }
+
+      setOnboardingData({ ...data, onboardingComplete })
+      // Load device interest flags if present
+      if (data.deviceInterest && typeof data.deviceInterest === 'object') {
+        setDeviceInterest(data.deviceInterest)
+      }
+
+      // Check Fitbit connection status
+      checkFitbitStatus()
+      // Check Garmin connection status
+      if (garminConnectEnabled) checkGarminStatus()
+
+      // Load profile image from database and cache it
+      if (data.profileImage) {
+        setProfileImage(data.profileImage)
+        // Cache in localStorage for instant loading on other pages (user-specific)
+        if (session?.user?.id) {
+          localStorage.setItem(`cachedProfileImage_${session.user.id}`, data.profileImage)
+        }
+      }
+    }
+
     const loadUserData = async () => {
       try {
         // 🔍 DASHBOARD PERFORMANCE MEASUREMENT START
@@ -113,53 +178,9 @@ export default function Dashboard() {
         if (response.ok) {
           const result = await response.json();
           if (result.data) {
-            console.log('✅ Successfully loaded data from database');
-            console.log('📊 Dashboard Data Summary:', {
-              hasProfileImage: !!result.data.profileImage,
-              hasHealthGoals: !!result.data.goals?.length,
-              hasSupplements: !!result.data.supplements?.length,
-              hasMedications: !!result.data.medications?.length,
-              dataSize: JSON.stringify(result.data).length + ' characters'
-            });
-            
-            // Define onboarding completion using the same rule as Insights:
-            // 1) basic profile data present, and 2) at least one health goal selected.
-            const hasBasicProfile = !!(result.data.gender && result.data.weight && result.data.height)
-            const hasHealthGoals = !!(result.data.goals && result.data.goals.length > 0)
-            const onboardingComplete = hasBasicProfile && hasHealthGoals
-
-            // For truly brand-new users with no meaningful data at all, redirect
-            // into onboarding on first visit, but respect "I'll do it later"
-            // for the current browser session.
-            if (!onboardingComplete && !hasBasicProfile && !hasHealthGoals && !result.data.supplements?.length && !result.data.medications?.length) {
-              const deferred = typeof window !== 'undefined' && sessionStorage.getItem('onboardingDeferredThisSession') === '1'
-              if (!deferred) {
-                console.log('🎯 Brand new user detected - redirecting to onboarding')
-                window.location.href = '/onboarding'
-                return
-              } else {
-                console.log('⏳ Onboarding deferred this session — staying on dashboard')
-              }
-            }
-
-            setOnboardingData({ ...result.data, onboardingComplete });
-            // Load device interest flags if present
-            if (result.data.deviceInterest && typeof result.data.deviceInterest === 'object') {
-              setDeviceInterest(result.data.deviceInterest)
-            }
-            
-            // Check Fitbit connection status
-            checkFitbitStatus()
-            // Check Garmin connection status
-            checkGarminStatus()
-            
-            // Load profile image from database and cache it
-            if (result.data.profileImage) {
-              setProfileImage(result.data.profileImage);
-              // Cache in localStorage for instant loading on other pages (user-specific)
-              if (session?.user?.id) {
-                localStorage.setItem(`cachedProfileImage_${session.user.id}`, result.data.profileImage);
-              }
+            applyUserData(result.data, true)
+            if (cacheKey) {
+              writeClientCache(cacheKey, result.data)
             }
           } else {
             // No data at all - definitely a new user
@@ -203,7 +224,24 @@ export default function Dashboard() {
       }
     }
 
-    if (session) {
+    const cached = cacheKey ? readClientCache<any>(cacheKey) : null
+    const cachedData = cached?.data
+    if (cachedData) {
+      applyUserData(cachedData, false)
+    }
+    const cachedIsEmpty =
+      !!cachedData &&
+      !cachedData.gender &&
+      !cachedData.weight &&
+      !cachedData.height &&
+      !(cachedData.goals && cachedData.goals.length > 0) &&
+      !(cachedData.supplements && cachedData.supplements.length > 0) &&
+      !(cachedData.medications && cachedData.medications.length > 0)
+    const shouldFetch =
+      !cached ||
+      !isCacheFresh(cached, DASHBOARD_CACHE_TTL_MS) ||
+      cachedIsEmpty
+    if (session && shouldFetch) {
       loadUserData();
     }
 
@@ -222,7 +260,7 @@ export default function Dashboard() {
     return () => {
       window.removeEventListener('message', handleMessage)
     }
-  }, [session]);
+  }, [session, cacheKey]);
 
   const handleEditOnboarding = () => {
     // Navigate directly to onboarding - data will be loaded from database
@@ -256,24 +294,20 @@ export default function Dashboard() {
 
   const saveDeviceInterest = async (next: any) => {
     try {
-      setSavingInterest('saving')
-      await fetch('/api/user-data', {
+      setSavingInterest(true)
+      const res = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceInterest: next })
       })
-      // Reload from server to ensure persistence and UI stays selected
-      try {
-        const res = await fetch('/api/user-data', { cache: 'no-cache' })
-        if (res.ok) {
-          const json = await res.json()
-          if (json?.data?.deviceInterest) setDeviceInterest(json.data.deviceInterest)
-        }
-      } catch {}
+      if (!res.ok) {
+        throw new Error('Device interest update failed')
+      }
+      setDeviceInterest(next)
     } catch (e) {
       console.error('Failed to save device interest', e)
     } finally {
-      setSavingInterest(null)
+      setSavingInterest(false)
     }
   }
 
@@ -293,6 +327,10 @@ export default function Dashboard() {
   }
 
   const checkGarminStatus = async () => {
+    if (!garminConnectEnabled) {
+      setGarminConnected(false)
+      return false
+    }
     try {
       const response = await fetch('/api/garmin/status')
       if (response.ok) {
@@ -395,12 +433,8 @@ export default function Dashboard() {
     if (key === 'fitbit' && fitbitConnected) {
       return
     }
-    setDeviceInterest((prev) => {
-      const next = { ...prev, [key]: !prev?.[key] }
-      // Fire-and-forget save; keep UI responsive even if request is slow
-      saveDeviceInterest(next)
-      return next
-    })
+    const next = { ...deviceInterest, [key]: !deviceInterest?.[key] }
+    saveDeviceInterest(next)
   }
 
   const handleSignOut = async () => {
@@ -742,19 +776,29 @@ export default function Dashboard() {
                   {/* Garmin */}
                   <div className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="text-2xl">💪</div>
+                      <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={24} height={24} className="rounded-md" />
                       <div>
-                        <div className="text-[15px] font-medium text-gray-900">Garmin</div>
+                        <div className="text-[15px] font-medium text-gray-900">Garmin Connect</div>
                         <div className="text-[12px] text-gray-500">Training metrics</div>
                       </div>
                     </div>
-                    {garminConnected ? (
+                    {!garminConnectEnabled ? (
+                      <button
+                        onClick={() => toggleInterest('garmin')}
+                        className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${
+                          deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        disabled={!!savingInterest}
+                      >
+                        {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
+                      </button>
+                    ) : garminConnected ? (
                       <Link href="/devices" className="mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-emerald-600 text-white block">
                         Connected ✓
                       </Link>
                     ) : (
                       <Link href="/devices" className="mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-helfi-green text-white block hover:bg-green-600 transition-colors">
-                        Connect Garmin
+                        Connect Garmin Connect
                       </Link>
                     )}
                   </div>
@@ -854,12 +898,24 @@ export default function Dashboard() {
                   {/* Garmin */}
                   <div className={`bg-white p-4 rounded-2xl border ${garminConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
-                      <div className="text-2xl mb-1">💪</div>
+                      <div className="flex justify-center mb-2">
+                        <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={28} height={28} className="rounded-md" />
+                      </div>
                       <div className="text-xs font-medium text-gray-700 mb-2 flex items-center justify-center gap-1">
-                        Garmin
+                        Garmin Connect
                         {garminConnected && <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>}
                       </div>
-                      {garminConnected ? (
+                      {!garminConnectEnabled ? (
+                        <button
+                          onClick={() => toggleInterest('garmin')}
+                          className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
+                            deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                          disabled={!!savingInterest}
+                        >
+                          {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
+                        </button>
+                      ) : garminConnected ? (
                         <Link
                           href="/devices"
                           className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-emerald-600 text-white"
@@ -871,7 +927,7 @@ export default function Dashboard() {
                           href="/devices"
                           className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-helfi-green text-white hover:bg-green-600 transition-colors"
                         >
-                          Connect Garmin
+                          Connect Garmin Connect
                         </Link>
                       )}
                     </div>

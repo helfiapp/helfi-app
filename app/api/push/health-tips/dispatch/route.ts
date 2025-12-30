@@ -383,6 +383,9 @@ function extractTipJson(raw: string) {
 }
 
 export async function POST(req: NextRequest) {
+  let claimedDelivery = false
+  let releaseDelivery: (() => Promise<void>) | null = null
+
   try {
     if (!isSchedulerAuthorized(req)) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -483,17 +486,6 @@ export async function POST(req: NextRequest) {
       .find((p) => p.type === 'month')
       ?.value}-${localDateParts.find((p) => p.type === 'day')?.value}`
 
-    // De-duplicate: only one tip per user/time/date
-    const existing: Array<{ exists: number }> = await prisma.$queryRawUnsafe(
-      `SELECT 1 as exists FROM HealthTipDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND tipDate = $3::date LIMIT 1`,
-      userId,
-      reminderTime,
-      localDateString
-    )
-    if (existing.length > 0) {
-      return NextResponse.json({ skipped: 'already_sent' })
-    }
-
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { subscription: true, creditTopUps: true },
@@ -513,6 +505,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'vapid_not_configured' }, { status: 500 })
     }
     webpush.setVapidDetails('mailto:support@helfi.ai', publicKey, privateKey)
+
+    releaseDelivery = async () => {
+      if (!claimedDelivery) return
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM HealthTipDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND tipDate = $3::date`,
+        userId,
+        reminderTime,
+        localDateString
+      ).catch(() => {})
+      claimedDelivery = false
+    }
+
+    const claim: Array<{ userId: string }> = await prisma.$queryRawUnsafe(
+      `INSERT INTO HealthTipDeliveryLog (userId, reminderTime, tipDate, sentAt)
+       VALUES ($1, $2, $3::date, NOW())
+       ON CONFLICT (userId, reminderTime, tipDate) DO NOTHING
+       RETURNING userId`,
+      userId,
+      reminderTime,
+      localDateString
+    )
+    if (!claim.length) {
+      return NextResponse.json({ skipped: 'already_sent' })
+    }
+    claimedDelivery = true
 
     // Build health context for this user
     const context = await buildUserHealthContext(userId)
@@ -567,15 +584,6 @@ export async function POST(req: NextRequest) {
         console.error('[HEALTH_TIPS] Low-credit notification send error', lowCreditSend.errors)
       }
 
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO HealthTipDeliveryLog (userId, reminderTime, tipDate, sentAt)
-         VALUES ($1, $2, $3::date, NOW())
-         ON CONFLICT (userId, reminderTime, tipDate) DO UPDATE SET sentAt = NOW()`,
-        userId,
-        reminderTime,
-        localDateString
-      )
-
       // Still schedule the next attempt for tomorrow at the same time
       await scheduleHealthTipWithQStash(userId, reminderTime, effectiveTimezone).catch(
         (error) => {
@@ -600,6 +608,9 @@ export async function POST(req: NextRequest) {
 
     if (!parsed || !parsed.title || !parsed.tip) {
       console.error('[HEALTH_TIPS] Failed to parse tip JSON', rawContent)
+      if (releaseDelivery) {
+        await releaseDelivery()
+      }
       return NextResponse.json({ error: 'tip_generation_failed' }, { status: 500 })
     }
 
@@ -628,6 +639,9 @@ export async function POST(req: NextRequest) {
     // Charge the user in credits for this tip
     const chargedOk = await creditManager.chargeCents(chargeCents)
     if (!chargedOk) {
+      if (releaseDelivery) {
+        await releaseDelivery()
+      }
       return NextResponse.json({ error: 'billing_failed' }, { status: 402 })
     }
 
@@ -645,15 +659,6 @@ export async function POST(req: NextRequest) {
       JSON.stringify({ rawContent, suggestedQuestions }).slice(0, 10000),
       costCents,
       chargeCents
-    )
-
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO HealthTipDeliveryLog (userId, reminderTime, tipDate, sentAt)
-       VALUES ($1, $2, $3::date, NOW())
-       ON CONFLICT (userId, reminderTime, tipDate) DO UPDATE SET sentAt = NOW()`,
-      userId,
-      reminderTime,
-      localDateString
     )
 
     const notificationBody = safeTip.length > 120 ? `${safeTip.slice(0, 117)}…` : safeTip
@@ -704,6 +709,9 @@ export async function POST(req: NextRequest) {
       chargeCents,
     })
   } catch (e: any) {
+    if (releaseDelivery) {
+      await releaseDelivery()
+    }
     console.error('[HEALTH_TIPS_DISPATCH] error', e?.stack || e)
     return NextResponse.json(
       { error: 'health_tip_dispatch_error', message: e?.message || String(e) },

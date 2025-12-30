@@ -122,42 +122,44 @@ export async function POST(req: NextRequest) {
     const effectiveTimezone = safeTimezone(timezoneToUse)
     const localDate = localDateForTimezone(now, effectiveTimezone)
 
-    const already: Array<{ exists: number }> = await prisma.$queryRawUnsafe(
-      `SELECT 1 as exists FROM MoodReminderDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND sentDate = $3::date LIMIT 1`,
+    const claim: Array<{ userId: string }> = await prisma.$queryRawUnsafe(
+      `INSERT INTO MoodReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
+       VALUES ($1, $2, $3::date, NOW())
+       ON CONFLICT (userId, reminderTime, sentDate) DO NOTHING
+       RETURNING userId`,
       userId,
       reminderTime,
       localDate,
     )
 
-    if (!already.length) {
-      const payload = JSON.stringify({
-        title: 'Quick mood check‑in',
-        body: 'How are you feeling right now? It takes 10 seconds.',
-        url: '/mood/quick',
-      })
-      const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
-        webpush.sendNotification(sub, payload)
-      )
-      if (goneEndpoints.length) {
-        const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
-        await prisma.$executeRawUnsafe(
-          `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
-          userId,
-          JSON.stringify(remaining)
-        )
-      }
-      if (!sent) {
-        return NextResponse.json({ error: 'push_failed', details: errors }, { status: 500 })
-      }
+    if (!claim.length) {
+      return NextResponse.json({ skipped: 'already_sent' })
+    }
 
-      await prisma.$queryRawUnsafe(
-        `INSERT INTO MoodReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
-         VALUES ($1, $2, $3::date, NOW())
-         ON CONFLICT (userId, reminderTime, sentDate) DO UPDATE SET sentAt = NOW()`,
+    const payload = JSON.stringify({
+      title: 'Quick mood check‑in',
+      body: 'How are you feeling right now? It takes 10 seconds.',
+      url: '/mood/quick',
+    })
+    const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
+      webpush.sendNotification(sub, payload)
+    )
+    if (goneEndpoints.length) {
+      const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
+      await prisma.$executeRawUnsafe(
+        `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+        userId,
+        JSON.stringify(remaining)
+      )
+    }
+    if (!sent) {
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM MoodReminderDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND sentDate = $3::date`,
         userId,
         reminderTime,
         localDate,
-      )
+      ).catch(() => {})
+      return NextResponse.json({ error: 'push_failed', details: errors }, { status: 500 })
     }
 
     const nextSchedule = await scheduleMoodReminderWithQStash(userId, reminderTime, effectiveTimezone).catch(

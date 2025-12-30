@@ -231,7 +231,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    2) Why it matters: Health files can remain after a user deletes their account.
    3) What could realistically go wrong: Former users’ files remain accessible long after deletion.
    4) How serious it is: High.
-   5) What needs to be done to fix it: Account deletion now removes stored files first (including uploaded images and reports) and stops if file removal fails. This is now in place.
+   5) What needs to be done to fix it: Account deletion now removes stored files first (including reports, medical images, food photos, support files, and mood journal media) and stops if file removal fails. This is now in place.
 
 8. ✅ Storage encryption confirmed.
    1) What the issue is: There is no visible confirmation of encryption at rest for stored files and data.
@@ -245,7 +245,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    2) Why it matters: Anyone who gets the link can view the file without logging in.
    3) What could realistically go wrong: A link is shared or guessed and private files are exposed.
    4) How serious it is: High.
-   5) What needs to be done to fix it: These uploads are no longer shared by public links and are now only shown through short‑lived secure links.
+   5) What needs to be done to fix it: These uploads now use private storage and are only shown through short‑lived secure links.
 
 ## Final Go-Live Recommendation
 NO
@@ -255,6 +255,16 @@ NO
 - All previously fixed items were re‑checked and are still fixed.
 - Storage encryption status is confirmed in the admin Security Status.
 - Food photos, mood journal media, and support attachments are no longer shared by public links and are only shown through short‑lived secure links.
+
+### New Issues Found
+None.
+
+## Audit 3 – Follow‑Up Verification
+### Verification Results
+- Account deletion now removes Vercel Blob files for mood journal entries along with other stored files, and stops if file removal fails.
+- Food photos, mood journal media, and support attachments now store in private file storage and are shown only through short‑lived secure links.
+- Storage encryption remains confirmed in the admin Security Status.
+- Daily check‑in reminders no longer send duplicates for the same day and time.
 
 ### New Issues Found
 None.

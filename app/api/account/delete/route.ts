@@ -21,6 +21,7 @@ const BLOB_PATH_PREFIXES = [
   'support/',
   'support/inquiry/',
   'food-photos/',
+  'mood-journal/',
   'test-vision/',
 ]
 
@@ -316,6 +317,8 @@ export async function POST(request: NextRequest) {
         for (const url of [...toUrlList(row.images), ...toUrlList(row.audio)]) {
           if (isCloudinaryUrl(url)) {
             addCloudinaryAsset(cloudinaryAssets, parseCloudinaryAsset(url))
+          } else {
+            addBlobTarget(blobTargets, url)
           }
         }
       }

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import FitbitSummary from '@/components/devices/FitbitSummary'
 import FitbitCharts from '@/components/devices/FitbitCharts'
@@ -14,10 +15,14 @@ import FitbitCorrelations from '@/components/devices/FitbitCorrelations'
 import GarminSummary from '@/components/devices/GarminSummary'
 import GarminCharts from '@/components/devices/GarminCharts'
 
+const USER_DATA_CACHE_TTL_MS = 5 * 60_000
+
 export default function HealthTracking() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const { profileImage: providerProfileImage } = useUserData()
+  const userDataCacheKey = session?.user?.email ? `user-data:${session.user.email}` : ''
+  const garminConnectEnabled = process.env.NEXT_PUBLIC_GARMIN_CONNECT_ENABLED === 'true'
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string>('')
   const [fitbitConnected, setFitbitConnected] = useState(false)
@@ -27,6 +32,8 @@ export default function HealthTracking() {
     lastWebhookAt: string | null
     lastDataType: string | null
   } | null>(null)
+  const [deviceInterest, setDeviceInterest] = useState<Record<string, boolean>>({})
+  const [savingInterest, setSavingInterest] = useState(false)
 
   // Profile data - prefer real photos; fall back to professional icon
   const hasProfileImage = !!(providerProfileImage || profileImage || session?.user?.image)
@@ -55,8 +62,16 @@ export default function HealthTracking() {
         const response = await fetch('/api/user-data');
         if (response.ok) {
           const result = await response.json();
-          if (result.data && result.data.profileImage) {
-            setProfileImage(result.data.profileImage);
+          if (result.data) {
+            if (result.data.profileImage) {
+              setProfileImage(result.data.profileImage);
+            }
+            if (result.data.deviceInterest && typeof result.data.deviceInterest === 'object') {
+              setDeviceInterest(result.data.deviceInterest)
+            }
+            if (userDataCacheKey) {
+              writeClientCache(userDataCacheKey, result.data)
+            }
           }
         }
       } catch (error) {
@@ -64,10 +79,21 @@ export default function HealthTracking() {
       }
     };
 
-    if (session) {
+    const cached = userDataCacheKey ? readClientCache<any>(userDataCacheKey) : null
+    if (cached?.data) {
+      if (cached.data.profileImage) {
+        setProfileImage(cached.data.profileImage)
+      }
+      if (cached.data.deviceInterest && typeof cached.data.deviceInterest === 'object') {
+        setDeviceInterest(cached.data.deviceInterest)
+      }
+    }
+
+    const shouldFetch = !cached || !isCacheFresh(cached, USER_DATA_CACHE_TTL_MS)
+    if (session && shouldFetch) {
       loadProfileImage();
     }
-  }, [session]);
+  }, [session, userDataCacheKey]);
 
   useEffect(() => {
     const checkFitbit = async () => {
@@ -84,6 +110,15 @@ export default function HealthTracking() {
 
   useEffect(() => {
     const checkGarmin = async () => {
+      if (!garminConnectEnabled) {
+        setGarminStatus({
+          connected: false,
+          webhookCount: 0,
+          lastWebhookAt: null,
+          lastDataType: null,
+        })
+        return
+      }
       try {
         const res = await fetch('/api/garmin/status')
         if (res.ok) {
@@ -99,6 +134,30 @@ export default function HealthTracking() {
     }
     checkGarmin()
   }, [])
+
+  const saveDeviceInterest = async (next: Record<string, boolean>) => {
+    try {
+      setSavingInterest(true)
+      const res = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceInterest: next }),
+      })
+      if (!res.ok) {
+        throw new Error('Device interest update failed')
+      }
+      setDeviceInterest(next)
+    } catch (e) {
+      console.error('Failed to save device interest', e)
+    } finally {
+      setSavingInterest(false)
+    }
+  }
+
+  const toggleInterest = (key: string) => {
+    const next = { ...deviceInterest, [key]: !deviceInterest?.[key] }
+    saveDeviceInterest(next)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -287,8 +346,15 @@ export default function HealthTracking() {
           <div className="mb-6 p-6 rounded-xl border bg-gray-50">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
-                <div className="text-lg font-semibold text-gray-900">Garmin</div>
-                {garminStatus?.connected ? (
+                <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                  <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={22} height={22} className="rounded-md" />
+                  <span>Garmin Connect</span>
+                </div>
+                {!garminConnectEnabled ? (
+                  <div className="text-sm text-gray-600">
+                    Garmin Connect is temporarily unavailable while production approval is pending.
+                  </div>
+                ) : garminStatus?.connected ? (
                   <div className="text-sm text-gray-700">
                     Connected{garminStatus.webhookCount ? ` • ${garminStatus.webhookCount} data deliveries received` : ''}.
                     <div className="text-xs text-gray-500 mt-1">
@@ -298,24 +364,41 @@ export default function HealthTracking() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-600">Connect Garmin to start receiving wellness data.</div>
+                  <div className="text-sm text-gray-600">Connect Garmin Connect to start receiving wellness data.</div>
                 )}
               </div>
-              <Link
-                href="/devices"
-                className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors text-sm text-center"
-              >
-                {garminStatus?.connected ? 'Manage Garmin' : 'Connect Garmin'}
-              </Link>
+              {!garminConnectEnabled ? (
+                <button
+                  onClick={() => toggleInterest('garmin')}
+                  disabled={savingInterest}
+                  className={`px-4 py-2 rounded-lg transition-colors text-sm text-center ${
+                    deviceInterest.garmin
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  } ${savingInterest ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
+                </button>
+              ) : (
+                <Link
+                  href="/devices"
+                  className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors text-sm text-center"
+                >
+                  {garminStatus?.connected ? 'Manage Garmin Connect' : 'Connect Garmin Connect'}
+                </Link>
+              )}
             </div>
+            <p className="mt-3 text-xs text-gray-500">
+              Garmin and the Garmin logo are trademarks of Garmin Ltd. or its subsidiaries.
+            </p>
           </div>
 
-          {garminStatus?.connected && (
+          {garminConnectEnabled && garminStatus?.connected && (
             <div className="space-y-6 mb-10">
               <GarminSummary rangeDays={7} />
               <GarminCharts rangeDays={30} />
               <p className="text-xs text-gray-500">
-                Tip: Garmin sends new data after the watch syncs to the Garmin Connect phone app.
+                Tip: New data arrives after the watch syncs in the Garmin Connect mobile app.
               </p>
             </div>
           )}

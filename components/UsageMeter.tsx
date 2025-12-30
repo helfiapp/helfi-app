@@ -19,7 +19,7 @@ type CreditStatusCacheEntry = {
 }
 
 const creditStatusCache: Record<string, CreditStatusCacheEntry> = {}
-const CREDIT_STATUS_TTL_MS = 2000
+const CREDIT_STATUS_TTL_MS = 60 * 1000
 
 async function fetchCreditStatus(feature?: string, forceRefresh?: boolean): Promise<any | null> {
   const key = feature || 'all'

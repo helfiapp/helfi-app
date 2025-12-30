@@ -131,41 +131,44 @@ export async function POST(req: NextRequest) {
     }).formatToParts(now)
     const localDate = `${dateParts.find(p => p.type==='year')?.value}-${dateParts.find(p=>p.type==='month')?.value}-${dateParts.find(p=>p.type==='day')?.value}`
 
-    const already: Array<{ exists: number }> = await prisma.$queryRawUnsafe(
-      `SELECT 1 as exists FROM ReminderDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND sentDate = $3::date LIMIT 1`,
+    const claim: Array<{ userId: string }> = await prisma.$queryRawUnsafe(
+      `INSERT INTO ReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
+       VALUES ($1, $2, $3::date, NOW())
+       ON CONFLICT (userId, reminderTime, sentDate) DO NOTHING
+       RETURNING userId`,
       userId,
       reminderTime,
       localDate
     )
-    if (!already.length) {
-      // Send push
-      const payload = JSON.stringify({
-        title: 'Time for your Helfi check‑in',
-        body: 'Rate your selected issues for today in under a minute.',
-        url: '/check-in',
-      })
-      const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
-        webpush.sendNotification(sub, payload)
+    if (!claim.length) {
+      return NextResponse.json({ skipped: 'already_sent' })
+    }
+
+    // Send push
+    const payload = JSON.stringify({
+      title: 'Time for your Helfi check‑in',
+      body: 'Rate your selected issues for today in under a minute.',
+      url: '/check-in',
+    })
+    const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
+      webpush.sendNotification(sub, payload)
+    )
+    if (goneEndpoints.length) {
+      const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
+      await prisma.$executeRawUnsafe(
+        `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+        userId,
+        JSON.stringify(remaining)
       )
-      if (goneEndpoints.length) {
-        const remaining = removeSubscriptionsByEndpoint(subscriptions, goneEndpoints)
-        await prisma.$executeRawUnsafe(
-          `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
-          userId,
-          JSON.stringify(remaining)
-        )
-      }
-      if (!sent) {
-        return NextResponse.json({ error: 'push_failed', details: errors }, { status: 500 })
-      }
-      await prisma.$queryRawUnsafe(
-        `INSERT INTO ReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
-         VALUES ($1, $2, $3::date, NOW())
-         ON CONFLICT (userId, reminderTime, sentDate) DO UPDATE SET sentAt = NOW()`,
+    }
+    if (!sent) {
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM ReminderDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND sentDate = $3::date`,
         userId,
         reminderTime,
         localDate
-      )
+      ).catch(() => {})
+      return NextResponse.json({ error: 'push_failed', details: errors }, { status: 500 })
     }
 
     // Schedule the next occurrence for this same reminder

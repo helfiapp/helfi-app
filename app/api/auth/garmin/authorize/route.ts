@@ -16,6 +16,11 @@ import {
  */
 export async function GET(request: NextRequest) {
   try {
+    const garminConnectEnabled = process.env.NEXT_PUBLIC_GARMIN_CONNECT_ENABLED === 'true'
+    if (!garminConnectEnabled) {
+      return NextResponse.redirect(new URL('/devices?garmin_error=disabled', request.nextUrl.origin))
+    }
+
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.id) {
