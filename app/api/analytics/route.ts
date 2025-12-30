@@ -136,11 +136,13 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
     const internalSecret = process.env.SCHEDULER_SECRET || ''
+    const diagnosticsToken = process.env.INSIGHTS_DIAGNOSTICS_TOKEN || ''
     const hasInternalSecret = !!internalSecret && authHeader === `Bearer ${internalSecret}`
+    const hasDiagnosticsToken = !!diagnosticsToken && authHeader === `Bearer ${diagnosticsToken}`
     if (!admin) {
       const url = new URL(request.url)
       const action = url.searchParams.get('action')
-      const allowedInternal = hasInternalSecret && action === 'insights'
+      const allowedInternal = action === 'insights' && (hasInternalSecret || hasDiagnosticsToken)
       if (!allowedInternal) {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
       }
