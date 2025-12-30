@@ -48,9 +48,9 @@ export function clearClientCache(prefix?: string) {
     if (!prefix) {
       memoryCache.clear()
     } else {
-      for (const key of memoryCache.keys()) {
+      memoryCache.forEach((_value, key) => {
         if (key.startsWith(prefix)) memoryCache.delete(key)
-      }
+      })
     }
     return
   }
@@ -67,9 +67,9 @@ export function clearClientCache(prefix?: string) {
     return
   }
 
-  for (const key of memoryCache.keys()) {
+  memoryCache.forEach((_value, key) => {
     if (key.startsWith(prefix)) memoryCache.delete(key)
-  }
+  })
   try {
     Object.keys(window.localStorage).forEach((key) => {
       if (key.startsWith(STORAGE_PREFIX + prefix)) {
