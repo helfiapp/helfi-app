@@ -1,19 +1,21 @@
 'use client'
 import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
 
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import PageHeader from '@/components/PageHeader'
+import { useSaveOnLeave } from '@/lib/use-save-on-leave'
 
 export default function Profile() {
   const { data: session } = useSession()
   const { userData, profileImage, updateUserData, updateProfileImage, refreshData } = useUserData()
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [profileData, setProfileData] = useState({
     firstName: '',
     lastName: '',
@@ -22,6 +24,10 @@ export default function Profile() {
     dateOfBirth: '',
     gender: ''
   })
+  const profileSnapshotRef = useRef<string>('')
+  const profileRef = useRef(profileData)
+  const dirtyRef = useRef(false)
+  const hasInitializedRef = useRef(false)
 
   // Profile data - prefer real photos; fall back to professional icon
   const hasProfileImage = !!(profileImage || session?.user?.image)
@@ -61,15 +67,21 @@ export default function Profile() {
       // This prevents overwriting user input during active editing
       setProfileData(prev => {
         // If user hasn't entered any data yet, load from cache
-        if (!prev.firstName && !prev.lastName && !prev.bio && !prev.dateOfBirth && !prev.gender) {
-          return mergedData;
+        const next = (!prev.firstName && !prev.lastName && !prev.bio && !prev.dateOfBirth && !prev.gender)
+          ? mergedData
+          : {
+              ...prev,
+              email: session?.user?.email || prev.email
+            }
+
+        if (!hasInitializedRef.current) {
+          hasInitializedRef.current = true
+          profileSnapshotRef.current = JSON.stringify(next)
+          dirtyRef.current = false
+          setHasUnsavedChanges(false)
         }
         
-        // If user has data, only update email and keep their current input
-        return {
-          ...prev,
-          email: session?.user?.email || prev.email
-        };
+        return next
       });
       
       console.log('Profile page - Data loaded from cache instantly!');
@@ -79,11 +91,20 @@ export default function Profile() {
       if (savedProfile) {
         try {
           const parsed = JSON.parse(savedProfile);
-          setProfileData(prev => ({
-            ...prev,
-            ...parsed,
-            email: session?.user?.email || prev.email
-          }));
+          setProfileData(prev => {
+            const next = {
+              ...prev,
+              ...parsed,
+              email: session?.user?.email || prev.email
+            }
+            if (!hasInitializedRef.current) {
+              hasInitializedRef.current = true
+              profileSnapshotRef.current = JSON.stringify(next)
+              dirtyRef.current = false
+              setHasUnsavedChanges(false)
+            }
+            return next
+          });
           console.log('Profile page - Loaded from localStorage fallback');
         } catch (e) {
           console.error('Error parsing saved profile:', e);
@@ -92,43 +113,54 @@ export default function Profile() {
     }
   }, [userData, session]);
 
-  // Auto-save when data changes
   useEffect(() => {
-    if (!profileData.firstName && !profileData.lastName && !profileData.bio) return; // Don't save empty initial state
-    
-    setSaveStatus('saving');
-    const saveTimer = setTimeout(async () => {
-      try {
-        // Save to database
-        const response = await fetch('/api/user-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profileInfo: profileData })
-        });
+    profileRef.current = profileData
+    if (!hasInitializedRef.current) return
+    const snapshot = JSON.stringify(profileData)
+    const dirty = snapshot !== profileSnapshotRef.current
+    dirtyRef.current = dirty
+    setHasUnsavedChanges(dirty)
+  }, [profileData])
 
-        if (response.ok) {
-          // Successful save to database - update provider cache too!
-          updateUserData({ profileInfo: profileData });
-          localStorage.setItem('profileData', JSON.stringify(profileData));
-          setSaveStatus('saved');
-          console.log('Profile auto-saved successfully to database and cache updated!');
-        } else {
-          throw new Error(`Failed to save: ${response.status} ${response.statusText}`);
-        }
-        
-        setTimeout(() => setSaveStatus('idle'), 2000);
-      } catch (error) {
-        console.error('Error saving profile to database:', error);
-        // Save to localStorage as fallback
-        localStorage.setItem('profileData', JSON.stringify(profileData));
-        setSaveStatus('saved');
-        console.log('Profile saved to localStorage as fallback');
-        setTimeout(() => setSaveStatus('idle'), 2000);
+  const saveProfile = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: typeof profileData }) => {
+    const payload = options?.payload ?? profileRef.current
+    if (!options?.silent) setSaveStatus('saving')
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileInfo: payload }),
+        keepalive: !!options?.keepalive,
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to save: ${response.status} ${response.statusText}`)
       }
-    }, 1000); // Debounce saves by 1 second
 
-    return () => clearTimeout(saveTimer);
-  }, [profileData]);
+      updateUserData({ profileInfo: payload })
+      localStorage.setItem('profileData', JSON.stringify(payload))
+      profileSnapshotRef.current = JSON.stringify(payload)
+      dirtyRef.current = false
+      setHasUnsavedChanges(false)
+      if (!options?.silent) {
+        setSaveStatus('saved')
+        setTimeout(() => setSaveStatus('idle'), 2000)
+      }
+      console.log('Profile saved successfully.')
+    } catch (error) {
+      console.error('Error saving profile to database:', error)
+      localStorage.setItem('profileData', JSON.stringify(payload))
+      if (!options?.silent) {
+        setSaveStatus('saved')
+        setTimeout(() => setSaveStatus('idle'), 2000)
+      }
+    }
+  }, [updateUserData])
+
+  useSaveOnLeave(() => {
+    if (!dirtyRef.current) return
+    void saveProfile({ silent: true, keepalive: true, payload: profileRef.current })
+  })
 
   const updateProfileData = (field: string, value: string) => {
     setProfileData(prev => ({
@@ -149,7 +181,7 @@ export default function Profile() {
             
             {/* Auto-save Notice */}
             <div className="text-sm text-gray-500">
-              Changes are saved automatically
+              Changes save when you leave this page
             </div>
           </div>
           
@@ -160,7 +192,7 @@ export default function Profile() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <p className="text-blue-700 text-sm">
-                <span className="font-medium">Auto-save enabled:</span> Your changes are automatically saved as you type.
+                <span className="font-medium">Auto-save enabled:</span> Your changes save automatically when you leave this page.
               </p>
             </div>
           </div>

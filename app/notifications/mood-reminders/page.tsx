@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import PageHeader from '@/components/PageHeader'
 import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
+import { useSaveOnLeave } from '@/lib/use-save-on-leave'
 
 const baseTimezones = [
   'UTC','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Stockholm','Europe/Athens',
@@ -51,7 +52,70 @@ export default function MoodReminderSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [sendingNow, setSendingNow] = useState(false)
   const [deviceTimezone, setDeviceTimezone] = useState('UTC')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const settingsSnapshotRef = useRef<string>('')
+  const settingsRef = useRef({
+    enabled: false,
+    frequency: 1,
+    time1: '20:00',
+    time2: '12:00',
+    time3: '18:00',
+    timezone: 'UTC',
+  })
+  const dirtyRef = useRef(false)
   const cacheKey = session?.user?.email ? `mood-reminders:${session.user.email}` : ''
+
+  const saveSettings = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: typeof settingsRef.current }) => {
+    if (saving && !options?.silent) return
+    const payload = options?.payload ?? {
+      enabled,
+      frequency,
+      time1,
+      time2,
+      time3,
+      timezone,
+    }
+    if (!options?.silent) setSaving(true)
+    try {
+      const res = await fetch('/api/mood/reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: payload.enabled,
+          frequency: payload.frequency,
+          time1: payload.time1,
+          time2: payload.time2,
+          time3: payload.time3,
+          timezone: payload.timezone,
+        }),
+        keepalive: !!options?.keepalive,
+      })
+      if (res.ok) {
+        const snapshot = JSON.stringify(payload)
+        settingsSnapshotRef.current = snapshot
+        dirtyRef.current = false
+        setHasUnsavedChanges(false)
+        if (cacheKey) {
+          writeClientCache(cacheKey, {
+            enabled: payload.enabled,
+            frequency: payload.frequency,
+            time1: payload.time1,
+            time2: payload.time2,
+            time3: payload.time3,
+            timezone: payload.timezone,
+          })
+        }
+        if (!options?.silent) alert('Mood reminders saved successfully!')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        if (!options?.silent) alert(`Failed to save: ${data.error || 'Unknown error'}`)
+      }
+    } catch (e) {
+      if (!options?.silent) alert('Failed to save mood reminders. Please try again.')
+    } finally {
+      if (!options?.silent) setSaving(false)
+    }
+  }, [cacheKey, saving, enabled, frequency, time1, time2, time3, timezone])
 
   useEffect(() => {
     try {
@@ -99,6 +163,34 @@ export default function MoodReminderSettingsPage() {
     })()
   }, [cacheKey, deviceTimezone])
 
+  useEffect(() => {
+    if (loading) return
+    const nextSettings = {
+      enabled,
+      frequency,
+      time1,
+      time2,
+      time3,
+      timezone,
+    }
+    settingsRef.current = nextSettings
+    const snapshot = JSON.stringify(nextSettings)
+    if (!settingsSnapshotRef.current) {
+      settingsSnapshotRef.current = snapshot
+      dirtyRef.current = false
+      setHasUnsavedChanges(false)
+      return
+    }
+    const dirty = snapshot !== settingsSnapshotRef.current
+    dirtyRef.current = dirty
+    setHasUnsavedChanges(dirty)
+  }, [enabled, frequency, time1, time2, time3, timezone, loading])
+
+  useSaveOnLeave(() => {
+    if (!dirtyRef.current) return
+    void saveSettings({ silent: true, keepalive: true, payload: settingsRef.current })
+  })
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <PageHeader title="Mood reminders" backHref="/notifications" />
@@ -117,7 +209,11 @@ export default function MoodReminderSettingsPage() {
                 type="checkbox"
                 className="sr-only peer"
                 checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
+                disabled={loading || saving}
+                onChange={(e) => {
+                  const nextEnabled = e.target.checked
+                  setEnabled(nextEnabled)
+                }}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
             </label>
@@ -216,47 +312,18 @@ export default function MoodReminderSettingsPage() {
               <div className="flex flex-col gap-3">
                 <button
                   onClick={async () => {
-                    setSaving(true)
-                    try {
-                      const res = await fetch('/api/mood/reminders', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          enabled,
-                          frequency,
-                          time1,
-                          time2,
-                          time3,
-                          timezone,
-                        }),
-                      })
-                      if (res.ok) {
-                        if (cacheKey) {
-                          writeClientCache(cacheKey, {
-                            enabled,
-                            frequency,
-                            time1,
-                            time2,
-                            time3,
-                            timezone,
-                          })
-                        }
-                        alert('Mood reminders saved successfully!')
-                      } else {
-                        const data = await res.json().catch(() => ({}))
-                        alert(`Failed to save: ${data.error || 'Unknown error'}`)
-                      }
-                    } catch (e) {
-                      alert('Failed to save mood reminders. Please try again.')
-                    } finally {
-                      setSaving(false)
-                    }
+                    await saveSettings()
                   }}
                   disabled={saving}
                   className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
                 >
                   {saving ? 'Saving...' : 'Save Mood Reminders'}
                 </button>
+                {hasUnsavedChanges && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Changes save automatically when you leave this page.
+                  </p>
+                )}
                 <button
                   onClick={async () => {
                     setSendingNow(true)

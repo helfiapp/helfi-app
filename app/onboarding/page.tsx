@@ -23,6 +23,8 @@ const sanitizeUserDataPayload = (payload: any) => {
   return rest;
 };
 
+const AUTO_UPDATE_INSIGHTS_ON_EXIT = true;
+
 // Auth-enabled onboarding flow
 
 // Update Insights Popup Component
@@ -39,6 +41,7 @@ function UpdateInsightsPopup({
   isGenerating: boolean
   onAddMore?: () => void
 }) {
+  if (AUTO_UPDATE_INSIGHTS_ON_EXIT) return null;
   if (!isOpen) return null;
 
   return (
@@ -414,6 +417,7 @@ function onboardingGuardSnapshotJson(form: any): string {
 
 // Track when the user chooses to continue without running Update Insights so navigation isn't blocked
 function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
+  const blockNavigation = !AUTO_UPDATE_INSIGHTS_ON_EXIT;
   const [allowUnsavedNavigation, setAllowUnsavedNavigation] = useState(false);
   const pendingActionRef = useRef<(() => void) | null>(null);
   const allowUnsavedNavigationRef = useRef(allowUnsavedNavigation);
@@ -431,6 +435,7 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
 
   // If new changes appear after we previously allowed navigation, re-lock navigation
   useEffect(() => {
+    if (!blockNavigation) return;
     const prev = prevHasUnsavedChangesRef.current;
     if (hasUnsavedChanges && !prev && allowUnsavedNavigationRef.current) {
       setAllowUnsavedNavigation(false);
@@ -442,17 +447,19 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
       lastSavedRef.current = Date.now();
     }
     prevHasUnsavedChangesRef.current = hasUnsavedChanges;
-  }, [hasUnsavedChanges]);
+  }, [hasUnsavedChanges, blockNavigation]);
 
   useEffect(() => {
+    if (!blockNavigation) return;
     if (!hasUnsavedChanges && allowUnsavedNavigation) {
       setAllowUnsavedNavigation(false);
       allowUnsavedNavigationRef.current = false;
       pendingActionRef.current = null;
     }
-  }, [hasUnsavedChanges, allowUnsavedNavigation]);
+  }, [hasUnsavedChanges, allowUnsavedNavigation, blockNavigation]);
 
   const acknowledgeUnsavedChanges = useCallback(() => {
+    if (!blockNavigation) return;
     allowUnsavedNavigationRef.current = true;
     setAllowUnsavedNavigation(true);
     lastSavedRef.current = Date.now();
@@ -465,6 +472,10 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
 
   const requestNavigation = useCallback(
     (action: () => void, triggerPopup: () => void) => {
+      if (!blockNavigation) {
+        action();
+        return;
+      }
       if (hasUnsavedChanges && !allowUnsavedNavigation) {
         pendingActionRef.current = action;
         triggerPopup();
@@ -473,20 +484,21 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
       }
       action();
     },
-    [hasUnsavedChanges, allowUnsavedNavigation],
+    [hasUnsavedChanges, allowUnsavedNavigation, blockNavigation],
   );
 
   const beforeUnloadHandler = useCallback((e: BeforeUnloadEvent) => {
+    if (!blockNavigation) return undefined;
     if (hasUnsavedChangesRef.current && !allowUnsavedNavigationRef.current) {
       e.preventDefault();
       e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
       return e.returnValue;
     }
     return undefined;
-  }, []);
+  }, [blockNavigation]);
 
   return {
-    shouldBlockNavigation: hasUnsavedChanges && !allowUnsavedNavigation,
+    shouldBlockNavigation: blockNavigation && hasUnsavedChanges && !allowUnsavedNavigation,
     allowUnsavedNavigation,
     acknowledgeUnsavedChanges,
     requestNavigation,
@@ -1820,7 +1832,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         </button>
         {showDietSavedNotice && (
           <div className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-            Saved. We’ll ask you to update insights when you leave Health Setup.
+            Saved. Insights will update when you leave Health Setup.
           </div>
         )}
         {normalizeDietTypes(dietTypes).length > 0 && (
@@ -1880,7 +1892,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           </button>
         </div>
       </div>
-      {/* Unsaved changes banner - purely informational, real action happens in the popup when you try to leave */}
+      {/* Unsaved changes banner - informational only; insights update when you leave Health Setup */}
       {hasUnsavedChanges && (
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-start gap-2">
@@ -1888,8 +1900,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
             <div>
               <div className="font-medium text-yellow-900 mb-1">Changes not in insights yet</div>
               <div className="text-sm text-yellow-700">
-                We&apos;ve noticed you updated your basic health details. When you leave this step, we&apos;ll ask if you&apos;d like to
-                update your insights so everything stays in sync.
+                We&apos;ve noticed you updated your basic health details. Insights will update in the background when you leave Health Setup.
               </div>
             </div>
           </div>
@@ -4182,7 +4193,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
         )}
 
         {/* Manual Update Insights Button - Show if there are unsaved changes */}
-        {hasUnsavedChanges && supplements.length > 0 && (
+        {!AUTO_UPDATE_INSIGHTS_ON_EXIT && hasUnsavedChanges && supplements.length > 0 && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex-1">
@@ -5150,7 +5161,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         )}
 
         {/* Manual Update Insights Button - Show if there are unsaved changes */}
-        {hasUnsavedChanges && medications.length > 0 && (
+        {!AUTO_UPDATE_INSIGHTS_ON_EXIT && hasUnsavedChanges && medications.length > 0 && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex-1">
@@ -6563,6 +6574,7 @@ export default function Onboarding() {
   const [allowAutosave, setAllowAutosave] = useState(false);
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
   const [hasGlobalUnsavedChanges, setHasGlobalUnsavedChanges] = useState(false);
+  const hasGlobalUnsavedChangesRef = useRef(false);
   const [showGlobalUpdatePopup, setShowGlobalUpdatePopup] = useState(false);
   const [isGlobalGenerating, setIsGlobalGenerating] = useState(false);
   // Track if the user has dismissed the first-time modal during this visit,
@@ -6572,9 +6584,11 @@ export default function Onboarding() {
   const formBaselineRef = useRef<string>(''); // canonical snapshot to detect real edits
   const formBaselineInitializedRef = useRef<boolean>(false);
   const pendingNavigationRef = useRef<(() => void) | null>(null);
+  const exitUpdateTriggeredRef = useRef(false);
 
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
   useEffect(() => {
+    hasGlobalUnsavedChangesRef.current = hasGlobalUnsavedChanges;
     try {
       (window as any).__helfiOnboardingHasUnsavedChanges = hasGlobalUnsavedChanges;
     } catch {
@@ -6603,6 +6617,38 @@ export default function Onboarding() {
       formBaselineInitializedRef.current = false;
     }
   }, []);
+
+  const triggerInsightsUpdateOnExit = useCallback((reason: string) => {
+    if (!AUTO_UPDATE_INSIGHTS_ON_EXIT) return
+    if (exitUpdateTriggeredRef.current) return
+    if (!hasGlobalUnsavedChangesRef.current) return
+    if (!formBaselineInitializedRef.current) return
+
+    const currentForm = formRef.current || form || {}
+    const changeTypes = detectChangedInsightTypes(formBaselineRef.current, currentForm)
+    if (!changeTypes.length) return
+
+    exitUpdateTriggeredRef.current = true
+    const payload = sanitizeUserDataPayload(currentForm)
+
+    // Save the latest health setup data before regenerating insights.
+    fetch('/api/user-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    })
+      .then(() => {
+        updateUserData(payload)
+        try {
+          window.dispatchEvent(new Event('userData:refresh'))
+        } catch {}
+      })
+      .catch(() => {})
+      .finally(() => {
+        fireAndForgetInsightsRegen(changeTypes)
+      })
+  }, [form, updateUserData])
   
   // Background regen status indicator
   const [backgroundRegenStatus, setBackgroundRegenStatus] = useState<{ isRegenerating: boolean; message?: string }>({ isRegenerating: false });
@@ -6612,6 +6658,12 @@ export default function Onboarding() {
     setGlobalRegenStatusCallback(setBackgroundRegenStatus);
     return () => setGlobalRegenStatusCallback(null);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      triggerInsightsUpdateOnExit('unmount');
+    };
+  }, [triggerInsightsUpdateOnExit]);
 
   const stepNames = [
     'Gender',
@@ -6696,18 +6748,16 @@ export default function Onboarding() {
       if (e?.data?.type !== 'OPEN_ONBOARDING_UPDATE_POPUP') return
       const raw = e?.data?.navigateTo
       const navigateTo = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : '/dashboard'
-      pendingNavigationRef.current = () => {
-        try {
-          router.push(navigateTo)
-        } catch {
-          window.location.assign(navigateTo)
-        }
+      triggerInsightsUpdateOnExit('external')
+      try {
+        router.push(navigateTo)
+      } catch {
+        window.location.assign(navigateTo)
       }
-      setShowGlobalUpdatePopup(true)
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [router]);
+  }, [router, triggerInsightsUpdateOnExit]);
 
   // Basic session validation without aggressive checks
   useEffect(() => {
@@ -7039,6 +7089,7 @@ export default function Onboarding() {
     } catch {
       // Ignore storage errors – deferral will just apply to this navigation
     }
+    triggerInsightsUpdateOnExit('defer')
     window.location.replace('/dashboard?deferred=1');
   };
 
@@ -7077,33 +7128,8 @@ export default function Onboarding() {
               href="/dashboard"
               className="flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
               title="back button to Dashboard"
-              onClick={(e) => {
-                try {
-                  const hasRealChanges = (() => {
-                    try {
-                      if (!formBaselineRef.current) return false;
-                      return onboardingGuardSnapshotJson(formRef.current || {}) !== formBaselineRef.current;
-                    } catch {
-                      return hasGlobalUnsavedChanges;
-                    }
-                  })();
-                  const hasPhysicalUnsaved =
-                    step === 1 &&
-                    (window as any).__helfiOnboardingPhysicalHasUnsavedChanges;
-                  if (hasPhysicalUnsaved || (hasGlobalUnsavedChanges && hasRealChanges)) {
-                    e.preventDefault();
-                    // On the Physical step, route through the step-scoped popup so Update Insights
-                    // can acknowledge and resume the correct pending navigation.
-                    if (step === 1) {
-                      window.postMessage({ type: 'OPEN_PHYSICAL_UPDATE_POPUP', navigateTo: 'dashboard' }, '*');
-                      return;
-                    }
-                    pendingNavigationRef.current = () => router.push('/dashboard');
-                    setShowGlobalUpdatePopup(true);
-                  }
-                } catch {
-                  // If anything goes wrong, fall back to normal navigation
-                }
+              onClick={() => {
+                triggerInsightsUpdateOnExit('dashboard');
               }}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

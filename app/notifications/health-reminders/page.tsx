@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import PageHeader from '@/components/PageHeader'
 import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
+import { useSaveOnLeave } from '@/lib/use-save-on-leave'
 
 const baseTimezones = [
   'UTC','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Stockholm','Europe/Athens',
@@ -49,7 +50,70 @@ export default function HealthReminderSettingsPage() {
   const [frequency, setFrequency] = useState(3)
   const [savingTimes, setSavingTimes] = useState(false)
   const [loadingSettings, setLoadingSettings] = useState(true)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const settingsSnapshotRef = useRef<string>('')
+  const settingsRef = useRef({
+    enabled: true,
+    time1: '12:30',
+    time2: '18:30',
+    time3: '21:30',
+    timezone: 'Australia/Melbourne',
+    frequency: 3,
+  })
+  const dirtyRef = useRef(false)
   const cacheKey = session?.user?.email ? `checkins-settings:${session.user.email}` : ''
+
+  const saveSettings = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: typeof settingsRef.current }) => {
+    if (savingTimes && !options?.silent) return
+    const payload = options?.payload ?? {
+      enabled,
+      time1,
+      time2,
+      time3,
+      timezone: tz,
+      frequency,
+    }
+    if (!options?.silent) setSavingTimes(true)
+    try {
+      const res = await fetch('/api/checkins/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: payload.enabled,
+          time1: payload.time1,
+          time2: payload.time2,
+          time3: payload.time3,
+          timezone: payload.timezone,
+          frequency: payload.frequency,
+        }),
+        keepalive: !!options?.keepalive,
+      })
+      if (res.ok) {
+        const snapshot = JSON.stringify(payload)
+        settingsSnapshotRef.current = snapshot
+        dirtyRef.current = false
+        setHasUnsavedChanges(false)
+        if (cacheKey) {
+          writeClientCache(cacheKey, {
+            enabled: payload.enabled,
+            time1: payload.time1,
+            time2: payload.time2,
+            time3: payload.time3,
+            timezone: payload.timezone,
+            frequency: payload.frequency,
+          })
+        }
+        if (!options?.silent) alert('Reminder times saved successfully!')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        if (!options?.silent) alert(`Failed to save: ${data.error || 'Unknown error'}`)
+      }
+    } catch (e) {
+      if (!options?.silent) alert('Failed to save reminder times. Please try again.')
+    } finally {
+      if (!options?.silent) setSavingTimes(false)
+    }
+  }, [cacheKey, savingTimes, enabled, time1, time2, time3, tz, frequency])
 
   useEffect(() => {
     const cached = cacheKey ? readClientCache<any>(cacheKey) : null
@@ -88,6 +152,34 @@ export default function HealthReminderSettingsPage() {
     })()
   }, [cacheKey])
 
+  useEffect(() => {
+    if (loadingSettings) return
+    const nextSettings = {
+      enabled,
+      time1,
+      time2,
+      time3,
+      timezone: tz,
+      frequency,
+    }
+    settingsRef.current = nextSettings
+    const snapshot = JSON.stringify(nextSettings)
+    if (!settingsSnapshotRef.current) {
+      settingsSnapshotRef.current = snapshot
+      dirtyRef.current = false
+      setHasUnsavedChanges(false)
+      return
+    }
+    const dirty = snapshot !== settingsSnapshotRef.current
+    dirtyRef.current = dirty
+    setHasUnsavedChanges(dirty)
+  }, [enabled, time1, time2, time3, tz, frequency, loadingSettings])
+
+  useSaveOnLeave(() => {
+    if (!dirtyRef.current) return
+    void saveSettings({ silent: true, keepalive: true, payload: settingsRef.current })
+  })
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <PageHeader title="Health reminders" backHref="/notifications" />
@@ -106,7 +198,11 @@ export default function HealthReminderSettingsPage() {
                 type="checkbox"
                 className="sr-only peer"
                 checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
+                disabled={loadingSettings || savingTimes}
+                onChange={(e) => {
+                  const nextEnabled = e.target.checked
+                  setEnabled(nextEnabled)
+                }}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
             </label>
@@ -204,40 +300,18 @@ export default function HealthReminderSettingsPage() {
 
               <button
                 onClick={async () => {
-                  setSavingTimes(true)
-                  try {
-                    const res = await fetch('/api/checkins/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ enabled, time1, time2, time3, timezone: tz, frequency })
-                    })
-                    if (res.ok) {
-                      if (cacheKey) {
-                        writeClientCache(cacheKey, {
-                          enabled,
-                          time1,
-                          time2,
-                          time3,
-                          timezone: tz,
-                          frequency,
-                        })
-                      }
-                      alert('Reminder times saved successfully!')
-                    } else {
-                      const data = await res.json().catch(() => ({}))
-                      alert(`Failed to save: ${data.error || 'Unknown error'}`)
-                    }
-                  } catch (e) {
-                    alert('Failed to save reminder times. Please try again.')
-                  } finally {
-                    setSavingTimes(false)
-                  }
+                  await saveSettings()
                 }}
                 disabled={savingTimes}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
               >
                 {savingTimes ? 'Saving...' : 'Save Reminder Times'}
               </button>
+              {hasUnsavedChanges && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Changes save automatically when you leave this page.
+                </p>
+              )}
             </>
           )}
         </div>

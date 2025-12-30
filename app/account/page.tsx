@@ -1,22 +1,28 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import PageHeader from '@/components/PageHeader'
+import { useSaveOnLeave } from '@/lib/use-save-on-leave'
 
 export default function AccountPage() {
   const { data: session } = useSession()
   const { userData, profileImage, updateUserData } = useUserData()
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [accountData, setAccountData] = useState({
     fullName: '',
     email: session?.user?.email || ''
   })
+  const accountSnapshotRef = useRef<string>('')
+  const accountRef = useRef(accountData)
+  const dirtyRef = useRef(false)
+  const hasInitializedRef = useRef(false)
   const router = useRouter()
 
   // Modal states
@@ -55,47 +61,67 @@ export default function AccountPage() {
     
     if (savedAccountData) {
       try {
-        setAccountData(JSON.parse(savedAccountData))
+        const parsed = JSON.parse(savedAccountData)
+        setAccountData(prev => {
+          const next = { ...prev, ...parsed }
+          if (!hasInitializedRef.current) {
+            hasInitializedRef.current = true
+            accountSnapshotRef.current = JSON.stringify(next)
+            dirtyRef.current = false
+            setHasUnsavedChanges(false)
+          }
+          return next
+        })
       } catch (error) {
         console.error('Error loading account data:', error)
       }
     } else {
       // Initialize with session data
-      setAccountData({
+      const seeded = {
         fullName: session?.user?.name || '',
         email: session?.user?.email || ''
-      })
+      }
+      setAccountData(seeded)
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true
+        accountSnapshotRef.current = JSON.stringify(seeded)
+        dirtyRef.current = false
+        setHasUnsavedChanges(false)
+      }
     }
   }, [session])
 
-  // Auto-save when data changes
   useEffect(() => {
-    if (!accountData.fullName && !accountData.email) return // Don't save empty initial state
-    
-    setSaveStatus('saving')
-    const saveTimer = setTimeout(async () => {
-      try {
-        // TODO: Replace with actual API call to save to database
-        // For now, using localStorage but this should be a proper API call
-        localStorage.setItem('accountSettings', JSON.stringify(accountData))
-        
-        // Simulate API call delay for realistic UX
-        await new Promise(resolve => setTimeout(resolve, 300))
-        
-        setSaveStatus('saved')
-        
-        // Hide saved status after 2 seconds
-        setTimeout(() => {
-          setSaveStatus('idle')
-        }, 2000)
-      } catch (error) {
-        console.error('Error auto-saving account settings:', error)
-        setSaveStatus('idle')
-      }
-    }, 800) // Debounce saves by 800ms for smoother experience
+    accountRef.current = accountData
+    if (!hasInitializedRef.current) return
+    const snapshot = JSON.stringify(accountData)
+    const dirty = snapshot !== accountSnapshotRef.current
+    dirtyRef.current = dirty
+    setHasUnsavedChanges(dirty)
+  }, [accountData])
 
-    return () => clearTimeout(saveTimer)
-  }, [accountData]) // Removed twoFactorEnabled since 2FA is no longer used
+  const saveAccount = useCallback((options?: { silent?: boolean; payload?: typeof accountData }) => {
+    const payload = options?.payload ?? accountRef.current
+    if (!options?.silent) setSaveStatus('saving')
+    try {
+      localStorage.setItem('accountSettings', JSON.stringify(payload))
+      accountSnapshotRef.current = JSON.stringify(payload)
+      dirtyRef.current = false
+      setHasUnsavedChanges(false)
+      if (!options?.silent) {
+        setSaveStatus('saved')
+        setTimeout(() => setSaveStatus('idle'), 2000)
+      }
+    } catch (error) {
+      console.error('Error saving account settings:', error)
+      if (!options?.silent) setSaveStatus('idle')
+    }
+  }, [])
+
+  useSaveOnLeave(() => {
+    if (!dirtyRef.current) return
+    saveAccount({ silent: true, payload: accountRef.current })
+  })
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -123,6 +149,11 @@ export default function AccountPage() {
                   <span className="text-sm font-medium">Saved</span>
                 </div>
               )}
+              {saveStatus === 'idle' && hasUnsavedChanges && (
+                <div className="flex items-center text-amber-600">
+                  <span className="text-sm font-medium">Will save on exit</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -133,7 +164,7 @@ export default function AccountPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
               <p className="text-green-700 text-sm">
-                <span className="font-medium">Auto-save enabled:</span> All changes are automatically saved as you type. No save button needed!
+                <span className="font-medium">Auto-save enabled:</span> Changes save automatically when you leave this page.
               </p>
             </div>
           </div>

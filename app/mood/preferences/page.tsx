@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import MoodTabs from '@/components/mood/MoodTabs'
+import { useSaveOnLeave } from '@/lib/use-save-on-leave'
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -50,6 +51,17 @@ export default function MoodPreferencesPage() {
   const [notificationsReady, setNotificationsReady] = useState(false)
   const [notificationsBusy, setNotificationsBusy] = useState(false)
   const [sendingNow, setSendingNow] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const settingsSnapshotRef = useRef<string>('')
+  const settingsRef = useRef({
+    enabled: false,
+    frequency: 1,
+    time1: '20:00',
+    time2: '12:00',
+    time3: '18:00',
+    timezone: 'UTC',
+  })
+  const dirtyRef = useRef(false)
 
   useEffect(() => {
     ;(async () => {
@@ -182,39 +194,57 @@ export default function MoodPreferencesPage() {
     }
   }
 
-  const save = async (nextEnabled: boolean) => {
-    setSaving(true)
-    setBanner(null)
+  const save = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: typeof settingsRef.current }) => {
+    const payload = options?.payload ?? {
+      enabled,
+      frequency,
+      time1,
+      time2,
+      time3,
+      timezone,
+    }
+    if (!options?.silent) {
+      setSaving(true)
+      setBanner(null)
+    }
     try {
       const res = await fetch('/api/mood/reminders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          enabled: nextEnabled,
-          frequency,
-          time1: normalizeTime(time1, '20:00'),
-          time2: normalizeTime(time2, '12:00'),
-          time3: normalizeTime(time3, '18:00'),
-          timezone,
+          enabled: payload.enabled,
+          frequency: payload.frequency,
+          time1: normalizeTime(payload.time1, '20:00'),
+          time2: normalizeTime(payload.time2, '12:00'),
+          time3: normalizeTime(payload.time3, '18:00'),
+          timezone: payload.timezone,
         }),
+        keepalive: !!options?.keepalive,
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error('save failed')
-      setEnabled(nextEnabled)
+      const snapshot = JSON.stringify(payload)
+      settingsSnapshotRef.current = snapshot
+      dirtyRef.current = false
+      setHasUnsavedChanges(false)
       const failed = Array.isArray(data?.scheduleResults)
         ? data.scheduleResults.filter((result: any) => result && result.scheduled === false)
         : []
-      if (failed.length > 0) {
-        setBanner({ type: 'error', message: 'Saved, but scheduling failed. Tap “Send” to verify.' })
-      } else {
-        setBanner({ type: 'success', message: 'Saved.' })
+      if (!options?.silent) {
+        if (failed.length > 0) {
+          setBanner({ type: 'error', message: 'Saved, but scheduling failed. Tap “Send” to verify.' })
+        } else {
+          setBanner({ type: 'success', message: 'Saved.' })
+        }
       }
     } catch {
-      setBanner({ type: 'error', message: 'Could not save. Please try again.' })
+      if (!options?.silent) {
+        setBanner({ type: 'error', message: 'Could not save. Please try again.' })
+      }
     } finally {
-      setSaving(false)
+      if (!options?.silent) setSaving(false)
     }
-  }
+  }, [enabled, frequency, time1, time2, time3, timezone])
 
   const toggleEnabled = async () => {
     const next = !enabled
@@ -225,8 +255,37 @@ export default function MoodPreferencesPage() {
         return
       }
     }
-    await save(next)
+    setEnabled(next)
+    setBanner({ type: 'success', message: 'Changes will save when you leave this page.' })
   }
+
+  useEffect(() => {
+    if (loading) return
+    const nextSettings = {
+      enabled,
+      frequency,
+      time1,
+      time2,
+      time3,
+      timezone,
+    }
+    settingsRef.current = nextSettings
+    const snapshot = JSON.stringify(nextSettings)
+    if (!settingsSnapshotRef.current) {
+      settingsSnapshotRef.current = snapshot
+      dirtyRef.current = false
+      setHasUnsavedChanges(false)
+      return
+    }
+    const dirty = snapshot !== settingsSnapshotRef.current
+    dirtyRef.current = dirty
+    setHasUnsavedChanges(dirty)
+  }, [enabled, frequency, time1, time2, time3, timezone, loading])
+
+  useSaveOnLeave(() => {
+    if (!dirtyRef.current) return
+    void save({ silent: true, keepalive: true, payload: settingsRef.current })
+  })
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] dark:bg-gray-900 pb-28">
@@ -434,12 +493,17 @@ export default function MoodPreferencesPage() {
           <div className="mt-6">
             <button
               type="button"
-              onClick={() => save(enabled)}
+              onClick={() => save()}
               disabled={saving || loading}
               className="w-full rounded-2xl bg-helfi-green hover:bg-helfi-green-dark text-white text-base font-bold py-4 transition-colors disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
+            {hasUnsavedChanges && (
+              <p className="mt-2 text-xs text-slate-500 dark:text-gray-400">
+                Changes save automatically when you leave this page.
+              </p>
+            )}
           </div>
         </div>
 

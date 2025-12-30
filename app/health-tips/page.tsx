@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import VoiceChat from '@/components/VoiceChat'
+import { useSaveOnLeave } from '@/lib/use-save-on-leave'
 
 type HealthTip = {
   id: string
@@ -52,6 +53,19 @@ export default function HealthTipsPage() {
   const [timezoneQuery, setTimezoneQuery] = useState('')
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false)
   const [expandedTipId, setExpandedTipId] = useState<string | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const settingsSnapshotRef = useRef<string>('')
+  const settingsRef = useRef<HealthTipSettings>({
+    enabled: false,
+    time1: '11:30',
+    time2: '15:30',
+    time3: '20:30',
+    timezone: 'Australia/Melbourne',
+    frequency: 1,
+    focusFood: true,
+    focusSupplements: true,
+    focusLifestyle: true,
+  })
 
   useEffect(() => {
     ;(async () => {
@@ -172,37 +186,74 @@ export default function HealthTipsPage() {
       .slice(0, 50)
   }, [timezoneOptions, timezoneQuery])
 
-  const handleSaveSettings = async () => {
-    setSaving(true)
+  const handleSaveSettings = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: HealthTipSettings }) => {
+    const payload = options?.payload ?? {
+      enabled,
+      time1,
+      time2,
+      time3,
+      timezone,
+      frequency,
+      focusFood,
+      focusSupplements,
+      focusLifestyle,
+    }
+    if (!options?.silent) setSaving(true)
     try {
       const res = await fetch('/api/health-tips/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabled,
-          time1,
-          time2,
-          time3,
-          timezone,
-          frequency,
-          focusFood,
-          focusSupplements,
-          focusLifestyle,
-        }),
+        body: JSON.stringify(payload),
+        keepalive: !!options?.keepalive,
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         const msg = (data && (data.error || data.detail)) || 'Failed to save settings'
-        alert(msg)
+        if (!options?.silent) alert(msg)
         return
       }
-      alert('Health tip settings saved. Your next AI tips will follow this schedule.')
+      const snapshot = JSON.stringify(payload)
+      settingsSnapshotRef.current = snapshot
+      setHasUnsavedChanges(false)
+      if (!options?.silent) {
+        alert('Health tip settings saved. Your next AI tips will follow this schedule.')
+      }
     } catch {
-      alert('Could not save health tip settings. Please try again.')
+      if (!options?.silent) {
+        alert('Could not save health tip settings. Please try again.')
+      }
     } finally {
-      setSaving(false)
+      if (!options?.silent) setSaving(false)
     }
-  }
+  }, [enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle])
+
+  useEffect(() => {
+    if (loadingSettings) return
+    const nextSettings: HealthTipSettings = {
+      enabled,
+      time1,
+      time2,
+      time3,
+      timezone,
+      frequency,
+      focusFood,
+      focusSupplements,
+      focusLifestyle,
+    }
+    settingsRef.current = nextSettings
+    const snapshot = JSON.stringify(nextSettings)
+    if (!settingsSnapshotRef.current) {
+      settingsSnapshotRef.current = snapshot
+      setHasUnsavedChanges(false)
+      return
+    }
+    setHasUnsavedChanges(snapshot !== settingsSnapshotRef.current)
+  }, [enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle, loadingSettings])
+
+  useSaveOnLeave(() => {
+    if (!hasUnsavedChanges) return
+    void handleSaveSettings({ silent: true, keepalive: true, payload: settingsRef.current })
+  })
 
   const isHistoryPage = pathname === '/health-tips/history'
 
@@ -532,12 +583,17 @@ export default function HealthTipsPage() {
               </div>
 
               <button
-                onClick={handleSaveSettings}
+                onClick={() => handleSaveSettings()}
                 disabled={saving}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium mt-2"
               >
                 {saving ? 'Saving…' : 'Save health tip settings'}
               </button>
+              {hasUnsavedChanges && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Changes save automatically when you leave this page.
+                </p>
+              )}
 
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 These AI tips are educational and do not replace medical advice. Always consider
