@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
             userId: user.id,
             reminderTime: t,
             timezone,
-          }).catch(() => ({ ok: false }))
+          }).catch(() => ({ ok: false, reason: 'exception' }))
           if (!publishResult?.ok) {
             console.warn('[MOOD] Failed to enqueue immediate reminder via QStash', {
               userId: user.id,
