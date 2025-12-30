@@ -135,8 +135,15 @@ export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
+    const internalSecret = process.env.SCHEDULER_SECRET || ''
+    const hasInternalSecret = !!internalSecret && authHeader === `Bearer ${internalSecret}`
     if (!admin) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+      const url = new URL(request.url)
+      const action = url.searchParams.get('action')
+      const allowedInternal = hasInternalSecret && action === 'insights'
+      if (!allowedInternal) {
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+      }
     }
 
     const url = new URL(request.url)
