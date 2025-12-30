@@ -28,7 +28,7 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <p className="text-sm text-emerald-700">
-            Insights refresh automatically when you click “Update Insights” in Health Setup. Open any section below to view the latest guidance.
+            Insights update automatically after you leave Health Setup. Make changes there and your updates run in the background.
           </p>
         </div>
       </section>
