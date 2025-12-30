@@ -28,7 +28,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, Component } f
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
@@ -1567,6 +1567,8 @@ export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isAnalysisRoute = pathname === '/food/analysis'
   const { userData, profileImage, updateUserData } = useUserData()
   const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
   const [persistentDiarySnapshotVersion, setPersistentDiarySnapshotVersion] = useState(0)
@@ -1831,6 +1833,7 @@ export default function FoodDiary() {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
   const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const [showAnalysisModeModal, setShowAnalysisModeModal] = useState(false)
+  const [showAnalysisExitConfirm, setShowAnalysisExitConfirm] = useState(false)
   const [pendingPhotoPicker, setPendingPhotoPicker] = useState(false)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -2049,6 +2052,22 @@ export default function FoodDiary() {
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
+  const analysisRouteDate = searchParams?.get('date') || ''
+  const analysisRouteCategory = searchParams?.get('category') || ''
+  useEffect(() => {
+    if (!isAnalysisRoute) return
+    if (analysisRouteDate && /^\d{4}-\d{2}-\d{2}$/.test(analysisRouteDate)) {
+      setSelectedDate(analysisRouteDate)
+    }
+    if (analysisRouteCategory) {
+      setSelectedAddCategory(normalizeCategory(analysisRouteCategory) as any)
+    }
+    setShowAddFood(true)
+    setShowCategoryPicker(false)
+    setShowPhotoOptions(false)
+    setPhotoOptionsAnchor(null)
+    setShowAnalysisModeModal(false)
+  }, [isAnalysisRoute, analysisRouteDate, analysisRouteCategory])
   const categoryRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const backfillAttemptedRef = useRef<Record<string, boolean>>({})
   const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => {
@@ -5696,7 +5715,7 @@ const applyStructuredItems = (
           setIsEditingDescription(false);
           setPhotoOptionsAnchor(null);
           // Keep the analysis mode modal visible so the 🤖 Analyze button stays in view after picking
-          setShowAnalysisModeModal(!shouldAutoAnalyze);
+          setShowAnalysisModeModal(!shouldAutoAnalyze && !isAnalysisRoute);
           if (shouldAutoAnalyze) {
             setAutoAnalyzeLabelPhoto(false);
             if (barcodeLabelTimeoutRef.current) {
@@ -5722,7 +5741,7 @@ const applyStructuredItems = (
           setShowAiResult(false);
           setIsEditingDescription(false);
           setPhotoOptionsAnchor(null);
-          setShowAnalysisModeModal(!shouldAutoAnalyze);
+          setShowAnalysisModeModal(!shouldAutoAnalyze && !isAnalysisRoute);
           if (shouldAutoAnalyze) {
             setAutoAnalyzeLabelPhoto(false);
             if (barcodeLabelTimeoutRef.current) {
@@ -6575,6 +6594,9 @@ Please add nutritional information manually if needed.`);
       // Reset all form states
       resetAnalyzerPanel()
       setEditingEntry(null)
+      if (isAnalysisRoute) {
+        router.push('/food')
+      }
     } finally {
       setIsSavingEntry(false)
     }
@@ -6703,6 +6725,9 @@ Please add nutritional information manually if needed.`);
       // Reset all form states
       resetAnalyzerPanel()
       setEditingEntry(null)
+      if (isAnalysisRoute) {
+        router.push('/food')
+      }
     } finally {
       setIsSavingEntry(false)
     }
@@ -7050,6 +7075,9 @@ Please add nutritional information manually if needed.`);
     // For new AI analyses, deleting the photo should behave like cancelling:
     // clear the analyzer state and return to the main Food Diary view.
     resetAnalyzerPanel()
+    if (isAnalysisRoute) {
+      router.push('/food')
+    }
   }
 
   const showQuickToast = (message: string) => {
@@ -11549,10 +11577,16 @@ Please add nutritional information manually if needed.`);
 
       {/* Main Content */}
       <div className="flex-1">
-        <div className="max-w-4xl mx-auto px-3 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
+        <div
+          className={
+            isAnalysisRoute
+              ? 'w-full px-3 sm:px-8 py-6 sm:py-8 pb-24 md:pb-8'
+              : 'max-w-4xl mx-auto px-3 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8'
+          }
+        >
         
         {/* Instruction Text - Hidden during edit mode */}
-        {!isEditingDescription && !editingEntry && (
+        {!isAnalysisRoute && !isEditingDescription && !editingEntry && (
         <div className="mb-6 text-center">
           <p className="text-lg text-gray-600 font-normal">
             📸 Take a photo of your meal or snack and let AI analyze it!
@@ -11576,7 +11610,7 @@ Please add nutritional information manually if needed.`);
         )}
 
         {/* Add Food Button - Hidden during edit mode */}
-        {!isEditingDescription && !editingEntry && (
+        {!isAnalysisRoute && !isEditingDescription && !editingEntry && (
         <div className="mb-6 relative add-food-entry-container">
           <button
             onClick={() => {
@@ -11665,10 +11699,12 @@ Please add nutritional information manually if needed.`);
                     type="button"
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                     onClick={() => {
-                      setPendingPhotoPicker(true);
-                      setShowPhotoOptions(false);
-                      setPhotoOptionsAnchor(null);
-                      setShowAnalysisModeModal(true);
+                      setShowPhotoOptions(false)
+                      setPhotoOptionsAnchor(null)
+                      const qs = new URLSearchParams()
+                      qs.set('date', selectedDate)
+                      qs.set('category', selectedAddCategory)
+                      router.push(`/food/analysis?${qs.toString()}`)
                     }}
                   >
                     <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mr-3 text-blue-600">
@@ -11794,6 +11830,37 @@ Please add nutritional information manually if needed.`);
         </div>
         )}
 
+        {isAnalysisRoute && (
+          <div className="mb-6 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAnalyzing) {
+                    setShowAnalysisExitConfirm(true)
+                    return
+                  }
+                  resetAnalyzerPanel()
+                  router.push('/food')
+                }}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back
+              </button>
+              <div className="text-base sm:text-lg font-semibold text-gray-900">Food Analysis</div>
+              <div className="w-10" />
+            </div>
+            <div>
+              <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="foodAnalysis" />
+              <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
+              <p className="text-xs text-gray-600 mt-1">Cost: 10 credits per food analysis.</p>
+            </div>
+          </div>
+        )}
+
         {/* Hidden photo input for controlled picker */}
         <input
           ref={selectPhotoInputRef}
@@ -11807,7 +11874,7 @@ Please add nutritional information manually if needed.`);
         />
 
         {/* Mode chooser modal immediately after photo selection */}
-        {showAnalysisModeModal && (
+        {showAnalysisModeModal && !isAnalysisRoute && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowAnalysisModeModal(false)} />
             <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-5 space-y-4">
@@ -11890,11 +11957,110 @@ Please add nutritional information manually if needed.`);
           </div>
         )}
 
+        {showAnalysisExitConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowAnalysisExitConfirm(false)} />
+            <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-200 p-5 space-y-4">
+              <div className="text-base font-semibold text-gray-900">Analysis in progress</div>
+              <p className="text-sm text-gray-600">
+                A food analysis is running. Are you sure you want to cancel and go back?
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAnalysisExitConfirm(false)}
+                  className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  No, stay here
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAnalysisExitConfirm(false)
+                    resetAnalyzerPanel()
+                    router.push('/food')
+                  }}
+                  className="px-3 py-2 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700"
+                >
+                  Yes, cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
                 {/* Food Processing Area */}
         {shouldShowAddPanel && (
           // Outer wrapper now has no extra background so the inner Food Analysis
           // card can stretch closer to the screen edges on mobile.
           <div className="mb-6">
+
+            {/* Analysis start (dedicated page) */}
+            {isAnalysisRoute && !photoPreview && !showAiResult && !isEditingDescription && (
+              <div className="text-center space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Choose a photo to analyze</h3>
+                  <p className="text-sm text-gray-600">
+                    We’ll tailor the AI before analyzing your food.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-left">
+                  {[
+                    { key: 'auto', label: 'Auto detect', helper: 'Best guess for meals and snacks' },
+                    { key: 'packaged', label: 'Product nutrition image', helper: 'Photo of the nutrition facts panel' },
+                    { key: 'meal', label: 'Homemade/restaurant', helper: 'Plated/restaurant foods' },
+                  ].map((mode) => {
+                    const active = analysisMode === mode.key
+                    return (
+                      <button
+                        key={mode.key}
+                        type="button"
+                        onClick={() => setAnalysisMode(mode.key as 'auto' | 'packaged' | 'meal')}
+                        className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left ${
+                          active
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                            : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className="text-sm font-semibold">{mode.label}</span>
+                        <span className="text-[11px] text-gray-500">{mode.helper}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {analysisMode !== 'packaged' && (
+                  <div className="rounded-lg border border-gray-200 p-3 bg-gray-50 text-left">
+                    <label className="block text-sm font-medium text-gray-900">
+                      Optional hint (only for tricky items)
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      If one item could be confused (e.g., beef vs lamb, banana bread vs carrot cake), mention just that item.
+                    </p>
+                    <input
+                      type="text"
+                      value={analysisHint}
+                      onChange={(e) => setAnalysisHint(e.target.value)}
+                      placeholder="e.g., Christmas pudding"
+                      className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-gray-600">
+                  Product nutrition image: take a clear photo of the nutrition facts panel. We’ll read the per-serving numbers.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      selectPhotoInputRef.current?.click()
+                    } catch {}
+                  }}
+                  className="w-full sm:w-auto mx-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                >
+                  Choose photo / camera
+                </button>
+              </div>
+            )}
             
             {/* Photo Analysis Flow */}
             {photoPreview && !showAiResult && !isEditingDescription && (
@@ -12004,16 +12170,18 @@ Please add nutritional information manually if needed.`);
                   <div className="text-xs text-gray-600">
                     Product nutrition image reads the per-serving column exactly (ignores per-100g).
                   </div>
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-500 text-center mb-2">Cost: 10 credits per food analysis</p>
-                    {!hasPaidAccess && (
-                      <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2 text-center">
-                        Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
-                      </div>
-                    )}
-                    <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="foodAnalysis" />
-                    <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
-                  </div>
+                  {!isAnalysisRoute && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 text-center mb-2">Cost: 10 credits per food analysis</p>
+                      {!hasPaidAccess && (
+                        <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2 text-center">
+                          Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
+                        </div>
+                      )}
+                      <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="foodAnalysis" />
+                      <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
+                    </div>
+                  )}
                   
                   {/* Photo Management Options */}
                   <div className="flex gap-3">
@@ -12063,7 +12231,11 @@ Please add nutritional information manually if needed.`);
 
             {/* AI Analysis Result - Premium Cronometer-style UI */}
             {showAiResult && (
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+              <div
+                className={`rounded-2xl ${
+                  isAnalysisRoute ? 'bg-transparent shadow-none border-0' : 'bg-white shadow-lg border border-gray-100'
+                }`}
+              >
                 {editingEntry && (
                   <div className="flex items-center justify-end gap-3 px-4 pt-4">
                     <button
@@ -14067,14 +14239,16 @@ Please add nutritional information manually if needed.`);
           </div>
         )}
 
-        {/* Loading State - Prevent Empty Flash */}
-        {!diaryHydrated ? (
-          <div className="bg-white rounded-lg shadow-sm p-12 flex flex-col items-center justify-center">
-            <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-            <div className="text-gray-500 font-medium">Loading your food diary...</div>
-          </div>
-        ) : (
-        <div className="overflow-visible space-y-6">
+        {!isAnalysisRoute && (
+          <>
+            {/* Loading State - Prevent Empty Flash */}
+            {!diaryHydrated ? (
+              <div className="bg-white rounded-lg shadow-sm p-12 flex flex-col items-center justify-center">
+                <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
+                <div className="text-gray-500 font-medium">Loading your food diary...</div>
+              </div>
+            ) : (
+            <div className="overflow-visible space-y-6">
 	          {/* Daily Totals Row - only show on main diary view, not while editing an entry */}
 	          {!editingEntry && (
 	            <div className="mb-4">
@@ -15051,10 +15225,12 @@ Please add nutritional information manually if needed.`);
                                         type="button"
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                         onClick={() => {
-                                          setPendingPhotoPicker(true);
-                                          setShowPhotoOptions(false);
-                                          setPhotoOptionsAnchor(null);
-                                          setShowAnalysisModeModal(true);
+                                          setShowPhotoOptions(false)
+                                          setPhotoOptionsAnchor(null)
+                                          const qs = new URLSearchParams()
+                                          qs.set('date', selectedDate)
+                                          qs.set('category', cat.key)
+                                          router.push(`/food/analysis?${qs.toString()}`)
                                         }}
                                       >
                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mr-3 text-blue-600">
@@ -15359,10 +15535,12 @@ Please add nutritional information manually if needed.`);
                                         type="button"
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                         onClick={() => {
-                                          setPendingPhotoPicker(true);
-                                          setShowPhotoOptions(false);
-                                          setPhotoOptionsAnchor(null);
-                                          setShowAnalysisModeModal(true);
+                                          setShowPhotoOptions(false)
+                                          setPhotoOptionsAnchor(null)
+                                          const qs = new URLSearchParams()
+                                          qs.set('date', selectedDate)
+                                          qs.set('category', cat.key)
+                                          router.push(`/food/analysis?${qs.toString()}`)
                                         }}
                                       >
                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mr-3 text-blue-600">
@@ -15660,6 +15838,8 @@ Please add nutritional information manually if needed.`);
             </>
           )}
         </div>
+            )}
+          </>
         )}
 
       {showFavoritesPicker && (
