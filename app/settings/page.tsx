@@ -16,6 +16,26 @@ declare global {
   }
 }
 
+type InstallPlatform = 'ios' | 'android' | 'other'
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
+
+const getInstallPlatform = (): InstallPlatform => {
+  if (typeof window === 'undefined') return 'other'
+  const ua = window.navigator.userAgent || ''
+  if (/android/i.test(ua)) return 'android'
+  if (/iphone|ipad|ipod/i.test(ua)) return 'ios'
+  return 'other'
+}
+
+const isStandaloneMode = () => {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true
+}
+
 export default function Settings() {
   const { data: session } = useSession()
   const { userData, profileImage } = useUserData()
@@ -28,6 +48,11 @@ export default function Settings() {
   const [dataAnalytics, setDataAnalytics] = useState(true)
   const [hapticsEnabled, setHapticsEnabled] = useState(true)
   const [isIOS, setIsIOS] = useState(false)
+  const [showInstallGuide, setShowInstallGuide] = useState(false)
+  const [installPlatform, setInstallPlatform] = useState<InstallPlatform>('other')
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [installOutcome, setInstallOutcome] = useState<'accepted' | 'dismissed' | null>(null)
+  const [isStandalone, setIsStandalone] = useState(false)
   // Prevent "auto-save" effects from overwriting stored values on first load
   const [localPrefsLoaded, setLocalPrefsLoaded] = useState(false)
   const [showPdf, setShowPdf] = useState(false)
@@ -65,6 +90,41 @@ export default function Settings() {
     setLocalPrefsLoaded(true)
     return () => window.removeEventListener('darkModeChanged', handleDarkModeChange as EventListener)
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setInstallPlatform(getInstallPlatform())
+    setIsStandalone(isStandaloneMode())
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault()
+      setDeferredPrompt(event as BeforeInstallPromptEvent)
+    }
+
+    const handleAppInstalled = () => {
+      setInstallOutcome('accepted')
+      setIsStandalone(true)
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return
+    try {
+      await deferredPrompt.prompt()
+      const choice = await deferredPrompt.userChoice
+      setInstallOutcome(choice.outcome === 'accepted' ? 'accepted' : 'dismissed')
+    } catch {
+      setInstallOutcome('dismissed')
+    }
+  }
 
   // Auto-save dark mode changes
   useEffect(() => {
@@ -288,6 +348,112 @@ export default function Settings() {
                   </label>
                 </div>
               )}
+
+              <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-white">Add Helfi to your Home Screen</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Install the shortcut so it opens like an app and keeps you signed in.
+                    </p>
+                    {isStandalone && (
+                      <p className="mt-2 text-xs text-helfi-green">You are already using the Home Screen app.</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowInstallGuide((v) => !v)}
+                    className="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                  >
+                    {showInstallGuide ? 'Hide steps' : 'Show steps'}
+                  </button>
+                </div>
+
+                {showInstallGuide && (
+                  <div className="mt-4 space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                    {installPlatform === 'ios' && (
+                      <>
+                        <p className="font-medium text-gray-900 dark:text-white">iPhone or iPad</p>
+                        <ol className="space-y-2">
+                          <li className="flex gap-3">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">1</span>
+                            <span>Tap the Share button in your browser.</span>
+                          </li>
+                          <li className="flex gap-3">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">2</span>
+                            <span>Scroll and tap Add to Home Screen.</span>
+                          </li>
+                          <li className="flex gap-3">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">3</span>
+                            <span>Tap Add. You are done.</span>
+                          </li>
+                        </ol>
+                      </>
+                    )}
+
+                    {installPlatform === 'android' && (
+                      <>
+                        <p className="font-medium text-gray-900 dark:text-white">Android</p>
+                        <ol className="space-y-2">
+                          {deferredPrompt ? (
+                            <>
+                              <li className="flex gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">1</span>
+                                <span>Tap Install below.</span>
+                              </li>
+                              <li className="flex gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">2</span>
+                                <span>Confirm the install prompt.</span>
+                              </li>
+                              <li className="flex gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">3</span>
+                                <span>Open Helfi from your Home Screen.</span>
+                              </li>
+                            </>
+                          ) : (
+                            <>
+                              <li className="flex gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">1</span>
+                                <span>Open the browser menu (three dots).</span>
+                              </li>
+                              <li className="flex gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">2</span>
+                                <span>Tap Install app or Add to Home Screen.</span>
+                              </li>
+                              <li className="flex gap-3">
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">3</span>
+                                <span>Confirm the install.</span>
+                              </li>
+                            </>
+                          )}
+                        </ol>
+                        {deferredPrompt && (
+                          <button
+                            onClick={handleInstallClick}
+                            className="mt-3 w-full rounded-lg bg-helfi-green px-4 py-3 text-white transition-colors hover:bg-helfi-green-dark"
+                          >
+                            Install app
+                          </button>
+                        )}
+                      </>
+                    )}
+
+                    {installPlatform === 'other' && (
+                      <p>Open this page on your phone in Safari (iOS) or Chrome (Android) to install.</p>
+                    )}
+
+                    {installOutcome === 'accepted' && (
+                      <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                        Installed. You can open Helfi from your Home Screen.
+                      </div>
+                    )}
+                    {installOutcome === 'dismissed' && (
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                        No problem. You can install it anytime from your browser menu.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

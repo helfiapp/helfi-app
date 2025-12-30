@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 
 // Paths that should never be used as "last page" destinations
 const disallowedPrefixes = ['/auth', '/onboarding', '/privacy', '/terms', '/help', '/faq']
-const disallowedExact = ['/', '/healthapp']
+const disallowedExact = ['/', '/healthapp', '/pwa-entry']
 
 function getSafeLastPath(raw?: string | null) {
   if (!raw) return null

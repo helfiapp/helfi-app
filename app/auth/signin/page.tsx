@@ -3,7 +3,7 @@
 import { signIn, useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 
 // Separate component for search params handling with Suspense
@@ -77,6 +77,36 @@ function SearchParamsHandler({
   return null
 }
 
+type InstallPlatform = 'ios' | 'android' | 'other'
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
+
+const getInstallPlatform = (): InstallPlatform => {
+  if (typeof window === 'undefined') return 'other'
+  const ua = window.navigator.userAgent || ''
+  if (/android/i.test(ua)) return 'android'
+  if (/iphone|ipad|ipod/i.test(ua)) return 'ios'
+  return 'other'
+}
+
+const isStandaloneMode = () => {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true
+}
+
+const getInstallContext = () => {
+  const platform = getInstallPlatform()
+  const standalone = isStandaloneMode()
+  return {
+    platform,
+    standalone,
+    eligible: platform !== 'other' && !standalone,
+  }
+}
+
 export default function SignIn() {
   const router = useRouter()
   const { status } = useSession()
@@ -89,6 +119,12 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const [showResendVerification, setShowResendVerification] = useState(false)
+  const [installPromptVisible, setInstallPromptVisible] = useState(false)
+  const [installTarget, setInstallTarget] = useState('/onboarding')
+  const [installPlatform, setInstallPlatform] = useState<InstallPlatform>('other')
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [installOutcome, setInstallOutcome] = useState<'accepted' | 'dismissed' | null>(null)
+  const skipAutoRedirectRef = useRef(false)
 
   // If the user is already logged in and somehow lands on the sign-in page
   // (for example, via the iOS Home Screen icon), immediately send them into
@@ -98,6 +134,8 @@ export default function SignIn() {
   // - If plan parameter exists, redirect to checkout after auth.
   useEffect(() => {
     if (status !== 'authenticated') return
+    if (skipAutoRedirectRef.current) return
+    if (installPromptVisible) return
     if (typeof window === 'undefined') {
       router.replace('/dashboard')
       return
@@ -165,11 +203,87 @@ export default function SignIn() {
       } catch {
         // Ignore storage errors and use default target.
       }
+      if (maybeShowInstallPrompt(target)) {
+        return
+      }
       router.replace(target)
     }
 
     void resume()
-  }, [status, router])
+  }, [status, router, installPromptVisible])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setInstallPlatform(getInstallPlatform())
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault()
+      setDeferredPrompt(event as BeforeInstallPromptEvent)
+    }
+
+    const handleAppInstalled = () => {
+      setInstallOutcome('accepted')
+      try {
+        localStorage.setItem('helfi:pwaInstalled', '1')
+      } catch {}
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
+  const maybeShowInstallPrompt = (target: string) => {
+    if (typeof window === 'undefined') return false
+    if (installPromptVisible) return true
+
+    const { platform, eligible } = getInstallContext()
+    if (!eligible) return false
+
+    try {
+      if (localStorage.getItem('helfi:pwaInstallPromptSeen') === '1') {
+        return false
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    try {
+      localStorage.setItem('helfi:pwaInstallPromptSeen', '1')
+    } catch {
+      // Ignore storage errors
+    }
+
+    setInstallPlatform(platform)
+    setInstallTarget(target)
+    setInstallPromptVisible(true)
+    return true
+  }
+
+  const handleContinueToApp = () => {
+    setInstallPromptVisible(false)
+    try {
+      localStorage.setItem('helfi:pwaInstallPromptSeen', '1')
+    } catch {
+      // Ignore storage errors
+    }
+    window.location.href = installTarget
+  }
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return
+    try {
+      await deferredPrompt.prompt()
+      const choice = await deferredPrompt.userChoice
+      setInstallOutcome(choice.outcome === 'accepted' ? 'accepted' : 'dismissed')
+    } catch {
+      setInstallOutcome('dismissed')
+    }
+  }
 
   useEffect(() => {
     try {
@@ -259,6 +373,7 @@ export default function SignIn() {
     } else {
       // Handle signin via NextAuth credentials
       try {
+        skipAutoRedirectRef.current = true
         // Check for plan parameter to preserve it through auth flow
         const searchParams = new URLSearchParams(window.location.search)
         const planParam = searchParams.get('plan')
@@ -303,13 +418,18 @@ export default function SignIn() {
               console.error('Checkout redirect error:', error)
             }
           }
-          window.location.href = '/onboarding'
+          const nextTarget = '/onboarding'
+          if (maybeShowInstallPrompt(nextTarget)) {
+            return
+          }
+          window.location.href = nextTarget
           return
         } else {
           if (res?.error === 'EMAIL_NOT_VERIFIED') {
             setError('Please verify your email before signing in. Check your inbox or resend the verification email.')
             setShowResendVerification(true)
             setLoading(false)
+            skipAutoRedirectRef.current = false
             return
           }
           setError('Invalid email or password')
@@ -317,10 +437,12 @@ export default function SignIn() {
       } catch (error) {
         console.error('Signin error:', error)
         setError('Signin failed. Please try again.')
+        skipAutoRedirectRef.current = false
         return
       }
     }
     setLoading(false)
+    skipAutoRedirectRef.current = false
   }
 
   return (
@@ -334,6 +456,116 @@ export default function SignIn() {
           setShowResendVerification={setShowResendVerification}
         />
       </Suspense>
+
+      {installPromptVisible && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">Add Helfi to your Home Screen</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  It opens like an app and keeps you signed in.
+                </p>
+              </div>
+              <button
+                onClick={handleContinueToApp}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Skip
+              </button>
+            </div>
+
+            <div className="mt-5">
+              {installPlatform === 'ios' && (
+                <div className="space-y-3 text-sm text-gray-700">
+                  <p className="font-medium text-gray-900">iPhone or iPad steps</p>
+                  <ol className="space-y-2">
+                    <li className="flex gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">1</span>
+                      <span>Tap the Share button in your browser.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">2</span>
+                      <span>Scroll and tap Add to Home Screen.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">3</span>
+                      <span>Tap Add. You are done.</span>
+                    </li>
+                  </ol>
+                </div>
+              )}
+
+              {installPlatform === 'android' && (
+                <div className="space-y-3 text-sm text-gray-700">
+                  <p className="font-medium text-gray-900">Android steps</p>
+                  <ol className="space-y-2">
+                    {deferredPrompt ? (
+                      <>
+                        <li className="flex gap-3">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">1</span>
+                          <span>Tap Install below.</span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">2</span>
+                          <span>Confirm the install prompt.</span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">3</span>
+                          <span>Open Helfi from your Home Screen.</span>
+                        </li>
+                      </>
+                    ) : (
+                      <>
+                        <li className="flex gap-3">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">1</span>
+                          <span>Open the browser menu (three dots).</span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">2</span>
+                          <span>Tap Install app or Add to Home Screen.</span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">3</span>
+                          <span>Confirm the install.</span>
+                        </li>
+                      </>
+                    )}
+                  </ol>
+                </div>
+              )}
+
+              {installOutcome === 'accepted' && (
+                <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                  Installed. You can open Helfi from your Home Screen.
+                </div>
+              )}
+              {installOutcome === 'dismissed' && (
+                <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                  No problem. You can install it anytime from your browser menu.
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3">
+              {installPlatform === 'android' && deferredPrompt && (
+                <button
+                  onClick={handleInstallClick}
+                  className="w-full rounded-lg bg-helfi-green px-4 py-3 text-white transition-colors hover:bg-helfi-green-dark"
+                >
+                  Install app
+                </button>
+              )}
+              <button
+                onClick={handleContinueToApp}
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Continue to app
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 p-4">
         <div className="max-w-md w-full space-y-8">
