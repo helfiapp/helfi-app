@@ -31,6 +31,14 @@ const getInstallPlatform = (): InstallPlatform => {
   return 'other'
 }
 
+const isIOSSafari = () => {
+  if (typeof window === 'undefined') return false
+  const ua = window.navigator.userAgent || ''
+  const isIOS = /iphone|ipad|ipod/i.test(ua)
+  const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios|opios|duckduckgo/i.test(ua)
+  return isIOS && isSafari
+}
+
 const isStandaloneMode = () => {
   if (typeof window === 'undefined') return false
   return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true
@@ -53,6 +61,7 @@ export default function Settings() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [installOutcome, setInstallOutcome] = useState<'accepted' | 'dismissed' | null>(null)
   const [isStandalone, setIsStandalone] = useState(false)
+  const [isSafariIOS, setIsSafariIOS] = useState(false)
   // Prevent "auto-save" effects from overwriting stored values on first load
   const [localPrefsLoaded, setLocalPrefsLoaded] = useState(false)
   const [showPdf, setShowPdf] = useState(false)
@@ -94,6 +103,7 @@ export default function Settings() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     setInstallPlatform(getInstallPlatform())
+    setIsSafariIOS(isIOSSafari())
     setIsStandalone(isStandaloneMode())
 
     const handleBeforeInstallPrompt = (event: Event) => {
@@ -374,19 +384,30 @@ export default function Settings() {
                       <>
                         <p className="font-medium text-gray-900 dark:text-white">iPhone or iPad</p>
                         <ol className="space-y-2">
+                          {!isSafariIOS && (
+                            <li className="flex gap-3">
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">1</span>
+                              <span>In Chrome, open the menu and tap Open in Safari.</span>
+                            </li>
+                          )}
                           <li className="flex gap-3">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">1</span>
-                            <span>Tap the Share button in your browser.</span>
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">{isSafariIOS ? '1' : '2'}</span>
+                            <span>Tap the Share button in Safari.</span>
                           </li>
                           <li className="flex gap-3">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">2</span>
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">{isSafariIOS ? '2' : '3'}</span>
                             <span>Scroll and tap Add to Home Screen.</span>
                           </li>
                           <li className="flex gap-3">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">3</span>
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-helfi-green-light/40 text-xs font-semibold text-helfi-green">{isSafariIOS ? '3' : '4'}</span>
                             <span>Tap Add. You are done.</span>
                           </li>
                         </ol>
+                        {!isSafariIOS && (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                            iOS installs only work from Safari.
+                          </div>
+                        )}
                       </>
                     )}
 
