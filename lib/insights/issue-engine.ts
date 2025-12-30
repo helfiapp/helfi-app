@@ -2360,9 +2360,14 @@ async function emitInsightsTimingSafe(event: {
     const url = base && /^https?:\/\//.test(base)
       ? `${base.replace(/\/$/, '')}/api/analytics`
       : `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://helfi.ai'}/api/analytics`
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const internalSecret = process.env.SCHEDULER_SECRET || ''
+    if (internalSecret) {
+      headers['Authorization'] = `Bearer ${internalSecret}`
+    }
     await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         type: 'insights-timing',
         action: 'insights',
