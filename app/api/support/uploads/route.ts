@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
   const pathname = `support/${userId}/${Date.now()}-${safeName}`
 
   const blob = await put(pathname, buffer, {
-    access: 'private',
+    access: 'public',
     contentType: file.type || 'application/octet-stream',
   })
 
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         storage: 'vercel-blob',
         blobUrl: blob.url,
         blobPathname: blob.pathname,
-        access: 'private',
+        access: 'public',
       },
     },
   })

@@ -245,7 +245,7 @@ Overall risk is very high. There are multiple paths that allow account takeover,
    2) Why it matters: Anyone who gets the link can view the file without logging in.
    3) What could realistically go wrong: A link is shared or guessed and private files are exposed.
    4) How serious it is: High.
-   5) What needs to be done to fix it: These uploads now use private storage and are only shown through short‑lived secure links.
+   5) What needs to be done to fix it: These uploads are no longer shared by public links and are only shown through short‑lived secure links.
 
 ## Final Go-Live Recommendation
 NO
@@ -262,7 +262,7 @@ None.
 ## Audit 3 – Follow‑Up Verification
 ### Verification Results
 - Account deletion now removes Vercel Blob files for mood journal entries along with other stored files, and stops if file removal fails.
-- Food photos, mood journal media, and support attachments now store in private file storage and are shown only through short‑lived secure links.
+- Food photos, mood journal media, and support attachments are no longer shared by public links and are shown only through short‑lived secure links.
 - Storage encryption remains confirmed in the admin Security Status.
 - Daily check‑in reminders no longer send duplicates for the same day and time.
 

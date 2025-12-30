@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     const filename = `${Date.now()}-${crypto.randomUUID()}.${ext}`
     const pathname = `mood-journal/${user.id}/audio/${filename}`
     const blob = await put(pathname, buffer, {
-      access: 'private',
+      access: 'public',
       contentType: audioFile.type || 'audio/webm',
       addRandomSuffix: true,
     })

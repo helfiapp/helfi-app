@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   const pathname = `support/inquiry/${ticketId}/${Date.now()}-${safeName}`
 
   const blob = await put(pathname, buffer, {
-    access: 'private',
+    access: 'public',
     contentType: file.type || 'application/octet-stream',
   })
 
