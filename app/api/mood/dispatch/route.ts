@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { scheduleAllMoodReminders, scheduleMoodReminderWithQStash } from '@/lib/qstash'
-import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 
 export const runtime = 'nodejs'
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     if (!subscriptionRows.length) {
       return NextResponse.json({ error: 'no_subscription' }, { status: 400 })
     }
-    const subscriptions = normalizeSubscriptionList(subscriptionRows[0].subscription)
+    const subscriptions = dedupeSubscriptions(normalizeSubscriptionList(subscriptionRows[0].subscription))
     if (!subscriptions.length) {
       return NextResponse.json({ error: 'no_subscription' }, { status: 400 })
     }

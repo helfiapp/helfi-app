@@ -8,7 +8,7 @@ import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { scheduleHealthTipWithQStash } from '@/lib/qstash'
 import { logAIUsage } from '@/lib/ai-usage-logger'
-import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 
 export const runtime = 'nodejs'
@@ -429,7 +429,7 @@ export async function POST(req: NextRequest) {
       await scheduleHealthTipWithQStash(userId, reminderTime, timezone).catch(() => {})
       return NextResponse.json({ skipped: 'no_subscription' })
     }
-    let subscriptions = normalizeSubscriptionList(subscriptionRows[0].subscription)
+    let subscriptions = dedupeSubscriptions(normalizeSubscriptionList(subscriptionRows[0].subscription))
     if (!subscriptions.length) {
       await scheduleHealthTipWithQStash(userId, reminderTime, timezone).catch(() => {})
       return NextResponse.json({ skipped: 'no_subscription' })

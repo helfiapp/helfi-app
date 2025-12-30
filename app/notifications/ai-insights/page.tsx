@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
+import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
 
 type HealthTipSettings = {
   enabled: boolean
@@ -53,7 +55,10 @@ const fallbackTimezones = [
   'America/Sao_Paulo',
 ]
 
+const HEALTH_TIPS_CACHE_TTL_MS = 5 * 60_000
+
 export default function AiInsightsNotificationsPage() {
+  const { data: session } = useSession()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [enabled, setEnabled] = useState(false)
@@ -66,6 +71,7 @@ export default function AiInsightsNotificationsPage() {
   const [focusSupplements, setFocusSupplements] = useState(true)
   const [focusLifestyle, setFocusLifestyle] = useState(true)
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>(fallbackTimezones)
+  const cacheKey = session?.user?.email ? `health-tips-settings:${session.user.email}` : ''
 
   useEffect(() => {
     try {
@@ -85,6 +91,22 @@ export default function AiInsightsNotificationsPage() {
   }, [])
 
   useEffect(() => {
+    const cached = cacheKey ? readClientCache<HealthTipSettings>(cacheKey) : null
+    if (cached?.data) {
+      const data = cached.data
+      setEnabled(!!data.enabled)
+      setTime1(data.time1 || '11:30')
+      setTime2(data.time2 || '15:30')
+      setTime3(data.time3 || '20:30')
+      setTimezone(data.timezone || 'UTC')
+      setFrequency(Number(data.frequency) || 1)
+      setFocusFood(!!data.focusFood)
+      setFocusSupplements(!!data.focusSupplements)
+      setFocusLifestyle(!!data.focusLifestyle)
+      setLoading(false)
+    }
+    if (cached && isCacheFresh(cached, HEALTH_TIPS_CACHE_TTL_MS)) return
+
     ;(async () => {
       try {
         const res = await fetch('/api/health-tips/settings', { cache: 'no-store' as any })
@@ -99,6 +121,9 @@ export default function AiInsightsNotificationsPage() {
           setFocusFood(!!data.focusFood)
           setFocusSupplements(!!data.focusSupplements)
           setFocusLifestyle(!!data.focusLifestyle)
+          if (cacheKey) {
+            writeClientCache(cacheKey, data)
+          }
         }
       } catch {
         // ignore, defaults will show
@@ -106,7 +131,7 @@ export default function AiInsightsNotificationsPage() {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [cacheKey])
 
   const handleSave = async () => {
     setSaving(true)
@@ -130,6 +155,19 @@ export default function AiInsightsNotificationsPage() {
       if (!res.ok) {
         alert(data?.error || data?.detail || 'Failed to save settings')
         return
+      }
+      if (cacheKey) {
+        writeClientCache(cacheKey, {
+          enabled,
+          time1,
+          time2,
+          time3,
+          timezone,
+          frequency,
+          focusFood,
+          focusSupplements,
+          focusLifestyle,
+        })
       }
       alert('AI insights schedule saved.')
     } catch {

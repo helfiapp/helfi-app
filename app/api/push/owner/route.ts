@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
-import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 
 // Upstash QStash will POST here. This simply reuses our notifyOwner pathway,
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (!subRows.length) {
       return NextResponse.json({ error: 'no_owner_subscription' }, { status: 400 })
     }
-    const subscriptions = normalizeSubscriptionList(subRows[0].subscription)
+    const subscriptions = dedupeSubscriptions(normalizeSubscriptionList(subRows[0].subscription))
     if (!subscriptions.length) {
       return NextResponse.json({ error: 'no_owner_subscription' }, { status: 400 })
     }

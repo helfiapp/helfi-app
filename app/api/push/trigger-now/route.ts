@@ -3,16 +3,35 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
-import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { publishWithQStash } from '@/lib/qstash'
+import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 
 // Manual trigger endpoint - bypasses cron and sends reminder immediately
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const isScheduler = isSchedulerAuthorized(req)
+  if (!isScheduler) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+    const publishResult = await publishWithQStash('/api/push/trigger-now', { userId: user.id })
+    if (!publishResult.ok) {
+      return NextResponse.json({ error: 'Failed to enqueue reminder' }, { status: 500 })
+    }
+    return NextResponse.json({ enqueued: true })
   }
 
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const body = await req.json().catch(() => ({}))
+  const userId = String(body?.userId || '')
+  if (!userId) {
+    return NextResponse.json({ error: 'invalid_payload' }, { status: 400 })
+  }
+  const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   try {
@@ -24,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (!subRows.length) {
       return NextResponse.json({ error: 'No push subscription found' }, { status: 400 })
     }
-    const subscriptions = normalizeSubscriptionList(subRows[0].subscription)
+    const subscriptions = dedupeSubscriptions(normalizeSubscriptionList(subRows[0].subscription))
     if (!subscriptions.length) {
       return NextResponse.json({ error: 'No push subscription found' }, { status: 400 })
     }

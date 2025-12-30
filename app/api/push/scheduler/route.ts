@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
 import crypto from 'crypto'
-import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 // Force dynamic execution - prevent caching for cron jobs
 export const dynamic = 'force-dynamic'
@@ -47,6 +47,10 @@ export async function POST(req: NextRequest) {
   }
   
   console.log('[SCHEDULER] ✅ Authorized - proceeding with notification check')
+
+  if (process.env.QSTASH_TOKEN) {
+    return NextResponse.json({ skipped: 'qstash_enabled' })
+  }
 
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
   const privateKey = process.env.VAPID_PRIVATE_KEY || ''
@@ -252,7 +256,7 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      const subscriptions = normalizeSubscriptionList(r.subscription)
+      const subscriptions = dedupeSubscriptions(normalizeSubscriptionList(r.subscription))
       if (!subscriptions.length) {
         errors.push({ userId: r.userId ?? 'unknown', error: 'no_subscription' })
         continue

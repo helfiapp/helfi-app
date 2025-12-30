@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { scheduleAllActiveReminders } from '@/lib/qstash'
+import { publishWithQStash, scheduleAllActiveReminders } from '@/lib/qstash'
 
 async function ensureCheckinSettingsTable() {
   await prisma.$executeRawUnsafe(`
@@ -188,44 +188,41 @@ export async function POST(req: NextRequest) {
       if (!enabled) {
         return NextResponse.json({ success: true, scheduleResults })
       }
-      const base =
-        process.env.PUBLIC_BASE_URL ||
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
-      if (base) {
-        const now = new Date()
-        const fmt = new Intl.DateTimeFormat('en-GB', {
-          timeZone: timezone,
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        })
-        const parts = fmt.formatToParts(now)
-        const ch = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10)
-        const cm = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10)
-        const currentTotal = ch * 60 + cm
-        const sendWindowMinutes = 5
-        const candidates: string[] = []
-        if (frequency >= 1) candidates.push(time1)
-        if (frequency >= 2) candidates.push(time2)
-        if (frequency >= 3) candidates.push(time3)
-        const schedulerSecret = process.env.SCHEDULER_SECRET || ''
-        for (const t of candidates) {
-          const [hh, mm] = t.split(':').map(v => parseInt(v, 10))
-          const target = hh * 60 + mm
-          let diff = currentTotal - target
-          if (diff < 0) diff += 1440
-          if (diff >= 0 && diff <= sendWindowMinutes) {
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-            if (schedulerSecret) {
-              headers.Authorization = `Bearer ${schedulerSecret}`
-            }
-            await fetch(`${base}/api/push/dispatch`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ userId: user.id, reminderTime: t, timezone }),
-            }).catch(() => {})
-            break
+      const now = new Date()
+      const fmt = new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      })
+      const parts = fmt.formatToParts(now)
+      const ch = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10)
+      const cm = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10)
+      const currentTotal = ch * 60 + cm
+      const sendWindowMinutes = 5
+      const candidates: string[] = []
+      if (frequency >= 1) candidates.push(time1)
+      if (frequency >= 2) candidates.push(time2)
+      if (frequency >= 3) candidates.push(time3)
+      for (const t of candidates) {
+        const [hh, mm] = t.split(':').map(v => parseInt(v, 10))
+        const target = hh * 60 + mm
+        let diff = currentTotal - target
+        if (diff < 0) diff += 1440
+        if (diff >= 0 && diff <= sendWindowMinutes) {
+          const publishResult = await publishWithQStash('/api/push/dispatch', {
+            userId: user.id,
+            reminderTime: t,
+            timezone,
+          }).catch(() => ({ ok: false }))
+          if (!publishResult?.ok) {
+            console.warn('[CHECKINS] Failed to enqueue immediate reminder via QStash', {
+              userId: user.id,
+              reminderTime: t,
+              reason: publishResult?.reason,
+            })
           }
+          break
         }
       }
     } catch {}

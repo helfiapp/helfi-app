@@ -7,6 +7,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import { UserIcon } from '@heroicons/react/24/outline'
+import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
+
+const AFFILIATE_CACHE_TTL_MS = 10 * 60_000
 
 interface PageHeaderProps {
   title: string
@@ -19,6 +22,7 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
   const { profileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null)
+  const affiliateCacheKey = session?.user?.email ? `affiliate-menu:${session.user.email}` : ''
 
   const hasProfileImage = !!(profileImage || session?.user?.image)
   const userImage = (profileImage || session?.user?.image || '') as string
@@ -46,12 +50,21 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
   }
 
   useEffect(() => {
-    if (!session?.user?.email) {
+    if (!affiliateCacheKey) {
       setAffiliateMenu(null)
       return
     }
     let cancelled = false
     setAffiliateMenu({ label: 'Become an Affiliate', href: '/affiliate/apply' })
+    const cached = affiliateCacheKey ? readClientCache<{ label: string; href: string }>(affiliateCacheKey) : null
+    if (cached?.data) {
+      setAffiliateMenu(cached.data)
+    }
+    if (cached && isCacheFresh(cached, AFFILIATE_CACHE_TTL_MS)) {
+      return () => {
+        cancelled = true
+      }
+    }
     const load = async () => {
       try {
         const res = await fetch('/api/affiliate/application', { cache: 'no-store' })
@@ -67,7 +80,12 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
             ? { label: 'Affiliate Application', href: '/affiliate/apply' }
             : { label: 'Become an Affiliate', href: '/affiliate/apply' }
 
-        if (!cancelled) setAffiliateMenu(menu)
+        if (!cancelled) {
+          setAffiliateMenu(menu)
+          if (affiliateCacheKey) {
+            writeClientCache(affiliateCacheKey, menu)
+          }
+        }
       } catch {
         // ignore
       }
@@ -76,7 +94,7 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
     return () => {
       cancelled = true
     }
-  }, [session?.user?.email])
+  }, [affiliateCacheKey])
 
   return (
     <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">

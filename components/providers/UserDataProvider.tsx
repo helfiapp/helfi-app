@@ -1,7 +1,8 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
+import { clearClientCache, isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
 
 interface UserData {
   profileImage?: string
@@ -24,6 +25,8 @@ interface UserDataContextType {
 
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined)
 
+const USER_DATA_CACHE_TTL_MS = 5 * 60_000
+
 export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
   const [userData, setUserData] = useState<UserData | null>(null)
@@ -34,14 +37,29 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   // render a professional icon fallback when no real image exists.
   const profileImage = userData?.profileImage || (session?.user?.image ?? '')
 
+  const userEmail = session?.user?.email || ''
+  const cacheKey = useMemo(() => (userEmail ? `user-data:${userEmail}` : ''), [userEmail])
+
   // Load data once and cache it
-  const loadData = async () => {
+  const loadData = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
     if (!session) return
 
+    const cached = cacheKey ? readClientCache<UserData>(cacheKey) : null
+    const hadCached = !!cached?.data
+    if (cached?.data) {
+      setUserData(cached.data)
+    }
+
+    if (!force && cached && isCacheFresh(cached, USER_DATA_CACHE_TTL_MS)) {
+      setIsLoading(false)
+      return
+    }
+
+    if (!hadCached) {
+      setIsLoading(true)
+    }
+
     try {
-      console.log('🚀 UserDataProvider: Loading user data...')
-      const startTime = Date.now()
-      
       const response = await fetch('/api/user-data', {
         cache: 'no-cache',
         headers: {
@@ -51,10 +69,12 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       
       if (response.ok) {
         const result = await response.json()
-        console.log(`🚀 UserDataProvider: Data loaded in ${Date.now() - startTime}ms`)
         
         if (result.data) {
           setUserData(result.data)
+          if (cacheKey) {
+            writeClientCache(cacheKey, result.data)
+          }
         }
       }
     } catch (error) {
@@ -62,22 +82,33 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [cacheKey, session])
 
   // Refresh data
-  const refreshData = async () => {
-    setIsLoading(true)
-    await loadData()
-  }
+  const refreshData = useCallback(async () => {
+    await loadData({ force: true })
+  }, [loadData])
 
   // Update user data
   const updateUserData = (newData: Partial<UserData>) => {
-    setUserData(prev => prev ? { ...prev, ...newData } : newData as UserData)
+    setUserData(prev => {
+      const next = prev ? { ...prev, ...newData } : (newData as UserData)
+      if (cacheKey) {
+        writeClientCache(cacheKey, next)
+      }
+      return next
+    })
   }
 
   // Update profile image specifically
   const updateProfileImage = (image: string) => {
-    setUserData(prev => prev ? { ...prev, profileImage: image } : { profileImage: image })
+    setUserData(prev => {
+      const next = prev ? { ...prev, profileImage: image } : ({ profileImage: image } as UserData)
+      if (cacheKey) {
+        writeClientCache(cacheKey, next)
+      }
+      return next
+    })
   }
 
   // Load data on mount and session change
@@ -88,8 +119,9 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     } else {
       setUserData(null)
       setIsLoading(false)
+      clearClientCache('user-data:')
     }
-  }, [session, status])
+  }, [session, status, loadData])
 
   // Allow other parts of the app to force a refresh (e.g., after insights updates)
   useEffect(() => {
@@ -98,7 +130,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     }
     window.addEventListener('userData:refresh', handler)
     return () => window.removeEventListener('userData:refresh', handler)
-  }, [])
+  }, [refreshData])
 
   const value: UserDataContextType = {
     userData,

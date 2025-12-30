@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import PageHeader from '@/components/PageHeader'
+import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
 
 const baseTimezones = [
   'UTC','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Stockholm','Europe/Athens',
@@ -9,6 +11,8 @@ const baseTimezones = [
   'Australia/Perth','Australia/Adelaide','Australia/Melbourne','Australia/Sydney','Pacific/Auckland',
   'America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Toronto','America/Vancouver','America/Mexico_City','America/Bogota','America/Sao_Paulo'
 ]
+
+const CHECKINS_CACHE_TTL_MS = 5 * 60_000
 
 function normalizeTime(input: string): string {
   if (!input) return '00:00'
@@ -36,6 +40,7 @@ function normalizeTime(input: string): string {
 }
 
 export default function HealthReminderSettingsPage() {
+  const { data: session } = useSession()
   const [enabled, setEnabled] = useState(true)
   const [time1, setTime1] = useState('12:30')
   const [time2, setTime2] = useState('18:30')
@@ -44,8 +49,22 @@ export default function HealthReminderSettingsPage() {
   const [frequency, setFrequency] = useState(3)
   const [savingTimes, setSavingTimes] = useState(false)
   const [loadingSettings, setLoadingSettings] = useState(true)
+  const cacheKey = session?.user?.email ? `checkins-settings:${session.user.email}` : ''
 
   useEffect(() => {
+    const cached = cacheKey ? readClientCache<any>(cacheKey) : null
+    if (cached?.data) {
+      const data = cached.data
+      if (typeof data.enabled === 'boolean') setEnabled(data.enabled)
+      if (data.time1) setTime1(normalizeTime(data.time1))
+      if (data.time2) setTime2(normalizeTime(data.time2))
+      if (data.time3) setTime3(normalizeTime(data.time3))
+      if (data.timezone) setTz(String(data.timezone))
+      if (data.frequency !== undefined) setFrequency(data.frequency)
+      setLoadingSettings(false)
+    }
+    if (cached && isCacheFresh(cached, CHECKINS_CACHE_TTL_MS)) return
+
     ;(async () => {
       try {
         const res = await fetch('/api/checkins/settings', { cache: 'no-store' as any })
@@ -57,6 +76,9 @@ export default function HealthReminderSettingsPage() {
           if (data.time3) setTime3(normalizeTime(data.time3))
           if (data.timezone) setTz(String(data.timezone))
           if (data.frequency !== undefined) setFrequency(data.frequency)
+          if (cacheKey) {
+            writeClientCache(cacheKey, data)
+          }
         }
       } catch (e) {
         console.error('Failed to load reminder settings', e)
@@ -64,7 +86,7 @@ export default function HealthReminderSettingsPage() {
         setLoadingSettings(false)
       }
     })()
-  }, [])
+  }, [cacheKey])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -190,6 +212,16 @@ export default function HealthReminderSettingsPage() {
                       body: JSON.stringify({ enabled, time1, time2, time3, timezone: tz, frequency })
                     })
                     if (res.ok) {
+                      if (cacheKey) {
+                        writeClientCache(cacheKey, {
+                          enabled,
+                          time1,
+                          time2,
+                          time3,
+                          timezone: tz,
+                          frequency,
+                        })
+                      }
                       alert('Reminder times saved successfully!')
                     } else {
                       const data = await res.json().catch(() => ({}))

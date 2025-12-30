@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import PageHeader from '@/components/PageHeader'
+import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
 
 const baseTimezones = [
   'UTC','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Stockholm','Europe/Athens',
@@ -9,6 +11,8 @@ const baseTimezones = [
   'Australia/Perth','Australia/Adelaide','Australia/Melbourne','Australia/Sydney','Pacific/Auckland',
   'America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Toronto','America/Vancouver','America/Mexico_City','America/Bogota','America/Sao_Paulo'
 ]
+
+const MOOD_CACHE_TTL_MS = 5 * 60_000
 
 function normalizeTime(input: string): string {
   if (!input) return '00:00'
@@ -36,6 +40,7 @@ function normalizeTime(input: string): string {
 }
 
 export default function MoodReminderSettingsPage() {
+  const { data: session } = useSession()
   const [enabled, setEnabled] = useState(false)
   const [frequency, setFrequency] = useState(1)
   const [time1, setTime1] = useState('20:00')
@@ -46,6 +51,7 @@ export default function MoodReminderSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [sendingNow, setSendingNow] = useState(false)
   const [deviceTimezone, setDeviceTimezone] = useState('UTC')
+  const cacheKey = session?.user?.email ? `mood-reminders:${session.user.email}` : ''
 
   useEffect(() => {
     try {
@@ -57,6 +63,19 @@ export default function MoodReminderSettingsPage() {
   }, [])
 
   useEffect(() => {
+    const cached = cacheKey ? readClientCache<any>(cacheKey) : null
+    if (cached?.data) {
+      const data = cached.data
+      setEnabled(!!data.enabled)
+      setFrequency(Number(data.frequency) || 1)
+      setTime1(normalizeTime(data.time1 || '20:00'))
+      setTime2(normalizeTime(data.time2 || '12:00'))
+      setTime3(normalizeTime(data.time3 || '18:00'))
+      setTimezone((data.timezone && String(data.timezone).trim()) || deviceTimezone || 'UTC')
+      setLoading(false)
+    }
+    if (cached && isCacheFresh(cached, MOOD_CACHE_TTL_MS)) return
+
     ;(async () => {
       try {
         const res = await fetch('/api/mood/reminders', { cache: 'no-store' as any })
@@ -68,6 +87,9 @@ export default function MoodReminderSettingsPage() {
           setTime2(normalizeTime(data.time2 || '12:00'))
           setTime3(normalizeTime(data.time3 || '18:00'))
           setTimezone((data.timezone && String(data.timezone).trim()) || deviceTimezone || 'UTC')
+          if (cacheKey) {
+            writeClientCache(cacheKey, data)
+          }
         }
       } catch (e) {
         console.error('Failed to load mood reminder settings', e)
@@ -75,7 +97,7 @@ export default function MoodReminderSettingsPage() {
         setLoading(false)
       }
     })()
-  }, [deviceTimezone])
+  }, [cacheKey, deviceTimezone])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -209,6 +231,16 @@ export default function MoodReminderSettingsPage() {
                         }),
                       })
                       if (res.ok) {
+                        if (cacheKey) {
+                          writeClientCache(cacheKey, {
+                            enabled,
+                            frequency,
+                            time1,
+                            time2,
+                            time3,
+                            timezone,
+                          })
+                        }
                         alert('Mood reminders saved successfully!')
                       } else {
                         const data = await res.json().catch(() => ({}))

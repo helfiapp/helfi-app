@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
-import { normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 
 /**
  * Owner Notification System
@@ -230,7 +230,7 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
       // Silently fail - owner hasn't subscribed yet
       return
     }
-    const subscriptions = normalizeSubscriptionList(subscriptionInfo.subscription)
+    const subscriptions = dedupeSubscriptions(normalizeSubscriptionList(subscriptionInfo.subscription))
     if (!subscriptions.length) {
       return
     }
