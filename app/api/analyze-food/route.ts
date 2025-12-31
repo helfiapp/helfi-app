@@ -1382,7 +1382,8 @@ const enrichItemsWithDatabaseIfOutlier = async (
     if (!allowIncrease) {
       const aiIsGuess = item?.isGuess === true;
       const aiHigherThanDb = aiPer100 > dbPer100;
-      if (!aiIsGuess && !aiHigherThanDb) continue;
+      const extremeLow = aiPer100 < dbPer100 * 0.65;
+      if (!aiIsGuess && !aiHigherThanDb && !extremeLow) continue;
     }
 
     const scale = weight / candidateWeight;
