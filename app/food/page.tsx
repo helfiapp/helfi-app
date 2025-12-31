@@ -12679,8 +12679,8 @@ Please add nutritional information manually if needed.`);
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
                     <div className="mb-6 space-y-2">
-                      <div className="mb-1 space-y-2">
-                        <div className="flex items-center justify-between gap-3">
+                      <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
                           <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
                           <div className="flex items-center gap-2 text-xs text-gray-500">
                             <span>Rate this result</span>
@@ -12710,19 +12710,17 @@ Please add nutritional information manually if needed.`);
                             </button>
                           </div>
                         </div>
-                        <div className="flex justify-end">
-                          <button
-                            onClick={(e) =>
-                              openAddIngredientModalFromMenu(e, {
-                                mode: 'analysis',
-                              })
-                            }
-                            className="text-sm px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-                            title="Add a missing ingredient"
-                          >
-                            + Add ingredient
-                          </button>
-                        </div>
+                        <button
+                          onClick={(e) =>
+                            openAddIngredientModalFromMenu(e, {
+                              mode: 'analysis',
+                            })
+                          }
+                          className="text-sm px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                          title="Add a missing ingredient"
+                        >
+                          + Add ingredient
+                        </button>
                       </div>
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
