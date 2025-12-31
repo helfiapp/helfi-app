@@ -1291,16 +1291,32 @@ const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: nu
   }
   if (candidatesWithMetrics.length === 0) return null;
 
+  const per100Values = candidatesWithMetrics.map((entry) => entry.per100).sort((a, b) => a - b);
+  const medianPer100 =
+    per100Values.length === 0
+      ? null
+      : per100Values.length % 2 === 1
+      ? per100Values[Math.floor(per100Values.length / 2)]
+      : (per100Values[per100Values.length / 2 - 1] + per100Values[per100Values.length / 2]) / 2;
+
   const aiPer100Safe = Number.isFinite(Number(aiPer100)) ? Number(aiPer100) : null;
+  const aiTooLow = aiPer100Safe && medianPer100 ? aiPer100Safe < medianPer100 * 0.85 : false;
+  const aiTooHigh = aiPer100Safe && medianPer100 ? aiPer100Safe > medianPer100 * 1.2 : false;
+
   let pool = candidatesWithMetrics;
-  if (aiPer100Safe && aiPer100Safe > 0) {
+  if (aiPer100Safe && aiPer100Safe > 0 && !aiTooLow) {
     const lowerOrNear = candidatesWithMetrics.filter((entry) => entry.per100 <= aiPer100Safe * 1.05);
     if (lowerOrNear.length > 0) {
       pool = lowerOrNear;
     }
   }
 
-  pool.sort((a, b) => b.score - a.score);
+  pool.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (aiTooLow) return b.per100 - a.per100;
+    if (aiTooHigh) return a.per100 - b.per100;
+    return b.per100 - a.per100;
+  });
   return { candidate: pool[0].candidate, weight: pool[0].weight, score: pool[0].score };
 };
 

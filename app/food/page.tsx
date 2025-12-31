@@ -15147,7 +15147,10 @@ Please add nutritional information manually if needed.`);
 
                     return mealCategories.map((cat) => {
                       const entries = entriesByCategory[cat.key] || []
-                      const totals = entries.reduce(
+                      const visibleEntries = Array.isArray(entries)
+                        ? entries.filter((entry) => !isEntryDeleted(entry))
+                        : []
+                      const totals = visibleEntries.reduce(
                         (acc, entry) => {
                           const t = getEntryTotals(entry)
                           acc.calories += Number(t.calories || 0)
@@ -15831,10 +15834,10 @@ Please add nutritional information manually if needed.`);
                           </div>
                           {expandedCategories[cat.key] && (
                             <div className="border-t border-gray-100 bg-white space-y-0 divide-y divide-gray-100 px-0 sm:px-6 pb-0 overflow-visible">
-                              {entries.length === 0 ? (
+                              {visibleEntries.length === 0 ? (
                                 <div className="text-sm text-gray-500 px-1 py-3 text-center">No entries in this category yet.</div>
                               ) : (
-                                entries
+                                visibleEntries
                                   .slice()
                                   .sort((a: any, b: any) => (b?.id || 0) - (a?.id || 0))
                                   .map((food) => renderEntryCard(food))
