@@ -202,6 +202,24 @@ the user.
 - Leaving Health Setup via the left menu must still trigger the “Update Insights / Add more” prompt when there are unsaved changes.
 - Do NOT allow silent navigation away from Health Setup when unsaved changes exist.
 
+### 2.7 Weekly 7‑Day Health Report (Jan 2026 – Locked)
+
+**Protected files:**
+- `lib/weekly-health-report.ts`
+- `lib/qstash.ts`
+- `app/api/reports/weekly/run/route.ts`
+- `app/api/reports/weekly/status/route.ts`
+- `app/api/reports/weekly/dispatch/route.ts`
+- `components/WeeklyReportReadyModal.tsx`
+
+**Guard rails:**
+- Reports are generated **in the background** and should not run on every page visit or whenever the app is opened.
+- The **ready alert is scheduled for 12:00 pm in the user’s time zone**. Do not change this timing without explicit user approval.
+- Time zone is resolved in this order: Check‑in settings → Mood reminders → AI tips → fallback UTC. Do not reorder without approval.
+- The popup should appear **at most once per day** until the report is viewed or dismissed.
+- If the report is locked (no credits), the popup CTA must send users to **Billing**, not to the report page.
+- Email + push are sent **only once per report** and are triggered by QStash; do not re‑introduce repeated sends.
+
 ---
 
 ## 3. Branding Assets (Logos & Icons)
@@ -418,6 +436,19 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - Tap the **same “+” again** to close it.
 - Do **not** change this to “tap outside to close” or any other behaviour.
 - The “Other/+” panel must remain scrollable so all options are reachable on mobile.
+
+### 3.7 Food Diary Manual Refresh Only (Jan 2026 – Locked)
+
+**Protected file:**
+- `app/food/page.tsx`
+
+**Guard rails:**
+- Do **not** auto‑refresh when:
+  - The user changes the diary date.
+  - The tab regains focus.
+  - The page becomes visible again.
+- Refreshing should happen **only** when the user manually pulls down (pull‑to‑refresh) or taps the refresh button.
+- Do not re‑enable background refresh without explicit user approval.
 - **Auto-scroll is required on mobile:** when a category “+” is opened, scroll that category row into view (without covering or moving the “+”) so the entire add panel is visible. Do not remove or alter this scroll behavior.
 
 ### 3.7 Food Diary Deletes & Snapshot Sync (Dec 2025 – Locked)
