@@ -910,6 +910,48 @@ If changes are requested, explain them to the user first, get explicit approval,
 - Diet warnings must show for meals added by analysis, favorites, and copy/duplicate.
 - Diet-based macro targets must remain consistent with selected diets; when multiple diets are selected, apply the strictest carb cap and the highest protein floor.
 
+---
+
+## 13. Pre-Launch Audit Fixes (Locked)
+
+**Primary reference:** `AUDIT.md`
+
+Anything marked ✅ in the audit is **locked**. Do not change, loosen, or bypass these protections unless the user explicitly approves it in writing.
+
+### Critical fixes that must stay locked
+- Direct email-only sign-in is disabled. Do not reintroduce login paths that do not require verified credentials.
+- Admin access requires server-side checks. Do not reintroduce browser-only passwords or shared admin keys.
+- Health files are private. Do not reintroduce public file links or direct public access.
+- Debug routes must never expose AI keys or secrets. Keep these locked down or removed.
+- All AI features must charge credits before returning results (or use the approved free-use counters). Do not return results before charging.
+
+### High priority fixes that must stay locked
+- Paid access is granted only when payment is confirmed. Do not keep premium access active after failed or overdue payments.
+- Refunds/chargebacks must revoke credits and access. Do not leave paid credits active after a refund.
+- Credit charges must be atomic. Do not allow concurrent requests to overspend credits.
+- Scheduler/cron routes must require authentication (secret or signature). Do not allow public access.
+- Credit receipts must be tied to the buyer. Do not allow a receipt link to be reused by another account.
+- Analytics data must require authentication. Do not allow public read/write access.
+
+### Medium and low priority fixes that must stay locked
+- Session lifetime must not be multi-year, and admin logout/revoke must remain available.
+- No fallback default secrets in production. Missing secrets must be flagged, not silently replaced.
+- Rate limits must be durable (not in-memory only). Do not remove the shared limiter.
+- Paid actions must not be blocked by overly strict credit estimates; keep the safe cap in place.
+- Critical error alerts must continue to fire (not just console logs).
+- Analytics storage must be durable (not in-memory only).
+- Free-credit rules must remain consistent across all AI features.
+
+### Profitability-related fixes that must stay locked
+- AI features must never run for free unless explicitly allowed by the free-credit counters.
+- Streaming responses must not complete unless charging succeeded.
+- Full insights regeneration pricing must not be lowered without user approval.
+
+If you touch any area related to these fixes, you must:
+1) Explain the change in plain English to the user,  
+2) Get explicit approval, and  
+3) Re-test the affected flows before deployment.
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
