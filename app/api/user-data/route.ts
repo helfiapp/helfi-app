@@ -1447,6 +1447,15 @@ export async function POST(request: NextRequest) {
 
       insightsUpdateRequired = isFullOnboarding || changedTypes.length > 0
 
+      if (isFullOnboarding) {
+        try {
+          const { markWeeklyReportOnboardingComplete } = await import('@/lib/weekly-health-report')
+          await markWeeklyReportOnboardingComplete(user.id)
+        } catch (error) {
+          console.warn('⚠️ Failed to start weekly health report schedule:', error)
+        }
+      }
+
       if (insightsAutoEnabled) {
         // Charge credits and generate insights automatically (legacy behaviour; now gated)
         if (isFullOnboarding) {

@@ -114,7 +114,7 @@ export default function LowCreditsModal({
             .
           </p>
           <p className="text-gray-600 text-center mb-8">
-            Purchase more credits or upgrade your subscription to continue using {featureName}.
+            Purchase more credits or upgrade your subscription to continue using {featureName} and keep your 7-day health reports coming.
           </p>
 
           {/* Action buttons */}

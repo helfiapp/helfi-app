@@ -507,6 +507,12 @@ export async function POST(request: NextRequest) {
     await bestEffort('InsightsUserState.deleteMany', () =>
       prisma.$executeRawUnsafe(`DELETE FROM "InsightsUserState" WHERE "userId" = $1`, user.id)
     )
+    await bestEffort('WeeklyHealthReports.deleteMany', () =>
+      prisma.$executeRawUnsafe(`DELETE FROM WeeklyHealthReports WHERE userId = $1`, user.id)
+    )
+    await bestEffort('WeeklyHealthReportState.deleteMany', () =>
+      prisma.$executeRawUnsafe(`DELETE FROM WeeklyHealthReportState WHERE userId = $1`, user.id)
+    )
     await bestEffort('AnalyticsEvent.deleteMany', () =>
       prisma.$executeRawUnsafe(
         `DELETE FROM "AnalyticsEvent" WHERE "userId" = $1 OR "userId" = $2`,

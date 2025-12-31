@@ -114,7 +114,7 @@ const CreditPurchaseModal: React.FC<CreditPurchaseModalProps> = ({
                 Upgrade to Premium
               </h4>
               <p className="text-sm text-blue-800 mb-3">
-                Get monthly credits plus unlimited additional credits. Perfect for both food analysis and interaction analysis.
+                Get monthly credits, the weekly 7-day health report, and full access to AI features.
               </p>
               <button
                 onClick={() => handlePurchase('premium')}

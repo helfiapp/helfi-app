@@ -25,6 +25,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const [isNavigating, startTransition] = useTransition()
   const [isUpdating, setIsUpdating] = useState(false)
   const [updateMessage, setUpdateMessage] = useState<string | null>(null)
+  const [weeklyStatus, setWeeklyStatus] = useState<any>(null)
   const lastLoaded = generatedAt
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
@@ -42,6 +43,20 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       }
     })
   }, [issues, router])
+
+  useEffect(() => {
+    let mounted = true
+    fetch('/api/reports/weekly/status', { method: 'GET' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!mounted || !data) return
+        setWeeklyStatus(data)
+      })
+      .catch(() => {})
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   async function handleUpdateInsights() {
     if (isUpdating) return
@@ -145,6 +160,53 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-10 pb-24 md:pb-10 space-y-10">
+        <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">7-day health report</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                We build this report automatically every 7 days based on how you use Helfi.
+              </p>
+              {weeklyStatus?.reportReady && (
+                <p className="text-sm text-emerald-700 mt-2">Your latest report is ready to view.</p>
+              )}
+              {weeklyStatus?.reportLocked && (
+                <p className="text-sm text-amber-700 mt-2">
+                  Your latest report is ready, but it needs a subscription or top-up credits to unlock.
+                </p>
+              )}
+              {!weeklyStatus?.reportReady && !weeklyStatus?.reportLocked && weeklyStatus?.nextReportDueAt && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Next report due {new Date(weeklyStatus.nextReportDueAt).toLocaleDateString()}.
+                </p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              {weeklyStatus?.reportReady ? (
+                <Link
+                  href="/insights/weekly-report"
+                  className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
+                >
+                  View report
+                </Link>
+              ) : weeklyStatus?.reportLocked ? (
+                <Link
+                  href="/billing"
+                  className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Unlock report
+                </Link>
+              ) : (
+                <Link
+                  href="/onboarding?step=1"
+                  className="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Update Health Setup
+                </Link>
+              )}
+            </div>
+          </div>
+        </section>
         {issues.length === 0 ? (
           !onboardingComplete ? (
             <EmptyState

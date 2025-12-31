@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import { MouseEvent, ReactNode, useEffect, useState } from 'react'
 import UsageMeter from '@/components/UsageMeter'
 import SupportChatWidget from '@/components/support/SupportChatWidget'
+import WeeklyReportReadyModal from '@/components/WeeklyReportReadyModal'
 
 // Desktop Sidebar Navigation Component  
 function DesktopSidebar({
@@ -484,6 +485,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           )}
           {children}
           <SupportChatWidget />
+          <WeeklyReportReadyModal />
         </div>
       </div>
     )

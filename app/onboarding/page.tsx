@@ -5542,18 +5542,21 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
 }
 
 function AIInsightsStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
-  const [wantInsights, setWantInsights] = useState(initial?.wantInsights || '');
+  const wantInsights = initial?.wantInsights || 'yes';
   return (
     <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded shadow">
-      <h2 className="text-2xl font-bold mb-4">Want AI-generated insights in 7 days?</h2>
-      <p className="mb-4 text-gray-600">Our AI will analyze trends and send a custom health report.</p>
-      <div className="flex gap-4 mb-6">
-        <button className={`flex-1 p-4 rounded border ${wantInsights === 'yes' ? 'bg-helfi-green text-white' : 'border-helfi-green'}`} onClick={() => setWantInsights('yes')}>Yes</button>
-        <button className={`flex-1 p-4 rounded border ${wantInsights === 'no' ? 'bg-helfi-green text-white' : 'border-helfi-green'}`} onClick={() => setWantInsights('no')}>No Thanks</button>
+      <h2 className="text-2xl font-bold mb-4">Your 7-day health report</h2>
+      <p className="mb-4 text-gray-600">
+        Once you use Helfi for 7 days, we automatically generate a detailed health report in the background.
+        You will get a notification when it is ready.
+      </p>
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800 mb-6">
+        To get the best report, try to use these features during the week: Food Diary, Mood Tracker, Daily Check-ins,
+        Symptom Analyzer, and Health Setup updates.
       </div>
       <div className="flex justify-between">
         <button className="btn-secondary" onClick={onBack}>Back</button>
-        <button className="btn-primary" disabled={!wantInsights} onClick={() => onNext({ wantInsights })}>Next</button>
+        <button className="btn-primary" onClick={() => onNext({ wantInsights })}>Continue</button>
       </div>
     </div>
   );
@@ -5716,7 +5719,7 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
             )}
           </div>
         )}
-        <div><b>AI Insights:</b> {data.wantInsights === 'yes' ? 'Yes' : 'No'}</div>
+        <div><b>7-day health report:</b> Generated automatically after 7 days of activity.</div>
       </div>
 
       {/* Modern Loading Progress Bar */}

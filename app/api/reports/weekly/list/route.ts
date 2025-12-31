@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { listWeeklyReports } from '@/lib/weekly-health-report'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -8,12 +11,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ enabled: false, reports: [] }, { status: 200 })
   }
 
-  // Mock weekly reports list
-  const reports = [
-    { id: 'w1', weekStart: '2025-08-25', summary: 'Energy improved; hydration low; magnesium helpful', createdAt: new Date().toISOString() },
-  ]
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const reports = await listWeeklyReports(session.user.id, 8)
 
   return NextResponse.json({ enabled: true, reports, preview }, { status: 200 })
 }
-
 
