@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { listDueWeeklyReportUsers } from '@/lib/weekly-health-report'
+import { backfillWeeklyReportState, listDueWeeklyReportUsers } from '@/lib/weekly-health-report'
 import { publishWithQStash } from '@/lib/qstash'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  await backfillWeeklyReportState(50)
   const dueUsers = await listDueWeeklyReportUsers(20)
   if (dueUsers.length === 0) {
     return NextResponse.json({ processed: 0, scheduled: 0 })

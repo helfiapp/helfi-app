@@ -355,6 +355,39 @@ export async function listDueWeeklyReportUsers(limit = 25): Promise<Array<{ user
   }
 }
 
+export async function backfillWeeklyReportState(limit = 50) {
+  await ensureWeeklyReportTables()
+  const now = new Date()
+  const nextDueAt = getNextDueAt(now).toISOString()
+  try {
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT u.id AS userId
+       FROM "User" u
+       WHERE u.gender IS NOT NULL
+         AND u.weight IS NOT NULL
+         AND u.height IS NOT NULL
+         AND EXISTS (
+           SELECT 1 FROM "HealthGoal" g
+           WHERE g."userId" = u.id AND g.name NOT LIKE '__%'
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM WeeklyHealthReportState s WHERE s.userId = u.id
+         )
+       LIMIT $1`,
+      limit
+    )
+    for (const row of rows) {
+      await upsertWeeklyReportState(row.userId, {
+        onboardingCompletedAt: now.toISOString(),
+        nextReportDueAt: nextDueAt,
+        lastStatus: 'scheduled',
+      })
+    }
+  } catch (error) {
+    console.warn('[weekly-report] Failed to backfill state', error)
+  }
+}
+
 export async function updateWeeklyReportNotification(
   userId: string,
   reportId: string,
