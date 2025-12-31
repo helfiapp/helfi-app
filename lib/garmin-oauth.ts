@@ -109,20 +109,22 @@ export async function refreshGarminTokens(refreshToken: string) {
   return json
 }
 
-export async function fetchGarminUserId(accessToken: string): Promise<GarminUserInfo> {
+export async function fetchGarminUserId(
+  accessToken: string,
+): Promise<GarminUserInfo & { status?: number }> {
   const baseUrl = getGarminApiBaseUrl()
   const resp = await fetch(`${baseUrl}/user/id`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   if (!resp.ok) {
     console.warn('⚠️ Garmin user id fetch failed', resp.status, await resp.text())
-    return { userId: null }
+    return { userId: null, status: resp.status }
   }
   try {
     const data = (await resp.json()) as { userId?: string }
-    return { userId: data.userId || null }
+    return { userId: data.userId || null, status: resp.status }
   } catch {
-    return { userId: null }
+    return { userId: null, status: resp.status }
   }
 }
 

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { deregisterGarminUser } from '@/lib/garmin-oauth'
+import { deregisterGarminUser, fetchGarminUserId } from '@/lib/garmin-oauth'
 import { ensureGarminSchema } from '@/lib/garmin-db'
 
 export const dynamic = 'force-dynamic'
@@ -22,6 +22,23 @@ export async function GET() {
     },
     select: { providerAccountId: true, access_token: true, userId: true },
   })
+
+  let tokenValid = true
+  if (account) {
+    if (!account.access_token) {
+      tokenValid = false
+    } else {
+      try {
+        const tokenCheck = await fetchGarminUserId(account.access_token)
+        const status = typeof tokenCheck?.status === 'number' ? tokenCheck.status : null
+        if (status === 401 || status === 403) {
+          tokenValid = false
+        }
+      } catch {
+        // Keep existing status on transient failures.
+      }
+    }
+  }
 
   let webhookCount = 0
   let lastWebhookAt: string | null = null
@@ -96,7 +113,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    connected: !!account,
+    connected: !!account && tokenValid,
     garminUserId: account?.providerAccountId || null,
     webhookCount,
     lastWebhookAt,

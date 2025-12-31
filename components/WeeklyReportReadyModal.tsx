@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 
 type WeeklyStatus = {
   reportId: string | null
+  status: string | null
   showPopup: boolean
   summary: string | null
   periodStart: string | null
@@ -50,6 +51,7 @@ export default function WeeklyReportReadyModal() {
   if (!isOpen || !status?.reportId) return null
 
   const dataWarning = status?.dataSummary?.dataWarning as string | undefined
+  const isLocked = status?.status === 'LOCKED'
 
   const handleView = async () => {
     await fetch('/api/reports/weekly/notify', {
@@ -58,7 +60,7 @@ export default function WeeklyReportReadyModal() {
       body: JSON.stringify({ reportId: status.reportId, action: 'viewed' }),
     }).catch(() => {})
     setIsOpen(false)
-    router.push('/insights/weekly-report')
+    router.push(isLocked ? '/billing' : '/insights/weekly-report')
   }
 
   const handleDontShow = async () => {
@@ -75,7 +77,9 @@ export default function WeeklyReportReadyModal() {
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Your 7-day health report is ready</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {isLocked ? 'Your 7-day health report is ready to unlock' : 'Your 7-day health report is ready'}
+            </h2>
             {status.periodStart && status.periodEnd && (
               <p className="text-xs text-gray-500 mt-1">
                 {status.periodStart} to {status.periodEnd}
@@ -92,7 +96,9 @@ export default function WeeklyReportReadyModal() {
         </div>
 
         <p className="text-sm text-gray-600 mt-4">
-          Open the report to see what&apos;s working, what to focus on next, and what to avoid this week.
+          {isLocked
+            ? 'Unlock your report to see what is working, what to focus on next, and what to avoid this week.'
+            : 'Open the report to see what is working, what to focus on next, and what to avoid this week.'}
         </p>
         {dataWarning && (
           <div className="mt-4 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800">
@@ -105,7 +111,7 @@ export default function WeeklyReportReadyModal() {
             onClick={handleView}
             className="w-full rounded-lg bg-helfi-green px-4 py-2 text-sm font-semibold text-white hover:bg-helfi-green/90"
           >
-            View report
+            {isLocked ? 'Unlock report' : 'View report'}
           </button>
           <button
             onClick={() => setIsOpen(false)}

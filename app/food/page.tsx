@@ -517,7 +517,7 @@ function TargetRing({ label, valueLabel, percent, tone, color }: RingProps) {
         </svg>
         {/* Center value */}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-xl font-bold text-gray-900">{mainValue}</div>
+          <div className="text-xl font-bold text-gray-900 leading-[1.15] pb-0.5">{mainValue}</div>
           {unitPart && (
             <div className="text-xs text-gray-500 mt-0.5">
               {unitPart}
@@ -12679,9 +12679,9 @@ Please add nutritional information manually if needed.`);
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
                     <div className="mb-6 space-y-2">
-                      <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
-                        <div className="flex items-center justify-between gap-3 sm:justify-end">
+                      <div className="mb-1 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
                           <div className="flex items-center gap-2 text-xs text-gray-500">
                             <span>Rate this result</span>
                             <button
@@ -12709,6 +12709,8 @@ Please add nutritional information manually if needed.`);
                               <HandThumbDownIcon className="w-5 h-5" />
                             </button>
                           </div>
+                        </div>
+                        <div className="flex justify-end">
                           <button
                             onClick={(e) =>
                               openAddIngredientModalFromMenu(e, {
@@ -14625,7 +14627,12 @@ Please add nutritional information manually if needed.`);
 		                        aria-label="Refresh from device"
 		                      >
 		                        <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-		                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M5 19a9 9 0 0014-7 9 9 0 00-14-7" />
+		                          <path
+		                            strokeLinecap="round"
+		                            strokeLinejoin="round"
+		                            strokeWidth={2}
+		                            d="M4.5 12a7.5 7.5 0 0 1 13.5-4.5m0 0V4.5m0 3h-3M19.5 12a7.5 7.5 0 0 1-13.5 4.5m0 0v3m0-3h3"
+		                          />
 		                        </svg>
 		                      </button>
 		                    )}

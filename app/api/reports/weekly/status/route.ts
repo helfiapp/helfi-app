@@ -19,7 +19,7 @@ export async function GET() {
   const now = Date.now()
   const lastShownAt = latest?.lastShownAt ? new Date(latest.lastShownAt).getTime() : 0
   const shouldShowPopup = Boolean(
-    reportReady &&
+    (reportReady || reportLocked) &&
       !latest?.viewedAt &&
       !latest?.dontShowAt &&
       (lastShownAt === 0 || now - lastShownAt >= 24 * 60 * 60 * 1000)

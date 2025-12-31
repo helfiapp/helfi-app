@@ -8,6 +8,7 @@ import {
   createWeeklyReportRecord,
   getNextDueAt,
   getWeeklyReportState,
+  queueWeeklyReportNotification,
   summarizeCoverage,
   updateWeeklyReportRecord,
   upsertWeeklyReportState,
@@ -199,7 +200,7 @@ export async function POST(request: NextRequest) {
   const hasCredits = wallet?.totalAvailableCents != null && wallet.totalAvailableCents >= costCredits
 
   if (!hasCredits) {
-    await updateWeeklyReportRecord(userId, report.id, {
+    const lockedReport = await updateWeeklyReportRecord(userId, report.id, {
       status: 'LOCKED',
       summary: 'Your weekly report is ready to unlock with a subscription or top-up credits.',
       dataSummary: {
@@ -208,6 +209,7 @@ export async function POST(request: NextRequest) {
       readyAt: now.toISOString(),
     })
     await upsertWeeklyReportState(userId, { lastStatus: 'LOCKED' })
+    await queueWeeklyReportNotification(lockedReport).catch(() => {})
     return NextResponse.json({ status: 'locked' })
   }
 
@@ -466,7 +468,7 @@ ${JSON.stringify(reportContext)}
 
   const charged = await cm.chargeCents(costCredits)
   if (!charged) {
-    await updateWeeklyReportRecord(userId, report.id, {
+    const lockedReport = await updateWeeklyReportRecord(userId, report.id, {
       status: 'LOCKED',
       summary: 'Your weekly report is ready to unlock with a subscription or top-up credits.',
       dataSummary: {
@@ -478,6 +480,7 @@ ${JSON.stringify(reportContext)}
       readyAt: now.toISOString(),
     })
     await upsertWeeklyReportState(userId, { lastStatus: 'LOCKED' })
+    await queueWeeklyReportNotification(lockedReport).catch(() => {})
     return NextResponse.json({ status: 'locked' })
   }
 
@@ -504,6 +507,7 @@ ${JSON.stringify(reportContext)}
     nextReportDueAt: getNextDueAt(now).toISOString(),
     lastStatus: 'READY',
   })
+  await queueWeeklyReportNotification(updated).catch(() => {})
 
   return NextResponse.json({ status: 'ready', reportId: report.id })
 }

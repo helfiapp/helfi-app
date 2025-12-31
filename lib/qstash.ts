@@ -121,6 +121,7 @@ type ScheduleTarget = {
   timeHHMM: string,
   timeZone: string
   callbackPath: string
+  payload?: Record<string, unknown>
 }
 
 async function scheduleWithQStash(
@@ -177,7 +178,8 @@ async function scheduleWithQStash(
   const callbackUrl = `${base}${normalizedPath}`
   const url = `https://qstash.upstash.io/v2/publish/${callbackUrl}`
 
-  const body = JSON.stringify({ userId, reminderTime: timeHHMM, timezone: timeZone })
+  const bodyPayload = target.payload ?? { userId, reminderTime: timeHHMM, timezone: timeZone }
+  const body = JSON.stringify(bodyPayload)
   let responseBody = ''
   let status: number | undefined
 
@@ -281,6 +283,21 @@ export async function scheduleHealthTipWithQStash(
     timeHHMM,
     timeZone,
     callbackPath: '/api/push/health-tips/dispatch',
+  })
+}
+
+export async function scheduleWeeklyReportNotificationWithQStash(
+  userId: string,
+  timeZone: string,
+  reportId: string,
+  timeHHMM = '12:00'
+): Promise<{ scheduled: boolean; reason?: string; status?: number; responseBody?: string }> {
+  return scheduleWithQStash({
+    userId,
+    timeHHMM,
+    timeZone,
+    callbackPath: '/api/reports/weekly/dispatch',
+    payload: { userId, reportId, timezone: timeZone },
   })
 }
 

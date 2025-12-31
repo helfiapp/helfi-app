@@ -562,7 +562,6 @@ const buildComponentBoundSchema = (components: string[]) => ({
         type: 'array',
         minItems: components.length,
         maxItems: components.length,
-        uniqueItems: true,
         items: {
           type: 'object',
           additionalProperties: false,
