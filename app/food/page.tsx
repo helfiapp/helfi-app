@@ -5393,17 +5393,18 @@ const applyStructuredItems = (
   }, [autoDiaryRefreshEnabled, selectedDate, isViewingToday, diaryHydrated, editingEntry?.id])
 
   // Save food entries to database and update context (OPTIMIZED + RELIABLE HISTORY)
-	  const saveFoodEntries = async (
-	    updatedFoods: any[],
+  const saveFoodEntries = async (
+    updatedFoods: any[],
     options?: {
       appendHistory?: boolean
       suppressToast?: boolean
       snapshotDateOverride?: string
+      allowDuplicate?: boolean
       // When deletes use the atomic server delete endpoint, we already updated the server
       // snapshot as part of that request. Keep local caching behavior but skip duplicate POSTs.
       skipServerSnapshot?: boolean
     },
-	  ) => {
+  ) => {
 	    try {
       // When the user intentionally saves, clear any tombstones for matching entries so
       // re-adding the same meal on purpose is allowed.
@@ -5521,6 +5522,7 @@ const applyStructuredItems = (
             // Always pin to the calendar date the user was viewing when they saved
             localDate: targetLocalDate,
             createdAt: anchoredCreatedAt,
+            allowDuplicate: options?.allowDuplicate === true,
           }
           setLastHistoryPayload(payload)
 
@@ -9198,7 +9200,12 @@ Please add nutritional information manually if needed.`);
     const category = normalizeCategory(targetCategory)
     const baseDescription = source.description || source.label || 'Duplicated meal'
     const opStamp = Date.now()
-    const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), targetDate)
+    const sourceTs = extractEntryTimestampMs(source)
+    const nowTs = Date.now()
+    const sourceBucket = Number.isFinite(sourceTs) ? Math.floor(sourceTs / 60000) : null
+    const nowBucket = Math.floor(nowTs / 60000)
+    const baseTs = sourceBucket !== null && sourceBucket === nowBucket ? nowTs + 60000 : nowTs
+    const createdAtIso = alignTimestampToLocalDate(new Date(baseTs).toISOString(), targetDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const clonedItems =
       source.items && Array.isArray(source.items) && source.items.length > 0
@@ -9260,7 +9267,7 @@ Please add nutritional information manually if needed.`);
     triggerHaptic(10)
 
     try {
-      await saveFoodEntries(foodsForSave)
+      await saveFoodEntries(foodsForSave, { allowDuplicate: true })
       await refreshEntriesFromServer()
     } catch (err) {
       console.warn('Duplicate/copy sync failed', err)
@@ -9279,9 +9286,9 @@ Please add nutritional information manually if needed.`);
     const targetDate = todayIso
     const metaStamp = Date.now()
     const clones = entries.map((entry: any, idx: number) => {
-      const createdSource = entry?.createdAt || entry?.id || new Date().toISOString()
+      // Use the copy action time as the base so repeat copy actions remain distinct.
+      const baseTs = Date.now()
       // Offset each entry slightly to avoid de-dupe collapsing them (description/time collisions).
-      const baseTs = new Date(createdSource).getTime()
       const adjusted = Number.isFinite(baseTs) ? new Date(baseTs + idx * 60000).toISOString() : new Date().toISOString()
       const anchored = alignTimestampToLocalDate(adjusted, targetDate)
       const time = new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -9368,6 +9375,7 @@ Please add nutritional information manually if needed.`);
               category: clone.category || clone.meal,
               localDate: clone.localDate,
               createdAt: clone.createdAt,
+              allowDuplicate: true,
             }),
           })
 

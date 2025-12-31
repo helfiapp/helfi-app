@@ -469,7 +469,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ POST /api/food-log - Found user:', { userId, email: userEmail })
 
     const body = await request.json()
-    const { description, nutrition, imageUrl, items, localDate, meal, category, createdAt } = body || {}
+    const { description, nutrition, imageUrl, items, localDate, meal, category, createdAt, allowDuplicate } = body || {}
 
     const normalizedMeal = normalizeMealCategory(meal ?? category)
     const storedCategory = normalizedMeal ?? (typeof category === 'string' ? category.trim() : null)
@@ -566,47 +566,49 @@ export async function POST(request: NextRequest) {
     })
 
     // Guard: prevent near-identical duplicates within a short window
-    try {
-      const dedupeWindowMs = 5 * 60 * 1000 // 5 minutes
-      const fallbackDate = normalizedLocalDate || (() => {
-        const d = normalizedCreatedAt || new Date()
-        const y = d.getFullYear()
-        const m = String(d.getMonth() + 1).padStart(2, '0')
-        const day = String(d.getDate()).padStart(2, '0')
-        return `${y}-${m}-${day}`
-      })()
-      const windowStart = new Date((normalizedCreatedAt || new Date()).getTime() - dedupeWindowMs)
-      const windowEnd = new Date((normalizedCreatedAt || new Date()).getTime() + dedupeWindowMs)
-      const normalizedDesc = (description || '').toString().trim().toLowerCase()
-      const existing = await prisma.foodLog.findMany({
-        where: {
-          userId: user.id,
-          OR: [
-            { localDate: normalizedLocalDate ?? undefined },
-            { localDate: fallbackDate },
-            { localDate: null },
-          ],
-          createdAt: { gte: windowStart, lte: windowEnd },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      })
-      const duplicate = existing.find((e) => {
-        const descMatch = (e.description || '').toString().trim().toLowerCase() === normalizedDesc
-        const catMatch = normalizeMealCategory(e.meal ?? e.category) === normalizedMeal
-        return descMatch && catMatch
-      })
-      if (duplicate) {
-        console.log('AGENT_DEBUG dedupe: reused existing FoodLog instead of creating new', {
-          duplicateId: duplicate.id,
-          localDate: duplicate.localDate,
-          createdAt: duplicate.createdAt,
-          normalizedMeal,
+    if (allowDuplicate !== true) {
+      try {
+        const dedupeWindowMs = 5 * 60 * 1000 // 5 minutes
+        const fallbackDate = normalizedLocalDate || (() => {
+          const d = normalizedCreatedAt || new Date()
+          const y = d.getFullYear()
+          const m = String(d.getMonth() + 1).padStart(2, '0')
+          const day = String(d.getDate()).padStart(2, '0')
+          return `${y}-${m}-${day}`
+        })()
+        const windowStart = new Date((normalizedCreatedAt || new Date()).getTime() - dedupeWindowMs)
+        const windowEnd = new Date((normalizedCreatedAt || new Date()).getTime() + dedupeWindowMs)
+        const normalizedDesc = (description || '').toString().trim().toLowerCase()
+        const existing = await prisma.foodLog.findMany({
+          where: {
+            userId: user.id,
+            OR: [
+              { localDate: normalizedLocalDate ?? undefined },
+              { localDate: fallbackDate },
+              { localDate: null },
+            ],
+            createdAt: { gte: windowStart, lte: windowEnd },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
         })
-        return NextResponse.json({ success: true, id: duplicate.id, deduped: true })
+        const duplicate = existing.find((e) => {
+          const descMatch = (e.description || '').toString().trim().toLowerCase() === normalizedDesc
+          const catMatch = normalizeMealCategory(e.meal ?? e.category) === normalizedMeal
+          return descMatch && catMatch
+        })
+        if (duplicate) {
+          console.log('AGENT_DEBUG dedupe: reused existing FoodLog instead of creating new', {
+            duplicateId: duplicate.id,
+            localDate: duplicate.localDate,
+            createdAt: duplicate.createdAt,
+            normalizedMeal,
+          })
+          return NextResponse.json({ success: true, id: duplicate.id, deduped: true })
+        }
+      } catch (dedupeErr) {
+        console.warn('AGENT_DEBUG dedupe check failed (non-blocking)', dedupeErr)
       }
-    } catch (dedupeErr) {
-      console.warn('AGENT_DEBUG dedupe check failed (non-blocking)', dedupeErr)
     }
 
     const created = await prisma.foodLog.create({
