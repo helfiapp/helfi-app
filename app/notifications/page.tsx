@@ -5,6 +5,11 @@ import PageHeader from '@/components/PageHeader'
 
 const notificationSections = [
   {
+    title: 'Notification inbox',
+    description: 'View alerts you might have missed.',
+    href: '/notifications/inbox',
+  },
+  {
     title: 'Delivery',
     description: 'Email and push settings for this device.',
     href: '/notifications/delivery',

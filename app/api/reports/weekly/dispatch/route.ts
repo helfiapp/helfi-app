@@ -6,6 +6,7 @@ import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { getEmailFooter } from '@/lib/email-footer'
 import { getWeeklyReportById, updateWeeklyReportRecord } from '@/lib/weekly-health-report'
+import { createInboxNotification } from '@/lib/notification-inbox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
     const reportUrl = isLocked ? `${baseUrl}/billing` : `${baseUrl}/insights/weekly-report`
 
     const results: Record<string, string> = {}
+    let loggedInbox = false
 
     if (!alreadyPushed) {
       const subscriptionRows: Array<{ subscription: any }> = await prisma.$queryRawUnsafe(
@@ -112,6 +114,7 @@ export async function POST(req: NextRequest) {
             if (sent > 0) {
               await updateWeeklyReportRecord(userId, reportId, { pushSentAt: new Date().toISOString() })
               results.pushStatus = 'sent'
+              loggedInbox = true
             } else {
               results.pushStatus = `failed:${errors?.[0]?.message || 'unknown'}`
             }
@@ -165,10 +168,24 @@ export async function POST(req: NextRequest) {
           })
           await updateWeeklyReportRecord(userId, reportId, { emailSentAt: new Date().toISOString() })
           results.emailStatus = 'sent'
+          loggedInbox = true
         } catch (error: any) {
           results.emailStatus = `failed:${error?.message || 'unknown'}`
         }
       }
+    }
+
+    if (loggedInbox) {
+      await createInboxNotification({
+        userId,
+        title,
+        body: bodyText,
+        url: isLocked ? '/billing' : '/insights/weekly-report',
+        type: 'weekly_report',
+        source: 'system',
+        eventKey: `weekly_report:${reportId}`,
+        metadata: { reportId, status: report.status },
+      }).catch(() => {})
     }
 
     return NextResponse.json({ ok: true, results })

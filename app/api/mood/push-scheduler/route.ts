@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { createInboxNotification } from '@/lib/notification-inbox'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -176,6 +177,15 @@ export async function POST(req: NextRequest) {
           matchedReminder,
           localDate,
         )
+        await createInboxNotification({
+          userId: r.userId,
+          title: 'Quick mood check-in',
+          body: 'How are you feeling right now? It takes 10 seconds.',
+          url: '/mood/quick',
+          type: 'mood_reminder',
+          source: 'push',
+          eventKey: `mood:${localDate}:${matchedReminder}`,
+        }).catch(() => {})
       } catch (e: any) {
         errors.push({ userId: r.userId ?? 'unknown', error: e?.body || e?.message || String(e) })
       }

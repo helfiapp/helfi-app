@@ -22,6 +22,7 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
   const { profileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null)
+  const [unreadCount, setUnreadCount] = useState(0)
   const affiliateCacheKey = session?.user?.email ? `affiliate-menu:${session.user.email}` : ''
 
   const hasProfileImage = !!(profileImage || session?.user?.image)
@@ -48,6 +49,34 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
     }
     await signOut({ callbackUrl: '/auth/signin' })
   }
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+    let mounted = true
+    const loadUnread = async () => {
+      try {
+        const res = await fetch('/api/notifications/unread-count', { cache: 'no-store' as any })
+        if (!res.ok) return
+        const data = await res.json().catch(() => ({}))
+        if (mounted) {
+          const count = typeof data?.count === 'number' ? data.count : 0
+          setUnreadCount(Number.isFinite(count) ? count : 0)
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadUnread()
+
+    const handleRefresh = () => loadUnread()
+    window.addEventListener('focus', handleRefresh)
+    window.addEventListener('notifications:refresh', handleRefresh)
+    return () => {
+      mounted = false
+      window.removeEventListener('focus', handleRefresh)
+      window.removeEventListener('notifications:refresh', handleRefresh)
+    }
+  }, [session?.user?.id])
 
   useEffect(() => {
     if (!affiliateCacheKey) {
@@ -132,19 +161,26 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
             className="focus:outline-none"
             aria-label="Open profile menu"
           >
-            {hasProfileImage ? (
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={40}
-                height={40}
-                className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-helfi-green shadow-sm flex items-center justify-center">
-                <UserIcon className="w-6 h-6 text-white" aria-hidden="true" />
-              </div>
-            )}
+            <div className="relative">
+              {hasProfileImage ? (
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={40}
+                  height={40}
+                  className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-helfi-green shadow-sm flex items-center justify-center">
+                  <UserIcon className="w-6 h-6 text-white" aria-hidden="true" />
+                </div>
+              )}
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] px-1 h-[18px] rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center shadow">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </div>
           </button>
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-2 z-50 border border-gray-100 dark:border-gray-700 animate-fade-in">

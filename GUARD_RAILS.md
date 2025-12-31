@@ -220,6 +220,23 @@ the user.
 - If the report is locked (no credits), the popup CTA must send users to **Billing**, not to the report page.
 - Email + push are sent **only once per report** and are triggered by QStash; do not re‑introduce repeated sends.
 
+### 2.8 Notification Inbox + Profile Badge (Jan 2026 – Locked)
+
+**Protected files:**
+- `lib/notification-inbox.ts`
+- `app/api/notifications/inbox/route.ts`
+- `app/api/notifications/unread-count/route.ts`
+- `app/notifications/inbox/page.tsx`
+- `app/notifications/page.tsx`
+- `components/PageHeader.tsx`
+- `app/insights/InsightsTopNav.tsx`
+
+**Guard rails:**
+- All user notifications must be saved to the inbox when sent (push or email). Do not remove this logging.
+- The inbox should show missed alerts and allow users to open or mark them as read.
+- The profile avatar must show an unread badge when there are unseen notifications.
+- Do not auto‑clear notifications without a user action (open / mark read / mark all).
+
 ---
 
 ## 3. Branding Assets (Logos & Icons)

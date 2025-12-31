@@ -5,6 +5,7 @@ import { ensureMoodTables } from '@/app/api/mood/_db'
 import { scheduleAllMoodReminders, scheduleMoodReminderWithQStash } from '@/lib/qstash'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
+import { createInboxNotification } from '@/lib/notification-inbox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -161,6 +162,16 @@ export async function POST(req: NextRequest) {
       ).catch(() => {})
       return NextResponse.json({ error: 'push_failed', details: errors }, { status: 500 })
     }
+
+    await createInboxNotification({
+      userId,
+      title: 'Quick mood check-in',
+      body: 'How are you feeling right now? It takes 10 seconds.',
+      url: '/mood/quick',
+      type: 'mood_reminder',
+      source: 'push',
+      eventKey: `mood:${localDate}:${reminderTime}`,
+    }).catch(() => {})
 
     const nextSchedule = await scheduleMoodReminderWithQStash(userId, reminderTime, effectiveTimezone).catch(
       (error) => {

@@ -10,6 +10,7 @@ import { scheduleHealthTipWithQStash } from '@/lib/qstash'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
+import { createInboxNotification } from '@/lib/notification-inbox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -583,6 +584,17 @@ export async function POST(req: NextRequest) {
       if (!lowCreditSend.sent) {
         console.error('[HEALTH_TIPS] Low-credit notification send error', lowCreditSend.errors)
       }
+      if (lowCreditSend.sent) {
+        await createInboxNotification({
+          userId,
+          title: 'Top up credits to keep AI health tips coming',
+          body: 'We could not send today’s health tip because your credits are low. Tap to add more credits or upgrade your plan.',
+          url: '/billing',
+          type: 'health_tip_low_credit',
+          source: 'push',
+          eventKey: `health_tip_low_credit:${localDateString}:${reminderTime}`,
+        }).catch(() => {})
+      }
 
       // Still schedule the next attempt for tomorrow at the same time
       await scheduleHealthTipWithQStash(userId, reminderTime, effectiveTimezone).catch(
@@ -680,6 +692,18 @@ export async function POST(req: NextRequest) {
     }
     if (!tipSend.sent) {
       console.error('[HEALTH_TIPS] Notification send error', tipSend.errors)
+    }
+    if (tipSend.sent) {
+      await createInboxNotification({
+        userId,
+        title: parsed.title.substring(0, 80),
+        body: notificationBody,
+        url: '/health-tips',
+        type: 'health_tip',
+        source: 'push',
+        eventKey: `health_tip:${localDateString}:${reminderTime}`,
+        metadata: { tipId, category },
+      }).catch(() => {})
     }
 
     // Schedule the next tip for this time tomorrow

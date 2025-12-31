@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
 import crypto from 'crypto'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
+import { createInboxNotification } from '@/lib/notification-inbox'
 
 // Force dynamic execution - prevent caching for cron jobs
 export const dynamic = 'force-dynamic'
@@ -306,6 +307,15 @@ export async function POST(req: NextRequest) {
         matchedReminder,
         localDate
       )
+      await createInboxNotification({
+        userId: r.userId,
+        title: 'Time for your Helfi check-in',
+        body: 'Rate your selected issues for today in under a minute.',
+        url: '/check-in',
+        type: 'checkin_reminder',
+        source: 'push',
+        eventKey: `checkin:${localDate}:${matchedReminder}`,
+      }).catch(() => {})
       console.log(`[SCHEDULER] ✅ Notification sent to user ${shortId}...`)
     } catch (e: any) {
       const errorMsg = e?.body || e?.message || String(e)

@@ -4,6 +4,7 @@ import webpush from 'web-push'
 import { scheduleAllActiveReminders, scheduleReminderWithQStash } from '@/lib/qstash'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
+import { createInboxNotification } from '@/lib/notification-inbox'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -170,6 +171,16 @@ export async function POST(req: NextRequest) {
       ).catch(() => {})
       return NextResponse.json({ error: 'push_failed', details: errors }, { status: 500 })
     }
+
+    await createInboxNotification({
+      userId,
+      title: 'Time for your Helfi check-in',
+      body: 'Rate your selected issues for today in under a minute.',
+      url: '/check-in',
+      type: 'checkin_reminder',
+      source: 'push',
+      eventKey: `checkin:${localDate}:${reminderTime}`,
+    }).catch(() => {})
 
     // Schedule the next occurrence for this same reminder
     const nextSchedule = await scheduleReminderWithQStash(userId, reminderTime, effectiveTimezone).catch((error) => {
