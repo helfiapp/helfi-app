@@ -5367,7 +5367,9 @@ const applyStructuredItems = (
       await refreshDiaryNow()
     }
   }
+  const autoDiaryRefreshEnabled = false
   useEffect(() => {
+    if (!autoDiaryRefreshEnabled) return
     if (typeof window === 'undefined') return
     if (!diaryHydrated) return
     if (editingEntry) return
@@ -5387,7 +5389,7 @@ const applyStructuredItems = (
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [selectedDate, isViewingToday, diaryHydrated, editingEntry?.id])
+  }, [autoDiaryRefreshEnabled, selectedDate, isViewingToday, diaryHydrated, editingEntry?.id])
 
   // Save food entries to database and update context (OPTIMIZED + RELIABLE HISTORY)
 	  const saveFoodEntries = async (
