@@ -156,11 +156,6 @@ const alignTimestampToLocalDate = (rawCreatedAt: any, localDate?: string | null)
 }
 
 const BARCODE_REGION_ID = 'food-barcode-reader'
-// Reset older history items from showing in the "All" tab. Only entries created after this
-// timestamp will be included in the All list so we can start fresh after data corruption.
-// (Dec 12, 2025 09:47:56 UTC)
-const HISTORY_RESET_EPOCH_MS = 1765532876309
-const HISTORY_RESET_UTC_DATE = new Date(HISTORY_RESET_EPOCH_MS).toISOString().slice(0, 10) // 2025-12-12
 const EMPTY_TOTALS = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 }
 
 class DiaryErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -3348,6 +3343,15 @@ export default function FoodDiary() {
     return `${y}-${m}-${day}`
   }
 
+  const entryMinuteBucketKey = (entry: any) => {
+    if (!entry) return ''
+    const ts = extractEntryTimestampMs(entry)
+    if (Number.isFinite(ts)) return String(Math.floor(ts / 60000))
+    const raw = entry?.time
+    if (raw === null || raw === undefined) return ''
+    return raw.toString().trim().toLowerCase()
+  }
+
   // Prevent duplicate rows from ever rendering (e.g., double writes or cached copies).
   const dedupeEntries = (list: any[], options?: { fallbackDate?: string }) => {
     if (!Array.isArray(list)) return []
@@ -5276,20 +5280,38 @@ const applyStructuredItems = (
         const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
         return [dateKeyForEntry(entry) || selectedDate, cat, descKey(entry?.description), timeBucketKey(entry)].join('|')
       }
+      const buildLooseMergeKey = (entry: any) =>
+        [dateKeyForEntry(entry) || selectedDate, descKey(entry?.description), timeBucketKey(entry)].join('|')
       const localByKey = new Map<string, any>()
+      const localByLooseKey = new Map<string, any>()
       if (Array.isArray(localList)) {
         for (const e of localList) {
           if (!e) continue
           if (isEntryDeleted(e)) continue
           localByKey.set(buildMergeKey(e), e)
+          localByLooseKey.set(buildLooseMergeKey(e), e)
         }
       }
       const mappedWithStableIds = mapped.map((e: any) => {
-        const existing = localByKey.get(buildMergeKey(e))
-        if (existing && typeof existing?.id === 'number' && Number.isFinite(existing.id)) {
-          return existing.id === e.id ? e : { ...e, id: existing.id }
+        let next = e
+        let existing = localByKey.get(buildMergeKey(e))
+        if (!existing) {
+          const cat = normalizeCategory(e?.meal || e?.category || e?.mealType)
+          if (cat === 'uncategorized') {
+            const loose = localByLooseKey.get(buildLooseMergeKey(e))
+            if (loose) {
+              const looseCat = normalizeCategory(loose?.meal || loose?.category || loose?.mealType)
+              if (looseCat && looseCat !== 'uncategorized') {
+                next = { ...next, meal: looseCat, category: looseCat, persistedCategory: looseCat }
+              }
+              existing = loose
+            }
+          }
         }
-        return e
+        if (existing && typeof existing?.id === 'number' && Number.isFinite(existing.id)) {
+          return existing.id === next.id ? next : { ...next, id: existing.id }
+        }
+        return next
       })
       const merged = mergeServerEntries(mappedWithStableIds, localList, selectedDate)
 
@@ -7718,25 +7740,12 @@ Please add nutritional information manually if needed.`);
         }
       })
     }
-    const meetsFreshnessAndShape = (entry: any) => {
+    const isValidEntry = (entry: any) => {
       if (!entry) return false
-      const entryDate = dateKeyForEntry(entry) || deriveDateFromEntryTimestamp(entry)
-      const ts =
-        typeof entry?.createdAt === 'string'
-          ? new Date(entry.createdAt).getTime()
-          : typeof entry?.createdAt === 'number'
-          ? entry.createdAt
-          : typeof entry?.id === 'number'
-          ? entry.id
-          : NaN
-      const hasFreshTimestamp = Number.isFinite(ts) && ts >= HISTORY_RESET_EPOCH_MS
-      const hasFreshDate = Boolean(entryDate) && entryDate >= HISTORY_RESET_UTC_DATE
       const desc = (entry?.description || entry?.label || '').toString().trim()
-      const hasNutrition =
-        Boolean(entry?.nutrition) || Boolean(entry?.total) || (Array.isArray(entry?.items) && entry.items.length > 0)
-      return (hasFreshDate || hasFreshTimestamp) && desc.length > 0 && hasNutrition
+      return desc.length > 0
     }
-    return dedupeEntries(pool.filter(meetsFreshnessAndShape), { fallbackDate: selectedDate })
+    return dedupeEntries(pool.filter(isValidEntry), { fallbackDate: selectedDate })
   }
 
   const buildFavoritesDatasets = () => {
@@ -7906,9 +7915,8 @@ Please add nutritional information manually if needed.`);
       }
       return Array.from(byDisplay.values())
     })()
-    // Product decision: "All" is for browsing non-favorited items.
-    // If a user saves something as a favorite, it should only appear in Favorites/Custom tabs.
-    const allMealsWithoutFavorites = allMeals.filter((it: any) => !it?.favorite)
+    // "All" should show every meal, including favorites.
+    const allMealsWithFavorites = allMeals
 
     const favoriteMeals = (favorites || []).map((fav: any) => ({
       id: fav?.id || `fav-${Math.random()}`,
@@ -7923,7 +7931,7 @@ Please add nutritional information manually if needed.`);
     // Product request: "Custom" only shows meals the user created (Build-a-meal / Combined).
     const customMeals = favoriteMeals.filter((m: any) => isCustomMealFavorite(m?.favorite))
 
-    return { allMeals: allMealsWithoutFavorites, favoriteMeals, customMeals }
+    return { allMeals: allMealsWithFavorites, favoriteMeals, customMeals }
   }
 
   // IMPORTANT: Do not auto-create or auto-persist favorites based on diary history.
@@ -9763,6 +9771,7 @@ Please add nutritional information manually if needed.`);
 	
 	    const targetDescKey = normalizedDescription(entry?.description || entry?.name || '')
 	    const targetDateKey = dateKeyForEntry(entry) || selectedDate
+      const targetTimeBucket = entryMinuteBucketKey(entry)
 	    const updatedFoods = todaysFoods.filter((food: any) => {
       const sameId =
         entryId !== null &&
@@ -9779,6 +9788,8 @@ Please add nutritional information manually if needed.`);
       if (!foodDescKey || !foodDateKey) return true
       if (foodDescKey !== targetDescKey) return true
       if (foodDateKey !== targetDateKey) return true
+      const foodTimeBucket = entryMinuteBucketKey(food)
+      if (targetTimeBucket && foodTimeBucket && foodTimeBucket !== targetTimeBucket) return true
 
       const foodCat = normalizeCategory(food?.meal || food?.category || food?.mealType)
       // If either side is uncategorized, treat it as a duplicate anyway (server rows sometimes miss meal).
@@ -9979,21 +9990,14 @@ Please add nutritional information manually if needed.`);
 	    try {
         // Single request: delete (with server sweep) + update server snapshot in one go
         try {
-          const sweepDates: string[] = []
-          autoDates.forEach((d) => sweepDates.push(d))
-          const base = autoDates[0] ? new Date(autoDates[0]) : new Date()
-          ;[1, -1, 2, -2].forEach((delta) => {
-            const d = new Date(base)
-            d.setDate(d.getDate() + delta)
-            sweepDates.push(d.toISOString().slice(0, 10))
-          })
+          const sweepDates = Array.from(new Set([targetDateKey || selectedDate].filter(Boolean)))
 
           const snapshotFoods = limitSnapshotFoods(updatedFoods, selectedDate)
           const payloadStr = JSON.stringify({
             id: dbId || null,
             description: (entry?.description || entry?.name || '').toString().trim().slice(0, 220),
             category: entryCategory,
-            dates: Array.from(new Set(sweepDates)).slice(0, 12),
+            dates: sweepDates.slice(0, 1),
             snapshotDate: selectedDate,
             snapshotFoods,
           })

@@ -85,12 +85,17 @@ export async function POST(request: NextRequest) {
             imageUrlsToCheck.add(existing.imageUrl.trim())
           }
           const rawText = String(existing.description || existing.name || '').trim()
+          const normalizeDesc = (value: string) => value.split('\n')[0].trim().toLowerCase()
+          const targetDesc = normalizeDesc(rawText)
           const needle = rawText.split('\n')[0].trim().slice(0, 140)
           const createdAt = existing.createdAt instanceof Date ? existing.createdAt : new Date(existing.createdAt as any)
           const createdAtMs = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.getTime() : NaN
+          const targetCategory = normalizeMealCategory((existing as any).meal ?? (existing as any).category) || 'uncategorized'
+          const targetBucket = Number.isFinite(createdAtMs) ? Math.floor(createdAtMs / 60000) : null
 
           const shouldSweep = needle.length >= 12 && Number.isFinite(createdAtMs)
           if (shouldSweep) {
+            const BUCKET_WINDOW_MINUTES = 5
             const WINDOW_HOURS = 6
             const windowStart = new Date(createdAtMs - WINDOW_HOURS * 60 * 60 * 1000)
             const windowEnd = new Date(createdAtMs + WINDOW_HOURS * 60 * 60 * 1000)
@@ -143,15 +148,32 @@ export async function POST(request: NextRequest) {
                     : undefined,
                 ].filter(Boolean) as any,
               },
-              select: { id: true, imageUrl: true },
+              select: { id: true, imageUrl: true, description: true, name: true, createdAt: true, meal: true, category: true },
             })
 
-            duplicates.forEach((row) => {
+            const filtered = duplicates.filter((row) => {
+              const rowDesc = normalizeDesc(String(row.description || row.name || ''))
+              if (!rowDesc || rowDesc !== targetDesc) return false
+              const rowCategory = normalizeMealCategory((row as any)?.meal ?? (row as any)?.category) || 'uncategorized'
+              const catMatches =
+                rowCategory === targetCategory ||
+                rowCategory === 'uncategorized' ||
+                targetCategory === 'uncategorized'
+              if (!catMatches) return false
+              if (targetBucket !== null) {
+                const rowBucket = row.createdAt ? Math.floor(new Date(row.createdAt as any).getTime() / 60000) : null
+                if (rowBucket === null) return false
+                if (Math.abs(rowBucket - targetBucket) > BUCKET_WINDOW_MINUTES) return false
+              }
+              return true
+            })
+
+            filtered.forEach((row) => {
               if (typeof row.imageUrl === 'string' && row.imageUrl.trim()) {
                 imageUrlsToCheck.add(row.imageUrl.trim())
               }
             })
-            const ids = Array.from(new Set(duplicates.map((d) => d.id))).slice(0, 50)
+            const ids = Array.from(new Set([requestedId, ...filtered.map((d) => d.id)])).slice(0, 50)
             if (ids.length > 0) {
               const result = await prisma.foodLog.deleteMany({
                 where: { userId: user.id, id: { in: ids } },
