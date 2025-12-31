@@ -1961,6 +1961,7 @@ export default function FoodDiary() {
   const [manualFoodName, setManualFoodName] = useState('')
   const [manualFoodType, setManualFoodType] = useState('single')
   const [manualIngredients, setManualIngredients] = useState([{ name: '', weight: '', unit: 'g' }])
+  const showManualEntry = false
   const [showEntryOptions, setShowEntryOptions] = useState<string | null>(null)
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
   const [photoOptionsAnchor, setPhotoOptionsAnchor] = useState<'global' | string | null>(null)
@@ -14086,6 +14087,160 @@ Please add nutritional information manually if needed.`);
               </div>
             )}
 
+            {/* Manual Food Entry - Improved Structure */}
+            {showManualEntry && !photoPreview && !editingEntry && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-6">Manual Food Entry</h3>
+                
+                {/* Type Dropdown First */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <select
+                    value={manualFoodType}
+                    onChange={(e) => {
+                      setManualFoodType(e.target.value);
+                      setManualFoodName('');
+                      setManualIngredients([{ name: '', weight: '', unit: 'g' }]);
+                    }}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition-colors"
+                  >
+                    <option value="single">Single Food</option>
+                    <option value="multiple">Multiple Ingredients</option>
+                  </select>
+                </div>
+
+                {/* Single Food Entry */}
+                {manualFoodType === 'single' && (
+                  <>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Food Name
+                      </label>
+                      <input
+                        type="text"
+                        value={manualFoodName}
+                        onChange={(e) => setManualFoodName(e.target.value)}
+                        placeholder="e.g., Grilled chicken breast, Medium banana"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Multiple Ingredients Entry */}
+                {/* PROTECTED: INGREDIENTS_CARD START */}
+
+                {manualFoodType === 'multiple' && (
+                  <div className="mb-6 max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
+                    <div className="mb-6">
+                      <div className="space-y-4">
+                      {manualIngredients.map((ing, index) => (
+                        <div key={index} className="border border-gray-200 rounded-xl p-4">
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="text-sm font-medium text-gray-700">Ingredient {index + 1}</h4>
+                            {manualIngredients.length > 1 && (
+                              <div className="relative ingredient-options-dropdown">
+                                <button
+                                  onClick={() => setShowIngredientOptions(showIngredientOptions === `${index}` ? null : `${index}`)}
+                                  className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                                >
+                                  <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                                  </svg>
+                                </button>
+                                
+                                {showIngredientOptions === `${index}` && (
+                                  <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                    <button
+                                      onClick={() => {
+                                        removeIngredient(index);
+                                        setShowIngredientOptions(null);
+                                      }}
+                                      className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 flex items-center text-sm"
+                                    >
+                                      <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="mb-3">
+                            <input
+                              type="text"
+                              value={ing.name}
+                              onChange={(e) => updateIngredient(index, 'name', e.target.value)}
+                              placeholder="Ingredient name"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button
+                        onClick={addIngredient}
+                        className="w-full px-4 py-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors flex items-center justify-center border border-emerald-200"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Add Ingredient
+                      </button>
+                    </div>
+                    </div>
+                  </div>
+                )}
+                {/* PROTECTED: INGREDIENTS_CARD END */}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={analyzeManualFood}
+                    disabled={
+                      (manualFoodType === 'single' && !manualFoodName.trim()) ||
+                      (manualFoodType === 'multiple' && manualIngredients.every((ing) => !ing.name.trim())) ||
+                      isAnalyzing
+                    }
+                    className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {analysisPhase === 'building'
+                          ? 'Step 2 of 2: Building ingredient cards...'
+                          : 'Step 1 of 2: Analyzing food...'}
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        Analyze Food
+                      </>
+                    )}
+                  </button>
+                  
+                  <button
+                    onClick={cancelManualEntry}
+                    className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                    title="Cancel"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
 
           </div>
         )}
