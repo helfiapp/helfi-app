@@ -3511,13 +3511,21 @@ export default function FoodDiary() {
       const fallbackKey = buildFallbackKey(entry)
       const clientKey = buildClientKey(entry)
       const dbKey = buildDbKey(entry)
-      const canonical =
-        (clientKey && keyAliases.get(clientKey)) ||
-        (dbKey && keyAliases.get(dbKey)) ||
-        (fallbackKey && keyAliases.get(fallbackKey)) ||
-        clientKey ||
-        dbKey ||
-        fallbackKey
+      let canonical = ''
+      if (clientKey) {
+        canonical = clientKey
+      } else if (dbKey) {
+        const fallbackAlias = fallbackKey ? keyAliases.get(fallbackKey) : ''
+        const aliasEntry = fallbackAlias ? preferred.get(fallbackAlias) : null
+        if (fallbackAlias && aliasEntry && getEntryClientId(aliasEntry)) {
+          // Merge DB rows into the optimistic entry when the server row lacks a clientId.
+          canonical = fallbackAlias
+        } else {
+          canonical = dbKey
+        }
+      } else if (fallbackKey) {
+        canonical = keyAliases.get(fallbackKey) || fallbackKey
+      }
       if (!canonical) continue
       const existing = preferred.get(canonical)
       const chosen = pickPreferred(existing, entry)
@@ -9457,6 +9465,7 @@ Please add nutritional information manually if needed.`);
       `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
       { forceNew: true },
     )
+    removeDeletedTombstonesForEntries([copiedEntry])
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     const normalizedHistory = Array.isArray(historyFoods) ? historyFoods : []
     const isTargetToday = targetDate === todayIso
@@ -9614,6 +9623,7 @@ Please add nutritional information manually if needed.`);
         { forceNew: true },
       )
     })
+    removeDeletedTombstonesForEntries(clones)
     setSelectedAddCategory(categoryKey)
     const deduped = dedupeEntries([...clones, ...todaysFoods], { fallbackDate: targetDate })
     setTodaysFoods(deduped)
@@ -10665,6 +10675,7 @@ Please add nutritional information manually if needed.`);
         { forceNew: true },
       )
     })
+    removeDeletedTombstonesForEntries(clones)
 
     const dedupeTargetDate = targetDate || selectedDate
     const dedupeList = (entries: any[]) => dedupeEntries(entries, { fallbackDate: dedupeTargetDate })
