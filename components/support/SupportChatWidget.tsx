@@ -19,6 +19,7 @@ const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
 
 const STORAGE_KEYS = {
   open: 'helfi:support:widget:open',
+  hidden: 'helfi:support:widget:hidden',
   guestTicketId: 'helfi:support:guest:ticketId',
   guestToken: 'helfi:support:guest:token',
   guestName: 'helfi:support:guest:name',
@@ -28,8 +29,12 @@ const STORAGE_KEYS = {
 export default function SupportChatWidget() {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const isHome = pathname === '/'
   const isLoggedIn = Boolean(session?.user?.email)
   const [isOpen, setIsOpen] = useState(false)
+  const [isWidgetHidden, setIsWidgetHidden] = useState(false)
+  const [hasReachedAnchor, setHasReachedAnchor] = useState(!isHome)
+  const [animateIn, setAnimateIn] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isAwaitingReply, setIsAwaitingReply] = useState(false)
   const [ticket, setTicket] = useState<any | null>(null)
@@ -70,6 +75,7 @@ export default function SupportChatWidget() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     setIsOpen(window.localStorage.getItem(STORAGE_KEYS.open) === 'true')
+    setIsWidgetHidden(window.localStorage.getItem(STORAGE_KEYS.hidden) === 'true')
     setGuestTicketId(window.localStorage.getItem(STORAGE_KEYS.guestTicketId) || '')
     setGuestToken(window.localStorage.getItem(STORAGE_KEYS.guestToken) || '')
     setGuestName(window.localStorage.getItem(STORAGE_KEYS.guestName) || '')
@@ -80,6 +86,45 @@ export default function SupportChatWidget() {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(STORAGE_KEYS.open, String(isOpen))
   }, [isOpen])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(STORAGE_KEYS.hidden, String(isWidgetHidden))
+  }, [isWidgetHidden])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!isHome) {
+      setHasReachedAnchor(true)
+      return
+    }
+    setHasReachedAnchor(false)
+    const anchor = document.querySelector('[data-chat-anchor="food-photo-analysis"]')
+    if (!anchor) {
+      setHasReachedAnchor(true)
+      return
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setHasReachedAnchor(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.2 }
+    )
+    observer.observe(anchor)
+    return () => observer.disconnect()
+  }, [isHome])
+
+  useEffect(() => {
+    if (!hasReachedAnchor || isWidgetHidden) {
+      setAnimateIn(false)
+      return
+    }
+    const raf = window.requestAnimationFrame(() => setAnimateIn(true))
+    return () => window.cancelAnimationFrame(raf)
+  }, [hasReachedAnchor, isWidgetHidden])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -202,7 +247,7 @@ export default function SupportChatWidget() {
           setTicket(nextTicket)
           setFeedbackSubmitted(Boolean(result.ticket?.responses?.some((res: any) => String(res.message || '').startsWith('[FEEDBACK]'))))
           if (nextTicket) {
-            setIsOpen(true)
+            setIsOpen(!isWidgetHidden)
           } else {
             setIsOpen(false)
           }
@@ -219,7 +264,7 @@ export default function SupportChatWidget() {
       console.error('Error loading support chat:', error)
     }
     setIsLoading(false)
-  }, [isOpen, isLoggedIn, guestTicketId, guestToken])
+  }, [isOpen, isLoggedIn, guestTicketId, guestToken, isWidgetHidden])
 
   useEffect(() => {
     if (isOpen) {
@@ -505,58 +550,111 @@ export default function SupportChatWidget() {
 
   if (shouldHideWidget) return null
   if (isLoggedIn && !ticket) return null
+  if (!hasReachedAnchor) return null
+
+  const handleHideWidget = () => {
+    triggerHaptic()
+    setIsOpen(false)
+    setIsWidgetHidden(true)
+  }
+
+  const handleShowWidget = () => {
+    triggerHaptic()
+    setIsWidgetHidden(false)
+  }
 
   return (
     <div className="fixed bottom-5 right-5 z-[60]">
-      {!isOpen && (
+      {isWidgetHidden && (
         <button
-          onClick={() => {
-            triggerHaptic()
-            setIsOpen(true)
-          }}
-          className="group flex items-center gap-3 rounded-full border border-emerald-100 bg-white/90 px-4 py-2 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] backdrop-blur"
+          type="button"
+          onClick={handleShowWidget}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-emerald-100 bg-white/90 text-emerald-600 shadow-lg transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] backdrop-blur"
+          aria-label="Show chat"
         >
-          <Image
-            src={agent.avatar}
-            alt={`${agent.name} avatar`}
-            width={36}
-            height={36}
-            className="rounded-full object-cover ring-2 ring-white"
-          />
-          <div className="text-left">
-            <div className="text-sm font-semibold text-gray-900">Chat with {agent.name}</div>
-            <div className="text-xs text-gray-500">Questions? We’re here.</div>
-          </div>
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+            <path d="M4 4h16v11H7l-3 3V4zm3 5h10v2H7V9zm0-4h10v2H7V5z" />
+          </svg>
         </button>
       )}
 
-      {isOpen && (
-        <div className="w-[360px] max-w-[92vw] h-[520px] max-h-[80vh] bg-white/95 rounded-2xl shadow-[0_18px_60px_rgba(16,24,40,0.18)] border border-emerald-100 flex flex-col backdrop-blur">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-white rounded-t-2xl">
-            <div className="flex items-center gap-3">
-              <Image
-                src={agent.avatar}
-                alt={`${agent.name} avatar`}
-                width={36}
-                height={36}
-                className="rounded-full object-cover ring-2 ring-white"
-              />
-              <div>
-                <div className="text-sm font-semibold text-gray-900">{agent.name}</div>
-                <div className="text-xs text-gray-500">{agent.role}</div>
-              </div>
+      {!isWidgetHidden && (
+        <div className={`transition-all duration-500 ${animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+          {!isOpen && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  triggerHaptic()
+                  setIsOpen(true)
+                }}
+                className="group flex items-center gap-3 rounded-full border border-emerald-100 bg-white/90 px-4 py-2 shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] backdrop-blur"
+              >
+                <Image
+                  src={agent.avatar}
+                  alt={`${agent.name} avatar`}
+                  width={36}
+                  height={36}
+                  className="rounded-full object-cover ring-2 ring-white"
+                />
+                <div className="text-left">
+                  <div className="text-sm font-semibold text-gray-900">Chat with {agent.name}</div>
+                  <div className="text-xs text-gray-500">Questions? We’re here.</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={handleHideWidget}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 bg-white/90 text-gray-500 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:text-gray-700 hover:shadow-lg active:scale-[0.98] backdrop-blur"
+                aria-label="Hide chat widget"
+                title="Hide"
+              >
+                <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                  <path d="M10 12l-6-7h12l-6 7z" />
+                </svg>
+              </button>
             </div>
-            <button
-              onClick={() => {
-                triggerHaptic()
-                setIsOpen(false)
-              }}
-              className="text-gray-400 hover:text-gray-600 active:scale-95 transition-transform"
-              aria-label="Close chat"
-            >
-              ✕
-            </button>
-          </div>
+          )}
+
+          {isOpen && (
+            <div className="w-[360px] max-w-[92vw] h-[520px] max-h-[80vh] bg-white/95 rounded-2xl shadow-[0_18px_60px_rgba(16,24,40,0.18)] border border-emerald-100 flex flex-col backdrop-blur">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-white rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <Image
+                    src={agent.avatar}
+                    alt={`${agent.name} avatar`}
+                    width={36}
+                    height={36}
+                    className="rounded-full object-cover ring-2 ring-white"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{agent.name}</div>
+                    <div className="text-xs text-gray-500">{agent.role}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleHideWidget}
+                    className="text-gray-400 hover:text-gray-600 active:scale-95 transition-transform"
+                    aria-label="Hide chat widget"
+                    title="Hide"
+                  >
+                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                      <path d="M10 12l-6-7h12l-6 7z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => {
+                      triggerHaptic()
+                      setIsOpen(false)
+                    }}
+                    className="text-gray-400 hover:text-gray-600 active:scale-95 transition-transform"
+                    aria-label="Close chat"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
 
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
             {isLoading && !ticket && (
@@ -801,6 +899,8 @@ export default function SupportChatWidget() {
               {!isLoggedIn && !guestEmail.trim() && (
                 <p className="text-[11px] text-gray-500">Add your email to start the chat.</p>
               )}
+            </div>
+          )}
             </div>
           )}
         </div>
