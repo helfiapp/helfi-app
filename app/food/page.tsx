@@ -2135,6 +2135,11 @@ export default function FoodDiary() {
   const latestTodaysFoodsRef = useRef<any[]>([])
   const latestHistoryFoodsRef = useRef<any[] | null>(null)
   const missingBackfillRef = useRef<Record<string, number>>({})
+  const pendingFoodLogSaveRef = useRef<Map<string, { key: string; targetDate: string; attempts: number; nextAttemptAt: number; lastAttemptAt: number }>>(new Map())
+  const pendingFoodLogTimerRef = useRef<number | null>(null)
+  const pendingFoodLogFlushRef = useRef(false)
+  const PENDING_SAVE_RETRY_BASE_MS = 2500
+  const PENDING_SAVE_RETRY_MAX_MS = 60000
   const VERIFY_MERGE_HOLD_MS = 4000
   const holdVerifyMergeForDate = (date: string, durationMs: number = VERIFY_MERGE_HOLD_MS) => {
     if (!date) return
@@ -3476,6 +3481,203 @@ export default function FoodDiary() {
     const raw = entry?.time
     if (raw === null || raw === undefined) return ''
     return raw.toString().trim().toLowerCase()
+  }
+
+  const buildPendingSaveKey = (entry: any, fallbackDate?: string) => {
+    if (!entry) return ''
+    const clientId = getEntryClientId(entry)
+    if (clientId) return `client:${clientId}`
+    const date = dateKeyForEntry(entry) || fallbackDate || ''
+    const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+    const desc = normalizedDescription(entry?.description || entry?.name || '')
+    const timeKey = entryTimestampKey(entry)
+    if (!date || !desc || !timeKey) return ''
+    return `fallback:${date}|${cat}|${desc}|${timeKey}`
+  }
+
+  const markEntryPendingSave = (entry: any, pendingKey?: string) => {
+    if (!entry || typeof entry !== 'object') return entry
+    const key = pendingKey || buildPendingSaveKey(entry, entry?.localDate || selectedDate)
+    if (!key) return entry
+    return {
+      ...(entry as any),
+      __pendingSave: true,
+      __pendingSince: (entry as any).__pendingSince || Date.now(),
+      __pendingKey: key,
+    }
+  }
+
+  const clearEntryPendingSave = (entry: any, dbId?: string | number | null) => {
+    if (!entry || typeof entry !== 'object') return entry
+    const next: any = { ...(entry as any) }
+    if (dbId && !next.dbId) next.dbId = dbId
+    delete next.__pendingSave
+    delete next.__pendingSince
+    delete next.__pendingKey
+    return next
+  }
+
+  const updateEntriesForPendingKey = (pendingKey: string, updater: (entry: any) => any) => {
+    if (!pendingKey) return
+    const apply = (list: any[] | null | undefined) => {
+      if (!Array.isArray(list)) return { list, changed: false }
+      let changed = false
+      const next = list.map((entry) => {
+        const entryKey =
+          (entry as any)?.__pendingKey ||
+          buildPendingSaveKey(entry, entry?.localDate || selectedDate)
+        if (entryKey !== pendingKey) return entry
+        const updated = updater(entry)
+        if (updated !== entry) changed = true
+        return updated
+      })
+      return { list: changed ? next : list, changed }
+    }
+
+    setTodaysFoods((prev) => {
+      const { list } = apply(prev as any[])
+      return list as any[]
+    })
+    setHistoryFoods((prev) => {
+      if (!Array.isArray(prev)) return prev
+      const { list } = apply(prev)
+      return list as any[]
+    })
+    const userSnapshot = Array.isArray((userData as any)?.todaysFoods)
+      ? ((userData as any).todaysFoods as any[])
+      : null
+    if (userSnapshot) {
+      const { list, changed } = apply(userSnapshot)
+      if (changed) {
+        updateUserData({ todaysFoods: list as any[] })
+      }
+    }
+  }
+
+  const enqueuePendingFoodLogSave = (entry: any, targetDate: string) => {
+    if (!entry) return
+    const key = buildPendingSaveKey(entry, targetDate)
+    if (!key) return
+    if (!pendingFoodLogSaveRef.current.has(key)) {
+      pendingFoodLogSaveRef.current.set(key, {
+        key,
+        targetDate: targetDate || selectedDate,
+        attempts: 0,
+        nextAttemptAt: Date.now() + 800,
+        lastAttemptAt: 0,
+      })
+    }
+    schedulePendingFoodLogFlush()
+  }
+
+  const schedulePendingFoodLogFlush = (overrideDelay?: number) => {
+    if (typeof window === 'undefined') return
+    if (pendingFoodLogTimerRef.current) {
+      window.clearTimeout(pendingFoodLogTimerRef.current)
+      pendingFoodLogTimerRef.current = null
+    }
+    const entries = Array.from(pendingFoodLogSaveRef.current.values())
+    if (entries.length === 0) return
+    const now = Date.now()
+    let nextAt = Infinity
+    entries.forEach((item) => {
+      if (item.nextAttemptAt < nextAt) nextAt = item.nextAttemptAt
+    })
+    const delay =
+      typeof overrideDelay === 'number'
+        ? Math.max(300, overrideDelay)
+        : Math.max(300, nextAt - now)
+    pendingFoodLogTimerRef.current = window.setTimeout(() => {
+      pendingFoodLogTimerRef.current = null
+      flushPendingFoodLogSaves()
+    }, delay)
+  }
+
+  const flushPendingFoodLogSaves = async () => {
+    if (pendingFoodLogFlushRef.current) return
+    pendingFoodLogFlushRef.current = true
+    try {
+      const now = Date.now()
+      const entries = Array.from(pendingFoodLogSaveRef.current.values())
+      for (const item of entries) {
+        if (now < item.nextAttemptAt) continue
+        const pendingKey = item.key
+        const combined = [
+          ...(Array.isArray(latestTodaysFoodsRef.current) ? latestTodaysFoodsRef.current : []),
+          ...(Array.isArray(latestHistoryFoodsRef.current) ? (latestHistoryFoodsRef.current as any[]) : []),
+        ]
+        const entry = combined.find((e) => {
+          const key =
+            (e as any)?.__pendingKey ||
+            buildPendingSaveKey(e, (e as any)?.localDate || item.targetDate)
+          return key === pendingKey
+        })
+        if (!entry || isEntryDeleted(entry)) {
+          pendingFoodLogSaveRef.current.delete(pendingKey)
+          continue
+        }
+        const entryDbId = (entry as any)?.dbId
+        if (entryDbId) {
+          pendingFoodLogSaveRef.current.delete(pendingKey)
+          updateEntriesForPendingKey(pendingKey, (e) => clearEntryPendingSave(e, entryDbId))
+          continue
+        }
+
+        const targetDate =
+          typeof entry?.localDate === 'string' && entry.localDate.length >= 8
+            ? entry.localDate
+            : item.targetDate || selectedDate
+        const payload = {
+          description: (entry?.description || '').toString(),
+          nutrition: buildPayloadNutrition(entry),
+          imageUrl: entry?.photo || null,
+          items: Array.isArray(entry?.items) && entry.items.length > 0 ? entry.items : null,
+          meal: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
+          category: normalizeCategory(entry?.category || entry?.meal || entry?.mealType),
+          localDate: targetDate,
+          createdAt: alignTimestampToLocalDate(
+            entry?.createdAt || entry?.id || new Date().toISOString(),
+            targetDate,
+          ),
+          allowDuplicate: true,
+        }
+
+        item.attempts += 1
+        item.lastAttemptAt = now
+        const backoff = Math.min(
+          PENDING_SAVE_RETRY_MAX_MS,
+          PENDING_SAVE_RETRY_BASE_MS * Math.pow(2, Math.min(item.attempts, 4)),
+        )
+        item.nextAttemptAt = now + backoff
+
+        try {
+          const res = await fetch('/api/food-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          if (res.ok) {
+            const json = await res.json().catch(() => ({} as any))
+            const createdId = typeof json?.id === 'string' && json.id ? json.id : null
+            if (createdId && entry?.id && Number.isFinite(Number(entry.id))) {
+              pendingServerIdRef.current.set(String(createdId), {
+                localId: Number(entry.id),
+                savedAt: Date.now(),
+              })
+            }
+            pendingFoodLogSaveRef.current.delete(pendingKey)
+            updateEntriesForPendingKey(pendingKey, (e) => clearEntryPendingSave(e, createdId || undefined))
+          }
+        } catch (err) {
+          console.warn('Pending FoodLog save failed', err)
+        }
+      }
+    } finally {
+      pendingFoodLogFlushRef.current = false
+      if (pendingFoodLogSaveRef.current.size > 0) {
+        schedulePendingFoodLogFlush()
+      }
+    }
   }
 
   // Prevent duplicate rows from ever rendering (e.g., double writes or cached copies).
@@ -4969,6 +5171,28 @@ const applyStructuredItems = (
               const logs = Array.isArray(json.logs) ? json.logs : [];
 
               const mappedFromDb = mapLogsToEntries(logs, selectedDate)
+              const dbByClientId = new Map<string, string | number>()
+              mappedFromDb.forEach((entry) => {
+                const clientId = getEntryClientId(entry)
+                if (!clientId || dbByClientId.has(clientId)) return
+                const dbId = (entry as any)?.dbId || (entry as any)?.id
+                if (dbId) dbByClientId.set(clientId, dbId)
+              })
+              if (dbByClientId.size > 0) {
+                verifyBaseline.forEach((entry: any) => {
+                  if (!(entry as any)?.__pendingSave) return
+                  const clientId = getEntryClientId(entry)
+                  if (!clientId) return
+                  const dbId = dbByClientId.get(clientId)
+                  if (!dbId) return
+                  const pendingKey =
+                    (entry as any)?.__pendingKey || buildPendingSaveKey(entry, entry?.localDate || selectedDate)
+                  if (pendingKey) {
+                    pendingFoodLogSaveRef.current.delete(pendingKey)
+                    updateEntriesForPendingKey(pendingKey, (e) => clearEntryPendingSave(e, dbId))
+                  }
+                })
+              }
 
               // Merge authoritative DB rows with local cache so fresh (not-yet-synced) entries
               // don't disappear when the DB is stale or incomplete.
@@ -5104,9 +5328,13 @@ const applyStructuredItems = (
               const nowTs = Date.now()
               const missingForServer = verifyBaseline.filter((entry: any) => {
                 if (!entry || (entry as any)?.dbId) return false
+                if ((entry as any)?.__pendingSave) return false
                 if (isEntryDeleted(entry)) return false
                 const key = buildSyncKey(entry)
                 if (!key || serverSyncKeys.has(key)) return false
+                const pendingKey =
+                  (entry as any)?.__pendingKey || buildPendingSaveKey(entry, entry?.localDate || selectedDate)
+                if (pendingKey && pendingFoodLogSaveRef.current.has(pendingKey)) return false
                 const last = missingBackfillRef.current[key] || 0
                 if (nowTs - last < 2 * 60 * 1000) return false
                 missingBackfillRef.current[key] = nowTs
@@ -9604,7 +9832,9 @@ Please add nutritional information manually if needed.`);
       `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
       { forceNew: true },
     )
-    removeDeletedTombstonesForEntries([copiedEntry])
+    const pendingKey = buildPendingSaveKey(copiedEntry, targetDate)
+    const pendingEntry = markEntryPendingSave(copiedEntry, pendingKey)
+    removeDeletedTombstonesForEntries([pendingEntry])
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     const normalizedHistory = Array.isArray(historyFoods) ? historyFoods : []
     const isTargetToday = targetDate === todayIso
@@ -9618,15 +9848,15 @@ Please add nutritional information manually if needed.`);
     let foodsForSave = todaysFoods
 
     if (isTargetToday || (isTargetSelected && isViewingToday)) {
-      updatedTodaysFoods = dedupeList([copiedEntry, ...todaysFoods])
+      updatedTodaysFoods = dedupeList([pendingEntry, ...todaysFoods])
       setTodaysFoods(updatedTodaysFoods)
       foodsForSave = updatedTodaysFoods
     } else if (isTargetSelected && !isViewingToday) {
-      updatedHistoryFoods = dedupeList([copiedEntry, ...normalizedHistory])
+      updatedHistoryFoods = dedupeList([pendingEntry, ...normalizedHistory])
       setHistoryFoods(updatedHistoryFoods)
       foodsForSave = updatedHistoryFoods
     } else {
-      updatedTodaysFoods = dedupeList([copiedEntry, ...todaysFoods])
+      updatedTodaysFoods = dedupeList([pendingEntry, ...todaysFoods])
       setTodaysFoods(updatedTodaysFoods)
       foodsForSave = updatedTodaysFoods
     }
@@ -9641,6 +9871,7 @@ Please add nutritional information manually if needed.`);
       updateUserData({ todaysFoods: mergedSnapshotFoods })
     } catch {}
     holdVerifyMergeForDate(dedupeTargetDate)
+    enqueuePendingFoodLogSave(pendingEntry, dedupeTargetDate)
 
     const toastMessage =
       mode === 'copyToToday'
@@ -9651,33 +9882,33 @@ Please add nutritional information manually if needed.`);
       [category]: true,
     }))
     showQuickToast(toastMessage)
-    maybeShowDietWarningToast(copiedEntry)
+    maybeShowDietWarningToast(pendingEntry)
     setDuplicateModalContext(null)
     triggerHaptic(10)
 
     try {
       await syncSnapshotOnly(foodsForSave, dedupeTargetDate)
 
-      const idKey = copiedEntry?.id !== null && copiedEntry?.id !== undefined ? `id:${copiedEntry.id}` : ''
-      const stableKeys = stableDeleteKeysForEntry(copiedEntry)
+      const idKey = pendingEntry?.id !== null && pendingEntry?.id !== undefined ? `id:${pendingEntry.id}` : ''
+      const stableKeys = stableDeleteKeysForEntry(pendingEntry)
       const shouldSkip =
         (idKey && deletedEntryKeysRef.current.has(idKey)) ||
         stableKeys.some((k) => deletedEntryKeysRef.current.has(k)) ||
-        isEntryDeleted(copiedEntry)
+        isEntryDeleted(pendingEntry)
       if (!shouldSkip) {
         try {
           const res = await fetch('/api/food-log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              description: copiedEntry.description || '',
-              nutrition: buildPayloadNutrition(copiedEntry),
-              imageUrl: copiedEntry.photo || null,
-              items: Array.isArray(copiedEntry.items) && copiedEntry.items.length > 0 ? copiedEntry.items : null,
-              meal: copiedEntry.meal || copiedEntry.category,
-              category: copiedEntry.category || copiedEntry.meal,
-              localDate: copiedEntry.localDate,
-              createdAt: copiedEntry.createdAt,
+              description: pendingEntry.description || '',
+              nutrition: buildPayloadNutrition(pendingEntry),
+              imageUrl: pendingEntry.photo || null,
+              items: Array.isArray(pendingEntry.items) && pendingEntry.items.length > 0 ? pendingEntry.items : null,
+              meal: pendingEntry.meal || pendingEntry.category,
+              category: pendingEntry.category || pendingEntry.meal,
+              localDate: pendingEntry.localDate,
+              createdAt: pendingEntry.createdAt,
               allowDuplicate: true,
             }),
           })
@@ -9685,20 +9916,20 @@ Please add nutritional information manually if needed.`);
             const json = await res.json().catch(() => ({} as any))
             const createdId = typeof json?.id === 'string' && json.id ? json.id : null
             if (createdId) {
-              const copiedClientId = getEntryClientId(copiedEntry)
+              const copiedClientId = getEntryClientId(pendingEntry)
               const attach = (list: any[] | null | undefined) =>
                 dedupeEntries(
                   (Array.isArray(list) ? list : []).map((e: any) => {
                     if (!copiedClientId || getEntryClientId(e) !== copiedClientId) return e
-                    return { ...e, dbId: createdId }
+                    return clearEntryPendingSave({ ...e, dbId: createdId }, createdId)
                   }),
                   { fallbackDate: dedupeTargetDate },
                 )
               setTodaysFoods((prev) => attach(prev))
               setHistoryFoods((prev) => attach(prev))
-              if (copiedEntry?.id && Number.isFinite(Number(copiedEntry.id))) {
+              if (pendingEntry?.id && Number.isFinite(Number(pendingEntry.id))) {
                 pendingServerIdRef.current.set(String(createdId), {
-                  localId: Number(copiedEntry.id),
+                  localId: Number(pendingEntry.id),
                   savedAt: Date.now(),
                 })
               }
@@ -9712,6 +9943,10 @@ Please add nutritional information manually if needed.`);
                   body: JSON.stringify({ id: createdId }),
                 }).catch(() => {})
               }
+            }
+            if (pendingKey) {
+              pendingFoodLogSaveRef.current.delete(pendingKey)
+              updateEntriesForPendingKey(pendingKey, (e) => clearEntryPendingSave(e, createdId || undefined))
             }
           }
         } catch (postErr) {
@@ -9751,7 +9986,7 @@ Please add nutritional information manually if needed.`);
         entry.items && Array.isArray(entry.items) && entry.items.length > 0
           ? JSON.parse(JSON.stringify(entry.items))
           : null
-      return applyEntryClientId(
+      const baseEntry = applyEntryClientId(
         {
           ...entry,
           clientId: undefined,
@@ -9772,6 +10007,8 @@ Please add nutritional information manually if needed.`);
         `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
         { forceNew: true },
       )
+      const pendingKey = buildPendingSaveKey(baseEntry, targetDate)
+      return markEntryPendingSave(baseEntry, pendingKey)
     })
     removeDeletedTombstonesForEntries(clones)
     setSelectedAddCategory(categoryKey)
@@ -9787,6 +10024,7 @@ Please add nutritional information manually if needed.`);
       )
       updateUserData({ todaysFoods: mergedSnapshotFoods })
     } catch {}
+    clones.forEach((clone) => enqueuePendingFoodLogSave(clone, targetDate))
     holdVerifyMergeForDate(targetDate)
     setExpandedCategories((prev) => ({ ...prev, [categoryKey]: true }))
     showQuickToast(`Copied ${categoryLabel(categoryKey)} to today`)
@@ -9826,6 +10064,7 @@ Please add nutritional information manually if needed.`);
       for (const clone of clones) {
         const idKey = clone?.id !== null && clone?.id !== undefined ? `id:${clone.id}` : ''
         const stableKeys = stableDeleteKeysForEntry(clone)
+        const pendingKey = (clone as any)?.__pendingKey || buildPendingSaveKey(clone, targetDate)
         const shouldSkip =
           (idKey && deletedEntryKeysRef.current.has(idKey)) ||
           stableKeys.some((k) => deletedEntryKeysRef.current.has(k)) ||
@@ -9852,18 +10091,36 @@ Please add nutritional information manually if needed.`);
           if (!res.ok) continue
           const json = await res.json().catch(() => ({} as any))
           const createdId = typeof json?.id === 'string' && json.id ? json.id : null
-          if (!createdId) continue
+          if (!createdId) {
+            if (pendingKey) {
+              pendingFoodLogSaveRef.current.delete(pendingKey)
+              updateEntriesForPendingKey(pendingKey, (e) => clearEntryPendingSave(e))
+            }
+            continue
+          }
 
           // Attach db id to the in-memory clone so future deletes are stable and immediate.
           setTodaysFoods((prev) =>
             dedupeEntries(
               (prev || []).map((e: any) => {
                 if (String(e?.id ?? '') !== String(clone?.id ?? '')) return e
-                return { ...e, dbId: createdId }
+                return clearEntryPendingSave({ ...e, dbId: createdId }, createdId)
               }),
               { fallbackDate: targetDate },
             ),
           )
+          if (pendingKey) {
+            pendingFoodLogSaveRef.current.delete(pendingKey)
+          }
+          if (clone?.id && Number.isFinite(Number(clone.id))) {
+            pendingServerIdRef.current.set(String(createdId), {
+              localId: Number(clone.id),
+              savedAt: Date.now(),
+            })
+          }
+          if (pendingKey) {
+            updateEntriesForPendingKey(pendingKey, (e) => clearEntryPendingSave(e, createdId))
+          }
 
           // If the user deleted this entry while the POST was in-flight, delete it server-side now
           // using the real DB id so it cannot resurrect on the next refresh tick.
@@ -15553,7 +15810,10 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
                                   {entryCalories !== null && <span className="font-semibold text-gray-900">{entryCalories} kcal</span>}
-                                  <span className="text-gray-500">{formatTimeWithAMPM(food.time)}</span>
+                                  <span className="text-gray-500">
+                                    {formatTimeWithAMPM(food.time)}
+                                    {(food as any)?.__pendingSave ? ' • Saving...' : ''}
+                                  </span>
                                 </div>
                                 {!isMobile && (
                                   <div className="relative entry-options-dropdown overflow-visible">
