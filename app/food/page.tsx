@@ -2008,6 +2008,9 @@ export default function FoodDiary() {
   } | null>(null)
   const duplicateInFlightRef = useRef(false)
   const favoriteInsertDebounceRef = useRef<Record<string, number>>({})
+  const mealInsertDebounceRef = useRef<Record<string, number>>({})
+  const pendingServerIdRef = useRef<Map<string, { localId: number; savedAt: number }>>(new Map())
+  const foodLibraryRefreshRef = useRef<{ last: number; inFlight: boolean }>({ last: 0, inFlight: false })
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
@@ -2346,7 +2349,7 @@ export default function FoodDiary() {
     loadExerciseEntriesForDate(selectedDate)
     // Keep device pills updated when switching dates (low-cost, cached by browser).
     refreshDeviceStatus()
-  }, [selectedDate])
+  }, [mapLogsToEntries, mergeFoodLibraryEntries, selectedDate])
 
   useEffect(() => {
     const today = buildTodayIso()
@@ -5211,29 +5214,29 @@ const applyStructuredItems = (
       }
     })
 
+  const PENDING_SERVER_ID_TTL_MS = 2 * 60 * 1000
+  const prunePendingServerIds = () => {
+    const now = Date.now()
+    pendingServerIdRef.current.forEach((value, key) => {
+      if (!value || now - value.savedAt > PENDING_SERVER_ID_TTL_MS) {
+        pendingServerIdRef.current.delete(key)
+      }
+    })
+  }
+
   const isLikelyUnsyncedEntry = (entry: any, targetDate: string) => {
     if (!entry) return false
-    if ((entry as any)?.dbId) return false
     if (!entryMatchesDate(entry, targetDate)) return false
     if (isEntryDeleted(entry)) return false
     const descKey = normalizedDescription(entry?.description || entry?.name || '')
     if (!descKey) return false
-    const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
-    const entryTs = extractEntryTimestampMs(entry)
-    const isRecent = Number.isFinite(entryTs) ? Date.now() - entryTs < 10 * 60 * 1000 : false
-    const pendingMatch = Array.isArray(pendingQueue)
-      ? pendingQueue.some((payload: any) => {
-          const payloadDesc = normalizedDescription(payload?.description || payload?.name || '')
-          if (!payloadDesc || payloadDesc !== descKey) return false
-          const payloadCategory = normalizeCategory(payload?.meal || payload?.category || payload?.mealType)
-          if (payloadCategory !== entryCategory) return false
-          const payloadDate =
-            typeof payload?.localDate === 'string' && payload.localDate.length >= 8 ? payload.localDate : ''
-          if (payloadDate && payloadDate !== (dateKeyForEntry(entry) || targetDate)) return false
-          return true
-        })
-      : false
-    return pendingMatch || isRecent
+    const entryDbId = (entry as any)?.dbId ? String((entry as any).dbId) : ''
+    if (entryDbId) {
+      const pending = pendingServerIdRef.current.get(entryDbId)
+      if (pending && Date.now() - pending.savedAt < PENDING_SERVER_ID_TTL_MS) return true
+      return false
+    }
+    return true
   }
 
   const mergeServerEntries = (serverEntries: any[], localEntries: any[], targetDate: string) => {
@@ -5246,6 +5249,7 @@ const applyStructuredItems = (
   // Best-effort reload to keep UI in sync with the authoritative DB rows right after saving.
   const refreshEntriesFromServer = async () => {
     try {
+      prunePendingServerIds()
       const tz = new Date().getTimezoneOffset();
       const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}&t=${Date.now()}`, {
         cache: 'no-store',
@@ -5284,6 +5288,11 @@ const applyStructuredItems = (
       }
       const mappedWithStableIds = mapped.map((e: any) => {
         let next = e
+        const pending = pendingServerIdRef.current.get(String((e as any)?.dbId || ''))
+        if (pending && Number.isFinite(pending.localId)) {
+          next = { ...next, id: pending.localId }
+          pendingServerIdRef.current.delete(String((e as any)?.dbId || ''))
+        }
         let existing = localByKey.get(buildMergeKey(e))
         if (!existing) {
           const cat = normalizeCategory(e?.meal || e?.category || e?.mealType)
@@ -5380,7 +5389,7 @@ const applyStructuredItems = (
       await refreshDiaryNow()
     }
   }
-  const autoDiaryRefreshEnabled = false
+  const autoDiaryRefreshEnabled = true
   useEffect(() => {
     if (!autoDiaryRefreshEnabled) return
     if (typeof window === 'undefined') return
@@ -5577,20 +5586,34 @@ const applyStructuredItems = (
               descriptionPreview: payload.description.substring(0, 50),
             })
             // Attach the real DB id to the newest entry so deletes always work (even for favorites).
-            if (result?.id) {
-              const matchesLatest = (food: any) => {
-                if (!food) return false
-                if (food?.id === latest?.id) return true
-                const sameDesc = String(food?.description || '').trim().toLowerCase() === String(latest?.description || '').trim().toLowerCase()
-                const sameCat =
-                  normalizeCategory(food?.meal || food?.category || food?.mealType) ===
-                  normalizeCategory(latest?.meal || latest?.category || latest?.mealType)
-                const samePhoto = String(food?.photo || '') === String(latest?.photo || '') // usually null/empty
-                return sameDesc && sameCat && samePhoto
-              }
-              const withDbId = snapshotFoods.map((food) =>
-                food?.dbId || !matchesLatest(food) ? food : { ...food, dbId: result.id },
-              )
+          if (result?.id) {
+            const localId = Number(latest?.id)
+            if (Number.isFinite(localId)) {
+              pendingServerIdRef.current.set(String(result.id), {
+                localId,
+                savedAt: Date.now(),
+              })
+            }
+            const matchesLatest = (food: any) => {
+              if (!food) return false
+              if (food?.id === latest?.id) return true
+              const latestDate = dateKeyForEntry(latest) || targetLocalDate
+              const foodDate = dateKeyForEntry(food) || ''
+              if (latestDate && foodDate && latestDate !== foodDate) return false
+              const latestCat = normalizeCategory(latest?.meal || latest?.category || latest?.mealType)
+              const foodCat = normalizeCategory(food?.meal || food?.category || food?.mealType)
+              if (latestCat !== foodCat) return false
+              const latestDesc = normalizedDescription(latest?.description || latest?.name || '')
+              const foodDesc = normalizedDescription(food?.description || food?.name || '')
+              if (!latestDesc || latestDesc !== foodDesc) return false
+              const latestTimeKey = entryTimestampKey(latest)
+              const foodTimeKey = entryTimestampKey(food)
+              if (latestTimeKey && foodTimeKey && latestTimeKey !== foodTimeKey) return false
+              return true
+            }
+            const withDbId = snapshotFoods.map((food) =>
+              food?.dbId || !matchesLatest(food) ? food : { ...food, dbId: result.id },
+            )
               if (isViewingToday) {
                 setTodaysFoods(withDbId)
                 updateUserData({ todaysFoods: withDbId })
@@ -7403,7 +7426,7 @@ Please add nutritional information manually if needed.`);
     return normalizeMealLabel(raw)
   }
 
-  const FOOD_LIBRARY_MAX_ENTRIES = 400
+  const FOOD_LIBRARY_MAX_ENTRIES = 2000
   const buildFoodLibraryEntry = (entry: any, fallbackDate: string) => {
     const compacted = compactEntryForSnapshot(entry, fallbackDate)
     if (!compacted || typeof compacted !== 'object') return null
@@ -7717,6 +7740,33 @@ Please add nutritional information manually if needed.`);
     if ((entry as any)?.method === 'text') return 'Manual'
     return 'CRDB'
   }
+
+  const refreshFoodLibraryFromServer = useCallback(async () => {
+    if (typeof window === 'undefined') return
+    const now = Date.now()
+    if (foodLibraryRefreshRef.current.inFlight) return
+    if (now - foodLibraryRefreshRef.current.last < 5 * 60 * 1000) return
+    foodLibraryRefreshRef.current.inFlight = true
+    try {
+      const res = await fetch('/api/food-log/library?limit=2000', { cache: 'no-store' })
+      if (!res.ok) return
+      const json = await res.json().catch(() => ({} as any))
+      const logs = Array.isArray(json.logs) ? json.logs : []
+      if (!logs.length) return
+      const mapped = mapLogsToEntries(logs, selectedDate)
+      setFoodLibrary((prev) => mergeFoodLibraryEntries(prev, mapped, selectedDate))
+    } catch (err) {
+      console.warn('Food library refresh failed', err)
+    } finally {
+      foodLibraryRefreshRef.current.last = now
+      foodLibraryRefreshRef.current.inFlight = false
+    }
+  }, [selectedDate])
+
+  useEffect(() => {
+    if (!showFavoritesPicker) return
+    refreshFoodLibraryFromServer()
+  }, [showFavoritesPicker, refreshFoodLibraryFromServer])
 
   const collectHistoryMeals = () => {
     const pool: any[] = []
@@ -8946,11 +8996,16 @@ Please add nutritional information manually if needed.`);
   const insertMealIntoDiary = async (source: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (!source) return
     const category = normalizeCategory(targetCategory || selectedAddCategory)
+    const now = Date.now()
     triggerHaptic(10)
     setQuickToast(`Adding to ${categoryLabel(category)}...`)
-    const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
+    const createdAtIso = alignTimestampToLocalDate(new Date(now).toISOString(), selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const description = applyFoodNameOverride(source?.description || source?.label || source?.favorite?.label || 'Meal', source)
+    const debounceKey = `${normalizedDescription(description)}|${selectedDate}|${category}`
+    const lastInsert = mealInsertDebounceRef.current[debounceKey] || 0
+    if (now - lastInsert < 800) return
+    mealInsertDebounceRef.current[debounceKey] = now
     const totals =
       sanitizeNutritionTotals(source?.nutrition || source?.total || source?.entry?.total || source?.entry?.nutrition) ||
       null
@@ -9003,7 +9058,7 @@ Please add nutritional information manually if needed.`);
     setExpandedCategories((prev) => ({ ...prev, [category]: true }))
     queueScrollToDiaryEntry({ entryKey: newEntry.id, category })
     try {
-      await saveFoodEntries(updated)
+      await saveFoodEntries(updated, { allowDuplicate: true })
       await refreshEntriesFromServer()
       showQuickToast(`Added to ${categoryLabel(category)}`)
     } catch (err) {
@@ -9134,7 +9189,7 @@ Please add nutritional information manually if needed.`);
       })
     }
     try {
-      await saveFoodEntries(updatedFoods)
+      await saveFoodEntries(updatedFoods, { allowDuplicate: true })
       await refreshEntriesFromServer()
       showQuickToast(`Added to ${categoryLabel(category)}`)
     } catch (err) {
@@ -9923,7 +9978,7 @@ Please add nutritional information manually if needed.`);
       try {
         const rawDesc = (entry?.description || entry?.name || '').toString().trim()
         const descForServer = rawDesc.length > 0 ? rawDesc.slice(0, 220) : ''
-        if (descForServer) {
+        if (descForServer && !deletedAny) {
           const categories = [entryCategory]
           // SAFETY: only attempt category-agnostic deletes on the exact target day.
           // Otherwise a missing-category row can cause deletes to wipe other days’ items.
