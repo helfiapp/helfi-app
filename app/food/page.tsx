@@ -10343,7 +10343,6 @@ Please add nutritional information manually if needed.`);
 
 	      try {
 	        await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true, skipServerSnapshot: true })
-	        await refreshEntriesFromServer()
 	      } catch (err) {
 	        console.warn('Delete sync failed', err)
 	      }
@@ -10409,7 +10408,6 @@ Please add nutritional information manually if needed.`);
 	      } catch (err) {
 	        console.warn('Failed to update local snapshot after history delete', err)
 	      }
-	      await refreshEntriesFromServer()
 	    } catch {
 	      // On error, reload history for the selected date
 	      try {
