@@ -7928,6 +7928,7 @@ Please add nutritional information manually if needed.`);
       allMealsWithFavorites.push({
         id: favId || `fav-${Math.random()}`,
         label,
+        entry: null,
         favorite: fav,
         createdAt: Number(fav?.createdAt) || Number(fav?.id) || Date.now(),
         sourceTag: 'Favorite',
