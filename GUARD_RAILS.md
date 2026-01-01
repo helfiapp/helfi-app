@@ -219,6 +219,7 @@ the user.
 - The popup should appear **at most once per day** until the report is viewed or dismissed.
 - If the report is locked (no credits), the popup CTA must send users to **Billing**, not to the report page.
 - Email + push are sent **only once per report** and are triggered by QStash; do not re‑introduce repeated sends.
+- The **PDF export lives on the 7‑day report page** (button uses `/api/export/pdf` with the report date range). Do not re‑introduce the old JSON export on the Account page without user approval.
 
 ### 2.8 Notification Inbox + Profile Badge (Jan 2026 – Locked)
 
@@ -306,6 +307,11 @@ On January 19th, 2025, food diary entries disappeared because entries were being
 5. **Desktop entry menu overflow (do not break):**
    - Keep desktop food entry cards square-cornered **with** a thin outline (`border border-gray-200`); do not remove the border or reintroduce rounding.
    - The desktop entry action menu must fully overflow: parents/cards must allow `overflow-visible`, and raise z-index when the menu is open so all menu items are reachable. Do **not** reintroduce clipping or hide the menu behind containers. If you change the menu, you must ensure it still displays fully (use a portal if needed).
+
+6. **Manual refresh only (mobile + desktop):**
+   - Food diary must **not auto-refresh** on day changes, focus events, or navigation.
+   - Refresh should only happen when the user manually pulls to refresh or taps the refresh control.
+   - Do not re‑enable background refresh without explicit user approval.
 
 **Backend (`app/api/food-log/route.ts`):**
 

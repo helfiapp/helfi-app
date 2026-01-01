@@ -4,11 +4,60 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
+let checkinTablesEnsured = false
+
+async function ensureCheckinTables() {
+  if (checkinTablesEnsured) return
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS CheckinIssues (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        polarity TEXT NOT NULL,
+        UNIQUE (userId, name)
+      )
+    `)
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS CheckinRatings (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        issueId TEXT NOT NULL,
+        date TEXT NOT NULL,
+        timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+        value INTEGER,
+        note TEXT,
+        isNa BOOLEAN DEFAULT false
+      )
+    `)
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM CheckinIssues a
+      USING CheckinIssues b
+      WHERE a.id > b.id AND a.userId = b.userId AND a.name = b.name
+    `).catch(() => {})
+    await prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
+    `).catch(() => {})
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS id TEXT`).catch(() => {})
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP NOT NULL DEFAULT NOW()`).catch(() => {})
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL`).catch(() => {})
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS note TEXT`).catch(() => {})
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false`).catch(() => {})
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_checkinratings_user_date ON CheckinRatings(userId, date)`).catch(() => {})
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_checkinratings_timestamp ON CheckinRatings(timestamp DESC)`).catch(() => {})
+    checkinTablesEnsured = true
+  } catch (error) {
+    console.error('[checkins] Failed to ensure tables', error)
+  }
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = await prisma.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  await ensureCheckinTables()
 
   const today = new Date().toISOString().slice(0,10)
 
@@ -145,6 +194,8 @@ export async function POST(req: NextRequest) {
   const user = await prisma.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
+  await ensureCheckinTables()
+
   const { ratings } = await req.json()
   const today = new Date().toISOString().slice(0,10)
   const now = new Date().toISOString()
@@ -186,5 +237,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save ratings' }, { status: 500 })
   }
 }
-
 

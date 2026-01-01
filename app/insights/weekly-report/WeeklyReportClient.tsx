@@ -63,6 +63,14 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
 
   const sections = payload?.sections || {}
   const dataWarning = (report?.dataSummary as any)?.dataWarning as string | null
+  const pdfHref = useMemo(() => {
+    if (!report) return null
+    const params = new URLSearchParams()
+    if (report.periodStart) params.set('from', `${report.periodStart}T00:00:00`)
+    if (report.periodEnd) params.set('to', `${report.periodEnd}T23:59:59`)
+    const query = params.toString()
+    return query ? `/api/export/pdf?${query}` : '/api/export/pdf'
+  }, [report])
 
   if (!report) {
     return (
@@ -166,12 +174,24 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
               {report.periodStart} to {report.periodEnd}
             </p>
           </div>
-          <Link
-            href="/insights"
-            className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
-          >
-            Back to Insights
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            {pdfHref && (
+              <a
+                href={pdfHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center rounded-lg border border-helfi-green px-4 py-2 text-sm font-medium text-helfi-green hover:bg-helfi-green/10"
+              >
+                Download PDF
+              </a>
+            )}
+            <Link
+              href="/insights"
+              className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
+            >
+              Back to Insights
+            </Link>
+          </div>
         </div>
 
         {dataWarning && (

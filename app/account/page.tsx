@@ -28,7 +28,6 @@ export default function AccountPage() {
   // Modal states
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showExportModal, setShowExportModal] = useState(false)
   
   // Password change state
   const [passwordData, setPasswordData] = useState({
@@ -46,7 +45,6 @@ export default function AccountPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   
   // Loading and feedback states
-  const [isExporting, setIsExporting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
@@ -222,18 +220,6 @@ export default function AccountPage() {
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Actions</h3>
             <div className="space-y-4">
-              <div className="p-4 border border-gray-200 rounded-lg">
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900">Export Data</h4>
-                  <p className="text-sm text-gray-600">Download a copy of your health data</p>
-                </div>
-                <button
-                  onClick={() => setShowExportModal(true)}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                >
-                  Export Data
-                </button>
-              </div>
               <div className="p-4 border border-red-200 rounded-lg bg-red-50">
                 <div className="mb-3">
                   <h4 className="font-medium text-red-900">Delete Account</h4>
@@ -440,65 +426,6 @@ export default function AccountPage() {
                 disabled={!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword}
               >
                 Change Password
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Export Data Modal */}
-      {showExportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Export Your Data</h3>
-            <p className="text-gray-600 mb-6">
-              This will download a JSON file containing all your health data including:
-              • Profile information
-              • Onboarding responses
-              • Food diary entries
-              • Health goals and preferences
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  setIsExporting(true)
-                  try {
-                    // Collect all user data
-                    const userData = {
-                      profile: accountData,
-                      exportDate: new Date().toISOString(),
-                      // Add more data sources as needed
-                    }
-                    
-                    // Create and download file
-                    const blob = new Blob([JSON.stringify(userData, null, 2)], { type: 'application/json' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `helfi-data-export-${new Date().toISOString().split('T')[0]}.json`
-                    document.body.appendChild(a)
-                    a.click()
-                    document.body.removeChild(a)
-                    URL.revokeObjectURL(url)
-                    
-                    setShowExportModal(false)
-                  } catch (error) {
-                    console.error('Export failed:', error)
-                    alert('Export failed. Please try again.')
-                  } finally {
-                    setIsExporting(false)
-                  }
-                }}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
-                disabled={isExporting}
-              >
-                {isExporting ? 'Exporting...' : 'Download Data'}
               </button>
             </div>
           </div>
