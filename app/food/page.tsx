@@ -7837,24 +7837,6 @@ Please add nutritional information manually if needed.`);
       }
     })
 
-    const entryKey = (entry: any) => {
-      // "All" is a picker list; we key by the (possibly renamed) label so old names collapse cleanly.
-      const label = normalizeKey(entry?.description || entry?.label || '', entry)
-      const labelSimple = simplifyKey(entry?.description || entry?.label || '')
-      const key = label || labelSimple
-      return key ? `label:${key}` : ''
-    }
-    history.forEach((entry) => {
-      const key = entryKey(entry)
-      if (!key) return
-      const existing = allByKey.get(key)
-      const created = Number(entry?.createdAt ? new Date(entry.createdAt).getTime() : entry?.id || 0)
-      const existingCreated = Number(existing?.createdAt ? new Date(existing.createdAt).getTime() : existing?.id || 0)
-      if (!existing || created > existingCreated) {
-        allByKey.set(key, entry)
-      }
-    })
-
     // Track favorites by label so "All" can still show edit/delete actions
     // even when a matching history entry exists (same name).
     const favoritesByKey = new Map<string, any>()
