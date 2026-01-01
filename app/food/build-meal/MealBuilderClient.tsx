@@ -1307,8 +1307,8 @@ export default function MealBuilderClient() {
               <div className="text-lg font-semibold text-gray-900 truncate">
                 {editFavoriteId ? 'Edit meal' : 'Build a meal'}
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-sm font-medium text-emerald-700">
                   {CATEGORY_LABELS[category]}
                 </span>
                 <span className="text-gray-300">•</span>
@@ -1326,7 +1326,7 @@ export default function MealBuilderClient() {
             >
               {editFavoriteId ? (favoriteSaving ? 'Saving…' : 'Save changes') : 'Save meal'}
             </button>
-            <div className="text-[11px] text-gray-500 md:text-right md:max-w-[260px]">
+            <div className="text-sm text-gray-500 md:text-right md:max-w-[260px]">
               Find this later in <span className="font-semibold">Food Diary → {CATEGORY_LABELS[category]}</span> (tap to edit) and <span className="font-semibold">Favorites → Custom</span>.
             </div>
           </div>
