@@ -1293,31 +1293,40 @@ export default function MealBuilderClient() {
   return (
     <div className="min-h-screen bg-white">
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <button
-            type="button"
-            onClick={() => router.push('/food')}
-            className="p-2 rounded-full hover:bg-gray-100"
-            aria-label="Back"
-          >
-            <span aria-hidden>←</span>
-          </button>
-          <div className="flex-1 min-w-0">
-            <div className="text-lg font-semibold text-gray-900 truncate">{editFavoriteId ? 'Edit meal' : 'Build a meal'}</div>
-            <div className="text-xs text-gray-500">
-              {CATEGORY_LABELS[category]} • {selectedDate}
+        <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:gap-4">
+          <div className="flex items-start gap-3 md:items-center">
+            <button
+              type="button"
+              onClick={() => router.push('/food')}
+              className="p-2 rounded-full hover:bg-gray-100"
+              aria-label="Back"
+            >
+              <span aria-hidden>←</span>
+            </button>
+            <div className="min-w-0">
+              <div className="text-lg font-semibold text-gray-900 truncate">
+                {editFavoriteId ? 'Edit meal' : 'Build a meal'}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                  {CATEGORY_LABELS[category]}
+                </span>
+                <span className="text-gray-300">•</span>
+                <span>{selectedDate}</span>
+              </div>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1">
+
+          <div className="flex flex-col gap-2 md:ml-auto md:items-end">
             <button
               type="button"
               onClick={createMeal}
               disabled={busy || favoriteSaving}
-              className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
+              className="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
             >
               {editFavoriteId ? (favoriteSaving ? 'Saving…' : 'Save changes') : 'Save meal'}
             </button>
-            <div className="text-[11px] text-gray-500 text-right max-w-[240px]">
+            <div className="text-[11px] text-gray-500 md:text-right md:max-w-[260px]">
               Find this later in <span className="font-semibold">Food Diary → {CATEGORY_LABELS[category]}</span> (tap to edit) and <span className="font-semibold">Favorites → Custom</span>.
             </div>
           </div>
