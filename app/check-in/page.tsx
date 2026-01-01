@@ -69,7 +69,10 @@ export default function CheckInPage() {
         isNa: !!na[it.id],
       }))
       const res = await fetch('/api/checkins/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ratings: payload }) })
-      if (!res.ok) throw new Error('save failed')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Failed to save')
+      }
       // Navigate after save
       try {
         const search = typeof window !== 'undefined' ? window.location.search : ''
@@ -93,8 +96,8 @@ export default function CheckInPage() {
         return
       } catch {}
       alert('Saved today\'s ratings.')
-    } catch (e) {
-      alert('Failed to save. Please try again.')
+    } catch (e: any) {
+      alert(e?.message || 'Failed to save. Please try again.')
     }
   }
 

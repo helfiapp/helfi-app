@@ -85,6 +85,14 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
               Next report due: {new Date(nextReportDueAt).toLocaleDateString()}
             </p>
           )}
+          <a
+            href="/api/export/pdf"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex mt-4 items-center rounded-lg border border-helfi-green px-4 py-2 text-sm font-medium text-helfi-green hover:bg-helfi-green/10"
+          >
+            Download PDF (current data)
+          </a>
           <Link
             href="/insights"
             className="inline-flex mt-6 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"

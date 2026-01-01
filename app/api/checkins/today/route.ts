@@ -196,7 +196,8 @@ export async function POST(req: NextRequest) {
 
   await ensureCheckinTables()
 
-  const { ratings } = await req.json()
+  const body = await req.json().catch(() => ({}))
+  const ratings = Array.isArray(body?.ratings) ? body.ratings : []
   const today = new Date().toISOString().slice(0,10)
   const now = new Date().toISOString()
 
@@ -221,10 +222,14 @@ export async function POST(req: NextRequest) {
     // try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false`) } catch(_) {}
     // try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL`) } catch(_) {}
     
-    // Create a new check-in entry (allowing multiple per day)
-    for (const r of ratings as Array<{ issueId: string, value?: number | null, note?: string, isNa?: boolean }>) {
+    for (const r of ratings as Array<{ issueId?: string, value?: number | null, note?: string, isNa?: boolean }>) {
+      if (!r?.issueId) continue
       const clamped = (r.value === null || r.value === undefined) ? null : Math.max(0, Math.min(6, Number(r.value)))
       const id = crypto.randomUUID()
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM CheckinRatings WHERE userId = $1 AND issueId = $2 AND date = $3`,
+        user.id, r.issueId, today
+      )
       await prisma.$queryRawUnsafe(
         `INSERT INTO CheckinRatings (id, userId, issueId, date, timestamp, value, note, isNa) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -234,7 +239,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('checkins save error', e)
-    return NextResponse.json({ error: 'Failed to save ratings' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to save ratings', detail: (e as any)?.message || null }, { status: 500 })
   }
 }
-

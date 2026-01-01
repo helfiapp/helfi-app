@@ -165,7 +165,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
             <div>
               <h2 className="text-lg font-semibold text-gray-900">7-day health report</h2>
               <p className="text-sm text-gray-600 mt-1">
-                We build this report automatically every 7 days based on how you use Helfi.
+                We build this report automatically every 7 days based on how you use Helfi. No action needed.
               </p>
               {weeklyStatus?.reportReady && (
                 <p className="text-sm text-emerald-700 mt-2">Your latest report is ready to view.</p>
@@ -201,7 +201,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   href="/onboarding?step=1"
                   className="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  Update Health Setup
+                  Edit Health Setup (optional)
                 </Link>
               )}
             </div>
