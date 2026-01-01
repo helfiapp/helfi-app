@@ -19,9 +19,24 @@ export async function chatCompletionWithCost(
   openai: OpenAI,
   params: CreateParams
 ): Promise<CompletionWithCost<OpenAI.Chat.Completions.ChatCompletion>> {
+  const modelName = String((params as any).model || '').toLowerCase()
+  const isGpt5Family = modelName.includes('gpt-5')
+  const normalizedParams = (() => {
+    if (!isGpt5Family) return params
+    const maxTokens = Number((params as any).max_tokens)
+    const maxCompletionTokens = Number((params as any).max_completion_tokens)
+    const next: any = { ...params }
+    delete next.max_tokens
+    if (Number.isFinite(maxCompletionTokens) && maxCompletionTokens > 0) {
+      next.max_completion_tokens = maxCompletionTokens
+    } else if (Number.isFinite(maxTokens) && maxTokens > 0) {
+      next.max_completion_tokens = maxTokens
+    }
+    return next
+  })()
   try {
     const completion = await openai.chat.completions.create({
-      ...params,
+      ...normalizedParams,
       stream: false,
     } as any);
 
@@ -90,7 +105,6 @@ function extractPromptText(messages: any[]): string {
     return '';
   }
 }
-
 
 
 
