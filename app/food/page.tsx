@@ -2130,6 +2130,41 @@ export default function FoodDiary() {
   }, [isAnalysisRoute])
   const categoryRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const backfillAttemptedRef = useRef<Record<string, boolean>>({})
+  const verifyMergeHoldRef = useRef<Record<string, number>>({})
+  const verifyMergeTimerRef = useRef<Record<string, { id: number; fireAt: number }>>({})
+  const VERIFY_MERGE_HOLD_MS = 4000
+  const holdVerifyMergeForDate = (date: string, durationMs: number = VERIFY_MERGE_HOLD_MS) => {
+    if (!date) return
+    verifyMergeHoldRef.current[date] = Date.now() + Math.max(0, durationMs)
+  }
+  const getVerifyMergeHoldRemaining = (date: string) => {
+    const until = verifyMergeHoldRef.current[date]
+    if (!until) return 0
+    const remaining = until - Date.now()
+    if (remaining <= 0) {
+      delete verifyMergeHoldRef.current[date]
+      return 0
+    }
+    return remaining
+  }
+  const scheduleVerifyMergeForDate = (date: string, delayMs: number, run: () => void) => {
+    if (!date || delayMs <= 0 || typeof window === 'undefined') return false
+    const fireAt = Date.now() + delayMs
+    const existing = verifyMergeTimerRef.current[date]
+    if (existing) {
+      if (existing.fireAt >= fireAt) return true
+      window.clearTimeout(existing.id)
+    }
+    const id = window.setTimeout(() => {
+      const current = verifyMergeTimerRef.current[date]
+      if (current && current.id === id) {
+        delete verifyMergeTimerRef.current[date]
+      }
+      run()
+    }, delayMs)
+    verifyMergeTimerRef.current[date] = { id, fireAt }
+    return true
+  }
   const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => {
     const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
     if (Array.isArray(warmHistory)) return warmHistory
@@ -4903,7 +4938,7 @@ const applyStructuredItems = (
         // saved but filtered out due to missing/incorrect localDate. This ensures we don't lose entries
         // that exist in FoodLog but not in cache. This verification step prevents the "missing entries"
         // bug that occurred on Jan 19, 2025. See GUARD_RAILS.md section 3 for details.
-        (async () => {
+        const runVerify = async () => {
           try {
             const tz = new Date().getTimezoneOffset();
             const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
@@ -5032,7 +5067,15 @@ const applyStructuredItems = (
           } catch (error) {
             console.error('Error verifying entries from database:', error);
           }
-        })();
+        }
+        const holdRemaining = getVerifyMergeHoldRemaining(selectedDate)
+        if (holdRemaining > 0) {
+          scheduleVerifyMergeForDate(selectedDate, holdRemaining + 50, () => {
+            runVerify()
+          })
+          return
+        }
+        runVerify()
       } else {
         // Fallback: if provider cache is empty or filtered out, load from food-log API for the selected date
         (async () => {
@@ -9507,6 +9550,7 @@ Please add nutritional information manually if needed.`);
       setTodaysFoods(updatedTodaysFoods)
       foodsForSave = updatedTodaysFoods
     }
+    holdVerifyMergeForDate(dedupeTargetDate)
 
     const toastMessage =
       mode === 'copyToToday'
@@ -9643,6 +9687,7 @@ Please add nutritional information manually if needed.`);
     setSelectedAddCategory(categoryKey)
     const deduped = dedupeEntries([...clones, ...todaysFoods], { fallbackDate: targetDate })
     setTodaysFoods(deduped)
+    holdVerifyMergeForDate(targetDate)
     setExpandedCategories((prev) => ({ ...prev, [categoryKey]: true }))
     showQuickToast(`Copied ${categoryLabel(categoryKey)} to today`)
     // Warn once if any copied meals don't match the selected diets.
