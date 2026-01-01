@@ -53,7 +53,7 @@ export default function QuickMoodCheckInPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] dark:bg-gray-900 pb-28">
+    <div className="min-h-screen bg-[#f8f9fa] dark:bg-gray-900 pb-40">
       <PageHeader title="Quick Check‑In" backHref="/dashboard" />
 
       <main className="max-w-3xl mx-auto px-4 py-6">
@@ -112,7 +112,7 @@ export default function QuickMoodCheckInPage() {
       </main>
 
       <div className="md:hidden fixed bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-gray-900 dark:via-gray-900/90 pt-10 z-40">
-        <div className="max-w-3xl mx-auto px-4 grid grid-cols-2 gap-3">
+        <div className="max-w-3xl mx-auto px-4 flex flex-col gap-3">
           <button
             type="button"
             onClick={() => window.history.back()}

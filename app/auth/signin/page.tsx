@@ -711,20 +711,22 @@ export default function SignIn() {
                 )}
               </div>
 
-              <div className="flex items-start justify-between gap-3">
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700 select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-helfi-green focus:ring-helfi-green"
-                  />
-                  Keep me signed in
-                </label>
-                <span className="text-xs text-gray-500 leading-5">
-                  If unchecked, you stay signed in for at least 24 hours.
-                </span>
-              </div>
+              {!isSignUp && (
+                <div className="flex items-start justify-between gap-3">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700 select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-helfi-green focus:ring-helfi-green"
+                    />
+                    Keep me signed in
+                  </label>
+                  <span className="text-xs text-gray-500 leading-5">
+                    If unchecked, you stay signed in for at least 24 hours.
+                  </span>
+                </div>
+              )}
 
               {error && (
                 <div className="text-red-600 text-sm">{error}</div>
