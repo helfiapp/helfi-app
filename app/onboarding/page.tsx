@@ -24,6 +24,7 @@ const sanitizeUserDataPayload = (payload: any) => {
 };
 
 const AUTO_UPDATE_INSIGHTS_ON_EXIT = true;
+const SAVE_HEALTH_SETUP_ON_LEAVE_ONLY = true;
 
 // Auth-enabled onboarding flow
 
@@ -6661,6 +6662,18 @@ export default function Onboarding() {
         fireAndForgetInsightsRegen(changeTypes)
       })
   }, [form, updateUserData])
+
+  useEffect(() => {
+    if (!SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) return
+    const handleBeforeUnload = () => {
+      triggerInsightsUpdateOnExit('unload')
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      triggerInsightsUpdateOnExit('unmount')
+    }
+  }, [triggerInsightsUpdateOnExit])
   
   // Background regen status indicator
   const [backgroundRegenStatus, setBackgroundRegenStatus] = useState<{ isRegenerating: boolean; message?: string }>({ isRegenerating: false });
@@ -6919,9 +6932,11 @@ export default function Onboarding() {
       setForm((prev: any) => {
         const next = { ...prev, ...partial };
         formRef.current = next; // Keep latest edits available for exit-save flows.
-        if (allowAutosave) {
+        if (allowAutosave && !SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) {
           debouncedSave(next);
-          // Mark dirty only if current form differs from baseline
+        }
+        // Mark dirty only if current form differs from baseline
+        if (allowAutosave) {
           try {
             if (formBaselineRef.current && onboardingGuardSnapshotJson(next) !== formBaselineRef.current) {
               setHasGlobalUnsavedChanges(true);
@@ -6938,7 +6953,7 @@ export default function Onboarding() {
 
   // Once autosave is allowed (after data load), push current form to backend to avoid blanks
   useEffect(() => {
-    if (!allowAutosave) return;
+    if (!allowAutosave || SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) return;
     debouncedSave(form);
   }, [allowAutosave, debouncedSave, form]);
 
@@ -6992,7 +7007,9 @@ export default function Onboarding() {
       }
       
       // Re-enabled debounced save with safer mechanism
-      debouncedSave(updatedForm);
+      if (!SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) {
+        debouncedSave(updatedForm);
+      }
       
       // Add small delay for visual feedback
       await new Promise(resolve => setTimeout(resolve, 150));
