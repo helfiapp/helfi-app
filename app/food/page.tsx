@@ -5847,6 +5847,22 @@ const applyStructuredItems = (
     }
   }
 
+  const syncSnapshotOnly = async (entries: any[], snapshotDate: string) => {
+    try {
+      const dedupeTargetDate = snapshotDate || selectedDate
+      const existingSnapshotFoods = Array.isArray((userData as any)?.todaysFoods)
+        ? ((userData as any).todaysFoods as any[])
+        : []
+      const mergedSnapshotFoods = dedupeEntries(
+        [...entries, ...existingSnapshotFoods],
+        { fallbackDate: dedupeTargetDate },
+      )
+      await syncSnapshotToServer(mergedSnapshotFoods, dedupeTargetDate)
+    } catch (err) {
+      console.warn('Snapshot-only sync failed', err)
+    }
+  }
+
   const retryHistorySave = async () => {
     const payload = lastHistoryPayload || pendingQueue[0]
     if (!payload || historyRetrying) return
@@ -9506,7 +9522,7 @@ Please add nutritional information manually if needed.`);
     triggerHaptic(10)
 
     try {
-      await saveFoodEntries(foodsForSave, { allowDuplicate: true, appendHistory: false, suppressToast: true })
+      await syncSnapshotOnly(foodsForSave, dedupeTargetDate)
 
       const idKey = copiedEntry?.id !== null && copiedEntry?.id !== undefined ? `id:${copiedEntry.id}` : ''
       const stableKeys = stableDeleteKeysForEntry(copiedEntry)
@@ -9657,7 +9673,7 @@ Please add nutritional information manually if needed.`);
     } catch {}
     try {
       // Persist to user-data snapshot (without history append to avoid single-entry overwrite)
-      await saveFoodEntries(deduped, { appendHistory: false, snapshotDateOverride: targetDate, suppressToast: true })
+      await syncSnapshotOnly(deduped, targetDate)
 
       // Persist each cloned entry to FoodLog so refresh won't drop them.
       // IMPORTANT: This must respect deletes that occur while copies are still being posted,
@@ -10342,9 +10358,9 @@ Please add nutritional information manually if needed.`);
         }
 
 	      try {
-	        await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true, skipServerSnapshot: true })
+	        await syncSnapshotOnly(updatedFoods, selectedDate)
 	      } catch (err) {
-	        console.warn('Delete sync failed', err)
+	        console.warn('Delete snapshot sync failed', err)
 	      }
 	    } finally {
 	      endDiaryMutation()
@@ -10404,9 +10420,9 @@ Please add nutritional information manually if needed.`);
 	        console.error('Failed to atomic-delete history entry from database:', error);
 	      }
 	      try {
-	        await saveFoodEntries(nextList, { appendHistory: false, suppressToast: true, snapshotDateOverride: selectedDate, skipServerSnapshot: true })
+	        await syncSnapshotOnly(nextList, selectedDate)
 	      } catch (err) {
-	        console.warn('Failed to update local snapshot after history delete', err)
+	        console.warn('Failed to update snapshot after history delete', err)
 	      }
 	    } catch {
 	      // On error, reload history for the selected date
@@ -10702,7 +10718,7 @@ Please add nutritional information manually if needed.`);
     clearMultiCopyClipboard()
 
     try {
-      await saveFoodEntries(foodsForSave, { appendHistory: false, snapshotDateOverride: targetDate, suppressToast: true })
+      await syncSnapshotOnly(foodsForSave, targetDate)
 
       // Persist to FoodLog so refresh won't drop pasted entries (especially for non-today dates).
       for (const clone of clones) {
