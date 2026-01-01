@@ -154,11 +154,12 @@ export async function POST(request: NextRequest) {
       }
     })
     
-    // Send verification email (don't await to avoid blocking)
+    // Send verification email before returning so it isn't dropped by serverless shutdown.
     console.log('📧 Sending verification email to new user')
-    sendVerificationEmail(user.email, verificationToken).catch(error => {
-      console.error('❌ Verification email failed (non-blocking):', error)
-    })
+    const emailSent = await sendVerificationEmail(user.email, verificationToken)
+    if (!emailSent) {
+      console.error('❌ Verification email failed (non-blocking)')
+    }
 
     // Notify owner of new signup (don't await to avoid blocking)
     notifyOwner({
