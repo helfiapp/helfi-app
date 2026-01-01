@@ -73,12 +73,13 @@ export async function POST(request: NextRequest) {
       const createdAt = existing.createdAt instanceof Date ? existing.createdAt : new Date(existing.createdAt as any)
       const createdAtMs = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.getTime() : NaN
       const targetCategory = normalizeMealCategory((existing as any).meal ?? (existing as any).category) || 'uncategorized'
-      const targetBucket = Number.isFinite(createdAtMs) ? Math.floor(createdAtMs / 60000) : null
+      const targetMs = Number.isFinite(createdAtMs) ? createdAtMs : null
+      const targetLocalDate = typeof (existing as any).localDate === 'string' ? String((existing as any).localDate) : ''
 
       // Only do a sweep when we have a meaningful text seed (avoid nuking short placeholder rows like "0").
       const shouldSweep = needle.length >= 12 && Number.isFinite(createdAtMs)
       if (shouldSweep) {
-        const BUCKET_WINDOW_MINUTES = 5
+        const MATCH_WINDOW_MS = 5000
         const WINDOW_HOURS = 6
         const windowStart = new Date(createdAtMs - WINDOW_HOURS * 60 * 60 * 1000)
         const windowEnd = new Date(createdAtMs + WINDOW_HOURS * 60 * 60 * 1000)
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
                 : undefined,
             ].filter(Boolean) as any,
           },
-          select: { id: true, imageUrl: true, description: true, name: true, createdAt: true, meal: true, category: true },
+          select: { id: true, imageUrl: true, description: true, name: true, createdAt: true, meal: true, category: true, localDate: true },
         })
 
         const filtered = duplicates.filter((row) => {
@@ -146,10 +147,14 @@ export async function POST(request: NextRequest) {
             rowCategory === 'uncategorized' ||
             targetCategory === 'uncategorized'
           if (!catMatches) return false
-          if (targetBucket !== null) {
-            const rowBucket = row.createdAt ? Math.floor(new Date(row.createdAt as any).getTime() / 60000) : null
-            if (rowBucket === null) return false
-            if (Math.abs(rowBucket - targetBucket) > BUCKET_WINDOW_MINUTES) return false
+          if (targetLocalDate) {
+            const rowLocalDate = typeof (row as any)?.localDate === 'string' ? String((row as any).localDate) : ''
+            if (rowLocalDate && rowLocalDate !== targetLocalDate) return false
+          }
+          if (targetMs !== null) {
+            const rowMs = row.createdAt ? new Date(row.createdAt as any).getTime() : NaN
+            if (!Number.isFinite(rowMs)) return false
+            if (Math.abs(rowMs - targetMs) > MATCH_WINDOW_MS) return false
           }
           return true
         })

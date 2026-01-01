@@ -3343,10 +3343,10 @@ export default function FoodDiary() {
     return `${y}-${m}-${day}`
   }
 
-  const entryMinuteBucketKey = (entry: any) => {
+  const entryTimestampKey = (entry: any) => {
     if (!entry) return ''
     const ts = extractEntryTimestampMs(entry)
-    if (Number.isFinite(ts)) return String(Math.floor(ts / 60000))
+    if (Number.isFinite(ts)) return String(Math.round(ts))
     const raw = entry?.time
     if (raw === null || raw === undefined) return ''
     return raw.toString().trim().toLowerCase()
@@ -3361,17 +3361,7 @@ export default function FoodDiary() {
       return cat !== 'uncategorized'
     }
     const descKey = (desc: any) => normalizedDescription(desc)
-    const timeBucketKey = (entry: any) => {
-      const ts = extractEntryTimestampMs(entry)
-      if (Number.isFinite(ts)) {
-        // Minute bucket: prevents “tap spam” duplicates while still allowing
-        // the same meal at different times to show separately.
-        return String(Math.floor(ts / 60000))
-      }
-      const raw = entry?.time
-      if (raw === null || raw === undefined) return ''
-      return raw.toString().trim().toLowerCase()
-    }
+    const timeBucketKey = (entry: any) => entryTimestampKey(entry)
     const fallbackDate = options?.fallbackDate || ''
     // First pass: drop obvious duplicates within the same category (same date+category+description+time-bucket)
     const seen = new Set<string>()
@@ -5271,7 +5261,7 @@ const applyStructuredItems = (
       const descKey = (desc: any) => normalizedDescription(desc)
       const timeBucketKey = (entry: any) => {
         const ts = extractEntryTimestampMs(entry)
-        if (Number.isFinite(ts)) return String(Math.floor(ts / 60000))
+        if (Number.isFinite(ts)) return String(Math.round(ts))
         const raw = entry?.time
         if (raw === null || raw === undefined) return ''
         return raw.toString().trim().toLowerCase()
@@ -9771,7 +9761,7 @@ Please add nutritional information manually if needed.`);
 	
 	    const targetDescKey = normalizedDescription(entry?.description || entry?.name || '')
 	    const targetDateKey = dateKeyForEntry(entry) || selectedDate
-      const targetTimeBucket = entryMinuteBucketKey(entry)
+      const targetTimeBucket = entryTimestampKey(entry)
 	    const updatedFoods = todaysFoods.filter((food: any) => {
       const sameId =
         entryId !== null &&
@@ -9788,7 +9778,7 @@ Please add nutritional information manually if needed.`);
       if (!foodDescKey || !foodDateKey) return true
       if (foodDescKey !== targetDescKey) return true
       if (foodDateKey !== targetDateKey) return true
-      const foodTimeBucket = entryMinuteBucketKey(food)
+      const foodTimeBucket = entryTimestampKey(food)
       if (targetTimeBucket && foodTimeBucket && foodTimeBucket !== targetTimeBucket) return true
 
       const foodCat = normalizeCategory(food?.meal || food?.category || food?.mealType)
@@ -15991,6 +15981,10 @@ Please add nutritional information manually if needed.`);
                         const tag = item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom')
                         const serving = item?.serving || '1 serving'
                         const handleSelect = () => {
+                          if (favoritesActiveTab === 'custom' && item.favorite) {
+                            insertMealIntoDiary(item.favorite, selectedAddCategory)
+                            return
+                          }
                           if (item.favorite) {
                             insertFavoriteIntoDiary(item.favorite, selectedAddCategory)
                           } else if (item.entry) {
