@@ -1,5 +1,7 @@
 'use client'
 
+import InsightMoreInfo from '@/components/InsightMoreInfo'
+import { buildDetailBullets } from '@/lib/insights/detail-bullets'
 import { useNutritionContext } from '../NutritionShell'
 
 export default function NutritionAvoidPage() {
@@ -28,6 +30,13 @@ export default function NutritionAvoidPage() {
                   <h3 className="text-base font-semibold text-rose-700">{food.name}</h3>
                   <p className="text-sm text-rose-700 mt-1 leading-relaxed">{food.reason}</p>
                   <p className="text-xs text-rose-700 mt-3">Swap in a steadier option from the suggested tab and monitor how you feel.</p>
+                  <InsightMoreInfo
+                    tone="warning"
+                    bullets={buildDetailBullets({
+                      variant: 'nutrition-avoid',
+                      reason: food.reason,
+                    })}
+                  />
                 </div>
               ))}
             </div>
@@ -37,6 +46,13 @@ export default function NutritionAvoidPage() {
               <h3 className="text-base font-semibold text-rose-700">{food.name}</h3>
               <p className="text-sm text-rose-700 mt-1 leading-relaxed">{food.reason}</p>
               <p className="text-xs text-rose-700 mt-3">Swap in a steadier option from the suggested tab and monitor how you feel.</p>
+              <InsightMoreInfo
+                tone="warning"
+                bullets={buildDetailBullets({
+                  variant: 'nutrition-avoid',
+                  reason: food.reason,
+                })}
+              />
             </div>
           ))}
     </div>

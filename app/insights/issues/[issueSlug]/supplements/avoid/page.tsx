@@ -1,5 +1,7 @@
 'use client'
 
+import InsightMoreInfo from '@/components/InsightMoreInfo'
+import { buildDetailBullets } from '@/lib/insights/detail-bullets'
 import { useSupplementsContext } from '../SupplementsShell'
 
 export default function SupplementsAvoidPage() {
@@ -35,6 +37,15 @@ export default function SupplementsAvoidPage() {
             </div>
           </dl>
           <p className="text-xs text-rose-700 mt-3">Discuss this with your practitioner before continuing.</p>
+          <InsightMoreInfo
+            tone="warning"
+            bullets={buildDetailBullets({
+              variant: 'avoid',
+              reason: supplement.reason,
+              dosage: supplement.dosage,
+              timing: supplement.timing,
+            })}
+          />
         </div>
       ))}
     </div>

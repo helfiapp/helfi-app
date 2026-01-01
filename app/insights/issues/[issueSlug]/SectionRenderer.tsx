@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import InsightMoreInfo from '@/components/InsightMoreInfo'
+import { buildDetailBullets } from '@/lib/insights/detail-bullets'
 import type { IssueSectionKey, IssueSectionResult } from '@/lib/insights/issue-engine'
 import SectionChat from './SectionChat'
 
@@ -68,6 +70,14 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
                 <dt className="text-xs uppercase text-gray-500 tracking-wide">{datum.label}</dt>
                 <dd className="text-base font-semibold text-gray-900">{datum.value}</dd>
                 {datum.context && <p className="text-xs text-gray-500 mt-1">{datum.context}</p>}
+                {section === 'labs' && datum.context && (
+                  <InsightMoreInfo
+                    bullets={buildDetailBullets({
+                      variant: 'labs-data',
+                      reason: datum.context,
+                    })}
+                  />
+                )}
               </div>
             ))}
           </dl>

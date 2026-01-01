@@ -1,5 +1,7 @@
 'use client'
 
+import InsightMoreInfo from '@/components/InsightMoreInfo'
+import { buildDetailBullets } from '@/lib/insights/detail-bullets'
 import { useNutritionContext } from '../NutritionShell'
 
 export default function NutritionWorkingPage() {
@@ -24,6 +26,14 @@ export default function NutritionWorkingPage() {
             <dt className="text-xs uppercase text-gray-500 tracking-wide">Example from your log</dt>
             <dd>{focus.example}</dd>
           </dl>
+          <InsightMoreInfo
+            tone="positive"
+            bullets={buildDetailBullets({
+              variant: 'nutrition-working',
+              reason: focus.reason,
+              example: focus.example,
+            })}
+          />
         </div>
       ))}
     </div>

@@ -1,5 +1,7 @@
 'use client'
 
+import InsightMoreInfo from '@/components/InsightMoreInfo'
+import { buildDetailBullets } from '@/lib/insights/detail-bullets'
 import { useMedicationsContext } from '../MedicationsShell'
 
 export default function MedicationsSuggestedPage() {
@@ -25,6 +27,13 @@ export default function MedicationsSuggestedPage() {
               Suggested protocol: {item.suggestion}
             </p>
           )}
+          <InsightMoreInfo
+            bullets={buildDetailBullets({
+              variant: 'suggested',
+              reason: item.reason,
+              suggestion: item.suggestion ?? null,
+            })}
+          />
         </div>
       ))}
       <p className="text-xs text-gray-500 mt-4">

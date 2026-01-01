@@ -1,5 +1,7 @@
 'use client'
 
+import InsightMoreInfo from '@/components/InsightMoreInfo'
+import { buildDetailBullets } from '@/lib/insights/detail-bullets'
 import { useNutritionContext } from '../NutritionShell'
 
 export default function NutritionSuggestedPage() {
@@ -28,6 +30,12 @@ export default function NutritionSuggestedPage() {
                   <h3 className="text-base font-semibold text-gray-900">{focus.title}</h3>
                   <p className="text-sm text-gray-700 mt-1 leading-relaxed">{focus.reason}</p>
                   <p className="mt-3 text-xs text-gray-500">Plan a meal this week that highlights this focus and log how you feel afterwards.</p>
+                  <InsightMoreInfo
+                    bullets={buildDetailBullets({
+                      variant: 'nutrition-suggested',
+                      reason: focus.reason,
+                    })}
+                  />
                 </div>
               ))}
             </div>
@@ -37,6 +45,12 @@ export default function NutritionSuggestedPage() {
               <h3 className="text-base font-semibold text-gray-900">{focus.title}</h3>
               <p className="text-sm text-gray-700 mt-1 leading-relaxed">{focus.reason}</p>
               <p className="mt-3 text-xs text-gray-500">Plan a meal this week that highlights this focus and log how you feel afterwards.</p>
+              <InsightMoreInfo
+                bullets={buildDetailBullets({
+                  variant: 'nutrition-suggested',
+                  reason: focus.reason,
+                })}
+              />
             </div>
           ))}
     </div>

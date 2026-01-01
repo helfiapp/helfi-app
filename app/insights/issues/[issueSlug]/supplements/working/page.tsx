@@ -1,5 +1,7 @@
 'use client'
 
+import InsightMoreInfo from '@/components/InsightMoreInfo'
+import { buildDetailBullets } from '@/lib/insights/detail-bullets'
 import { useSupplementsContext } from '../SupplementsShell'
 
 export default function SupplementsWorkingPage() {
@@ -34,6 +36,15 @@ export default function SupplementsWorkingPage() {
               </dd>
             </div>
           </dl>
+          <InsightMoreInfo
+            tone="positive"
+            bullets={buildDetailBullets({
+              variant: 'working',
+              reason: supplement.reason,
+              dosage: supplement.dosage,
+              timing: supplement.timing,
+            })}
+          />
         </div>
       ))}
     </div>
