@@ -4914,21 +4914,24 @@ const applyStructuredItems = (
         seenIds.add(id);
         return true;
       });
+      const localForDate = dedupeEntries(todaysFoodsForSelectedDate, { fallbackDate: selectedDate })
+      const cacheMerged = dedupeEntries([...localForDate, ...deduped], { fallbackDate: selectedDate })
+      const cacheEntries = cacheMerged.length > 0 ? cacheMerged : deduped
       
-      if (Array.isArray(deduped) && deduped.length > 0) {
+      if (Array.isArray(cacheEntries) && cacheEntries.length > 0) {
         // Update the appropriate state based on whether we're viewing today or a past date
         if (isViewingToday) {
           // Only update if the data actually changed to prevent unnecessary re-renders
           setTodaysFoods(prev => {
             const prevIds = new Set(prev.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
-            const newIds = new Set(deduped.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
+            const newIds = new Set(cacheEntries.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
             const prevIdsArray = Array.from(prevIds);
             const idsMatch = prevIds.size === newIds.size && prevIdsArray.every(id => newIds.has(id));
-            return idsMatch ? prev : deduped;
+            return idsMatch ? prev : cacheEntries;
           });
         } else {
           // For past dates, set historyFoods
-          setHistoryFoods(deduped);
+          setHistoryFoods(cacheEntries);
         }
         // Mark as loaded once data is set from context
         setFoodDiaryLoaded(true);
@@ -4951,10 +4954,10 @@ const applyStructuredItems = (
               // Merge authoritative DB rows with local cache so fresh (not-yet-synced) entries
               // don't disappear when the DB is stale or incomplete.
               if (mappedFromDb.length > 0) {
-                const mergedForDate = mergeServerEntries(mappedFromDb, deduped, selectedDate)
+                const mergedForDate = dedupeEntries([...cacheEntries, ...mappedFromDb], { fallbackDate: selectedDate })
                 console.log('♻️ Merging cache with DB rows for date', selectedDate, {
                   dbCount: mappedFromDb.length,
-                  cacheCount: deduped.length,
+                  cacheCount: cacheEntries.length,
                   mergedCount: mergedForDate.length,
                 })
                 if (isViewingToday) {
@@ -4968,14 +4971,14 @@ const applyStructuredItems = (
               }
 
               // Check if database has entries that aren't in our cached list
-              const cachedIdsForMissing = new Set(deduped.map((f: any) => {
+              const cachedIdsForMissing = new Set(cacheEntries.map((f: any) => {
                 const id = typeof f.id === 'number' ? f.id : Number(f.id);
                 return id;
               }));
 
               // Also enrich existing cached entries with dbId from database
               // This ensures delete functionality works even for cached entries
-              const enrichedCached = deduped.map((cachedEntry: any) => {
+              const enrichedCached = cacheEntries.map((cachedEntry: any) => {
                 const cachedId = typeof cachedEntry.id === 'number' ? cachedEntry.id : Number(cachedEntry.id);
                 // Find matching database entry by timestamp
                 const dbEntry = mappedFromDb.find((l: any) => {
@@ -4994,7 +4997,7 @@ const applyStructuredItems = (
                 return !cachedIdsForMissing.has(logId);
               });
 
-              if (missingEntries.length > 0 || enrichedCached.some((e: any, i: number) => e.dbId !== deduped[i]?.dbId)) {
+              if (missingEntries.length > 0 || enrichedCached.some((e: any, i: number) => e.dbId !== cacheEntries[i]?.dbId)) {
                 console.log('⚠️ Found entries in database that were missing from cache:', missingEntries.length);
                 const mappedMissing = missingEntries.map((l: any) => ({
                   ...l,
@@ -5013,10 +5016,10 @@ const applyStructuredItems = (
 
                 // Update cache with merged data (including dbId for future loads)
                 await syncSnapshotToServer(merged, selectedDate)
-              } else if (mappedFromDb.length === 0 && deduped.length > 0 && !backfillAttemptedRef.current[selectedDate]) {
+              } else if (mappedFromDb.length === 0 && cacheEntries.length > 0 && !backfillAttemptedRef.current[selectedDate]) {
                 // Safety net: backfill only when entries are not in-flight to avoid duplicate rows.
                 const nowTs = Date.now()
-                const hasRecentLocal = deduped.some((entry: any) => {
+                const hasRecentLocal = cacheEntries.some((entry: any) => {
                   const ts = extractEntryTimestampMs(entry)
                   return Number.isFinite(ts) && nowTs - ts < 90 * 1000
                 })
@@ -5025,7 +5028,7 @@ const applyStructuredItems = (
                   backfillAttemptedRef.current[selectedDate] = true
                   try {
                     await Promise.all(
-                      deduped.map(async (entry: any) => {
+                      cacheEntries.map(async (entry: any) => {
                         const payload = {
                           description: (entry?.description || '').toString(),
                           nutrition: buildPayloadNutrition(entry),
