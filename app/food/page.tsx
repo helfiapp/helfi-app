@@ -1673,6 +1673,17 @@ export default function FoodDiary() {
     if (!base || typeof base !== 'object') return { __clientId: clientId }
     return attachClientIdToTotals(base, clientId)
   }
+  const ensureEntryClientId = (entry: any, clientId: string) => {
+    if (!entry || !clientId) return entry
+    const existing = getEntryClientId(entry)
+    if (existing) return entry
+    return {
+      ...(entry as any),
+      clientId,
+      nutrition: attachClientIdToTotals((entry as any)?.nutrition, clientId),
+      total: attachClientIdToTotals((entry as any)?.total, clientId),
+    }
+  }
   const compactItemForSnapshot = (item: any) => {
     if (!item || typeof item !== 'object') return item
     return {
@@ -3434,57 +3445,87 @@ export default function FoodDiary() {
     const descKey = (desc: any) => normalizedDescription(desc)
     const timeBucketKey = (entry: any) => entryTimestampKey(entry)
     const fallbackDate = options?.fallbackDate || ''
-    // First pass: drop obvious duplicates within the same category (same date+category+description+time-bucket)
-    const seen = new Set<string>()
-    const firstPass: any[] = []
+    const buildFallbackKey = (entry: any) => {
+      const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+      return [
+        dateKeyForEntry(entry) || fallbackDate,
+        cat,
+        descKey(entry?.description),
+        timeBucketKey(entry),
+      ].join('|')
+    }
+    const buildClientKey = (entry: any) => {
+      const clientId = getEntryClientId(entry)
+      return clientId ? `client:${clientId}` : ''
+    }
+    const buildDbKey = (entry: any) => {
+      const dbId = (entry as any)?.dbId
+      return dbId ? `db:${dbId}` : ''
+    }
+    const mergePreferredEntry = (primary: any, secondary: any) => {
+      if (!primary || !secondary) return primary
+      let next = primary
+      const primaryCat = normalizeCategory(primary?.meal || primary?.category || primary?.mealType)
+      const secondaryCat = normalizeCategory(secondary?.meal || secondary?.category || secondary?.mealType)
+      if (primaryCat === 'uncategorized' && secondaryCat && secondaryCat !== 'uncategorized') {
+        next = { ...next, meal: secondaryCat, category: secondaryCat, persistedCategory: secondaryCat }
+      }
+      const secondaryClientId = getEntryClientId(secondary)
+      if (secondaryClientId && !getEntryClientId(next)) {
+        next = ensureEntryClientId(next, secondaryClientId)
+      }
+      return next
+    }
+    const pickPreferred = (existing: any, entry: any) => {
+      if (!existing) return entry
+      if (!entry) return existing
+      const existingDb = Boolean(existing?.dbId)
+      const entryDb = Boolean(entry?.dbId)
+      if (existingDb !== entryDb) return entryDb ? entry : existing
+      const existingHasCat = hasRealCategory(existing)
+      const entryHasCat = hasRealCategory(entry)
+      if (existingHasCat !== entryHasCat) return entryHasCat ? entry : existing
+      const existingClientId = Boolean(getEntryClientId(existing))
+      const entryClientId = Boolean(getEntryClientId(entry))
+      if (existingClientId !== entryClientId) return entryClientId ? entry : existing
+      const existingHasItems = Array.isArray(existing?.items) && existing.items.length > 0
+      const entryHasItems = Array.isArray(entry?.items) && entry.items.length > 0
+      if (existingHasItems !== entryHasItems) return entryHasItems ? entry : existing
+      const existingHasTotals = Boolean(existing?.nutrition || existing?.total)
+      const entryHasTotals = Boolean(entry?.nutrition || entry?.total)
+      if (existingHasTotals !== entryHasTotals) return entryHasTotals ? entry : existing
+      const existingTs = extractEntryTimestampMs(existing)
+      const entryTs = extractEntryTimestampMs(entry)
+      if (Number.isFinite(existingTs) && Number.isFinite(entryTs) && entryTs !== existingTs) {
+        return entryTs > existingTs ? entry : existing
+      }
+      return entry
+    }
+    const keyAliases = new Map<string, string>()
+    const preferred = new Map<string, any>()
+    const registerAlias = (canonical: string, key: string) => {
+      if (key) keyAliases.set(key, canonical)
+    }
     for (const entry of list) {
       if (isEntryDeleted(entry)) continue
-      const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
-      const key = [
-        dateKeyForEntry(entry) || fallbackDate,
-        cat,
-        descKey(entry?.description),
-        timeBucketKey(entry),
-      ].join('|')
-      if (!seen.has(key)) {
-        seen.add(key)
-        firstPass.push(entry)
-      }
-    }
-    // Second pass: within the same date+category+description+time-bucket, prefer:
-    // - entries that have a real category over uncategorized
-    // - entries that have a real database id (`dbId`) over purely cached copies
-    // - the most recent entry when both are equivalent
-    const preferred = new Map<string, any>()
-    for (const entry of firstPass) {
-      if (isEntryDeleted(entry)) continue
-      const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
-      const key = [
-        dateKeyForEntry(entry) || fallbackDate,
-        cat,
-        descKey(entry?.description),
-        timeBucketKey(entry),
-      ].join('|')
-      const existing = preferred.get(key)
-      const entryHasCat = hasRealCategory(entry)
-      const existingHasCat = hasRealCategory(existing || {})
-      const entryClientId = getEntryClientId(entry)
-      const existingClientId = getEntryClientId(existing || {})
-      if (!existing) {
-        preferred.set(key, entry)
-      } else if (!existing?.dbId && entry?.dbId) {
-        // Always prefer entries that are backed by a real FoodLog row
-        preferred.set(key, entry)
-      } else if (!existingClientId && entryClientId) {
-        preferred.set(key, entry)
-      } else if (!existingHasCat && entryHasCat) {
-        preferred.set(key, entry)
-      } else if (existingHasCat === entryHasCat) {
-        // If both have same category quality, keep the most recent by createdAt/id
-        const existingTs = typeof existing.id === 'number' ? existing.id : new Date(existing.createdAt || existing.time || 0).getTime()
-        const entryTs = typeof entry.id === 'number' ? entry.id : new Date(entry.createdAt || entry.time || 0).getTime()
-        if (entryTs > existingTs) preferred.set(key, entry)
-      }
+      const fallbackKey = buildFallbackKey(entry)
+      const clientKey = buildClientKey(entry)
+      const dbKey = buildDbKey(entry)
+      const canonical =
+        (clientKey && keyAliases.get(clientKey)) ||
+        (dbKey && keyAliases.get(dbKey)) ||
+        (fallbackKey && keyAliases.get(fallbackKey)) ||
+        clientKey ||
+        dbKey ||
+        fallbackKey
+      if (!canonical) continue
+      const existing = preferred.get(canonical)
+      const chosen = pickPreferred(existing, entry)
+      const merged = mergePreferredEntry(chosen, existing && chosen === existing ? entry : existing)
+      preferred.set(canonical, merged)
+      registerAlias(canonical, clientKey)
+      registerAlias(canonical, dbKey)
+      registerAlias(canonical, fallbackKey)
     }
     return Array.from(preferred.values())
   }
@@ -4930,31 +4971,45 @@ const applyStructuredItems = (
                 // Update cache with merged data (including dbId for future loads)
                 await syncSnapshotToServer(merged, selectedDate)
               } else if (mappedFromDb.length === 0 && deduped.length > 0 && !backfillAttemptedRef.current[selectedDate]) {
-                // Safety net: if we have local entries but the server has none, backfill them into the history table.
-	                backfillAttemptedRef.current[selectedDate] = true
-	                try {
-	                  await Promise.all(
-	                    deduped.map(async (entry: any) => {
-	                      const payload = {
-                        description: (entry?.description || '').toString(),
-                        nutrition: buildPayloadNutrition(entry),
-                        imageUrl: entry?.photo || null,
-                        items: Array.isArray(entry?.items) && entry.items.length > 0 ? entry.items : null,
-                        meal: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
-                        category: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
-                        localDate: typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : selectedDate,
-                        createdAt: alignTimestampToLocalDate(entry?.createdAt || entry?.id || new Date().toISOString(), entry?.localDate || selectedDate),
-                      }
-                      await fetch('/api/food-log', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                      })
-                    }),
-                  )
-                  await refreshEntriesFromServer()
-                } catch (backfillErr) {
-                  console.warn('Backfill to FoodLog failed', backfillErr)
+                // Safety net: backfill only when entries are not in-flight to avoid duplicate rows.
+                const nowTs = Date.now()
+                const hasRecentLocal = deduped.some((entry: any) => {
+                  const ts = extractEntryTimestampMs(entry)
+                  return Number.isFinite(ts) && nowTs - ts < 90 * 1000
+                })
+                const shouldDeferBackfill = syncPausedRef.current || hasRecentLocal
+                if (!shouldDeferBackfill) {
+                  backfillAttemptedRef.current[selectedDate] = true
+                  try {
+                    await Promise.all(
+                      deduped.map(async (entry: any) => {
+                        const payload = {
+                          description: (entry?.description || '').toString(),
+                          nutrition: buildPayloadNutrition(entry),
+                          imageUrl: entry?.photo || null,
+                          items: Array.isArray(entry?.items) && entry.items.length > 0 ? entry.items : null,
+                          meal: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
+                          category: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
+                          localDate:
+                            typeof entry?.localDate === 'string' && entry.localDate.length >= 8
+                              ? entry.localDate
+                              : selectedDate,
+                          createdAt: alignTimestampToLocalDate(
+                            entry?.createdAt || entry?.id || new Date().toISOString(),
+                            entry?.localDate || selectedDate,
+                          ),
+                        }
+                        await fetch('/api/food-log', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(payload),
+                        })
+                      }),
+                    )
+                    await refreshEntriesFromServer()
+                  } catch (backfillErr) {
+                    console.warn('Backfill to FoodLog failed', backfillErr)
+                  }
                 }
               } else if (enrichedCached.length > 0) {
                 // Even if no missing entries, update with enriched dbIds
