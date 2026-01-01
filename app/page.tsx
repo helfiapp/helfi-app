@@ -49,6 +49,7 @@ export default function SplashPage() {
   const [showDemoModal, setShowDemoModal] = useState(false)
   const [videoLoaded, setVideoLoaded] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
+  const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Handle subscription plan selection
@@ -120,14 +121,39 @@ export default function SplashPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
       {/* Medical Disclaimer Banner */}
-      <div className="bg-helfi-green p-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="inline-flex items-center bg-white text-helfi-green px-3 py-1 rounded-full font-semibold text-sm mb-2">
-            Medical Disclaimer
+      <div className="bg-helfi-green text-white">
+        <div className="max-w-6xl mx-auto px-4">
+          <button
+            type="button"
+            onClick={() => setIsDisclaimerOpen((prev) => !prev)}
+            className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold tracking-wide"
+            aria-expanded={isDisclaimerOpen}
+            aria-controls="medical-disclaimer-content"
+          >
+            <span>Medical Disclaimer</span>
+            <svg
+              className={`w-4 h-4 transition-transform duration-300 ${isDisclaimerOpen ? 'rotate-180' : ''}`}
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M10 14l-6-7h12l-6 7z" />
+            </svg>
+          </button>
+          <div
+            id="medical-disclaimer-content"
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              isDisclaimerOpen ? 'max-h-64 opacity-100 pb-4' : 'max-h-0 opacity-0'
+            }`}
+          >
+            <p className="text-sm text-white/95 text-center">
+              Helfi is not a medical device and does not provide medical advice, diagnosis, or treatment. Always consult
+              with a qualified healthcare provider before making health-related decisions.{' '}
+              <Link href="/terms" className="underline text-white hover:text-white/90">
+                View full disclaimer
+              </Link>
+            </p>
           </div>
-          <p className="text-sm text-white">
-            Helfi is not a medical device and does not provide medical advice, diagnosis, or treatment. Always consult with a qualified healthcare provider before making health-related decisions. <Link href="/terms" className="underline text-white hover:text-white/90">View full disclaimer</Link>
-          </p>
         </div>
       </div>
 
