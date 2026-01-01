@@ -45,6 +45,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({} as any))
     const rawDesc = String((body as any)?.description || '').trim()
     const rawCategory = String((body as any)?.category || '').trim()
+    const rawClientId = typeof (body as any)?.clientId === 'string' ? String((body as any).clientId).trim() : ''
+    const rawCreatedAt = (body as any)?.createdAt ?? (body as any)?.createdAtMs ?? null
+    let targetCreatedAtMs: number | null = null
+    if (typeof rawCreatedAt === 'number' && Number.isFinite(rawCreatedAt)) {
+      targetCreatedAtMs = rawCreatedAt
+    } else if (typeof rawCreatedAt === 'string' && rawCreatedAt.trim()) {
+      const parsed = new Date(rawCreatedAt)
+      if (!Number.isNaN(parsed.getTime())) {
+        targetCreatedAtMs = parsed.getTime()
+      }
+    }
     const targetDates = Array.isArray((body as any)?.dates)
       ? ((body as any).dates as string[]).filter((d) => typeof d === 'string' && d.length >= 8)
       : []
@@ -72,29 +83,42 @@ export async function POST(request: NextRequest) {
       whereClause.AND = whereClause.AND || []
       whereClause.AND.push({ localDate: { in: targetDates } })
     }
+    if (targetCreatedAtMs !== null) {
+      const windowStart = new Date(targetCreatedAtMs - 2000)
+      const windowEnd = new Date(targetCreatedAtMs + 2000)
+      whereClause.AND = whereClause.AND || []
+      whereClause.AND.push({ createdAt: { gte: windowStart, lte: windowEnd } })
+    }
 
     const matches = await prisma.foodLog.findMany({
       where: whereClause,
-      select: { id: true, description: true, meal: true, localDate: true, imageUrl: true },
+      select: { id: true, description: true, meal: true, localDate: true, imageUrl: true, nutrients: true, createdAt: true },
     })
+
+    const filteredMatches = rawClientId
+      ? matches.filter((row) => {
+          const rowClientId = typeof (row as any)?.nutrients?.__clientId === 'string' ? String((row as any).nutrients.__clientId) : ''
+          return Boolean(rowClientId) && rowClientId === rawClientId
+        })
+      : matches
 
     // #region agent log
     try {
-      console.log('AGENT_DEBUG', JSON.stringify({hypothesisId:'D',location:'app/api/food-log/delete-by-description/route.ts:POST',message:'Delete-by-description match summary',data:{rawDescLen:rawDesc.length,category,datesCount:targetDates.length,matchesCount:matches.length,sample:matches.slice(0,3).map(m=>({idPrefix:String(m.id).slice(0,8),meal:m.meal||null,localDate:m.localDate||null}))},timestamp:Date.now()}));
+      console.log('AGENT_DEBUG', JSON.stringify({hypothesisId:'D',location:'app/api/food-log/delete-by-description/route.ts:POST',message:'Delete-by-description match summary',data:{rawDescLen:rawDesc.length,category,datesCount:targetDates.length,matchesCount:filteredMatches.length,sample:filteredMatches.slice(0,3).map(m=>({idPrefix:String(m.id).slice(0,8),meal:m.meal||null,localDate:m.localDate||null}))},timestamp:Date.now()}));
     } catch {}
     // #endregion agent log
 
-    if (!matches.length) {
+    if (!filteredMatches.length) {
       return NextResponse.json({ success: true, deleted: 0 })
     }
 
-    const ids = matches.map((m) => m.id)
+    const ids = filteredMatches.map((m) => m.id)
     const result = await prisma.foodLog.deleteMany({
       where: { id: { in: ids }, userId: user.id },
     })
 
     try {
-      await deleteFoodPhotosIfUnused(matches.map((row) => row.imageUrl))
+      await deleteFoodPhotosIfUnused(filteredMatches.map((row) => row.imageUrl))
     } catch (cleanupError) {
       console.warn('AGENT_DEBUG', JSON.stringify({ hypothesisId: 'PHOTO_CLEAN', location: 'app/api/food-log/delete-by-description/route.ts:POST:cleanup', message: 'Food photo cleanup failed (non-blocking)', timestamp: Date.now() }))
       console.warn(cleanupError)

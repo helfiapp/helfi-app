@@ -1628,6 +1628,51 @@ export default function FoodDiary() {
     const safeBase = Number.isFinite(baseMs) ? baseMs : Date.now()
     return safeBase + hashToOffset(salt || String(safeBase))
   }
+  const normalizeClientId = (value: any) => {
+    if (value === null || value === undefined) return ''
+    const raw = String(value).trim()
+    return raw.length > 0 ? raw : ''
+  }
+  const buildClientId = (seed?: string) => {
+    const base = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    return seed ? `${seed}-${base}` : base
+  }
+  const getEntryClientId = (entry: any) => {
+    if (!entry) return ''
+    const direct =
+      normalizeClientId((entry as any)?.clientId) ||
+      normalizeClientId((entry as any)?.client_id) ||
+      normalizeClientId((entry as any)?.clientID)
+    if (direct) return direct
+    const fromNutrition =
+      normalizeClientId((entry as any)?.nutrition?.__clientId) ||
+      normalizeClientId((entry as any)?.total?.__clientId)
+    if (fromNutrition) return fromNutrition
+    return ''
+  }
+  const attachClientIdToTotals = (totals: any, clientId: string) => {
+    if (!clientId) return totals
+    if (!totals || typeof totals !== 'object') return totals
+    if ((totals as any).__clientId === clientId) return totals
+    return { ...(totals as any), __clientId: clientId }
+  }
+  const applyEntryClientId = (entry: any, seed?: string) => {
+    if (!entry || typeof entry !== 'object') return entry
+    const clientId = getEntryClientId(entry) || buildClientId(seed)
+    return {
+      ...(entry as any),
+      clientId,
+      nutrition: attachClientIdToTotals((entry as any)?.nutrition, clientId),
+      total: attachClientIdToTotals((entry as any)?.total, clientId),
+    }
+  }
+  const buildPayloadNutrition = (entry: any) => {
+    const clientId = getEntryClientId(entry)
+    const base = (entry as any)?.nutrition || (entry as any)?.total || null
+    if (!clientId) return base
+    if (!base || typeof base !== 'object') return { __clientId: clientId }
+    return attachClientIdToTotals(base, clientId)
+  }
   const compactItemForSnapshot = (item: any) => {
     if (!item || typeof item !== 'object') return item
     return {
@@ -1668,6 +1713,7 @@ export default function FoodDiary() {
     return {
       id: entry?.id,
       dbId: (entry as any)?.dbId,
+      clientId: getEntryClientId(entry) || undefined,
       localDate,
       description,
       time: entry?.time,
@@ -1710,6 +1756,7 @@ export default function FoodDiary() {
       entries.map((entry) => ({
         id: entry?.id,
         dbId: (entry as any)?.dbId,
+        clientId: getEntryClientId(entry) || undefined,
         localDate:
           (typeof entry?.localDate === 'string' && entry.localDate.length >= 8
             ? entry.localDate
@@ -3222,10 +3269,10 @@ export default function FoodDiary() {
     const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     const descCanonical = normalizedDescription(entry?.description || entry?.name || '')
     const date = dateKeyForEntry(entry)
-    if (!descCanonical || !date) return [] as string[]
     const timeKey = entryTimestampKey(entry)
     const includeTime = mode !== 'legacy'
     const includeLegacy = mode === 'both' || mode === 'legacy' || (!timeKey && mode === 'time')
+    const clientId = getEntryClientId(entry)
 
     // Back-compat: older tombstones may have used the multiplication sign `×` instead of `x`.
     // Include both variants for numeric multipliers (e.g., "0.55× avocado").
@@ -3234,6 +3281,14 @@ export default function FoodDiary() {
     if (multiplierVariant && multiplierVariant !== descCanonical) descVariants.add(multiplierVariant)
 
     const keys: string[] = []
+    if (clientId) {
+      const baseClient = `stable:client:${clientId}`
+      if (includeTime && timeKey) {
+        keys.push(`${baseClient}|${timeKey}`)
+      }
+      keys.push(baseClient)
+    }
+    if (!descCanonical || !date) return keys
     for (const desc of Array.from(descVariants)) {
       const base = `stable:${cat}|${desc}|${date}`
       const baseUncategorized = `stable:uncategorized|${desc}|${date}`
@@ -3331,7 +3386,7 @@ export default function FoodDiary() {
     if ((entry as any)?.__library) return false
     const candidates = [
       buildDeleteKey(entry),
-      stableDeleteKeyForEntry(entry),
+      ...stableDeleteKeysForEntry(entry, 'both'),
     ].filter(Boolean)
     for (const key of candidates) {
       if (deletedEntryKeysRef.current.has(key)) return true
@@ -3412,10 +3467,14 @@ export default function FoodDiary() {
       const existing = preferred.get(key)
       const entryHasCat = hasRealCategory(entry)
       const existingHasCat = hasRealCategory(existing || {})
+      const entryClientId = getEntryClientId(entry)
+      const existingClientId = getEntryClientId(existing || {})
       if (!existing) {
         preferred.set(key, entry)
       } else if (!existing?.dbId && entry?.dbId) {
         // Always prefer entries that are backed by a real FoodLog row
+        preferred.set(key, entry)
+      } else if (!existingClientId && entryClientId) {
         preferred.set(key, entry)
       } else if (!existingHasCat && entryHasCat) {
         preferred.set(key, entry)
@@ -4877,7 +4936,7 @@ const applyStructuredItems = (
 	                    deduped.map(async (entry: any) => {
 	                      const payload = {
                         description: (entry?.description || '').toString(),
-                        nutrition: entry?.nutrition || null,
+                        nutrition: buildPayloadNutrition(entry),
                         imageUrl: entry?.photo || null,
                         items: Array.isArray(entry?.items) && entry.items.length > 0 ? entry.items : null,
                         meal: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
@@ -5190,6 +5249,7 @@ const applyStructuredItems = (
         l.createdAt ? new Date(l.createdAt).toISOString() : new Date().toISOString(),
         (l as any).localDate || fallbackDate,
       )
+      const storedClientId = normalizeClientId((l as any)?.nutrients?.__clientId)
       const storedOrigin = (() => {
         const n = (l as any)?.nutrients
         if (n && typeof n === 'object') {
@@ -5209,6 +5269,7 @@ const applyStructuredItems = (
       return {
         id: new Date(createdAtIso).getTime(), // UI key and sorting by timestamp
         dbId: l.id, // actual database id for delete operations
+        clientId: storedClientId || undefined,
         description: l.description || l.name,
         time: new Date(createdAtIso).toLocaleTimeString([], {
           hour: '2-digit',
@@ -5282,12 +5343,18 @@ const applyStructuredItems = (
         if (raw === null || raw === undefined) return ''
         return raw.toString().trim().toLowerCase()
       }
+      const clientKey = (entry: any) => {
+        const clientId = getEntryClientId(entry)
+        return clientId ? `client:${clientId}` : ''
+      }
       const buildMergeKey = (entry: any) => {
+        const client = clientKey(entry)
+        if (client) return client
         const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
         return [dateKeyForEntry(entry) || selectedDate, cat, descKey(entry?.description), timeBucketKey(entry)].join('|')
       }
       const buildLooseMergeKey = (entry: any) =>
-        [dateKeyForEntry(entry) || selectedDate, descKey(entry?.description), timeBucketKey(entry)].join('|')
+        clientKey(entry) || [dateKeyForEntry(entry) || selectedDate, descKey(entry?.description), timeBucketKey(entry)].join('|')
       const localByKey = new Map<string, any>()
       const localByLooseKey = new Map<string, any>()
       if (Array.isArray(localList)) {
@@ -5547,7 +5614,7 @@ const applyStructuredItems = (
           setHistorySaveError(null)
           const payload = {
             description: (latest?.description || '').toString(),
-            nutrition: latest?.nutrition || null,
+            nutrition: buildPayloadNutrition(latest),
             imageUrl: latest?.photo || null,
             items: Array.isArray(latest?.items) && latest.items.length > 0 ? latest.items : null,
             meal: normalizeCategory(latest?.meal || latest?.category || latest?.mealType),
@@ -5608,6 +5675,10 @@ const applyStructuredItems = (
             }
             const matchesLatest = (food: any) => {
               if (!food) return false
+              const latestClientId = getEntryClientId(latest)
+              if (latestClientId) {
+                return getEntryClientId(food) === latestClientId
+              }
               if (food?.id === latest?.id) return true
               const latestDate = dateKeyForEntry(latest) || targetLocalDate
               const foodDate = dateKeyForEntry(food) || ''
@@ -6560,12 +6631,13 @@ Please add nutritional information manually if needed.`);
     const finalDescription = (baseFromAi || baseFromItems || description || '').trim();
     
     const category = normalizeCategory(selectedAddCategory)
+    const opStamp = Date.now()
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    const newEntry = {
+    const newEntry = applyEntryClientId({
       id: makeUniqueLocalEntryId(
         new Date(createdAtIso).getTime(),
-        `entry:${Date.now()}|${selectedDate}|${category}|${normalizedDescription(finalDescription)}`,
+        `entry:${opStamp}|${selectedDate}|${category}|${normalizedDescription(finalDescription)}`,
       ),
       localDate: selectedDate, // pin to the date the user is viewing when saving
       description: finalDescription,
@@ -6579,7 +6651,7 @@ Please add nutritional information manually if needed.`);
       category,
       persistedCategory: category,
       createdAt: createdAtIso,
-    };
+    }, `entry:${opStamp}|${selectedDate}|${category}|${normalizedDescription(finalDescription)}`);
     
     // Prevent duplicates: check if entry with same ID already exists
     const existingById = todaysFoods.find(food => food.id === newEntry.id);
@@ -6600,6 +6672,7 @@ Please add nutritional information manually if needed.`);
         const mapped = {
           id: newEntry.id,
           dbId: undefined,
+          clientId: newEntry.clientId,
           description: newEntry.description,
           time: newEntry.time,
           createdAt: newEntry.createdAt,
@@ -6682,10 +6755,11 @@ Please add nutritional information manually if needed.`);
 
     const meta = (() => {
       const n = editingEntry?.nutrition
-      if (!n || typeof n !== 'object') return { favoriteId: '', origin: '' }
+      const clientId = getEntryClientId(editingEntry)
+      if (!n || typeof n !== 'object') return { favoriteId: '', origin: '', clientId }
       const favoriteId = typeof (n as any).__favoriteId === 'string' ? String((n as any).__favoriteId).trim() : ''
       const origin = typeof (n as any).__origin === 'string' ? String((n as any).__origin).trim() : ''
-      return { favoriteId, origin }
+      return { favoriteId, origin, clientId }
     })()
 
     const mergedNutrition = (() => {
@@ -6694,6 +6768,7 @@ Please add nutritional information manually if needed.`);
       const next: any = { ...(base as any) }
       if (meta.favoriteId) next.__favoriteId = meta.favoriteId
       if (meta.origin) next.__origin = meta.origin
+      if (meta.clientId) next.__clientId = meta.clientId
       return next
     })()
 
@@ -7505,6 +7580,15 @@ Please add nutritional information manually if needed.`);
   }, [mapLogsToEntries, mergeFoodLibraryEntries, selectedDate])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!diaryHydrated) return
+    const handle = window.setTimeout(() => {
+      refreshFoodLibraryFromServer()
+    }, 900)
+    return () => window.clearTimeout(handle)
+  }, [diaryHydrated, refreshFoodLibraryFromServer])
+
+  useEffect(() => {
     if (!showFavoritesPicker) return
     refreshFoodLibraryFromServer()
   }, [showFavoritesPicker, refreshFoodLibraryFromServer])
@@ -8215,6 +8299,7 @@ Please add nutritional information manually if needed.`);
 
   const insertBarcodeFoodIntoDiary = async (food: any, code?: string) => {
     const category = normalizeCategory(selectedAddCategory)
+    const opStamp = Date.now()
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const item = buildBarcodeIngredientItem(food, code)
@@ -8236,10 +8321,10 @@ Please add nutritional information manually if needed.`);
       buildMealSummaryFromItems(items) ||
       [food?.name, food?.brand].filter(Boolean).join(' – ') ||
       'Scanned food'
-    const entry = {
+    const entry = applyEntryClientId({
       id: makeUniqueLocalEntryId(
         new Date(createdAtIso).getTime(),
-        `barcode:${Date.now()}|${selectedDate}|${category}|${normalizedDescription(description)}`,
+        `barcode:${opStamp}|${selectedDate}|${category}|${normalizedDescription(description)}`,
       ),
       localDate: selectedDate,
       description,
@@ -8253,7 +8338,7 @@ Please add nutritional information manually if needed.`);
       category,
       persistedCategory: category,
       createdAt: createdAtIso,
-    }
+    }, `barcode:${opStamp}|${selectedDate}|${category}|${normalizedDescription(description)}`)
     const updated = dedupeEntries([entry, ...todaysFoods], { fallbackDate: selectedDate })
     setTodaysFoods(updated)
     if (!isViewingToday) {
@@ -9005,10 +9090,10 @@ Please add nutritional information manually if needed.`);
       }
       return null
     })()
-    const newEntry = {
+    const newEntry = applyEntryClientId({
       id: makeUniqueLocalEntryId(
         new Date(createdAtIso).getTime(),
-        `insert:${Date.now()}|${selectedDate}|${category}|${normalizedDescription(description)}`,
+        `insert:${now}|${selectedDate}|${category}|${normalizedDescription(description)}`,
       ),
       localDate: selectedDate,
       description,
@@ -9022,7 +9107,7 @@ Please add nutritional information manually if needed.`);
       category,
       persistedCategory: category,
       createdAt: createdAtIso,
-    }
+    }, `insert:${now}|${selectedDate}|${category}|${normalizedDescription(description)}`)
     // If the user previously deleted this same item (same day + category + description),
     // we keep a tombstone to prevent server "resurrections". But if the user is *intentionally*
     // re-adding it now, we must clear that tombstone so it can appear again.
@@ -9121,7 +9206,7 @@ Please add nutritional information manually if needed.`);
       if (origin) next.__origin = origin
       return next
     }
-    const entry = {
+    const entry = applyEntryClientId({
       id: makeUniqueLocalEntryId(
         new Date(createdAtIso).getTime(),
         `favorite:${now}|${selectedDate}|${category}|${normalizedDescription(baseDescription)}`,
@@ -9149,7 +9234,7 @@ Please add nutritional information manually if needed.`);
       category,
       persistedCategory: category,
       createdAt: createdAtIso,
-    }
+    }, `favorite:${now}|${selectedDate}|${category}|${normalizedDescription(baseDescription)}`)
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     setExpandedCategories((prev) => ({
       ...prev,
@@ -9248,22 +9333,26 @@ Please add nutritional information manually if needed.`);
       source.items && Array.isArray(source.items) && source.items.length > 0
         ? JSON.parse(JSON.stringify(source.items))
         : null
-    const copiedEntry = {
-      ...source,
-      id: makeUniqueLocalEntryId(
-        new Date(createdAtIso).getTime(),
-        `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
-      ),
-      dbId: undefined,
-      localDate: targetDate,
-      time: displayTime,
-      meal: category,
-      category,
-      persistedCategory: category,
-      items: clonedItems,
-      description: baseDescription,
-      createdAt: createdAtIso,
-    }
+    const copiedEntry = applyEntryClientId(
+      {
+        ...source,
+        clientId: undefined,
+        id: makeUniqueLocalEntryId(
+          new Date(createdAtIso).getTime(),
+          `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
+        ),
+        dbId: undefined,
+        localDate: targetDate,
+        time: displayTime,
+        meal: category,
+        category,
+        persistedCategory: category,
+        items: clonedItems,
+        description: baseDescription,
+        createdAt: createdAtIso,
+      },
+      `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
+    )
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     const normalizedHistory = Array.isArray(historyFoods) ? historyFoods : []
     const isTargetToday = targetDate === todayIso
@@ -9304,7 +9393,69 @@ Please add nutritional information manually if needed.`);
     triggerHaptic(10)
 
     try {
-      await saveFoodEntries(foodsForSave, { allowDuplicate: true })
+      await saveFoodEntries(foodsForSave, { allowDuplicate: true, appendHistory: false })
+
+      const idKey = copiedEntry?.id !== null && copiedEntry?.id !== undefined ? `id:${copiedEntry.id}` : ''
+      const stableKeys = stableDeleteKeysForEntry(copiedEntry)
+      const shouldSkip =
+        (idKey && deletedEntryKeysRef.current.has(idKey)) ||
+        stableKeys.some((k) => deletedEntryKeysRef.current.has(k)) ||
+        isEntryDeleted(copiedEntry)
+      if (!shouldSkip) {
+        try {
+          const res = await fetch('/api/food-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              description: copiedEntry.description || '',
+              nutrition: buildPayloadNutrition(copiedEntry),
+              imageUrl: copiedEntry.photo || null,
+              items: Array.isArray(copiedEntry.items) && copiedEntry.items.length > 0 ? copiedEntry.items : null,
+              meal: copiedEntry.meal || copiedEntry.category,
+              category: copiedEntry.category || copiedEntry.meal,
+              localDate: copiedEntry.localDate,
+              createdAt: copiedEntry.createdAt,
+              allowDuplicate: true,
+            }),
+          })
+          if (res.ok) {
+            const json = await res.json().catch(() => ({} as any))
+            const createdId = typeof json?.id === 'string' && json.id ? json.id : null
+            if (createdId) {
+              const copiedClientId = getEntryClientId(copiedEntry)
+              const attach = (list: any[] | null | undefined) =>
+                dedupeEntries(
+                  (Array.isArray(list) ? list : []).map((e: any) => {
+                    if (!copiedClientId || getEntryClientId(e) !== copiedClientId) return e
+                    return { ...e, dbId: createdId }
+                  }),
+                  { fallbackDate: dedupeTargetDate },
+                )
+              setTodaysFoods((prev) => attach(prev))
+              setHistoryFoods((prev) => attach(prev))
+              if (copiedEntry?.id && Number.isFinite(Number(copiedEntry.id))) {
+                pendingServerIdRef.current.set(String(createdId), {
+                  localId: Number(copiedEntry.id),
+                  savedAt: Date.now(),
+                })
+              }
+              const deletedNow =
+                (idKey && deletedEntryKeysRef.current.has(idKey)) ||
+                stableKeys.some((k) => deletedEntryKeysRef.current.has(k))
+              if (deletedNow) {
+                await fetch('/api/food-log/delete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id: createdId }),
+                }).catch(() => {})
+              }
+            }
+          }
+        } catch (postErr) {
+          console.warn('Duplicate/copy FoodLog save failed', postErr)
+        }
+      }
+
       await refreshEntriesFromServer()
     } catch (err) {
       console.warn('Duplicate/copy sync failed', err)
@@ -9338,22 +9489,26 @@ Please add nutritional information manually if needed.`);
         entry.items && Array.isArray(entry.items) && entry.items.length > 0
           ? JSON.parse(JSON.stringify(entry.items))
           : null
-      return {
-        ...entry,
-        id: makeUniqueLocalEntryId(
-          baseMs,
-          `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
-        ),
-        dbId: undefined,
-        localDate: targetDate,
-        createdAt: anchored,
-        time,
-        meal: category,
-        category,
-        persistedCategory: category,
-        items: clonedItems,
-        description: baseDescription,
-      }
+      return applyEntryClientId(
+        {
+          ...entry,
+          clientId: undefined,
+          id: makeUniqueLocalEntryId(
+            baseMs,
+            `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
+          ),
+          dbId: undefined,
+          localDate: targetDate,
+          createdAt: anchored,
+          time,
+          meal: category,
+          category,
+          persistedCategory: category,
+          items: clonedItems,
+          description: baseDescription,
+        },
+        `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
+      )
     })
     setSelectedAddCategory(categoryKey)
     const deduped = dedupeEntries([...clones, ...todaysFoods], { fallbackDate: targetDate })
@@ -9408,7 +9563,7 @@ Please add nutritional information manually if needed.`);
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               description: clone.description || '',
-              nutrition: clone.nutrition || null,
+              nutrition: buildPayloadNutrition(clone),
               imageUrl: clone.photo || null,
               items: Array.isArray(clone.items) && clone.items.length > 0 ? clone.items : null,
               meal: clone.meal || clone.category,
@@ -9992,6 +10147,8 @@ Please add nutritional information manually if needed.`);
                 description: descForServer,
                 category: cat,
                 dates: cat === 'uncategorized' ? [targetDay] : dates,
+                clientId: getEntryClientId(entry) || undefined,
+                createdAt: entry?.createdAt || undefined,
               }
               const res = await fetch('/api/food-log/delete-by-description', {
                 method: 'POST',
@@ -10010,6 +10167,8 @@ Please add nutritional information manually if needed.`);
               description: descForServer,
               category: 'uncategorized',
               dates,
+              clientId: getEntryClientId(entry) || undefined,
+              createdAt: entry?.createdAt || undefined,
             }
             const res = await fetch('/api/food-log/delete-by-description', {
               method: 'POST',
@@ -10039,6 +10198,15 @@ Please add nutritional information manually if needed.`);
           const sweepDates = Array.from(new Set([targetDateKey || selectedDate].filter(Boolean)))
 
           const snapshotFoods = limitSnapshotFoods(updatedFoods, selectedDate)
+          const createdAtForDelete = (() => {
+            if (entry?.createdAt) {
+              const dt = new Date(entry.createdAt)
+              if (!Number.isNaN(dt.getTime())) return dt.toISOString()
+            }
+            const ts = extractEntryTimestampMs(entry)
+            if (Number.isFinite(ts)) return new Date(ts).toISOString()
+            return null
+          })()
           const payloadStr = JSON.stringify({
             id: dbId || null,
             description: (entry?.description || entry?.name || '').toString().trim().slice(0, 220),
@@ -10046,6 +10214,8 @@ Please add nutritional information manually if needed.`);
             dates: sweepDates.slice(0, 1),
             snapshotDate: selectedDate,
             snapshotFoods,
+            clientId: getEntryClientId(entry) || undefined,
+            createdAt: createdAtForDelete || undefined,
           })
           const keepalive = payloadStr.length < 60_000
           await fetch('/api/food-log/delete-atomic', {
@@ -10105,6 +10275,8 @@ Please add nutritional information manually if needed.`);
             dates: [selectedDate].filter(Boolean),
             snapshotDate: selectedDate,
             snapshotFoods: limitSnapshotFoods(nextList, selectedDate),
+            clientId: getEntryClientId(deletedEntry) || undefined,
+            createdAt: deletedEntry?.createdAt || undefined,
           })
           const keepalive = payloadStr.length < 60_000
 	        const res = await fetch('/api/food-log/delete-atomic', {
@@ -10366,25 +10538,28 @@ Please add nutritional information manually if needed.`);
         item?.time ||
         new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       const description = (item?.description || '').toString() || 'Copied meal'
-      return {
-        id: makeUniqueLocalEntryId(
-          baseMs,
-          `paste:${pasteStamp}|${targetDate}|${category}|${normalizedDescription(description)}|${idx}`,
-        ),
-        dbId: undefined,
-        localDate: targetDate,
-        createdAt: anchored,
-        time,
-        meal: category,
-        category,
-        persistedCategory: category,
-        description,
-        nutrition: item?.nutrition ?? null,
-        total: item?.total ?? null,
-        items: Array.isArray(item?.items) && item.items.length > 0 ? item.items : null,
-        photo: item?.photo ?? null,
-        method: item?.method ?? 'copied',
-      }
+      return applyEntryClientId(
+        {
+          id: makeUniqueLocalEntryId(
+            baseMs,
+            `paste:${pasteStamp}|${targetDate}|${category}|${normalizedDescription(description)}|${idx}`,
+          ),
+          dbId: undefined,
+          localDate: targetDate,
+          createdAt: anchored,
+          time,
+          meal: category,
+          category,
+          persistedCategory: category,
+          description,
+          nutrition: item?.nutrition ?? null,
+          total: item?.total ?? null,
+          items: Array.isArray(item?.items) && item.items.length > 0 ? item.items : null,
+          photo: item?.photo ?? null,
+          method: item?.method ?? 'copied',
+        },
+        `paste:${pasteStamp}|${targetDate}|${category}|${normalizedDescription(description)}|${idx}`,
+      )
     })
 
     const dedupeTargetDate = targetDate || selectedDate
@@ -10432,7 +10607,7 @@ Please add nutritional information manually if needed.`);
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               description: clone.description || '',
-              nutrition: clone.nutrition || null,
+              nutrition: buildPayloadNutrition(clone),
               imageUrl: clone.photo || null,
               items: Array.isArray(clone.items) && clone.items.length > 0 ? clone.items : null,
               meal: clone.meal || clone.category,

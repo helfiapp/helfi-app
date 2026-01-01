@@ -56,6 +56,17 @@ export async function POST(request: NextRequest) {
     const rawDesc = typeof (body as any)?.description === 'string' ? String((body as any).description).trim() : ''
     const rawCategory = typeof (body as any)?.category === 'string' ? String((body as any).category).trim() : ''
     const category = rawCategory ? normalizeMealCategory(rawCategory) : null
+    const rawClientId = typeof (body as any)?.clientId === 'string' ? String((body as any).clientId).trim() : ''
+    const rawCreatedAt = (body as any)?.createdAt ?? (body as any)?.createdAtMs ?? null
+    let targetCreatedAtMs: number | null = null
+    if (typeof rawCreatedAt === 'number' && Number.isFinite(rawCreatedAt)) {
+      targetCreatedAtMs = rawCreatedAt
+    } else if (typeof rawCreatedAt === 'string' && rawCreatedAt.trim()) {
+      const parsed = new Date(rawCreatedAt)
+      if (!Number.isNaN(parsed.getTime())) {
+        targetCreatedAtMs = parsed.getTime()
+      }
+    }
 
     const datePattern = /^\d{4}-\d{2}-\d{2}$/
     const snapshotDateRaw = typeof (body as any)?.snapshotDate === 'string' ? String((body as any).snapshotDate).slice(0, 10) : ''
@@ -93,10 +104,11 @@ export async function POST(request: NextRequest) {
           const targetCategory = normalizeMealCategory((existing as any).meal ?? (existing as any).category) || 'uncategorized'
           const targetMs = Number.isFinite(createdAtMs) ? createdAtMs : null
           const targetLocalDate = typeof (existing as any).localDate === 'string' ? String((existing as any).localDate) : ''
+          const targetClientId = rawClientId || (existing as any)?.nutrients?.__clientId || ''
 
           const shouldSweep = needle.length >= 12 && Number.isFinite(createdAtMs)
           if (shouldSweep) {
-            const MATCH_WINDOW_MS = 5000
+            const MATCH_WINDOW_MS = 2000
             const WINDOW_HOURS = 6
             const windowStart = new Date(createdAtMs - WINDOW_HOURS * 60 * 60 * 1000)
             const windowEnd = new Date(createdAtMs + WINDOW_HOURS * 60 * 60 * 1000)
@@ -149,12 +161,16 @@ export async function POST(request: NextRequest) {
                     : undefined,
                 ].filter(Boolean) as any,
               },
-              select: { id: true, imageUrl: true, description: true, name: true, createdAt: true, meal: true, category: true, localDate: true },
+              select: { id: true, imageUrl: true, description: true, name: true, createdAt: true, meal: true, category: true, localDate: true, nutrients: true },
             })
 
             const filtered = duplicates.filter((row) => {
               const rowDesc = normalizeDesc(String(row.description || row.name || ''))
               if (!rowDesc || rowDesc !== targetDesc) return false
+              if (targetClientId) {
+                const rowClientId = typeof (row as any)?.nutrients?.__clientId === 'string' ? String((row as any).nutrients.__clientId) : ''
+                if (!rowClientId || rowClientId !== targetClientId) return false
+              }
               const rowCategory = normalizeMealCategory((row as any)?.meal ?? (row as any)?.category) || 'uncategorized'
               const catMatches =
                 rowCategory === targetCategory ||
@@ -231,19 +247,30 @@ export async function POST(request: NextRequest) {
             whereClause.AND = whereClause.AND || []
             whereClause.AND.push({ localDate: { in: cat === 'uncategorized' && targetDay ? [targetDay] : dates } })
           }
+          if (targetCreatedAtMs !== null) {
+            const windowStart = new Date(targetCreatedAtMs - 2000)
+            const windowEnd = new Date(targetCreatedAtMs + 2000)
+            whereClause.AND = whereClause.AND || []
+            whereClause.AND.push({ createdAt: { gte: windowStart, lte: windowEnd } })
+          }
 
           const matches = await prisma.foodLog.findMany({
             where: whereClause,
-            select: { id: true, imageUrl: true },
+            select: { id: true, imageUrl: true, nutrients: true, createdAt: true },
             take: 50,
           })
 
-          matches.forEach((row) => {
+          const filteredMatches = matches.filter((row) => {
+            if (!rawClientId) return true
+            const rowClientId = typeof (row as any)?.nutrients?.__clientId === 'string' ? String((row as any).nutrients.__clientId) : ''
+            return Boolean(rowClientId) && rowClientId === rawClientId
+          })
+          filteredMatches.forEach((row) => {
             if (typeof row.imageUrl === 'string' && row.imageUrl.trim()) {
               imageUrlsToCheck.add(row.imageUrl.trim())
             }
           })
-          const ids = Array.from(new Set(matches.map((m) => String(m.id)))).filter(Boolean).slice(0, 50)
+          const ids = Array.from(new Set(filteredMatches.map((m) => String(m.id)))).filter(Boolean).slice(0, 50)
           if (ids.length > 0) {
             const result = await prisma.foodLog.deleteMany({
               where: { userId: user.id, id: { in: ids } },
