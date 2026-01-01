@@ -2132,6 +2132,9 @@ export default function FoodDiary() {
   const backfillAttemptedRef = useRef<Record<string, boolean>>({})
   const verifyMergeHoldRef = useRef<Record<string, number>>({})
   const verifyMergeTimerRef = useRef<Record<string, { id: number; fireAt: number }>>({})
+  const latestTodaysFoodsRef = useRef<any[]>([])
+  const latestHistoryFoodsRef = useRef<any[] | null>(null)
+  const missingBackfillRef = useRef<Record<string, number>>({})
   const VERIFY_MERGE_HOLD_MS = 4000
   const holdVerifyMergeForDate = (date: string, durationMs: number = VERIFY_MERGE_HOLD_MS) => {
     if (!date) return
@@ -2172,6 +2175,12 @@ export default function FoodDiary() {
     if (persisted?.entries && Array.isArray(persisted.entries)) return persisted.entries
     return null
   })
+  useEffect(() => {
+    latestTodaysFoodsRef.current = Array.isArray(todaysFoods) ? todaysFoods : []
+  }, [todaysFoods])
+  useEffect(() => {
+    latestHistoryFoodsRef.current = Array.isArray(historyFoods) ? historyFoods : null
+  }, [historyFoods])
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
   const [creditInfo, setCreditInfo] = useState<any>({
@@ -4917,21 +4926,26 @@ const applyStructuredItems = (
       const localForDate = dedupeEntries(todaysFoodsForSelectedDate, { fallbackDate: selectedDate })
       const cacheMerged = dedupeEntries([...localForDate, ...deduped], { fallbackDate: selectedDate })
       const cacheEntries = cacheMerged.length > 0 ? cacheMerged : deduped
+      const latestForDate = dedupeEntries(
+        filterEntriesForDate(latestTodaysFoodsRef.current, selectedDate),
+        { fallbackDate: selectedDate },
+      )
+      const localBaseline = latestForDate.length > 0 ? latestForDate : cacheEntries
       
-      if (Array.isArray(cacheEntries) && cacheEntries.length > 0) {
+      if (Array.isArray(localBaseline) && localBaseline.length > 0) {
         // Update the appropriate state based on whether we're viewing today or a past date
         if (isViewingToday) {
           // Only update if the data actually changed to prevent unnecessary re-renders
           setTodaysFoods(prev => {
             const prevIds = new Set(prev.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
-            const newIds = new Set(cacheEntries.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
+            const newIds = new Set(localBaseline.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
             const prevIdsArray = Array.from(prevIds);
             const idsMatch = prevIds.size === newIds.size && prevIdsArray.every(id => newIds.has(id));
-            return idsMatch ? prev : cacheEntries;
+            return idsMatch ? prev : localBaseline;
           });
         } else {
           // For past dates, set historyFoods
-          setHistoryFoods(cacheEntries);
+          setHistoryFoods(localBaseline);
         }
         // Mark as loaded once data is set from context
         setFoodDiaryLoaded(true);
@@ -4943,6 +4957,11 @@ const applyStructuredItems = (
         // bug that occurred on Jan 19, 2025. See GUARD_RAILS.md section 3 for details.
         const runVerify = async () => {
           try {
+            const currentLocal = dedupeEntries(
+              filterEntriesForDate(latestTodaysFoodsRef.current, selectedDate),
+              { fallbackDate: selectedDate },
+            )
+            const verifyBaseline = currentLocal.length > 0 ? currentLocal : localBaseline
             const tz = new Date().getTimezoneOffset();
             const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
             if (res.ok) {
@@ -4954,10 +4973,10 @@ const applyStructuredItems = (
               // Merge authoritative DB rows with local cache so fresh (not-yet-synced) entries
               // don't disappear when the DB is stale or incomplete.
               if (mappedFromDb.length > 0) {
-                const mergedForDate = dedupeEntries([...cacheEntries, ...mappedFromDb], { fallbackDate: selectedDate })
+                const mergedForDate = dedupeEntries([...verifyBaseline, ...mappedFromDb], { fallbackDate: selectedDate })
                 console.log('♻️ Merging cache with DB rows for date', selectedDate, {
                   dbCount: mappedFromDb.length,
-                  cacheCount: cacheEntries.length,
+                  cacheCount: verifyBaseline.length,
                   mergedCount: mergedForDate.length,
                 })
                 if (isViewingToday) {
@@ -4971,14 +4990,14 @@ const applyStructuredItems = (
               }
 
               // Check if database has entries that aren't in our cached list
-              const cachedIdsForMissing = new Set(cacheEntries.map((f: any) => {
+              const cachedIdsForMissing = new Set(verifyBaseline.map((f: any) => {
                 const id = typeof f.id === 'number' ? f.id : Number(f.id);
                 return id;
               }));
 
               // Also enrich existing cached entries with dbId from database
               // This ensures delete functionality works even for cached entries
-              const enrichedCached = cacheEntries.map((cachedEntry: any) => {
+              const enrichedCached = verifyBaseline.map((cachedEntry: any) => {
                 const cachedId = typeof cachedEntry.id === 'number' ? cachedEntry.id : Number(cachedEntry.id);
                 // Find matching database entry by timestamp
                 const dbEntry = mappedFromDb.find((l: any) => {
@@ -4997,7 +5016,7 @@ const applyStructuredItems = (
                 return !cachedIdsForMissing.has(logId);
               });
 
-              if (missingEntries.length > 0 || enrichedCached.some((e: any, i: number) => e.dbId !== cacheEntries[i]?.dbId)) {
+              if (missingEntries.length > 0 || enrichedCached.some((e: any, i: number) => e.dbId !== verifyBaseline[i]?.dbId)) {
                 console.log('⚠️ Found entries in database that were missing from cache:', missingEntries.length);
                 const mappedMissing = missingEntries.map((l: any) => ({
                   ...l,
@@ -5016,10 +5035,10 @@ const applyStructuredItems = (
 
                 // Update cache with merged data (including dbId for future loads)
                 await syncSnapshotToServer(merged, selectedDate)
-              } else if (mappedFromDb.length === 0 && cacheEntries.length > 0 && !backfillAttemptedRef.current[selectedDate]) {
+              } else if (mappedFromDb.length === 0 && verifyBaseline.length > 0 && !backfillAttemptedRef.current[selectedDate]) {
                 // Safety net: backfill only when entries are not in-flight to avoid duplicate rows.
                 const nowTs = Date.now()
-                const hasRecentLocal = cacheEntries.some((entry: any) => {
+                const hasRecentLocal = verifyBaseline.some((entry: any) => {
                   const ts = extractEntryTimestampMs(entry)
                   return Number.isFinite(ts) && nowTs - ts < 90 * 1000
                 })
@@ -5028,7 +5047,7 @@ const applyStructuredItems = (
                   backfillAttemptedRef.current[selectedDate] = true
                   try {
                     await Promise.all(
-                      cacheEntries.map(async (entry: any) => {
+                      verifyBaseline.map(async (entry: any) => {
                         const payload = {
                           description: (entry?.description || '').toString(),
                           nutrition: buildPayloadNutrition(entry),
@@ -5065,6 +5084,64 @@ const applyStructuredItems = (
                   setHistoryFoods(enrichedCached);
                 }
                 await syncSnapshotToServer(enrichedCached, selectedDate)
+              }
+
+              const buildSyncKey = (entry: any) => {
+                if (!entry) return ''
+                const clientId = getEntryClientId(entry)
+                if (clientId) return `client:${clientId}`
+                const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+                const date = dateKeyForEntry(entry) || selectedDate
+                const desc = normalizedDescription(entry?.description || entry?.name || '')
+                const timeKey = entryTimestampKey(entry)
+                if (!date || !desc || !timeKey) return ''
+                return [date, cat, desc, timeKey].join('|')
+              }
+
+              const serverSyncKeys = new Set(
+                mappedFromDb.map(buildSyncKey).filter(Boolean),
+              )
+              const nowTs = Date.now()
+              const missingForServer = verifyBaseline.filter((entry: any) => {
+                if (!entry || (entry as any)?.dbId) return false
+                if (isEntryDeleted(entry)) return false
+                const key = buildSyncKey(entry)
+                if (!key || serverSyncKeys.has(key)) return false
+                const last = missingBackfillRef.current[key] || 0
+                if (nowTs - last < 2 * 60 * 1000) return false
+                missingBackfillRef.current[key] = nowTs
+                return true
+              })
+              if (missingForServer.length > 0) {
+                try {
+                  await Promise.all(
+                    missingForServer.map(async (entry: any) => {
+                      await fetch('/api/food-log', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          description: (entry?.description || '').toString(),
+                          nutrition: buildPayloadNutrition(entry),
+                          imageUrl: entry?.photo || null,
+                          items: Array.isArray(entry?.items) && entry.items.length > 0 ? entry.items : null,
+                          meal: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
+                          category: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
+                          localDate:
+                            typeof entry?.localDate === 'string' && entry.localDate.length >= 8
+                              ? entry.localDate
+                              : selectedDate,
+                          createdAt: alignTimestampToLocalDate(
+                            entry?.createdAt || entry?.id || new Date().toISOString(),
+                            entry?.localDate || selectedDate,
+                          ),
+                          allowDuplicate: true,
+                        }),
+                      })
+                    }),
+                  )
+                } catch (backfillErr) {
+                  console.warn('Backfill missing FoodLog entries failed', backfillErr)
+                }
               }
             }
           } catch (error) {
@@ -9553,6 +9630,16 @@ Please add nutritional information manually if needed.`);
       setTodaysFoods(updatedTodaysFoods)
       foodsForSave = updatedTodaysFoods
     }
+    try {
+      const existingSnapshotFoods = Array.isArray((userData as any)?.todaysFoods)
+        ? ((userData as any).todaysFoods as any[])
+        : []
+      const mergedSnapshotFoods = dedupeEntries(
+        [...foodsForSave, ...existingSnapshotFoods],
+        { fallbackDate: dedupeTargetDate },
+      )
+      updateUserData({ todaysFoods: mergedSnapshotFoods })
+    } catch {}
     holdVerifyMergeForDate(dedupeTargetDate)
 
     const toastMessage =
@@ -9690,6 +9777,16 @@ Please add nutritional information manually if needed.`);
     setSelectedAddCategory(categoryKey)
     const deduped = dedupeEntries([...clones, ...todaysFoods], { fallbackDate: targetDate })
     setTodaysFoods(deduped)
+    try {
+      const existingSnapshotFoods = Array.isArray((userData as any)?.todaysFoods)
+        ? ((userData as any).todaysFoods as any[])
+        : []
+      const mergedSnapshotFoods = dedupeEntries(
+        [...deduped, ...existingSnapshotFoods],
+        { fallbackDate: targetDate },
+      )
+      updateUserData({ todaysFoods: mergedSnapshotFoods })
+    } catch {}
     holdVerifyMergeForDate(targetDate)
     setExpandedCategories((prev) => ({ ...prev, [categoryKey]: true }))
     showQuickToast(`Copied ${categoryLabel(categoryKey)} to today`)
