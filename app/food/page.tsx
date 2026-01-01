@@ -2140,6 +2140,7 @@ export default function FoodDiary() {
   const pendingFoodLogFlushRef = useRef(false)
   const PENDING_SAVE_RETRY_BASE_MS = 2500
   const PENDING_SAVE_RETRY_MAX_MS = 60000
+  const PENDING_SAVE_STALE_MS = 5 * 60 * 1000
   const VERIFY_MERGE_HOLD_MS = 4000
   const holdVerifyMergeForDate = (date: string, durationMs: number = VERIFY_MERGE_HOLD_MS) => {
     if (!date) return
@@ -3525,6 +3526,31 @@ export default function FoodDiary() {
       buildPendingSaveKey(entry, entry?.localDate || fallbackDate || selectedDate)
     if (!pendingKey) return false
     return pendingFoodLogSaveRef.current.has(pendingKey)
+  }
+
+  const isFreshPendingEntry = (entry: any, fallbackDate?: string) => {
+    if (!isEntryPendingSave(entry, fallbackDate)) return false
+    const sinceRaw = (entry as any)?.__pendingSince
+    const since =
+      typeof sinceRaw === 'number' && Number.isFinite(sinceRaw) && sinceRaw > 0 ? sinceRaw : null
+    if (since !== null) {
+      return Date.now() - since <= PENDING_SAVE_STALE_MS
+    }
+    const pendingKey =
+      (entry as any)?.__pendingKey ||
+      buildPendingSaveKey(entry, entry?.localDate || fallbackDate || selectedDate)
+    const meta = pendingKey ? pendingFoodLogSaveRef.current.get(pendingKey) : null
+    if (meta && Number.isFinite(meta.lastAttemptAt) && meta.lastAttemptAt > 0) {
+      return Date.now() - meta.lastAttemptAt <= PENDING_SAVE_STALE_MS
+    }
+    return true
+  }
+
+  const isFreshUnsyncedEntry = (entry: any) => {
+    if (!entry || (entry as any)?.dbId) return false
+    const ts = extractEntryTimestampMs(entry)
+    if (!Number.isFinite(ts)) return false
+    return Date.now() - ts <= PENDING_SAVE_STALE_MS
   }
 
   const updateEntriesForPendingKey = (pendingKey: string, updater: (entry: any) => any) => {
@@ -5436,10 +5462,21 @@ const applyStructuredItems = (
     return true
   }
 
-  const mergeServerEntries = (serverEntries: any[], localEntries: any[], targetDate: string) => {
+  const mergeServerEntries = (
+    serverEntries: any[],
+    localEntries: any[],
+    targetDate: string,
+    options?: { mode?: 'verify' | 'manual' },
+  ) => {
     const serverList = dedupeEntries(serverEntries || [], { fallbackDate: targetDate })
     const localList = Array.isArray(localEntries) ? localEntries : []
-    const keepLocal = localList.filter((entry) => isLikelyUnsyncedEntry(entry, targetDate))
+    const mode = options?.mode || 'verify'
+    const keepLocal = localList.filter((entry) => {
+      if (mode === 'manual') {
+        return isFreshPendingEntry(entry, targetDate) || isFreshUnsyncedEntry(entry)
+      }
+      return isLikelyUnsyncedEntry(entry, targetDate)
+    })
     return dedupeEntries([...serverList, ...keepLocal], { fallbackDate: targetDate })
   }
 
@@ -5536,7 +5573,7 @@ const applyStructuredItems = (
   }
 
   // Best-effort reload to keep UI in sync with the authoritative DB rows right after saving.
-  const refreshEntriesFromServer = async () => {
+  const refreshEntriesFromServer = async (options?: { mode?: 'verify' | 'manual' }) => {
     const targetDate = selectedDate
     if (!targetDate) return
     if (diaryMergeInFlightRef.current[targetDate]) return
@@ -5558,7 +5595,7 @@ const applyStructuredItems = (
         ? historyFoods
         : []
       const mappedWithStableIds = mapServerEntriesWithLocalIds(mapped, localList, targetDate)
-      const merged = mergeServerEntries(mappedWithStableIds, localList, targetDate)
+      const merged = mergeServerEntries(mappedWithStableIds, localList, targetDate, options)
       markDiaryVerified(targetDate)
       setFoodDiaryLoaded(true)
       if (hasSameEntryMembers(localList, merged)) {
@@ -5603,7 +5640,8 @@ const applyStructuredItems = (
     diaryRefreshingRef.current = true
     setIsDiaryRefreshing(true)
     try {
-      await refreshEntriesFromServer()
+      await flushPendingFoodLogSaves()
+      await refreshEntriesFromServer({ mode: 'manual' })
     } finally {
       syncInFlightRef.current = false
       diaryRefreshingRef.current = false
@@ -15446,23 +15484,26 @@ Please add nutritional information manually if needed.`);
                       const visibleEntries = Array.isArray(entries)
                         ? entries.filter((entry) => !isEntryDeleted(entry))
                         : []
-                      const totals = visibleEntries.reduce(
-                        (acc, entry) => {
-                          const t = getEntryTotals(entry)
-                          acc.calories += Number(t.calories || 0)
-                          acc.protein += Number(t.protein || 0)
-                          acc.carbs += Number(t.carbs || 0)
-                          acc.fat += Number(t.fat || 0)
-                          return acc
-                        },
-                        { calories: 0, protein: 0, carbs: 0, fat: 0 },
-                      )
-                      const summaryParts: string[] = []
-                      if (totals.calories > 0) summaryParts.push(`${Math.round(totals.calories)} kcal`)
-                      if (totals.protein > 0) summaryParts.push(`${Math.round(totals.protein)}g Protein`)
-                      if (totals.carbs > 0) summaryParts.push(`${Math.round(totals.carbs)}g Carbs`)
-                      if (totals.fat > 0) summaryParts.push(`${Math.round(totals.fat)}g Fat`)
-                      const summaryText = summaryParts.length > 0 ? summaryParts.join(', ') : 'No entries yet'
+                      let summaryText = 'No entries yet'
+                      if (visibleEntries.length > 0) {
+                        const totals = visibleEntries.reduce(
+                          (acc, entry) => {
+                            const t = getEntryTotals(entry)
+                            acc.calories += Number(t.calories || 0)
+                            acc.protein += Number(t.protein || 0)
+                            acc.carbs += Number(t.carbs || 0)
+                            acc.fat += Number(t.fat || 0)
+                            return acc
+                          },
+                          { calories: 0, protein: 0, carbs: 0, fat: 0 },
+                        )
+                        const summaryParts: string[] = []
+                        if (totals.calories > 0) summaryParts.push(`${Math.round(totals.calories)} kcal`)
+                        if (totals.protein > 0) summaryParts.push(`${Math.round(totals.protein)}g Protein`)
+                        if (totals.carbs > 0) summaryParts.push(`${Math.round(totals.carbs)}g Carbs`)
+                        if (totals.fat > 0) summaryParts.push(`${Math.round(totals.fat)}g Fat`)
+                        summaryText = summaryParts.length > 0 ? summaryParts.join(', ') : 'No entries yet'
+                      }
 
                       const toggleCategory = () =>
                         setExpandedCategories((prev) => ({
