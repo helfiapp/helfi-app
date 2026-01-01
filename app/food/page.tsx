@@ -5504,7 +5504,7 @@ const applyStructuredItems = (
       await refreshDiaryNow()
     }
   }
-  const autoDiaryRefreshEnabled = true
+  const autoDiaryRefreshEnabled = false
   useEffect(() => {
     if (!autoDiaryRefreshEnabled) return
     if (typeof window === 'undefined') return
@@ -9160,7 +9160,6 @@ Please add nutritional information manually if needed.`);
     queueScrollToDiaryEntry({ entryKey: newEntry.id, category })
     try {
       await saveFoodEntries(updated, { allowDuplicate: true })
-      await refreshEntriesFromServer()
       showQuickToast(`Added to ${categoryLabel(category)}`)
     } catch (err) {
       console.warn('Meal insert sync failed', err)
@@ -9293,7 +9292,6 @@ Please add nutritional information manually if needed.`);
     }
     try {
       await saveFoodEntries(updatedFoods, { allowDuplicate: true })
-      await refreshEntriesFromServer()
       showQuickToast(`Added to ${categoryLabel(category)}`)
     } catch (err) {
       console.warn('Favorite add sync failed', err)
@@ -9506,7 +9504,6 @@ Please add nutritional information manually if needed.`);
         }
       }
 
-      await refreshEntriesFromServer()
     } catch (err) {
       console.warn('Duplicate/copy sync failed', err)
     } finally {
@@ -9657,7 +9654,6 @@ Please add nutritional information manually if needed.`);
         }
       }
 
-      await refreshEntriesFromServer()
     } catch (err) {
       console.warn('Copy category to today failed', err)
     }
@@ -10703,7 +10699,6 @@ Please add nutritional information manually if needed.`);
         } catch {}
       }
 
-      await refreshEntriesFromServer()
     } catch (err) {
       console.warn('Paste multiple items failed', err)
     }
