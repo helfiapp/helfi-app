@@ -1,5 +1,4 @@
-'use client';
-
+import { redirect } from 'next/navigation';
 import InteractionAnalysis from '../../components/InteractionAnalysis';
 
 const sampleAnalysis = {
@@ -38,6 +37,9 @@ const sampleAnalysis = {
 };
 
 export default function TestInteractionsPage() {
+  if (process.env.NODE_ENV === 'production') {
+    redirect('/');
+  }
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">

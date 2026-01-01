@@ -48,10 +48,12 @@ export default function SplashPage() {
   const { data: session, status } = useSession()
   const [showDemoModal, setShowDemoModal] = useState(false)
   const [videoLoaded, setVideoLoaded] = useState(false)
+  const [checkoutError, setCheckoutError] = useState('')
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Handle subscription plan selection
   const handlePlanSelection = async (planId: string) => {
+    setCheckoutError('')
     // If user is authenticated, go directly to checkout
     if (status === 'authenticated' && session) {
       try {
@@ -67,8 +69,12 @@ export default function SplashPage() {
             return
           }
         }
+        setCheckoutError('We could not open the payment page. Please try again.')
+        return
       } catch (error) {
         console.error('Checkout error:', error)
+        setCheckoutError('We could not open the payment page. Please try again.')
+        return
       }
     }
     // If not authenticated, redirect to signin with plan parameter
@@ -77,6 +83,7 @@ export default function SplashPage() {
 
   // Handle credit purchase
   const handleCreditPurchase = async (planId: string) => {
+    setCheckoutError('')
     // If user is authenticated, go directly to checkout
     if (status === 'authenticated' && session) {
       try {
@@ -92,8 +99,12 @@ export default function SplashPage() {
             return
           }
         }
+        setCheckoutError('We could not open the payment page. Please try again.')
+        return
       } catch (error) {
         console.error('Checkout error:', error)
+        setCheckoutError('We could not open the payment page. Please try again.')
+        return
       }
     }
     // If not authenticated, redirect to signin with plan parameter
@@ -625,6 +636,11 @@ export default function SplashPage() {
               Choose the plan that fits your health journey
             </p>
           </div>
+          {checkoutError && (
+            <div className="mb-8 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {checkoutError}
+            </div>
+          )}
 
           {/* Plans Section */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
