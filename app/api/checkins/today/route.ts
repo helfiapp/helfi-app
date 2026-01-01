@@ -199,7 +199,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const ratings = Array.isArray(body?.ratings) ? body.ratings : []
   const today = new Date().toISOString().slice(0,10)
-  const now = new Date().toISOString()
 
   try {
     // await prisma.$executeRawUnsafe(`
@@ -232,8 +231,8 @@ export async function POST(req: NextRequest) {
       )
       await prisma.$queryRawUnsafe(
         `INSERT INTO CheckinRatings (id, userId, issueId, date, timestamp, value, note, isNa) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        id, user.id, r.issueId, today, now, clamped, String(r.note || ''), !!r.isNa
+         VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7)`,
+        id, user.id, r.issueId, today, clamped, String(r.note || ''), !!r.isNa
       )
     }
     return NextResponse.json({ success: true })

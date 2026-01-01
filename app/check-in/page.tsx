@@ -71,7 +71,7 @@ export default function CheckInPage() {
       const res = await fetch('/api/checkins/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ratings: payload }) })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || 'Failed to save')
+        throw new Error(data?.detail || data?.error || 'Failed to save')
       }
       // Navigate after save
       try {
