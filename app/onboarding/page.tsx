@@ -3188,7 +3188,10 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave, onUnsave
               rows={4}
               placeholder="e.g., High blood pressure, elevated cholesterol, digestive issues, sleep problems, joint pain, fatigue, etc."
               value={healthIssues}
-              onChange={(e) => setHealthIssues(e.target.value)}
+              onChange={(e) => {
+                if (skipped) setSkipped(false);
+                setHealthIssues(e.target.value);
+              }}
             />
           </div>
 
@@ -3201,7 +3204,10 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave, onUnsave
               rows={4}
               placeholder="e.g., Diabetes, hypertension, arthritis, thyroid issues, heart conditions, autoimmune disorders, etc."
               value={healthProblems}
-              onChange={(e) => setHealthProblems(e.target.value)}
+              onChange={(e) => {
+                if (skipped) setSkipped(false);
+                setHealthProblems(e.target.value);
+              }}
             />
           </div>
 
@@ -3214,7 +3220,10 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave, onUnsave
               rows={4}
               placeholder="e.g., Family history, recent symptoms, lifestyle factors, stress levels, dietary restrictions, allergies, etc."
               value={additionalInfo}
-              onChange={(e) => setAdditionalInfo(e.target.value)}
+              onChange={(e) => {
+                if (skipped) setSkipped(false);
+                setAdditionalInfo(e.target.value);
+              }}
             />
           </div>
         </div>
@@ -6909,6 +6918,7 @@ export default function Onboarding() {
     (partial: any) => {
       setForm((prev: any) => {
         const next = { ...prev, ...partial };
+        formRef.current = next; // Keep latest edits available for exit-save flows.
         if (allowAutosave) {
           debouncedSave(next);
           // Mark dirty only if current form differs from baseline

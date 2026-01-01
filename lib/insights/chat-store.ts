@@ -173,6 +173,21 @@ export async function buildSystemPrompt(userId: string, slug: string, section: I
         .filter((g: any) => typeof g?.name === 'string' && !g.name.startsWith('__'))
         .map((g: any) => g.name)
         .slice(0, 12)
+      let healthSituations: { healthIssues?: string; healthProblems?: string; additionalInfo?: string; skipped?: boolean } | null = null
+      const healthSituationsGoal = (user.healthGoals || []).find((g: any) => g?.name === '__HEALTH_SITUATIONS_DATA__')
+      if (healthSituationsGoal?.category) {
+        try {
+          const parsed = JSON.parse(healthSituationsGoal.category)
+          healthSituations = {
+            healthIssues: typeof parsed?.healthIssues === 'string' ? parsed.healthIssues : '',
+            healthProblems: typeof parsed?.healthProblems === 'string' ? parsed.healthProblems : '',
+            additionalInfo: typeof parsed?.additionalInfo === 'string' ? parsed.additionalInfo : '',
+            skipped: Boolean(parsed?.skipped),
+          }
+        } catch {
+          healthSituations = null
+        }
+      }
       const supplements = (user.supplements || [])
         .map((s: any) => ({ name: s.name, dosage: s.dosage, timing: s.timing }))
         .filter((s: any) => typeof s.name === 'string' && s.name)
@@ -192,6 +207,7 @@ export async function buildSystemPrompt(userId: string, slug: string, section: I
         height: user.height,
         weight: user.weight,
         goals,
+        healthSituations,
         supplements,
         medications,
         recentHealthLogs,
@@ -231,5 +247,4 @@ export async function buildSystemPrompt(userId: string, slug: string, section: I
     'When answering follow-up questions, provide NEW information or clarification, not a repetition of previous answers.'
   ].filter(Boolean).join('\n')
 }
-
 

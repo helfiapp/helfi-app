@@ -156,6 +156,12 @@ interface LLMInputData {
     bodyType?: string | null
     exerciseFrequency?: string | null
     exerciseTypes?: string[] | null
+    healthSituations?: {
+      healthIssues?: string | null
+      healthProblems?: string | null
+      additionalInfo?: string | null
+      skipped?: boolean | null
+    }
   }
   userId?: string | null
   mode: SectionMode
@@ -413,6 +419,24 @@ function modeGuidance(mode: SectionMode) {
   }
 }
 
+function hasDhtSensitivity(profile?: LLMInputData['profile']) {
+  if (!profile?.healthSituations) return false
+  const text = [
+    profile.healthSituations.healthIssues,
+    profile.healthSituations.healthProblems,
+    profile.healthSituations.additionalInfo,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  if (!text) return false
+  return /\bdht\b/.test(text) ||
+    text.includes('dihydrotestosterone') ||
+    text.includes('5-alpha') ||
+    text.includes('5 alpha') ||
+    text.includes('5α')
+}
+
 function buildPrompt(
   {
     issueName,
@@ -423,6 +447,7 @@ function buildPrompt(
     minSuggested,
     minAvoid,
     force,
+    dhtSensitive,
   }: {
     issueName: string
     issueSummary?: string | null
@@ -432,6 +457,7 @@ function buildPrompt(
     minSuggested: number
     minAvoid: number
     force: boolean
+    dhtSensitive: boolean
   }
 ) {
   const guidanceFocus = modeGuidance(mode)
@@ -526,8 +552,11 @@ Close every array/object and ensure the JSON is syntactically valid—never trun
   const libidoRules = loweredIssue.includes('libido') || loweredIssue.includes('erection')
     ? `\nIssue-specific rules for libido/erection quality:\n- Consider sex, age, weight/height, and training frequency when assessing androgen status and arousal.\n- Evaluate mechanisms: testosterone/DHT, nitric oxide/endothelial function, SHBG, stress/cortisol, sleep.\n- When focusItems include botanicals commonly discussed for libido (e.g., Tongkat Ali, Cistanche, Muira Puama), assess them and include in "working" if supportive with rationale; otherwise omit without moving them to suggested.\n- CRITICAL FOR BRAND-NAME SUPPLEMENTS: If a supplement name suggests testosterone/libido support (e.g., products with "testosterone", "libido", "men's health", "erection", "virility", "Miraforte", or similar marketing), analyze it by its key ingredients (zinc, chrysin, muira puama, maca, stinging nettle, lignans, tribulus, tongkat ali, etc.) and include it in "working" if those ingredients are supportive, even if you don't recognize the exact brand name. Use the exact logged name but explain the mechanism based on its ingredient profile.\n- For males, flag 5-alpha-reductase inhibitors (e.g., saw palmetto) as potential libido-reducing; explain the DHT rationale and advise clinician discussion.\n- Provide concrete protocols where possible (e.g., dosing ranges/timing windows).\n`
     : ''
+  const dhtGuidance = dhtSensitive && (mode === 'supplements' || mode === 'medications')
+    ? `\nUser note: they are sensitive to lowered DHT. Avoid recommending DHT-lowering items (e.g., saw palmetto, finasteride/dutasteride, fenugreek, high-dose spearmint/peppermint, reishi, licorice) unless clinically justified; if mentioned, place them in "avoid" with a caution.\n`
+    : ''
 
-  return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n${exerciseTypesInstruction}\n${baseGuidance}\n${libidoRules}${forceNote}`
+  return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n${exerciseTypesInstruction}\n${baseGuidance}\n${libidoRules}${dhtGuidance}${forceNote}`
 }
 
 function uniqueByName<T extends { name: string }>(items: T[]): T[] {
@@ -1150,6 +1179,7 @@ export async function generateSectionInsightsFromLLM(
     null,
     2
   )
+  const dhtSensitive = hasDhtSensitivity(input.profile)
 
   // Debug logging for exercise mode
   if (input.mode === 'exercise') {
@@ -1198,6 +1228,7 @@ export async function generateSectionInsightsFromLLM(
       minSuggested,
       minAvoid,
       force,
+      dhtSensitive,
     })
 
     try {

@@ -104,6 +104,12 @@ interface UserInsightContext {
     bodyType?: string | null
     exerciseFrequency?: string | null
     exerciseTypes?: string[] | null
+    healthSituations?: {
+      healthIssues?: string | null
+      healthProblems?: string | null
+      additionalInfo?: string | null
+      skipped?: boolean | null
+    }
   }
   onboardingComplete: boolean
 }
@@ -827,6 +833,24 @@ function hasStructuredData(value: unknown) {
   return !!value
 }
 
+function hasDhtSensitivity(healthSituations?: UserInsightContext['profile']['healthSituations']) {
+  if (!healthSituations) return false
+  const text = [
+    healthSituations.healthIssues,
+    healthSituations.healthProblems,
+    healthSituations.additionalInfo,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  if (!text) return false
+  return /\bdht\b/.test(text) ||
+    text.includes('dihydrotestosterone') ||
+    text.includes('5-alpha') ||
+    text.includes('5 alpha') ||
+    text.includes('5α')
+}
+
 // Only persist successful, useful results in the DB cache. Avoid caching
 // error states or placeholder results that would mask recovery for 15 minutes.
 function shouldCacheSectionResult(result: IssueSectionResult | null): boolean {
@@ -1494,6 +1518,12 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
   const visibleGoals: HealthGoalWithLogs[] = []
   const todaysFoods: Array<{ name?: string; meal?: string; calories?: number }> = []
   let bloodResults: BloodResultsData | null = null
+  let healthSituations: {
+    healthIssues?: string | null
+    healthProblems?: string | null
+    additionalInfo?: string | null
+    skipped?: boolean | null
+  } | null = null
   const dataNeeds: InsightDataNeed[] = []
   const seenNeeds = new Set<string>()
 
@@ -1517,6 +1547,19 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
           }
         } catch {
           bloodResults = bloodResults || null
+        }
+      }
+      if (goal.name === '__HEALTH_SITUATIONS_DATA__') {
+        try {
+          const parsed = JSON.parse(goal.category ?? '{}')
+          healthSituations = {
+            healthIssues: typeof parsed?.healthIssues === 'string' ? parsed.healthIssues : '',
+            healthProblems: typeof parsed?.healthProblems === 'string' ? parsed.healthProblems : '',
+            additionalInfo: typeof parsed?.additionalInfo === 'string' ? parsed.additionalInfo : '',
+            skipped: Boolean(parsed?.skipped),
+          }
+        } catch {
+          healthSituations = healthSituations || null
         }
       }
       if (goal.name === '__TODAYS_FOODS_DATA__') {
@@ -1655,6 +1698,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
       bodyType: user.bodyType ?? null,
       exerciseFrequency: user.exerciseFrequency ?? null,
       exerciseTypes: user.exerciseTypes ?? null,
+      healthSituations: healthSituations ?? undefined,
     },
     onboardingComplete,
   }
@@ -1716,6 +1760,12 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
   const healthGoals: Record<string, HealthGoalWithLogs> = {}
   const visibleGoals: HealthGoalWithLogs[] = []
   const dataNeeds: InsightDataNeed[] = []
+  let healthSituations: {
+    healthIssues?: string | null
+    healthProblems?: string | null
+    additionalInfo?: string | null
+    skipped?: boolean | null
+  } | null = null
   const seenNeeds = new Set<string>()
   for (const goal of user.healthGoals) {
     if (goal.name.startsWith('__')) {
@@ -1723,6 +1773,19 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
       if (dataNeed && !seenNeeds.has(dataNeed.key)) {
         seenNeeds.add(dataNeed.key)
         dataNeeds.push(dataNeed)
+      }
+      if (goal.name === '__HEALTH_SITUATIONS_DATA__') {
+        try {
+          const parsed = JSON.parse(goal.category ?? '{}')
+          healthSituations = {
+            healthIssues: typeof parsed?.healthIssues === 'string' ? parsed.healthIssues : '',
+            healthProblems: typeof parsed?.healthProblems === 'string' ? parsed.healthProblems : '',
+            additionalInfo: typeof parsed?.additionalInfo === 'string' ? parsed.additionalInfo : '',
+            skipped: Boolean(parsed?.skipped),
+          }
+        } catch {
+          healthSituations = healthSituations || null
+        }
       }
       continue
     }
@@ -1825,6 +1888,7 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
       bodyType: (user.bodyType as any) ?? null,
       exerciseFrequency: user.exerciseFrequency ?? null,
       exerciseTypes: (user as any).exerciseTypes ?? null,
+      healthSituations: healthSituations ?? undefined,
     },
     onboardingComplete,
   }
@@ -3515,6 +3579,35 @@ async function buildSupplementsSection(
     if (!Array.isArray(llmResult.working)) llmResult.working = []
     if (!Array.isArray(llmResult.suggested)) llmResult.suggested = []
     if (!Array.isArray(llmResult.avoid)) llmResult.avoid = []
+  }
+
+  const dhtSensitive = hasDhtSensitivity(context.profile.healthSituations)
+  if (dhtSensitive && llmResult) {
+    const dhtTokens = ['fenugreek', 'saw palmetto', 'reishi', 'spearmint', 'peppermint', 'licorice']
+    const flagged = new Set<string>()
+    const shouldFlag = (name: string) => {
+      const lower = name.toLowerCase()
+      return dhtTokens.some((token) => lower.includes(token))
+    }
+    const scrubList = <T extends { name: string }>(items: T[]) =>
+      items.filter((item) => {
+        if (!shouldFlag(item.name)) return true
+        flagged.add(item.name)
+        return false
+      })
+    llmResult.working = scrubList(llmResult.working)
+    llmResult.suggested = scrubList(llmResult.suggested)
+    if (flagged.size) {
+      const avoid = llmResult.avoid ?? []
+      for (const name of flagged) {
+        if (avoid.some((item) => item.name.toLowerCase() === name.toLowerCase())) continue
+        avoid.push({
+          name,
+          reason: 'You noted sensitivity to lower DHT. This can reduce DHT and may worsen libido or sexual function.',
+        })
+      }
+      llmResult.avoid = avoid
+    }
   }
 
   if (!llmResult) {

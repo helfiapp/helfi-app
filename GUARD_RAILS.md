@@ -76,6 +76,14 @@ getting user approval.
 
 ---
 
+### 2.1.1 Health Setup autosave + AI context (Jan 2026 – Locked)
+
+- Health Setup changes must auto‑save without a manual save button (including the “Health situations” step).
+- If a user previously tapped “Skip for now,” typing into any Health situations field must **clear the skip** and keep auto‑save active.
+- Insights generation must include Health situations notes (e.g., DHT sensitivity) and treat them as constraints when generating supplement guidance.
+
+---
+
 ### 2.2 Onboarding Page Popup (“Complete your health setup”)
 
 File: `app/onboarding/page.tsx`
