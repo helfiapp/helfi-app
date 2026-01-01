@@ -2054,6 +2054,7 @@ export default function FoodDiary() {
     mode: 'duplicate' | 'copyToToday'
   } | null>(null)
   const duplicateInFlightRef = useRef(false)
+  const duplicateActionDebounceRef = useRef<Record<string, number>>({})
   const favoriteInsertDebounceRef = useRef<Record<string, number>>({})
   const mealInsertDebounceRef = useRef<Record<string, number>>({})
   const pendingServerIdRef = useRef<Map<string, { localId: number; savedAt: number }>>(new Map())
@@ -5319,6 +5320,38 @@ const applyStructuredItems = (
     return dedupeEntries([...serverList, ...keepLocal], { fallbackDate: targetDate })
   }
 
+  const entryIdentityKey = (entry: any) => {
+    const clientId = getEntryClientId(entry)
+    if (clientId) return `client:${clientId}`
+    const dbId = (entry as any)?.dbId
+    if (dbId) return `db:${dbId}`
+    if (entry?.id !== null && entry?.id !== undefined) return `id:${entry.id}`
+    return ''
+  }
+  const hasSameEntryMembers = (a: any[], b: any[]) => {
+    if (!Array.isArray(a) || !Array.isArray(b)) return false
+    if (a.length !== b.length) return false
+    const aKeys = a.map(entryIdentityKey).filter(Boolean)
+    if (aKeys.length !== a.length) return false
+    const aSet = new Set(aKeys)
+    if (aSet.size !== a.length) return false
+    const localDbByKey = new Map<string, string>()
+    a.forEach((entry) => {
+      const key = entryIdentityKey(entry)
+      if (!key) return
+      const dbId = (entry as any)?.dbId
+      if (dbId) localDbByKey.set(key, String(dbId))
+    })
+    for (const entry of b) {
+      const key = entryIdentityKey(entry)
+      if (!key || !aSet.has(key)) return false
+      const mergedDbId = (entry as any)?.dbId
+      const localDbId = localDbByKey.get(key) || ''
+      if (mergedDbId && !localDbId) return false
+    }
+    return true
+  }
+
   // Best-effort reload to keep UI in sync with the authoritative DB rows right after saving.
   const refreshEntriesFromServer = async () => {
     try {
@@ -5392,6 +5425,9 @@ const applyStructuredItems = (
         return next
       })
       const merged = mergeServerEntries(mappedWithStableIds, localList, selectedDate)
+      if (hasSameEntryMembers(localList, merged)) {
+        return
+      }
 
       if (isViewingToday) {
         setTodaysFoods(merged)
@@ -9322,6 +9358,20 @@ Please add nutritional information manually if needed.`);
     const category = normalizeCategory(targetCategory)
     const baseDescription = source.description || source.label || 'Duplicated meal'
     const opStamp = Date.now()
+    const actionKey = [
+      getEntryClientId(source) || (source as any)?.dbId || source?.id || '',
+      targetDate,
+      category,
+      mode,
+    ].join('|')
+    const lastAction = duplicateActionDebounceRef.current[actionKey] || 0
+    if (opStamp - lastAction < 900) {
+      duplicateInFlightRef.current = false
+      setDuplicateModalContext(null)
+      endDiaryMutation()
+      return
+    }
+    duplicateActionDebounceRef.current[actionKey] = opStamp
     const sourceTs = extractEntryTimestampMs(source)
     const nowTs = Date.now()
     const sourceBucket = Number.isFinite(sourceTs) ? Math.floor(sourceTs / 60000) : null
@@ -14992,6 +15042,7 @@ Please add nutritional information manually if needed.`);
 
                     const renderEntryCard = (food: any) => {
                       const entryKey = food.id.toString()
+                      const entryRenderKey = entryIdentityKey(food) || entryKey
                       const swipeOffset = entrySwipeOffsets[entryKey] || 0
                       const isMenuOpen = swipeMenuEntry === entryKey
                       const entryTotals = getEntryTotals(food)
@@ -15206,7 +15257,7 @@ Please add nutritional information manually if needed.`);
 
                       return (
                         <div
-                          key={food.id}
+                          key={entryRenderKey}
                           data-food-entry-key={entryKey}
                           data-food-entry-db-id={(food as any)?.dbId || (typeof (food as any)?.id === 'string' ? (food as any).id : '')}
                           className="relative w-full overflow-visible"
