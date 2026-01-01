@@ -1656,9 +1656,9 @@ export default function FoodDiary() {
     if ((totals as any).__clientId === clientId) return totals
     return { ...(totals as any), __clientId: clientId }
   }
-  const applyEntryClientId = (entry: any, seed?: string) => {
+  const applyEntryClientId = (entry: any, seed?: string, options?: { forceNew?: boolean }) => {
     if (!entry || typeof entry !== 'object') return entry
-    const clientId = getEntryClientId(entry) || buildClientId(seed)
+    const clientId = options?.forceNew ? buildClientId(seed) : getEntryClientId(entry) || buildClientId(seed)
     return {
       ...(entry as any),
       clientId,
@@ -9455,6 +9455,7 @@ Please add nutritional information manually if needed.`);
         createdAt: createdAtIso,
       },
       `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
+      { forceNew: true },
     )
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     const normalizedHistory = Array.isArray(historyFoods) ? historyFoods : []
@@ -9610,6 +9611,7 @@ Please add nutritional information manually if needed.`);
           description: baseDescription,
         },
         `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
+        { forceNew: true },
       )
     })
     setSelectedAddCategory(categoryKey)
@@ -10660,6 +10662,7 @@ Please add nutritional information manually if needed.`);
           method: item?.method ?? 'copied',
         },
         `paste:${pasteStamp}|${targetDate}|${category}|${normalizedDescription(description)}|${idx}`,
+        { forceNew: true },
       )
     })
 
