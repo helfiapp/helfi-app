@@ -1656,6 +1656,24 @@ export default function FoodDiary() {
     if ((totals as any).__clientId === clientId) return totals
     return { ...(totals as any), __clientId: clientId }
   }
+  const entryAllowsDuplicate = (entry: any) =>
+    Boolean((entry as any)?.nutrition?.__allowDuplicate || (entry as any)?.total?.__allowDuplicate)
+  const markEntryAllowDuplicate = (entry: any) => {
+    if (!entry || typeof entry !== 'object') return entry
+    const next: any = { ...(entry as any) }
+    if (next.total && typeof next.total === 'object') {
+      if (!(next.total as any).__allowDuplicate) {
+        next.total = { ...(next.total as any), __allowDuplicate: true }
+      }
+    } else if (next.nutrition && typeof next.nutrition === 'object') {
+      if (!(next.nutrition as any).__allowDuplicate) {
+        next.nutrition = { ...(next.nutrition as any), __allowDuplicate: true }
+      }
+    } else {
+      next.nutrition = { __allowDuplicate: true }
+    }
+    return next
+  }
   const applyEntryClientId = (entry: any, seed?: string, options?: { forceNew?: boolean }) => {
     if (!entry || typeof entry !== 'object') return entry
     const clientId = options?.forceNew ? buildClientId(seed) : getEntryClientId(entry) || buildClientId(seed)
@@ -2141,6 +2159,7 @@ export default function FoodDiary() {
   const PENDING_SAVE_RETRY_BASE_MS = 2500
   const PENDING_SAVE_RETRY_MAX_MS = 60000
   const PENDING_SAVE_STALE_MS = 5 * 60 * 1000
+  const DUPLICATE_CLEANUP_WINDOW_MS = 2 * 60 * 1000
   const VERIFY_MERGE_HOLD_MS = 4000
   const holdVerifyMergeForDate = (date: string, durationMs: number = VERIFY_MERGE_HOLD_MS) => {
     if (!date) return
@@ -3884,6 +3903,108 @@ export default function FoodDiary() {
     }
   }
 
+  const buildDuplicateItemSignature = (items: any[]) => {
+    if (!Array.isArray(items) || items.length === 0) return ''
+    const parts = items
+      .map((item) => {
+        const name = normalizedDescription(item?.name || item?.label || '')
+        if (!name) return ''
+        const cals = Number(item?.calories ?? item?.calories_g ?? item?.caloriesPerServing ?? item?.calories_per_serving ?? 0)
+        const protein = Number(item?.protein_g ?? item?.protein ?? 0)
+        const carbs = Number(item?.carbs_g ?? item?.carbs ?? 0)
+        const fat = Number(item?.fat_g ?? item?.fat ?? 0)
+        const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
+        return [
+          name,
+          Math.round(cals || 0),
+          Math.round((protein || 0) * 10) / 10,
+          Math.round((carbs || 0) * 10) / 10,
+          Math.round((fat || 0) * 10) / 10,
+          servings === null ? '' : Math.round(servings * 100) / 100,
+        ].join(':')
+      })
+      .filter(Boolean)
+    if (parts.length === 0) return ''
+    parts.sort()
+    return parts.join('|')
+  }
+
+  const buildDuplicateMacroSignature = (totals: any) => {
+    const calories = Number(totals?.calories || 0)
+    const protein = Number(totals?.protein || 0)
+    const carbs = Number(totals?.carbs || 0)
+    const fat = Number(totals?.fat || 0)
+    return [
+      Math.round(calories || 0),
+      Math.round((protein || 0) * 10) / 10,
+      Math.round((carbs || 0) * 10) / 10,
+      Math.round((fat || 0) * 10) / 10,
+    ].join('|')
+  }
+
+  const buildDuplicateEntryKey = (entry: any, targetDate: string) => {
+    const desc = normalizedDescription(entry?.description || entry?.name || '')
+    if (!desc) return ''
+    const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+    const itemsSig = buildDuplicateItemSignature(entry?.items)
+    const totals = getEntryTotals(entry)
+    const macroSig = buildDuplicateMacroSignature(totals)
+    const base = itemsSig || macroSig
+    if (!base) return ''
+    const dateKey = dateKeyForEntry(entry) || targetDate || ''
+    return [dateKey, cat, desc, base].join('|')
+  }
+
+  const collapseNearDuplicates = (entries: any[], targetDate: string) => {
+    const groups = new Map<string, any[]>()
+    entries.forEach((entry) => {
+      const key = buildDuplicateEntryKey(entry, targetDate)
+      if (!key) return
+      const list = groups.get(key) || []
+      list.push(entry)
+      groups.set(key, list)
+    })
+    const duplicates: any[] = []
+    groups.forEach((list) => {
+      if (!Array.isArray(list) || list.length < 2) return
+      const sorted = list
+        .slice()
+        .sort((a, b) => (extractEntryTimestampMs(b) || 0) - (extractEntryTimestampMs(a) || 0))
+      let keeper = sorted[0]
+      for (let i = 1; i < sorted.length; i += 1) {
+        const entry = sorted[i]
+        const keeperTs = extractEntryTimestampMs(keeper)
+        const entryTs = extractEntryTimestampMs(entry)
+        if (!Number.isFinite(keeperTs) || !Number.isFinite(entryTs)) {
+          keeper = entry
+          continue
+        }
+        if (entryAllowsDuplicate(entry) || entryAllowsDuplicate(keeper)) {
+          keeper = entry
+          continue
+        }
+        if (Math.abs(keeperTs - entryTs) <= DUPLICATE_CLEANUP_WINDOW_MS) {
+          duplicates.push(entry)
+          continue
+        }
+        keeper = entry
+      }
+    })
+    if (duplicates.length === 0) return { filtered: entries, duplicates }
+    const dropIds = new Set<string>(
+      duplicates
+        .map((entry) => (entry as any)?.dbId)
+        .filter((id) => id !== null && id !== undefined)
+        .map((id) => String(id)),
+    )
+    const filtered = entries.filter((entry) => {
+      const dbId = (entry as any)?.dbId
+      if (!dbId) return true
+      return !dropIds.has(String(dbId))
+    })
+    return { filtered, duplicates }
+  }
+
   const handleDeleteItem = (index: number) => {
     const item = analyzedItems[index]
     const name = item?.name || 'this ingredient'
@@ -5595,7 +5716,30 @@ const applyStructuredItems = (
         ? historyFoods
         : []
       const mappedWithStableIds = mapServerEntriesWithLocalIds(mapped, localList, targetDate)
-      const merged = mergeServerEntries(mappedWithStableIds, localList, targetDate, options)
+      const { filtered: cleanedServerEntries, duplicates: duplicateCandidates } = collapseNearDuplicates(
+        mappedWithStableIds,
+        targetDate,
+      )
+      if (options?.mode === 'manual' && duplicateCandidates.length > 0) {
+        ;(async () => {
+          const ids = duplicateCandidates
+            .map((entry) => (entry as any)?.dbId)
+            .filter((id) => id !== null && id !== undefined)
+            .map((id) => String(id))
+          const unique = Array.from(new Set(ids)).slice(0, 12)
+          if (unique.length === 0) return
+          await Promise.all(
+            unique.map((id) =>
+              fetch('/api/food-log/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+              }).catch((err) => console.warn('Duplicate cleanup delete failed', err)),
+            ),
+          )
+        })().catch(() => {})
+      }
+      const merged = mergeServerEntries(cleanedServerEntries, localList, targetDate, options)
       markDiaryVerified(targetDate)
       setFoodDiaryLoaded(true)
       if (hasSameEntryMembers(localList, merged)) {
@@ -9586,7 +9730,8 @@ Please add nutritional information manually if needed.`);
       source.items && Array.isArray(source.items) && source.items.length > 0
         ? JSON.parse(JSON.stringify(source.items))
         : null
-    const copiedEntry = applyEntryClientId(
+    const copiedEntry = markEntryAllowDuplicate(
+      applyEntryClientId(
       {
         ...source,
         clientId: undefined,
@@ -9606,6 +9751,7 @@ Please add nutritional information manually if needed.`);
       },
       `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
       { forceNew: true },
+    ),
     )
     const pendingKey = buildPendingSaveKey(copiedEntry, targetDate)
     const pendingEntry = markEntryPendingSave(copiedEntry, pendingKey)
@@ -9693,7 +9839,8 @@ Please add nutritional information manually if needed.`);
         entry.items && Array.isArray(entry.items) && entry.items.length > 0
           ? JSON.parse(JSON.stringify(entry.items))
           : null
-      const baseEntry = applyEntryClientId(
+      const baseEntry = markEntryAllowDuplicate(
+        applyEntryClientId(
         {
           ...entry,
           clientId: undefined,
@@ -9713,6 +9860,7 @@ Please add nutritional information manually if needed.`);
         },
         `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
         { forceNew: true },
+      ),
       )
       const pendingKey = buildPendingSaveKey(baseEntry, targetDate)
       return markEntryPendingSave(baseEntry, pendingKey)
@@ -10686,7 +10834,8 @@ Please add nutritional information manually if needed.`);
         item?.time ||
         new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       const description = (item?.description || '').toString() || 'Copied meal'
-      const baseEntry = applyEntryClientId(
+      const baseEntry = markEntryAllowDuplicate(
+        applyEntryClientId(
         {
           id: makeUniqueLocalEntryId(
             baseMs,
@@ -10708,6 +10857,7 @@ Please add nutritional information manually if needed.`);
         },
         `paste:${pasteStamp}|${targetDate}|${category}|${normalizedDescription(description)}|${idx}`,
         { forceNew: true },
+      ),
       )
       const pendingKey = buildPendingSaveKey(baseEntry, targetDate)
       return markEntryPendingSave(baseEntry, pendingKey)
