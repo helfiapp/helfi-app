@@ -9506,7 +9506,7 @@ Please add nutritional information manually if needed.`);
     triggerHaptic(10)
 
     try {
-      await saveFoodEntries(foodsForSave, { allowDuplicate: true, appendHistory: false })
+      await saveFoodEntries(foodsForSave, { allowDuplicate: true, appendHistory: false, suppressToast: true })
 
       const idKey = copiedEntry?.id !== null && copiedEntry?.id !== undefined ? `id:${copiedEntry.id}` : ''
       const stableKeys = stableDeleteKeysForEntry(copiedEntry)
@@ -9657,7 +9657,7 @@ Please add nutritional information manually if needed.`);
     } catch {}
     try {
       // Persist to user-data snapshot (without history append to avoid single-entry overwrite)
-      await saveFoodEntries(deduped, { appendHistory: false, snapshotDateOverride: targetDate })
+      await saveFoodEntries(deduped, { appendHistory: false, snapshotDateOverride: targetDate, suppressToast: true })
 
       // Persist each cloned entry to FoodLog so refresh won't drop them.
       // IMPORTANT: This must respect deletes that occur while copies are still being posted,
@@ -10704,7 +10704,7 @@ Please add nutritional information manually if needed.`);
     clearMultiCopyClipboard()
 
     try {
-      await saveFoodEntries(foodsForSave, { appendHistory: false, snapshotDateOverride: targetDate })
+      await saveFoodEntries(foodsForSave, { appendHistory: false, snapshotDateOverride: targetDate, suppressToast: true })
 
       // Persist to FoodLog so refresh won't drop pasted entries (especially for non-today dates).
       for (const clone of clones) {
