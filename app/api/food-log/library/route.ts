@@ -4,14 +4,6 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const normalizeLabel = (raw: string) =>
-  String(raw || '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 export async function GET(request: NextRequest) {
@@ -45,13 +37,12 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const requestedLimit = Number(searchParams.get('limit') || 0)
-    const maxUnique = clamp(Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 2000, 200, 5000)
-    const scanLimit = clamp(maxUnique * 6, 1000, 15000)
+    const maxEntries = clamp(Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 5000, 200, 5000)
 
     const logs = await prisma.foodLog.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
-      take: scanLimit,
+      take: maxEntries,
       select: {
         id: true,
         description: true,
@@ -66,18 +57,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const seen = new Set<string>()
-    const unique: typeof logs = []
-    for (const log of logs) {
-      const key = normalizeLabel(log.description || log.name || '')
-      if (!key) continue
-      if (seen.has(key)) continue
-      seen.add(key)
-      unique.push(log)
-      if (unique.length >= maxUnique) break
-    }
-
-    return NextResponse.json({ success: true, logs: unique, total: unique.length })
+    return NextResponse.json({ success: true, logs, total: logs.length })
   } catch (error) {
     console.error('GET /api/food-log/library error', error)
     return NextResponse.json({ error: 'Failed to load library' }, { status: 500 })

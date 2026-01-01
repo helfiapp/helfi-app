@@ -3216,12 +3216,16 @@ export default function FoodDiary() {
   // Stable delete keys so resurrected entries (or entries missing a category) can still be suppressed.
   // We always include a category-specific key, and also an "uncategorized" variant because server rows
   // can intermittently miss the meal/category field.
-  const stableDeleteKeysForEntry = (entry: any) => {
+  type StableDeleteKeyMode = 'time' | 'legacy' | 'both'
+  const stableDeleteKeysForEntry = (entry: any, mode: StableDeleteKeyMode = 'time') => {
     if (!entry) return [] as string[]
     const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     const descCanonical = normalizedDescription(entry?.description || entry?.name || '')
     const date = dateKeyForEntry(entry)
     if (!descCanonical || !date) return [] as string[]
+    const timeKey = entryTimestampKey(entry)
+    const includeTime = mode !== 'legacy'
+    const includeLegacy = mode === 'both' || mode === 'legacy' || (!timeKey && mode === 'time')
 
     // Back-compat: older tombstones may have used the multiplication sign `×` instead of `x`.
     // Include both variants for numeric multipliers (e.g., "0.55× avocado").
@@ -3231,8 +3235,16 @@ export default function FoodDiary() {
 
     const keys: string[] = []
     for (const desc of Array.from(descVariants)) {
-      keys.push(`stable:${cat}|${desc}|${date}`)
-      if (cat !== 'uncategorized') keys.push(`stable:uncategorized|${desc}|${date}`)
+      const base = `stable:${cat}|${desc}|${date}`
+      const baseUncategorized = `stable:uncategorized|${desc}|${date}`
+      if (includeTime && timeKey) {
+        keys.push(`${base}|${timeKey}`)
+        if (cat !== 'uncategorized') keys.push(`${baseUncategorized}|${timeKey}`)
+      }
+      if (includeLegacy) {
+        keys.push(base)
+        if (cat !== 'uncategorized') keys.push(baseUncategorized)
+      }
     }
     return keys
   }
@@ -3292,7 +3304,7 @@ export default function FoodDiary() {
     if (!Array.isArray(entries) || entries.length === 0) return
     const keysToRemove = new Set<string>()
     entries.forEach((entry) => {
-      stableDeleteKeysForEntry(entry).forEach((k) => {
+      stableDeleteKeysForEntry(entry, 'both').forEach((k) => {
         if (k) keysToRemove.add(k)
       })
       const dbKey = (entry as any)?.dbId ? `db:${(entry as any).dbId}` : ''
@@ -7426,7 +7438,7 @@ Please add nutritional information manually if needed.`);
     return normalizeMealLabel(raw)
   }
 
-  const FOOD_LIBRARY_MAX_ENTRIES = 2000
+  const FOOD_LIBRARY_MAX_ENTRIES = 5000
   const buildFoodLibraryEntry = (entry: any, fallbackDate: string) => {
     const compacted = compactEntryForSnapshot(entry, fallbackDate)
     if (!compacted || typeof compacted !== 'object') return null
@@ -7458,18 +7470,8 @@ Please add nutritional information manually if needed.`);
       const normalized = buildFoodLibraryEntry(entry, fallbackDate)
       if (normalized) pool.push(normalized)
     }
-    const byLabel = new Map<string, any>()
-    for (const entry of pool) {
-      const label = normalizeFoodName(normalizeMealLabel(entry?.description || entry?.label || ''))
-      if (!label) continue
-      const existing = byLabel.get(label)
-      const entryTs = extractEntryTimestampMs(entry)
-      const existingTs = existing ? extractEntryTimestampMs(existing) : -Infinity
-      if (!existing || entryTs > existingTs) {
-        byLabel.set(label, entry)
-      }
-    }
-    const sorted = Array.from(byLabel.values()).sort((a, b) => {
+    const deduped = dedupeEntries(pool, { fallbackDate })
+    const sorted = deduped.sort((a, b) => {
       const aTs = extractEntryTimestampMs(a)
       const bTs = extractEntryTimestampMs(b)
       if (!Number.isFinite(aTs) && !Number.isFinite(bTs)) return 0
@@ -7487,7 +7489,7 @@ Please add nutritional information manually if needed.`);
     if (now - foodLibraryRefreshRef.current.last < 5 * 60 * 1000) return
     foodLibraryRefreshRef.current.inFlight = true
     try {
-      const res = await fetch('/api/food-log/library?limit=2000', { cache: 'no-store' })
+      const res = await fetch('/api/food-log/library?limit=5000', { cache: 'no-store' })
       if (!res.ok) return
       const json = await res.json().catch(() => ({} as any))
       const logs = Array.isArray(json.logs) ? json.logs : []
@@ -7790,7 +7792,6 @@ Please add nutritional information manually if needed.`);
 
   const buildFavoritesDatasets = () => {
     const history = collectHistoryMeals()
-    const allByKey = new Map<string, any>()
     const linkedFavoriteIdForEntry = (entry: any) => {
       try {
         const fromNutrition =
@@ -7863,17 +7864,13 @@ Please add nutritional information manually if needed.`);
       if (!key) return
       favoritesByKey.set(key, fav)
       if (fav?.id) favoritesById.set(String(fav.id), fav)
-      // If something is a Favorite, it should still be selectable from "All".
-      // Prefer the explicit favorite payload when no history entry exists.
-      const allKey = `label:${key}`
-      if (allKey && !allByKey.has(allKey)) {
-        allByKey.set(allKey, { ...fav, sourceTag: 'Favorite' })
-      }
     })
 
-    const allMealsRaw = Array.from(allByKey.values()).map((entry) => ({
-      id: entry?.id || `all-${Math.random()}`,
-      label: (() => {
+    const usedFavoriteIds = new Set<string>()
+    const usedLabels = new Set<string>()
+
+    const allMealsRaw = history.map((entry, idx) => {
+      const label = (() => {
         const linkedId = linkedFavoriteIdForEntry(entry)
         if (linkedId && favoritesById.has(linkedId)) {
           const fav = favoritesById.get(linkedId)
@@ -7894,14 +7891,13 @@ Please add nutritional information manually if needed.`);
           }
         } catch {}
         return applyFoodNameOverride(entry?.description || entry?.label || 'Meal', entry)
-      })(),
-      entry,
-      favorite:
+      })()
+
+      const favorite =
         (entry as any)?.sourceTag === 'Favorite'
           ? entry
           : (() => {
-              const linkedId =
-                linkedFavoriteIdForEntry(entry) || ''
+              const linkedId = linkedFavoriteIdForEntry(entry) || ''
               if (linkedId && favoritesById.has(linkedId)) return favoritesById.get(linkedId)
               try {
                 const labelKey = normalizeKey(entry?.description || entry?.label || '')
@@ -7914,49 +7910,49 @@ Please add nutritional information manually if needed.`);
                 if (aliasId && favoritesById.has(aliasId)) return favoritesById.get(aliasId)
               } catch {}
               return favoritesByKey.get(normalizeKey(entry?.description || entry?.label || '', entry)) || null
-            })(),
-      createdAt: entry?.createdAt || entry?.id || Date.now(),
-      sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
-      calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
-      serving: entry?.items?.[0]?.serving_size || entry?.serving || entry?.items?.[0]?.servings || '',
-    }))
+            })()
 
-    // Last safety net: if two different sources end up displaying the same label/serving,
-    // show only one row in "All" (prefer the saved Favorite version so edit/delete works).
-    const allMeals = (() => {
-      const byDisplay = new Map<string, any>()
-      const score = (it: any) => {
-        const hasFavorite = Boolean(it?.favorite)
-        const hasEntry = Boolean(it?.entry)
-        return (hasFavorite ? 100 : 0) + (hasEntry ? 10 : 0)
+      if (favorite?.id) usedFavoriteIds.add(String(favorite.id))
+      const labelKey = normalizeFoodName(String(label || '').trim())
+      if (labelKey) usedLabels.add(labelKey)
+
+      const entryTs = extractEntryTimestampMs(entry)
+      const createdAtValue =
+        Number.isFinite(entryTs) ? entryTs : Number(entry?.createdAt) || Number(entry?.id) || Date.now()
+
+      return {
+        id: entry?.dbId ? `log-${entry.dbId}` : entry?.id || `all-${idx}`,
+        label,
+        entry,
+        favorite,
+        createdAt: createdAtValue,
+        sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
+        calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
+        serving: entry?.items?.[0]?.serving_size || entry?.serving || entry?.items?.[0]?.servings || '',
       }
-      for (const item of Array.isArray(allMealsRaw) ? allMealsRaw : []) {
-        const labelKey = normalizeFoodName(String(item?.label || '').trim())
-        if (!labelKey) continue
-        const key = labelKey
-        const existing = byDisplay.get(key)
-        if (!existing) {
-          byDisplay.set(key, item)
-          continue
-        }
-        const a = existing
-        const b = item
-        const aScore = score(a)
-        const bScore = score(b)
-        if (bScore > aScore) {
-          byDisplay.set(key, b)
-          continue
-        }
-        if (bScore === aScore) {
-          const aTs = Number(a?.createdAt) || 0
-          const bTs = Number(b?.createdAt) || 0
-          if (bTs > aTs) byDisplay.set(key, b)
-        }
-      }
-      return Array.from(byDisplay.values())
-    })()
-    // "All" should show every meal, including favorites.
-    const allMealsWithFavorites = allMeals
+    })
+
+    // "All" should show every meal, including favorites that aren't in history yet.
+    const allMealsWithFavorites = [...allMealsRaw]
+    ;(favorites || []).forEach((fav: any) => {
+      const favId = fav?.id ? String(fav.id).trim() : ''
+      const label =
+        applyFoodNameOverride(fav?.label || fav?.description || 'Favorite meal') ||
+        favoriteDisplayLabel(fav) ||
+        normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal')
+      const labelKey = normalizeFoodName(String(label || '').trim())
+      if (favId && usedFavoriteIds.has(favId)) return
+      if (labelKey && usedLabels.has(labelKey)) return
+      allMealsWithFavorites.push({
+        id: favId || `fav-${Math.random()}`,
+        label,
+        favorite: fav,
+        createdAt: Number(fav?.createdAt) || Number(fav?.id) || Date.now(),
+        sourceTag: 'Favorite',
+        calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
+        serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
+      })
+    })
 
     const favoriteMeals = (favorites || []).map((fav: any) => ({
       id: fav?.id || `fav-${Math.random()}`,
@@ -9006,6 +9002,7 @@ Please add nutritional information manually if needed.`);
     const lastInsert = mealInsertDebounceRef.current[debounceKey] || 0
     if (now - lastInsert < 800) return
     mealInsertDebounceRef.current[debounceKey] = now
+    beginDiaryMutation()
     const totals =
       sanitizeNutritionTotals(source?.nutrition || source?.total || source?.entry?.total || source?.entry?.nutrition) ||
       null
@@ -9068,6 +9065,7 @@ Please add nutritional information manually if needed.`);
       setShowAddFood(false)
       setShowPhotoOptions(false)
       setShowFavoritesPicker(false)
+      endDiaryMutation()
     }
   }
 
@@ -9120,6 +9118,7 @@ Please add nutritional information manually if needed.`);
     // Mobile browsers can fire multiple taps/clicks; guard to avoid triple inserts.
     if (now - last < 1200) return
     favoriteInsertDebounceRef.current[debounceKey] = now
+    beginDiaryMutation()
 
     const createdAtIso = alignTimestampToLocalDate(new Date(now).toISOString(), selectedDate)
     const clonedItems =
@@ -9196,6 +9195,7 @@ Please add nutritional information manually if needed.`);
       console.warn('Favorite add sync failed', err)
     } finally {
       setPhotoOptionsAnchor(null)
+      endDiaryMutation()
     }
   }
 
@@ -9246,6 +9246,7 @@ Please add nutritional information manually if needed.`);
   const duplicateEntryToCategory = async (targetCategory: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (!duplicateModalContext || duplicateInFlightRef.current) return
     duplicateInFlightRef.current = true
+    beginDiaryMutation()
     const { entry: source, targetDate, mode } = duplicateModalContext
     setSwipeMenuEntry(null)
     setEntrySwipeOffsets({})
@@ -9326,6 +9327,7 @@ Please add nutritional information manually if needed.`);
       console.warn('Duplicate/copy sync failed', err)
     } finally {
       duplicateInFlightRef.current = false
+      endDiaryMutation()
     }
   }
 
@@ -9335,6 +9337,8 @@ Please add nutritional information manually if needed.`);
       showQuickToast(`No ${categoryLabel(categoryKey)} entries to copy`)
       return
     }
+    beginDiaryMutation()
+    try {
     const category = normalizeCategory(categoryKey)
     const targetDate = todayIso
     const metaStamp = Date.now()
@@ -9468,6 +9472,9 @@ Please add nutritional information manually if needed.`);
       await refreshEntriesFromServer()
     } catch (err) {
       console.warn('Copy category to today failed', err)
+    }
+    } finally {
+      endDiaryMutation()
     }
   }
 
@@ -9909,6 +9916,13 @@ Please add nutritional information manually if needed.`);
       // otherwise the entry will "resurrect" after refresh.
       let deletedAny = false
       const sweepDates: string[] = []
+      const entryTs = extractEntryTimestampMs(entry)
+      const timeWindowMs = 2 * 60 * 1000
+      const isSameEntryTime = (log: any) => {
+        const logTs = log?.createdAt ? new Date(log.createdAt).getTime() : NaN
+        if (!Number.isFinite(entryTs) || !Number.isFinite(logTs)) return false
+        return Math.abs(logTs - entryTs) <= timeWindowMs
+      }
 
       // 1) Try direct id deletes first (fast path), but do NOT stop here: duplicates may remain.
       if (dbId) {
@@ -9935,7 +9949,6 @@ Please add nutritional information manually if needed.`);
             if (!res.ok) continue
             const json = await res.json()
             const logs = Array.isArray(json.logs) ? json.logs : []
-            const entryTs = extractEntryTimestampMs(entry)
             const matches = logs.filter((l: any) => {
               const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
               const descMatch =
@@ -9945,15 +9958,20 @@ Please add nutritional information manually if needed.`);
 
               // SAFETY: never let `uncategorized` match *any* category across days, otherwise
               // deleting a pasted item can wipe an older entry that was saved without a meal.
-              if (cat === entryCategory) return true
-              if (entryCategory === 'uncategorized') return cat === 'uncategorized'
+              if (cat === entryCategory) {
+                if (Number.isFinite(entryTs)) return isSameEntryTime(l)
+                return day === (targetDateKey || selectedDate)
+              }
+              if (entryCategory === 'uncategorized') {
+                if (cat !== 'uncategorized') return false
+                if (Number.isFinite(entryTs)) return isSameEntryTime(l)
+                return day === (targetDateKey || selectedDate)
+              }
 
               // Only treat missing-category rows as the same entry when timestamps are very close
               // (same save/copy operation), not a different day’s breakfast/lunch copy.
               if (cat === 'uncategorized') {
-                const logTs = l?.createdAt ? new Date(l.createdAt).getTime() : NaN
-                if (!Number.isFinite(entryTs) || !Number.isFinite(logTs)) return false
-                return Math.abs(logTs - entryTs) <= 2 * 60 * 60 * 1000 // 2 hours
+                return isSameEntryTime(l)
               }
               return false
             })
@@ -16036,10 +16054,6 @@ Please add nutritional information manually if needed.`);
                         const tag = item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom')
                         const serving = item?.serving || '1 serving'
                         const handleSelect = () => {
-                          if (favoritesActiveTab === 'custom' && item.favorite) {
-                            insertMealIntoDiary(item.favorite, selectedAddCategory)
-                            return
-                          }
                           if (item.favorite) {
                             insertFavoriteIntoDiary(item.favorite, selectedAddCategory)
                           } else if (item.entry) {
