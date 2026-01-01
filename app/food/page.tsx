@@ -2349,7 +2349,7 @@ export default function FoodDiary() {
     loadExerciseEntriesForDate(selectedDate)
     // Keep device pills updated when switching dates (low-cost, cached by browser).
     refreshDeviceStatus()
-  }, [mapLogsToEntries, mergeFoodLibraryEntries, selectedDate])
+  }, [selectedDate])
 
   useEffect(() => {
     const today = buildTodayIso()
