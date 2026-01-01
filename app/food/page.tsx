@@ -7480,6 +7480,33 @@ Please add nutritional information manually if needed.`);
     return sorted.slice(0, FOOD_LIBRARY_MAX_ENTRIES)
   }
 
+  const refreshFoodLibraryFromServer = useCallback(async () => {
+    if (typeof window === 'undefined') return
+    const now = Date.now()
+    if (foodLibraryRefreshRef.current.inFlight) return
+    if (now - foodLibraryRefreshRef.current.last < 5 * 60 * 1000) return
+    foodLibraryRefreshRef.current.inFlight = true
+    try {
+      const res = await fetch('/api/food-log/library?limit=2000', { cache: 'no-store' })
+      if (!res.ok) return
+      const json = await res.json().catch(() => ({} as any))
+      const logs = Array.isArray(json.logs) ? json.logs : []
+      if (!logs.length) return
+      const mapped = mapLogsToEntries(logs, selectedDate)
+      setFoodLibrary((prev) => mergeFoodLibraryEntries(prev, mapped, selectedDate))
+    } catch (err) {
+      console.warn('Food library refresh failed', err)
+    } finally {
+      foodLibraryRefreshRef.current.last = now
+      foodLibraryRefreshRef.current.inFlight = false
+    }
+  }, [mapLogsToEntries, mergeFoodLibraryEntries, selectedDate])
+
+  useEffect(() => {
+    if (!showFavoritesPicker) return
+    refreshFoodLibraryFromServer()
+  }, [showFavoritesPicker, refreshFoodLibraryFromServer])
+
   const foodNameOverrideMap = useMemo(() => {
     const map = new Map<string, string>()
     const byItemId = new Map<string, string>()
@@ -7740,33 +7767,6 @@ Please add nutritional information manually if needed.`);
     if ((entry as any)?.method === 'text') return 'Manual'
     return 'CRDB'
   }
-
-  const refreshFoodLibraryFromServer = useCallback(async () => {
-    if (typeof window === 'undefined') return
-    const now = Date.now()
-    if (foodLibraryRefreshRef.current.inFlight) return
-    if (now - foodLibraryRefreshRef.current.last < 5 * 60 * 1000) return
-    foodLibraryRefreshRef.current.inFlight = true
-    try {
-      const res = await fetch('/api/food-log/library?limit=2000', { cache: 'no-store' })
-      if (!res.ok) return
-      const json = await res.json().catch(() => ({} as any))
-      const logs = Array.isArray(json.logs) ? json.logs : []
-      if (!logs.length) return
-      const mapped = mapLogsToEntries(logs, selectedDate)
-      setFoodLibrary((prev) => mergeFoodLibraryEntries(prev, mapped, selectedDate))
-    } catch (err) {
-      console.warn('Food library refresh failed', err)
-    } finally {
-      foodLibraryRefreshRef.current.last = now
-      foodLibraryRefreshRef.current.inFlight = false
-    }
-  }, [selectedDate])
-
-  useEffect(() => {
-    if (!showFavoritesPicker) return
-    refreshFoodLibraryFromServer()
-  }, [showFavoritesPicker, refreshFoodLibraryFromServer])
 
   const collectHistoryMeals = () => {
     const pool: any[] = []
