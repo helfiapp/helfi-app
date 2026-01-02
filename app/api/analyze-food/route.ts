@@ -950,11 +950,14 @@ const hasDiscreteKeyword = (text: string) => {
   return DISCRETE_PIECE_KEYWORDS.some((k) => lower.includes(k))
 }
 
+const hasWeightUnitText = (text: string) =>
+  /\b\d+(?:\.\d+)?\s*(g|gram|grams|kg|ml|oz|ounce|ounces|lb|pound|pounds)\b/i.test(String(text || ''));
+
 const extractExplicitPieceCount = (text: string, keywords: string[] = DISCRETE_PIECE_KEYWORDS): number | null => {
   if (!text) return null
   const normalized = replaceWordNumbers(String(text).toLowerCase()).replace(/\b(a|an)\b/g, '1')
   // If a weight unit is present, never treat it as a piece count (e.g., "6 oz patty").
-  if (/\b\d+(?:\.\d+)?\s*(g|gram|grams|kg|ml|oz|ounce|ounces|lb|pound|pounds)\b/i.test(normalized)) {
+  if (hasWeightUnitText(normalized)) {
     return null
   }
   const keywordPattern = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
@@ -964,6 +967,18 @@ const extractExplicitPieceCount = (text: string, keywords: string[] = DISCRETE_P
   if (!match) return null
   const n = parseFloat(match[1])
   return Number.isFinite(n) && n > 0 ? n : null
+}
+
+const extractExplicitDiscreteCountFromServing = (text: string, keywords: string[] = DISCRETE_PIECE_KEYWORDS): number | null => {
+  if (!text) return null;
+  const normalized = replaceWordNumbers(String(text).toLowerCase()).replace(/\b(a|an)\b/g, '1');
+  const keywordPattern = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const match = normalized.match(
+    new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:[a-z-]+\\s+){0,2}(?:${keywordPattern})\\b`),
+  );
+  if (!match) return null;
+  const n = parseFloat(match[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 const hasExplicitPieceCount = (text: string, keywords?: string[]): boolean => {
@@ -1035,10 +1050,17 @@ const stripPiecesWithoutExplicitCount = (items: any[]): { items: any[]; changed:
     const name = String(updated?.name || '')
     const serving = String(updated?.serving_size || updated?.servingSize || '')
     const label = replaceWordNumbers(`${name} ${serving}`.trim())
-    const explicitCount = extractExplicitPieceCount(label)
+    const servingExplicit = extractExplicitDiscreteCountFromServing(serving)
+    const explicitCount = extractExplicitPieceCount(label) || servingExplicit
     const hasPieces =
       (Number.isFinite(Number(updated?.piecesPerServing)) && Number(updated.piecesPerServing) > 0) ||
       (Number.isFinite(Number(updated?.pieces)) && Number(updated.pieces) > 0)
+
+    // If the serving is weight-based and doesn't declare a discrete count, strip any leading count from the name.
+    if (hasWeightUnitText(serving) && !servingExplicit && /^\s*\d+\s+/.test(name)) {
+      updated.name = name.replace(/^\s*\d+\s+/, '').trim()
+      changed = true
+    }
 
     if (!explicitCount && hasPieces) {
       delete updated.piecesPerServing
@@ -1721,7 +1743,10 @@ const ensureBurgerComponents = (items: any[] | null, analysis: string | null | u
       Number.isFinite(Number(it.servings)) && Number(it.servings) > 0 ? Number(it.servings) : 1;
     const nameOnly = replaceWordNumbers(String(it?.name || '').trim());
     const labelSource = replaceWordNumbers(`${it?.name || ''} ${it?.serving_size || ''}`.trim());
-    const explicitCount = extractExplicitPieceCount(nameOnly) ?? extractExplicitPieceCount(labelSource);
+    const servingSizeRaw = String(it?.serving_size || '');
+    const servingHasWeight = hasWeightUnitText(servingSizeRaw);
+    const servingExplicit = extractExplicitDiscreteCountFromServing(servingSizeRaw);
+    const explicitCount = servingExplicit ?? (servingHasWeight ? extractExplicitPieceCount(labelSource) : (extractExplicitPieceCount(nameOnly) ?? extractExplicitPieceCount(labelSource)));
 
     it.servings = Math.round(existingServings * 1000) / 1000;
 
