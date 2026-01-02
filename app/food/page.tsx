@@ -9579,6 +9579,43 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const isEntryAlreadyFavorite = (entry?: any) => {
+    if (!entry) return false
+    const favoriteId =
+      (entry?.favorite && entry.favorite.id && String(entry.favorite.id)) ||
+      (entry?.nutrition &&
+      typeof entry.nutrition === 'object' &&
+      typeof (entry.nutrition as any).__favoriteId === 'string'
+        ? String((entry.nutrition as any).__favoriteId)
+        : '') ||
+      (entry?.total &&
+      typeof entry.total === 'object' &&
+      typeof (entry.total as any).__favoriteId === 'string'
+        ? String((entry.total as any).__favoriteId)
+        : '') ||
+      (entry?.id && String(entry.id).startsWith('fav-') ? String(entry.id) : '') ||
+      ''
+    if (favoriteId) return true
+
+    const sourceId =
+      (entry?.favorite && entry.favorite.sourceId) ||
+      entry?.sourceId ||
+      entry?.dbId ||
+      entry?.id ||
+      ''
+    const nameKey = normalizeFoodName(normalizeMealLabel(entry?.description || entry?.label || ''))
+    const list = Array.isArray(favorites) ? favorites : []
+    return list.some((fav: any) => {
+      const favSourceId = fav?.sourceId ? String(fav.sourceId) : ''
+      if (sourceId && favSourceId && String(sourceId) === favSourceId) return true
+      const favLabel = normalizeFoodName(
+        normalizeMealLabel(favoriteDisplayLabel(fav) || fav?.label || fav?.description || ''),
+      )
+      if (nameKey && favLabel && nameKey === favLabel) return true
+      return false
+    })
+  }
+
   const handleAddToFavorites = (entry?: any) => {
     const source = entry || editingEntry
     if (!source) {
@@ -12787,13 +12824,15 @@ Please add nutritional information manually if needed.`);
               >
                 {editingEntry && (
                   <div className="flex items-center justify-end gap-3 px-4 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => handleAddToFavorites(editingEntry)}
-                      className="px-3 py-1.5 rounded-full border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-                    >
-                      Add to Favorites
-                    </button>
+                    {!isEntryAlreadyFavorite(editingEntry) && (
+                      <button
+                        type="button"
+                        onClick={() => handleAddToFavorites(editingEntry)}
+                        className="px-3 py-1.5 rounded-full border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                      >
+                        Add to Favorites
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleDeleteEditingEntry}
@@ -13281,7 +13320,7 @@ Please add nutritional information manually if needed.`);
                               mode: 'analysis',
                             })
                           }
-                          className="text-sm px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                          className="text-sm px-2.5 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                           title="Add a missing ingredient"
                         >
                           + Add ingredient
@@ -13373,10 +13412,23 @@ Please add nutritional information manually if needed.`);
                           const trimmed = withoutGenericPrefixes.trim()
                           return trimmed || 'Unknown Food'
                         })()
-                        const displayName =
-                          piecesPerServing && piecesPerServing > 0 && pieceCountDisplay
-                            ? `${pieceCountDisplay} ${cleanBaseName}`.trim()
-                            : cleanBaseName
+                        const displayName = (() => {
+                          const base =
+                            piecesPerServing && piecesPerServing > 0 && pieceCountDisplay
+                              ? `${pieceCountDisplay} ${cleanBaseName}`.trim()
+                              : cleanBaseName
+                          if (!base) return base
+                          for (let i = 0; i < base.length; i += 1) {
+                            const ch = base[i]
+                            if (ch >= 'a' && ch <= 'z') {
+                              return `${base.slice(0, i)}${ch.toUpperCase()}${base.slice(i + 1)}`
+                            }
+                            if (ch >= 'A' && ch <= 'Z') {
+                              return base
+                            }
+                          }
+                          return base
+                        })()
                         const servingSizeDisplayLabel = (() => {
                           if (piecesDisplayMultiplier && servingSizeLabel) {
                             const withoutLeadingOne = servingSizeLabel.replace(/^\s*1\s+/, '').trim()
@@ -13402,7 +13454,7 @@ Please add nutritional information manually if needed.`);
                         }
                         
                         const cardPaddingClass =
-                          isCollapsed ? 'py-2 px-4' : 'p-4'
+                          isCollapsed ? 'py-2 px-5' : 'p-4'
 
                         return (
                           <div
@@ -15378,7 +15430,9 @@ Please add nutritional information manually if needed.`);
                       }
 
                       const actions = [
-                        { label: 'Add to Favorites', onClick: () => handleAddToFavorites(food) },
+                        ...(isEntryAlreadyFavorite(food)
+                          ? []
+                          : [{ label: 'Add to Favorites', onClick: () => handleAddToFavorites(food) }]),
                         {
                           label: 'Duplicate Meal',
                           onClick: () =>
