@@ -14212,57 +14212,28 @@ Please add nutritional information manually if needed.`);
                       </div>
                       
                       {(() => {
-                        const servingRaw = String(analyzedItems[editingItemIndex]?.serving_size || '').trim()
-                        const meta = parseServingUnitMetadata(servingRaw)
-                        const info = parseServingSizeInfo({ serving_size: servingRaw })
-                        const normalizeUnit = (label: string) => {
-                          const l = (label || '').toLowerCase()
-                          if (l.includes('ml') || l.includes('millil')) return 'ml'
-                          if (l.includes('oz') || l.includes('ounce')) return 'oz'
-                          if (l.includes('g') || l.includes('gram')) return 'g'
-                          return ''
-                        }
-                        let unit = ''
-                        let amount: number | string = ''
-                        if (meta && meta.quantity && normalizeUnit(meta.unitLabel)) {
-                          unit = normalizeUnit(meta.unitLabel)
-                          amount = meta.quantity
-                        } else if (info.mlPerServing) {
-                          unit = 'ml'
-                          amount = Math.round(info.mlPerServing * 100) / 100
-                        } else if (info.ozPerServing) {
-                          unit = 'oz'
-                          amount = Math.round(info.ozPerServing * 100) / 100
-                        } else if (info.gramsPerServing) {
-                          unit = 'g'
-                          amount = Math.round(info.gramsPerServing * 100) / 100
-                        } else {
-                          unit = 'g'
-                          amount = ''
-                        }
-                        const amountKey = `ai:modal:${editingItemIndex}:serving_size_amount`
+                        const item = analyzedItems[editingItemIndex]
+                        const servingsCount = Number.isFinite(item?.servings) ? Number(item.servings) : 1
+                        const baseWeightPerServing = getBaseWeightPerServing(item)
+                        const unit =
+                          item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+                        const amountKey = `ai:modal:${editingItemIndex}:weightAmount`
                         const amountValue = Object.prototype.hasOwnProperty.call(numericInputDrafts, amountKey)
                           ? numericInputDrafts[amountKey]
-                          : formatNumberInputValue(amount)
-                        const updateServingSize = (nextAmount: string | number, nextUnit: string) => {
-                          const trimmed = String(nextAmount || '').trim()
-                          if (!trimmed) {
-                            updateItemField(editingItemIndex, 'serving_size', '')
-                            return
-                          }
-                          updateItemField(editingItemIndex, 'serving_size', `${trimmed} ${nextUnit}`)
-                        }
+                          : Number.isFinite(Number(item?.weightAmount)) && Number(item.weightAmount) > 0
+                          ? String(Number(item.weightAmount))
+                          : ''
                         return (
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Serving Size
+                              Weight
                             </label>
                             <div className="flex gap-2">
                               <input
                                 type="number"
                                 inputMode="decimal"
                                 min={0}
-                                step={0.1}
+                                step={(unit === 'oz' ? 0.1 : 1) as any}
                                 value={amountValue}
                                 onFocus={() => {
                                   setNumericInputDrafts((prev) => ({ ...prev, [amountKey]: '' }))
@@ -14271,7 +14242,7 @@ Please add nutritional information manually if needed.`);
                                   const v = e.target.value
                                   setNumericInputDrafts((prev) => ({ ...prev, [amountKey]: v }))
                                   if (String(v).trim() !== '') {
-                                    updateServingSize(v, unit || 'g')
+                                    updateItemField(editingItemIndex, 'weightAmount', v)
                                   }
                                 }}
                                 onBlur={() => {
@@ -14281,12 +14252,20 @@ Please add nutritional information manually if needed.`);
                                     return next
                                   })
                                 }}
+                                placeholder={
+                                  baseWeightPerServing
+                                    ? String(
+                                        unit === 'oz'
+                                          ? Math.round(baseWeightPerServing * servingsCount * 100) / 100
+                                          : Math.round(baseWeightPerServing * servingsCount),
+                                      )
+                                    : 'e.g., 250'
+                                }
                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                placeholder="e.g., 15"
                               />
                               <select
-                                value={unit || 'g'}
-                                onChange={(e) => updateServingSize(amountValue, e.target.value)}
+                                value={unit}
+                                onChange={(e) => updateItemField(editingItemIndex, 'weightUnit', e.target.value)}
                                 className="w-24 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               >
                                 <option value="g">g</option>
@@ -14294,9 +14273,16 @@ Please add nutritional information manually if needed.`);
                                 <option value="oz">oz</option>
                               </select>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">
-                              This is the serving size shown on the package or your estimate
-                            </p>
+                            {baseWeightPerServing && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Total amount ≈{' '}
+                                {(() => {
+                                  const raw = baseWeightPerServing * servingsCount
+                                  const amount = unit === 'oz' ? Math.round(raw * 100) / 100 : Math.round(raw)
+                                  return `${amount} ${unit}`
+                                })()}
+                              </p>
+                            )}
                           </div>
                         )
                       })()}
@@ -14505,46 +14491,72 @@ Please add nutritional information manually if needed.`);
                         )}
                       </div>
 
-                      <div>
-                        <div className="block text-sm font-medium text-gray-700 mb-2">
-                          Macros per serving
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
+                      {(() => {
+                        const item = analyzedItems[editingItemIndex]
+                        const servingsCount = Number.isFinite(item?.servings) ? Number(item.servings) : 1
+                        const macroMultiplier = macroMultiplierForItem(item) || 1
+                        const totalMultiplier = Math.max(0, servingsCount * macroMultiplier)
+                        const divider = totalMultiplier > 0 ? totalMultiplier : 1
+                        const formatTotal = (value: any, decimals: number) => {
+                          const num = Number(value)
+                          if (!Number.isFinite(num)) return ''
+                          const scaled = totalMultiplier > 0 ? num * totalMultiplier : 0
+                          if (decimals <= 0) return String(Math.round(scaled))
+                          const factor = Math.pow(10, decimals)
+                          return String(Math.round(scaled * factor) / factor)
+                        }
+                        const toPerServing = (value: any, decimals: number) => {
+                          const num = Number(value)
+                          if (!Number.isFinite(num)) return value
+                          const per = num / divider
+                          if (decimals <= 0) return Math.round(per)
+                          const factor = Math.pow(10, decimals)
+                          return Math.round(per * factor) / factor
+                        }
+                        const totalLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
+                        return (
                           <div>
-                            <label className="block text-xs text-gray-600 mb-1">Calories</label>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              step={1}
-                              value={(() => {
-                                const key = `ai:modal:${editingItemIndex}:calories`
-                                return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
-                                  ? numericInputDrafts[key]
-                                  : String(analyzedItems[editingItemIndex]?.calories ?? '')
-                              })()}
-                              onFocus={() => {
-                                const key = `ai:modal:${editingItemIndex}:calories`
-                                setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
-                              }}
-                              onChange={(e) => {
-                                const key = `ai:modal:${editingItemIndex}:calories`
-                                const v = e.target.value
-                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'calories', v)
-                              }}
-                              onBlur={() => {
-                                const key = `ai:modal:${editingItemIndex}:calories`
-                                setNumericInputDrafts((prev) => {
-                                  const next = { ...prev }
-                                  delete next[key]
-                                  return next
-                                })
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              placeholder="kcal"
-                            />
-                          </div>
+                            <div className="block text-sm font-medium text-gray-700 mb-2">
+                              Totals for {totalLabel}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">Calories</label>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={0}
+                                  step={1}
+                                  value={(() => {
+                                    const key = `ai:modal:${editingItemIndex}:calories`
+                                    return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                                      ? numericInputDrafts[key]
+                                      : formatTotal(item?.calories ?? '', 0)
+                                  })()}
+                                  onFocus={() => {
+                                    const key = `ai:modal:${editingItemIndex}:calories`
+                                    setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                                  }}
+                                  onChange={(e) => {
+                                    const key = `ai:modal:${editingItemIndex}:calories`
+                                    const v = e.target.value
+                                    setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                    if (String(v).trim() !== '') {
+                                      updateItemField(editingItemIndex, 'calories', toPerServing(v, 0))
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    const key = `ai:modal:${editingItemIndex}:calories`
+                                    setNumericInputDrafts((prev) => {
+                                      const next = { ...prev }
+                                      delete next[key]
+                                      return next
+                                    })
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                  placeholder="kcal"
+                                />
+                              </div>
                           <div>
                             <label className="block text-xs text-gray-600 mb-1">Protein (g)</label>
                             <input
@@ -14556,7 +14568,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:protein_g`
                                 return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
                                   ? numericInputDrafts[key]
-                                  : String(analyzedItems[editingItemIndex]?.protein_g ?? '')
+                                  : formatTotal(item?.protein_g ?? '', 1)
                               })()}
                               onFocus={() => {
                                 const key = `ai:modal:${editingItemIndex}:protein_g`
@@ -14566,7 +14578,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:protein_g`
                                 const v = e.target.value
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'protein_g', v)
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'protein_g', toPerServing(v, 1))
                               }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:protein_g`
@@ -14591,7 +14603,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:carbs_g`
                                 return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
                                   ? numericInputDrafts[key]
-                                  : String(analyzedItems[editingItemIndex]?.carbs_g ?? '')
+                                  : formatTotal(item?.carbs_g ?? '', 1)
                               })()}
                               onFocus={() => {
                                 const key = `ai:modal:${editingItemIndex}:carbs_g`
@@ -14601,7 +14613,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:carbs_g`
                                 const v = e.target.value
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'carbs_g', v)
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'carbs_g', toPerServing(v, 1))
                               }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:carbs_g`
@@ -14626,7 +14638,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:fat_g`
                                 return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
                                   ? numericInputDrafts[key]
-                                  : String(analyzedItems[editingItemIndex]?.fat_g ?? '')
+                                  : formatTotal(item?.fat_g ?? '', 1)
                               })()}
                               onFocus={() => {
                                 const key = `ai:modal:${editingItemIndex}:fat_g`
@@ -14636,7 +14648,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:fat_g`
                                 const v = e.target.value
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'fat_g', v)
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'fat_g', toPerServing(v, 1))
                               }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:fat_g`
@@ -14661,7 +14673,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:fiber_g`
                                 return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
                                   ? numericInputDrafts[key]
-                                  : String(analyzedItems[editingItemIndex]?.fiber_g ?? '')
+                                  : formatTotal(item?.fiber_g ?? '', 1)
                               })()}
                               onFocus={() => {
                                 const key = `ai:modal:${editingItemIndex}:fiber_g`
@@ -14671,7 +14683,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:fiber_g`
                                 const v = e.target.value
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'fiber_g', v)
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'fiber_g', toPerServing(v, 1))
                               }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:fiber_g`
@@ -14696,7 +14708,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:sugar_g`
                                 return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
                                   ? numericInputDrafts[key]
-                                  : String(analyzedItems[editingItemIndex]?.sugar_g ?? '')
+                                  : formatTotal(item?.sugar_g ?? '', 1)
                               })()}
                               onFocus={() => {
                                 const key = `ai:modal:${editingItemIndex}:sugar_g`
@@ -14706,7 +14718,7 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:sugar_g`
                                 const v = e.target.value
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'sugar_g', v)
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'sugar_g', toPerServing(v, 1))
                               }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:sugar_g`
@@ -14720,8 +14732,10 @@ Please add nutritional information manually if needed.`);
                               placeholder="g"
                             />
                           </div>
-                        </div>
-                      </div>
+                            </div>
+                          </div>
+                        )
+                      })()}
                       
                       <div className="pt-4 border-t border-gray-200">
                         <button
