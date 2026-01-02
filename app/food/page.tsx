@@ -13389,7 +13389,7 @@ Please add nutritional information manually if needed.`);
                               mode: 'analysis',
                             })
                           }
-                          className="text-sm px-2.5 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                          className="w-full sm:w-auto px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors"
                           title="Add a missing ingredient"
                         >
                           + Add ingredient
