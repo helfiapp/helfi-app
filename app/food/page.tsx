@@ -2114,6 +2114,7 @@ export default function FoodDiary() {
   const mealInsertDebounceRef = useRef<Record<string, number>>({})
   const pendingServerIdRef = useRef<Map<string, { localId: number; savedAt: number }>>(new Map())
   const foodLibraryRefreshRef = useRef<{ last: number; inFlight: boolean }>({ last: 0, inFlight: false })
+  const renameSaveRef = useRef<((value: string) => void) | null>(null)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
@@ -2122,6 +2123,10 @@ export default function FoodDiary() {
   const favoriteClickBlockRef = useRef<Record<string, boolean>>({})
   const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>('all')
   const [favoritesSearch, setFavoritesSearch] = useState('')
+  const [showRenameModal, setShowRenameModal] = useState(false)
+  const [renameValue, setRenameValue] = useState('')
+  const [renameOriginal, setRenameOriginal] = useState('')
+  const [renameCleared, setRenameCleared] = useState(false)
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const [barcodeValue, setBarcodeValue] = useState('')
@@ -9794,34 +9799,59 @@ Please add nutritional information manually if needed.`);
     showQuickToast('Favorite removed')
   }
 
+  const openRenameModal = (current: string, onSave: (value: string) => void) => {
+    const safeCurrent = (current || '').toString()
+    setRenameOriginal(safeCurrent)
+    setRenameValue(safeCurrent)
+    setRenameCleared(false)
+    renameSaveRef.current = onSave
+    setShowRenameModal(true)
+  }
+
+  const closeRenameModal = () => {
+    setShowRenameModal(false)
+    setRenameValue(renameOriginal)
+    setRenameCleared(false)
+  }
+
+  const handleRenameConfirm = () => {
+    const nextName = (renameValue || '').toString().trim()
+    setShowRenameModal(false)
+    setRenameCleared(false)
+    if (!nextName) return
+    const save = renameSaveRef.current
+    if (save) {
+      save(nextName)
+    }
+  }
+
   const handleRenameFavorite = (id: string) => {
     const favId = String(id || '').trim()
     if (!favId) return
     const existing = (Array.isArray(favorites) ? favorites : []).find((f: any) => String(f?.id || '') === favId) || null
     if (!existing) return
     const current = applyFoodNameOverride(favoriteDisplayLabel(existing) || 'Favorite') || 'Favorite'
-    const nextRaw = typeof window !== 'undefined' ? window.prompt('Rename to:', current) : null
-    const nextName = (nextRaw || '').toString().trim()
-    if (!nextName) return
-    const cleaned = normalizeMealLabel(nextName) || nextName
-    try {
-      saveFoodNameOverride(favoriteDisplayLabel(existing) || current, cleaned, existing)
-    } catch {}
-    setFavorites((prev) => {
-      const next = (Array.isArray(prev) ? prev : []).map((fav: any) => {
-        if (String(fav?.id || '') !== favId) return fav
-        const existingLabel = favoriteDisplayLabel(fav) || ''
-        const aliases = Array.isArray((fav as any)?.aliases) ? ([...(fav as any).aliases] as string[]) : []
-        const normalizedExisting = normalizeMealLabel(existingLabel) || existingLabel
-        if (normalizedExisting && normalizedExisting !== cleaned && !aliases.includes(normalizedExisting)) {
-          aliases.push(normalizedExisting)
-        }
-        return { ...fav, label: cleaned, description: cleaned, ...(aliases.length > 0 ? { aliases } : {}) }
+    openRenameModal(current, (nextName) => {
+      const cleaned = normalizeMealLabel(nextName) || nextName
+      try {
+        saveFoodNameOverride(favoriteDisplayLabel(existing) || current, cleaned, existing)
+      } catch {}
+      setFavorites((prev) => {
+        const next = (Array.isArray(prev) ? prev : []).map((fav: any) => {
+          if (String(fav?.id || '') !== favId) return fav
+          const existingLabel = favoriteDisplayLabel(fav) || ''
+          const aliases = Array.isArray((fav as any)?.aliases) ? ([...(fav as any).aliases] as string[]) : []
+          const normalizedExisting = normalizeMealLabel(existingLabel) || existingLabel
+          if (normalizedExisting && normalizedExisting !== cleaned && !aliases.includes(normalizedExisting)) {
+            aliases.push(normalizedExisting)
+          }
+          return { ...fav, label: cleaned, description: cleaned, ...(aliases.length > 0 ? { aliases } : {}) }
+        })
+        persistFavorites(next)
+        return next
       })
-      persistFavorites(next)
-      return next
+      showQuickToast('Renamed')
     })
-    showQuickToast('Renamed')
   }
 
   const duplicateEntryToCategory = async (targetCategory: typeof MEAL_CATEGORY_ORDER[number]) => {
@@ -12851,15 +12881,6 @@ Please add nutritional information manually if needed.`);
               >
                 {editingEntry && (
                   <div className="flex items-center justify-end gap-3 px-4 pt-4">
-                    {!isEntryAlreadyFavorite(editingEntry) && (
-                      <button
-                        type="button"
-                        onClick={() => handleAddToFavorites(editingEntry)}
-                        className="px-3 py-1.5 rounded-full border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-                      >
-                        Add to Favorites
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={handleCancelEditing}
@@ -12952,6 +12973,18 @@ Please add nutritional information manually if needed.`);
                         </>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {editingEntry && !isEntryAlreadyFavorite(editingEntry) && (
+                  <div className="px-4 mt-3 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => handleAddToFavorites(editingEntry)}
+                      className="w-full max-w-sm px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
+                    >
+                      Add to Favorites
+                    </button>
                   </div>
                 )}
                 
@@ -16762,11 +16795,10 @@ Please add nutritional information manually if needed.`);
                                       }
 
                                       const current = applyFoodNameOverride(entry?.description || entry?.label || 'Meal', entry) || 'Meal'
-                                      const nextRaw = typeof window !== 'undefined' ? window.prompt('Rename to:', current) : null
-                                      const nextName = (nextRaw || '').toString().trim()
-                                      if (!nextName) return
-                                      saveFoodNameOverride(entry?.description || entry?.label || current, nextName, entry)
-                                      showQuickToast('Renamed')
+                                      openRenameModal(current, (nextName) => {
+                                        saveFoodNameOverride(entry?.description || entry?.label || current, nextName, entry)
+                                        showQuickToast('Renamed')
+                                      })
                                       return
                                     }
                                   } catch {}
@@ -16793,6 +16825,42 @@ Please add nutritional information manually if needed.`);
                   )
                 })()}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRenameModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/30" onClick={closeRenameModal} />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-200 p-5">
+            <div className="text-lg font-semibold text-gray-900 mb-3">Rename to:</div>
+            <input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onFocus={() => {
+                if (!renameCleared) {
+                  setRenameValue('')
+                  setRenameCleared(true)
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            />
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeRenameModal}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRenameConfirm}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                OK
+              </button>
             </div>
           </div>
         </div>
