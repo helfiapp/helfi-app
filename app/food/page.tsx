@@ -2094,6 +2094,7 @@ export default function FoodDiary() {
   const desktopAddMenuRef = useRef<HTMLDivElement | null>(null)
   const barcodeLabelTimeoutRef = useRef<number | null>(null)
   const photoPreviewRef = useRef<string | null>(null)
+  const photoRefreshAttemptedRef = useRef<Record<string, boolean>>({})
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -6215,6 +6216,46 @@ const applyStructuredItems = (
   useEffect(() => {
     photoPreviewRef.current = photoPreview
   }, [photoPreview])
+
+  const refreshEditingEntryPhoto = async () => {
+    if (!editingEntry) return
+    const dbId = (editingEntry as any)?.dbId
+    const key = dbId !== null && dbId !== undefined ? String(dbId) : ''
+    if (!key) return
+    if (photoRefreshAttemptedRef.current[key]) return
+    photoRefreshAttemptedRef.current[key] = true
+    try {
+      const tz = new Date().getTimezoneOffset()
+      const dateValue =
+        typeof (editingEntry as any)?.localDate === 'string' && (editingEntry as any).localDate
+          ? (editingEntry as any).localDate
+          : selectedDate
+      if (!dateValue) return
+      const res = await fetch(
+        `/api/food-log?date=${encodeURIComponent(dateValue)}&tz=${tz}&t=${Date.now()}`,
+        { cache: 'no-store' },
+      )
+      if (!res.ok) return
+      const json = await res.json()
+      const logs = Array.isArray(json.logs) ? json.logs : []
+      const match = logs.find((log: any) => String(log?.id ?? '') === key)
+      const nextPhoto = typeof match?.imageUrl === 'string' ? match.imageUrl : ''
+      if (!nextPhoto) return
+      setPhotoPreview(nextPhoto)
+      setEditingEntry((prev: any) => (prev ? { ...prev, photo: nextPhoto } : prev))
+      setOriginalEditingEntry((prev: any) =>
+        prev && String((prev as any)?.dbId ?? '') === key ? { ...prev, photo: nextPhoto } : prev,
+      )
+      setTodaysFoods((prev: any[]) =>
+        prev.map((entry: any) => (String(entry?.dbId ?? '') === key ? { ...entry, photo: nextPhoto } : entry)),
+      )
+      setHistoryFoods((prev: any) =>
+        Array.isArray(prev)
+          ? prev.map((entry: any) => (String(entry?.dbId ?? '') === key ? { ...entry, photo: nextPhoto } : entry))
+          : prev,
+      )
+    } catch {}
+  }
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -12742,7 +12783,7 @@ Please add nutritional information manually if needed.`);
             {/* AI Analysis Result - Premium Cronometer-style UI */}
             {showAiResult && (
               <div
-                className="w-full bg-transparent border-0 shadow-none rounded-none"
+                className="w-full bg-transparent border-0 shadow-none rounded-none -mx-3 sm:-mx-4 lg:-mx-6"
               >
                 {editingEntry && (
                   <div className="flex items-center justify-end gap-3 px-4 pt-4">
@@ -12805,6 +12846,16 @@ Please add nutritional information manually if needed.`);
                             [photoPreview]: true,
                           }))
                         }
+                        onError={() => {
+                          if (!photoPreview) return
+                          setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                            ...prev,
+                            [photoPreview]: false,
+                          }))
+                          if (editingEntry) {
+                            refreshEditingEntryPhoto()
+                          }
+                        }}
                       />
                       {editingEntry && (
                         <>
@@ -12937,6 +12988,11 @@ Please add nutritional information manually if needed.`);
                               width={300}
                               height={300}
                               className="w-full max-w-sm aspect-square object-cover transition-transform duration-200 group-hover:scale-[1.01]"
+                              onError={() => {
+                                if (editingEntry) {
+                                  refreshEditingEntryPhoto()
+                                }
+                              }}
                             />
                             {/* Subtle dark overlay on hover */}
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
