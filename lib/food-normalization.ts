@@ -79,8 +79,15 @@ export const replaceWordNumbers = (text: string | null | undefined): string => {
 
 export const parseCountFromText = (text: string | null | undefined): number | null => {
   if (!text) return null
-  const normalized = replaceWordNumbers(String(text).toLowerCase())
-  const match = normalized.match(/(\d+(?:\.\d+)?)/)
+  const normalized = replaceWordNumbers(String(text).toLowerCase()).replace(/\b(a|an)\b/g, '1')
+  const stripped = normalized.replace(
+    /\b\d+(?:\.\d+)?\s*(g|gram|grams|kg|ml|milliliter|millilitre|l|liter|litre|oz|ounce|ounces|lb|pound|pounds)\b/g,
+    ' ',
+  )
+  const keywordPattern = DISCRETE_KEYWORDS.map((kw) => kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  const match = stripped.match(
+    new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:[a-z-]+\\s+){0,2}(?:${keywordPattern})\\b`),
+  )
   if (!match) return null
   const n = parseFloat(match[1])
   return Number.isFinite(n) && n > 0 ? n : null

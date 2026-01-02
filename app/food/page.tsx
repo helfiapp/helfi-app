@@ -705,6 +705,18 @@ const parseServingUnitMetadata = (servingSize: string | number | null | undefine
   }
 }
 
+const DISCRETE_UNIT_KEYWORDS = [
+  'egg','slice','cookie','piece','patty','pattie','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop',
+  'cracker','crackers','chip','chips',
+  'bacon','rasher','rashers','strip','strips',
+  'sausage','sausages','link','links',
+  'hashbrown','hashbrowns','hash brown','hash browns',
+  // whole-vegetable / whole-fruit pieces
+  'zucchini','zucchinis','courgette','courgettes',
+  'carrot','carrots','cucumber','cucumbers',
+  'banana','bananas','apple','apples','tomato','tomatoes'
+]
+
 // Heuristics: treat eggs, slices, cookies, pieces, patties, wings, nuggets, meatballs, sticks, bars as discrete items
 // and DO NOT treat weight/volume units as discrete
 const isDiscreteUnitLabel = (label: string) => {
@@ -719,18 +731,44 @@ const isDiscreteUnitLabel = (label: string) => {
   if (l.includes('slice') && (l.includes('avocado') || l.includes('cucumber') || l.includes('tomato') || l.includes('zucchini') || l.includes('courgette'))) {
     return false
   }
-  const discreteKeywords = [
-  'egg','slice','cookie','piece','patty','pattie','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop',
-  'cracker','crackers','chip','chips',
-  'bacon','rasher','rashers','strip','strips',
-  'sausage','sausages','link','links',
-  'hashbrown','hashbrowns','hash brown','hash browns',
-  // whole-vegetable / whole-fruit pieces
-  'zucchini','zucchinis','courgette','courgettes',
-  'carrot','carrots','cucumber','cucumbers',
-  'banana','bananas','apple','apples','tomato','tomatoes'
-  ]
-  return discreteKeywords.some(k => l.includes(k))
+  return DISCRETE_UNIT_KEYWORDS.some(k => l.includes(k))
+}
+
+const stripWeightPhrasesFromLabel = (value: string) =>
+  value.replace(
+    /\b\d+(?:\.\d+)?\s*(g|gram|grams|kg|kilogram|ml|milliliter|millilitre|l|liter|litre|oz|ounce|ounces|lb|pound|pounds)\b/gi,
+    ' ',
+  )
+
+const replaceWordNumbersForLabel = (value: string) => {
+  const map: Record<string, string> = {
+    one: '1',
+    two: '2',
+    three: '3',
+    four: '4',
+    five: '5',
+    six: '6',
+    seven: '7',
+    eight: '8',
+    nine: '9',
+    ten: '10',
+    eleven: '11',
+    twelve: '12',
+  }
+  return String(value || '').replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi, (m) =>
+    map[m.toLowerCase()] || m,
+  )
+}
+
+const hasExplicitPieceCountInLabel = (value: string) => {
+  const normalized = replaceWordNumbersForLabel(String(value || ''))
+    .toLowerCase()
+    .replace(/\b(a|an)\b/g, '1')
+  const cleaned = stripWeightPhrasesFromLabel(normalized)
+  const keywordPattern = DISCRETE_UNIT_KEYWORDS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  return new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:[a-z-]+\\s+){0,2}(?:${keywordPattern})\\b`).test(
+    cleaned,
+  )
 }
 
 const getExplicitPieces = (item: any): number | null => {
@@ -753,34 +791,18 @@ const getPiecesPerServing = (item: any): number | null => {
   const explicitPieces = getExplicitPieces(item)
   if (explicitPieces && explicitPieces > 0) return explicitPieces
 
-  const normalizeWordNumbersLocal = (value: string) =>
-    value.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi, (m) => {
-      const map: Record<string, string> = {
-        one: '1',
-        two: '2',
-        three: '3',
-        four: '4',
-        five: '5',
-        six: '6',
-        seven: '7',
-        eight: '8',
-        nine: '9',
-        ten: '10',
-        eleven: '11',
-        twelve: '12',
-      }
-      return map[m.toLowerCase()] || m
-    })
-
-  const servingLabel = normalizeWordNumbersLocal(String(item?.serving_size || '').trim())
-  const nameLabel = normalizeWordNumbersLocal(String(item?.name || '').trim())
+  const servingLabel = replaceWordNumbersForLabel(String(item?.serving_size || '').trim())
+  const nameLabel = replaceWordNumbersForLabel(String(item?.name || '').trim())
+  const servingHasExplicitCount = hasExplicitPieceCountInLabel(servingLabel)
+  const nameHasExplicitCount = hasExplicitPieceCountInLabel(nameLabel)
 
   const fromServing = servingLabel ? parseServingUnitMetadata(servingLabel) : null
   if (
     fromServing &&
     isDiscreteUnitLabel(fromServing.unitLabel) &&
     fromServing.quantity >= 1 &&
-    !isFractionalServingQuantity(fromServing.quantity)
+    !isFractionalServingQuantity(fromServing.quantity) &&
+    servingHasExplicitCount
   ) {
     return fromServing.quantity
   }
@@ -790,7 +812,8 @@ const getPiecesPerServing = (item: any): number | null => {
     isGenericSizeLabel(fromServing.unitLabel) &&
     fromServing.quantity >= 1 &&
     !isFractionalServingQuantity(fromServing.quantity) &&
-    isDiscreteUnitLabel(nameLabel)
+    isDiscreteUnitLabel(nameLabel) &&
+    servingHasExplicitCount
   ) {
     return fromServing.quantity
   }
@@ -800,7 +823,8 @@ const getPiecesPerServing = (item: any): number | null => {
     fromName &&
     isDiscreteUnitLabel(fromName.unitLabel) &&
     fromName.quantity >= 1 &&
-    !isFractionalServingQuantity(fromName.quantity)
+    !isFractionalServingQuantity(fromName.quantity) &&
+    nameHasExplicitCount
   ) {
     return fromName.quantity
   }
@@ -1182,6 +1206,7 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
     const next = { ...item }
     const labelSource = `${item?.name || ''} ${item?.serving_size || ''}`.toLowerCase()
     if (!labelSource.trim()) return next
+    if (!hasExplicitPieceCountInLabel(labelSource)) return next
 
     const rule = DISCRETE_SERVING_RULES.find((r) =>
       r.keywords.some((kw) => labelSource.includes(kw)),

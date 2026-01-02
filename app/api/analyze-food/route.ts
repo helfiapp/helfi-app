@@ -543,6 +543,8 @@ const cleanComponentLabel = (value: string) => {
     .replace(/^(small|medium|large)\s+portion\s+of\s+/i, '')
     .replace(/^portion\s+of\s+/i, '')
     .replace(/^(small|medium|large)\s+/i, '')
+    .replace(/(\d)\s*"/g, '$1 in ')
+    .replace(/"/g, '')
     .trim();
 };
 
@@ -953,15 +955,18 @@ const hasDiscreteKeyword = (text: string) => {
 const hasWeightUnitText = (text: string) =>
   /\b\d+(?:\.\d+)?\s*(g|gram|grams|kg|ml|oz|ounce|ounces|lb|pound|pounds)\b/i.test(String(text || ''));
 
+const stripWeightPhrases = (text: string) =>
+  String(text || '').replace(
+    /\b\d+(?:\.\d+)?\s*(g|gram|grams|kg|ml|milliliter|millilitre|l|liter|litre|oz|ounce|ounces|lb|pound|pounds)\b/gi,
+    ' ',
+  );
+
 const extractExplicitPieceCount = (text: string, keywords: string[] = DISCRETE_PIECE_KEYWORDS): number | null => {
   if (!text) return null
   const normalized = replaceWordNumbers(String(text).toLowerCase()).replace(/\b(a|an)\b/g, '1')
-  // If a weight unit is present, never treat it as a piece count (e.g., "6 oz patty").
-  if (hasWeightUnitText(normalized)) {
-    return null
-  }
+  const cleaned = stripWeightPhrases(normalized)
   const keywordPattern = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
-  const match = normalized.match(
+  const match = cleaned.match(
     new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:[a-z-]+\\s+){0,2}(?:${keywordPattern})\\b`),
   )
   if (!match) return null
@@ -972,8 +977,9 @@ const extractExplicitPieceCount = (text: string, keywords: string[] = DISCRETE_P
 const extractExplicitDiscreteCountFromServing = (text: string, keywords: string[] = DISCRETE_PIECE_KEYWORDS): number | null => {
   if (!text) return null;
   const normalized = replaceWordNumbers(String(text).toLowerCase()).replace(/\b(a|an)\b/g, '1');
+  const cleaned = stripWeightPhrases(normalized);
   const keywordPattern = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  const match = normalized.match(
+  const match = cleaned.match(
     new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:[a-z-]+\\s+){0,2}(?:${keywordPattern})\\b`),
   );
   if (!match) return null;
@@ -1019,16 +1025,18 @@ const fixWeightUnitsMisreadAsPieces = (items: any[]): { items: any[]; changed: b
       Number.isFinite(Number(next?.pieces)) && Number(next.pieces) > 0 ? Number(next.pieces) : null
 
     if (!hasWeightUnit(serving)) return next
-    if (hasDiscreteKeyword(label)) return next
+    const explicitCount = extractExplicitPieceCount(label)
+    const servingExplicit = extractExplicitDiscreteCountFromServing(serving)
+    const hasExplicitCount = Boolean(explicitCount || servingExplicit)
 
     // If the model prefixed the name with a number (often from oz), strip it.
-    if (/^\s*\d+\s+/.test(name)) {
+    if (!hasExplicitCount && /^\s*\d+\s+/.test(name)) {
       next.name = name.replace(/^\s*\d+\s+/, '').trim()
       changed = true
     }
 
     // If pieces metadata exists in a weight-based serving, remove it.
-    if (piecesPerServing || pieces) {
+    if (!hasExplicitCount && (piecesPerServing || pieces)) {
       delete next.piecesPerServing
       delete next.pieces
       changed = true
@@ -1057,7 +1065,7 @@ const stripPiecesWithoutExplicitCount = (items: any[]): { items: any[]; changed:
       (Number.isFinite(Number(updated?.pieces)) && Number(updated.pieces) > 0)
 
     // If the serving is weight-based and doesn't declare a discrete count, strip any leading count from the name.
-    if (hasWeightUnitText(serving) && !servingExplicit && /^\s*\d+\s+/.test(name)) {
+    if (hasWeightUnitText(serving) && !explicitCount && /^\s*\d+\s+/.test(name)) {
       updated.name = name.replace(/^\s*\d+\s+/, '').trim()
       changed = true
     }
@@ -2042,6 +2050,30 @@ const sanitizeStructuredItems = (items: any[]): any[] => {
 
   // Prevent runaway lists from exploding the UI
   return cleaned.length > 10 ? cleaned.slice(0, 10) : cleaned;
+};
+
+const itemsCoverComponentList = (items: any[] | null | undefined, components: string[]): boolean => {
+  if (!Array.isArray(components) || components.length === 0) return true;
+  if (!Array.isArray(items) || items.length === 0) return false;
+  const normalizedComponents = components.map((c) => normalizeComponentName(c)).filter(Boolean);
+  if (normalizedComponents.length === 0) return true;
+  const labels = items.map((item: any) =>
+    normalizeComponentName(`${item?.name || ''} ${item?.serving_size || ''}`),
+  );
+  return normalizedComponents.every((comp) =>
+    labels.some((label) => label.includes(comp) || comp.includes(label)),
+  );
+};
+
+const itemsAreUsable = (
+  items: any[] | null | undefined,
+  requiredCount: number,
+  requireMultiple: boolean,
+): boolean => {
+  if (!Array.isArray(items) || items.length === 0) return false;
+  if (looksLikeSingleGenericItem(items) || looksLikeMultiIngredientSummary(items)) return false;
+  if (requireMultiple && items.length < Math.max(2, requiredCount)) return false;
+  return true;
 };
 
 const buildMultiComponentFallback = (
@@ -3139,12 +3171,22 @@ CRITICAL REQUIREMENTS:
       const requiredComponentCount = Math.max(listedComponents.length, analysisComponents.length);
       componentsRequirement =
         requiredComponentCount > 1 ? `- Return at least ${requiredComponentCount} items.\n` : '';
+      const needsMultipleItems = preferMultiDetect && (analysisLooksMulti || requiredComponentCount > 1);
+      let itemsReady =
+        itemsAreUsable(resp.items, requiredComponentCount, needsMultipleItems) &&
+        itemsCoverComponentList(resp.items, listedComponents);
+      const refreshItemsReady = () => {
+        itemsReady =
+          itemsAreUsable(resp.items, requiredComponentCount, needsMultipleItems) &&
+          itemsCoverComponentList(resp.items, listedComponents);
+      };
 
       // If the main analysis did not contain a usable ITEMS_JSON block, make a
       // compact follow-up call whose ONLY job is to produce structured items
       // so the UI can render editable ingredient cards. This is text-only and
       // only runs when the first call missed items.
       if (
+        !itemsReady &&
         !isImageAnalysis &&
         (!resp.items || resp.items.length === 0) &&
         analysisTextForFollowUp.length > 0
@@ -3210,6 +3252,7 @@ CRITICAL REQUIREMENTS:
               console.log('✅ Structured items extracted via follow-up call:', {
                 itemCount: items.length,
               });
+              refreshItemsReady();
               if (listedComponents.length === 0 && looksLikeMultiIngredientSummary(resp.items)) {
                 const summaryLabel = `${resp.items?.[0]?.name || ''} ${resp.items?.[0]?.serving_size || ''}`;
                 listedComponents = extractComponentsFromDelimitedText(summaryLabel);
@@ -3229,7 +3272,7 @@ CRITICAL REQUIREMENTS:
         }
 
         // If we still have no items, synthesize multiple editable items so cards stay separate.
-        if (!resp.items || resp.items.length === 0) {
+        if (!itemsReady && (!resp.items || resp.items.length === 0)) {
           const caloriesMatch = analysisTextForFollowUp.match(/calories\s*[:\-]?\s*(\d+)/i);
           const proteinMatch = analysisTextForFollowUp.match(/protein\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
           const carbsMatch = analysisTextForFollowUp.match(/carbs?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
@@ -3278,13 +3321,14 @@ CRITICAL REQUIREMENTS:
             resp.total = baseTotal || resp.total || null;
             console.warn('⚠️ Strict AI-only mode: no fallback cards created for packaged/single cases.');
           }
+          refreshItemsReady();
         }
       }
     }
 
     // For photo analyses with a clear component list, force a component-bound
     // vision follow-up so we always return one card per ingredient.
-    if (wantStructured && preferMultiDetect && isImageAnalysis && listedComponents.length > 1) {
+    if (!itemsReady && wantStructured && preferMultiDetect && isImageAnalysis && listedComponents.length > 1) {
       const needsComponentBound =
         !resp.items ||
         resp.items.length === 0 ||
@@ -3383,6 +3427,7 @@ CRITICAL REQUIREMENTS:
                 itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
                 componentBoundApplied = true;
                 console.log('✅ Component-bound follow-up produced items:', resp.items.length);
+                refreshItemsReady();
               }
             }
           }
@@ -3402,6 +3447,7 @@ CRITICAL REQUIREMENTS:
       Array.isArray(resp.items) &&
       resp.items.length < listedComponents.length;
     if (
+      !itemsReady &&
       wantStructured &&
       preferMultiDetect &&
       !componentBoundApplied &&
@@ -3490,6 +3536,7 @@ CRITICAL REQUIREMENTS:
             itemsSource = itemsSource === 'none' ? sourceLabel : `${itemsSource}+${sourceLabel}`;
             itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
             console.log('✅ Multi-item follow-up produced structured items:', items.length);
+            refreshItemsReady();
           }
         }
       } catch (multiErr) {
@@ -3500,6 +3547,7 @@ CRITICAL REQUIREMENTS:
     // Final safety net for image analyses: if we still have no usable items,
     // force a structured follow-up using the image + analysis text.
     if (
+      !itemsReady &&
       wantStructured &&
       isImageAnalysis &&
       !packagedMode &&
@@ -3584,6 +3632,7 @@ CRITICAL REQUIREMENTS:
             itemsSource = itemsSource === 'none' ? 'forced_image_followup' : `${itemsSource}+forced_image_followup`;
             itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
             console.log('✅ Forced image follow-up produced items:', resp.items.length);
+            refreshItemsReady();
           }
         }
       } catch (forcedErr) {
@@ -3594,6 +3643,7 @@ CRITICAL REQUIREMENTS:
     // Absolute last resort: if we still have no usable items, run a text-only
     // structured extractor so the UI never falls back to a summary-only card.
     if (
+      !itemsReady &&
       wantStructured &&
       !packagedMode &&
       analysisTextForFollowUp &&
@@ -3657,6 +3707,7 @@ CRITICAL REQUIREMENTS:
             itemsSource = itemsSource === 'none' ? 'text_only_fallback' : `${itemsSource}+text_only_fallback`;
             itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
             console.log('✅ Text-only fallback produced items:', resp.items.length);
+            refreshItemsReady();
           }
         }
       } catch (fallbackErr) {
@@ -3666,7 +3717,7 @@ CRITICAL REQUIREMENTS:
 
     // If the analysis text clearly lists components that are missing from ITEMS_JSON,
     // backfill those components so the user can edit/remove them.
-    if (wantStructured && preferMultiDetect && !componentBoundApplied) {
+    if (!itemsReady && wantStructured && preferMultiDetect && !componentBoundApplied) {
       if (listedComponents.length > 0) {
         const existing = resp.items || [];
         const existingFiltered = existing.filter(
@@ -3767,6 +3818,7 @@ CRITICAL REQUIREMENTS:
               console.log('✅ Backfilled missing components from AI-only follow-up:', {
                 missingCount: additions.length,
               });
+              refreshItemsReady();
             }
           } catch (missingErr) {
             console.warn('Missing component AI follow-up failed (non-fatal):', missingErr);
