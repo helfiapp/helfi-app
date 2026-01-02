@@ -398,6 +398,18 @@ If you believe the portion‑control UI must change, you **must**:
    - The total grams line remains correct.
    - Nutrition totals match the expected math.
 
+#### 3.4.3 Ingredient Card Integrity (Mar 2026 - Locked)
+
+**Protected files:**
+- `app/api/analyze-food/route.ts`
+- `app/food/page.tsx`
+
+Rules that must stay locked:
+- **Never** allow a single combined ingredient card that lists multiple foods. If multi‑ingredient text appears, the server must re‑ask for separate items before returning.
+- The client must **never** create a fallback single card from a combined sentence.
+- **Weight numbers are not piece counts.** If a number is tied to weight (oz/g/ml/lb), it must **not** create pieces.
+- A piece count is allowed only when the text explicitly says “2 patties / 3 slices / 4 wings” (or equivalent).
+
 ### 3.5 Testing Requirements
 
 Before modifying food diary loading logic, agents must test:
@@ -424,6 +436,19 @@ Before modifying food diary loading logic, agents must test:
 
 5. **Cross-day boundary:**
    - Entries created late at night should appear on correct date
+
+### 3.6 Food Diary Copy/Duplicate/Delete/Refresh (Mar 2026 - Locked)
+
+**Protected file:**
+- `app/food/page.tsx`
+
+Do **not** change these without explicit written approval:
+- Manual refresh only (pull‑to‑refresh / refresh button). Do **not** re‑enable auto refresh.
+- Copy to today / duplicate / paste flows must stay instant and should add exactly one visible entry.
+- Pending save queue and optimistic UI must remain (entries should not disappear while saving).
+- Manual refresh duplicate cleanup must remain, and it must **not** remove entries marked as intentional duplicates.
+- Deleting an entry must remove all matching duplicates and prevent “delete then re‑appear.”
+- Keep the local‑to‑server ID linking so deletes always target the correct DB row.
 
 ---
 
