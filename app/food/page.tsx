@@ -12836,7 +12836,7 @@ Please add nutritional information manually if needed.`);
                     <button
                       type="button"
                       onClick={handleDeleteEditingEntry}
-                      className="px-3 py-1.5 rounded-full bg-red-50 text-sm font-semibold text-red-600 hover:bg-red-100"
+                      className="px-3 py-1.5 rounded-full bg-red-600 text-sm font-semibold text-white hover:bg-red-700"
                     >
                       Delete
                     </button>
@@ -15252,36 +15252,38 @@ Please add nutritional information manually if needed.`);
 		                        Connect device
 		                      </button>
 		                    )}
-		                    {(fitbitConnected || garminConnected) && (
-		                      <button
-		                        type="button"
-		                        onClick={() => syncExerciseFromDevices()}
-		                        disabled={exerciseSyncing}
-		                        className="p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-60"
-		                        title="Refresh from device"
-		                        aria-label="Refresh from device"
-		                      >
-		                        <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-		                          <path
-		                            strokeLinecap="round"
-		                            strokeLinejoin="round"
-		                            strokeWidth={2}
-		                            d="M4.5 12a7.5 7.5 0 0 1 13.5-4.5m0 0V4.5m0 3h-3M19.5 12a7.5 7.5 0 0 1-13.5 4.5m0 0v3m0-3h3"
-		                          />
-		                        </svg>
-		                      </button>
-		                    )}
-		                    <button
-		                      type="button"
-		                      onClick={openCreateExercise}
-		                      className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-		                      title="Add exercise"
-		                      aria-label="Add exercise"
-		                    >
-		                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-		                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-		                      </svg>
-		                    </button>
+                    {(fitbitConnected || garminConnected) && (
+                      <button
+                        type="button"
+                        onClick={() => syncExerciseFromDevices()}
+                        disabled={exerciseSyncing}
+                        className="p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-60"
+                        title="Refresh from device"
+                        aria-label="Refresh from device"
+                      >
+                        <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4.5 12a7.5 7.5 0 0 1 13.5-4.5m0 0V4.5m0 3h-3M19.5 12a7.5 7.5 0 0 1-13.5 4.5m0 0v3m0-3h3"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                    {exerciseEntries.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={openCreateExercise}
+                        className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        title="Add exercise"
+                        aria-label="Add exercise"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      </button>
+                    )}
 		                  </div>
 		                </div>
 
@@ -15293,9 +15295,22 @@ Please add nutritional information manually if needed.`);
 		                    <div className="px-4 py-3 text-sm text-gray-500">Loading…</div>
 		                  ) : (
 		                    <div className="divide-y divide-gray-100">
-		                      {exerciseEntries.length === 0 ? (
-		                        <div className="px-4 py-3 text-sm text-gray-500">No exercise logged for this date.</div>
-		                      ) : (
+                      {exerciseEntries.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-500 flex items-center justify-between gap-3">
+                          <span>No exercise logged for this date.</span>
+                          <button
+                            type="button"
+                            onClick={openCreateExercise}
+                            className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            title="Add exercise"
+                            aria-label="Add exercise"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
 		                        exerciseEntries.map((entry: any) => {
 		                          const calories = convertKcalToUnit(Number(entry?.calories) || 0, energyUnit)
 		                          const duration = Number(entry?.durationMinutes) || 0
