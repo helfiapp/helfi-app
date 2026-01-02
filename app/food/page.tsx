@@ -12783,7 +12783,7 @@ Please add nutritional information manually if needed.`);
             {/* AI Analysis Result - Premium Cronometer-style UI */}
             {showAiResult && (
               <div
-                className="w-full bg-transparent border-0 shadow-none rounded-none -mx-3 sm:-mx-4 lg:-mx-6"
+                className="w-full bg-transparent border-0 shadow-none rounded-none"
               >
                 {editingEntry && (
                   <div className="flex items-center justify-end gap-3 px-4 pt-4">
@@ -13240,7 +13240,10 @@ Please add nutritional information manually if needed.`);
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
-                    <div className="mb-6 -mx-4 sm:-mx-6">
+                    <div
+                      className="mb-6 -mx-4 sm:-mx-6"
+                      style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
+                    >
                       <div className="mb-1 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-3">
                           <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
@@ -13284,6 +13287,7 @@ Please add nutritional information manually if needed.`);
                           + Add ingredient
                         </button>
                       </div>
+                      <div className="mt-3">
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
                         const macroMultiplier = macroMultiplierForItem(item)
@@ -13392,6 +13396,10 @@ Please add nutritional information manually if needed.`);
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
                         const isCollapsed = isMultiIngredient && !isExpanded
+                        const toggleExpand = () => {
+                          if (!isMultiIngredient) return
+                          setExpandedItemIndex(expandedItemIndex === index ? null : index)
+                        }
                         
                         const cardPaddingClass =
                           isCollapsed ? 'py-2 px-3' : 'p-4'
@@ -13400,7 +13408,20 @@ Please add nutritional information manually if needed.`);
                           <div
                             key={index}
                             data-analysis-ingredient-card="1"
-                            className={`bg-white border-gray-200 ${cardPaddingClass} border-b ${index === 0 ? 'border-t' : ''} rounded-none`}
+                            className={`bg-white border-gray-200 ${cardPaddingClass} border-b ${index === 0 ? 'border-t' : ''} rounded-none ${isCollapsed ? 'cursor-pointer' : ''}`}
+                            role={isCollapsed ? 'button' : undefined}
+                            tabIndex={isCollapsed ? 0 : undefined}
+                            onClick={isCollapsed ? toggleExpand : undefined}
+                            onKeyDown={
+                              isCollapsed
+                                ? (event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault()
+                                      toggleExpand()
+                                    }
+                                  }
+                                : undefined
+                            }
                           >
                             {/* Header row with actions, title, and description */}
                             {isCollapsed ? (
@@ -13410,7 +13431,7 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 <button
                                   onClick={() => {
-                                    setExpandedItemIndex(expandedItemIndex === index ? null : index)
+                                    toggleExpand()
                                   }}
                                   className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                                   title="Expand"
@@ -13478,7 +13499,7 @@ Please add nutritional information manually if needed.`);
                                   {isMultiIngredient && (
                                     <button
                                       onClick={() => {
-                                        setExpandedItemIndex(expandedItemIndex === index ? null : index)
+                                        toggleExpand()
                                       }}
                                       className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                                       title={isExpanded ? 'Collapse' : 'Expand'}
@@ -13820,6 +13841,7 @@ Please add nutritional information manually if needed.`);
                           </div>
                         );
                       })}
+                      </div>
                     </div>
                   ) : (
                     <div className="mb-6 -mx-4 sm:-mx-6">
