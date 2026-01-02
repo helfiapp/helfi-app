@@ -224,6 +224,14 @@ interface UsdaFoodNutrient {
   unitName?: string
   value?: number
   amount?: number
+  nutrientId?: number
+  nutrientNumber?: string
+  nutrient?: {
+    name?: string
+    unitName?: string
+    number?: string
+    id?: number
+  }
 }
 
 interface UsdaFood {
@@ -244,23 +252,82 @@ interface UsdaFood {
 
 const extractUsdaNutrients = (food: UsdaFood) => {
   const nutrients = food.foodNutrients || []
-  const findVal = (name: string, units?: string[]): number | null => {
-    const n = nutrients.find(
-      (n) => n.nutrientName?.toLowerCase() === name.toLowerCase() && (!units || units.includes(n.unitName || '')),
-    )
-    if (!n) return null
+
+  const getName = (n: UsdaFoodNutrient) => (n.nutrientName || n.nutrient?.name || '').toLowerCase()
+  const getUnit = (n: UsdaFoodNutrient) => (n.unitName || n.nutrient?.unitName || '').toUpperCase()
+  const getId = (n: UsdaFoodNutrient) =>
+    Number.isFinite(Number(n.nutrientId)) ? Number(n.nutrientId) : Number(n.nutrient?.id)
+  const getNumber = (n: UsdaFoodNutrient) => (n.nutrientNumber || n.nutrient?.number || '').trim()
+  const getValue = (n: UsdaFoodNutrient) => {
     const raw = Number.isFinite(Number(n.value)) ? n.value : n.amount
-    if (!Number.isFinite(Number(raw))) return null
-    return Number(raw)
+    return Number.isFinite(Number(raw)) ? Number(raw) : null
   }
-  const energyKcal = findVal('Energy', ['KCAL']) ?? findVal('Energy', ['kcal'])
-  const energyKj = findVal('Energy', ['KJ']) ?? findVal('Energy', ['kJ'])
+
+  const findVal = (opts: {
+    names?: string[]
+    ids?: number[]
+    numbers?: string[]
+    units?: string[]
+  }): number | null => {
+    const names = (opts.names || []).map((n) => n.toLowerCase())
+    const ids = opts.ids || []
+    const numbers = opts.numbers || []
+    const units = (opts.units || []).map((u) => u.toUpperCase())
+    for (const n of nutrients) {
+      const name = getName(n)
+      const id = getId(n)
+      const number = getNumber(n)
+      const unit = getUnit(n)
+      const matchesName = name && names.includes(name)
+      const matchesId = Number.isFinite(Number(id)) && ids.includes(Number(id))
+      const matchesNumber = number && numbers.includes(number)
+      if (!matchesName && !matchesId && !matchesNumber) continue
+      if (units.length > 0 && unit && !units.includes(unit)) continue
+      const val = getValue(n)
+      if (val != null) return val
+    }
+    return null
+  }
+
+  const energyKcal =
+    findVal({ names: ['Energy'], units: ['KCAL'] }) ??
+    findVal({ ids: [1008], numbers: ['208'], units: ['KCAL'] })
+  const energyKj =
+    findVal({ names: ['Energy'], units: ['KJ'] }) ??
+    findVal({ ids: [1008], numbers: ['208'], units: ['KJ'] })
   const energy = energyKcal ?? (energyKj ? energyKj / 4.184 : null)
-  const protein = findVal('Protein', ['G', 'g'])
-  const carbs = findVal('Carbohydrate, by difference', ['G', 'g'])
-  const fat = findVal('Total lipid (fat)', ['G', 'g'])
-  const fiber = findVal('Fiber, total dietary', ['G', 'g'])
-  const sugar = findVal('Sugars, total including NLEA', ['G', 'g']) ?? findVal('Sugars, total', ['G', 'g'])
+
+  const protein = findVal({
+    names: ['Protein'],
+    ids: [1003],
+    numbers: ['203'],
+    units: ['G'],
+  })
+  const carbs = findVal({
+    names: ['Carbohydrate, by difference', 'Carbohydrate'],
+    ids: [1005],
+    numbers: ['205'],
+    units: ['G'],
+  })
+  const fat = findVal({
+    names: ['Total lipid (fat)'],
+    ids: [1004],
+    numbers: ['204'],
+    units: ['G'],
+  })
+  const fiber = findVal({
+    names: ['Fiber, total dietary', 'Dietary Fiber'],
+    ids: [1079],
+    numbers: ['291'],
+    units: ['G'],
+  })
+  const sugar =
+    findVal({
+      names: ['Sugars, total including NLEA', 'Sugars, total'],
+      ids: [2000],
+      numbers: ['269'],
+      units: ['G'],
+    }) ?? null
   return { energyKcal: energy, protein, carbs, fat, fiber, sugar }
 }
 
