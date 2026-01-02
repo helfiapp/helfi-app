@@ -12742,9 +12742,7 @@ Please add nutritional information manually if needed.`);
             {/* AI Analysis Result - Premium Cronometer-style UI */}
             {showAiResult && (
               <div
-                className={`rounded-2xl ${
-                  isAnalysisRoute ? 'bg-transparent shadow-none border-0' : 'bg-white shadow-lg border border-gray-100'
-                }`}
+                className="w-full bg-transparent border-0 shadow-none rounded-none"
               >
                 {editingEntry && (
                   <div className="flex items-center justify-end gap-3 px-4 pt-4">
@@ -13116,7 +13114,7 @@ Please add nutritional information manually if needed.`);
                       energyUnit === 'kJ' ? Math.round(caloriesValue * 4.184) : Math.round(caloriesValue)
                     
                     return (
-                      <div className={`mb-6 mt-3 rounded-lg p-4 sm:p-6 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur ${editingEntry ? 'lg:hidden' : ''}`}>
+                      <div className={`mb-6 mt-3 p-4 sm:p-6 ${editingEntry ? 'lg:hidden' : ''}`}>
                         <div className="flex justify-end mb-4">
                           <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
                             <button
@@ -13186,8 +13184,8 @@ Please add nutritional information manually if needed.`);
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
-                    <div className="mb-6 space-y-2">
-                      <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="mb-6 -mx-4 sm:-mx-6">
+                      <div className="mb-1 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-3">
                           <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
                           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -13346,7 +13344,7 @@ Please add nutritional information manually if needed.`);
                           <div
                             key={index}
                             data-analysis-ingredient-card="1"
-                            className={`bg-white rounded-xl border border-gray-200 shadow-sm ${cardPaddingClass}`}
+                            className={`bg-white border-gray-200 ${cardPaddingClass} border-b ${index === 0 ? 'border-t' : ''} rounded-none`}
                           >
                             {/* Header row with actions, title, and description */}
                             {isCollapsed ? (
@@ -13768,8 +13766,8 @@ Please add nutritional information manually if needed.`);
                       })}
                     </div>
                   ) : (
-                    <div className="mb-6">
-                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <div className="mb-6 -mx-4 sm:-mx-6">
+                      <div className="px-4 sm:px-6">
                         <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
                         <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
 
