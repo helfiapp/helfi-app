@@ -4736,8 +4736,49 @@ const applyStructuredItems = (
       const v = String(value || '').trim()
       itemsCopy[index].brand = v.length > 0 ? v : null
     } else if (field === 'serving_size') {
-      itemsCopy[index].serving_size = stripNutritionFromServingSize(String(value || '').trim())
+      const previousLabel = String(itemsCopy[index].serving_size || '')
+      const nextLabel = stripNutritionFromServingSize(String(value || '').trim())
+      const pickAmount = (info: any) => {
+        if (!info) return null
+        if (Number.isFinite(info.gramsPerServing) && info.gramsPerServing > 0) return info.gramsPerServing
+        if (Number.isFinite(info.mlPerServing) && info.mlPerServing > 0) return info.mlPerServing
+        return null
+      }
+      const oldInfo = parseServingSizeInfo({ serving_size: previousLabel })
+      const newInfo = parseServingSizeInfo({ serving_size: nextLabel })
+      const oldAmount = pickAmount(oldInfo)
+      const newAmount = pickAmount(newInfo)
+      const ratio =
+        oldAmount && newAmount && Number.isFinite(oldAmount) && Number.isFinite(newAmount) && oldAmount > 0 && newAmount > 0
+          ? newAmount / oldAmount
+          : null
+
+      itemsCopy[index].serving_size = nextLabel
       clearLabelReviewFlag()
+      if (ratio && Number.isFinite(ratio) && ratio > 0) {
+        const scaleMacro = (fieldName: string, decimals: number) => {
+          const raw = Number((itemsCopy[index] as any)[fieldName])
+          if (!Number.isFinite(raw)) return
+          const scaled = raw * ratio
+          const factor = decimals > 0 ? Math.pow(10, decimals) : 1
+          const rounded = decimals > 0 ? Math.round(scaled * factor) / factor : Math.round(scaled)
+          ;(itemsCopy[index] as any)[fieldName] = rounded
+        }
+        scaleMacro('calories', 0)
+        scaleMacro('protein_g', 1)
+        scaleMacro('carbs_g', 1)
+        scaleMacro('fat_g', 1)
+        scaleMacro('fiber_g', 1)
+        scaleMacro('sugar_g', 1)
+        const baseWeight = getBaseWeightPerServing(itemsCopy[index])
+        const servings = Number.isFinite(itemsCopy[index].servings) ? Number(itemsCopy[index].servings) : 1
+        if (baseWeight && baseWeight > 0) {
+          const unit =
+            itemsCopy[index]?.weightUnit === 'ml' ? 'ml' : itemsCopy[index]?.weightUnit === 'oz' ? 'oz' : 'g'
+          const precision = unit === 'oz' ? 100 : 1000
+          itemsCopy[index].weightAmount = Math.round(baseWeight * Math.max(0, servings || 1) * precision) / precision
+        }
+      }
     } else if (field === 'servings') {
       // Keep servings stable to 2 decimals to avoid 1.24 vs 1.25 drift when stepping.
       const clamped = clampNumber(value, 0, 20)
