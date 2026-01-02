@@ -2388,6 +2388,7 @@ Components: component 1, component 2, component 3
 - Include every distinct component you mentioned or can see.
 - Even for a single-item meal, include one component.
 - Do not use placeholders like "component 1" in the final output.
+- The Components line must match the ITEMS_JSON items exactly (no extras, no missing).
 Then include a single nutrition line at the end in this exact format:
 
 Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
@@ -2647,6 +2648,7 @@ Components: component 1, component 2, component 3
 - Include every distinct component you mentioned or can see.
 - Even for a single-item meal, include one component.
 - Do not use placeholders like "component 1" in the final output.
+- The Components line must match the ITEMS_JSON items exactly (no extras, no missing).
 Then include a single nutrition line at the end in this exact format:
 
 Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
@@ -2693,7 +2695,7 @@ CRITICAL REQUIREMENTS:
               type: "image_url",
               image_url: {
                 url: imageDataUrl,
-                detail: "high"
+                detail: "auto"
               }
             }
           ]
