@@ -14283,6 +14283,11 @@ Please add nutritional information manually if needed.`);
                                 })()}
                               </p>
                             )}
+                            {!baseWeightPerServing && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                This is the weight shown on the package or your estimate
+                              </p>
+                            )}
                           </div>
                         )
                       })()}
@@ -14505,13 +14510,22 @@ Please add nutritional information manually if needed.`);
                           const factor = Math.pow(10, decimals)
                           return String(Math.round(scaled * factor) / factor)
                         }
-                        const toPerServing = (value: any, decimals: number) => {
-                          const num = Number(value)
-                          if (!Number.isFinite(num)) return value
-                          const per = num / divider
-                          if (decimals <= 0) return Math.round(per)
-                          const factor = Math.pow(10, decimals)
-                          return Math.round(per * factor) / factor
+                        const computeServingsFromTotal = (value: any, perServingValue: any) => {
+                          const total = Number(value)
+                          const per = Number(perServingValue)
+                          const multiplier = macroMultiplier > 0 ? macroMultiplier : 1
+                          if (!Number.isFinite(total) || !Number.isFinite(per) || per <= 0) return null
+                          const next = total / (per * multiplier)
+                          return Number.isFinite(next) ? next : null
+                        }
+                        const updateServingsFromMacroTotal = (value: any, fieldName: string) => {
+                          const perServingValue = (item as any)?.[fieldName]
+                          const nextServings = computeServingsFromTotal(value, perServingValue)
+                          if (nextServings !== null) {
+                            updateItemField(editingItemIndex, 'servings', nextServings)
+                            return
+                          }
+                          updateItemField(editingItemIndex, fieldName as any, value)
                         }
                         const totalLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         return (
@@ -14541,9 +14555,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:calories`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') {
-                                      updateItemField(editingItemIndex, 'calories', toPerServing(v, 0))
-                                    }
+                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'calories')
                                   }}
                                   onBlur={() => {
                                     const key = `ai:modal:${editingItemIndex}:calories`
@@ -14574,12 +14586,12 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:protein_g`
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
                               }}
-                              onChange={(e) => {
-                                const key = `ai:modal:${editingItemIndex}:protein_g`
-                                const v = e.target.value
-                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'protein_g', toPerServing(v, 1))
-                              }}
+                                  onChange={(e) => {
+                                    const key = `ai:modal:${editingItemIndex}:protein_g`
+                                    const v = e.target.value
+                                    setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'protein_g')
+                                  }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:protein_g`
                                 setNumericInputDrafts((prev) => {
@@ -14609,12 +14621,12 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:carbs_g`
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
                               }}
-                              onChange={(e) => {
-                                const key = `ai:modal:${editingItemIndex}:carbs_g`
-                                const v = e.target.value
-                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'carbs_g', toPerServing(v, 1))
-                              }}
+                                  onChange={(e) => {
+                                    const key = `ai:modal:${editingItemIndex}:carbs_g`
+                                    const v = e.target.value
+                                    setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'carbs_g')
+                                  }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:carbs_g`
                                 setNumericInputDrafts((prev) => {
@@ -14644,12 +14656,12 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:fat_g`
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
                               }}
-                              onChange={(e) => {
-                                const key = `ai:modal:${editingItemIndex}:fat_g`
-                                const v = e.target.value
-                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'fat_g', toPerServing(v, 1))
-                              }}
+                                  onChange={(e) => {
+                                    const key = `ai:modal:${editingItemIndex}:fat_g`
+                                    const v = e.target.value
+                                    setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'fat_g')
+                                  }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:fat_g`
                                 setNumericInputDrafts((prev) => {
@@ -14679,12 +14691,12 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:fiber_g`
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
                               }}
-                              onChange={(e) => {
-                                const key = `ai:modal:${editingItemIndex}:fiber_g`
-                                const v = e.target.value
-                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'fiber_g', toPerServing(v, 1))
-                              }}
+                                  onChange={(e) => {
+                                    const key = `ai:modal:${editingItemIndex}:fiber_g`
+                                    const v = e.target.value
+                                    setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'fiber_g')
+                                  }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:fiber_g`
                                 setNumericInputDrafts((prev) => {
@@ -14714,12 +14726,12 @@ Please add nutritional information manually if needed.`);
                                 const key = `ai:modal:${editingItemIndex}:sugar_g`
                                 setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
                               }}
-                              onChange={(e) => {
-                                const key = `ai:modal:${editingItemIndex}:sugar_g`
-                                const v = e.target.value
-                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'sugar_g', toPerServing(v, 1))
-                              }}
+                                  onChange={(e) => {
+                                    const key = `ai:modal:${editingItemIndex}:sugar_g`
+                                    const v = e.target.value
+                                    setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'sugar_g')
+                                  }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:sugar_g`
                                 setNumericInputDrafts((prev) => {
