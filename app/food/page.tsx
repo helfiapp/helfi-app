@@ -6263,6 +6263,14 @@ const applyStructuredItems = (
     photoPreviewRef.current = photoPreview
   }, [photoPreview])
 
+  useEffect(() => {
+    if (!photoPreview) return
+    setFoodImagesLoading((prev) => {
+      if (prev[photoPreview]) return prev
+      return { ...prev, [photoPreview]: true }
+    })
+  }, [photoPreview])
+
   const refreshEditingEntryPhoto = async () => {
     if (!editingEntry) return
     const dbId = (editingEntry as any)?.dbId
@@ -12752,13 +12760,36 @@ Please add nutritional information manually if needed.`);
             {photoPreview && !showAiResult && !isEditingDescription && (
               <div className="text-center">
                 <h3 className="text-lg font-semibold mb-4">📸 Your Photo</h3>
-                <Image
-                  src={photoPreview}
-                  alt="Food preview"
-                  width={300}
-                  height={300}
-                  className="w-full max-w-sm aspect-square object-cover rounded-lg mx-auto shadow-lg mb-6"
-                />
+                <div className="relative w-full max-w-sm mx-auto mb-6">
+                  {foodImagesLoading[photoPreview] && (
+                    <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                    </div>
+                  )}
+                  <Image
+                    src={photoPreview}
+                    alt="Food preview"
+                    width={300}
+                    height={300}
+                    className={`w-full aspect-square object-cover rounded-lg shadow-lg transition-opacity duration-300 ${
+                      foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
+                    }`}
+                    loading="eager"
+                    priority
+                    onLoad={() =>
+                      setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                        ...prev,
+                        [photoPreview]: false,
+                      }))
+                    }
+                    onError={() =>
+                      setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                        ...prev,
+                        [photoPreview]: false,
+                      }))
+                    }
+                  />
+                </div>
                 {/* Always-visible 3-step tracker so progress feels clear even when AI is slow */}
                 <div className="mb-4">
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-[11px] sm:text-xs">
@@ -13352,34 +13383,34 @@ Please add nutritional information manually if needed.`);
                       className="mb-6 -mx-4 sm:-mx-6"
                       style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
                     >
-                      <div className="mb-1 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <span>Rate this result</span>
+                      <div className="mb-1 px-4 sm:px-6 flex flex-col items-center gap-2">
+                        <div className="flex flex-wrap items-center justify-center gap-3 text-center">
+                          <div className="text-sm sm:text-base font-medium text-gray-600">Detected Foods:</div>
+                          <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
+                            <span className="whitespace-nowrap">Rate this result</span>
                             <button
                               type="button"
                               onClick={() => handleOverallThumb('up')}
-                              className={`p-1 rounded-md transition-colors ${
+                              className={`p-1.5 rounded-md transition-colors ${
                                 analysisFeedbackOverall === 'up'
                                   ? 'bg-emerald-600 text-white'
                                   : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
                               }`}
                               title="Thumbs up"
                             >
-                              <HandThumbUpIcon className="w-5 h-5" />
+                              <HandThumbUpIcon className="w-6 h-6" />
                             </button>
                             <button
                               type="button"
                               onClick={() => handleOverallThumb('down')}
-                              className={`p-1 rounded-md transition-colors ${
+                              className={`p-1.5 rounded-md transition-colors ${
                                 analysisFeedbackOverall === 'down'
                                   ? 'bg-red-600 text-white'
                                   : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
                               }`}
                               title="Thumbs down"
                             >
-                              <HandThumbDownIcon className="w-5 h-5" />
+                              <HandThumbDownIcon className="w-6 h-6" />
                             </button>
                           </div>
                         </div>
@@ -13389,7 +13420,7 @@ Please add nutritional information manually if needed.`);
                               mode: 'analysis',
                             })
                           }
-                          className="w-full sm:w-auto px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors"
+                          className="w-full max-w-sm px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors"
                           title="Add a missing ingredient"
                         >
                           + Add ingredient
