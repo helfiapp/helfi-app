@@ -14142,7 +14142,7 @@ Please add nutritional information manually if needed.`);
                     </button>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto px-5 py-4 pb-10">
+                  <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 pb-10">
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
