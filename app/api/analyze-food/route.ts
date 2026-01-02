@@ -1719,14 +1719,18 @@ const ensureBurgerComponents = (items: any[] | null, analysis: string | null | u
 
     const existingServings =
       Number.isFinite(Number(it.servings)) && Number(it.servings) > 0 ? Number(it.servings) : 1;
+    const nameOnly = replaceWordNumbers(String(it?.name || '').trim());
     const labelSource = replaceWordNumbers(`${it?.name || ''} ${it?.serving_size || ''}`.trim());
-    const explicitCount = extractExplicitPieceCount(labelSource);
+    const explicitCount = extractExplicitPieceCount(nameOnly) ?? extractExplicitPieceCount(labelSource);
 
     it.servings = Math.round(existingServings * 1000) / 1000;
 
     if (!explicitCount) {
       delete (it as any).piecesPerServing;
       delete (it as any).pieces;
+      if (/^\s*\d+\s+/.test(String(it?.name || ''))) {
+        it.name = String(it.name || '').replace(/^\s*\d+\s+/, '').trim();
+      }
       if (!it.serving_size) {
         it.serving_size = '115 g';
       }
