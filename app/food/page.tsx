@@ -15204,7 +15204,7 @@ Please add nutritional information manually if needed.`);
                               <div
                                 ref={summaryCarouselRef}
                                 onScroll={handleSummaryScroll}
-                                className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0"
+                                className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0"
                               >
                                 {slides.map((slide, idx) => (
                                   <div
