@@ -37,15 +37,22 @@ export async function GET(request: NextRequest) {
         .trim()
         .replace(/\s+/g, ' ')
 
+    const normalizeForCompact = (value: any) => normalizeForMatch(value).replace(/\s+/g, '')
+
     const queryNorm = normalizeForMatch(query)
+    const queryCompact = normalizeForCompact(query)
     const queryTokens = queryNorm ? queryNorm.split(' ').filter(Boolean) : []
 
     const scoreNameMatch = (name: any) => {
       if (!queryNorm) return 0
       const n = normalizeForMatch(name)
+      const nCompact = normalizeForCompact(name)
       if (!n) return 0
-      if (n === queryNorm) return 1000
-      if (n.startsWith(queryNorm)) return 800
+      if (nCompact === queryCompact) return 1200
+      if (nCompact.startsWith(queryCompact)) return 1000
+      if (n === queryNorm) return 900
+      if (n.startsWith(queryNorm)) return 750
+      if (nCompact.includes(queryCompact)) return 600
       if (n.includes(queryNorm)) return 500
       if (queryTokens.length > 0) {
         const hitCount = queryTokens.filter((t) => n.includes(t)).length
@@ -74,9 +81,9 @@ export async function GET(request: NextRequest) {
       const scoreItem = (it: any) => {
         let score = 0
         score += scoreNameMatch(it?.name)
-        if (it?.source === 'fatsecret') score += 3
-        if (it?.source === 'openfoodfacts') score += 2
-        if (it?.source === 'usda') score += 1
+        if (it?.source === 'usda') score += 4
+        if (it?.source === 'fatsecret') score += 2
+        if (it?.source === 'openfoodfacts') score += 1
         if (it?.brand) score += 2
         if (Number.isFinite(Number(it?.calories)) && Number(it.calories) > 0) score += 1
         score += scoredServing(it?.serving_size)

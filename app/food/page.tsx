@@ -16199,7 +16199,7 @@ Please add nutritional information manually if needed.`);
 
                                       {(() => {
                                         const entriesForCopy = entriesByCategory[cat.key] || []
-                                        return entriesForCopy.length > 0 ? (
+                                        return entriesForCopy.length > 1 ? (
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -16509,7 +16509,7 @@ Please add nutritional information manually if needed.`);
 
                                       {(() => {
                                         const entriesForCopy = entriesByCategory[cat.key] || []
-                                        return entriesForCopy.length > 0 ? (
+                                        return entriesForCopy.length > 1 ? (
                                           <button
                                             type="button"
                                             onClick={() => {

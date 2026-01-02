@@ -21,6 +21,21 @@ type NormalizedFoodItem = {
   sugar_g?: number | null
 }
 
+type ServingOption = {
+  id: string
+  serving_size: string
+  label?: string
+  grams?: number | null
+  ml?: number | null
+  unit?: 'g' | 'ml' | 'oz'
+  calories?: number | null
+  protein_g?: number | null
+  carbs_g?: number | null
+  fat_g?: number | null
+  fiber_g?: number | null
+  sugar_g?: number | null
+}
+
 const CATEGORY_LABELS: Record<MealCategory, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
@@ -49,6 +64,12 @@ const buildTodayIso = () => {
 
 const safeNumber = (n: any) => (typeof n === 'number' && Number.isFinite(n) ? n : null)
 const round3 = (n: number) => Math.round(n * 1000) / 1000
+const is100gServing = (label?: string | null) => /\b100\s*g\b/i.test(String(label || ''))
+const sameNumber = (a: any, b: any) => {
+  if (a === null || a === undefined) return b === null || b === undefined
+  if (b === null || b === undefined) return false
+  return Number(a) === Number(b)
+}
 
 const alignTimestampToLocalDate = (iso: string, localDate: string) => {
   try {
@@ -96,6 +117,8 @@ export default function AddIngredientClient() {
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
+  const servingCacheRef = useRef<Map<string, ServingOption>>(new Map())
+  const servingPendingRef = useRef<Set<string>>(new Set())
   const seqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -118,6 +141,77 @@ export default function AddIngredientClient() {
   }, [selectedDate])
 
   const categoryLabel = CATEGORY_LABELS[category] || 'Other'
+
+  const scoreServingOption = (opt: ServingOption) => {
+    const label = String(opt?.label || opt?.serving_size || '').toLowerCase()
+    let score = 0
+    if (label.includes('serving')) score += 4
+    if (label.includes('piece') || label.includes('burger') || label.includes('sandwich') || label.includes('slice')) score += 3
+    const grams = Number(opt?.grams)
+    if (Number.isFinite(grams)) {
+      if (grams >= 40 && grams <= 400) score += 3
+      if (grams === 100) score -= 6
+    }
+    if (is100gServing(label)) score -= 10
+    return score
+  }
+
+  const pickBestServingOption = (options: ServingOption[]) => {
+    if (!Array.isArray(options) || options.length === 0) return null
+    const non100 = options.filter((opt) => !is100gServing(opt?.serving_size))
+    const pool = non100.length > 0 ? non100 : options
+    const sorted = [...pool].sort((a, b) => scoreServingOption(b) - scoreServingOption(a))
+    return sorted[0] || null
+  }
+
+  const applyServingOptionToResult = (r: NormalizedFoodItem, opt: ServingOption): NormalizedFoodItem => ({
+    ...r,
+    serving_size: opt.serving_size || r.serving_size,
+    calories: safeNumber(opt.calories),
+    protein_g: safeNumber(opt.protein_g),
+    carbs_g: safeNumber(opt.carbs_g),
+    fat_g: safeNumber(opt.fat_g),
+    fiber_g: safeNumber(opt.fiber_g),
+    sugar_g: safeNumber(opt.sugar_g),
+  })
+
+  const hasMeaningfulChange = (before: NormalizedFoodItem, after: NormalizedFoodItem) => {
+    if (String(before.serving_size || '') !== String(after.serving_size || '')) return true
+    if (!sameNumber(before.calories, after.calories)) return true
+    if (!sameNumber(before.protein_g, after.protein_g)) return true
+    if (!sameNumber(before.carbs_g, after.carbs_g)) return true
+    if (!sameNumber(before.fat_g, after.fat_g)) return true
+    if (!sameNumber(before.fiber_g, after.fiber_g)) return true
+    if (!sameNumber(before.sugar_g, after.sugar_g)) return true
+    return false
+  }
+
+  const loadServingOverride = async (r: NormalizedFoodItem): Promise<NormalizedFoodItem | null> => {
+    if (!r || (r.source !== 'usda' && r.source !== 'fatsecret')) return null
+    if (!is100gServing(r.serving_size)) return null
+    const key = `${r.source}:${r.id}`
+    const cached = servingCacheRef.current.get(key)
+    if (cached) return applyServingOptionToResult(r, cached)
+    if (servingPendingRef.current.has(key)) return null
+    servingPendingRef.current.add(key)
+    try {
+      const params = new URLSearchParams({ source: r.source, id: String(r.id) })
+      const res = await fetch(`/api/food-data/servings?${params.toString()}`, { method: 'GET' })
+      if (!res.ok) return null
+      const data = await res.json().catch(() => ({}))
+      const options: ServingOption[] = Array.isArray(data?.options) ? data.options : []
+      const best = pickBestServingOption(options)
+      if (!best) return null
+      servingCacheRef.current.set(key, best)
+      const updated = applyServingOptionToResult(r, best)
+      if (!hasMeaningfulChange(r, updated)) return null
+      return updated
+    } catch {
+      return null
+    } finally {
+      servingPendingRef.current.delete(key)
+    }
+  }
 
   const runSearch = async (qOverride?: string, kindOverride?: SearchKind) => {
     const q = String(qOverride ?? query).trim()
@@ -167,6 +261,35 @@ export default function AddIngredientClient() {
     }
   }
 
+  useEffect(() => {
+    if (results.length === 0) return
+    let cancelled = false
+    const run = async () => {
+      for (const r of results) {
+        if (!is100gServing(r.serving_size)) continue
+        const updated = await loadServingOverride(r)
+        if (!updated || cancelled) continue
+        setResults((prev) => {
+          let changed = false
+          const next = prev.map((item) => {
+            if (item.source === updated.source && item.id === updated.id) {
+              if (hasMeaningfulChange(item, updated)) {
+                changed = true
+                return updated
+              }
+            }
+            return item
+          })
+          return changed ? next : prev
+        })
+      }
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [results])
+
   const addFoodEntry = async (payload: any) => {
     const res = await fetch('/api/food-log', {
       method: 'POST',
@@ -192,16 +315,18 @@ export default function AddIngredientClient() {
     triggerHaptic(10)
     setAddingId(`${r.source}:${r.id}`)
     try {
+      const upgraded = await loadServingOverride(r)
+      const final = upgraded || r
       const item = {
-        name: String(r.name || 'Food'),
-        brand: r.brand ?? null,
-        serving_size: String(r.serving_size || '1 serving'),
-        calories: safeNumber(r.calories),
-        protein_g: safeNumber(r.protein_g),
-        carbs_g: safeNumber(r.carbs_g),
-        fat_g: safeNumber(r.fat_g),
-        fiber_g: safeNumber(r.fiber_g),
-        sugar_g: safeNumber(r.sugar_g),
+        name: String(final.name || 'Food'),
+        brand: final.brand ?? null,
+        serving_size: String(final.serving_size || '1 serving'),
+        calories: safeNumber(final.calories),
+        protein_g: safeNumber(final.protein_g),
+        carbs_g: safeNumber(final.carbs_g),
+        fat_g: safeNumber(final.fat_g),
+        fiber_g: safeNumber(final.fiber_g),
+        sugar_g: safeNumber(final.sugar_g),
         servings: 1,
       }
 
