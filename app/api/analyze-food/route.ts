@@ -3101,6 +3101,8 @@ CRITICAL REQUIREMENTS:
     let componentsHint = '';
     let componentsRequirement = '';
     let componentBoundApplied = false;
+    let itemsReady = false;
+    let refreshItemsReady = () => {};
     if (wantStructured) {
       try {
         const m = analysis.match(/<ITEMS_JSON>([\s\S]*?)<\/ITEMS_JSON>/i);
@@ -3172,10 +3174,10 @@ CRITICAL REQUIREMENTS:
       componentsRequirement =
         requiredComponentCount > 1 ? `- Return at least ${requiredComponentCount} items.\n` : '';
       const needsMultipleItems = preferMultiDetect && (analysisLooksMulti || requiredComponentCount > 1);
-      let itemsReady =
+      itemsReady =
         itemsAreUsable(resp.items, requiredComponentCount, needsMultipleItems) &&
         itemsCoverComponentList(resp.items, listedComponents);
-      const refreshItemsReady = () => {
+      refreshItemsReady = () => {
         itemsReady =
           itemsAreUsable(resp.items, requiredComponentCount, needsMultipleItems) &&
           itemsCoverComponentList(resp.items, listedComponents);
