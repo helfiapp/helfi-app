@@ -62,9 +62,14 @@ export async function GET(request: NextRequest) {
       return 0
     }
 
+    const scoreItemName = (it: any) => {
+      const combined = [it?.brand, it?.name].filter(Boolean).join(' ').trim()
+      return scoreNameMatch(combined || it?.name)
+    }
+
     if (source === 'auto' || !source) {
       const usdaDataType =
-        kind === 'packaged' ? 'branded' : kind === 'single' ? 'generic' : 'all'
+        kind === 'packaged' ? 'all' : kind === 'single' ? 'generic' : 'all'
 
       const perSource = Math.min(Math.max(Math.ceil(limit / 2), 10), 25)
 
@@ -80,7 +85,7 @@ export async function GET(request: NextRequest) {
 
       const scoreItem = (it: any) => {
         let score = 0
-        score += scoreNameMatch(it?.name)
+        score += scoreItemName(it)
         if (it?.source === 'usda') score += 4
         if (it?.source === 'fatsecret') score += 2
         if (it?.source === 'openfoodfacts') score += 1
@@ -120,7 +125,7 @@ export async function GET(request: NextRequest) {
       items = await searchOpenFoodFactsByQuery(query, { pageSize: limit })
     } else if (source === 'usda') {
       const dataType =
-        kind === 'packaged' ? 'branded' : kind === 'single' ? 'generic' : 'all'
+        kind === 'packaged' ? 'all' : kind === 'single' ? 'generic' : 'all'
       items = await searchUsdaFoods(query, { pageSize: limit, dataType })
     } else if (source === 'fatsecret') {
       items = await searchFatSecretFoods(query, { pageSize: limit })
@@ -133,7 +138,7 @@ export async function GET(request: NextRequest) {
 
     // For non-auto sources, apply the same name-match ranking so exact matches come first.
     if (actualSource !== 'auto' && Array.isArray(items) && items.length > 1) {
-      items = [...items].sort((a, b) => scoreNameMatch(b?.name) - scoreNameMatch(a?.name))
+      items = [...items].sort((a, b) => scoreItemName(b) - scoreItemName(a))
     }
 
     return NextResponse.json({ success: true, source: actualSource, items })
