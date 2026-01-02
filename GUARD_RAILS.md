@@ -359,44 +359,32 @@ On January 19th, 2025, food diary entries disappeared because entries were being
 - Merge missing entries back into cache
 - Test with entries that have missing/incorrect `localDate` values
 
-### 3.4 Detected Foods Portion Controls (Servings UI)
+### 3.4 Detected Foods and Ingredient Edit UI (Apr 2026 - Locked)
 
 **Protected file:**
-- `app/food/page.tsx` (Detected Foods card in the Food Analysis edit view)
+- `app/food/page.tsx` (Detected Foods card + ingredient edit screen)
 
-This section controls **how portion sizes are edited for each detected ingredient** (e.g. Carman's Toasted Muesli).
-The current design has been carefully agreed with the user and must **not** be changed without explicit written
-approval.
+This section controls how detected ingredients are shown and edited. It has been agreed with the user and must not be changed without explicit written approval.
 
 #### 3.4.1 Current Behaviour (Must Stay)
 
-- Each ingredient shows a **single editable field: `Servings`**.
-- The serving size label (from the database) is displayed as:
-  - `1 serving = 1/2 cup (45 g)` (example)
-- There is **no separate editable "Units" field**. Portions are always edited in terms of servings only.
-- When grams are known, the UI also shows a **read‑only total line**, e.g.:
-  - `Total amount ≈ 180 g` (calculated as `servings × gramsPerServing`).
-- Changing `Servings` updates:
-  - The per‑serving and total nutrition cards.
-  - The in‑memory `editingEntry` so Today's Totals remain accurate while editing.
+- The ingredient edit screen is full screen (not a pop-up) and must scroll.
+- The rename box clears its text when the field is tapped. Cancel restores the original name.
+- The label is **Weight** (not "Serving Size").
+- Weight uses two controls: a number and a unit dropdown (g / oz / ml).
+- Servings is a separate editable field.
+- Changing Weight or Servings updates the macro totals and the front card.
+- Editing the macro totals updates Weight and Servings (two-way sync).
+- The front card and edit screen always show the same values for Weight, Servings, and macros.
+- The macro section shows totals for the current number of servings.
 
 #### 3.4.2 What Agents MUST NOT Do
 
-- Do **NOT** re‑introduce an editable "Units" control (e.g. cups / ml / ounces) as a second number.
-- Do **NOT** make the servings step jump in large increments (e.g. 1 → 10) or anything other than:
-  - Whole numbers for discrete items (pieces, slices, etc.).
-  - Reasonable fractional steps (e.g. 0.25) for continuous units.
-- Do **NOT** remove or hide the "1 serving = …" label or the total grams line.
-- Do **NOT** change the underlying meaning of one serving without also updating the database entry and
-  clearly explaining this to the user.
-
-If you believe the portion‑control UI must change, you **must**:
-1. Explain the proposed change to the user in simple, non‑technical language.
-2. Get explicit written approval.
-3. Re‑test that:
-   - Servings behave intuitively (1, 2, 3, …).
-   - The total grams line remains correct.
-   - Nutrition totals match the expected math.
+- Do not revert the edit screen to a pop-up.
+- Do not remove scrolling from the edit screen.
+- Do not rename Weight back to "Serving Size".
+- Do not break the two-way sync between Weight, Servings, and macros.
+- Do not allow front card values to differ from the edit screen.
 
 #### 3.4.3 Ingredient Card Integrity (Mar 2026 - Locked)
 
@@ -409,6 +397,41 @@ Rules that must stay locked:
 - The client must **never** create a fallback single card from a combined sentence.
 - **Weight numbers are not piece counts.** If a number is tied to weight (oz/g/ml/lb), it must **not** create pieces.
 - A piece count is allowed only when the text explicitly says “2 patties / 3 slices / 4 wings” (or equivalent).
+
+#### 3.4.4 Detected Foods List Layout (Apr 2026 - Locked)
+
+- Ingredient cards are full width, edge to edge, with no gaps between cards.
+- There is no background panel behind the ingredient cards.
+- The whole card is clickable to expand and collapse.
+- Add space between the Add ingredient button and the first card.
+- Ingredient titles have extra left padding and must start with a capital letter.
+- The "+ Add ingredient" button matches the "Add to Favorites" button style and width (rounded full, green, white text).
+- The "Detected Foods: Rate this result" row is centered. The text is larger and the thumbs icons are larger. The text must not overflow.
+
+#### 3.4.5 Food Analysis Header and Action Buttons (Apr 2026 - Locked)
+
+- The "Food Analysis" title and the "Editing a saved entry" text are removed.
+- The "Save changes" button is removed.
+- The Cancel and Delete buttons sit in the top row, with Delete always red and white text.
+- "Add to Favorites" sits under the image, uses green with white text, and is hidden when already added.
+
+#### 3.4.6 Image Loading Behaviour (Apr 2026 - Locked)
+
+- While a food image is loading, show a loading spinner inside the image box.
+- Do not show a broken image icon while loading.
+- If an edit-entry photo fails to load, auto-refresh the photo link.
+
+#### 3.4.7 Favorites "All" Tab (Apr 2026 - Locked)
+
+- The All tab must list each meal only once. No duplicates.
+
+#### 3.4.8 Exercise Card Add Button (Apr 2026 - Locked)
+
+- The exercise "+" button is aligned with "No exercise logged for this date" to reduce empty space.
+
+#### 3.4.9 Energy Summary Swipe Bar (Apr 2026 - Locked)
+
+- The grey swipe bar must not appear when scrolling left to right in the energy summary.
 
 ### 3.5 Testing Requirements
 
@@ -754,6 +777,9 @@ for a change.
 - **Strict AI-only ingredient cards (Dec 2025 – locked):**
   - Ingredient cards must come from AI‑generated structured items only. Do **not** create placeholder cards or extract cards from prose descriptions on the client.
   - If ingredients are missing, the backend must re‑ask the AI to output the missing items (AI‑only follow‑up). Do not backfill cards locally.
+- **Analysis speed and cost control (Apr 2026 - locked):**
+  - Stop after one good follow-up. If valid items exist, do not chain extra AI calls.
+  - Avoid multi-step follow-ups that increase time or credits unless the user explicitly asks.
 - **Food photo model defaults + component-bound follow-up (Dec 25, 2025 – locked):**
   - Food photo analysis defaults to `gpt-4o` for speed and accuracy. Do not revert image analysis to `gpt-5.2` by default.
   - Packaged/label OCR keeps `gpt-5.2` for per‑serve accuracy; do not downgrade label scans.
