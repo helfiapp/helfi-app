@@ -551,6 +551,18 @@ const normalizeComponentList = (items: string[]) =>
     .map((item) => cleanComponentLabel(item))
     .filter((item) => item && item.length >= 3);
 
+const dedupeComponentList = (items: string[]) => {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  items.forEach((item) => {
+    const normalized = normalizeComponentName(item);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    unique.push(item);
+  });
+  return unique;
+};
+
 const buildComponentBoundSchema = (components: string[]) => ({
   name: 'food_component_items',
   schema: {
@@ -3732,6 +3744,114 @@ CRITICAL REQUIREMENTS:
 
     if (resp.items && resp.items.length > 0 && !resp.total) {
       resp.total = computeTotalsFromItems(resp.items);
+    }
+
+    // Hard guard: never return a single summary-style card when multiple components are present.
+    if (
+      wantStructured &&
+      preferMultiDetect &&
+      !packagedMode &&
+      !labelScan &&
+      resp.items &&
+      Array.isArray(resp.items) &&
+      resp.items.length === 1 &&
+      looksLikeMultiIngredientSummary(resp.items)
+    ) {
+      const summaryLabel = `${String(resp.items?.[0]?.name || '')} ${String(resp.items?.[0]?.serving_size || '')}`.trim();
+      const forcedComponents = dedupeComponentList(
+        normalizeComponentList([
+          ...listedComponents,
+          ...analysisComponents,
+          ...extractComponentsFromDelimitedText(summaryLabel),
+          ...extractComponentsFromDelimitedText(analysisTextForFollowUp),
+        ]),
+      ).slice(0, 12);
+
+      if (forcedComponents.length > 1) {
+        try {
+          const componentPrompt =
+            'Return JSON only. Use the component list and output exactly one item per component.\n' +
+            'You must include ALL components and no extras.\n' +
+            `${forcedComponents.map((c) => `- ${c}`).join('\n')}\n` +
+            '- Do not combine components into a single item.\n' +
+            '- Use simple serving sizes (e.g., "1 serving", "1 slice").\n' +
+            '- If unsure, set isGuess: true and leave macros as null.\n' +
+            (imageDataUrl ? '- Use the image as the main source of truth.\n' : '') +
+            '\nAnalysis text:\n' +
+            analysisTextForFollowUp;
+          const componentMessages = imageDataUrl
+            ? [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: componentPrompt },
+                    { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+                  ],
+                },
+              ]
+            : [
+                {
+                  role: 'user',
+                  content: componentPrompt,
+                },
+              ];
+          const componentFollowUp = await chatCompletionWithCost(openai, {
+            model: 'gpt-4o',
+            response_format: { type: 'json_schema', json_schema: buildComponentBoundSchema(forcedComponents) } as any,
+            messages: componentMessages,
+            max_tokens: 420,
+            temperature: 0,
+          } as any);
+
+          totalCostCents += componentFollowUp.costCents;
+          const text = componentFollowUp.completion.choices?.[0]?.message?.content?.trim() || '';
+          const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+          if (parsed) {
+            const items = Array.isArray(parsed)
+              ? parsed
+              : Array.isArray((parsed as any).items)
+              ? (parsed as any).items
+              : [];
+            const total =
+              !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
+                ? (parsed as any).total
+                : null;
+            const normalizedComponents = forcedComponents.map((c) => normalizeComponentName(c));
+            const itemsByComponent = items.filter((item: any) => {
+              const key = normalizeComponentName(item?.component || item?.name || '');
+              return key && normalizedComponents.includes(key);
+            });
+            const orderedItems = normalizedComponents
+              .map((comp, idx) => {
+                const item = itemsByComponent.find(
+                  (candidate: any) => normalizeComponentName(candidate?.component || candidate?.name || '') === comp,
+                );
+                if (!item) return null;
+                const next = { ...item };
+                delete (next as any).component;
+                if (!next.name) next.name = forcedComponents[idx];
+                return next;
+              })
+              .filter(Boolean) as any[];
+            if (
+              orderedItems.length === forcedComponents.length &&
+              !itemsResultIsInvalid(orderedItems, true)
+            ) {
+              resp.items = sanitizeStructuredItems(orderedItems);
+              resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
+              itemsSource =
+                itemsSource === 'none' ? 'component_bound_repair' : `${itemsSource}+component_bound_repair`;
+              itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+              console.log('✅ Forced component split repaired summary output:', {
+                itemCount: resp.items.length,
+              });
+            }
+          }
+        } catch (repairErr) {
+          console.warn('Component split repair failed (non-fatal):', repairErr);
+        }
+      }
     }
 
     // Burger-specific enrichment: ensure core components and realistic per-item macros.
