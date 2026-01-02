@@ -8434,8 +8434,35 @@ Please add nutritional information manually if needed.`);
       }
     })
 
+    const allMealsUnique = (() => {
+      const byKey = new Map<string, any>()
+      const pickBetter = (a: any, b: any) => {
+        const aFav = Boolean(a?.favorite)
+        const bFav = Boolean(b?.favorite)
+        if (aFav !== bFav) return aFav ? a : b
+        const aHasCalories = Number.isFinite(Number(a?.calories))
+        const bHasCalories = Number.isFinite(Number(b?.calories))
+        if (aHasCalories !== bHasCalories) return aHasCalories ? a : b
+        return (a?.createdAt || 0) >= (b?.createdAt || 0) ? a : b
+      }
+      allMealsRaw.forEach((item) => {
+        const rawLabel = String(item?.label || '').trim()
+        const key =
+          simplifyKey(rawLabel) ||
+          normalizeFoodName(rawLabel) ||
+          `__id:${String(item?.id || Math.random())}`
+        const existing = byKey.get(key)
+        if (!existing) {
+          byKey.set(key, item)
+          return
+        }
+        byKey.set(key, pickBetter(existing, item))
+      })
+      return Array.from(byKey.values())
+    })()
+
     // "All" should show every meal, including favorites that aren't in history yet.
-    const allMealsWithFavorites = [...allMealsRaw]
+    const allMealsWithFavorites = [...allMealsUnique]
     ;(favorites || []).forEach((fav: any) => {
       const favId = fav?.id ? String(fav.id).trim() : ''
       const label =
