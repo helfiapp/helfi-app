@@ -13402,7 +13402,7 @@ Please add nutritional information manually if needed.`);
                         }
                         
                         const cardPaddingClass =
-                          isCollapsed ? 'py-2 px-3' : 'p-4'
+                          isCollapsed ? 'py-2 px-4' : 'p-4'
 
                         return (
                           <div
