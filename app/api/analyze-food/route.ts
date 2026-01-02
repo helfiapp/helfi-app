@@ -953,6 +953,10 @@ const hasDiscreteKeyword = (text: string) => {
 const extractExplicitPieceCount = (text: string, keywords: string[] = DISCRETE_PIECE_KEYWORDS): number | null => {
   if (!text) return null
   const normalized = replaceWordNumbers(String(text).toLowerCase()).replace(/\b(a|an)\b/g, '1')
+  // If a weight unit is present, never treat it as a piece count (e.g., "6 oz patty").
+  if (/\b\d+(?:\.\d+)?\s*(g|gram|grams|kg|ml|oz|ounce|ounces|lb|pound|pounds)\b/i.test(normalized)) {
+    return null
+  }
   const keywordPattern = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
   const match = normalized.match(
     new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:[a-z-]+\\s+){0,2}(?:${keywordPattern})\\b`),
