@@ -223,12 +223,16 @@ interface UsdaFoodNutrient {
   nutrientName?: string
   unitName?: string
   value?: number
+  amount?: number
 }
 
 interface UsdaFood {
   fdcId: number
   description: string
   brandName?: string
+  dataType?: string
+  servingSize?: number
+  servingSizeUnit?: string | { name?: string }
   foodNutrients?: UsdaFoodNutrient[]
   foodPortions?: Array<{
     gramWeight?: number
@@ -245,8 +249,9 @@ const extractUsdaNutrients = (food: UsdaFood) => {
       (n) => n.nutrientName?.toLowerCase() === name.toLowerCase() && (!units || units.includes(n.unitName || '')),
     )
     if (!n) return null
-    if (!Number.isFinite(Number(n.value))) return null
-    return Number(n.value)
+    const raw = Number.isFinite(Number(n.value)) ? n.value : n.amount
+    if (!Number.isFinite(Number(raw))) return null
+    return Number(raw)
   }
   const energyKcal = findVal('Energy', ['KCAL']) ?? findVal('Energy', ['kcal'])
   const energyKj = findVal('Energy', ['KJ']) ?? findVal('Energy', ['kJ'])
@@ -313,6 +318,25 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
       sugar_g: sugar,
     }
 
+    const dataType = String((food as any)?.dataType || '').toLowerCase()
+    const isBranded = dataType.includes('branded')
+    const servingSizeRaw = (food as any)?.servingSize
+    const servingSizeUnitRaw = (food as any)?.servingSizeUnit
+    const servingSizeUnit =
+      typeof servingSizeUnitRaw === 'string'
+        ? servingSizeUnitRaw
+        : typeof servingSizeUnitRaw?.name === 'string'
+        ? servingSizeUnitRaw.name
+        : ''
+    const servingSizeNum = Number(servingSizeRaw)
+    const servingSizeGrams =
+      Number.isFinite(servingSizeNum) && servingSizeNum > 0 && String(servingSizeUnit).toLowerCase() === 'g'
+        ? servingSizeNum
+        : null
+    const baseWeightGrams = isBranded && servingSizeGrams ? servingSizeGrams : 100
+
+    const scaleFromBase = (grams: number) => grams / baseWeightGrams
+
     const options: ServingOption[] = []
     if (Number.isFinite(Number(base.calories))) {
       options.push({
@@ -320,6 +344,23 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
         label: '100 g',
         serving_size: '100 g',
         grams: 100,
+        unit: 'g',
+        calories: base.calories != null ? Math.round(base.calories * scaleFromBase(100)) : null,
+        protein_g: base.protein_g != null ? Math.round(base.protein_g * scaleFromBase(100) * 10) / 10 : null,
+        carbs_g: base.carbs_g != null ? Math.round(base.carbs_g * scaleFromBase(100) * 10) / 10 : null,
+        fat_g: base.fat_g != null ? Math.round(base.fat_g * scaleFromBase(100) * 10) / 10 : null,
+        fiber_g: base.fiber_g != null ? Math.round(base.fiber_g * scaleFromBase(100) * 10) / 10 : null,
+        sugar_g: base.sugar_g != null ? Math.round(base.sugar_g * scaleFromBase(100) * 10) / 10 : null,
+        source: 'usda',
+      })
+    }
+
+    if (isBranded && servingSizeGrams && Number.isFinite(Number(base.calories))) {
+      options.push({
+        id: `usda:${fdcId}:serving`,
+        label: `Serving — ${Math.round(servingSizeGrams)}g`,
+        serving_size: `Serving — ${Math.round(servingSizeGrams)}g`,
+        grams: servingSizeGrams,
         unit: 'g',
         calories: base.calories ?? null,
         protein_g: base.protein_g ?? null,
@@ -341,7 +382,7 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
         portion?.measureUnit?.name ||
         'Serving'
       const label = `${labelBase} — ${Math.round(grams)}g`
-      const factor = grams / 100
+      const factor = scaleFromBase(grams)
       options.push({
         id: `usda:${fdcId}:${idx}`,
         label,
