@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 
+// GUARD RAIL: Notification inbox UI behavior is locked. Do not change without owner approval.
+
 type InboxItem = {
   id: string
   title: string
@@ -18,11 +20,20 @@ export default function NotificationInboxPage() {
   const [items, setItems] = useState<InboxItem[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [deleting, setDeleting] = useState(false)
 
   const unreadCount = useMemo(
     () => items.filter((item) => item.status === 'unread').length,
     [items]
   )
+
+  const allSelected = useMemo(
+    () => items.length > 0 && selectedIds.length === items.length,
+    [items, selectedIds]
+  )
+
+  const selectedCount = selectedIds.length
 
   const loadInbox = async () => {
     try {
@@ -43,6 +54,10 @@ export default function NotificationInboxPage() {
     loadInbox()
   }, [])
 
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => items.some((item) => item.id === id)))
+  }, [items])
+
   const markRead = async (id: string) => {
     if (!id) return
     await fetch('/api/notifications/inbox', {
@@ -55,6 +70,86 @@ export default function NotificationInboxPage() {
       window.dispatchEvent(new Event('notifications:refresh'))
     } catch {
       // ignore
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id]))
+  }
+
+  const handleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(items.map((item) => item.id))
+    }
+  }
+
+  const deleteSelected = async () => {
+    if (deleting || selectedIds.length === 0) return
+    const ok = window.confirm('Delete selected notifications?')
+    if (!ok) return
+    setDeleting(true)
+    try {
+      await fetch('/api/notifications/inbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_selected', ids: selectedIds }),
+      }).catch(() => {})
+      await loadInbox()
+      setSelectedIds([])
+      try {
+        window.dispatchEvent(new Event('notifications:refresh'))
+      } catch {
+        // ignore
+      }
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const deleteAll = async () => {
+    if (deleting || items.length === 0) return
+    const ok = window.confirm('Delete all notifications?')
+    if (!ok) return
+    setDeleting(true)
+    try {
+      await fetch('/api/notifications/inbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_all' }),
+      }).catch(() => {})
+      await loadInbox()
+      setSelectedIds([])
+      try {
+        window.dispatchEvent(new Event('notifications:refresh'))
+      } catch {
+        // ignore
+      }
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const deleteOne = async (id: string) => {
+    if (!id || deleting) return
+    const ok = window.confirm('Delete this notification?')
+    if (!ok) return
+    setDeleting(true)
+    try {
+      await fetch('/api/notifications/inbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_selected', ids: [id] }),
+      }).catch(() => {})
+      await loadInbox()
+      try {
+        window.dispatchEvent(new Event('notifications:refresh'))
+      } catch {
+        // ignore
+      }
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -97,21 +192,63 @@ export default function NotificationInboxPage() {
                 Missed a pop-up? It will show here so you can open it later.
               </p>
             </div>
-            <button
-              onClick={markAllRead}
-              disabled={busy || unreadCount === 0}
-              className={`text-sm font-semibold ${
-                busy || unreadCount === 0
-                  ? 'text-gray-300 cursor-not-allowed'
-                  : 'text-helfi-green hover:text-helfi-green/80'
-              }`}
-            >
-              Mark all as read
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={markAllRead}
+                disabled={busy || unreadCount === 0}
+                className={`text-sm font-semibold ${
+                  busy || unreadCount === 0
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-helfi-green hover:text-helfi-green/80'
+                }`}
+              >
+                Mark all as read
+              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSelectAll}
+                  disabled={items.length === 0}
+                  className={`text-sm font-semibold ${
+                    items.length === 0
+                      ? 'text-gray-300 cursor-not-allowed'
+                      : 'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
+                  }`}
+                >
+                  {allSelected ? 'Clear selection' : 'Select all'}
+                </button>
+                <button
+                  onClick={deleteSelected}
+                  disabled={selectedCount === 0 || deleting}
+                  className={`text-sm font-semibold ${
+                    selectedCount === 0 || deleting
+                      ? 'text-gray-300 cursor-not-allowed'
+                      : 'text-red-600 hover:text-red-700'
+                  }`}
+                >
+                  Delete selected
+                </button>
+                <button
+                  onClick={deleteAll}
+                  disabled={items.length === 0 || deleting}
+                  className={`text-sm font-semibold ${
+                    items.length === 0 || deleting
+                      ? 'text-gray-300 cursor-not-allowed'
+                      : 'text-red-600 hover:text-red-700'
+                  }`}
+                >
+                  Delete all
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             Unread: <span className="font-semibold text-gray-900 dark:text-white">{unreadCount}</span>
+            {selectedCount > 0 && (
+              <span className="ml-3 text-gray-600 dark:text-gray-300">
+                Selected: <span className="font-semibold">{selectedCount}</span>
+              </span>
+            )}
           </div>
 
           {loading ? (
@@ -132,15 +269,33 @@ export default function NotificationInboxPage() {
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">{item.title}</p>
-                      {item.body && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{item.body}</p>
-                      )}
-                      <p className="text-xs text-gray-400 mt-2">
-                        {new Date(item.createdAt).toLocaleString()}
-                      </p>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-helfi-green focus:ring-helfi-green/30"
+                        checked={selectedIds.includes(item.id)}
+                        onChange={() => toggleSelect(item.id)}
+                        aria-label="Select notification"
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-white">{item.title}</p>
+                        {item.body && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{item.body}</p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-2">
+                          {new Date(item.createdAt).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => deleteOne(item.id)}
+                      disabled={deleting}
+                      className={`text-sm font-semibold ${
+                        deleting ? 'text-gray-300 cursor-not-allowed' : 'text-red-600 hover:text-red-700'
+                      }`}
+                    >
+                      Delete
+                    </button>
                     {item.status === 'unread' && (
                       <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
                     )}

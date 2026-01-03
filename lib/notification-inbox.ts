@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 
+// GUARD RAIL: Notification inbox behavior is locked. Do not change without owner approval.
+
 export type InboxNotification = {
   id: string
   userId: string
@@ -197,6 +199,37 @@ export async function countUnreadNotifications(userId: string): Promise<number> 
     return Number.isFinite(count) ? count : 0
   } catch (error) {
     console.warn('[notifications] Failed to count unread', error)
+    return 0
+  }
+}
+
+export async function deleteNotifications(userId: string, ids: string[]): Promise<number> {
+  await ensureNotificationInboxTable()
+  const list = Array.isArray(ids) ? ids.filter(Boolean) : []
+  if (!list.length) return 0
+  try {
+    const rows: Array<{ id: string }> = await prisma.$queryRawUnsafe(
+      `DELETE FROM NotificationInbox WHERE userId = $1 AND id = ANY($2::text[]) RETURNING id`,
+      userId,
+      list
+    )
+    return rows.length
+  } catch (error) {
+    console.warn('[notifications] Failed to delete inbox items', error)
+    return 0
+  }
+}
+
+export async function deleteAllNotifications(userId: string): Promise<number> {
+  await ensureNotificationInboxTable()
+  try {
+    const rows: Array<{ id: string }> = await prisma.$queryRawUnsafe(
+      `DELETE FROM NotificationInbox WHERE userId = $1 RETURNING id`,
+      userId
+    )
+    return rows.length
+  } catch (error) {
+    console.warn('[notifications] Failed to delete all inbox items', error)
     return 0
   }
 }

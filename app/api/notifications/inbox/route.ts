@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { listInboxNotifications, markAllNotificationsRead, markNotificationRead } from '@/lib/notification-inbox'
+import { deleteAllNotifications, deleteNotifications, listInboxNotifications, markAllNotificationsRead, markNotificationRead } from '@/lib/notification-inbox'
+
+// GUARD RAIL: Notification inbox API behavior is locked. Do not change without owner approval.
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -38,6 +40,18 @@ export async function POST(request: NextRequest) {
   if (action === 'mark_all_read') {
     const ok = await markAllNotificationsRead(session.user.id)
     return NextResponse.json({ success: ok })
+  }
+
+  if (action === 'delete_selected') {
+    const ids = Array.isArray(body?.ids) ? body.ids.filter((id: unknown) => typeof id === 'string') : []
+    if (!ids.length) return NextResponse.json({ error: 'Missing ids' }, { status: 400 })
+    const deleted = await deleteNotifications(session.user.id, ids)
+    return NextResponse.json({ success: true, deleted })
+  }
+
+  if (action === 'delete_all') {
+    const deleted = await deleteAllNotifications(session.user.id)
+    return NextResponse.json({ success: true, deleted })
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

@@ -1015,6 +1015,33 @@ Anything marked ✅ in the audit is **locked**. Do not change, loosen, or bypass
 - Credit receipts must be tied to the buyer. Do not allow a receipt link to be reused by another account.
 - Analytics data must require authentication. Do not allow public read/write access.
 
+---
+
+## 14. Notifications Inbox + Reminder Opens (Locked)
+
+**This area is fragile and business‑critical. Do not change it without the owner’s written approval.**
+
+**Protected files:**
+- `lib/notification-inbox.ts`
+- `app/notifications/inbox/page.tsx`
+- `app/api/notifications/inbox/route.ts`
+- `app/api/notifications/pending-open/route.ts`
+- `app/pwa-entry/page.tsx`
+- `app/api/push/dispatch/route.ts`
+- `app/api/push/scheduler/route.ts`
+- `app/api/mood/dispatch/route.ts`
+- `app/api/mood/push-scheduler/route.ts`
+
+**Required behavior (must not change):**
+1) Tapping a reminder must open the reminder page (check‑in or mood) even if the app was last left on another page.  
+2) Reminders must always appear in the Notification inbox.  
+3) Normal app opens must still go to the last page the user visited.
+
+**If changes are requested:**
+1) Explain the change in plain language first.  
+2) Get explicit written approval.  
+3) Re‑test reminder tap behavior and inbox logging on iPhone PWA before shipping.
+
 ### Medium and low priority fixes that must stay locked
 - Session lifetime must not be multi-year, and admin logout/revoke must remain available.
 - No fallback default secrets in production. Missing secrets must be flagged, not silently replaced.
