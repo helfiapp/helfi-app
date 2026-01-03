@@ -2068,6 +2068,7 @@ export default function FoodDiary() {
     maxHeight?: number
   } | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
+  const [isDeletingEditingEntry, setIsDeletingEditingEntry] = useState(false)
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
   const usdaFallbackAttemptedRef = useRef(false)
@@ -9336,8 +9337,10 @@ Please add nutritional information manually if needed.`);
   }, [showManualBarcodeInput])
 
   const handleDeleteEditingEntry = async () => {
-    if (!editingEntry) return
+    if (!editingEntry || isDeletingEditingEntry) return
     try {
+      setIsDeletingEditingEntry(true)
+      triggerHaptic(16)
       if (isViewingToday) {
         await deleteFood(editingEntry)
       } else if ((editingEntry as any)?.dbId) {
@@ -9346,6 +9349,7 @@ Please add nutritional information manually if needed.`);
         await deleteFood(editingEntry)
       }
     } finally {
+      setIsDeletingEditingEntry(false)
       exitEditingSession()
     }
   }
@@ -12963,9 +12967,18 @@ Please add nutritional information manually if needed.`);
                     <button
                       type="button"
                       onClick={handleDeleteEditingEntry}
-                      className="px-3 py-1.5 rounded-full bg-red-600 text-sm font-semibold text-white hover:bg-red-700"
+                      disabled={isDeletingEditingEntry}
+                      aria-busy={isDeletingEditingEntry}
+                      className="px-3 py-1.5 rounded-full bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-80 disabled:cursor-not-allowed"
                     >
-                      Delete
+                      {isDeletingEditingEntry ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
+                          Deleting...
+                        </span>
+                      ) : (
+                        'Delete'
+                      )}
                     </button>
                   </div>
                 )}
