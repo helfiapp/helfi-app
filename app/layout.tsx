@@ -108,6 +108,18 @@ export default function RootLayout({
                     navigator.serviceWorker.register('/sw.js').catch(function(err) {
                       console.log('Service worker registration failed:', err);
                     });
+                    navigator.serviceWorker.addEventListener('message', function(event) {
+                      try {
+                        var data = event && event.data ? event.data : null;
+                        if (!data || data.type !== 'navigate' || !data.url) return;
+                        var target = new URL(data.url, window.location.origin);
+                        if (target.origin !== window.location.origin) return;
+                        if (window.location.href === target.href) return;
+                        window.location.href = target.href;
+                      } catch (e) {
+                        // Ignore navigation message errors
+                      }
+                    });
                   }
                 } catch (e) {
                   console.log('Service worker not supported:', e);

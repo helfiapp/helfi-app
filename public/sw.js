@@ -44,14 +44,17 @@ self.addEventListener('notificationclick', (event) => {
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientsArr) => {
-        const focused = clientsArr.find((client) => client.focused) || clientsArr[0];
-        if (focused) {
-          if ('navigate' in focused) {
-            return focused.navigate(targetUrl).then(() => focused.focus());
-          }
-          focused.focus();
-          if (self.clients.openWindow) {
-            return self.clients.openWindow(targetUrl);
+        if (clientsArr.length) {
+          clientsArr.forEach((client) => {
+            try {
+              client.postMessage({ type: 'navigate', url: targetUrl });
+            } catch (e) {
+              // Ignore postMessage failures
+            }
+          });
+          const focused = clientsArr.find((client) => client.focused) || clientsArr[0];
+          if (focused && 'focus' in focused) {
+            focused.focus();
           }
           return undefined;
         }
