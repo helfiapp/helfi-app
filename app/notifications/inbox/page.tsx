@@ -185,61 +185,59 @@ export default function NotificationInboxPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8 space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <div className="flex items-start justify-between gap-4">
+          <div className="space-y-3">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Notification inbox</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Missed a pop-up? It will show here so you can open it later.
               </p>
             </div>
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-4 overflow-x-auto pb-1">
               <button
-                onClick={markAllRead}
-                disabled={busy || unreadCount === 0}
-                className={`text-sm font-semibold ${
-                  busy || unreadCount === 0
+                onClick={handleSelectAll}
+                disabled={items.length === 0}
+                className={`text-sm font-semibold whitespace-nowrap ${
+                  items.length === 0
                     ? 'text-gray-300 cursor-not-allowed'
-                    : 'text-helfi-green hover:text-helfi-green/80'
+                    : 'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                 }`}
               >
-                Mark all as read
+                {allSelected ? 'Clear selection' : 'Select all'}
               </button>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleSelectAll}
-                  disabled={items.length === 0}
-                  className={`text-sm font-semibold ${
-                    items.length === 0
-                      ? 'text-gray-300 cursor-not-allowed'
-                      : 'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
-                  }`}
-                >
-                  {allSelected ? 'Clear selection' : 'Select all'}
-                </button>
-                <button
-                  onClick={deleteSelected}
-                  disabled={selectedCount === 0 || deleting}
-                  className={`text-sm font-semibold ${
-                    selectedCount === 0 || deleting
-                      ? 'text-gray-300 cursor-not-allowed'
-                      : 'text-red-600 hover:text-red-700'
-                  }`}
-                >
-                  Delete selected
-                </button>
-                <button
-                  onClick={deleteAll}
-                  disabled={items.length === 0 || deleting}
-                  className={`text-sm font-semibold ${
-                    items.length === 0 || deleting
-                      ? 'text-gray-300 cursor-not-allowed'
-                      : 'text-red-600 hover:text-red-700'
-                  }`}
-                >
-                  Delete all
-                </button>
-              </div>
+              <button
+                onClick={deleteSelected}
+                disabled={selectedCount === 0 || deleting}
+                className={`text-sm font-semibold whitespace-nowrap ${
+                  selectedCount === 0 || deleting
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-red-600 hover:text-red-700'
+                }`}
+              >
+                Delete selected
+              </button>
+              <button
+                onClick={deleteAll}
+                disabled={items.length === 0 || deleting}
+                className={`text-sm font-semibold whitespace-nowrap ${
+                  items.length === 0 || deleting
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-red-600 hover:text-red-700'
+                }`}
+              >
+                Delete all
+              </button>
             </div>
+            <button
+              onClick={markAllRead}
+              disabled={busy || unreadCount === 0}
+              className={`text-sm font-semibold ${
+                busy || unreadCount === 0
+                  ? 'text-gray-300 cursor-not-allowed'
+                  : 'text-helfi-green hover:text-helfi-green/80'
+              }`}
+            >
+              Mark all as read
+            </button>
           </div>
 
           <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
