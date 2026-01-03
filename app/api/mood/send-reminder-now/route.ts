@@ -6,6 +6,7 @@ import webpush from 'web-push'
 import { publishWithQStash } from '@/lib/qstash'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
+import { createInboxNotification } from '@/lib/notification-inbox'
 
 export const runtime = 'nodejs'
 
@@ -71,6 +72,15 @@ export async function POST(req: NextRequest) {
       console.error('mood send-reminder-now error', errors.map((e) => e.message).join('; '))
       return NextResponse.json({ error: 'Failed to send reminder' }, { status: 500 })
     }
+    await createInboxNotification({
+      userId: user.id,
+      title: 'Quick mood check-in',
+      body: 'How are you feeling right now? It takes 10 seconds.',
+      url: '/mood/quick',
+      type: 'mood_reminder',
+      source: 'push',
+      eventKey: `mood:manual:${Date.now()}`,
+    }).catch(() => {})
     return NextResponse.json({ success: true, sent })
   } catch (e: any) {
     console.error('mood send-reminder-now error', e?.body || e?.message || e)

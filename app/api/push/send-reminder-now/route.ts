@@ -6,6 +6,7 @@ import webpush from 'web-push'
 import { publishWithQStash } from '@/lib/qstash'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
+import { createInboxNotification } from '@/lib/notification-inbox'
 
 export async function POST(req: NextRequest) {
   const isScheduler = isSchedulerAuthorized(req)
@@ -75,6 +76,15 @@ export async function POST(req: NextRequest) {
       console.error('send-reminder-now error', errors.map((e) => e.message).join('; '))
       return NextResponse.json({ error: 'Failed to send reminder' }, { status: 500 })
     }
+    await createInboxNotification({
+      userId: user.id,
+      title: 'Time for your Helfi check-in',
+      body: 'Rate your selected issues for today in under a minute.',
+      url: '/check-in',
+      type: 'checkin_reminder',
+      source: 'push',
+      eventKey: `checkin:manual:${Date.now()}`,
+    }).catch(() => {})
     return NextResponse.json({ success: true, sent })
   } catch (e: any) {
     console.error('send-reminder-now error', e?.body || e?.message || e)

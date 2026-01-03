@@ -93,7 +93,7 @@ export async function createInboxNotification(params: {
     await prisma.$executeRawUnsafe(
       `INSERT INTO NotificationInbox (id, userId, title, body, url, type, status, source, eventKey, metadata)
        VALUES ($1,$2,$3,$4,$5,$6,'unread',$7,$8,$9::jsonb)
-       ON CONFLICT (userId, eventKey) DO NOTHING`,
+       ON CONFLICT DO NOTHING`,
       id,
       params.userId,
       params.title,
@@ -109,6 +109,51 @@ export async function createInboxNotification(params: {
     return null
   }
   return id
+}
+
+export async function consumePendingNotificationOpen(
+  userId: string,
+  options?: { withinMinutes?: number; types?: string[]; sources?: string[] }
+): Promise<{ id: string; url: string } | null> {
+  await ensureNotificationInboxTable()
+  const withinMinutes = Math.min(Math.max(Number(options?.withinMinutes ?? 10), 1), 180)
+  const types = Array.isArray(options?.types) && options.types.length > 0 ? options.types : null
+  const sources = Array.isArray(options?.sources) && options.sources.length > 0 ? options.sources : null
+
+  try {
+    const rows: Array<{ id: string; url: string | null }> = await prisma.$queryRawUnsafe(
+      `SELECT id, url
+       FROM NotificationInbox
+       WHERE userId = $1
+         AND url IS NOT NULL
+         AND ($2::text[] IS NULL OR type = ANY($2))
+         AND ($3::text[] IS NULL OR source = ANY($3))
+         AND (metadata->>'launchConsumedAt' IS NULL OR metadata->>'launchConsumedAt' = '')
+         AND createdAt >= NOW() - ($4 * INTERVAL '1 minute')
+       ORDER BY createdAt DESC
+       LIMIT 1`,
+      userId,
+      types,
+      sources,
+      withinMinutes
+    )
+
+    const row = rows?.[0]
+    if (!row?.id || !row?.url) return null
+
+    await prisma.$executeRawUnsafe(
+      `UPDATE NotificationInbox
+       SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{launchConsumedAt}', to_jsonb(NOW()::text), true)
+       WHERE id = $1 AND userId = $2`,
+      row.id,
+      userId
+    )
+
+    return { id: row.id, url: row.url }
+  } catch (error) {
+    console.warn('[notifications] Failed to consume pending open', error)
+    return null
+  }
 }
 
 export async function listInboxNotifications(

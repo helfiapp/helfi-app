@@ -6,6 +6,7 @@ import webpush from 'web-push'
 import { publishWithQStash } from '@/lib/qstash'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
+import { createInboxNotification } from '@/lib/notification-inbox'
 
 // Manual trigger endpoint - bypasses cron and sends reminder immediately
 export async function POST(req: NextRequest) {
@@ -95,6 +96,16 @@ export async function POST(req: NextRequest) {
     if (!sent) {
       return NextResponse.json({ error: 'Failed to send reminder', details: errors }, { status: 500 })
     }
+
+    await createInboxNotification({
+      userId: user.id,
+      title: 'Time for your Helfi check-in',
+      body: 'Rate your selected issues for today in under a minute.',
+      url: '/check-in',
+      type: 'checkin_reminder',
+      source: 'push',
+      eventKey: `checkin:manual:${Date.now()}`,
+    }).catch(() => {})
     
     return NextResponse.json({ 
       success: true, 

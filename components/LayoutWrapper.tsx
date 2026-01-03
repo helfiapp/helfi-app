@@ -3,7 +3,7 @@ import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { MouseEvent, ReactNode, useEffect, useState } from 'react'
+import { MouseEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import UsageMeter from '@/components/UsageMeter'
 import SupportChatWidget from '@/components/support/SupportChatWidget'
 import WeeklyReportReadyModal from '@/components/WeeklyReportReadyModal'
@@ -204,6 +204,8 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
+  const pendingOpenCheckRef = useRef(0)
+  const pendingOpenBusyRef = useRef(false)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = [
@@ -315,6 +317,49 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       document.cookie = `helfi-last-path=${encoded}; path=/; max-age=${maxAgeSeconds}; samesite=lax`
     } catch {
       // Ignore storage errors
+    }
+  }, [status, pathname, isAdminPanelPath, publicPages])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    if (publicPages.includes(pathname) || isAdminPanelPath) return
+    if (typeof window === 'undefined') return
+
+    const checkPendingOpen = async () => {
+      const now = Date.now()
+      if (pendingOpenBusyRef.current) return
+      if (now - pendingOpenCheckRef.current < 3000) return
+      pendingOpenBusyRef.current = true
+      pendingOpenCheckRef.current = now
+      try {
+        const res = await fetch('/api/notifications/pending-open', { cache: 'no-store' as any })
+        if (!res.ok) return
+        const data = await res.json().catch(() => ({}))
+        const url = typeof data?.url === 'string' ? data.url : ''
+        if (!url) return
+        const target = new URL(url, window.location.origin).href
+        if (window.location.href === target) return
+        window.location.href = target
+      } catch {
+        // Ignore
+      } finally {
+        pendingOpenBusyRef.current = false
+      }
+    }
+
+    checkPendingOpen()
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkPendingOpen()
+      }
+    }
+
+    window.addEventListener('focus', checkPendingOpen)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      window.removeEventListener('focus', checkPendingOpen)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [status, pathname, isAdminPanelPath, publicPages])
 
