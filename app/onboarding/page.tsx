@@ -24,7 +24,7 @@ const sanitizeUserDataPayload = (payload: any) => {
 };
 
 const AUTO_UPDATE_INSIGHTS_ON_EXIT = true;
-const SAVE_HEALTH_SETUP_ON_LEAVE_ONLY = true;
+const SAVE_HEALTH_SETUP_ON_LEAVE_ONLY = false;
 
 // Auth-enabled onboarding flow
 
