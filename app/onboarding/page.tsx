@@ -6929,6 +6929,13 @@ export default function Onboarding() {
 
   const persistForm = useCallback(
     (partial: any) => {
+      if (allowAutosave) {
+        try {
+          updateUserData(sanitizeUserDataPayload(partial));
+        } catch {
+          // Ignore
+        }
+      }
       setForm((prev: any) => {
         const next = { ...prev, ...partial };
         formRef.current = next; // Keep latest edits available for exit-save flows.
@@ -6948,7 +6955,7 @@ export default function Onboarding() {
         return next;
       });
     },
-    [debouncedSave, allowAutosave],
+    [debouncedSave, allowAutosave, updateUserData],
   );
 
   // Once autosave is allowed (after data load), push current form to backend to avoid blanks
