@@ -15965,48 +15965,56 @@ Please add nutritional information manually if needed.`);
                             </div>
                           </div>
                           {isMobile && isMenuOpen && (
-                            <div className="fixed inset-x-0 bottom-0 z-30 flex justify-end">
-                              <div
-                                className="relative w-full px-4 pb-[env(safe-area-inset-bottom)] mb-16"
-                                style={{
-                                  marginLeft: '96px',
-                                  width: 'calc(100% - 96px)',
-                                  maxWidth: 'calc(100% - 96px)',
-                                }}
-                              >
+                            <>
+                              <div className="fixed inset-0 z-30" onClick={closeSwipeMenus} />
+                              <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+16px)] z-40 flex justify-end">
                                 <div
-                                  className="absolute inset-0"
-                                  onClick={closeSwipeMenus}
-                                  style={{ background: 'transparent', zIndex: 0 }}
-                                />
-                                <div className="relative z-10 rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full max-h-[65vh] overflow-y-auto">
-                                  {actions.map((item, idx) => (
-                                    <button
-                                      key={item.label}
-                                      className={`w-full text-left px-5 py-3.5 text-base flex items-center gap-3 ${item.destructive ? 'text-red-600' : 'text-gray-900'} ${idx > 0 ? 'border-t border-gray-200' : ''}`}
-                                      onClick={() => {
-                                        item.onClick()
-                                        closeSwipeMenus()
-                                      }}
-                                    >
-                                      <span className="flex-shrink-0">
-                                        {actionIcons[item.label] || (
-                                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                  className="relative w-full px-4"
+                                  style={{
+                                    marginLeft: '96px',
+                                    width: 'calc(100% - 96px)',
+                                    maxWidth: 'calc(100% - 96px)',
+                                  }}
+                                >
+                                  <div
+                                    className="relative z-10 rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full max-h-[65vh] overflow-y-auto"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {actions.map((item, idx) => (
+                                      <button
+                                        key={item.label}
+                                        className={`w-full text-left px-5 py-3.5 text-base flex items-center gap-3 ${item.destructive ? 'text-red-600' : 'text-gray-900'} ${idx > 0 ? 'border-t border-gray-200' : ''}`}
+                                        onClick={() => {
+                                          item.onClick()
+                                          closeSwipeMenus()
+                                        }}
+                                      >
+                                        <span className="flex-shrink-0">
+                                          {actionIcons[item.label] || (
+                                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                            </svg>
+                                          )}
+                                        </span>
+                                        <span className="flex-1">{item.label}</span>
+                                        {item.destructive && (
+                                          <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                           </svg>
                                         )}
-                                      </span>
-                                      <span className="flex-1">{item.label}</span>
-                                      {item.destructive && (
-                                        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                      )}
+                                      </button>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      className="w-full text-left px-5 py-3.5 text-base text-gray-700 border-t border-gray-200 bg-white"
+                                      onClick={closeSwipeMenus}
+                                    >
+                                      Cancel
                                     </button>
-                                  ))}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            </>
                           )}
                         </div>
                       )
