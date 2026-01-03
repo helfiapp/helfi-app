@@ -192,7 +192,7 @@ export default function NotificationInboxPage() {
                 Missed a pop-up? It will show here so you can open it later.
               </p>
             </div>
-            <div className="flex items-center gap-4 overflow-x-auto pb-1">
+            <div className="flex flex-wrap items-center gap-4">
               <button
                 onClick={handleSelectAll}
                 disabled={items.length === 0}
