@@ -36,21 +36,29 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url =
+  const rawUrl =
     (event.notification && event.notification.data && event.notification.data.url) || '/check-in';
+  const targetUrl = new URL(rawUrl, self.location.origin).href;
 
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientsArr) => {
-        const hadWindow = clientsArr.some((w) =>
-          w.url.includes(url) && 'focus' in w ? (w.focus(), true) : false,
-        );
-        if (!hadWindow && self.clients.openWindow) {
-          return self.clients.openWindow(url);
+        const focused = clientsArr.find((client) => client.focused) || clientsArr[0];
+        if (focused) {
+          if ('navigate' in focused) {
+            return focused.navigate(targetUrl).then(() => focused.focus());
+          }
+          focused.focus();
+          if (self.clients.openWindow) {
+            return self.clients.openWindow(targetUrl);
+          }
+          return undefined;
+        }
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(targetUrl);
         }
         return undefined;
       }),
   );
 });
-
