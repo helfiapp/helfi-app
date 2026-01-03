@@ -15967,7 +15967,7 @@ Please add nutritional information manually if needed.`);
                           {isMobile && isMenuOpen && (
                             <>
                               <div className="fixed inset-0 z-30" onClick={closeSwipeMenus} />
-                              <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+16px)] z-40 flex justify-end">
+                              <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+72px)] z-40 flex justify-end">
                                 <div
                                   className="relative w-full px-4"
                                   style={{
