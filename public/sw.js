@@ -43,22 +43,31 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientsArr) => {
+      .then(async (clientsArr) => {
+        let navigated = false;
         if (clientsArr.length) {
-          clientsArr.forEach((client) => {
-            try {
-              client.postMessage({ type: 'navigate', url: targetUrl });
-            } catch (e) {
-              // Ignore postMessage failures
-            }
-          });
-          const focused = clientsArr.find((client) => client.focused) || clientsArr[0];
-          if (focused && 'focus' in focused) {
-            focused.focus();
-          }
-          return undefined;
+          await Promise.all(
+            clientsArr.map(async (client) => {
+              try {
+                client.postMessage({ type: 'navigate', url: targetUrl });
+              } catch (e) {
+                // Ignore postMessage failures
+              }
+              if ('navigate' in client) {
+                try {
+                  await client.navigate(targetUrl);
+                  navigated = true;
+                } catch (e) {
+                  // Ignore navigation failures
+                }
+              }
+              if ('focus' in client) {
+                client.focus();
+              }
+            }),
+          );
         }
-        if (self.clients.openWindow) {
+        if (!navigated && self.clients.openWindow) {
           return self.clients.openWindow(targetUrl);
         }
         return undefined;
