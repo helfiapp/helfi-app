@@ -88,7 +88,7 @@ export async function createInboxNotification(params: {
   const type = params.type ?? null
   const source = params.source ?? null
   const eventKey = params.eventKey ?? null
-  const metadata = params.metadata ?? null
+  const metadata = params.metadata ?? {}
   try {
     await prisma.$executeRawUnsafe(
       `INSERT INTO NotificationInbox (id, userId, title, body, url, type, status, source, eventKey, metadata)
@@ -143,7 +143,7 @@ export async function consumePendingNotificationOpen(
 
     await prisma.$executeRawUnsafe(
       `UPDATE NotificationInbox
-       SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{launchConsumedAt}', to_jsonb(NOW()::text), true)
+       SET metadata = jsonb_set(COALESCE(NULLIF(metadata, 'null'::jsonb), '{}'::jsonb), '{launchConsumedAt}', to_jsonb(NOW()::text), true)
        WHERE id = $1 AND userId = $2`,
       row.id,
       userId

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { consumePendingNotificationOpen } from '@/lib/notification-inbox'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,15 @@ export default async function PwaEntryPage() {
 
   if (!onboardingComplete) {
     redirect('/onboarding')
+  }
+
+  const pending = await consumePendingNotificationOpen(user.id, {
+    withinMinutes: 60,
+    types: ['checkin_reminder', 'mood_reminder'],
+    sources: ['push'],
+  })
+  if (pending?.url) {
+    redirect(pending.url)
   }
 
   if (lastPath) {
