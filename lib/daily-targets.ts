@@ -398,13 +398,19 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
       targetCalories > 0 ? targetCalories * 0.12 / 4 : sugarCap // default to ~12% kcal cap if stricter
     )
   )
-  const manualFiber = Number(input.fiberTarget)
-  if (Number.isFinite(manualFiber) && manualFiber >= 0) {
-    fiber = Math.round(manualFiber)
+  const manualFiberRaw = input.fiberTarget
+  if (manualFiberRaw !== null && manualFiberRaw !== undefined && manualFiberRaw !== '') {
+    const manualFiber = Number(manualFiberRaw)
+    if (Number.isFinite(manualFiber) && manualFiber >= 0) {
+      fiber = Math.round(manualFiber)
+    }
   }
-  const manualSugar = Number(input.sugarMax)
-  if (Number.isFinite(manualSugar) && manualSugar >= 0) {
-    sugarMax = Math.round(manualSugar)
+  const manualSugarRaw = input.sugarMax
+  if (manualSugarRaw !== null && manualSugarRaw !== undefined && manualSugarRaw !== '') {
+    const manualSugar = Number(manualSugarRaw)
+    if (Number.isFinite(manualSugar) && manualSugar >= 0) {
+      sugarMax = Math.round(manualSugar)
+    }
   }
   if (Number.isFinite(carbs) && carbs > 0) {
     sugarMax = Math.min(sugarMax, carbs)
