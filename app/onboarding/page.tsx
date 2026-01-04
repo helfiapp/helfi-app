@@ -1747,6 +1747,28 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     }
   }, []);
 
+  const closeGoalDetails = useCallback(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#goal-details') {
+      window.history.back();
+      return;
+    }
+    setShowGoalDetails(false);
+  }, []);
+
+  useEffect(() => {
+    if (!showGoalDetails || typeof window === 'undefined') return;
+    const current = new URL(window.location.href);
+    if (current.hash !== '#goal-details') {
+      current.hash = 'goal-details';
+      window.history.pushState({ goalDetails: true }, '', current.toString());
+    }
+    const handlePopState = () => {
+      setShowGoalDetails(false);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showGoalDetails]);
+
   const handleGoalTargetWeightUnitChange = useCallback(
     (nextUnit: 'kg' | 'lb') => {
       if (nextUnit === goalTargetWeightUnit) return;
@@ -2239,9 +2261,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           <div className="max-w-md mx-auto w-full flex items-center justify-between px-4 py-4">
             <button
               type="button"
-              onClick={() => setShowGoalDetails(false)}
+              onClick={closeGoalDetails}
               className="flex items-center justify-center size-10 rounded-full hover:bg-gray-100 transition-colors"
-              aria-label="Back"
+              aria-label="Back to step 2"
             >
               <MaterialSymbol name="arrow_back" className="text-2xl" />
             </button>
@@ -2480,7 +2502,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           <div className="max-w-md mx-auto w-full">
             <button
               type="button"
-              onClick={() => setShowGoalDetails(false)}
+              onClick={closeGoalDetails}
               className="w-full flex items-center justify-center rounded-lg h-14 px-8 bg-helfi-green hover:bg-helfi-green/90 active:scale-[0.98] transition-all duration-200 text-white text-lg font-bold tracking-wide shadow-lg shadow-helfi-green/10"
             >
               Done
@@ -2658,8 +2680,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
         {[
           { key: 'lose weight', label: 'Lose weight' },
-          { key: 'maintain weight', label: 'Maintain weight' },
           { key: 'gain weight', label: 'Gain weight' },
+          { key: 'maintain weight', label: 'Maintain weight' },
           { key: 'tone up', label: 'Tone up' },
           { key: 'get shredded', label: 'Get shredded' },
         ].map((option) => (
