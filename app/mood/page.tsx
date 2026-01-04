@@ -91,6 +91,8 @@ export default function MoodCheckInPage() {
     if (mood == null) return
     setSaving(true)
     setBanner(null)
+    const pendingId =
+      typeof window !== 'undefined' ? sessionStorage.getItem('helfi:pending-notification-id') : null
     try {
       const res = await fetch('/api/mood/entries', {
         method: 'POST',
@@ -100,6 +102,7 @@ export default function MoodCheckInPage() {
           tags,
           note,
           localDate,
+          notificationId: pendingId || undefined,
           context: {
             localHour: new Date().getHours(),
             intensityPercent,
@@ -113,6 +116,11 @@ export default function MoodCheckInPage() {
         }),
       })
       if (!res.ok) throw new Error('save failed')
+      if (pendingId) {
+        try {
+          sessionStorage.removeItem('helfi:pending-notification-id')
+        } catch {}
+      }
       setBanner({ type: 'success', message: 'Saved.' })
       setMood(null)
       setTags([])

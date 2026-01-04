@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
+import { deleteNotifications } from '@/lib/notification-inbox'
 
 let checkinTablesEnsured = false
 
@@ -198,6 +199,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const ratings = Array.isArray(body?.ratings) ? body.ratings : []
+  const notificationId = typeof body?.notificationId === 'string' ? body.notificationId.trim() : ''
   const today = new Date().toISOString().slice(0,10)
 
   try {
@@ -234,6 +236,9 @@ export async function POST(req: NextRequest) {
          VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7)`,
         id, user.id, r.issueId, today, clamped, String(r.note || ''), !!r.isNa
       )
+    }
+    if (notificationId) {
+      await deleteNotifications(user.id, [notificationId]).catch(() => {})
     }
     return NextResponse.json({ success: true })
   } catch (e) {

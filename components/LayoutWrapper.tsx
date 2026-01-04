@@ -8,6 +8,15 @@ import UsageMeter from '@/components/UsageMeter'
 import SupportChatWidget from '@/components/support/SupportChatWidget'
 import WeeklyReportReadyModal from '@/components/WeeklyReportReadyModal'
 
+function storePendingNotificationId(id?: string | null) {
+  if (!id || typeof window === 'undefined') return
+  try {
+    sessionStorage.setItem('helfi:pending-notification-id', id)
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 // Desktop Sidebar Navigation Component  
 function DesktopSidebar({
   pathname,
@@ -336,6 +345,8 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         if (!res.ok) return
         const data = await res.json().catch(() => ({}))
         const url = typeof data?.url === 'string' ? data.url : ''
+        const pendingId = typeof data?.id === 'string' ? data.id : ''
+        if (pendingId) storePendingNotificationId(pendingId)
         if (!url) return
         const target = new URL(url, window.location.origin).href
         if (window.location.href === target) return
@@ -362,6 +373,22 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [status, pathname, isAdminPanelPath, publicPages])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const pendingId = params.get('notificationId')
+      if (!pendingId) return
+      storePendingNotificationId(pendingId)
+      params.delete('notificationId')
+      const query = params.toString()
+      const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`
+      window.history.replaceState(null, '', nextUrl)
+    } catch {
+      // Ignore URL errors
+    }
+  }, [pathname])
 
   // Don't show sidebar while session is loading to prevent flickering
   if (status === 'loading') {

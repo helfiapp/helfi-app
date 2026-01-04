@@ -171,6 +171,11 @@ export default function NotificationInboxPage() {
   }
 
   const handleOpen = async (item: InboxItem) => {
+    try {
+      sessionStorage.setItem('helfi:pending-notification-id', item.id)
+    } catch {
+      // ignore
+    }
     if (item.status === 'unread') {
       await markRead(item.id)
     }

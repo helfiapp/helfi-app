@@ -62,16 +62,27 @@ export default function CheckInPage() {
 
   const handleSave = async () => {
     try {
+      const pendingId =
+        typeof window !== 'undefined' ? sessionStorage.getItem('helfi:pending-notification-id') : null
       const payload = issues.map((it) => ({
         issueId: it.id,
         value: na[it.id] ? null : (ratings[it.id] ?? null),
         note: notes[it.id] || '',
         isNa: !!na[it.id],
       }))
-      const res = await fetch('/api/checkins/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ratings: payload }) })
+      const res = await fetch('/api/checkins/today', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ratings: payload, notificationId: pendingId || undefined }),
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.detail || data?.error || 'Failed to save')
+      }
+      if (pendingId) {
+        try {
+          sessionStorage.removeItem('helfi:pending-notification-id')
+        } catch {}
       }
       // Navigate after save
       try {

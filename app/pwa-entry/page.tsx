@@ -66,7 +66,12 @@ export default async function PwaEntryPage() {
     sources: ['push'],
   })
   if (pending?.url) {
-    redirect(pending.url)
+    let redirectUrl = pending.url
+    if (pending?.id) {
+      const divider = redirectUrl.includes('?') ? '&' : '?'
+      redirectUrl = `${redirectUrl}${divider}notificationId=${encodeURIComponent(pending.id)}`
+    }
+    redirect(redirectUrl)
   }
 
   if (lastPath) {

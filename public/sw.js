@@ -1,5 +1,6 @@
 // Minimal placeholder service worker for PWA install and push notifications.
 // This version deliberately does NOT manage authentication or cookies.
+// GUARD RAIL: Notification routing is locked. Do not change without owner approval.
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

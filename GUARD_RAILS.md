@@ -235,16 +235,22 @@ the user.
 - `lib/notification-inbox.ts`
 - `app/api/notifications/inbox/route.ts`
 - `app/api/notifications/unread-count/route.ts`
+- `app/api/notifications/pending-open/route.ts`
 - `app/notifications/inbox/page.tsx`
 - `app/notifications/page.tsx`
 - `components/PageHeader.tsx`
 - `app/insights/InsightsTopNav.tsx`
+- `components/LayoutWrapper.tsx`
+- `app/pwa-entry/page.tsx`
+- `public/sw.js`
 
 **Guard rails:**
 - All user notifications must be saved to the inbox when sent (push or email). Do not remove this logging.
 - The inbox should show missed alerts and allow users to open or mark them as read.
 - The profile avatar must show an unread badge when there are unseen notifications.
 - Do not auto‑clear notifications without a user action (open / mark read / mark all).
+- Notification tap routing (service worker + pending-open logic) is locked. Do not change without explicit owner approval.
+- Completed alerts must be cleared only after a successful save (mood check-in or daily check-in). Do not remove this cleanup behavior.
 
 ---
 

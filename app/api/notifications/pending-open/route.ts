@@ -15,5 +15,5 @@ export async function GET() {
     sources: ['push'],
   })
 
-  return NextResponse.json({ url: pending?.url ?? null })
+  return NextResponse.json({ url: pending?.url ?? null, id: pending?.id ?? null })
 }
