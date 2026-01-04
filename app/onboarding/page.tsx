@@ -771,6 +771,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [activeDietCategoryId, setActiveDietCategoryId] = useState<string>(DIET_CATEGORIES[0]?.id || 'plant-based');
   const [showDietSavedNotice, setShowDietSavedNotice] = useState(false);
   const dietSavedNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const partialSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dietHydratedRef = useRef(false);
   const dietTouchedRef = useRef(false);
   const goalDetailsHydratedRef = useRef(false);
@@ -1178,6 +1179,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       if (dietSavedNoticeTimeoutRef.current) {
         clearTimeout(dietSavedNoticeTimeoutRef.current);
         dietSavedNoticeTimeoutRef.current = null;
+      }
+      if (partialSaveTimeoutRef.current) {
+        clearTimeout(partialSaveTimeoutRef.current);
+        partialSaveTimeoutRef.current = null;
       }
     };
   }, []);
@@ -2048,6 +2053,19 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   const normalizedAllergyValue = (value: string) => value.trim().replace(/\s+/g, ' ');
 
+  const schedulePartialSave = useCallback(
+    (payload: any) => {
+      if (!onPartialSave) return;
+      if (partialSaveTimeoutRef.current) {
+        clearTimeout(partialSaveTimeoutRef.current);
+      }
+      partialSaveTimeoutRef.current = setTimeout(() => {
+        onPartialSave(payload);
+      }, 250);
+    },
+    [onPartialSave],
+  );
+
   const handleAddAllergy = useCallback(
     (value?: string) => {
       const raw = typeof value === 'string' && value.trim().length > 0 ? value : allergyInput;
@@ -2117,7 +2135,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       diabetesType,
       ...(includeDietTypes ? { dietTypes: Array.from(new Set(dietTypes)).sort() } : {}),
     };
-    onPartialSave(payload);
+    schedulePartialSave(payload);
   }, [
     weight,
     birthdateFromParts,
@@ -2144,6 +2162,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     allergies,
     diabetesType,
     onPartialSave,
+    schedulePartialSave,
   ]);
 
   const bodyTypeDescriptions = {
