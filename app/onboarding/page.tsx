@@ -787,6 +787,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const factor = Math.pow(10, precision);
     return Math.round(value * factor) / factor;
   };
+  const roundToStep = (value: number, step: number) => {
+    if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) return value;
+    return Math.round(value / step) * step;
+  };
+  const floorToStep = (value: number, step: number) => {
+    if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) return value;
+    return Math.floor(value / step) * step;
+  };
+  const ceilToStep = (value: number, step: number) => {
+    if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) return value;
+    return Math.ceil(value / step) * step;
+  };
   const normalizeMacroSplit = (proteinPct: number, carbPct: number, fatPct: number) => {
     const total = proteinPct + carbPct + fatPct;
     if (!Number.isFinite(total) || total <= 0) {
@@ -1198,6 +1210,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const DEFAULT_GOAL_PACE = 0.3;
   const CALORIE_MIN = 1200;
   const CALORIE_MAX = 4000;
+  const GOAL_PACE_STEP = 0.1;
+  const CALORIE_STEP = 25;
+  const MACRO_STEP = 5;
+  const FIBER_STEP = 1;
+  const SUGAR_STEP = 1;
+  const MACRO_COLORS = {
+    protein: '#ef4444',
+    carbs: '#22c55e',
+    fat: '#6366f1',
+    fiber: '#12adc9',
+    sugar: '#f97316',
+  };
 
   const clampNumber = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
@@ -1208,10 +1232,20 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const gender = genderValue;
     const birthdateValue = birthdateFromParts || initial?.birthdate || '';
     const goalsArray = Array.isArray((initial as any)?.goals) ? (initial as any).goals : [];
+    const fallbackCalories = 2000;
+    const fallbackSeedSplit = normalizeMacroSplit(0.3, 0.4, 0.3);
+    const fallbackSeedMacros = macroGramsFromSplit(fallbackCalories, fallbackSeedSplit);
+    const fallbackProtein = roundToStep(fallbackSeedMacros.protein, MACRO_STEP);
+    const fallbackCarbs = roundToStep(fallbackSeedMacros.carbs, MACRO_STEP);
+    const fallbackFat = roundToStep(fallbackSeedMacros.fat, MACRO_STEP);
+    const fallbackSplit = macroSplitFromGrams(fallbackProtein, fallbackCarbs, fallbackFat);
     if (!weightKg || !heightCm || !birthdateValue || (gender !== 'male' && gender !== 'female')) {
       return {
-        calories: 2000,
-        split: normalizeMacroSplit(0.3, 0.4, 0.3),
+        calories: fallbackCalories,
+        protein: fallbackProtein,
+        carbs: fallbackCarbs,
+        fat: fallbackFat,
+        split: fallbackSplit,
         fiber: 28,
         sugarMax: 35,
       };
@@ -1233,19 +1267,45 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       diabetesType: diabetesType || null,
     });
 
-    const calories = typeof targets.calories === 'number' ? targets.calories : 2000;
-    const protein = typeof targets.protein === 'number' ? targets.protein : Math.round((calories * 0.3) / 4);
-    const carbs = typeof targets.carbs === 'number' ? targets.carbs : Math.round((calories * 0.4) / 4);
-    const fat = typeof targets.fat === 'number' ? targets.fat : Math.round((calories * 0.3) / 9);
+    const calories = typeof targets.calories === 'number' ? targets.calories : fallbackCalories;
+    const fallbackProteinFromTargets = roundToStep(
+      typeof targets.protein === 'number' ? targets.protein : Math.round((calories * 0.3) / 4),
+      MACRO_STEP,
+    );
+    const fallbackCarbsFromTargets = roundToStep(
+      typeof targets.carbs === 'number' ? targets.carbs : Math.round((calories * 0.4) / 4),
+      MACRO_STEP,
+    );
+    const fallbackFatFromTargets = roundToStep(
+      typeof targets.fat === 'number' ? targets.fat : Math.round((calories * 0.3) / 9),
+      MACRO_STEP,
+    );
+    const proteinPerKg = isGainGoal ? 1.8 : 1.6;
+    const fatPerKg = isGainGoal ? 0.8 : 0.7;
+    const weightBasedProtein = Number.isFinite(weightKg)
+      ? roundToStep(Math.round(weightKg * proteinPerKg), MACRO_STEP)
+      : null;
+    const weightBasedFat = Number.isFinite(weightKg)
+      ? roundToStep(Math.round(weightKg * fatPerKg), MACRO_STEP)
+      : null;
+    let protein = weightBasedProtein ?? fallbackProteinFromTargets;
+    let fat = weightBasedFat ?? fallbackFatFromTargets;
+    let carbs = roundToStep(Math.round((calories - protein * 4 - fat * 9) / 4), MACRO_STEP);
+    if (!Number.isFinite(carbs) || carbs < 0) {
+      protein = fallbackProteinFromTargets;
+      fat = fallbackFatFromTargets;
+      carbs = fallbackCarbsFromTargets;
+    }
     const split = macroSplitFromGrams(protein, carbs, fat);
     const fiber = typeof targets.fiber === 'number' ? targets.fiber : 28;
     const sugarMax = typeof targets.sugarMax === 'number' ? targets.sugarMax : 35;
 
-    return { calories, split, fiber, sugarMax };
+    return { calories, protein, carbs, fat, split, fiber, sugarMax };
   }, [
     birthdateFromParts,
     bodyType,
     dietTypes,
+    isGainGoal,
     goalChoice,
     goalIntensity,
     genderValue,
@@ -1292,16 +1352,24 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const calorieBounds = useMemo(() => {
     const base = maintenanceCalories ?? activeGoalCalories ?? 2000;
     if (isLoseGoal) {
+      const minRaw = base - MAX_GOAL_PACE * KCAL_PER_KG_WEEK;
+      const maxRaw = base - MIN_GOAL_PACE * KCAL_PER_KG_WEEK;
+      const min = clampNumber(ceilToStep(minRaw, CALORIE_STEP), CALORIE_MIN, CALORIE_MAX);
+      const max = clampNumber(floorToStep(maxRaw, CALORIE_STEP), CALORIE_MIN, CALORIE_MAX);
       return {
-        min: clampNumber(Math.round(base - MAX_GOAL_PACE * KCAL_PER_KG_WEEK), CALORIE_MIN, CALORIE_MAX),
-        max: clampNumber(Math.round(base - MIN_GOAL_PACE * KCAL_PER_KG_WEEK), CALORIE_MIN, CALORIE_MAX),
+        min,
+        max: Math.max(min, max),
         base,
       };
     }
     if (isGainGoal) {
+      const minRaw = base + MIN_GOAL_PACE * KCAL_PER_KG_WEEK;
+      const maxRaw = base + MAX_GOAL_PACE * KCAL_PER_KG_WEEK;
+      const min = clampNumber(ceilToStep(minRaw, CALORIE_STEP), CALORIE_MIN, CALORIE_MAX);
+      const max = clampNumber(floorToStep(maxRaw, CALORIE_STEP), CALORIE_MIN, CALORIE_MAX);
       return {
-        min: clampNumber(Math.round(base + MIN_GOAL_PACE * KCAL_PER_KG_WEEK), CALORIE_MIN, CALORIE_MAX),
-        max: clampNumber(Math.round(base + MAX_GOAL_PACE * KCAL_PER_KG_WEEK), CALORIE_MIN, CALORIE_MAX),
+        min,
+        max: Math.max(min, max),
         base,
       };
     }
@@ -1311,21 +1379,35 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const derivedGoalPace = useMemo(() => {
     if (!calorieBounds.base) return null;
     const delta = Math.abs(activeGoalCalories - calorieBounds.base);
-    return roundToPrecision(delta / KCAL_PER_KG_WEEK, 2);
+    return roundToStep(roundToPrecision(delta / KCAL_PER_KG_WEEK, 2), GOAL_PACE_STEP);
   }, [activeGoalCalories, calorieBounds.base]);
 
-  const activeGoalPace = clampNumber(goalPaceKgPerWeek ?? derivedGoalPace ?? DEFAULT_GOAL_PACE, MIN_GOAL_PACE, MAX_GOAL_PACE);
-
-  const clampedGoalCalories = clampNumber(activeGoalCalories, calorieBounds.min, calorieBounds.max);
-  const macroTotals = useMemo(
-    () => macroGramsFromSplit(clampedGoalCalories, activeGoalSplit),
-    [clampedGoalCalories, activeGoalSplit],
+  const activeGoalPace = clampNumber(
+    roundToStep(goalPaceKgPerWeek ?? derivedGoalPace ?? DEFAULT_GOAL_PACE, GOAL_PACE_STEP),
+    MIN_GOAL_PACE,
+    MAX_GOAL_PACE,
   );
+
+  const clampedGoalCalories = clampNumber(
+    roundToStep(activeGoalCalories, CALORIE_STEP),
+    calorieBounds.min,
+    calorieBounds.max,
+  );
+  const macroTotals = useMemo(() => {
+    const totals = macroGramsFromSplit(clampedGoalCalories, activeGoalSplit);
+    return {
+      protein: Math.max(0, roundToStep(totals.protein, MACRO_STEP)),
+      carbs: Math.max(0, roundToStep(totals.carbs, MACRO_STEP)),
+      fat: Math.max(0, roundToStep(totals.fat, MACRO_STEP)),
+    };
+  }, [clampedGoalCalories, activeGoalSplit]);
   const clampedFiberTarget = Math.min(activeFiberTarget, macroTotals.carbs);
   const clampedSugarMax = Math.min(activeSugarMax, macroTotals.carbs);
 
   const displayGoalPace = roundToPrecision(
-    goalTargetWeightUnit === 'lb' ? activeGoalPace * 2.20462 : activeGoalPace,
+    goalTargetWeightUnit === 'lb'
+      ? roundToStep(activeGoalPace, GOAL_PACE_STEP) * 2.20462
+      : roundToStep(activeGoalPace, GOAL_PACE_STEP),
     2,
   );
   const currentWeightKg = getCurrentWeightKgRounded();
@@ -1408,10 +1490,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const includeDietTypes = dietHydratedRef.current || dietTouchedRef.current;
     const includeGoalDetails = goalDetailsTouchedRef.current && isLoseGainGoal;
     const targetWeightKg = getTargetWeightKg();
-    const goalSplitPayload = goalMacroSplit ?? activeGoalSplit;
-    const goalCaloriePayload = Number.isFinite(goalCalorieTarget as number)
-      ? Math.round(goalCalorieTarget as number)
-      : activeGoalCalories;
+    const goalSplitPayload = macroSplitFromGrams(macroTotals.protein, macroTotals.carbs, macroTotals.fat);
+    const goalCaloriePayload = clampedGoalCalories;
     const goalPacePayload = Number.isFinite(goalPaceKgPerWeek as number)
       ? (goalPaceKgPerWeek as number)
       : activeGoalPace;
@@ -1605,14 +1685,27 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   const handleGoalPaceChange = useCallback(
     (value: number) => {
-      const pace = clampNumber(value, MIN_GOAL_PACE, MAX_GOAL_PACE);
+      const pace = clampNumber(roundToStep(value, GOAL_PACE_STEP), MIN_GOAL_PACE, MAX_GOAL_PACE);
       const base = calorieBounds.base || activeGoalCalories;
       const delta = pace * KCAL_PER_KG_WEEK;
       const nextCalories = isLoseGoal ? base - delta : base + delta;
-      const clampedCalories = clampNumber(Math.round(nextCalories), calorieBounds.min, calorieBounds.max);
-      setGoalPaceKgPerWeek(pace);
+      const clampedCalories = clampNumber(
+        roundToStep(nextCalories, CALORIE_STEP),
+        calorieBounds.min,
+        calorieBounds.max,
+      );
+      const protein = macroTotals.protein;
+      const fat = macroTotals.fat;
+      const carbs = Math.max(0, roundToStep((clampedCalories - protein * 4 - fat * 9) / 4, MACRO_STEP));
+      const nextSplit = macroSplitFromGrams(protein, carbs, fat);
+      const nextPace = clampNumber(
+        roundToStep(Math.abs(clampedCalories - base) / KCAL_PER_KG_WEEK, GOAL_PACE_STEP),
+        MIN_GOAL_PACE,
+        MAX_GOAL_PACE,
+      );
+      setGoalPaceKgPerWeek(nextPace);
       setGoalCalorieTarget(clampedCalories);
-      setGoalMacroSplit(activeGoalSplit);
+      setGoalMacroSplit(nextSplit);
       markGoalDetailsTouched();
     },
     [
@@ -1620,50 +1713,76 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       MIN_GOAL_PACE,
       MAX_GOAL_PACE,
       activeGoalCalories,
-      activeGoalSplit,
       calorieBounds,
       isLoseGoal,
+      macroTotals,
       markGoalDetailsTouched,
     ],
   );
 
   const handleGoalCaloriesChange = useCallback(
     (value: number) => {
-      const clampedCalories = clampNumber(Math.round(value), calorieBounds.min, calorieBounds.max);
+      const clampedCalories = clampNumber(
+        roundToStep(value, CALORIE_STEP),
+        calorieBounds.min,
+        calorieBounds.max,
+      );
       setGoalCalorieTarget(clampedCalories);
+      const protein = macroTotals.protein;
+      const fat = macroTotals.fat;
+      const carbs = Math.max(0, roundToStep((clampedCalories - protein * 4 - fat * 9) / 4, MACRO_STEP));
+      const nextSplit = macroSplitFromGrams(protein, carbs, fat);
       if (calorieBounds.base) {
         const delta = Math.abs(clampedCalories - calorieBounds.base);
-        const nextPace = clampNumber(roundToPrecision(delta / KCAL_PER_KG_WEEK, 2), MIN_GOAL_PACE, MAX_GOAL_PACE);
+        const nextPace = clampNumber(
+          roundToStep(roundToPrecision(delta / KCAL_PER_KG_WEEK, 2), GOAL_PACE_STEP),
+          MIN_GOAL_PACE,
+          MAX_GOAL_PACE,
+        );
         setGoalPaceKgPerWeek(nextPace);
       }
-      setGoalMacroSplit(activeGoalSplit);
+      setGoalMacroSplit(nextSplit);
       markGoalDetailsTouched();
     },
     [
       KCAL_PER_KG_WEEK,
       MIN_GOAL_PACE,
       MAX_GOAL_PACE,
-      activeGoalSplit,
       calorieBounds,
+      macroTotals,
       markGoalDetailsTouched,
     ],
   );
 
   const handleMacroChange = useCallback(
     (macro: 'protein' | 'carbs' | 'fat', value: number) => {
-      const nextProtein = macro === 'protein' ? value : macroTotals.protein;
-      const nextCarbs = macro === 'carbs' ? value : macroTotals.carbs;
-      const nextFat = macro === 'fat' ? value : macroTotals.fat;
+      const snappedValue = roundToStep(value, MACRO_STEP);
+      const nextProtein = macro === 'protein' ? snappedValue : macroTotals.protein;
+      const nextCarbs = macro === 'carbs' ? snappedValue : macroTotals.carbs;
+      const nextFat = macro === 'fat' ? snappedValue : macroTotals.fat;
       const nextCaloriesRaw = nextProtein * 4 + nextCarbs * 4 + nextFat * 9;
-      const clampedCalories = clampNumber(Math.round(nextCaloriesRaw), calorieBounds.min, calorieBounds.max);
-      const nextSplit = macroSplitFromGrams(nextProtein, nextCarbs, nextFat);
-      const scaledMacros = macroGramsFromSplit(clampedCalories, nextSplit);
-      const finalSplit = macroSplitFromGrams(scaledMacros.protein, scaledMacros.carbs, scaledMacros.fat);
+      const clampedCalories = clampNumber(
+        roundToStep(nextCaloriesRaw, CALORIE_STEP),
+        calorieBounds.min,
+        calorieBounds.max,
+      );
+      let finalProtein = nextProtein;
+      let finalCarbs = nextCarbs;
+      let finalFat = nextFat;
+      if (clampedCalories !== nextCaloriesRaw) {
+        const remainingCalories = clampedCalories - finalProtein * 4 - finalFat * 9;
+        finalCarbs = Math.max(0, roundToStep(remainingCalories / 4, MACRO_STEP));
+      }
+      const finalSplit = macroSplitFromGrams(finalProtein, finalCarbs, finalFat);
       setGoalCalorieTarget(clampedCalories);
       setGoalMacroSplit(finalSplit);
       if (calorieBounds.base) {
         const delta = Math.abs(clampedCalories - calorieBounds.base);
-        const nextPace = clampNumber(roundToPrecision(delta / KCAL_PER_KG_WEEK, 2), MIN_GOAL_PACE, MAX_GOAL_PACE);
+        const nextPace = clampNumber(
+          roundToStep(roundToPrecision(delta / KCAL_PER_KG_WEEK, 2), GOAL_PACE_STEP),
+          MIN_GOAL_PACE,
+          MAX_GOAL_PACE,
+        );
         setGoalPaceKgPerWeek(nextPace);
       }
       markGoalDetailsTouched();
@@ -1680,7 +1799,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   const handleFiberChange = useCallback(
     (value: number) => {
-      const nextValue = Math.min(Math.round(value), macroTotals.carbs);
+      const nextValue = Math.min(roundToStep(value, FIBER_STEP), macroTotals.carbs);
       setGoalFiberTarget(nextValue);
       markGoalDetailsTouched();
     },
@@ -1689,7 +1808,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   const handleSugarChange = useCallback(
     (value: number) => {
-      const nextValue = Math.min(Math.round(value), macroTotals.carbs);
+      const nextValue = Math.min(roundToStep(value, SUGAR_STEP), macroTotals.carbs);
       setGoalSugarMax(nextValue);
       markGoalDetailsTouched();
     },
@@ -1707,11 +1826,19 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   useEffect(() => {
     if (!isLoseGainGoal || goalCalorieTarget == null) return;
-    const clamped = clampNumber(Math.round(goalCalorieTarget), calorieBounds.min, calorieBounds.max);
+    const clamped = clampNumber(
+      roundToStep(goalCalorieTarget, CALORIE_STEP),
+      calorieBounds.min,
+      calorieBounds.max,
+    );
     if (clamped !== goalCalorieTarget) {
       setGoalCalorieTarget(clamped);
+      const protein = macroTotals.protein;
+      const fat = macroTotals.fat;
+      const carbs = Math.max(0, roundToStep((clamped - protein * 4 - fat * 9) / 4, MACRO_STEP));
+      setGoalMacroSplit(macroSplitFromGrams(protein, carbs, fat));
     }
-  }, [calorieBounds.max, calorieBounds.min, goalCalorieTarget, isLoseGainGoal]);
+  }, [calorieBounds.max, calorieBounds.min, goalCalorieTarget, isLoseGainGoal, macroTotals]);
 
   // Body type is optional: tapping the same option again should deselect (match diabetes toggle UX).
   const handleBodyTypeChange = useCallback((type: string) => {
@@ -1783,10 +1910,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const includeDietTypes = dietHydratedRef.current || dietTouchedRef.current;
     const includeGoalDetails = goalDetailsTouchedRef.current && isLoseGainGoal;
     const targetWeightKg = getTargetWeightKg();
-    const goalSplitPayload = goalMacroSplit ?? activeGoalSplit;
-    const goalCaloriePayload = Number.isFinite(goalCalorieTarget as number)
-      ? Math.round(goalCalorieTarget as number)
-      : activeGoalCalories;
+    const goalSplitPayload = macroSplitFromGrams(macroTotals.protein, macroTotals.carbs, macroTotals.fat);
+    const goalCaloriePayload = clampedGoalCalories;
     const goalPacePayload = Number.isFinite(goalPaceKgPerWeek as number)
       ? (goalPaceKgPerWeek as number)
       : activeGoalPace;
@@ -1832,6 +1957,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     goalMacroSplit,
     goalFiberTarget,
     goalSugarMax,
+    clampedGoalCalories,
     activeGoalCalories,
     activeGoalSplit,
     activeGoalPace,
@@ -2093,25 +2219,50 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   }
 
   if (showGoalDetails) {
-    const proteinPct = Math.round(activeGoalSplit.proteinPct * 100);
-    const carbPct = Math.round(activeGoalSplit.carbPct * 100);
-    const fatPct = Math.round(activeGoalSplit.fatPct * 100);
+    const macroCaloriesTotal = macroTotals.protein * 4 + macroTotals.carbs * 4 + macroTotals.fat * 9;
+    const proteinPct = macroCaloriesTotal > 0 ? Math.round((macroTotals.protein * 4 / macroCaloriesTotal) * 100) : 0;
+    const carbPct = macroCaloriesTotal > 0 ? Math.round((macroTotals.carbs * 4 / macroCaloriesTotal) * 100) : 0;
+    const fatPct = macroCaloriesTotal > 0 ? Math.round((macroTotals.fat * 9 / macroCaloriesTotal) * 100) : 0;
     const paceUnit = goalTargetWeightUnit === 'lb' ? 'lb' : 'kg';
     const goalTitle = isLoseGoal ? 'Lose weight goal' : 'Gain weight goal';
-    const proteinMax = Math.max(60, Math.round(clampedGoalCalories / 4));
-    const carbsMax = Math.max(60, Math.round(clampedGoalCalories / 4));
-    const fatMax = Math.max(30, Math.round(clampedGoalCalories / 9));
+    const paceValue = roundToStep(activeGoalPace, GOAL_PACE_STEP);
     const fiberMax = Math.max(0, Math.min(80, macroTotals.carbs));
     const sugarMaxLimit = Math.max(0, Math.min(100, macroTotals.carbs));
+    const proteinBounds = (() => {
+      const otherCals = macroTotals.carbs * 4 + macroTotals.fat * 9;
+      const min = Math.max(0, ceilToStep((calorieBounds.min - otherCals) / 4, MACRO_STEP));
+      const max = Math.max(min, floorToStep((calorieBounds.max - otherCals) / 4, MACRO_STEP));
+      return { min, max };
+    })();
+    const carbBounds = (() => {
+      const otherCals = macroTotals.protein * 4 + macroTotals.fat * 9;
+      const min = Math.max(0, ceilToStep((calorieBounds.min - otherCals) / 4, MACRO_STEP));
+      const max = Math.max(min, floorToStep((calorieBounds.max - otherCals) / 4, MACRO_STEP));
+      return { min, max };
+    })();
+    const fatBounds = (() => {
+      const otherCals = macroTotals.protein * 4 + macroTotals.carbs * 4;
+      const min = Math.max(0, ceilToStep((calorieBounds.min - otherCals) / 9, MACRO_STEP));
+      const max = Math.max(min, floorToStep((calorieBounds.max - otherCals) / 9, MACRO_STEP));
+      return { min, max };
+    })();
+    const tickStyle = (min: number, max: number, step: number) => {
+      const count = Math.max(1, Math.round((max - min) / step));
+      return {
+        backgroundImage: 'linear-gradient(to right, rgba(148,163,184,0.55) 1px, transparent 1px)',
+        backgroundSize: `${100 / count}% 100%`,
+        backgroundRepeat: 'repeat',
+      };
+    };
 
     return (
-      <div className="bg-gray-50 min-h-screen flex flex-col">
-        <header className="sticky top-0 z-50 bg-gray-50/95 backdrop-blur-md border-b border-gray-100">
+      <div className="bg-white min-h-screen flex flex-col">
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100">
           <div className="max-w-md mx-auto w-full flex items-center justify-between px-4 py-4">
             <button
               type="button"
               onClick={() => setShowGoalDetails(false)}
-              className="flex items-center justify-center size-10 rounded-full hover:bg-gray-200 transition-colors"
+              className="flex items-center justify-center size-10 rounded-full hover:bg-gray-100 transition-colors"
               aria-label="Back"
             >
               <MaterialSymbol name="arrow_back" className="text-2xl" />
@@ -2122,8 +2273,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         </header>
 
         <main className="flex-1 flex flex-col w-full max-w-md mx-auto pb-[calc(12rem+env(safe-area-inset-bottom))] md:pb-32">
-          <div className="px-5 pt-5 pb-4 space-y-4">
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+          <div className="px-5 pt-6 pb-4 space-y-8">
+            <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-gray-900">Target weight</h2>
                 <div className="flex items-center">
@@ -2158,13 +2309,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
               ) : (
                 <p className="text-xs text-gray-500">Set a target to see the timeline.</p>
               )}
-            </div>
+            </section>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+            <div className="h-px bg-gray-100" />
+
+            <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Weekly pace</h2>
-                  <p className="text-xs text-gray-500">Adjusts your calories and macros.</p>
+                  <p className="text-xs text-gray-500">Adjusts calories and macro balance.</p>
                 </div>
                 <span className="text-sm font-semibold text-gray-900">
                   {displayGoalPace} {paceUnit}/week
@@ -2174,23 +2327,28 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 type="range"
                 min={MIN_GOAL_PACE}
                 max={MAX_GOAL_PACE}
-                step={0.05}
-                value={activeGoalPace}
+                step={GOAL_PACE_STEP}
+                value={paceValue}
                 onChange={(e) => handleGoalPaceChange(Number(e.target.value))}
                 className="w-full"
+                style={{ accentColor: '#16a34a' }}
               />
+              <div className="h-2 w-full rounded-full" style={tickStyle(MIN_GOAL_PACE, MAX_GOAL_PACE, GOAL_PACE_STEP)} />
+              <p className="text-xs text-gray-500">Weekly pace uses the 7,700 kcal per kg rule.</p>
               {activeGoalPace >= MAX_GOAL_PACE && (
                 <p className="text-xs font-semibold text-red-600">
-                  Warning: This is an extreme weight loss plan. Check with your doctor or your dietician on whether this is a safe plan for you.
+                  Warning: This is an aggressive pace. Check with your doctor or dietitian to make sure it’s safe for you.
                 </p>
               )}
-            </div>
+            </section>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+            <div className="h-px bg-gray-100" />
+
+            <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Daily calories</h2>
-                  <p className="text-xs text-gray-500">Moves the pace automatically.</p>
+                  <p className="text-xs text-gray-500">Calories update the pace automatically.</p>
                 </div>
                 <span className="text-sm font-semibold text-gray-900">{clampedGoalCalories} kcal</span>
               </div>
@@ -2198,117 +2356,161 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 type="range"
                 min={calorieBounds.min}
                 max={calorieBounds.max}
-                step={10}
+                step={CALORIE_STEP}
                 value={clampedGoalCalories}
                 onChange={(e) => handleGoalCaloriesChange(Number(e.target.value))}
                 className="w-full"
+                style={{ accentColor: '#16a34a' }}
               />
-            </div>
+              <div className="h-2 w-full rounded-full" style={tickStyle(calorieBounds.min, calorieBounds.max, CALORIE_STEP)} />
+            </section>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-4">
+            <div className="h-px bg-gray-100" />
+
+            <section className="space-y-4">
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Macros</h2>
-                <p className="text-xs text-gray-500">Changing these updates calories and pace.</p>
+                <p className="text-xs text-gray-500">
+                  Protein and fat are based on your body weight. Carbs fill the remaining calories.
+                </p>
+                <p className="text-xs text-gray-500">
+                  Changing any macro, calories, or pace updates the other numbers.
+                </p>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Protein</p>
-                    <p className="text-xs text-gray-500">{proteinPct}% of calories</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <span className="size-2 rounded-full" style={{ backgroundColor: MACRO_COLORS.protein }} />
+                        Protein
+                      </p>
+                      <p className="text-xs text-gray-500">{proteinPct}% of calories</p>
+                    </div>
+                    <span className="text-sm font-semibold" style={{ color: MACRO_COLORS.protein }}>
+                      {macroTotals.protein} g
+                    </span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-900">{macroTotals.protein} g</span>
+                  <input
+                    type="range"
+                    min={proteinBounds.min}
+                    max={proteinBounds.max}
+                    step={MACRO_STEP}
+                    value={macroTotals.protein}
+                    onChange={(e) => handleMacroChange('protein', Number(e.target.value))}
+                    className="w-full"
+                    style={{ accentColor: MACRO_COLORS.protein }}
+                  />
+                  <div className="h-2 w-full rounded-full" style={tickStyle(proteinBounds.min, proteinBounds.max, MACRO_STEP)} />
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={proteinMax}
-                  step={1}
-                  value={macroTotals.protein}
-                  onChange={(e) => handleMacroChange('protein', Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Carbs</p>
-                    <p className="text-xs text-gray-500">{carbPct}% of calories</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <span className="size-2 rounded-full" style={{ backgroundColor: MACRO_COLORS.carbs }} />
+                        Carbs
+                      </p>
+                      <p className="text-xs text-gray-500">{carbPct}% of calories</p>
+                    </div>
+                    <span className="text-sm font-semibold" style={{ color: MACRO_COLORS.carbs }}>
+                      {macroTotals.carbs} g
+                    </span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-900">{macroTotals.carbs} g</span>
+                  <input
+                    type="range"
+                    min={carbBounds.min}
+                    max={carbBounds.max}
+                    step={MACRO_STEP}
+                    value={macroTotals.carbs}
+                    onChange={(e) => handleMacroChange('carbs', Number(e.target.value))}
+                    className="w-full"
+                    style={{ accentColor: MACRO_COLORS.carbs }}
+                  />
+                  <div className="h-2 w-full rounded-full" style={tickStyle(carbBounds.min, carbBounds.max, MACRO_STEP)} />
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={carbsMax}
-                  step={1}
-                  value={macroTotals.carbs}
-                  onChange={(e) => handleMacroChange('carbs', Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Fat</p>
-                    <p className="text-xs text-gray-500">{fatPct}% of calories</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <span className="size-2 rounded-full" style={{ backgroundColor: MACRO_COLORS.fat }} />
+                        Fat
+                      </p>
+                      <p className="text-xs text-gray-500">{fatPct}% of calories</p>
+                    </div>
+                    <span className="text-sm font-semibold" style={{ color: MACRO_COLORS.fat }}>
+                      {macroTotals.fat} g
+                    </span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-900">{macroTotals.fat} g</span>
+                  <input
+                    type="range"
+                    min={fatBounds.min}
+                    max={fatBounds.max}
+                    step={MACRO_STEP}
+                    value={macroTotals.fat}
+                    onChange={(e) => handleMacroChange('fat', Number(e.target.value))}
+                    className="w-full"
+                    style={{ accentColor: MACRO_COLORS.fat }}
+                  />
+                  <div className="h-2 w-full rounded-full" style={tickStyle(fatBounds.min, fatBounds.max, MACRO_STEP)} />
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={fatMax}
-                  step={1}
-                  value={macroTotals.fat}
-                  onChange={(e) => handleMacroChange('fat', Number(e.target.value))}
-                  className="w-full"
-                />
               </div>
-            </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-4">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Fibre and sugar</h2>
-                <p className="text-xs text-gray-500">These are part of your carb total.</p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-900">Fibre</span>
-                  <span className="text-sm font-semibold text-gray-900">{clampedFiberTarget} g</span>
+              <div className="pt-4 border-t border-gray-100 space-y-4">
+                <p className="text-xs text-gray-500">Fibre and sugar are counted inside your carb total.</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <span className="size-2 rounded-full" style={{ backgroundColor: MACRO_COLORS.fiber }} />
+                      Fibre
+                    </p>
+                    <span className="text-sm font-semibold" style={{ color: MACRO_COLORS.fiber }}>
+                      {clampedFiberTarget} g
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={fiberMax}
+                    step={FIBER_STEP}
+                    value={clampedFiberTarget}
+                    onChange={(e) => handleFiberChange(Number(e.target.value))}
+                    className="w-full"
+                    style={{ accentColor: MACRO_COLORS.fiber }}
+                  />
+                  <div className="h-2 w-full rounded-full" style={tickStyle(0, fiberMax, FIBER_STEP)} />
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={fiberMax}
-                  step={1}
-                  value={clampedFiberTarget}
-                  onChange={(e) => handleFiberChange(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-900">Sugar</span>
-                  <span className="text-sm font-semibold text-gray-900">{clampedSugarMax} g</span>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <span className="size-2 rounded-full" style={{ backgroundColor: MACRO_COLORS.sugar }} />
+                      Sugar (max)
+                    </p>
+                    <span className="text-sm font-semibold" style={{ color: MACRO_COLORS.sugar }}>
+                      {clampedSugarMax} g
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={sugarMaxLimit}
+                    step={SUGAR_STEP}
+                    value={clampedSugarMax}
+                    onChange={(e) => handleSugarChange(Number(e.target.value))}
+                    className="w-full"
+                    style={{ accentColor: MACRO_COLORS.sugar }}
+                  />
+                  <div className="h-2 w-full rounded-full" style={tickStyle(0, sugarMaxLimit, SUGAR_STEP)} />
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={sugarMaxLimit}
-                  step={1}
-                  value={clampedSugarMax}
-                  onChange={(e) => handleSugarChange(Number(e.target.value))}
-                  className="w-full"
-                />
               </div>
-            </div>
+            </section>
 
             {dietWarnings.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-amber-900 mb-2">Diet warnings</p>
+              <div className="border-l-4 border-amber-400 pl-3">
+                <p className="text-sm font-semibold text-amber-900 mb-1">Diet warnings</p>
                 <ul className="list-disc list-inside text-sm text-amber-800 space-y-1">
                   {dietWarnings.map((warning, idx) => (
                     <li key={`${warning}-${idx}`}>{warning}</li>
@@ -2319,7 +2521,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           </div>
         </main>
 
-        <div className="fixed bottom-0 left-0 right-0 pt-4 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-4 bg-gray-50/95 backdrop-blur-xl border-t border-gray-200 z-50">
+        <div className="fixed bottom-0 left-0 right-0 pt-4 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-4 bg-white/95 backdrop-blur-xl border-t border-gray-200 z-50">
           <div className="max-w-md mx-auto w-full">
             <button
               type="button"
