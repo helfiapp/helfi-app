@@ -1778,6 +1778,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     }
   }, []);
 
+  const scrollToTop = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, []);
+
   const closeGoalDetails = useCallback(() => {
     if (typeof window !== 'undefined' && window.location.hash === '#goal-details') {
       window.history.back();
@@ -1788,6 +1793,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   useEffect(() => {
     if (!showGoalDetails || typeof window === 'undefined') return;
+    scrollToTop();
     const current = new URL(window.location.href);
     if (current.hash !== '#goal-details') {
       current.hash = 'goal-details';
@@ -1798,7 +1804,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [showGoalDetails]);
+  }, [showGoalDetails, scrollToTop]);
+
+  useEffect(() => {
+    if (!showDietPicker) return;
+    scrollToTop();
+  }, [scrollToTop, showDietPicker]);
 
   const handleGoalTargetWeightUnitChange = useCallback(
     (nextUnit: 'kg' | 'lb') => {

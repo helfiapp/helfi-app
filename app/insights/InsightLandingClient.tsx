@@ -212,7 +212,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
             <EmptyState
               emoji="📝"
               title="Finish onboarding to unlock insights"
-              description="Complete your intake so we can analyse the health concerns that matter most to you."
+              description="Complete your Health Intake so we can analyse the health concerns that matter most to you."
               actionLabel="Resume onboarding"
               actionHref="/onboarding"
             />
