@@ -21,6 +21,14 @@ export type DailyTargetInput = {
   allergies?: string[] | null
   diabetesType?: 'type1' | 'type2' | 'prediabetes' | null
   dietTypes?: any
+  calorieTarget?: number | null
+  macroSplit?: {
+    proteinPct?: number | null
+    carbPct?: number | null
+    fatPct?: number | null
+  } | null
+  fiberTarget?: number | null
+  sugarMax?: number | null
   healthSituations?: {
     healthIssues?: string
     healthProblems?: string
@@ -175,6 +183,20 @@ function normalizeSplit(proteinPct: number, fatPct: number, carbPct: number) {
   return { proteinPct: 0.3, fatPct: 0.3, carbPct: 0.4 }
 }
 
+function normalizeMacroSplit(input?: DailyTargetInput['macroSplit'] | null) {
+  if (!input || typeof input !== 'object') return null
+  const protein = Number(input.proteinPct)
+  const carbs = Number(input.carbPct)
+  const fat = Number(input.fatPct)
+  const hasAny = [protein, carbs, fat].some((v) => Number.isFinite(v) && v > 0)
+  if (!hasAny) return null
+  return normalizeSplit(
+    Number.isFinite(protein) ? protein : 0,
+    Number.isFinite(fat) ? fat : 0,
+    Number.isFinite(carbs) ? carbs : 0,
+  )
+}
+
 function parseConditionsFromGoals(goals?: string[] | null): string[] {
   if (!Array.isArray(goals) || goals.length === 0) return []
   const blob = goals.join(' ').toLowerCase()
@@ -323,13 +345,16 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
     weightKg && metMinutes > 0 ? (metMinutes * weightKg) / 200 : 0 // kcal/day
 
   const tdee = bmr * activity
+  const rawTargetCalories = Math.round((tdee + extraActivityKcal) * goalFactor * bodyTypeFactor)
+  const manualCalories = Number(input.calorieTarget)
   const targetCalories = clamp(
-    Math.round((tdee + extraActivityKcal) * goalFactor * bodyTypeFactor),
+    Number.isFinite(manualCalories) && manualCalories > 0 ? Math.round(manualCalories) : rawTargetCalories,
     1200,
     4000,
   )
 
-  const baseSplit = macroSplitForGoal(input.goalChoice)
+  const manualSplit = normalizeMacroSplit(input.macroSplit)
+  const baseSplit = manualSplit ?? macroSplitForGoal(input.goalChoice)
   const conditions = Array.from(
     new Set([
       ...parseConditionsText(input.healthSituations),
@@ -337,13 +362,27 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
       ...parseConditionsFromDiabetes(input.diabetesType),
     ]),
   )
-  const { proteinPct: conditionedProtein, fatPct: conditionedFat, carbPct: conditionedCarb, fiberTarget, sugarCap } =
-    applyConditionAdjustments(baseSplit, conditions)
+  const conditioned = applyConditionAdjustments(baseSplit, conditions)
+  let proteinPct = baseSplit.proteinPct
+  let fatPct = baseSplit.fatPct
+  let carbPct = baseSplit.carbPct
+  let fiberTarget = conditioned.fiberTarget
+  let sugarCap = conditioned.sugarCap
+  let fiberBonus = 0
 
-  const { proteinPct, fatPct, carbPct, fiberBonus } = applyBodyTypeAdjustments(
-    { proteinPct: conditionedProtein, fatPct: conditionedFat, carbPct: conditionedCarb },
-    input.bodyType,
-  )
+  if (!manualSplit) {
+    const bodyAdjusted = applyBodyTypeAdjustments(
+      { proteinPct: conditioned.proteinPct, fatPct: conditioned.fatPct, carbPct: conditioned.carbPct },
+      input.bodyType,
+    )
+    proteinPct = bodyAdjusted.proteinPct
+    fatPct = bodyAdjusted.fatPct
+    carbPct = bodyAdjusted.carbPct
+    fiberBonus = bodyAdjusted.fiberBonus
+  } else {
+    const bodyAdjusted = applyBodyTypeAdjustments({ proteinPct, fatPct, carbPct }, input.bodyType)
+    fiberBonus = bodyAdjusted.fiberBonus
+  }
 
   const proteinCalories = targetCalories * proteinPct
   const carbCalories = targetCalories * carbPct
@@ -352,13 +391,24 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
   const protein = Math.round(proteinCalories / 4)
   const carbs = Math.round(carbCalories / 4)
   const fat = Math.round(fatCalories / 9)
-  const fiber = Math.round(fiberTarget + fiberBonus)
-  const sugarMax = Math.round(
+  let fiber = Math.round(fiberTarget + fiberBonus)
+  let sugarMax = Math.round(
     Math.min(
       sugarCap,
       targetCalories > 0 ? targetCalories * 0.12 / 4 : sugarCap // default to ~12% kcal cap if stricter
     )
   )
+  const manualFiber = Number(input.fiberTarget)
+  if (Number.isFinite(manualFiber) && manualFiber >= 0) {
+    fiber = Math.round(manualFiber)
+  }
+  const manualSugar = Number(input.sugarMax)
+  if (Number.isFinite(manualSugar) && manualSugar >= 0) {
+    sugarMax = Math.round(manualSugar)
+  }
+  if (Number.isFinite(carbs) && carbs > 0) {
+    sugarMax = Math.min(sugarMax, carbs)
+  }
 
   const base: DailyTargets = {
     calories: targetCalories,
@@ -374,7 +424,7 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
   // - Some diets are mainly "macro rules" (e.g., keto, low-carb) and should clamp carbs and rebalance.
   // These are starting-point targets, not medical advice.
   const dietTypes = normalizeDietTypes(input.dietTypes)
-  if (!dietTypes.length) return base
+  if (!dietTypes.length || manualSplit) return base
 
   type DietMacroRule = {
     carbsMaxG?: number

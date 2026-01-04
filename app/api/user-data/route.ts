@@ -323,14 +323,43 @@ export async function GET(request: NextRequest) {
     }
 
     // Get primary goal choice + intensity (Step 2) stored as hidden health goal
-    let primaryGoalData: { goalChoice?: string; goalIntensity?: string } = {};
+    let primaryGoalData: {
+      goalChoice?: string
+      goalIntensity?: string
+      goalTargetWeightKg?: number | null
+      goalTargetWeightUnit?: string
+      goalPaceKgPerWeek?: number | null
+      goalCalorieTarget?: number | null
+      goalMacroSplit?: { proteinPct?: number | null; carbPct?: number | null; fatPct?: number | null } | null
+      goalFiberTarget?: number | null
+      goalSugarMax?: number | null
+    } = {};
     try {
       const storedPrimaryGoal = user.healthGoals.find((goal: any) => goal.name === '__PRIMARY_GOAL__');
       if (storedPrimaryGoal?.category) {
       const parsed = JSON.parse(storedPrimaryGoal.category);
+      const parseOptionalNumber = (value: any) => {
+        const n = Number(value)
+        return Number.isFinite(n) ? n : null
+      }
+      const parseMacroSplit = (value: any) => {
+        if (!value || typeof value !== 'object') return null
+        const proteinPct = parseOptionalNumber(value.proteinPct)
+        const carbPct = parseOptionalNumber(value.carbPct)
+        const fatPct = parseOptionalNumber(value.fatPct)
+        if (proteinPct === null && carbPct === null && fatPct === null) return null
+        return { proteinPct, carbPct, fatPct }
+      }
       primaryGoalData = {
         goalChoice: typeof parsed.goalChoice === 'string' ? parsed.goalChoice : '',
         goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity.toLowerCase() : '',
+        goalTargetWeightKg: parseOptionalNumber(parsed.goalTargetWeightKg),
+        goalTargetWeightUnit: typeof parsed.goalTargetWeightUnit === 'string' ? parsed.goalTargetWeightUnit.toLowerCase() : '',
+        goalPaceKgPerWeek: parseOptionalNumber(parsed.goalPaceKgPerWeek),
+        goalCalorieTarget: parseOptionalNumber(parsed.goalCalorieTarget),
+        goalMacroSplit: parseMacroSplit(parsed.goalMacroSplit),
+        goalFiberTarget: parseOptionalNumber(parsed.goalFiberTarget),
+        goalSugarMax: parseOptionalNumber(parsed.goalSugarMax),
       };
     }
   } catch (e) {
@@ -394,6 +423,13 @@ export async function GET(request: NextRequest) {
       termsAccepted: (user as any).termsAccepted === true,
       goalChoice: primaryGoalData.goalChoice || '',
       goalIntensity: (primaryGoalData.goalIntensity || 'standard').toString().toLowerCase(),
+      goalTargetWeightKg: primaryGoalData.goalTargetWeightKg ?? null,
+      goalTargetWeightUnit: primaryGoalData.goalTargetWeightUnit || '',
+      goalPaceKgPerWeek: primaryGoalData.goalPaceKgPerWeek ?? null,
+      goalCalorieTarget: primaryGoalData.goalCalorieTarget ?? null,
+      goalMacroSplit: primaryGoalData.goalMacroSplit ?? null,
+      goalFiberTarget: primaryGoalData.goalFiberTarget ?? null,
+      goalSugarMax: primaryGoalData.goalSugarMax ?? null,
       allergies: allergyData.allergies,
       diabetesType: allergyData.diabetesType,
       dietTypes,
@@ -544,16 +580,45 @@ export async function POST(request: NextRequest) {
     }
 
     // Load existing primary goal (goal choice + intensity) for safe merging
-    let existingPrimaryGoalData: { goalChoice?: string; goalIntensity?: string } = {}
+    let existingPrimaryGoalData: {
+      goalChoice?: string
+      goalIntensity?: string
+      goalTargetWeightKg?: number | null
+      goalTargetWeightUnit?: string
+      goalPaceKgPerWeek?: number | null
+      goalCalorieTarget?: number | null
+      goalMacroSplit?: { proteinPct?: number | null; carbPct?: number | null; fatPct?: number | null } | null
+      goalFiberTarget?: number | null
+      goalSugarMax?: number | null
+    } = {}
     try {
       const storedPrimaryGoal = await prisma.healthGoal.findFirst({
         where: { userId: user.id, name: '__PRIMARY_GOAL__' },
       })
       if (storedPrimaryGoal?.category) {
         const parsed = JSON.parse(storedPrimaryGoal.category)
+        const parseOptionalNumber = (value: any) => {
+          const n = Number(value)
+          return Number.isFinite(n) ? n : null
+        }
+        const parseMacroSplit = (value: any) => {
+          if (!value || typeof value !== 'object') return null
+          const proteinPct = parseOptionalNumber(value.proteinPct)
+          const carbPct = parseOptionalNumber(value.carbPct)
+          const fatPct = parseOptionalNumber(value.fatPct)
+          if (proteinPct === null && carbPct === null && fatPct === null) return null
+          return { proteinPct, carbPct, fatPct }
+        }
         existingPrimaryGoalData = {
           goalChoice: typeof parsed.goalChoice === 'string' ? parsed.goalChoice : '',
           goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity.toLowerCase() : '',
+          goalTargetWeightKg: parseOptionalNumber(parsed.goalTargetWeightKg),
+          goalTargetWeightUnit: typeof parsed.goalTargetWeightUnit === 'string' ? parsed.goalTargetWeightUnit.toLowerCase() : '',
+          goalPaceKgPerWeek: parseOptionalNumber(parsed.goalPaceKgPerWeek),
+          goalCalorieTarget: parseOptionalNumber(parsed.goalCalorieTarget),
+          goalMacroSplit: parseMacroSplit(parsed.goalMacroSplit),
+          goalFiberTarget: parseOptionalNumber(parsed.goalFiberTarget),
+          goalSugarMax: parseOptionalNumber(parsed.goalSugarMax),
         }
       }
     } catch (error) {
@@ -815,10 +880,57 @@ export async function POST(request: NextRequest) {
         normalizedIncomingIntensityRaw === 'mild' ||
         normalizedIncomingIntensityRaw === 'standard' ||
         normalizedIncomingIntensityRaw === 'aggressive'
+
+      const parseOptionalNumber = (value: any) => {
+        const n = Number(value)
+        return Number.isFinite(n) ? n : null
+      }
+      const normalizeMacroSplitInput = (value: any) => {
+        if (!value || typeof value !== 'object') return null
+        const protein = Number(value.proteinPct)
+        const carbs = Number(value.carbPct)
+        const fat = Number(value.fatPct)
+        const p = Number.isFinite(protein) && protein > 0 ? protein : 0
+        const c = Number.isFinite(carbs) && carbs > 0 ? carbs : 0
+        const f = Number.isFinite(fat) && fat > 0 ? fat : 0
+        const total = p + c + f
+        if (total <= 0) return null
+        return { proteinPct: p / total, carbPct: c / total, fatPct: f / total }
+      }
+
+      const incomingGoalTargetWeightKg = parseOptionalNumber((data as any).goalTargetWeightKg)
+      const incomingGoalTargetWeightUnitRaw =
+        typeof (data as any).goalTargetWeightUnit === 'string'
+          ? (data as any).goalTargetWeightUnit.trim().toLowerCase()
+          : ''
+      const incomingGoalTargetWeightUnit =
+        incomingGoalTargetWeightUnitRaw === 'lb' ? 'lb' : incomingGoalTargetWeightUnitRaw === 'kg' ? 'kg' : ''
+      const incomingGoalPaceKgPerWeek = parseOptionalNumber((data as any).goalPaceKgPerWeek)
+      const incomingGoalCalorieTarget = parseOptionalNumber((data as any).goalCalorieTarget)
+      const incomingGoalMacroSplit = normalizeMacroSplitInput((data as any).goalMacroSplit)
+      const incomingGoalFiberTarget = parseOptionalNumber((data as any).goalFiberTarget)
+      const incomingGoalSugarMax = parseOptionalNumber((data as any).goalSugarMax)
+
+      const hasIncomingGoalTargetWeightKg = incomingGoalTargetWeightKg !== null
+      const hasIncomingGoalTargetWeightUnit = !!incomingGoalTargetWeightUnit
+      const hasIncomingGoalPaceKgPerWeek = incomingGoalPaceKgPerWeek !== null
+      const hasIncomingGoalCalorieTarget = incomingGoalCalorieTarget !== null
+      const hasIncomingGoalMacroSplit = incomingGoalMacroSplit !== null
+      const hasIncomingGoalFiberTarget = incomingGoalFiberTarget !== null
+      const hasIncomingGoalSugarMax = incomingGoalSugarMax !== null
       
       // Only update the stored primary goal when the request explicitly includes it.
       // Otherwise, unrelated saves (food snapshot, profile image, etc.) could overwrite the user's goal unintentionally.
-      const shouldUpdatePrimaryGoal = normalizedIncomingGoalChoice.length > 0 || isValidIntensity
+      const shouldUpdatePrimaryGoal =
+        normalizedIncomingGoalChoice.length > 0 ||
+        isValidIntensity ||
+        hasIncomingGoalTargetWeightKg ||
+        hasIncomingGoalTargetWeightUnit ||
+        hasIncomingGoalPaceKgPerWeek ||
+        hasIncomingGoalCalorieTarget ||
+        hasIncomingGoalMacroSplit ||
+        hasIncomingGoalFiberTarget ||
+        hasIncomingGoalSugarMax
       if (shouldUpdatePrimaryGoal) {
         const incomingGoalChoice =
           normalizedIncomingGoalChoice.length > 0
@@ -828,6 +940,27 @@ export async function POST(request: NextRequest) {
           isValidIntensity
             ? normalizedIncomingIntensityRaw
             : (existingPrimaryGoalData.goalIntensity || 'standard').toLowerCase()
+        const nextGoalTargetWeightKg = hasIncomingGoalTargetWeightKg
+          ? incomingGoalTargetWeightKg
+          : (existingPrimaryGoalData.goalTargetWeightKg ?? null)
+        const nextGoalTargetWeightUnit = hasIncomingGoalTargetWeightUnit
+          ? incomingGoalTargetWeightUnit
+          : (existingPrimaryGoalData.goalTargetWeightUnit || '')
+        const nextGoalPaceKgPerWeek = hasIncomingGoalPaceKgPerWeek
+          ? incomingGoalPaceKgPerWeek
+          : (existingPrimaryGoalData.goalPaceKgPerWeek ?? null)
+        const nextGoalCalorieTarget = hasIncomingGoalCalorieTarget
+          ? incomingGoalCalorieTarget
+          : (existingPrimaryGoalData.goalCalorieTarget ?? null)
+        const nextGoalMacroSplit = hasIncomingGoalMacroSplit
+          ? incomingGoalMacroSplit
+          : (existingPrimaryGoalData.goalMacroSplit ?? null)
+        const nextGoalFiberTarget = hasIncomingGoalFiberTarget
+          ? incomingGoalFiberTarget
+          : (existingPrimaryGoalData.goalFiberTarget ?? null)
+        const nextGoalSugarMax = hasIncomingGoalSugarMax
+          ? incomingGoalSugarMax
+          : (existingPrimaryGoalData.goalSugarMax ?? null)
 
         await prisma.healthGoal.deleteMany({
           where: {
@@ -847,6 +980,13 @@ export async function POST(request: NextRequest) {
             category: JSON.stringify({
               goalChoice: incomingGoalChoice,
               goalIntensity: incomingGoalIntensity || 'standard',
+              goalTargetWeightKg: nextGoalTargetWeightKg,
+              goalTargetWeightUnit: nextGoalTargetWeightUnit,
+              goalPaceKgPerWeek: nextGoalPaceKgPerWeek,
+              goalCalorieTarget: nextGoalCalorieTarget,
+              goalMacroSplit: nextGoalMacroSplit,
+              goalFiberTarget: nextGoalFiberTarget,
+              goalSugarMax: nextGoalSugarMax,
             }),
             currentRating: 0,
           }

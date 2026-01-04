@@ -2898,6 +2898,10 @@ export default function FoodDiary() {
         : null
     const goalsArray = Array.isArray(userData.goals) ? userData.goals : []
 
+    const goalChoiceValue =
+      typeof (userData as any).goalChoice === 'string' ? (userData as any).goalChoice.toLowerCase() : '';
+    const useManualTargets = goalChoiceValue.includes('lose') || goalChoiceValue.includes('gain');
+
     return calculateDailyTargets({
       gender: userData.gender,
       birthdate: (userData as any).birthdate || userData.profileInfo?.dateOfBirth,
@@ -2908,6 +2912,10 @@ export default function FoodDiary() {
       goals: goalsArray,
       goalChoice: (userData as any).goalChoice,
       goalIntensity: (userData as any).goalIntensity,
+      calorieTarget: useManualTargets ? (userData as any).goalCalorieTarget : null,
+      macroSplit: useManualTargets ? (userData as any).goalMacroSplit : null,
+      fiberTarget: useManualTargets ? (userData as any).goalFiberTarget : null,
+      sugarMax: useManualTargets ? (userData as any).goalSugarMax : null,
       exerciseDurations: (userData as any).exerciseDurations,
       bodyType: (userData as any).bodyType,
       healthSituations: (userData as any).healthSituations,

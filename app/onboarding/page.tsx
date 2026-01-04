@@ -15,6 +15,7 @@ import InsightsProgressBar from '@/components/InsightsProgressBar';
 import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import MaterialSymbol from '@/components/MaterialSymbol';
 import { DIET_CATEGORIES, DIET_OPTIONS, getDietOption, normalizeDietTypes } from '@/lib/diets';
+import { calculateDailyTargets } from '@/lib/daily-targets';
 
 const sanitizeUserDataPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return payload;
@@ -161,6 +162,12 @@ function getInsightsRelevantOnboardingFormSnapshot(source: any): any {
     if (!Number.isFinite(n)) return (raw || '').toString()
     return String(Math.round(n))
   }
+  const normalizeDecimalString = (raw: any, precision = 2) => {
+    if (raw === null || raw === undefined || raw === '') return ''
+    const n = typeof raw === 'number' ? raw : Number(String(raw))
+    if (!Number.isFinite(n)) return (raw || '').toString()
+    return n.toFixed(precision)
+  }
   const healthSituationsDefault = {
     healthIssues: '',
     healthProblems: '',
@@ -179,6 +186,24 @@ function getInsightsRelevantOnboardingFormSnapshot(source: any): any {
     dietTypes: normalizeDietTypes((sanitized as any)?.dietTypes ?? (sanitized as any)?.dietType).sort(),
     goalChoice: typeof sanitized.goalChoice === 'string' ? sanitized.goalChoice : '',
     goalIntensity: (sanitized.goalIntensity || 'standard').toString().toLowerCase(),
+    goalTargetWeightKg: normalizeDecimalString((sanitized as any).goalTargetWeightKg, 1),
+    goalTargetWeightUnit:
+      typeof (sanitized as any).goalTargetWeightUnit === 'string'
+        ? (sanitized as any).goalTargetWeightUnit.toLowerCase()
+        : '',
+    goalPaceKgPerWeek: normalizeDecimalString((sanitized as any).goalPaceKgPerWeek, 2),
+    goalCalorieTarget: normalizeRoundedNumberString((sanitized as any).goalCalorieTarget),
+    goalMacroSplit: (() => {
+      const split = (sanitized as any).goalMacroSplit
+      if (!split || typeof split !== 'object') return null
+      const proteinPct = normalizeDecimalString(split.proteinPct, 3)
+      const carbPct = normalizeDecimalString(split.carbPct, 3)
+      const fatPct = normalizeDecimalString(split.fatPct, 3)
+      if (!proteinPct && !carbPct && !fatPct) return null
+      return { proteinPct, carbPct, fatPct }
+    })(),
+    goalFiberTarget: normalizeRoundedNumberString((sanitized as any).goalFiberTarget),
+    goalSugarMax: normalizeRoundedNumberString((sanitized as any).goalSugarMax),
     profileInfo: sanitized.profileInfo && typeof sanitized.profileInfo === 'object' ? sanitized.profileInfo : {},
     allergies: Array.isArray(sanitized.allergies) ? sanitized.allergies : [],
     diabetesType: typeof sanitized.diabetesType === 'string' ? sanitized.diabetesType : '',
@@ -221,8 +246,46 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
 
   if (
     hasChanged(
-      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'dietTypes', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
-      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'dietTypes', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
+      pickFields(baseline, [
+        'gender',
+        'weight',
+        'height',
+        'bodyType',
+        'birthdate',
+        'dietTypes',
+        'goalChoice',
+        'goalIntensity',
+        'goalTargetWeightKg',
+        'goalTargetWeightUnit',
+        'goalPaceKgPerWeek',
+        'goalCalorieTarget',
+        'goalMacroSplit',
+        'goalFiberTarget',
+        'goalSugarMax',
+        'profileInfo',
+        'allergies',
+        'diabetesType',
+      ]),
+      pickFields(current, [
+        'gender',
+        'weight',
+        'height',
+        'bodyType',
+        'birthdate',
+        'dietTypes',
+        'goalChoice',
+        'goalIntensity',
+        'goalTargetWeightKg',
+        'goalTargetWeightUnit',
+        'goalPaceKgPerWeek',
+        'goalCalorieTarget',
+        'goalMacroSplit',
+        'goalFiberTarget',
+        'goalSugarMax',
+        'profileInfo',
+        'allergies',
+        'diabetesType',
+      ]),
     )
   ) {
     changeTypes.push('profile');
@@ -670,6 +733,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [goalIntensity, setGoalIntensity] = useState<'mild' | 'standard' | 'aggressive'>(
     (initial?.goalIntensity as any) || 'standard',
   );
+  const [showGoalDetails, setShowGoalDetails] = useState(false);
+  const [goalTargetWeightUnit, setGoalTargetWeightUnit] = useState<'kg' | 'lb'>('kg');
+  const [goalTargetWeightInput, setGoalTargetWeightInput] = useState('');
+  const [goalPaceKgPerWeek, setGoalPaceKgPerWeek] = useState<number | null>(null);
+  const [goalCalorieTarget, setGoalCalorieTarget] = useState<number | null>(null);
+  const [goalMacroSplit, setGoalMacroSplit] = useState<{
+    proteinPct: number
+    carbPct: number
+    fatPct: number
+  } | null>(null);
+  const [goalFiberTarget, setGoalFiberTarget] = useState<number | null>(null);
+  const [goalSugarMax, setGoalSugarMax] = useState<number | null>(null);
   const [allergies, setAllergies] = useState<string[]>(initial?.allergies || []);
   const [allergyInput, setAllergyInput] = useState('');
   const [diabetesType, setDiabetesType] = useState<'type1' | 'type2' | 'prediabetes' | ''>(
@@ -684,6 +759,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const dietSavedNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dietHydratedRef = useRef(false);
   const dietTouchedRef = useRef(false);
+  const goalDetailsHydratedRef = useRef(false);
+  const goalDetailsTouchedRef = useRef(false);
   const allergiesHydratedRef = useRef(false);
   const diabetesHydratedRef = useRef(false);
   const bodyTypeHydratedRef = useRef(false);
@@ -704,7 +781,41 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   };
 
   const poundsToKg = (lbs: number) => lbs / 2.20462;
+  const kgToLb = (kg: number) => kg * 2.20462;
   const feetInchesToCm = (ft: number, inch: number) => (ft * 12 + inch) * 2.54;
+  const roundToPrecision = (value: number, precision: number) => {
+    const factor = Math.pow(10, precision);
+    return Math.round(value * factor) / factor;
+  };
+  const normalizeMacroSplit = (proteinPct: number, carbPct: number, fatPct: number) => {
+    const total = proteinPct + carbPct + fatPct;
+    if (!Number.isFinite(total) || total <= 0) {
+      return { proteinPct: 0.3, carbPct: 0.4, fatPct: 0.3 };
+    }
+    return {
+      proteinPct: proteinPct / total,
+      carbPct: carbPct / total,
+      fatPct: fatPct / total,
+    };
+  };
+  const macroGramsFromSplit = (calories: number, split: { proteinPct: number; carbPct: number; fatPct: number }) => {
+    const safeCalories = Number.isFinite(calories) && calories > 0 ? calories : 0;
+    return {
+      protein: Math.max(0, Math.round((safeCalories * split.proteinPct) / 4)),
+      carbs: Math.max(0, Math.round((safeCalories * split.carbPct) / 4)),
+      fat: Math.max(0, Math.round((safeCalories * split.fatPct) / 9)),
+    };
+  };
+  const macroSplitFromGrams = (protein: number, carbs: number, fat: number) => {
+    const proteinCals = Math.max(0, protein) * 4;
+    const carbCals = Math.max(0, carbs) * 4;
+    const fatCals = Math.max(0, fat) * 9;
+    const total = proteinCals + carbCals + fatCals;
+    if (!Number.isFinite(total) || total <= 0) {
+      return { proteinPct: 0.3, carbPct: 0.4, fatPct: 0.3 };
+    }
+    return normalizeMacroSplit(proteinCals / total, carbCals / total, fatCals / total);
+  };
 
   const getCurrentWeightKgRounded = () => {
     const w = parseNumber(weight);
@@ -729,6 +840,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     return Number.isFinite(cm) ? Math.round(cm) : null;
   };
 
+  const getTargetWeightKg = () => {
+    const value = parseNumber(goalTargetWeightInput);
+    if (value == null) return null;
+    const kg = goalTargetWeightUnit === 'lb' ? poundsToKg(value) : value;
+    return Number.isFinite(kg) ? roundToPrecision(kg, 1) : null;
+  };
+
   const weightNumber = parseNumber(weight);
   const heightNumber = parseNumber(height);
   const feetNumber = parseNumber(feet);
@@ -740,7 +858,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       : ((feetNumber != null && feetNumber > 0) || (inchesNumber != null && inchesNumber > 0));
   const hasBirthdate = !!(birthYear && birthMonth && birthDay) || !!(birthdate || initial?.birthdate);
   const hasGoalChoice = !!goalChoice;
-  const hasGoalIntensity = !!goalIntensity;
+  const isLoseGoal = goalChoice === 'lose weight';
+  const isGainGoal = goalChoice === 'gain weight';
+  const isLoseGainGoal = isLoseGoal || isGainGoal;
+  const requiresGoalIntensity = goalChoice === 'tone up' || goalChoice === 'get shredded';
+  const hasGoalIntensity = !requiresGoalIntensity || !!goalIntensity;
   const hasBodyType = !!bodyType;
   const genderValue = (initial?.gender || '').toString().toLowerCase();
   const hasGender = genderValue === 'male' || genderValue === 'female';
@@ -806,6 +928,71 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     }
     if (initial.goalIntensity && !goalIntensity) {
       setGoalIntensity(initial.goalIntensity);
+    }
+
+    if (!goalDetailsHydratedRef.current) {
+      const rawGoalUnit =
+        typeof (initial as any).goalTargetWeightUnit === 'string'
+          ? (initial as any).goalTargetWeightUnit.toLowerCase()
+          : '';
+      const nextGoalUnit =
+        rawGoalUnit === 'lb'
+          ? 'lb'
+          : rawGoalUnit === 'kg'
+          ? 'kg'
+          : unit === 'imperial'
+          ? 'lb'
+          : 'kg';
+      setGoalTargetWeightUnit(nextGoalUnit);
+
+      const targetWeightKgRaw = parseNumber(String((initial as any).goalTargetWeightKg ?? ''));
+      if (targetWeightKgRaw != null) {
+        const displayWeight = nextGoalUnit === 'lb' ? kgToLb(targetWeightKgRaw) : targetWeightKgRaw;
+        setGoalTargetWeightInput(String(roundToPrecision(displayWeight, 1)));
+      }
+
+      const incomingPace = parseNumber(String((initial as any).goalPaceKgPerWeek ?? ''));
+      if (incomingPace != null) {
+        setGoalPaceKgPerWeek(incomingPace);
+      }
+
+      const incomingCalories = parseNumber(String((initial as any).goalCalorieTarget ?? ''));
+      if (incomingCalories != null) {
+        setGoalCalorieTarget(Math.round(incomingCalories));
+      }
+
+      const incomingSplit = (initial as any).goalMacroSplit;
+      if (incomingSplit && typeof incomingSplit === 'object') {
+        const protein = parseNumber(String(incomingSplit.proteinPct ?? '')) ?? 0;
+        const carbs = parseNumber(String(incomingSplit.carbPct ?? '')) ?? 0;
+        const fat = parseNumber(String(incomingSplit.fatPct ?? '')) ?? 0;
+        if (protein || carbs || fat) {
+          setGoalMacroSplit(normalizeMacroSplit(protein, carbs, fat));
+        }
+      }
+
+      const incomingFiber = parseNumber(String((initial as any).goalFiberTarget ?? ''));
+      if (incomingFiber != null) {
+        setGoalFiberTarget(Math.round(incomingFiber));
+      }
+
+      const incomingSugar = parseNumber(String((initial as any).goalSugarMax ?? ''));
+      if (incomingSugar != null) {
+        setGoalSugarMax(Math.round(incomingSugar));
+      }
+
+      const hasExistingGoalDetails =
+        targetWeightKgRaw != null ||
+        incomingPace != null ||
+        incomingCalories != null ||
+        (incomingSplit && typeof incomingSplit === 'object') ||
+        incomingFiber != null ||
+        incomingSugar != null;
+      if (hasExistingGoalDetails) {
+        goalDetailsTouchedRef.current = true;
+      }
+
+      goalDetailsHydratedRef.current = true;
     }
 
     if (!birthYear && !birthMonth && !birthDay && typeof initial.birthdate === 'string') {
@@ -1005,10 +1192,231 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     [birthYear, birthMonth, birthDay, birthdate],
   );
 
+  const KCAL_PER_KG_WEEK = 7700 / 7;
+  const MIN_GOAL_PACE = 0.1;
+  const MAX_GOAL_PACE = 0.9;
+  const DEFAULT_GOAL_PACE = 0.3;
+  const CALORIE_MIN = 1200;
+  const CALORIE_MAX = 4000;
+
+  const clampNumber = (value: number, min: number, max: number) =>
+    Math.min(Math.max(value, min), max);
+
+  const goalDetailDefaults = useMemo(() => {
+    const weightKg = getCurrentWeightKgRounded();
+    const heightCm = getCurrentHeightCmRounded();
+    const gender = genderValue;
+    const birthdateValue = birthdateFromParts || initial?.birthdate || '';
+    const goalsArray = Array.isArray((initial as any)?.goals) ? (initial as any).goals : [];
+    if (!weightKg || !heightCm || !birthdateValue || (gender !== 'male' && gender !== 'female')) {
+      return {
+        calories: 2000,
+        split: normalizeMacroSplit(0.3, 0.4, 0.3),
+        fiber: 28,
+        sugarMax: 35,
+      };
+    }
+
+    const targets = calculateDailyTargets({
+      gender,
+      birthdate: birthdateValue,
+      weightKg,
+      heightCm,
+      exerciseFrequency: (initial as any)?.exerciseFrequency,
+      exerciseDurations: (initial as any)?.exerciseDurations,
+      dietTypes: Array.isArray(dietTypes) ? dietTypes : [],
+      goals: goalsArray,
+      goalChoice,
+      goalIntensity,
+      bodyType,
+      healthSituations: (initial as any)?.healthSituations,
+      diabetesType,
+    });
+
+    const calories = typeof targets.calories === 'number' ? targets.calories : 2000;
+    const protein = typeof targets.protein === 'number' ? targets.protein : Math.round((calories * 0.3) / 4);
+    const carbs = typeof targets.carbs === 'number' ? targets.carbs : Math.round((calories * 0.4) / 4);
+    const fat = typeof targets.fat === 'number' ? targets.fat : Math.round((calories * 0.3) / 9);
+    const split = macroSplitFromGrams(protein, carbs, fat);
+    const fiber = typeof targets.fiber === 'number' ? targets.fiber : 28;
+    const sugarMax = typeof targets.sugarMax === 'number' ? targets.sugarMax : 35;
+
+    return { calories, split, fiber, sugarMax };
+  }, [
+    birthdateFromParts,
+    bodyType,
+    dietTypes,
+    goalChoice,
+    goalIntensity,
+    genderValue,
+    initial,
+    diabetesType,
+    weight,
+    height,
+    feet,
+    inches,
+    unit,
+  ]);
+
+  const maintenanceCalories = useMemo(() => {
+    const weightKg = getCurrentWeightKgRounded();
+    const heightCm = getCurrentHeightCmRounded();
+    const gender = genderValue;
+    const birthdateValue = birthdateFromParts || initial?.birthdate || '';
+    if (!weightKg || !heightCm || !birthdateValue || (gender !== 'male' && gender !== 'female')) {
+      return null;
+    }
+    const targets = calculateDailyTargets({
+      gender,
+      birthdate: birthdateValue,
+      weightKg,
+      heightCm,
+      exerciseFrequency: (initial as any)?.exerciseFrequency,
+      exerciseDurations: (initial as any)?.exerciseDurations,
+      goalChoice: 'maintain weight',
+      goalIntensity: 'standard',
+      bodyType,
+    });
+    return typeof targets.calories === 'number' ? targets.calories : null;
+  }, [birthdateFromParts, bodyType, genderValue, initial, weight, height, feet, inches, unit]);
+
+  const activeGoalCalories = Math.round(goalCalorieTarget ?? goalDetailDefaults.calories);
+  const activeGoalSplit = normalizeMacroSplit(
+    goalMacroSplit?.proteinPct ?? goalDetailDefaults.split.proteinPct,
+    goalMacroSplit?.carbPct ?? goalDetailDefaults.split.carbPct,
+    goalMacroSplit?.fatPct ?? goalDetailDefaults.split.fatPct,
+  );
+  const activeFiberTarget = goalFiberTarget ?? goalDetailDefaults.fiber;
+  const activeSugarMax = goalSugarMax ?? goalDetailDefaults.sugarMax;
+
+  const calorieBounds = useMemo(() => {
+    const base = maintenanceCalories ?? activeGoalCalories ?? 2000;
+    if (isLoseGoal) {
+      return {
+        min: clampNumber(Math.round(base - MAX_GOAL_PACE * KCAL_PER_KG_WEEK), CALORIE_MIN, CALORIE_MAX),
+        max: clampNumber(Math.round(base - MIN_GOAL_PACE * KCAL_PER_KG_WEEK), CALORIE_MIN, CALORIE_MAX),
+        base,
+      };
+    }
+    if (isGainGoal) {
+      return {
+        min: clampNumber(Math.round(base + MIN_GOAL_PACE * KCAL_PER_KG_WEEK), CALORIE_MIN, CALORIE_MAX),
+        max: clampNumber(Math.round(base + MAX_GOAL_PACE * KCAL_PER_KG_WEEK), CALORIE_MIN, CALORIE_MAX),
+        base,
+      };
+    }
+    return { min: CALORIE_MIN, max: CALORIE_MAX, base };
+  }, [activeGoalCalories, isGainGoal, isLoseGoal, maintenanceCalories]);
+
+  const derivedGoalPace = useMemo(() => {
+    if (!calorieBounds.base) return null;
+    const delta = Math.abs(activeGoalCalories - calorieBounds.base);
+    return roundToPrecision(delta / KCAL_PER_KG_WEEK, 2);
+  }, [activeGoalCalories, calorieBounds.base]);
+
+  const activeGoalPace = clampNumber(goalPaceKgPerWeek ?? derivedGoalPace ?? DEFAULT_GOAL_PACE, MIN_GOAL_PACE, MAX_GOAL_PACE);
+
+  const clampedGoalCalories = clampNumber(activeGoalCalories, calorieBounds.min, calorieBounds.max);
+  const macroTotals = useMemo(
+    () => macroGramsFromSplit(clampedGoalCalories, activeGoalSplit),
+    [clampedGoalCalories, activeGoalSplit],
+  );
+  const clampedFiberTarget = Math.min(activeFiberTarget, macroTotals.carbs);
+  const clampedSugarMax = Math.min(activeSugarMax, macroTotals.carbs);
+
+  const displayGoalPace = roundToPrecision(
+    goalTargetWeightUnit === 'lb' ? activeGoalPace * 2.20462 : activeGoalPace,
+    2,
+  );
+  const currentWeightKg = getCurrentWeightKgRounded();
+  const targetWeightKg = getTargetWeightKg();
+  const weightDeltaKg =
+    currentWeightKg != null && targetWeightKg != null
+      ? Math.abs(targetWeightKg - currentWeightKg)
+      : null;
+  const estimatedWeeks =
+    weightDeltaKg != null && activeGoalPace > 0
+      ? roundToPrecision(weightDeltaKg / activeGoalPace, 1)
+      : null;
+
+  const dietWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    const normalizedDiets = normalizeDietTypes(dietTypes);
+    if (!normalizedDiets.length) return warnings;
+
+    const carbs = macroTotals.carbs;
+    const sugar = Math.min(activeSugarMax, macroTotals.carbs);
+    const protein = macroTotals.protein;
+    const weightKg = getCurrentWeightKgRounded();
+
+    const rules: Record<
+      string,
+      { carbsMaxG?: number; sugarMaxG?: number; proteinMinGPerKg?: number }
+    > = {
+      keto: { carbsMaxG: 30, sugarMaxG: 25 },
+      'keto-carnivore': { carbsMaxG: 20, sugarMaxG: 15 },
+      'low-carb': { carbsMaxG: 130 },
+      atkins: { carbsMaxG: 40, sugarMaxG: 30 },
+      'zero-carb': { carbsMaxG: 10, sugarMaxG: 5 },
+      carnivore: { carbsMaxG: 10, sugarMaxG: 5 },
+      lion: { carbsMaxG: 10, sugarMaxG: 5 },
+      diabetic: { carbsMaxG: 160, sugarMaxG: 25 },
+      'high-protein': { proteinMinGPerKg: 1.6 },
+      bodybuilding: { proteinMinGPerKg: 1.8 },
+    };
+
+    normalizedDiets.forEach((dietId) => {
+      const rule = rules[dietId];
+      if (!rule) return;
+      const label = getDietOption(dietId)?.label || dietId;
+      if (rule.carbsMaxG != null && carbs > rule.carbsMaxG) {
+        warnings.push(`${label} usually keeps carbs under ${rule.carbsMaxG} g.`);
+      }
+      if (rule.sugarMaxG != null && sugar > rule.sugarMaxG) {
+        warnings.push(`${label} usually keeps sugar under ${rule.sugarMaxG} g.`);
+      }
+      if (rule.proteinMinGPerKg != null && weightKg) {
+        const minProtein = Math.round(weightKg * rule.proteinMinGPerKg);
+        if (protein < minProtein) {
+          warnings.push(`${label} usually targets at least ${minProtein} g of protein per day.`);
+        }
+      }
+    });
+
+    const diabetes = (diabetesType || '').toLowerCase();
+    const diabetesRules: Record<string, { carbsMaxG: number; sugarMaxG: number }> = {
+      type1: { carbsMaxG: 180, sugarMaxG: 22 },
+      type2: { carbsMaxG: 160, sugarMaxG: 20 },
+      prediabetes: { carbsMaxG: 170, sugarMaxG: 28 },
+    };
+    if (diabetesRules[diabetes]) {
+      const { carbsMaxG, sugarMaxG } = diabetesRules[diabetes];
+      if (carbs > carbsMaxG) {
+        warnings.push(`This is higher in carbs than typical for ${diabetes.replace('type', 'Type ')}.`);
+      }
+      if (sugar > sugarMaxG) {
+        warnings.push(`This is higher in sugar than typical for ${diabetes.replace('type', 'Type ')}.`);
+      }
+    }
+
+    return Array.from(new Set(warnings));
+  }, [activeSugarMax, dietTypes, diabetesType, macroTotals, weight, height, feet, inches, unit]);
+
   const buildPayload = () => {
     const weightKgRounded = getCurrentWeightKgRounded();
     const heightCmRounded = getCurrentHeightCmRounded();
     const includeDietTypes = dietHydratedRef.current || dietTouchedRef.current;
+    const includeGoalDetails = goalDetailsTouchedRef.current && isLoseGainGoal;
+    const targetWeightKg = getTargetWeightKg();
+    const goalSplitPayload = goalMacroSplit ?? activeGoalSplit;
+    const goalCaloriePayload = Number.isFinite(goalCalorieTarget as number)
+      ? Math.round(goalCalorieTarget as number)
+      : activeGoalCalories;
+    const goalPacePayload = Number.isFinite(goalPaceKgPerWeek as number)
+      ? (goalPaceKgPerWeek as number)
+      : activeGoalPace;
+    const clampedFiberTarget = Math.min(activeFiberTarget, macroTotals.carbs);
+    const clampedSugarMax = Math.min(activeSugarMax, macroTotals.carbs);
     return {
       // Persist canonical measurements so targets/insights stay consistent everywhere
       weight: weightKgRounded != null ? String(weightKgRounded) : '',
@@ -1018,6 +1426,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       ...(includeDietTypes ? { dietTypes: Array.from(new Set(dietTypes)).sort() } : {}),
       goalChoice: goalChoice?.trim(),
       goalIntensity: goalIntensity,
+      ...(includeGoalDetails
+        ? {
+            ...(targetWeightKg != null && targetWeightKg > 0
+              ? { goalTargetWeightKg: targetWeightKg, goalTargetWeightUnit: goalTargetWeightUnit }
+              : {}),
+            ...(Number.isFinite(goalPacePayload) ? { goalPaceKgPerWeek: roundToPrecision(goalPacePayload, 2) } : {}),
+            ...(Number.isFinite(goalCaloriePayload) ? { goalCalorieTarget: goalCaloriePayload } : {}),
+            ...(goalSplitPayload ? { goalMacroSplit: goalSplitPayload } : {}),
+            ...(Number.isFinite(clampedFiberTarget) ? { goalFiberTarget: Math.round(clampedFiberTarget) } : {}),
+            ...(Number.isFinite(clampedSugarMax) ? { goalSugarMax: Math.round(clampedSugarMax) } : {}),
+          }
+        : {}),
       allergies,
       diabetesType,
     }
@@ -1147,6 +1567,152 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     [unit, weight, height, feet, inches],
   );
 
+  const markGoalDetailsTouched = useCallback(() => {
+    goalDetailsTouchedRef.current = true;
+  }, []);
+
+  const handleGoalChoiceSelect = useCallback((choice: string) => {
+    setGoalChoice(choice);
+    if (choice === 'lose weight' || choice === 'gain weight' || choice === 'maintain weight') {
+      setGoalIntensity('standard');
+    }
+    if (choice === 'lose weight' || choice === 'gain weight') {
+      setShowGoalDetails(true);
+    }
+  }, []);
+
+  const handleGoalTargetWeightUnitChange = useCallback(
+    (nextUnit: 'kg' | 'lb') => {
+      if (nextUnit === goalTargetWeightUnit) return;
+      const currentValue = parseNumber(goalTargetWeightInput);
+      if (currentValue != null) {
+        const converted = nextUnit === 'lb' ? kgToLb(currentValue) : poundsToKg(currentValue);
+        setGoalTargetWeightInput(String(roundToPrecision(converted, 1)));
+      }
+      setGoalTargetWeightUnit(nextUnit);
+      markGoalDetailsTouched();
+    },
+    [goalTargetWeightInput, goalTargetWeightUnit, markGoalDetailsTouched],
+  );
+
+  const handleGoalTargetWeightChange = useCallback(
+    (value: string) => {
+      setGoalTargetWeightInput(value);
+      markGoalDetailsTouched();
+    },
+    [markGoalDetailsTouched],
+  );
+
+  const handleGoalPaceChange = useCallback(
+    (value: number) => {
+      const pace = clampNumber(value, MIN_GOAL_PACE, MAX_GOAL_PACE);
+      const base = calorieBounds.base || activeGoalCalories;
+      const delta = pace * KCAL_PER_KG_WEEK;
+      const nextCalories = isLoseGoal ? base - delta : base + delta;
+      const clampedCalories = clampNumber(Math.round(nextCalories), calorieBounds.min, calorieBounds.max);
+      setGoalPaceKgPerWeek(pace);
+      setGoalCalorieTarget(clampedCalories);
+      setGoalMacroSplit(activeGoalSplit);
+      markGoalDetailsTouched();
+    },
+    [
+      KCAL_PER_KG_WEEK,
+      MIN_GOAL_PACE,
+      MAX_GOAL_PACE,
+      activeGoalCalories,
+      activeGoalSplit,
+      calorieBounds,
+      isLoseGoal,
+      markGoalDetailsTouched,
+    ],
+  );
+
+  const handleGoalCaloriesChange = useCallback(
+    (value: number) => {
+      const clampedCalories = clampNumber(Math.round(value), calorieBounds.min, calorieBounds.max);
+      setGoalCalorieTarget(clampedCalories);
+      if (calorieBounds.base) {
+        const delta = Math.abs(clampedCalories - calorieBounds.base);
+        const nextPace = clampNumber(roundToPrecision(delta / KCAL_PER_KG_WEEK, 2), MIN_GOAL_PACE, MAX_GOAL_PACE);
+        setGoalPaceKgPerWeek(nextPace);
+      }
+      setGoalMacroSplit(activeGoalSplit);
+      markGoalDetailsTouched();
+    },
+    [
+      KCAL_PER_KG_WEEK,
+      MIN_GOAL_PACE,
+      MAX_GOAL_PACE,
+      activeGoalSplit,
+      calorieBounds,
+      markGoalDetailsTouched,
+    ],
+  );
+
+  const handleMacroChange = useCallback(
+    (macro: 'protein' | 'carbs' | 'fat', value: number) => {
+      const nextProtein = macro === 'protein' ? value : macroTotals.protein;
+      const nextCarbs = macro === 'carbs' ? value : macroTotals.carbs;
+      const nextFat = macro === 'fat' ? value : macroTotals.fat;
+      const nextCaloriesRaw = nextProtein * 4 + nextCarbs * 4 + nextFat * 9;
+      const clampedCalories = clampNumber(Math.round(nextCaloriesRaw), calorieBounds.min, calorieBounds.max);
+      const nextSplit = macroSplitFromGrams(nextProtein, nextCarbs, nextFat);
+      const scaledMacros = macroGramsFromSplit(clampedCalories, nextSplit);
+      const finalSplit = macroSplitFromGrams(scaledMacros.protein, scaledMacros.carbs, scaledMacros.fat);
+      setGoalCalorieTarget(clampedCalories);
+      setGoalMacroSplit(finalSplit);
+      if (calorieBounds.base) {
+        const delta = Math.abs(clampedCalories - calorieBounds.base);
+        const nextPace = clampNumber(roundToPrecision(delta / KCAL_PER_KG_WEEK, 2), MIN_GOAL_PACE, MAX_GOAL_PACE);
+        setGoalPaceKgPerWeek(nextPace);
+      }
+      markGoalDetailsTouched();
+    },
+    [
+      KCAL_PER_KG_WEEK,
+      MIN_GOAL_PACE,
+      MAX_GOAL_PACE,
+      calorieBounds,
+      macroTotals,
+      markGoalDetailsTouched,
+    ],
+  );
+
+  const handleFiberChange = useCallback(
+    (value: number) => {
+      const nextValue = Math.min(Math.round(value), macroTotals.carbs);
+      setGoalFiberTarget(nextValue);
+      markGoalDetailsTouched();
+    },
+    [macroTotals.carbs, markGoalDetailsTouched],
+  );
+
+  const handleSugarChange = useCallback(
+    (value: number) => {
+      const nextValue = Math.min(Math.round(value), macroTotals.carbs);
+      setGoalSugarMax(nextValue);
+      markGoalDetailsTouched();
+    },
+    [macroTotals.carbs, markGoalDetailsTouched],
+  );
+
+  useEffect(() => {
+    if (goalFiberTarget != null && goalFiberTarget > macroTotals.carbs) {
+      setGoalFiberTarget(macroTotals.carbs);
+    }
+    if (goalSugarMax != null && goalSugarMax > macroTotals.carbs) {
+      setGoalSugarMax(macroTotals.carbs);
+    }
+  }, [macroTotals.carbs, goalFiberTarget, goalSugarMax]);
+
+  useEffect(() => {
+    if (!isLoseGainGoal || goalCalorieTarget == null) return;
+    const clamped = clampNumber(Math.round(goalCalorieTarget), calorieBounds.min, calorieBounds.max);
+    if (clamped !== goalCalorieTarget) {
+      setGoalCalorieTarget(clamped);
+    }
+  }, [calorieBounds.max, calorieBounds.min, goalCalorieTarget, isLoseGainGoal]);
+
   // Body type is optional: tapping the same option again should deselect (match diabetes toggle UX).
   const handleBodyTypeChange = useCallback((type: string) => {
     setBodyType((current: string) => (current === type ? '' : type));
@@ -1215,6 +1781,17 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const weightKgRounded = getCurrentWeightKgRounded();
     const heightCmRounded = getCurrentHeightCmRounded();
     const includeDietTypes = dietHydratedRef.current || dietTouchedRef.current;
+    const includeGoalDetails = goalDetailsTouchedRef.current && isLoseGainGoal;
+    const targetWeightKg = getTargetWeightKg();
+    const goalSplitPayload = goalMacroSplit ?? activeGoalSplit;
+    const goalCaloriePayload = Number.isFinite(goalCalorieTarget as number)
+      ? Math.round(goalCalorieTarget as number)
+      : activeGoalCalories;
+    const goalPacePayload = Number.isFinite(goalPaceKgPerWeek as number)
+      ? (goalPaceKgPerWeek as number)
+      : activeGoalPace;
+    const clampedFiberTarget = Math.min(activeFiberTarget, macroTotals.carbs);
+    const clampedSugarMax = Math.min(activeSugarMax, macroTotals.carbs);
     const payload = {
       weight: weightKgRounded != null ? String(weightKgRounded) : '',
       birthdate: birthdateFromParts || '',
@@ -1222,6 +1799,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       bodyType,
       goalChoice,
       goalIntensity,
+      ...(includeGoalDetails
+        ? {
+            ...(targetWeightKg != null && targetWeightKg > 0
+              ? { goalTargetWeightKg: targetWeightKg, goalTargetWeightUnit: goalTargetWeightUnit }
+              : {}),
+            ...(Number.isFinite(goalPacePayload) ? { goalPaceKgPerWeek: roundToPrecision(goalPacePayload, 2) } : {}),
+            ...(Number.isFinite(goalCaloriePayload) ? { goalCalorieTarget: goalCaloriePayload } : {}),
+            ...(goalSplitPayload ? { goalMacroSplit: goalSplitPayload } : {}),
+            ...(Number.isFinite(clampedFiberTarget) ? { goalFiberTarget: Math.round(clampedFiberTarget) } : {}),
+            ...(Number.isFinite(clampedSugarMax) ? { goalSugarMax: Math.round(clampedSugarMax) } : {}),
+          }
+        : {}),
       allergies,
       diabetesType,
       ...(includeDietTypes ? { dietTypes: Array.from(new Set(dietTypes)).sort() } : {}),
@@ -1235,6 +1824,20 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     dietTypes,
     goalChoice,
     goalIntensity,
+    isLoseGainGoal,
+    goalTargetWeightInput,
+    goalTargetWeightUnit,
+    goalPaceKgPerWeek,
+    goalCalorieTarget,
+    goalMacroSplit,
+    goalFiberTarget,
+    goalSugarMax,
+    activeGoalCalories,
+    activeGoalSplit,
+    activeGoalPace,
+    macroTotals,
+    activeFiberTarget,
+    activeSugarMax,
     allergies,
     diabetesType,
     onPartialSave,
@@ -1489,6 +2092,248 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     )
   }
 
+  if (showGoalDetails) {
+    const proteinPct = Math.round(activeGoalSplit.proteinPct * 100);
+    const carbPct = Math.round(activeGoalSplit.carbPct * 100);
+    const fatPct = Math.round(activeGoalSplit.fatPct * 100);
+    const paceUnit = goalTargetWeightUnit === 'lb' ? 'lb' : 'kg';
+    const goalTitle = isLoseGoal ? 'Lose weight goal' : 'Gain weight goal';
+    const proteinMax = Math.max(60, Math.round(clampedGoalCalories / 4));
+    const carbsMax = Math.max(60, Math.round(clampedGoalCalories / 4));
+    const fatMax = Math.max(30, Math.round(clampedGoalCalories / 9));
+    const fiberMax = Math.max(0, Math.min(80, macroTotals.carbs));
+    const sugarMaxLimit = Math.max(0, Math.min(100, macroTotals.carbs));
+
+    return (
+      <div className="bg-gray-50 min-h-screen flex flex-col">
+        <header className="sticky top-0 z-50 bg-gray-50/95 backdrop-blur-md border-b border-gray-100">
+          <div className="max-w-md mx-auto w-full flex items-center justify-between px-4 py-4">
+            <button
+              type="button"
+              onClick={() => setShowGoalDetails(false)}
+              className="flex items-center justify-center size-10 rounded-full hover:bg-gray-200 transition-colors"
+              aria-label="Back"
+            >
+              <MaterialSymbol name="arrow_back" className="text-2xl" />
+            </button>
+            <h1 className="text-lg font-bold tracking-tight">{goalTitle}</h1>
+            <div className="size-10" aria-hidden="true" />
+          </div>
+        </header>
+
+        <main className="flex-1 flex flex-col w-full max-w-md mx-auto pb-[calc(12rem+env(safe-area-inset-bottom))] md:pb-32">
+          <div className="px-5 pt-5 pb-4 space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold text-gray-900">Target weight</h2>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    className={`px-3 py-1 rounded-l text-sm font-semibold ${goalTargetWeightUnit === 'kg' ? 'bg-helfi-green text-white' : 'bg-gray-100 text-gray-700'}`}
+                    onClick={() => handleGoalTargetWeightUnitChange('kg')}
+                  >
+                    kg
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-3 py-1 rounded-r text-sm font-semibold ${goalTargetWeightUnit === 'lb' ? 'bg-helfi-green text-white' : 'bg-gray-100 text-gray-700'}`}
+                    onClick={() => handleGoalTargetWeightUnitChange('lb')}
+                  >
+                    lb
+                  </button>
+                </div>
+              </div>
+              <input
+                type="number"
+                inputMode="decimal"
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder={`Target weight (${goalTargetWeightUnit})`}
+                value={goalTargetWeightInput}
+                onChange={(e) => handleGoalTargetWeightChange(e.target.value)}
+              />
+              {estimatedWeeks != null ? (
+                <p className="text-xs text-gray-500">
+                  Estimated time: {estimatedWeeks} weeks at this pace.
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500">Set a target to see the timeline.</p>
+              )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">Weekly pace</h2>
+                  <p className="text-xs text-gray-500">Adjusts your calories and macros.</p>
+                </div>
+                <span className="text-sm font-semibold text-gray-900">
+                  {displayGoalPace} {paceUnit}/week
+                </span>
+              </div>
+              <input
+                type="range"
+                min={MIN_GOAL_PACE}
+                max={MAX_GOAL_PACE}
+                step={0.05}
+                value={activeGoalPace}
+                onChange={(e) => handleGoalPaceChange(Number(e.target.value))}
+                className="w-full"
+              />
+              {activeGoalPace >= MAX_GOAL_PACE && (
+                <p className="text-xs font-semibold text-red-600">
+                  Warning: This is an extreme weight loss plan. Check with your doctor or your dietician on whether this is a safe plan for you.
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">Daily calories</h2>
+                  <p className="text-xs text-gray-500">Moves the pace automatically.</p>
+                </div>
+                <span className="text-sm font-semibold text-gray-900">{clampedGoalCalories} kcal</span>
+              </div>
+              <input
+                type="range"
+                min={calorieBounds.min}
+                max={calorieBounds.max}
+                step={10}
+                value={clampedGoalCalories}
+                onChange={(e) => handleGoalCaloriesChange(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-4">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Macros</h2>
+                <p className="text-xs text-gray-500">Changing these updates calories and pace.</p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Protein</p>
+                    <p className="text-xs text-gray-500">{proteinPct}% of calories</p>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">{macroTotals.protein} g</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={proteinMax}
+                  step={1}
+                  value={macroTotals.protein}
+                  onChange={(e) => handleMacroChange('protein', Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Carbs</p>
+                    <p className="text-xs text-gray-500">{carbPct}% of calories</p>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">{macroTotals.carbs} g</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={carbsMax}
+                  step={1}
+                  value={macroTotals.carbs}
+                  onChange={(e) => handleMacroChange('carbs', Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Fat</p>
+                    <p className="text-xs text-gray-500">{fatPct}% of calories</p>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">{macroTotals.fat} g</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={fatMax}
+                  step={1}
+                  value={macroTotals.fat}
+                  onChange={(e) => handleMacroChange('fat', Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-4">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Fibre and sugar</h2>
+                <p className="text-xs text-gray-500">These are part of your carb total.</p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-900">Fibre</span>
+                  <span className="text-sm font-semibold text-gray-900">{clampedFiberTarget} g</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={fiberMax}
+                  step={1}
+                  value={clampedFiberTarget}
+                  onChange={(e) => handleFiberChange(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-900">Sugar</span>
+                  <span className="text-sm font-semibold text-gray-900">{clampedSugarMax} g</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={sugarMaxLimit}
+                  step={1}
+                  value={clampedSugarMax}
+                  onChange={(e) => handleSugarChange(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {dietWarnings.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-amber-900 mb-2">Diet warnings</p>
+                <ul className="list-disc list-inside text-sm text-amber-800 space-y-1">
+                  {dietWarnings.map((warning, idx) => (
+                    <li key={`${warning}-${idx}`}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </main>
+
+        <div className="fixed bottom-0 left-0 right-0 pt-4 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-4 bg-gray-50/95 backdrop-blur-xl border-t border-gray-200 z-50">
+          <div className="max-w-md mx-auto w-full">
+            <button
+              type="button"
+              onClick={() => setShowGoalDetails(false)}
+              className="w-full flex items-center justify-center rounded-lg h-14 px-8 bg-helfi-green hover:bg-helfi-green/90 active:scale-[0.98] transition-all duration-200 text-white text-lg font-bold tracking-wide shadow-lg shadow-helfi-green/10"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded shadow">
       <h2 className="text-2xl font-bold mb-4">Enter your current weight</h2>
@@ -1656,10 +2501,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
         {[
           { key: 'lose weight', label: 'Lose weight' },
-          { key: 'tone up', label: 'Tone up' },
-          { key: 'get shredded', label: 'Get shredded' },
           { key: 'maintain weight', label: 'Maintain weight' },
           { key: 'gain weight', label: 'Gain weight' },
+          { key: 'tone up', label: 'Tone up' },
+          { key: 'get shredded', label: 'Get shredded' },
         ].map((option) => (
           <button
             key={option.key}
@@ -1668,42 +2513,53 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 ? 'bg-green-600 text-white border-green-600'
                 : 'border-green-600 text-green-700 hover:bg-green-50'
             } transition-colors`}
-            onClick={() => setGoalChoice(option.key)}
+            onClick={() => handleGoalChoiceSelect(option.key)}
             type="button"
           >
             <span>{option.label}</span>
           </button>
         ))}
       </div>
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-semibold text-gray-900">How intense?</h3>
-          <span className="text-sm text-gray-500">Adjusts deficit/surplus</span>
+      {isLoseGainGoal && (
+        <button
+          type="button"
+          onClick={() => setShowGoalDetails(true)}
+          className="mb-6 text-sm font-semibold text-helfi-green underline underline-offset-2"
+        >
+          Set your weight goal
+        </button>
+      )}
+      {requiresGoalIntensity && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold text-gray-900">How intense?</h3>
+            <span className="text-sm text-gray-500">Adjusts deficit/surplus</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { key: 'mild', label: 'Mild' },
+              { key: 'standard', label: 'Standard' },
+              { key: 'aggressive', label: 'Aggressive' },
+            ].map((option) => (
+              <button
+                key={option.key}
+                className={`w-full py-2 rounded-xl border ${
+                  goalIntensity === option.key
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                } transition-colors text-sm font-semibold`}
+                onClick={() => setGoalIntensity(option.key as any)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            Mild = smaller change, Standard = balanced, Aggressive = faster change (use only if safe for you).
+          </p>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { key: 'mild', label: 'Mild' },
-            { key: 'standard', label: 'Standard' },
-            { key: 'aggressive', label: 'Aggressive' },
-          ].map((option) => (
-            <button
-              key={option.key}
-              className={`w-full py-2 rounded-xl border ${
-                goalIntensity === option.key
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              } transition-colors text-sm font-semibold`}
-              onClick={() => setGoalIntensity(option.key as any)}
-              type="button"
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-gray-500">
-          Mild = smaller change, Standard = balanced, Aggressive = faster change (use only if safe for you).
-        </p>
-      </div>
+      )}
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">Do you have diabetes?</h2>
         <p className="mb-3 text-gray-600">Helps set safer sugar and carb targets.</p>

@@ -590,6 +590,10 @@ const buildTargetsForUser = async (user: any) => {
     }
   })()
 
+  const goalChoiceValue =
+    typeof primaryGoal?.goalChoice === 'string' ? primaryGoal.goalChoice.toLowerCase() : ''
+  const useManualTargets = goalChoiceValue.includes('lose') || goalChoiceValue.includes('gain')
+
   const targets = calculateDailyTargets({
     gender: user.gender ? String(user.gender).toLowerCase() : '',
     birthdate: typeof profile?.dateOfBirth === 'string' ? profile.dateOfBirth : '',
@@ -604,6 +608,13 @@ const buildTargetsForUser = async (user: any) => {
       ['mild', 'standard', 'aggressive'].includes(primaryGoal.goalIntensity.toLowerCase())
         ? (primaryGoal.goalIntensity.toLowerCase() as any)
         : 'standard',
+    calorieTarget: useManualTargets && typeof primaryGoal?.goalCalorieTarget === 'number' ? primaryGoal.goalCalorieTarget : null,
+    macroSplit:
+      useManualTargets && primaryGoal?.goalMacroSplit && typeof primaryGoal.goalMacroSplit === 'object'
+        ? primaryGoal.goalMacroSplit
+        : null,
+    fiberTarget: useManualTargets && typeof primaryGoal?.goalFiberTarget === 'number' ? primaryGoal.goalFiberTarget : null,
+    sugarMax: useManualTargets && typeof primaryGoal?.goalSugarMax === 'number' ? primaryGoal.goalSugarMax : null,
     bodyType: user.bodyType ? String(user.bodyType).toLowerCase() : '',
     diabetesType:
       typeof allergySettings?.diabetesType === 'string' &&
