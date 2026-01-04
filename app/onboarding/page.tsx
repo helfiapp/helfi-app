@@ -1215,6 +1215,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const MACRO_STEP = 5;
   const FIBER_STEP = 1;
   const SUGAR_STEP = 1;
+  const SLIDER_HAPTIC_MS = 15;
   const MACRO_COLORS = {
     protein: '#ef4444',
     carbs: '#22c55e',
@@ -1225,6 +1226,17 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   const clampNumber = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
+
+  const triggerSliderHaptic = () => {
+    try {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches;
+      const pref = typeof window !== 'undefined' ? localStorage.getItem('hapticsEnabled') : null;
+      const enabled = pref === null ? true : pref === 'true';
+      if (!reduced && enabled && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(SLIDER_HAPTIC_MS);
+      }
+    } catch {}
+  };
 
   const goalDetailDefaults = useMemo(() => {
     const weightKg = getCurrentWeightKgRounded();
@@ -1346,8 +1358,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     goalMacroSplit?.carbPct ?? goalDetailDefaults.split.carbPct,
     goalMacroSplit?.fatPct ?? goalDetailDefaults.split.fatPct,
   );
-  const activeFiberTarget = goalFiberTarget ?? goalDetailDefaults.fiber;
-  const activeSugarMax = goalSugarMax ?? goalDetailDefaults.sugarMax;
 
   const calorieBounds = useMemo(() => {
     const base = maintenanceCalories ?? activeGoalCalories ?? 2000;
@@ -1401,6 +1411,25 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       fat: Math.max(0, roundToStep(totals.fat, MACRO_STEP)),
     };
   }, [clampedGoalCalories, activeGoalSplit]);
+  const autoFiberTarget = useMemo(() => {
+    const baseCalories = goalDetailDefaults.calories;
+    const baseFiber = goalDetailDefaults.fiber ?? 0;
+    const ratio = baseCalories > 0 && Number.isFinite(baseFiber) ? baseFiber / baseCalories : 14 / 1000;
+    const next = Math.max(0, Math.round(clampedGoalCalories * ratio));
+    return Math.min(next, macroTotals.carbs);
+  }, [clampedGoalCalories, goalDetailDefaults.calories, goalDetailDefaults.fiber, macroTotals.carbs]);
+  const autoSugarMax = useMemo(() => {
+    const baseCalories = goalDetailDefaults.calories;
+    const baseSugar = goalDetailDefaults.sugarMax ?? 0;
+    const ratioFallback = 0.1 / 4;
+    const ratio = baseCalories > 0 && Number.isFinite(baseSugar) ? baseSugar / baseCalories : ratioFallback;
+    const ratioBased = Math.max(0, Math.round(clampedGoalCalories * ratio));
+    const tenPctCap = Math.max(0, Math.round((clampedGoalCalories * 0.1) / 4));
+    const next = Math.min(ratioBased, tenPctCap);
+    return Math.min(next, macroTotals.carbs);
+  }, [clampedGoalCalories, goalDetailDefaults.calories, goalDetailDefaults.sugarMax, macroTotals.carbs]);
+  const activeFiberTarget = autoFiberTarget;
+  const activeSugarMax = autoSugarMax;
   const clampedFiberTarget = Math.min(activeFiberTarget, macroTotals.carbs);
   const clampedSugarMax = Math.min(activeSugarMax, macroTotals.carbs);
 
@@ -1796,33 +1825,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       markGoalDetailsTouched,
     ],
   );
-
-  const handleFiberChange = useCallback(
-    (value: number) => {
-      const nextValue = Math.min(roundToStep(value, FIBER_STEP), macroTotals.carbs);
-      setGoalFiberTarget(nextValue);
-      markGoalDetailsTouched();
-    },
-    [macroTotals.carbs, markGoalDetailsTouched],
-  );
-
-  const handleSugarChange = useCallback(
-    (value: number) => {
-      const nextValue = Math.min(roundToStep(value, SUGAR_STEP), macroTotals.carbs);
-      setGoalSugarMax(nextValue);
-      markGoalDetailsTouched();
-    },
-    [macroTotals.carbs, markGoalDetailsTouched],
-  );
-
-  useEffect(() => {
-    if (goalFiberTarget != null && goalFiberTarget > macroTotals.carbs) {
-      setGoalFiberTarget(macroTotals.carbs);
-    }
-    if (goalSugarMax != null && goalSugarMax > macroTotals.carbs) {
-      setGoalSugarMax(macroTotals.carbs);
-    }
-  }, [macroTotals.carbs, goalFiberTarget, goalSugarMax]);
 
   useEffect(() => {
     if (!isLoseGainGoal || goalCalorieTarget == null) return;
@@ -2273,8 +2275,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         </header>
 
         <main className="flex-1 flex flex-col w-full max-w-md mx-auto pb-[calc(12rem+env(safe-area-inset-bottom))] md:pb-32">
-          <div className="px-5 pt-6 pb-4 space-y-8">
-            <section className="space-y-3">
+          <div className="px-5 pt-4 pb-4 space-y-5">
+            <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-gray-900">Target weight</h2>
                 <div className="flex items-center">
@@ -2313,7 +2315,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
             <div className="h-px bg-gray-100" />
 
-            <section className="space-y-3">
+            <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Weekly pace</h2>
@@ -2329,7 +2331,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 max={MAX_GOAL_PACE}
                 step={GOAL_PACE_STEP}
                 value={paceValue}
-                onChange={(e) => handleGoalPaceChange(Number(e.target.value))}
+                onChange={(e) => {
+                  handleGoalPaceChange(Number(e.target.value));
+                  triggerSliderHaptic();
+                }}
                 className="w-full"
                 style={{ accentColor: '#16a34a' }}
               />
@@ -2344,7 +2349,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
             <div className="h-px bg-gray-100" />
 
-            <section className="space-y-3">
+            <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Daily calories</h2>
@@ -2358,7 +2363,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 max={calorieBounds.max}
                 step={CALORIE_STEP}
                 value={clampedGoalCalories}
-                onChange={(e) => handleGoalCaloriesChange(Number(e.target.value))}
+                onChange={(e) => {
+                  handleGoalCaloriesChange(Number(e.target.value));
+                  triggerSliderHaptic();
+                }}
                 className="w-full"
                 style={{ accentColor: '#16a34a' }}
               />
@@ -2367,7 +2375,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
             <div className="h-px bg-gray-100" />
 
-            <section className="space-y-4">
+            <section className="space-y-3">
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Macros</h2>
                 <p className="text-xs text-gray-500">
@@ -2378,7 +2386,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 </p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -2398,7 +2406,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                     max={proteinBounds.max}
                     step={MACRO_STEP}
                     value={macroTotals.protein}
-                    onChange={(e) => handleMacroChange('protein', Number(e.target.value))}
+                    onChange={(e) => {
+                      handleMacroChange('protein', Number(e.target.value));
+                      triggerSliderHaptic();
+                    }}
                     className="w-full"
                     style={{ accentColor: MACRO_COLORS.protein }}
                   />
@@ -2424,7 +2435,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                     max={carbBounds.max}
                     step={MACRO_STEP}
                     value={macroTotals.carbs}
-                    onChange={(e) => handleMacroChange('carbs', Number(e.target.value))}
+                    onChange={(e) => {
+                      handleMacroChange('carbs', Number(e.target.value));
+                      triggerSliderHaptic();
+                    }}
                     className="w-full"
                     style={{ accentColor: MACRO_COLORS.carbs }}
                   />
@@ -2450,7 +2464,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                     max={fatBounds.max}
                     step={MACRO_STEP}
                     value={macroTotals.fat}
-                    onChange={(e) => handleMacroChange('fat', Number(e.target.value))}
+                    onChange={(e) => {
+                      handleMacroChange('fat', Number(e.target.value));
+                      triggerSliderHaptic();
+                    }}
                     className="w-full"
                     style={{ accentColor: MACRO_COLORS.fat }}
                   />
@@ -2458,8 +2475,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-gray-100 space-y-4">
+              <div className="pt-3 border-t border-gray-100 space-y-3">
                 <p className="text-xs text-gray-500">Fibre and sugar are counted inside your carb total.</p>
+                <p className="text-xs text-gray-500">Auto-calculated from calories and your health profile.</p>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -2476,8 +2494,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                     max={fiberMax}
                     step={FIBER_STEP}
                     value={clampedFiberTarget}
-                    onChange={(e) => handleFiberChange(Number(e.target.value))}
-                    className="w-full"
+                    disabled
+                    className="w-full opacity-80"
                     style={{ accentColor: MACRO_COLORS.fiber }}
                   />
                   <div className="h-2 w-full rounded-full" style={tickStyle(0, fiberMax, FIBER_STEP)} />
@@ -2499,8 +2517,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                     max={sugarMaxLimit}
                     step={SUGAR_STEP}
                     value={clampedSugarMax}
-                    onChange={(e) => handleSugarChange(Number(e.target.value))}
-                    className="w-full"
+                    disabled
+                    className="w-full opacity-80"
                     style={{ accentColor: MACRO_COLORS.sugar }}
                   />
                   <div className="h-2 w-full rounded-full" style={tickStyle(0, sugarMaxLimit, SUGAR_STEP)} />
