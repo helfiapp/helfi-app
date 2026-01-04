@@ -1355,8 +1355,16 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       const weightKg = getCurrentWeightKgRounded();
       if (!safeCalories || !weightKg) return fallback;
 
-      const proteinPerKg = isGainGoal ? 1.8 : 1.6;
-      const fatPerKg = isGainGoal ? 0.8 : 0.7;
+      const baseCalories = goalDetailDefaults.calories || safeCalories;
+      const calorieRatio = clampNumber(baseCalories > 0 ? safeCalories / baseCalories : 1, 0.7, 1.3);
+      const proteinRange = isGainGoal
+        ? { min: 1.4, base: 1.8, max: 2.2 }
+        : { min: 1.2, base: 1.6, max: 2.0 };
+      const fatRange = isGainGoal
+        ? { min: 0.6, base: 0.8, max: 1.1 }
+        : { min: 0.5, base: 0.7, max: 1.0 };
+      const proteinPerKg = clampNumber(proteinRange.base * calorieRatio, proteinRange.min, proteinRange.max);
+      const fatPerKg = clampNumber(fatRange.base * calorieRatio, fatRange.min, fatRange.max);
       let protein = roundToStep(Math.round(weightKg * proteinPerKg), MACRO_STEP);
       let fat = roundToStep(Math.round(weightKg * fatPerKg), MACRO_STEP);
 
@@ -2210,6 +2218,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const paceUnit = goalTargetWeightUnit === 'lb' ? 'lb' : 'kg';
     const goalTitle = isLoseGoal ? 'Lose weight goal' : 'Gain weight goal';
     const paceValue = roundToStep(activeGoalPace, GOAL_PACE_STEP);
+    const paceProgress =
+      ((paceValue - MIN_GOAL_PACE) / Math.max(1e-6, MAX_GOAL_PACE - MIN_GOAL_PACE)) * 100;
     const fiberMax = Math.max(0, Math.min(80, macroTotals.carbs));
     const sugarMaxLimit = Math.max(0, Math.min(100, macroTotals.carbs));
     const fiberPct = fiberMax > 0 ? Math.round((clampedFiberTarget / fiberMax) * 100) : 0;
@@ -2301,8 +2311,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                   const next = handleGoalPaceChange(Number(e.currentTarget.value));
                   if (next != null) triggerSliderHaptic('pace', next);
                 }}
-                className="w-full touch-pan-x cursor-pointer"
-                style={{ accentColor: '#16a34a' }}
+                className="w-full cursor-pointer goal-pace-slider"
+                style={{ '--progress': `${Math.min(100, Math.max(0, paceProgress))}%` } as React.CSSProperties}
               />
               <div className="h-2 w-full rounded-full" style={tickStyle(MIN_GOAL_PACE, MAX_GOAL_PACE, GOAL_PACE_STEP)} />
               <p className="text-xs text-gray-500">Weekly pace uses the 7,700 kcal per kg rule.</p>
@@ -2342,7 +2352,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Macros</h2>
                 <p className="text-xs text-gray-500">
-                  Protein and fat are set from your body weight. Carbs fill the remaining calories.
+                  Protein and fat scale with your body weight and pace. Carbs fill the remaining calories.
                 </p>
                 <p className="text-xs text-gray-500">Adjust weekly pace to recalculate.</p>
               </div>

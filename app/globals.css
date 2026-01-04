@@ -95,6 +95,72 @@
   }
 }
 
+input.goal-pace-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 38px;
+  background: transparent;
+  touch-action: pan-x;
+}
+
+input.goal-pace-slider:focus {
+  outline: none;
+}
+
+input.goal-pace-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #16a34a var(--progress, 0%),
+    #e5e7eb var(--progress, 0%)
+  );
+}
+
+input.goal-pace-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 2px solid #16a34a;
+  margin-top: -8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.15);
+}
+
+input.goal-pace-slider:active::-webkit-slider-thumb,
+input.goal-pace-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 12px rgba(22, 163, 74, 0.25), 0 1px 2px rgba(15, 23, 42, 0.2);
+}
+
+input.goal-pace-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+input.goal-pace-slider::-moz-range-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #16a34a;
+}
+
+input.goal-pace-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 2px solid #16a34a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.15);
+}
+
+input.goal-pace-slider:active::-moz-range-thumb,
+input.goal-pace-slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 12px rgba(22, 163, 74, 0.25), 0 1px 2px rgba(15, 23, 42, 0.2);
+}
+
 @layer components {
   .btn-primary {
     @apply bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green-dark transition-colors;
