@@ -70,6 +70,23 @@ type NutritionTotals = {
   sugar: number | null
 }
 
+type HealthCheckPromptPayload = {
+  entryId: string
+  description: string
+  totals: NutritionTotals
+  items: any[] | null
+}
+
+type HealthCheckResult = {
+  warning: string
+  alternative: string | null
+}
+
+const HEALTH_CHECK_THRESHOLDS = { sugar: 25, carbs: 75, fat: 25 } as const
+const HEALTH_CHECK_COST_CREDITS = 2
+const HEALTH_CHECK_PROMPT_STORAGE_KEY = 'food:healthCheckPrompted'
+const HEALTH_CHECK_PROMPT_CACHE_LIMIT = 200
+
 const formatServingsDisplay = (value: number | null | undefined) => {
   const numeric = Number(value)
   if (!Number.isFinite(numeric) || numeric <= 0) return '1'
@@ -1947,6 +1964,9 @@ export default function FoodDiary() {
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
   const [dietWarning, setDietWarning] = useState<string | null>(null)
   const [dietAlternatives, setDietAlternatives] = useState<string | null>(null)
+  const [healthCheckPrompt, setHealthCheckPrompt] = useState<HealthCheckPromptPayload | null>(null)
+  const [healthCheckResult, setHealthCheckResult] = useState<HealthCheckResult | null>(null)
+  const [healthCheckLoading, setHealthCheckLoading] = useState(false)
   const [historySaveError, setHistorySaveError] = useState<string | null>(null)
   const [lastHistoryPayload, setLastHistoryPayload] = useState<any>(null)
   const [historyRetrying, setHistoryRetrying] = useState(false)
@@ -2096,6 +2116,8 @@ export default function FoodDiary() {
   const barcodeLabelTimeoutRef = useRef<number | null>(null)
   const photoPreviewRef = useRef<string | null>(null)
   const photoRefreshAttemptedRef = useRef<Record<string, boolean>>({})
+  const healthCheckPromptedRef = useRef<Set<string>>(new Set())
+  const healthCheckPromptedLoadedRef = useRef(false)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -2881,6 +2903,23 @@ export default function FoodDiary() {
       }
     } catch {}
   }, [foodNameOverrides])
+
+  useEffect(() => {
+    if (healthCheckPromptedLoadedRef.current) return
+    healthCheckPromptedLoadedRef.current = true
+    if (typeof window === 'undefined') return
+    try {
+      const raw = localStorage.getItem(HEALTH_CHECK_PROMPT_STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        parsed
+          .map((id) => String(id || '').trim())
+          .filter((id) => id.length > 0)
+          .forEach((id) => healthCheckPromptedRef.current.add(id))
+      }
+    } catch {}
+  }, [])
 
   const dailyTargets = useMemo(() => {
     if (!userData) return { calories: null, protein: null, carbs: null, fat: null }
@@ -7161,6 +7200,7 @@ Please add nutritional information manually if needed.`);
     
     const updatedFoods = [newEntry, ...todaysFoods]
     setTodaysFoods(updatedFoods)
+    maybeShowHealthCheckPrompt(newEntry)
 
     // If the user is viewing a non‑today date (e.g. yesterday), keep the
     // visible history list in sync so the new entry doesn't "disappear"
@@ -7858,6 +7898,129 @@ Please add nutritional information manually if needed.`);
       fat_g: (n as any).fat,
       fiber_g: (n as any).fiber,
       sugar_g: (n as any).sugar,
+    }
+  }
+
+  const getHealthCheckEntryKey = (entry: any) => {
+    if (!entry) return ''
+    const dbId = entry?.dbId ? String(entry.dbId) : ''
+    const id = entry?.id ? String(entry.id) : ''
+    const clientId = getEntryClientId(entry) || ''
+    return dbId || id || clientId
+  }
+
+  const persistHealthCheckPrompted = () => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(
+        HEALTH_CHECK_PROMPT_STORAGE_KEY,
+        JSON.stringify(Array.from(healthCheckPromptedRef.current)),
+      )
+    } catch {}
+  }
+
+  const markHealthCheckPrompted = (entryKey: string) => {
+    if (!entryKey) return
+    const set = healthCheckPromptedRef.current
+    if (set.has(entryKey)) return
+    set.add(entryKey)
+    if (set.size > HEALTH_CHECK_PROMPT_CACHE_LIMIT) {
+      const overflow = set.size - HEALTH_CHECK_PROMPT_CACHE_LIMIT
+      let removed = 0
+      for (const key of set) {
+        set.delete(key)
+        removed += 1
+        if (removed >= overflow) break
+      }
+    }
+    persistHealthCheckPrompted()
+  }
+
+  const isHighRiskTotals = (totals: NutritionTotals | null) => {
+    if (!totals) return false
+    const sugar = typeof totals.sugar === 'number' ? totals.sugar : 0
+    const carbs = typeof totals.carbs === 'number' ? totals.carbs : 0
+    const fat = typeof totals.fat === 'number' ? totals.fat : 0
+    if (![sugar, carbs, fat].some((value) => Number.isFinite(value) && value > 0)) return false
+    return (
+      sugar > HEALTH_CHECK_THRESHOLDS.sugar ||
+      carbs > HEALTH_CHECK_THRESHOLDS.carbs ||
+      fat > HEALTH_CHECK_THRESHOLDS.fat
+    )
+  }
+
+  const maybeShowHealthCheckPrompt = (entry: any) => {
+    try {
+      const goals = Array.isArray((userData as any)?.goals)
+        ? (userData as any).goals
+            .map((goal: any) => String(goal || '').trim())
+            .filter((goal: string) => goal.length > 0 && !goal.startsWith('__'))
+        : []
+      const dietIds = normalizeDietTypes((userData as any)?.dietTypes ?? (userData as any)?.dietType)
+      if (!goals.length && !dietIds.length) return
+
+      const entryKey = getHealthCheckEntryKey(entry)
+      if (!entryKey) return
+      if (healthCheckPromptedRef.current.has(entryKey)) return
+
+      const totals = getEntryTotals(entry)
+      if (!isHighRiskTotals(totals)) return
+
+      const description = String(entry?.description || entry?.label || '').trim()
+      const items = Array.isArray(entry?.items) ? entry.items : null
+
+      markHealthCheckPrompted(entryKey)
+      setHealthCheckResult(null)
+      setHealthCheckPrompt({
+        entryId: entryKey,
+        description: description || 'Meal',
+        totals,
+        items,
+      })
+    } catch {
+      // non-blocking
+    }
+  }
+
+  const runHealthCheck = async (payload: HealthCheckPromptPayload) => {
+    if (!payload || healthCheckLoading) return
+    setHealthCheckLoading(true)
+    setHealthCheckResult(null)
+    try {
+      const res = await fetch('/api/food-health-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: payload.description,
+          totals: payload.totals,
+          items: payload.items,
+        }),
+      })
+      if (res.status === 402) {
+        showQuickToast('Insufficient credits for health check.')
+        return
+      }
+      if (!res.ok) {
+        showQuickToast('Health check failed. Please try again.')
+        return
+      }
+      const data = await res.json()
+      const warning = typeof data?.warning === 'string' ? data.warning.trim() : ''
+      const alternative = typeof data?.alternative === 'string' ? data.alternative.trim() : ''
+      setHealthCheckPrompt(null)
+      setHealthCheckResult({
+        warning: warning || 'This meal may not fully support your current goals.',
+        alternative: alternative || null,
+      })
+      showQuickToast('Health check complete')
+      try {
+        window.dispatchEvent(new Event('credits:refresh'))
+      } catch {}
+    } catch (err) {
+      console.error('Health check error', err)
+      showQuickToast('Health check failed. Please try again.')
+    } finally {
+      setHealthCheckLoading(false)
     }
   }
 
@@ -9649,6 +9812,7 @@ Please add nutritional information manually if needed.`);
     )
     const updated = dedupeEntries([pendingEntry, ...baseForDate], { fallbackDate: selectedDate })
     updateTodaysFoodsForDate(updated, selectedDate)
+    maybeShowHealthCheckPrompt(pendingEntry)
     if (!isViewingToday) {
       setHistoryFoods((prev: any[] | null) => {
         const base = Array.isArray(prev) ? prev : []
@@ -9828,6 +9992,7 @@ Please add nutritional information manually if needed.`);
     setShowAddFood(false)
     setQuickToast(`Adding to ${categoryLabel(category)}...`)
     maybeShowDietWarningToast(pendingEntry)
+    maybeShowHealthCheckPrompt(pendingEntry)
     if (!isViewingToday) {
       setHistoryFoods((prev: any[] | null) => {
         const base = Array.isArray(prev) ? prev : []
@@ -10023,6 +10188,7 @@ Please add nutritional information manually if needed.`);
     }))
     showQuickToast(toastMessage)
     maybeShowDietWarningToast(pendingEntry)
+    maybeShowHealthCheckPrompt(pendingEntry)
     setDuplicateModalContext(null)
     triggerHaptic(10)
 
@@ -11321,6 +11487,57 @@ Please add nutritional information manually if needed.`);
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
           <div className="px-4 py-2 bg-gray-900 text-white rounded-full shadow-lg text-sm">
             {quickToast}
+          </div>
+        </div>
+      )}
+      {healthCheckPrompt && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[10000] w-[92%] max-w-xl">
+          <div className="px-3 py-2 rounded-2xl border border-amber-200 bg-amber-50 shadow-lg flex items-center gap-3">
+            <div className="text-xs text-amber-900 flex-1">
+              High-risk meal detected (sugar/carbs/fat). Run a quick health check for your goals? {HEALTH_CHECK_COST_CREDITS} credits.
+            </div>
+            <button
+              type="button"
+              onClick={() => runHealthCheck(healthCheckPrompt)}
+              disabled={healthCheckLoading}
+              className="px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-semibold disabled:opacity-60"
+            >
+              {healthCheckLoading ? 'Checking...' : 'Run check'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setHealthCheckPrompt(null)}
+              className="text-amber-900 text-sm font-semibold px-1"
+              aria-label="Dismiss"
+            >
+              x
+            </button>
+          </div>
+        </div>
+      )}
+      {healthCheckResult && !healthCheckPrompt && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[10000] w-[92%] max-w-xl">
+          <div className="px-3 py-2 rounded-2xl border border-blue-200 bg-blue-50 shadow-lg">
+            <div className="flex items-start gap-3">
+              <div className="flex-1">
+                <div className="text-xs font-semibold text-blue-900">Health check</div>
+                <div className="text-xs text-blue-900 mt-1 whitespace-pre-line">{healthCheckResult.warning}</div>
+                {healthCheckResult.alternative && (
+                  <div className="text-xs text-blue-900 mt-1">
+                    <span className="font-semibold">Swap idea:</span> {healthCheckResult.alternative}
+                  </div>
+                )}
+                <div className="text-[11px] text-blue-700 mt-1">{HEALTH_CHECK_COST_CREDITS} credits used.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHealthCheckResult(null)}
+                className="text-blue-900 text-sm font-semibold px-1"
+                aria-label="Dismiss"
+              >
+                x
+              </button>
+            </div>
           </div>
         </div>
       )}
