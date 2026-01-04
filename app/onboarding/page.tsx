@@ -15,7 +15,7 @@ import InsightsProgressBar from '@/components/InsightsProgressBar';
 import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import MaterialSymbol from '@/components/MaterialSymbol';
 import { DIET_CATEGORIES, DIET_OPTIONS, getDietOption, normalizeDietTypes } from '@/lib/diets';
-import { calculateDailyTargets } from '@/lib/daily-targets';
+import { applyDietMacroRules, calculateDailyTargets } from '@/lib/daily-targets';
 
 const sanitizeUserDataPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return payload;
@@ -1392,10 +1392,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         remaining = safeCalories - protein * 4 - fat * 9;
       }
 
-      const carbs = Math.max(0, roundToStep(remaining / 4, MACRO_STEP));
+      let carbs = Math.max(0, roundToStep(remaining / 4, MACRO_STEP));
+      const dietAdjusted = applyDietMacroRules(
+        { calories: safeCalories, protein, carbs, fat, sugarMax: null },
+        dietTypes,
+        weightKg,
+      );
+      protein = Math.max(0, roundToStep(dietAdjusted.protein ?? protein, MACRO_STEP));
+      fat = Math.max(0, roundToStep(dietAdjusted.fat ?? fat, MACRO_STEP));
+      carbs = Math.max(0, roundToStep(dietAdjusted.carbs ?? carbs, MACRO_STEP));
       return { protein, carbs, fat };
     },
-    [goalDetailDefaults.calories, goalDetailDefaults.split, isGainGoal, weight, unit],
+    [dietTypes, goalDetailDefaults.calories, goalDetailDefaults.split, isGainGoal, weight, unit],
   );
 
   const maintenanceCalories = useMemo(() => {
@@ -1482,8 +1490,31 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const ratioBased = Math.max(0, Math.round(clampedGoalCalories * ratio));
     const tenPctCap = Math.max(0, Math.round((clampedGoalCalories * 0.1) / 4));
     const next = Math.min(ratioBased, tenPctCap);
-    return Math.min(next, macroTotals.carbs);
-  }, [clampedGoalCalories, goalDetailDefaults.calories, goalDetailDefaults.sugarMax, macroTotals.carbs]);
+    const weightKg = getCurrentWeightKgRounded();
+    const adjusted = applyDietMacroRules(
+      {
+        calories: clampedGoalCalories,
+        protein: macroTotals.protein,
+        carbs: macroTotals.carbs,
+        fat: macroTotals.fat,
+        sugarMax: next,
+      },
+      dietTypes,
+      weightKg,
+    );
+    const dietCapped = typeof adjusted.sugarMax === 'number' ? adjusted.sugarMax : next;
+    return Math.min(dietCapped, macroTotals.carbs);
+  }, [
+    clampedGoalCalories,
+    dietTypes,
+    goalDetailDefaults.calories,
+    goalDetailDefaults.sugarMax,
+    macroTotals.carbs,
+    macroTotals.fat,
+    macroTotals.protein,
+    unit,
+    weight,
+  ]);
   const activeFiberTarget = autoFiberTarget;
   const activeSugarMax = autoSugarMax;
   const clampedFiberTarget = Math.min(activeFiberTarget, macroTotals.carbs);
@@ -2377,6 +2408,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                   Protein and fat scale with your body weight and pace. Carbs fill the remaining calories.
                 </p>
                 <p className="text-xs text-gray-500">Adjust weekly pace to recalculate.</p>
+                <p className="text-xs text-gray-500">
+                  Diet choices like keto or carnivore can cap carbs and rebalance macros.
+                </p>
               </div>
 
               <div className="space-y-2">

@@ -307,6 +307,120 @@ function applyBodyTypeAdjustments(
   return { ...normalized, calorieFactor, fiberBonus }
 }
 
+type DietMacroRule = {
+  carbsMaxG?: number
+  sugarMaxG?: number
+  proteinMinGPerKg?: number
+  split?: { proteinPct: number; fatPct: number; carbPct: number }
+}
+
+const DIET_MACRO_RULES: Record<string, DietMacroRule> = {
+  keto: { carbsMaxG: 30, sugarMaxG: 25, split: { proteinPct: 0.25, fatPct: 0.7, carbPct: 0.05 } },
+  'keto-carnivore': { carbsMaxG: 20, sugarMaxG: 15, split: { proteinPct: 0.25, fatPct: 0.7, carbPct: 0.05 } },
+  'low-carb': { carbsMaxG: 130 },
+  atkins: { carbsMaxG: 40, sugarMaxG: 30 },
+  'zero-carb': { carbsMaxG: 10, sugarMaxG: 5, split: { proteinPct: 0.3, fatPct: 0.7, carbPct: 0.0 } },
+  carnivore: { carbsMaxG: 10, sugarMaxG: 5, split: { proteinPct: 0.3, fatPct: 0.7, carbPct: 0.0 } },
+  lion: { carbsMaxG: 10, sugarMaxG: 5, split: { proteinPct: 0.3, fatPct: 0.7, carbPct: 0.0 } },
+  diabetic: { carbsMaxG: 160, sugarMaxG: 25 },
+  'high-protein': { proteinMinGPerKg: 1.6 },
+  bodybuilding: { proteinMinGPerKg: 1.8 },
+}
+
+export function applyDietMacroRules(
+  base: DailyTargets,
+  dietTypesRaw: any,
+  weightKg?: number | null,
+): DailyTargets {
+  const dietTypes = normalizeDietTypes(dietTypesRaw)
+  if (!dietTypes.length) return base
+
+  const rules = dietTypes.map((d) => DIET_MACRO_RULES[d]).filter(Boolean) as DietMacroRule[]
+  if (!rules.length) return base
+
+  const calories = base.calories
+  if (!calories || calories <= 0) return base
+
+  const carbsMaxG = rules.reduce<number | null>((min, r) => {
+    if (typeof r.carbsMaxG !== 'number') return min
+    return min === null ? r.carbsMaxG : Math.min(min, r.carbsMaxG)
+  }, null)
+
+  const sugarMaxG = rules.reduce<number | null>((min, r) => {
+    if (typeof r.sugarMaxG !== 'number') return min
+    return min === null ? r.sugarMaxG : Math.min(min, r.sugarMaxG)
+  }, null)
+
+  const proteinMinGPerKg = rules.reduce<number | null>((max, r) => {
+    if (typeof r.proteinMinGPerKg !== 'number') return max
+    return max === null ? r.proteinMinGPerKg : Math.max(max, r.proteinMinGPerKg)
+  }, null)
+
+  const splitRule = (() => {
+    const priority = ['zero-carb', 'carnivore', 'lion', 'keto-carnivore', 'keto', 'atkins', 'low-carb', 'diabetic']
+    for (const id of priority) {
+      const rule = DIET_MACRO_RULES[id]
+      if (rule?.split && dietTypes.includes(id)) return rule.split
+    }
+    return null
+  })()
+
+  let nextCarbs = typeof base.carbs === 'number' ? base.carbs : 0
+  if (splitRule) {
+    nextCarbs = Math.round((calories * splitRule.carbPct) / 4)
+  }
+  if (carbsMaxG !== null) nextCarbs = Math.min(nextCarbs, carbsMaxG)
+  nextCarbs = Math.max(0, Math.round(nextCarbs))
+
+  const minProtein = (() => {
+    if (proteinMinGPerKg === null) return 0
+    if (!weightKg || weightKg <= 0) return 0
+    return Math.round(weightKg * proteinMinGPerKg)
+  })()
+
+  let nextProtein = typeof base.protein === 'number' ? base.protein : 0
+  if (splitRule) {
+    nextProtein = Math.round((calories * splitRule.proteinPct) / 4)
+  }
+  nextProtein = Math.max(nextProtein, minProtein)
+  nextProtein = Math.max(0, Math.round(nextProtein))
+
+  const adjustDownToFit = () => {
+    const used = nextProtein * 4 + nextCarbs * 4
+    const room = calories - used
+    if (room >= 0) return
+
+    const need = Math.abs(room)
+    const reducibleCarbCals = nextCarbs * 4
+    const carbCutCals = Math.min(reducibleCarbCals, need)
+    nextCarbs = Math.max(0, Math.round((reducibleCarbCals - carbCutCals) / 4))
+    const usedAfterCarb = nextProtein * 4 + nextCarbs * 4
+    const roomAfterCarb = calories - usedAfterCarb
+    if (roomAfterCarb >= 0) return
+
+    const need2 = Math.abs(roomAfterCarb)
+    const reducibleProteinG = Math.max(0, nextProtein - minProtein)
+    const reducibleProteinCals = reducibleProteinG * 4
+    const proteinCutCals = Math.min(reducibleProteinCals, need2)
+    nextProtein = Math.max(minProtein, Math.round(nextProtein - proteinCutCals / 4))
+  }
+  adjustDownToFit()
+
+  const remainingCalories = calories - (nextProtein * 4 + nextCarbs * 4)
+  const nextFat = Math.max(0, Math.round(remainingCalories / 9))
+
+  return {
+    ...base,
+    protein: nextProtein,
+    carbs: nextCarbs,
+    fat: nextFat,
+    sugarMax:
+      typeof base.sugarMax === 'number'
+        ? Math.round(Math.min(base.sugarMax, sugarMaxG ?? base.sugarMax))
+        : sugarMaxG,
+  }
+}
+
 /**
  * Calculate daily calorie + macro targets using a simple, transparent approach:
  * - Mifflin–St Jeor BMR
@@ -425,124 +539,5 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
     sugarMax,
   }
 
-  // Diet-based macro adjustments:
-  // - Some diets are mainly "food rules" (e.g., gluten-free) and should not change macros.
-  // - Some diets are mainly "macro rules" (e.g., keto, low-carb) and should clamp carbs and rebalance.
-  // These are starting-point targets, not medical advice.
-  const dietTypes = normalizeDietTypes(input.dietTypes)
-  if (!dietTypes.length || manualSplit) return base
-
-  type DietMacroRule = {
-    carbsMaxG?: number
-    sugarMaxG?: number
-    proteinMinGPerKg?: number
-    // Optional "typical" split guidance; carbsMax still wins as a hard cap.
-    split?: { proteinPct: number; fatPct: number; carbPct: number }
-  }
-
-  // Defaults are based on common public guidance from major nutrition/health sources and mainstream macro-tracking apps:
-  // - Keto: often ~5% carbs / 25% protein / 70% fat, and 20–50g carbs/day.
-  // - Low-carb: commonly defined as <130g carbs/day.
-  // - Atkins: commonly described by plans like ~20g / 40g / 100g net carbs; we treat it as a strict low-carb cap.
-  // - Carnivore/Zero-carb/Lion: typically near-zero carbs.
-  // - High-protein/bodybuilding: protein floor is often described in g/kg/day ranges for active people.
-  const RULES: Record<string, DietMacroRule> = {
-    keto: { carbsMaxG: 30, sugarMaxG: 25, split: { proteinPct: 0.25, fatPct: 0.7, carbPct: 0.05 } },
-    'keto-carnivore': { carbsMaxG: 20, sugarMaxG: 15, split: { proteinPct: 0.25, fatPct: 0.7, carbPct: 0.05 } },
-    'low-carb': { carbsMaxG: 130 },
-    atkins: { carbsMaxG: 40, sugarMaxG: 30 },
-    'zero-carb': { carbsMaxG: 10, sugarMaxG: 5, split: { proteinPct: 0.3, fatPct: 0.7, carbPct: 0.0 } },
-    carnivore: { carbsMaxG: 10, sugarMaxG: 5, split: { proteinPct: 0.3, fatPct: 0.7, carbPct: 0.0 } },
-    lion: { carbsMaxG: 10, sugarMaxG: 5, split: { proteinPct: 0.3, fatPct: 0.7, carbPct: 0.0 } },
-    diabetic: { carbsMaxG: 160, sugarMaxG: 25 },
-    'high-protein': { proteinMinGPerKg: 1.6 },
-    bodybuilding: { proteinMinGPerKg: 1.8 },
-  }
-
-  const rules = dietTypes.map((d) => RULES[d]).filter(Boolean) as DietMacroRule[]
-  if (!rules.length) return base
-
-  const carbsMaxG = rules.reduce<number | null>((min, r) => {
-    if (typeof r.carbsMaxG !== 'number') return min
-    return min === null ? r.carbsMaxG : Math.min(min, r.carbsMaxG)
-  }, null)
-
-  const sugarMaxG = rules.reduce<number | null>((min, r) => {
-    if (typeof r.sugarMaxG !== 'number') return min
-    return min === null ? r.sugarMaxG : Math.min(min, r.sugarMaxG)
-  }, null)
-
-  const proteinMinGPerKg = rules.reduce<number | null>((max, r) => {
-    if (typeof r.proteinMinGPerKg !== 'number') return max
-    return max === null ? r.proteinMinGPerKg : Math.max(max, r.proteinMinGPerKg)
-  }, null)
-
-  const splitRule = (() => {
-    const priority = ['zero-carb', 'carnivore', 'lion', 'keto-carnivore', 'keto', 'atkins', 'low-carb', 'diabetic']
-    for (const id of priority) {
-      const rule = RULES[id]
-      if (rule?.split && dietTypes.includes(id)) return rule.split
-    }
-    return null
-  })()
-
-  const calories = base.calories
-  if (!calories || calories <= 0) return base
-
-  let nextCarbs = typeof base.carbs === 'number' ? base.carbs : 0
-  if (splitRule) {
-    nextCarbs = Math.round((calories * splitRule.carbPct) / 4)
-  }
-  if (carbsMaxG !== null) nextCarbs = Math.min(nextCarbs, carbsMaxG)
-  nextCarbs = Math.max(0, Math.round(nextCarbs))
-
-  const minProtein = (() => {
-    if (proteinMinGPerKg === null) return 0
-    if (!weightKg || weightKg <= 0) return 0
-    return Math.round(weightKg * proteinMinGPerKg)
-  })()
-
-  let nextProtein = typeof base.protein === 'number' ? base.protein : 0
-  if (splitRule) {
-    nextProtein = Math.round((calories * splitRule.proteinPct) / 4)
-  }
-  nextProtein = Math.max(nextProtein, minProtein)
-  nextProtein = Math.max(0, Math.round(nextProtein))
-
-  // Ensure macros fit inside total calories. If they don't, reduce carbs first, then protein (but not below minProtein).
-  const adjustDownToFit = () => {
-    const used = nextProtein * 4 + nextCarbs * 4
-    const room = calories - used
-    if (room >= 0) return
-
-    // Try reducing carbs to 0 first.
-    const need = Math.abs(room)
-    const reducibleCarbCals = nextCarbs * 4
-    const carbCutCals = Math.min(reducibleCarbCals, need)
-    nextCarbs = Math.max(0, Math.round((reducibleCarbCals - carbCutCals) / 4))
-    const usedAfterCarb = nextProtein * 4 + nextCarbs * 4
-    const roomAfterCarb = calories - usedAfterCarb
-    if (roomAfterCarb >= 0) return
-
-    // Then reduce protein, but keep minProtein.
-    const need2 = Math.abs(roomAfterCarb)
-    const reducibleProteinG = Math.max(0, nextProtein - minProtein)
-    const reducibleProteinCals = reducibleProteinG * 4
-    const proteinCutCals = Math.min(reducibleProteinCals, need2)
-    nextProtein = Math.max(minProtein, Math.round(nextProtein - proteinCutCals / 4))
-  }
-  adjustDownToFit()
-
-  const remainingCalories = calories - (nextProtein * 4 + nextCarbs * 4)
-  const nextFat = Math.max(0, Math.round(remainingCalories / 9))
-
-  return {
-    ...base,
-    protein: nextProtein,
-    carbs: nextCarbs,
-    fat: nextFat,
-    sugarMax: typeof base.sugarMax === 'number'
-      ? Math.round(Math.min(base.sugarMax, sugarMaxG ?? base.sugarMax))
-      : sugarMaxG,
-  }
+  return applyDietMacroRules(base, input.dietTypes, weightKg)
 }
