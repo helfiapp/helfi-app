@@ -399,14 +399,14 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
     )
   )
   const manualFiberRaw = input.fiberTarget
-  if (manualFiberRaw !== null && manualFiberRaw !== undefined && manualFiberRaw !== '') {
+  if (manualFiberRaw !== null && manualFiberRaw !== undefined) {
     const manualFiber = Number(manualFiberRaw)
     if (Number.isFinite(manualFiber) && manualFiber >= 0) {
       fiber = Math.round(manualFiber)
     }
   }
   const manualSugarRaw = input.sugarMax
-  if (manualSugarRaw !== null && manualSugarRaw !== undefined && manualSugarRaw !== '') {
+  if (manualSugarRaw !== null && manualSugarRaw !== undefined) {
     const manualSugar = Number(manualSugarRaw)
     if (Number.isFinite(manualSugar) && manualSugar >= 0) {
       sugarMax = Math.round(manualSugar)
