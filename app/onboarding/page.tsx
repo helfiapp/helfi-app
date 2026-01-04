@@ -6598,6 +6598,7 @@ export default function Onboarding() {
   const formBaselineInitializedRef = useRef<boolean>(false);
   const pendingNavigationRef = useRef<(() => void) | null>(null);
   const exitUpdateTriggeredRef = useRef(false);
+  const triggerInsightsUpdateOnExitRef = useRef<(reason: string) => void>(() => {});
 
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
   useEffect(() => {
@@ -6637,7 +6638,7 @@ export default function Onboarding() {
     if (!hasGlobalUnsavedChangesRef.current) return
     if (!formBaselineInitializedRef.current) return
 
-    const currentForm = formRef.current || form || {}
+    const currentForm = formRef.current || {}
     const changeTypes = detectChangedInsightTypes(formBaselineRef.current, currentForm)
     if (!changeTypes.length) return
 
@@ -6661,7 +6662,7 @@ export default function Onboarding() {
       .finally(() => {
         fireAndForgetInsightsRegen(changeTypes)
       })
-  }, [form, updateUserData])
+  }, [updateUserData])
 
   useEffect(() => {
     if (!SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) return
@@ -6685,10 +6686,14 @@ export default function Onboarding() {
   }, []);
 
   useEffect(() => {
-    return () => {
-      triggerInsightsUpdateOnExit('unmount');
-    };
+    triggerInsightsUpdateOnExitRef.current = triggerInsightsUpdateOnExit;
   }, [triggerInsightsUpdateOnExit]);
+
+  useEffect(() => {
+    return () => {
+      triggerInsightsUpdateOnExitRef.current('unmount');
+    };
+  }, []);
 
   const stepNames = [
     'Gender',
@@ -6929,16 +6934,16 @@ export default function Onboarding() {
 
   const persistForm = useCallback(
     (partial: any) => {
-      if (allowAutosave) {
-        try {
-          updateUserData(sanitizeUserDataPayload(partial));
-        } catch {
-          // Ignore
-        }
-      }
       setForm((prev: any) => {
         const next = { ...prev, ...partial };
         formRef.current = next; // Keep latest edits available for exit-save flows.
+        if (allowAutosave) {
+          try {
+            updateUserData(sanitizeUserDataPayload(next));
+          } catch {
+            // Ignore
+          }
+        }
         if (allowAutosave && !SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) {
           debouncedSave(next);
         }
@@ -7604,7 +7609,7 @@ export default function Onboarding() {
         
         {/* Background Regen Status Indicator */}
         {backgroundRegenStatus.isRegenerating && (
-          <div className="fixed bottom-20 md:bottom-4 left-1/2 transform -translate-x-1/2 z-50 animate-in fade-in duration-300">
+          <div className="fixed bottom-20 md:bottom-4 left-1/2 transform -translate-x-1/2 z-50 animate-in fade-in duration-300 pointer-events-none">
             <div className="bg-gray-900 text-white px-4 py-2 rounded-full shadow-lg flex items-center space-x-2">
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
