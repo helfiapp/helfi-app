@@ -202,6 +202,13 @@ function getInsightsRelevantOnboardingFormSnapshot(source: any): any {
       if (!proteinPct && !carbPct && !fatPct) return null
       return { proteinPct, carbPct, fatPct }
     })(),
+    goalMacroMode: (() => {
+      const raw =
+        typeof (sanitized as any).goalMacroMode === 'string'
+          ? (sanitized as any).goalMacroMode.toLowerCase()
+          : '';
+      return raw === 'manual' ? 'manual' : 'auto';
+    })(),
     goalFiberTarget: normalizeRoundedNumberString((sanitized as any).goalFiberTarget),
     goalSugarMax: normalizeRoundedNumberString((sanitized as any).goalSugarMax),
     profileInfo: sanitized.profileInfo && typeof sanitized.profileInfo === 'object' ? sanitized.profileInfo : {},
@@ -260,6 +267,7 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
         'goalPaceKgPerWeek',
         'goalCalorieTarget',
         'goalMacroSplit',
+        'goalMacroMode',
         'goalFiberTarget',
         'goalSugarMax',
         'profileInfo',
@@ -280,6 +288,7 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
         'goalPaceKgPerWeek',
         'goalCalorieTarget',
         'goalMacroSplit',
+        'goalMacroMode',
         'goalFiberTarget',
         'goalSugarMax',
         'profileInfo',
@@ -743,6 +752,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     carbPct: number
     fatPct: number
   } | null>(null);
+  const [goalMacroMode, setGoalMacroMode] = useState<'auto' | 'manual'>('auto');
+  const manualMacroStateRef = useRef<{
+    split: { proteinPct: number; carbPct: number; fatPct: number } | null
+    calories: number | null
+  } | null>(null);
   const [goalFiberTarget, setGoalFiberTarget] = useState<number | null>(null);
   const [goalSugarMax, setGoalSugarMax] = useState<number | null>(null);
   const [allergies, setAllergies] = useState<string[]>(initial?.allergies || []);
@@ -974,13 +988,31 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       }
 
       const incomingSplit = (initial as any).goalMacroSplit;
+      let normalizedIncomingSplit: { proteinPct: number; carbPct: number; fatPct: number } | null = null;
       if (incomingSplit && typeof incomingSplit === 'object') {
         const protein = parseNumber(String(incomingSplit.proteinPct ?? '')) ?? 0;
         const carbs = parseNumber(String(incomingSplit.carbPct ?? '')) ?? 0;
         const fat = parseNumber(String(incomingSplit.fatPct ?? '')) ?? 0;
         if (protein || carbs || fat) {
-          setGoalMacroSplit(normalizeMacroSplit(protein, carbs, fat));
+          normalizedIncomingSplit = normalizeMacroSplit(protein, carbs, fat);
+          setGoalMacroSplit(normalizedIncomingSplit);
         }
+      }
+
+      const incomingMacroModeRaw =
+        typeof (initial as any).goalMacroMode === 'string' ? (initial as any).goalMacroMode.toLowerCase() : '';
+      const incomingMacroMode = incomingMacroModeRaw === 'manual' ? 'manual' : 'auto';
+      setGoalMacroMode(incomingMacroMode);
+      if (
+        incomingMacroMode === 'manual' &&
+        normalizedIncomingSplit &&
+        incomingCalories != null &&
+        Number.isFinite(incomingCalories)
+      ) {
+        manualMacroStateRef.current = {
+          split: normalizedIncomingSplit,
+          calories: Math.round(incomingCalories),
+        };
       }
 
       const incomingFiber = parseNumber(String((initial as any).goalFiberTarget ?? ''));
@@ -998,6 +1030,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         incomingPace != null ||
         incomingCalories != null ||
         (incomingSplit && typeof incomingSplit === 'object') ||
+        incomingMacroModeRaw === 'manual' ||
         incomingFiber != null ||
         incomingSugar != null;
       if (hasExistingGoalDetails) {
@@ -1215,7 +1248,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const MACRO_STEP = 5;
   const FIBER_STEP = 1;
   const SUGAR_STEP = 1;
-  const SLIDER_HAPTIC_MS = 15;
+  const SLIDER_HAPTIC_MS = 25;
   const MACRO_COLORS = {
     protein: '#ef4444',
     carbs: '#22c55e',
@@ -1227,7 +1260,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const clampNumber = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
 
-  const triggerSliderHaptic = () => {
+  const sliderHapticRef = useRef<Record<string, number | null>>({});
+  const triggerSliderHaptic = (key: string, value: number | null) => {
+    if (value == null || !Number.isFinite(value)) return;
+    const normalized = Number(value.toFixed(3));
+    if (sliderHapticRef.current[key] === normalized) return;
+    sliderHapticRef.current[key] = normalized;
     try {
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches;
       const pref = typeof window !== 'undefined' ? localStorage.getItem('hapticsEnabled') : null;
@@ -1330,6 +1368,56 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     unit,
   ]);
 
+  const computeAutoMacros = useCallback(
+    (calories: number) => {
+      const safeCalories = Number.isFinite(calories) && calories > 0 ? calories : 0;
+      const fallbackSplit = goalDetailDefaults.split ?? normalizeMacroSplit(0.3, 0.4, 0.3);
+      const fallbackCalories = safeCalories || goalDetailDefaults.calories || 0;
+      const fallbackTotals = macroGramsFromSplit(fallbackCalories, fallbackSplit);
+      const fallback = {
+        protein: Math.max(0, roundToStep(fallbackTotals.protein, MACRO_STEP)),
+        carbs: Math.max(0, roundToStep(fallbackTotals.carbs, MACRO_STEP)),
+        fat: Math.max(0, roundToStep(fallbackTotals.fat, MACRO_STEP)),
+      };
+
+      const weightKg = getCurrentWeightKgRounded();
+      if (!safeCalories || !weightKg) return fallback;
+
+      const proteinPerKg = isGainGoal ? 1.8 : 1.6;
+      const fatPerKg = isGainGoal ? 0.8 : 0.7;
+      let protein = roundToStep(Math.round(weightKg * proteinPerKg), MACRO_STEP);
+      let fat = roundToStep(Math.round(weightKg * fatPerKg), MACRO_STEP);
+
+      const proteinCap = roundToStep((safeCalories * 0.4) / 4, MACRO_STEP);
+      const fatCap = roundToStep((safeCalories * 0.35) / 9, MACRO_STEP);
+      if (Number.isFinite(proteinCap)) {
+        protein = Math.min(protein, Math.max(0, proteinCap));
+      }
+      if (Number.isFinite(fatCap)) {
+        fat = Math.min(fat, Math.max(0, fatCap));
+      }
+
+      let remaining = safeCalories - protein * 4 - fat * 9;
+      if (!Number.isFinite(remaining)) remaining = 0;
+      if (remaining < 0) {
+        if (fat > 0) {
+          const reduction = Math.min(fat, roundToStep(Math.ceil(Math.abs(remaining) / 9), MACRO_STEP));
+          fat = Math.max(0, fat - reduction);
+        }
+        remaining = safeCalories - protein * 4 - fat * 9;
+        if (remaining < 0 && protein > 0) {
+          const reduction = Math.min(protein, roundToStep(Math.ceil(Math.abs(remaining) / 4), MACRO_STEP));
+          protein = Math.max(0, protein - reduction);
+        }
+        remaining = safeCalories - protein * 4 - fat * 9;
+      }
+
+      const carbs = Math.max(0, roundToStep(remaining / 4, MACRO_STEP));
+      return { protein, carbs, fat };
+    },
+    [goalDetailDefaults.calories, goalDetailDefaults.split, isGainGoal, weight, unit],
+  );
+
   const maintenanceCalories = useMemo(() => {
     const weightKg = getCurrentWeightKgRounded();
     const heightCm = getCurrentHeightCmRounded();
@@ -1353,7 +1441,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   }, [birthdateFromParts, bodyType, genderValue, initial, weight, height, feet, inches, unit]);
 
   const activeGoalCalories = Math.round(goalCalorieTarget ?? goalDetailDefaults.calories);
-  const activeGoalSplit = normalizeMacroSplit(
+  const manualGoalSplit = normalizeMacroSplit(
     goalMacroSplit?.proteinPct ?? goalDetailDefaults.split.proteinPct,
     goalMacroSplit?.carbPct ?? goalDetailDefaults.split.carbPct,
     goalMacroSplit?.fatPct ?? goalDetailDefaults.split.fatPct,
@@ -1403,14 +1491,16 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     calorieBounds.min,
     calorieBounds.max,
   );
-  const macroTotals = useMemo(() => {
-    const totals = macroGramsFromSplit(clampedGoalCalories, activeGoalSplit);
+  const autoMacroTotals = useMemo(() => computeAutoMacros(clampedGoalCalories), [clampedGoalCalories, computeAutoMacros]);
+  const manualMacroTotals = useMemo(() => {
+    const totals = macroGramsFromSplit(clampedGoalCalories, manualGoalSplit);
     return {
       protein: Math.max(0, roundToStep(totals.protein, MACRO_STEP)),
       carbs: Math.max(0, roundToStep(totals.carbs, MACRO_STEP)),
       fat: Math.max(0, roundToStep(totals.fat, MACRO_STEP)),
     };
-  }, [clampedGoalCalories, activeGoalSplit]);
+  }, [clampedGoalCalories, manualGoalSplit]);
+  const macroTotals = goalMacroMode === 'manual' ? manualMacroTotals : autoMacroTotals;
   const autoFiberTarget = useMemo(() => {
     const baseCalories = goalDetailDefaults.calories;
     const baseFiber = goalDetailDefaults.fiber ?? 0;
@@ -1543,6 +1633,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
             ...(Number.isFinite(goalPacePayload) ? { goalPaceKgPerWeek: roundToPrecision(goalPacePayload, 2) } : {}),
             ...(Number.isFinite(goalCaloriePayload) ? { goalCalorieTarget: goalCaloriePayload } : {}),
             ...(goalSplitPayload ? { goalMacroSplit: goalSplitPayload } : {}),
+            ...(goalMacroMode ? { goalMacroMode } : {}),
             ...(Number.isFinite(clampedFiberTarget) ? { goalFiberTarget: Math.round(clampedFiberTarget) } : {}),
             ...(Number.isFinite(clampedSugarMax) ? { goalSugarMax: Math.round(clampedSugarMax) } : {}),
           }
@@ -1714,6 +1805,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   const handleGoalPaceChange = useCallback(
     (value: number) => {
+      if (goalMacroMode === 'manual') return null;
       const pace = clampNumber(roundToStep(value, GOAL_PACE_STEP), MIN_GOAL_PACE, MAX_GOAL_PACE);
       const base = calorieBounds.base || activeGoalCalories;
       const delta = pace * KCAL_PER_KG_WEEK;
@@ -1723,10 +1815,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         calorieBounds.min,
         calorieBounds.max,
       );
-      const protein = macroTotals.protein;
-      const fat = macroTotals.fat;
-      const carbs = Math.max(0, roundToStep((clampedCalories - protein * 4 - fat * 9) / 4, MACRO_STEP));
-      const nextSplit = macroSplitFromGrams(protein, carbs, fat);
+      const nextTotals = computeAutoMacros(clampedCalories);
+      const nextSplit = macroSplitFromGrams(nextTotals.protein, nextTotals.carbs, nextTotals.fat);
       const nextPace = clampNumber(
         roundToStep(Math.abs(clampedCalories - base) / KCAL_PER_KG_WEEK, GOAL_PACE_STEP),
         MIN_GOAL_PACE,
@@ -1736,6 +1826,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       setGoalCalorieTarget(clampedCalories);
       setGoalMacroSplit(nextSplit);
       markGoalDetailsTouched();
+      return pace;
     },
     [
       KCAL_PER_KG_WEEK,
@@ -1743,24 +1834,24 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       MAX_GOAL_PACE,
       activeGoalCalories,
       calorieBounds,
+      computeAutoMacros,
+      goalMacroMode,
       isLoseGoal,
-      macroTotals,
       markGoalDetailsTouched,
     ],
   );
 
   const handleGoalCaloriesChange = useCallback(
     (value: number) => {
+      if (goalMacroMode === 'manual') return null;
       const clampedCalories = clampNumber(
         roundToStep(value, CALORIE_STEP),
         calorieBounds.min,
         calorieBounds.max,
       );
       setGoalCalorieTarget(clampedCalories);
-      const protein = macroTotals.protein;
-      const fat = macroTotals.fat;
-      const carbs = Math.max(0, roundToStep((clampedCalories - protein * 4 - fat * 9) / 4, MACRO_STEP));
-      const nextSplit = macroSplitFromGrams(protein, carbs, fat);
+      const nextTotals = computeAutoMacros(clampedCalories);
+      const nextSplit = macroSplitFromGrams(nextTotals.protein, nextTotals.carbs, nextTotals.fat);
       if (calorieBounds.base) {
         const delta = Math.abs(clampedCalories - calorieBounds.base);
         const nextPace = clampNumber(
@@ -1772,19 +1863,53 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       }
       setGoalMacroSplit(nextSplit);
       markGoalDetailsTouched();
+      return clampedCalories;
     },
     [
       KCAL_PER_KG_WEEK,
       MIN_GOAL_PACE,
       MAX_GOAL_PACE,
       calorieBounds,
-      macroTotals,
+      computeAutoMacros,
+      goalMacroMode,
+      markGoalDetailsTouched,
+    ],
+  );
+
+  const handleGoalMacroModeChange = useCallback(
+    (mode: 'auto' | 'manual') => {
+      if (mode === goalMacroMode) return;
+      if (mode === 'manual') {
+        if (manualMacroStateRef.current?.split && manualMacroStateRef.current.calories != null) {
+          setGoalMacroSplit(manualMacroStateRef.current.split);
+          setGoalCalorieTarget(manualMacroStateRef.current.calories);
+        } else {
+          const seeded = computeAutoMacros(clampedGoalCalories);
+          setGoalMacroSplit(macroSplitFromGrams(seeded.protein, seeded.carbs, seeded.fat));
+          setGoalCalorieTarget(clampedGoalCalories);
+        }
+      } else {
+        if (goalMacroSplit) {
+          manualMacroStateRef.current = { split: goalMacroSplit, calories: clampedGoalCalories };
+        }
+        const autoTotals = computeAutoMacros(clampedGoalCalories);
+        setGoalMacroSplit(macroSplitFromGrams(autoTotals.protein, autoTotals.carbs, autoTotals.fat));
+      }
+      setGoalMacroMode(mode);
+      markGoalDetailsTouched();
+    },
+    [
+      clampedGoalCalories,
+      computeAutoMacros,
+      goalMacroMode,
+      goalMacroSplit,
       markGoalDetailsTouched,
     ],
   );
 
   const handleMacroChange = useCallback(
     (macro: 'protein' | 'carbs' | 'fat', value: number) => {
+      if (goalMacroMode !== 'manual') return null;
       const snappedValue = roundToStep(value, MACRO_STEP);
       const nextProtein = macro === 'protein' ? snappedValue : macroTotals.protein;
       const nextCarbs = macro === 'carbs' ? snappedValue : macroTotals.carbs;
@@ -1802,9 +1927,36 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         const remainingCalories = clampedCalories - finalProtein * 4 - finalFat * 9;
         finalCarbs = Math.max(0, roundToStep(remainingCalories / 4, MACRO_STEP));
       }
+      if (finalProtein * 4 + finalCarbs * 4 + finalFat * 9 > clampedCalories) {
+        let over = finalProtein * 4 + finalCarbs * 4 + finalFat * 9 - clampedCalories;
+        const reduceMacro = (current: number, caloriesPerGram: number) => {
+          if (over <= 0 || current <= 0) return current;
+          const reduction = Math.min(
+            current,
+            roundToStep(Math.ceil(over / caloriesPerGram), MACRO_STEP),
+          );
+          over -= reduction * caloriesPerGram;
+          return Math.max(0, current - reduction);
+        };
+
+        if (macro === 'protein') {
+          finalFat = reduceMacro(finalFat, 9);
+          finalProtein = reduceMacro(finalProtein, 4);
+        } else if (macro === 'fat') {
+          finalProtein = reduceMacro(finalProtein, 4);
+          finalFat = reduceMacro(finalFat, 9);
+        } else {
+          finalFat = reduceMacro(finalFat, 9);
+          finalProtein = reduceMacro(finalProtein, 4);
+        }
+
+        const remainingCalories = clampedCalories - finalProtein * 4 - finalFat * 9;
+        finalCarbs = Math.max(0, roundToStep(remainingCalories / 4, MACRO_STEP));
+      }
       const finalSplit = macroSplitFromGrams(finalProtein, finalCarbs, finalFat);
       setGoalCalorieTarget(clampedCalories);
       setGoalMacroSplit(finalSplit);
+      manualMacroStateRef.current = { split: finalSplit, calories: clampedCalories };
       if (calorieBounds.base) {
         const delta = Math.abs(clampedCalories - calorieBounds.base);
         const nextPace = clampNumber(
@@ -1815,12 +1967,14 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         setGoalPaceKgPerWeek(nextPace);
       }
       markGoalDetailsTouched();
+      return snappedValue;
     },
     [
       KCAL_PER_KG_WEEK,
       MIN_GOAL_PACE,
       MAX_GOAL_PACE,
       calorieBounds,
+      goalMacroMode,
       macroTotals,
       markGoalDetailsTouched,
     ],
@@ -1835,12 +1989,32 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     );
     if (clamped !== goalCalorieTarget) {
       setGoalCalorieTarget(clamped);
-      const protein = macroTotals.protein;
-      const fat = macroTotals.fat;
-      const carbs = Math.max(0, roundToStep((clamped - protein * 4 - fat * 9) / 4, MACRO_STEP));
-      setGoalMacroSplit(macroSplitFromGrams(protein, carbs, fat));
+      if (goalMacroMode === 'manual') {
+        const protein = macroTotals.protein;
+        const fat = macroTotals.fat;
+        const carbs = Math.max(0, roundToStep((clamped - protein * 4 - fat * 9) / 4, MACRO_STEP));
+        const nextSplit = macroSplitFromGrams(protein, carbs, fat);
+        setGoalMacroSplit(nextSplit);
+        manualMacroStateRef.current = { split: nextSplit, calories: clamped };
+      } else {
+        const nextTotals = computeAutoMacros(clamped);
+        setGoalMacroSplit(macroSplitFromGrams(nextTotals.protein, nextTotals.carbs, nextTotals.fat));
+      }
     }
-  }, [calorieBounds.max, calorieBounds.min, goalCalorieTarget, isLoseGainGoal, macroTotals]);
+  }, [
+    calorieBounds.max,
+    calorieBounds.min,
+    computeAutoMacros,
+    goalCalorieTarget,
+    goalMacroMode,
+    isLoseGainGoal,
+    macroTotals,
+  ]);
+
+  useEffect(() => {
+    if (goalMacroMode !== 'manual' || !goalMacroSplit) return;
+    manualMacroStateRef.current = { split: goalMacroSplit, calories: clampedGoalCalories };
+  }, [clampedGoalCalories, goalMacroMode, goalMacroSplit]);
 
   // Body type is optional: tapping the same option again should deselect (match diabetes toggle UX).
   const handleBodyTypeChange = useCallback((type: string) => {
@@ -1934,6 +2108,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
             ...(Number.isFinite(goalPacePayload) ? { goalPaceKgPerWeek: roundToPrecision(goalPacePayload, 2) } : {}),
             ...(Number.isFinite(goalCaloriePayload) ? { goalCalorieTarget: goalCaloriePayload } : {}),
             ...(goalSplitPayload ? { goalMacroSplit: goalSplitPayload } : {}),
+            ...(goalMacroMode ? { goalMacroMode } : {}),
             ...(Number.isFinite(clampedFiberTarget) ? { goalFiberTarget: Math.round(clampedFiberTarget) } : {}),
             ...(Number.isFinite(clampedSugarMax) ? { goalSugarMax: Math.round(clampedSugarMax) } : {}),
           }
@@ -1957,11 +2132,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     goalPaceKgPerWeek,
     goalCalorieTarget,
     goalMacroSplit,
+    goalMacroMode,
     goalFiberTarget,
     goalSugarMax,
     clampedGoalCalories,
     activeGoalCalories,
-    activeGoalSplit,
     activeGoalPace,
     macroTotals,
     activeFiberTarget,
@@ -2230,24 +2405,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const paceValue = roundToStep(activeGoalPace, GOAL_PACE_STEP);
     const fiberMax = Math.max(0, Math.min(80, macroTotals.carbs));
     const sugarMaxLimit = Math.max(0, Math.min(100, macroTotals.carbs));
-    const proteinBounds = (() => {
-      const otherCals = macroTotals.carbs * 4 + macroTotals.fat * 9;
-      const min = Math.max(0, ceilToStep((calorieBounds.min - otherCals) / 4, MACRO_STEP));
-      const max = Math.max(min, floorToStep((calorieBounds.max - otherCals) / 4, MACRO_STEP));
-      return { min, max };
-    })();
-    const carbBounds = (() => {
-      const otherCals = macroTotals.protein * 4 + macroTotals.fat * 9;
-      const min = Math.max(0, ceilToStep((calorieBounds.min - otherCals) / 4, MACRO_STEP));
-      const max = Math.max(min, floorToStep((calorieBounds.max - otherCals) / 4, MACRO_STEP));
-      return { min, max };
-    })();
-    const fatBounds = (() => {
-      const otherCals = macroTotals.protein * 4 + macroTotals.carbs * 4;
-      const min = Math.max(0, ceilToStep((calorieBounds.min - otherCals) / 9, MACRO_STEP));
-      const max = Math.max(min, floorToStep((calorieBounds.max - otherCals) / 9, MACRO_STEP));
-      return { min, max };
-    })();
+    const proteinBounds = {
+      min: 0,
+      max: Math.max(MACRO_STEP, roundToStep(calorieBounds.max / 4, MACRO_STEP)),
+    };
+    const carbBounds = {
+      min: 0,
+      max: Math.max(MACRO_STEP, roundToStep(calorieBounds.max / 4, MACRO_STEP)),
+    };
+    const fatBounds = {
+      min: 0,
+      max: Math.max(MACRO_STEP, roundToStep(calorieBounds.max / 9, MACRO_STEP)),
+    };
     const tickStyle = (min: number, max: number, step: number) => {
       const count = Math.max(1, Math.round((max - min) / step));
       return {
@@ -2319,7 +2488,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Weekly pace</h2>
-                  <p className="text-xs text-gray-500">Adjusts calories and macro balance.</p>
+                  <p className="text-xs text-gray-500">
+                    {goalMacroMode === 'manual'
+                      ? 'Pace is calculated from your macros.'
+                      : 'Adjusts calories and macro balance.'}
+                  </p>
                 </div>
                 <span className="text-sm font-semibold text-gray-900">
                   {displayGoalPace} {paceUnit}/week
@@ -2331,11 +2504,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 max={MAX_GOAL_PACE}
                 step={GOAL_PACE_STEP}
                 value={paceValue}
-                onChange={(e) => {
-                  handleGoalPaceChange(Number(e.target.value));
-                  triggerSliderHaptic();
+                disabled={goalMacroMode === 'manual'}
+                onInput={(e) => {
+                  const next = handleGoalPaceChange(Number(e.currentTarget.value));
+                  if (next != null) triggerSliderHaptic('pace', next);
                 }}
-                className="w-full"
+                className={`w-full touch-pan-x ${goalMacroMode === 'manual' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 style={{ accentColor: '#16a34a' }}
               />
               <div className="h-2 w-full rounded-full" style={tickStyle(MIN_GOAL_PACE, MAX_GOAL_PACE, GOAL_PACE_STEP)} />
@@ -2353,7 +2527,14 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Daily calories</h2>
-                  <p className="text-xs text-gray-500">Calories update the pace automatically.</p>
+                  <p className="text-xs text-gray-500">
+                    {goalMacroMode === 'manual'
+                      ? 'Calculated from your macro grams.'
+                      : 'Calories update the pace automatically.'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Maintenance calories use your age, height, weight, sex, and activity level.
+                  </p>
                 </div>
                 <span className="text-sm font-semibold text-gray-900">{clampedGoalCalories} kcal</span>
               </div>
@@ -2363,11 +2544,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 max={calorieBounds.max}
                 step={CALORIE_STEP}
                 value={clampedGoalCalories}
-                onChange={(e) => {
-                  handleGoalCaloriesChange(Number(e.target.value));
-                  triggerSliderHaptic();
+                disabled={goalMacroMode === 'manual'}
+                onInput={(e) => {
+                  const next = handleGoalCaloriesChange(Number(e.currentTarget.value));
+                  if (next != null) triggerSliderHaptic('calories', next);
                 }}
-                className="w-full"
+                className={`w-full touch-pan-x ${goalMacroMode === 'manual' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 style={{ accentColor: '#16a34a' }}
               />
               <div className="h-2 w-full rounded-full" style={tickStyle(calorieBounds.min, calorieBounds.max, CALORIE_STEP)} />
@@ -2376,14 +2558,35 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
             <div className="h-px bg-gray-100" />
 
             <section className="space-y-3">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Macros</h2>
-                <p className="text-xs text-gray-500">
-                  Protein and fat are based on your body weight. Carbs fill the remaining calories.
-                </p>
-                <p className="text-xs text-gray-500">
-                  Changing any macro, calories, or pace updates the other numbers.
-                </p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">Macros</h2>
+                  <p className="text-xs text-gray-500">
+                    {goalMacroMode === 'auto'
+                      ? 'Auto keeps protein and fat tied to your body weight. Carbs fill the remaining calories.'
+                      : 'Manual lets you set grams. Calories and weekly pace update automatically.'}
+                  </p>
+                </div>
+                <div className="flex items-center rounded-full bg-gray-100 p-1 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => handleGoalMacroModeChange('auto')}
+                    className={`px-3 py-1 rounded-full transition-colors ${
+                      goalMacroMode === 'auto' ? 'bg-helfi-green text-white' : 'text-gray-600'
+                    }`}
+                  >
+                    Auto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleGoalMacroModeChange('manual')}
+                    className={`px-3 py-1 rounded-full transition-colors ${
+                      goalMacroMode === 'manual' ? 'bg-helfi-green text-white' : 'text-gray-600'
+                    }`}
+                  >
+                    Manual
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -2406,11 +2609,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                     max={proteinBounds.max}
                     step={MACRO_STEP}
                     value={macroTotals.protein}
-                    onChange={(e) => {
-                      handleMacroChange('protein', Number(e.target.value));
-                      triggerSliderHaptic();
+                    disabled={goalMacroMode === 'auto'}
+                    onInput={(e) => {
+                      const next = handleMacroChange('protein', Number(e.currentTarget.value));
+                      if (next != null) triggerSliderHaptic('protein', next);
                     }}
-                    className="w-full"
+                    className={`w-full touch-pan-x ${goalMacroMode === 'auto' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                     style={{ accentColor: MACRO_COLORS.protein }}
                   />
                   <div className="h-2 w-full rounded-full" style={tickStyle(proteinBounds.min, proteinBounds.max, MACRO_STEP)} />
@@ -2435,11 +2639,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                     max={carbBounds.max}
                     step={MACRO_STEP}
                     value={macroTotals.carbs}
-                    onChange={(e) => {
-                      handleMacroChange('carbs', Number(e.target.value));
-                      triggerSliderHaptic();
+                    disabled={goalMacroMode === 'auto'}
+                    onInput={(e) => {
+                      const next = handleMacroChange('carbs', Number(e.currentTarget.value));
+                      if (next != null) triggerSliderHaptic('carbs', next);
                     }}
-                    className="w-full"
+                    className={`w-full touch-pan-x ${goalMacroMode === 'auto' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                     style={{ accentColor: MACRO_COLORS.carbs }}
                   />
                   <div className="h-2 w-full rounded-full" style={tickStyle(carbBounds.min, carbBounds.max, MACRO_STEP)} />
@@ -2464,11 +2669,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                     max={fatBounds.max}
                     step={MACRO_STEP}
                     value={macroTotals.fat}
-                    onChange={(e) => {
-                      handleMacroChange('fat', Number(e.target.value));
-                      triggerSliderHaptic();
+                    disabled={goalMacroMode === 'auto'}
+                    onInput={(e) => {
+                      const next = handleMacroChange('fat', Number(e.currentTarget.value));
+                      if (next != null) triggerSliderHaptic('fat', next);
                     }}
-                    className="w-full"
+                    className={`w-full touch-pan-x ${goalMacroMode === 'auto' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                     style={{ accentColor: MACRO_COLORS.fat }}
                   />
                   <div className="h-2 w-full rounded-full" style={tickStyle(fatBounds.min, fatBounds.max, MACRO_STEP)} />

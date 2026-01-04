@@ -331,6 +331,7 @@ export async function GET(request: NextRequest) {
       goalPaceKgPerWeek?: number | null
       goalCalorieTarget?: number | null
       goalMacroSplit?: { proteinPct?: number | null; carbPct?: number | null; fatPct?: number | null } | null
+      goalMacroMode?: string
       goalFiberTarget?: number | null
       goalSugarMax?: number | null
     } = {};
@@ -358,6 +359,7 @@ export async function GET(request: NextRequest) {
         goalPaceKgPerWeek: parseOptionalNumber(parsed.goalPaceKgPerWeek),
         goalCalorieTarget: parseOptionalNumber(parsed.goalCalorieTarget),
         goalMacroSplit: parseMacroSplit(parsed.goalMacroSplit),
+        goalMacroMode: typeof parsed.goalMacroMode === 'string' ? parsed.goalMacroMode.toLowerCase() : '',
         goalFiberTarget: parseOptionalNumber(parsed.goalFiberTarget),
         goalSugarMax: parseOptionalNumber(parsed.goalSugarMax),
       };
@@ -428,6 +430,7 @@ export async function GET(request: NextRequest) {
       goalPaceKgPerWeek: primaryGoalData.goalPaceKgPerWeek ?? null,
       goalCalorieTarget: primaryGoalData.goalCalorieTarget ?? null,
       goalMacroSplit: primaryGoalData.goalMacroSplit ?? null,
+      goalMacroMode: primaryGoalData.goalMacroMode || 'auto',
       goalFiberTarget: primaryGoalData.goalFiberTarget ?? null,
       goalSugarMax: primaryGoalData.goalSugarMax ?? null,
       allergies: allergyData.allergies,
@@ -588,6 +591,7 @@ export async function POST(request: NextRequest) {
       goalPaceKgPerWeek?: number | null
       goalCalorieTarget?: number | null
       goalMacroSplit?: { proteinPct?: number | null; carbPct?: number | null; fatPct?: number | null } | null
+      goalMacroMode?: string
       goalFiberTarget?: number | null
       goalSugarMax?: number | null
     } = {}
@@ -617,6 +621,7 @@ export async function POST(request: NextRequest) {
           goalPaceKgPerWeek: parseOptionalNumber(parsed.goalPaceKgPerWeek),
           goalCalorieTarget: parseOptionalNumber(parsed.goalCalorieTarget),
           goalMacroSplit: parseMacroSplit(parsed.goalMacroSplit),
+          goalMacroMode: typeof parsed.goalMacroMode === 'string' ? parsed.goalMacroMode.toLowerCase() : '',
           goalFiberTarget: parseOptionalNumber(parsed.goalFiberTarget),
           goalSugarMax: parseOptionalNumber(parsed.goalSugarMax),
         }
@@ -908,6 +913,14 @@ export async function POST(request: NextRequest) {
       const incomingGoalPaceKgPerWeek = parseOptionalNumber((data as any).goalPaceKgPerWeek)
       const incomingGoalCalorieTarget = parseOptionalNumber((data as any).goalCalorieTarget)
       const incomingGoalMacroSplit = normalizeMacroSplitInput((data as any).goalMacroSplit)
+      const incomingGoalMacroModeRaw =
+        typeof (data as any).goalMacroMode === 'string' ? (data as any).goalMacroMode.trim().toLowerCase() : ''
+      const incomingGoalMacroMode =
+        incomingGoalMacroModeRaw === 'manual'
+          ? 'manual'
+          : incomingGoalMacroModeRaw === 'auto'
+          ? 'auto'
+          : ''
       const incomingGoalFiberTarget = parseOptionalNumber((data as any).goalFiberTarget)
       const incomingGoalSugarMax = parseOptionalNumber((data as any).goalSugarMax)
 
@@ -916,6 +929,7 @@ export async function POST(request: NextRequest) {
       const hasIncomingGoalPaceKgPerWeek = incomingGoalPaceKgPerWeek !== null
       const hasIncomingGoalCalorieTarget = incomingGoalCalorieTarget !== null
       const hasIncomingGoalMacroSplit = incomingGoalMacroSplit !== null
+      const hasIncomingGoalMacroMode = !!incomingGoalMacroMode
       const hasIncomingGoalFiberTarget = incomingGoalFiberTarget !== null
       const hasIncomingGoalSugarMax = incomingGoalSugarMax !== null
       
@@ -929,6 +943,7 @@ export async function POST(request: NextRequest) {
         hasIncomingGoalPaceKgPerWeek ||
         hasIncomingGoalCalorieTarget ||
         hasIncomingGoalMacroSplit ||
+        hasIncomingGoalMacroMode ||
         hasIncomingGoalFiberTarget ||
         hasIncomingGoalSugarMax
       if (shouldUpdatePrimaryGoal) {
@@ -955,6 +970,9 @@ export async function POST(request: NextRequest) {
         const nextGoalMacroSplit = hasIncomingGoalMacroSplit
           ? incomingGoalMacroSplit
           : (existingPrimaryGoalData.goalMacroSplit ?? null)
+        const nextGoalMacroMode = hasIncomingGoalMacroMode
+          ? incomingGoalMacroMode
+          : (existingPrimaryGoalData.goalMacroMode || '')
         const nextGoalFiberTarget = hasIncomingGoalFiberTarget
           ? incomingGoalFiberTarget
           : (existingPrimaryGoalData.goalFiberTarget ?? null)
@@ -985,6 +1003,7 @@ export async function POST(request: NextRequest) {
               goalPaceKgPerWeek: nextGoalPaceKgPerWeek,
               goalCalorieTarget: nextGoalCalorieTarget,
               goalMacroSplit: nextGoalMacroSplit,
+              goalMacroMode: nextGoalMacroMode,
               goalFiberTarget: nextGoalFiberTarget,
               goalSugarMax: nextGoalSugarMax,
             }),
