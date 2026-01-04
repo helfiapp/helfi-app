@@ -747,16 +747,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [goalTargetWeightInput, setGoalTargetWeightInput] = useState('');
   const [goalPaceKgPerWeek, setGoalPaceKgPerWeek] = useState<number | null>(null);
   const [goalCalorieTarget, setGoalCalorieTarget] = useState<number | null>(null);
-  const [goalMacroSplit, setGoalMacroSplit] = useState<{
-    proteinPct: number
-    carbPct: number
-    fatPct: number
-  } | null>(null);
-  const [goalMacroMode, setGoalMacroMode] = useState<'auto' | 'manual'>('auto');
-  const manualMacroStateRef = useRef<{
-    split: { proteinPct: number; carbPct: number; fatPct: number } | null
-    calories: number | null
-  } | null>(null);
   const [goalFiberTarget, setGoalFiberTarget] = useState<number | null>(null);
   const [goalSugarMax, setGoalSugarMax] = useState<number | null>(null);
   const [allergies, setAllergies] = useState<string[]>(initial?.allergies || []);
@@ -989,32 +979,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       }
 
       const incomingSplit = (initial as any).goalMacroSplit;
-      let normalizedIncomingSplit: { proteinPct: number; carbPct: number; fatPct: number } | null = null;
-      if (incomingSplit && typeof incomingSplit === 'object') {
-        const protein = parseNumber(String(incomingSplit.proteinPct ?? '')) ?? 0;
-        const carbs = parseNumber(String(incomingSplit.carbPct ?? '')) ?? 0;
-        const fat = parseNumber(String(incomingSplit.fatPct ?? '')) ?? 0;
-        if (protein || carbs || fat) {
-          normalizedIncomingSplit = normalizeMacroSplit(protein, carbs, fat);
-          setGoalMacroSplit(normalizedIncomingSplit);
-        }
-      }
-
-      const incomingMacroModeRaw =
-        typeof (initial as any).goalMacroMode === 'string' ? (initial as any).goalMacroMode.toLowerCase() : '';
-      const incomingMacroMode = incomingMacroModeRaw === 'manual' ? 'manual' : 'auto';
-      setGoalMacroMode(incomingMacroMode);
-      if (
-        incomingMacroMode === 'manual' &&
-        normalizedIncomingSplit &&
-        incomingCalories != null &&
-        Number.isFinite(incomingCalories)
-      ) {
-        manualMacroStateRef.current = {
-          split: normalizedIncomingSplit,
-          calories: Math.round(incomingCalories),
-        };
-      }
+      const hasIncomingSplit =
+        incomingSplit &&
+        typeof incomingSplit === 'object' &&
+        ((parseNumber(String(incomingSplit.proteinPct ?? '')) ?? 0) ||
+          (parseNumber(String(incomingSplit.carbPct ?? '')) ?? 0) ||
+          (parseNumber(String(incomingSplit.fatPct ?? '')) ?? 0));
 
       const incomingFiber = parseNumber(String((initial as any).goalFiberTarget ?? ''));
       if (incomingFiber != null) {
@@ -1030,8 +1000,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         targetWeightKgRaw != null ||
         incomingPace != null ||
         incomingCalories != null ||
-        (incomingSplit && typeof incomingSplit === 'object') ||
-        incomingMacroModeRaw === 'manual' ||
+        hasIncomingSplit ||
         incomingFiber != null ||
         incomingSugar != null;
       if (hasExistingGoalDetails) {
@@ -1251,9 +1220,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const GOAL_PACE_STEP = 0.1;
   const CALORIE_STEP = 25;
   const MACRO_STEP = 5;
-  const FIBER_STEP = 1;
-  const SUGAR_STEP = 1;
-  const SLIDER_HAPTIC_MS = 25;
+  const SLIDER_HAPTIC_MS = 40;
   const MACRO_COLORS = {
     protein: '#ef4444',
     carbs: '#22c55e',
@@ -1446,11 +1413,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   }, [birthdateFromParts, bodyType, genderValue, initial, weight, height, feet, inches, unit]);
 
   const activeGoalCalories = Math.round(goalCalorieTarget ?? goalDetailDefaults.calories);
-  const manualGoalSplit = normalizeMacroSplit(
-    goalMacroSplit?.proteinPct ?? goalDetailDefaults.split.proteinPct,
-    goalMacroSplit?.carbPct ?? goalDetailDefaults.split.carbPct,
-    goalMacroSplit?.fatPct ?? goalDetailDefaults.split.fatPct,
-  );
 
   const calorieBounds = useMemo(() => {
     const base = maintenanceCalories ?? activeGoalCalories ?? 2000;
@@ -1496,16 +1458,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     calorieBounds.min,
     calorieBounds.max,
   );
-  const autoMacroTotals = useMemo(() => computeAutoMacros(clampedGoalCalories), [clampedGoalCalories, computeAutoMacros]);
-  const manualMacroTotals = useMemo(() => {
-    const totals = macroGramsFromSplit(clampedGoalCalories, manualGoalSplit);
-    return {
-      protein: Math.max(0, roundToStep(totals.protein, MACRO_STEP)),
-      carbs: Math.max(0, roundToStep(totals.carbs, MACRO_STEP)),
-      fat: Math.max(0, roundToStep(totals.fat, MACRO_STEP)),
-    };
-  }, [clampedGoalCalories, manualGoalSplit]);
-  const macroTotals = goalMacroMode === 'manual' ? manualMacroTotals : autoMacroTotals;
+  const macroTotals = useMemo(() => computeAutoMacros(clampedGoalCalories), [clampedGoalCalories, computeAutoMacros]);
   const autoFiberTarget = useMemo(() => {
     const baseCalories = goalDetailDefaults.calories;
     const baseFiber = goalDetailDefaults.fiber ?? 0;
@@ -1638,7 +1591,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
             ...(Number.isFinite(goalPacePayload) ? { goalPaceKgPerWeek: roundToPrecision(goalPacePayload, 2) } : {}),
             ...(Number.isFinite(goalCaloriePayload) ? { goalCalorieTarget: goalCaloriePayload } : {}),
             ...(goalSplitPayload ? { goalMacroSplit: goalSplitPayload } : {}),
-            ...(goalMacroMode ? { goalMacroMode } : {}),
+            goalMacroMode: 'auto',
             ...(Number.isFinite(clampedFiberTarget) ? { goalFiberTarget: Math.round(clampedFiberTarget) } : {}),
             ...(Number.isFinite(clampedSugarMax) ? { goalSugarMax: Math.round(clampedSugarMax) } : {}),
           }
@@ -1810,7 +1763,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   const handleGoalPaceChange = useCallback(
     (value: number) => {
-      if (goalMacroMode === 'manual') return null;
       const pace = clampNumber(roundToStep(value, GOAL_PACE_STEP), MIN_GOAL_PACE, MAX_GOAL_PACE);
       const base = calorieBounds.base || activeGoalCalories;
       const delta = pace * KCAL_PER_KG_WEEK;
@@ -1820,8 +1772,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         calorieBounds.min,
         calorieBounds.max,
       );
-      const nextTotals = computeAutoMacros(clampedCalories);
-      const nextSplit = macroSplitFromGrams(nextTotals.protein, nextTotals.carbs, nextTotals.fat);
       const nextPace = clampNumber(
         roundToStep(Math.abs(clampedCalories - base) / KCAL_PER_KG_WEEK, GOAL_PACE_STEP),
         MIN_GOAL_PACE,
@@ -1829,7 +1779,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       );
       setGoalPaceKgPerWeek(nextPace);
       setGoalCalorieTarget(clampedCalories);
-      setGoalMacroSplit(nextSplit);
       markGoalDetailsTouched();
       return pace;
     },
@@ -1839,151 +1788,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       MAX_GOAL_PACE,
       activeGoalCalories,
       calorieBounds,
-      computeAutoMacros,
-      goalMacroMode,
       isLoseGoal,
       markGoalDetailsTouched,
     ],
   );
 
-  const handleGoalCaloriesChange = useCallback(
-    (value: number) => {
-      if (goalMacroMode === 'manual') return null;
-      const clampedCalories = clampNumber(
-        roundToStep(value, CALORIE_STEP),
-        calorieBounds.min,
-        calorieBounds.max,
-      );
-      setGoalCalorieTarget(clampedCalories);
-      const nextTotals = computeAutoMacros(clampedCalories);
-      const nextSplit = macroSplitFromGrams(nextTotals.protein, nextTotals.carbs, nextTotals.fat);
-      if (calorieBounds.base) {
-        const delta = Math.abs(clampedCalories - calorieBounds.base);
-        const nextPace = clampNumber(
-          roundToStep(roundToPrecision(delta / KCAL_PER_KG_WEEK, 2), GOAL_PACE_STEP),
-          MIN_GOAL_PACE,
-          MAX_GOAL_PACE,
-        );
-        setGoalPaceKgPerWeek(nextPace);
-      }
-      setGoalMacroSplit(nextSplit);
-      markGoalDetailsTouched();
-      return clampedCalories;
-    },
-    [
-      KCAL_PER_KG_WEEK,
-      MIN_GOAL_PACE,
-      MAX_GOAL_PACE,
-      calorieBounds,
-      computeAutoMacros,
-      goalMacroMode,
-      markGoalDetailsTouched,
-    ],
-  );
-
-  const handleGoalMacroModeChange = useCallback(
-    (mode: 'auto' | 'manual') => {
-      if (mode === goalMacroMode) return;
-      if (mode === 'manual') {
-        if (manualMacroStateRef.current?.split && manualMacroStateRef.current.calories != null) {
-          setGoalMacroSplit(manualMacroStateRef.current.split);
-          setGoalCalorieTarget(manualMacroStateRef.current.calories);
-        } else {
-          const seeded = computeAutoMacros(clampedGoalCalories);
-          setGoalMacroSplit(macroSplitFromGrams(seeded.protein, seeded.carbs, seeded.fat));
-          setGoalCalorieTarget(clampedGoalCalories);
-        }
-      } else {
-        if (goalMacroSplit) {
-          manualMacroStateRef.current = { split: goalMacroSplit, calories: clampedGoalCalories };
-        }
-        const autoTotals = computeAutoMacros(clampedGoalCalories);
-        setGoalMacroSplit(macroSplitFromGrams(autoTotals.protein, autoTotals.carbs, autoTotals.fat));
-      }
-      setGoalMacroMode(mode);
-      markGoalDetailsTouched();
-    },
-    [
-      clampedGoalCalories,
-      computeAutoMacros,
-      goalMacroMode,
-      goalMacroSplit,
-      markGoalDetailsTouched,
-    ],
-  );
-
-  const handleMacroChange = useCallback(
-    (macro: 'protein' | 'carbs' | 'fat', value: number) => {
-      if (goalMacroMode !== 'manual') return null;
-      const snappedValue = roundToStep(value, MACRO_STEP);
-      const nextProtein = macro === 'protein' ? snappedValue : macroTotals.protein;
-      const nextCarbs = macro === 'carbs' ? snappedValue : macroTotals.carbs;
-      const nextFat = macro === 'fat' ? snappedValue : macroTotals.fat;
-      const nextCaloriesRaw = nextProtein * 4 + nextCarbs * 4 + nextFat * 9;
-      const clampedCalories = clampNumber(
-        roundToStep(nextCaloriesRaw, CALORIE_STEP),
-        calorieBounds.min,
-        calorieBounds.max,
-      );
-      let finalProtein = nextProtein;
-      let finalCarbs = nextCarbs;
-      let finalFat = nextFat;
-      if (clampedCalories !== nextCaloriesRaw) {
-        const remainingCalories = clampedCalories - finalProtein * 4 - finalFat * 9;
-        finalCarbs = Math.max(0, roundToStep(remainingCalories / 4, MACRO_STEP));
-      }
-      if (finalProtein * 4 + finalCarbs * 4 + finalFat * 9 > clampedCalories) {
-        let over = finalProtein * 4 + finalCarbs * 4 + finalFat * 9 - clampedCalories;
-        const reduceMacro = (current: number, caloriesPerGram: number) => {
-          if (over <= 0 || current <= 0) return current;
-          const reduction = Math.min(
-            current,
-            roundToStep(Math.ceil(over / caloriesPerGram), MACRO_STEP),
-          );
-          over -= reduction * caloriesPerGram;
-          return Math.max(0, current - reduction);
-        };
-
-        if (macro === 'protein') {
-          finalFat = reduceMacro(finalFat, 9);
-          finalProtein = reduceMacro(finalProtein, 4);
-        } else if (macro === 'fat') {
-          finalProtein = reduceMacro(finalProtein, 4);
-          finalFat = reduceMacro(finalFat, 9);
-        } else {
-          finalFat = reduceMacro(finalFat, 9);
-          finalProtein = reduceMacro(finalProtein, 4);
-        }
-
-        const remainingCalories = clampedCalories - finalProtein * 4 - finalFat * 9;
-        finalCarbs = Math.max(0, roundToStep(remainingCalories / 4, MACRO_STEP));
-      }
-      const finalSplit = macroSplitFromGrams(finalProtein, finalCarbs, finalFat);
-      setGoalCalorieTarget(clampedCalories);
-      setGoalMacroSplit(finalSplit);
-      manualMacroStateRef.current = { split: finalSplit, calories: clampedCalories };
-      if (calorieBounds.base) {
-        const delta = Math.abs(clampedCalories - calorieBounds.base);
-        const nextPace = clampNumber(
-          roundToStep(roundToPrecision(delta / KCAL_PER_KG_WEEK, 2), GOAL_PACE_STEP),
-          MIN_GOAL_PACE,
-          MAX_GOAL_PACE,
-        );
-        setGoalPaceKgPerWeek(nextPace);
-      }
-      markGoalDetailsTouched();
-      return snappedValue;
-    },
-    [
-      KCAL_PER_KG_WEEK,
-      MIN_GOAL_PACE,
-      MAX_GOAL_PACE,
-      calorieBounds,
-      goalMacroMode,
-      macroTotals,
-      markGoalDetailsTouched,
-    ],
-  );
 
   useEffect(() => {
     if (!isLoseGainGoal || goalCalorieTarget == null) return;
@@ -1994,32 +1803,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     );
     if (clamped !== goalCalorieTarget) {
       setGoalCalorieTarget(clamped);
-      if (goalMacroMode === 'manual') {
-        const protein = macroTotals.protein;
-        const fat = macroTotals.fat;
-        const carbs = Math.max(0, roundToStep((clamped - protein * 4 - fat * 9) / 4, MACRO_STEP));
-        const nextSplit = macroSplitFromGrams(protein, carbs, fat);
-        setGoalMacroSplit(nextSplit);
-        manualMacroStateRef.current = { split: nextSplit, calories: clamped };
-      } else {
-        const nextTotals = computeAutoMacros(clamped);
-        setGoalMacroSplit(macroSplitFromGrams(nextTotals.protein, nextTotals.carbs, nextTotals.fat));
-      }
     }
   }, [
     calorieBounds.max,
     calorieBounds.min,
-    computeAutoMacros,
     goalCalorieTarget,
-    goalMacroMode,
     isLoseGainGoal,
-    macroTotals,
   ]);
-
-  useEffect(() => {
-    if (goalMacroMode !== 'manual' || !goalMacroSplit) return;
-    manualMacroStateRef.current = { split: goalMacroSplit, calories: clampedGoalCalories };
-  }, [clampedGoalCalories, goalMacroMode, goalMacroSplit]);
 
   // Body type is optional: tapping the same option again should deselect (match diabetes toggle UX).
   const handleBodyTypeChange = useCallback((type: string) => {
@@ -2126,7 +1916,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
             ...(Number.isFinite(goalPacePayload) ? { goalPaceKgPerWeek: roundToPrecision(goalPacePayload, 2) } : {}),
             ...(Number.isFinite(goalCaloriePayload) ? { goalCalorieTarget: goalCaloriePayload } : {}),
             ...(goalSplitPayload ? { goalMacroSplit: goalSplitPayload } : {}),
-            ...(goalMacroMode ? { goalMacroMode } : {}),
+            goalMacroMode: 'auto',
             ...(Number.isFinite(clampedFiberTarget) ? { goalFiberTarget: Math.round(clampedFiberTarget) } : {}),
             ...(Number.isFinite(clampedSugarMax) ? { goalSugarMax: Math.round(clampedSugarMax) } : {}),
           }
@@ -2149,8 +1939,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     goalTargetWeightUnit,
     goalPaceKgPerWeek,
     goalCalorieTarget,
-    goalMacroSplit,
-    goalMacroMode,
     goalFiberTarget,
     goalSugarMax,
     clampedGoalCalories,
@@ -2424,18 +2212,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const paceValue = roundToStep(activeGoalPace, GOAL_PACE_STEP);
     const fiberMax = Math.max(0, Math.min(80, macroTotals.carbs));
     const sugarMaxLimit = Math.max(0, Math.min(100, macroTotals.carbs));
-    const proteinBounds = {
-      min: 0,
-      max: Math.max(MACRO_STEP, roundToStep(calorieBounds.max / 4, MACRO_STEP)),
-    };
-    const carbBounds = {
-      min: 0,
-      max: Math.max(MACRO_STEP, roundToStep(calorieBounds.max / 4, MACRO_STEP)),
-    };
-    const fatBounds = {
-      min: 0,
-      max: Math.max(MACRO_STEP, roundToStep(calorieBounds.max / 9, MACRO_STEP)),
-    };
+    const fiberPct = fiberMax > 0 ? Math.round((clampedFiberTarget / fiberMax) * 100) : 0;
+    const sugarPct = sugarMaxLimit > 0 ? Math.round((clampedSugarMax / sugarMaxLimit) * 100) : 0;
     const tickStyle = (min: number, max: number, step: number) => {
       const count = Math.max(1, Math.round((max - min) / step));
       return {
@@ -2463,7 +2241,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         </header>
 
         <main className="flex-1 flex flex-col w-full max-w-md mx-auto pb-[calc(12rem+env(safe-area-inset-bottom))] md:pb-32">
-          <div className="px-5 pt-4 pb-4 space-y-5">
+          <div className="px-4 pt-3 pb-3 space-y-4">
             <section className="space-y-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-gray-900">Target weight</h2>
@@ -2507,11 +2285,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Weekly pace</h2>
-                  <p className="text-xs text-gray-500">
-                    {goalMacroMode === 'manual'
-                      ? 'Pace is calculated from your macros.'
-                      : 'Adjusts calories and macro balance.'}
-                  </p>
+                  <p className="text-xs text-gray-500">Weekly pace sets your calories and macros.</p>
                 </div>
                 <span className="text-sm font-semibold text-gray-900">
                   {displayGoalPace} {paceUnit}/week
@@ -2523,12 +2297,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 max={MAX_GOAL_PACE}
                 step={GOAL_PACE_STEP}
                 value={paceValue}
-                disabled={goalMacroMode === 'manual'}
                 onInput={(e) => {
                   const next = handleGoalPaceChange(Number(e.currentTarget.value));
                   if (next != null) triggerSliderHaptic('pace', next);
                 }}
-                className={`w-full touch-pan-x ${goalMacroMode === 'manual' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                className="w-full touch-pan-x cursor-pointer"
                 style={{ accentColor: '#16a34a' }}
               />
               <div className="h-2 w-full rounded-full" style={tickStyle(MIN_GOAL_PACE, MAX_GOAL_PACE, GOAL_PACE_STEP)} />
@@ -2546,70 +2319,36 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Daily calories</h2>
-                  <p className="text-xs text-gray-500">
-                    {goalMacroMode === 'manual'
-                      ? 'Calculated from your macro grams.'
-                      : 'Calories update the pace automatically.'}
-                  </p>
+                  <p className="text-xs text-gray-500">Calculated from your weekly pace.</p>
                   <p className="text-xs text-gray-500">
                     Maintenance calories use your age, height, weight, sex, and activity level.
                   </p>
                 </div>
                 <span className="text-sm font-semibold text-gray-900">{clampedGoalCalories} kcal</span>
               </div>
-              <input
-                type="range"
-                min={calorieBounds.min}
-                max={calorieBounds.max}
-                step={CALORIE_STEP}
-                value={clampedGoalCalories}
-                disabled={goalMacroMode === 'manual'}
-                onInput={(e) => {
-                  const next = handleGoalCaloriesChange(Number(e.currentTarget.value));
-                  if (next != null) triggerSliderHaptic('calories', next);
-                }}
-                className={`w-full touch-pan-x ${goalMacroMode === 'manual' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                style={{ accentColor: '#16a34a' }}
-              />
-              <div className="h-2 w-full rounded-full" style={tickStyle(calorieBounds.min, calorieBounds.max, CALORIE_STEP)} />
+              <div className="h-2 w-full rounded-full bg-gray-100">
+                <div
+                  className="h-2 rounded-full bg-helfi-green"
+                  style={{
+                    width: `${Math.min(100, Math.max(0, ((clampedGoalCalories - calorieBounds.min) / (calorieBounds.max - calorieBounds.min || 1)) * 100))}%`,
+                  }}
+                />
+              </div>
             </section>
 
             <div className="h-px bg-gray-100" />
 
-            <section className="space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-gray-900">Macros</h2>
-                  <p className="text-xs text-gray-500">
-                    {goalMacroMode === 'auto'
-                      ? 'Auto keeps protein and fat tied to your body weight. Carbs fill the remaining calories.'
-                      : 'Manual lets you set grams. Calories and weekly pace update automatically.'}
-                  </p>
-                </div>
-                <div className="flex items-center rounded-full bg-gray-100 p-1 text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => handleGoalMacroModeChange('auto')}
-                    className={`px-3 py-1 rounded-full transition-colors ${
-                      goalMacroMode === 'auto' ? 'bg-helfi-green text-white' : 'text-gray-600'
-                    }`}
-                  >
-                    Auto
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleGoalMacroModeChange('manual')}
-                    className={`px-3 py-1 rounded-full transition-colors ${
-                      goalMacroMode === 'manual' ? 'bg-helfi-green text-white' : 'text-gray-600'
-                    }`}
-                  >
-                    Manual
-                  </button>
-                </div>
+            <section className="space-y-2">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Macros</h2>
+                <p className="text-xs text-gray-500">
+                  Protein and fat are set from your body weight. Carbs fill the remaining calories.
+                </p>
+                <p className="text-xs text-gray-500">Adjust weekly pace to recalculate.</p>
               </div>
 
-              <div className="space-y-3">
-                <div className="space-y-2">
+              <div className="space-y-2">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -2622,24 +2361,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                       {macroTotals.protein} g
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min={proteinBounds.min}
-                    max={proteinBounds.max}
-                    step={MACRO_STEP}
-                    value={macroTotals.protein}
-                    disabled={goalMacroMode === 'auto'}
-                    onInput={(e) => {
-                      const next = handleMacroChange('protein', Number(e.currentTarget.value));
-                      if (next != null) triggerSliderHaptic('protein', next);
-                    }}
-                    className={`w-full touch-pan-x ${goalMacroMode === 'auto' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                    style={{ accentColor: MACRO_COLORS.protein }}
-                  />
-                  <div className="h-2 w-full rounded-full" style={tickStyle(proteinBounds.min, proteinBounds.max, MACRO_STEP)} />
+                  <div className="h-2 w-full rounded-full bg-gray-100">
+                    <div
+                      className="h-2 rounded-full"
+                      style={{ width: `${Math.min(100, Math.max(0, proteinPct))}%`, backgroundColor: MACRO_COLORS.protein }}
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -2652,24 +2382,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                       {macroTotals.carbs} g
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min={carbBounds.min}
-                    max={carbBounds.max}
-                    step={MACRO_STEP}
-                    value={macroTotals.carbs}
-                    disabled={goalMacroMode === 'auto'}
-                    onInput={(e) => {
-                      const next = handleMacroChange('carbs', Number(e.currentTarget.value));
-                      if (next != null) triggerSliderHaptic('carbs', next);
-                    }}
-                    className={`w-full touch-pan-x ${goalMacroMode === 'auto' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                    style={{ accentColor: MACRO_COLORS.carbs }}
-                  />
-                  <div className="h-2 w-full rounded-full" style={tickStyle(carbBounds.min, carbBounds.max, MACRO_STEP)} />
+                  <div className="h-2 w-full rounded-full bg-gray-100">
+                    <div
+                      className="h-2 rounded-full"
+                      style={{ width: `${Math.min(100, Math.max(0, carbPct))}%`, backgroundColor: MACRO_COLORS.carbs }}
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -2682,28 +2403,19 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                       {macroTotals.fat} g
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min={fatBounds.min}
-                    max={fatBounds.max}
-                    step={MACRO_STEP}
-                    value={macroTotals.fat}
-                    disabled={goalMacroMode === 'auto'}
-                    onInput={(e) => {
-                      const next = handleMacroChange('fat', Number(e.currentTarget.value));
-                      if (next != null) triggerSliderHaptic('fat', next);
-                    }}
-                    className={`w-full touch-pan-x ${goalMacroMode === 'auto' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                    style={{ accentColor: MACRO_COLORS.fat }}
-                  />
-                  <div className="h-2 w-full rounded-full" style={tickStyle(fatBounds.min, fatBounds.max, MACRO_STEP)} />
+                  <div className="h-2 w-full rounded-full bg-gray-100">
+                    <div
+                      className="h-2 rounded-full"
+                      style={{ width: `${Math.min(100, Math.max(0, fatPct))}%`, backgroundColor: MACRO_COLORS.fat }}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-gray-100 space-y-3">
+              <div className="pt-2 border-t border-gray-100 space-y-2">
                 <p className="text-xs text-gray-500">Fibre and sugar are counted inside your carb total.</p>
-                <p className="text-xs text-gray-500">Auto-calculated from calories and your health profile.</p>
-                <div className="space-y-2">
+                <p className="text-xs text-gray-500">Calculated from calories and your health profile.</p>
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                       <span className="size-2 rounded-full" style={{ backgroundColor: MACRO_COLORS.fiber }} />
@@ -2713,20 +2425,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                       {clampedFiberTarget} g
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={fiberMax}
-                    step={FIBER_STEP}
-                    value={clampedFiberTarget}
-                    disabled
-                    className="w-full opacity-80"
-                    style={{ accentColor: MACRO_COLORS.fiber }}
-                  />
-                  <div className="h-2 w-full rounded-full" style={tickStyle(0, fiberMax, FIBER_STEP)} />
+                  <div className="h-2 w-full rounded-full bg-gray-100">
+                    <div
+                      className="h-2 rounded-full"
+                      style={{ width: `${Math.min(100, Math.max(0, fiberPct))}%`, backgroundColor: MACRO_COLORS.fiber }}
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                       <span className="size-2 rounded-full" style={{ backgroundColor: MACRO_COLORS.sugar }} />
@@ -2736,17 +2443,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                       {clampedSugarMax} g
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={sugarMaxLimit}
-                    step={SUGAR_STEP}
-                    value={clampedSugarMax}
-                    disabled
-                    className="w-full opacity-80"
-                    style={{ accentColor: MACRO_COLORS.sugar }}
-                  />
-                  <div className="h-2 w-full rounded-full" style={tickStyle(0, sugarMaxLimit, SUGAR_STEP)} />
+                  <div className="h-2 w-full rounded-full bg-gray-100">
+                    <div
+                      className="h-2 rounded-full"
+                      style={{ width: `${Math.min(100, Math.max(0, sugarPct))}%`, backgroundColor: MACRO_COLORS.sugar }}
+                    />
+                  </div>
                 </div>
               </div>
             </section>
