@@ -53,10 +53,10 @@ self.addEventListener('notificationclick', (event) => {
       .then(async (clientsArr) => {
         let navigated = false;
         if (clientsArr.length) {
+          navigated = true;
           await Promise.all(
             clientsArr.map(async (client) => {
               if (client && client.url && sameUrl(client.url, targetUrl)) {
-                navigated = true;
                 if ('focus' in client) {
                   client.focus();
                 }
@@ -66,21 +66,6 @@ self.addEventListener('notificationclick', (event) => {
                 client.postMessage({ type: 'navigate', url: targetUrl });
               } catch (e) {
                 // Ignore postMessage failures
-              }
-              if ('navigate' in client) {
-                try {
-                  const result = await client.navigate(targetUrl);
-                  const resolvedUrl = (result && result.url) || client.url;
-                  if (resolvedUrl && sameUrl(resolvedUrl, targetUrl)) {
-                    navigated = true;
-                    const focusTarget = result || client;
-                    if (focusTarget && 'focus' in focusTarget) {
-                      focusTarget.focus();
-                    }
-                  }
-                } catch (e) {
-                  // Ignore navigation failures
-                }
               }
               if ('focus' in client) {
                 client.focus();
