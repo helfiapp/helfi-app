@@ -1230,7 +1230,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       goalIntensity,
       bodyType,
       healthSituations: (initial as any)?.healthSituations,
-      diabetesType,
+      diabetesType: diabetesType || null,
     });
 
     const calories = typeof targets.calories === 'number' ? targets.calories : 2000;
