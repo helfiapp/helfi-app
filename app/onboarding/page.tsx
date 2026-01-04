@@ -6937,13 +6937,6 @@ export default function Onboarding() {
       setForm((prev: any) => {
         const next = { ...prev, ...partial };
         formRef.current = next; // Keep latest edits available for exit-save flows.
-        if (allowAutosave) {
-          try {
-            updateUserData(sanitizeUserDataPayload(next));
-          } catch {
-            // Ignore
-          }
-        }
         if (allowAutosave && !SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) {
           debouncedSave(next);
         }
@@ -6960,8 +6953,17 @@ export default function Onboarding() {
         return next;
       });
     },
-    [debouncedSave, allowAutosave, updateUserData],
+    [debouncedSave, allowAutosave],
   );
+
+  useEffect(() => {
+    if (!allowAutosave) return;
+    try {
+      updateUserData(sanitizeUserDataPayload(form));
+    } catch {
+      // Ignore
+    }
+  }, [allowAutosave, form, updateUserData]);
 
   // Once autosave is allowed (after data load), push current form to backend to avoid blanks
   useEffect(() => {
