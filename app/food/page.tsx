@@ -7983,10 +7983,12 @@ Please add nutritional information manually if needed.`);
   }
 
   const buildAnalysisHealthCheckKey = (analysisIdValue?: string | null, analysisSeqValue?: number | null) => {
-    if (analysisIdValue) return `analysis:${analysisIdValue}`
     const seq = typeof analysisSeqValue === 'number' ? analysisSeqValue : analysisSequenceRef.current
-    if (!seq) return ''
-    return `analysis:seq:${seq}`
+    const resolvedId = analysisIdValue ?? analysisId ?? null
+    if (resolvedId && seq) return `analysis:${resolvedId}:${seq}`
+    if (resolvedId) return `analysis:${resolvedId}`
+    if (seq) return `analysis:seq:${seq}`
+    return ''
   }
 
   const maybeShowHealthCheckPrompt = (entry: any, options?: { entryKey?: string; source?: 'analysis' | 'entry' }) => {
