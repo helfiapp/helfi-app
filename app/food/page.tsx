@@ -1967,6 +1967,7 @@ export default function FoodDiary() {
   const [healthCheckPrompt, setHealthCheckPrompt] = useState<HealthCheckPromptPayload | null>(null)
   const [healthCheckResult, setHealthCheckResult] = useState<HealthCheckResult | null>(null)
   const [healthCheckLoading, setHealthCheckLoading] = useState(false)
+  const [healthCheckError, setHealthCheckError] = useState<string | null>(null)
   const [historySaveError, setHistorySaveError] = useState<string | null>(null)
   const [lastHistoryPayload, setLastHistoryPayload] = useState<any>(null)
   const [historyRetrying, setHistoryRetrying] = useState(false)
@@ -2058,6 +2059,7 @@ export default function FoodDiary() {
   const officialSearchSeqRef = useRef(0)
   const officialSearchDebounceRef = useRef<any>(null)
   const analysisSequenceRef = useRef(0)
+  const analysisHealthCheckKeyRef = useRef<string | null>(null)
   const autoDbMatchAbortRef = useRef<AbortController | null>(null)
   const [officialLastRequest, setOfficialLastRequest] = useState<{
     query: string
@@ -6983,6 +6985,15 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         setDietWarning(result.dietWarning || null);
         setDietAlternatives(result.dietAlternatives || null);
         setShowAiResult(true);
+        if (!isFeedbackRescan) {
+          const analysisPromptKey = buildAnalysisHealthCheckKey(result.analysisId ?? null, analysisSeq)
+          maybeShowHealthCheckPromptFromAnalysis({
+            analysisKey: analysisPromptKey,
+            analysisText: result.analysis,
+            items: Array.isArray(result.items) ? result.items : null,
+            total: result.total ?? null,
+          })
+        }
         // Trigger usage meter refresh after successful analysis
         try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
       } else {
@@ -7112,6 +7123,13 @@ Meanwhile, you can describe your food manually:
         setDietWarning(result.dietWarning || null);
         setDietAlternatives(result.dietAlternatives || null);
         setShowAiResult(true);
+        const analysisPromptKey = buildAnalysisHealthCheckKey(null, analysisSeq)
+        maybeShowHealthCheckPromptFromAnalysis({
+          analysisKey: analysisPromptKey,
+          analysisText: result.analysis,
+          items: Array.isArray(result.items) ? result.items : null,
+          total: result.total ?? null,
+        })
         
         // Clear manual form
         setManualFoodName('');
@@ -7200,7 +7218,14 @@ Please add nutritional information manually if needed.`);
     
     const updatedFoods = [newEntry, ...todaysFoods]
     setTodaysFoods(updatedFoods)
-    maybeShowHealthCheckPrompt(newEntry)
+    const analysisPromptKey = buildAnalysisHealthCheckKey()
+    const shouldSkipHealthCheckPrompt =
+      method === 'photo' &&
+      analysisPromptKey &&
+      analysisPromptKey === analysisHealthCheckKeyRef.current
+    if (!shouldSkipHealthCheckPrompt) {
+      maybeShowHealthCheckPrompt(newEntry)
+    }
 
     // If the user is viewing a non‑today date (e.g. yesterday), keep the
     // visible history list in sync so the new entry doesn't "disappear"
@@ -7470,6 +7495,7 @@ Please add nutritional information manually if needed.`);
     setBarcodeLabelFlow(null)
     setShowBarcodeLabelPrompt(false)
     setAutoAnalyzeLabelPhoto(false)
+    analysisHealthCheckKeyRef.current = null
     if (barcodeLabelTimeoutRef.current) {
       clearTimeout(barcodeLabelTimeoutRef.current)
       barcodeLabelTimeoutRef.current = null
@@ -7869,6 +7895,7 @@ Please add nutritional information manually if needed.`);
     setFeedbackReasons([])
     setFeedbackComment('')
     setFeedbackError(null)
+    analysisHealthCheckKeyRef.current = null
   }
 
   const buildDietTotalsForCheck = (entry: any) => {
@@ -7949,8 +7976,16 @@ Please add nutritional information manually if needed.`);
     )
   }
 
-  const maybeShowHealthCheckPrompt = (entry: any) => {
+  const buildAnalysisHealthCheckKey = (analysisIdValue?: string | null, analysisSeqValue?: number | null) => {
+    if (analysisIdValue) return `analysis:${analysisIdValue}`
+    const seq = typeof analysisSeqValue === 'number' ? analysisSeqValue : analysisSequenceRef.current
+    if (!seq) return ''
+    return `analysis:seq:${seq}`
+  }
+
+  const maybeShowHealthCheckPrompt = (entry: any, options?: { entryKey?: string; source?: 'analysis' | 'entry' }) => {
     try {
+      if (healthCheckPrompt) return
       const goals = Array.isArray((userData as any)?.goals)
         ? (userData as any).goals
             .map((goal: any) => String(goal || '').trim())
@@ -7959,7 +7994,7 @@ Please add nutritional information manually if needed.`);
       const dietIds = normalizeDietTypes((userData as any)?.dietTypes ?? (userData as any)?.dietType)
       if (!goals.length && !dietIds.length) return
 
-      const entryKey = getHealthCheckEntryKey(entry)
+      const entryKey = options?.entryKey || getHealthCheckEntryKey(entry)
       if (!entryKey) return
       if (healthCheckPromptedRef.current.has(entryKey)) return
 
@@ -7970,6 +8005,7 @@ Please add nutritional information manually if needed.`);
       const items = Array.isArray(entry?.items) ? entry.items : null
 
       markHealthCheckPrompted(entryKey)
+      setHealthCheckError(null)
       setHealthCheckResult(null)
       setHealthCheckPrompt({
         entryId: entryKey,
@@ -7977,14 +8013,41 @@ Please add nutritional information manually if needed.`);
         totals,
         items,
       })
+      if (options?.source === 'analysis') {
+        analysisHealthCheckKeyRef.current = entryKey
+      }
     } catch {
       // non-blocking
     }
   }
 
+  const maybeShowHealthCheckPromptFromAnalysis = (payload: {
+    analysisKey: string
+    analysisText?: string | null
+    items?: any[] | null
+    total?: any | null
+    nutrition?: any | null
+  }) => {
+    if (!payload.analysisKey) return
+    if (analysisHealthCheckKeyRef.current === payload.analysisKey) return
+    const baseFromAi = extractBaseMealDescription(payload.analysisText || '')
+    const baseFromItems =
+      Array.isArray(payload.items) && payload.items.length > 0 ? buildMealSummaryFromItems(payload.items) : ''
+    const description = (baseFromAi || baseFromItems || 'Meal').trim()
+    const entry = {
+      id: payload.analysisKey,
+      description,
+      items: Array.isArray(payload.items) ? payload.items : null,
+      total: payload.total ?? null,
+      nutrition: payload.nutrition ?? null,
+    }
+    maybeShowHealthCheckPrompt(entry, { entryKey: payload.analysisKey, source: 'analysis' })
+  }
+
   const runHealthCheck = async (payload: HealthCheckPromptPayload) => {
     if (!payload || healthCheckLoading) return
     setHealthCheckLoading(true)
+    setHealthCheckError(null)
     setHealthCheckResult(null)
     try {
       const res = await fetch('/api/food-health-check', {
@@ -7997,10 +8060,12 @@ Please add nutritional information manually if needed.`);
         }),
       })
       if (res.status === 402) {
+        setHealthCheckError('Not enough credits to run the health check.')
         showQuickToast('Insufficient credits for health check.')
         return
       }
       if (!res.ok) {
+        setHealthCheckError('Health check failed. Please try again.')
         showQuickToast('Health check failed. Please try again.')
         return
       }
@@ -8018,6 +8083,7 @@ Please add nutritional information manually if needed.`);
       } catch {}
     } catch (err) {
       console.error('Health check error', err)
+      setHealthCheckError('Health check failed. Please try again.')
       showQuickToast('Health check failed. Please try again.')
     } finally {
       setHealthCheckLoading(false)
@@ -11491,53 +11557,79 @@ Please add nutritional information manually if needed.`);
         </div>
       )}
       {healthCheckPrompt && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[10000] w-[92%] max-w-xl">
-          <div className="px-3 py-2 rounded-2xl border border-amber-200 bg-amber-50 shadow-lg flex items-center gap-3">
-            <div className="text-xs text-amber-900 flex-1">
-              High-risk meal detected (sugar/carbs/fat). Run a quick health check for your goals? {HEALTH_CHECK_COST_CREDITS} credits.
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[94%] max-w-2xl">
+          <div className="relative overflow-hidden rounded-3xl border border-amber-200/70 bg-white/95 shadow-2xl backdrop-blur">
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-50 via-white to-emerald-50 opacity-80" />
+            <div className="relative flex items-start gap-4 p-4 sm:p-5">
+              <div className="h-11 w-11 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-sm">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M5.07 19h13.86c1.2 0 1.96-1.3 1.35-2.32L13.4 4.64c-.6-1.04-2.08-1.04-2.68 0L3.72 16.68c-.6 1.02.15 2.32 1.35 2.32z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm sm:text-base font-semibold text-gray-900">Health check recommended</div>
+                <p className="mt-1 text-sm text-gray-700">
+                  High-risk meal detected (sugar/carbs/fat). Run a quick check aligned to your goals?
+                </p>
+                {healthCheckError && (
+                  <div className="mt-2 text-xs text-amber-700">{healthCheckError}</div>
+                )}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => runHealthCheck(healthCheckPrompt)}
+                    disabled={healthCheckLoading}
+                    className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {healthCheckLoading ? 'Checking...' : `Review (${HEALTH_CHECK_COST_CREDITS})`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHealthCheckPrompt(null)}
+                    className="px-4 py-2 rounded-full border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                  >
+                    Not now
+                  </button>
+                  <span className="text-xs text-gray-500">{HEALTH_CHECK_COST_CREDITS} credits</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHealthCheckPrompt(null)}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label="Dismiss"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => runHealthCheck(healthCheckPrompt)}
-              disabled={healthCheckLoading}
-              className="px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-semibold disabled:opacity-60"
-            >
-              {healthCheckLoading ? 'Checking...' : 'Run check'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setHealthCheckPrompt(null)}
-              className="text-amber-900 text-sm font-semibold px-1"
-              aria-label="Dismiss"
-            >
-              x
-            </button>
           </div>
         </div>
       )}
-      {healthCheckResult && !healthCheckPrompt && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[10000] w-[92%] max-w-xl">
-          <div className="px-3 py-2 rounded-2xl border border-blue-200 bg-blue-50 shadow-lg">
-            <div className="flex items-start gap-3">
-              <div className="flex-1">
-                <div className="text-xs font-semibold text-blue-900">Health check</div>
-                <div className="text-xs text-blue-900 mt-1 whitespace-pre-line">{healthCheckResult.warning}</div>
-                {healthCheckResult.alternative && (
-                  <div className="text-xs text-blue-900 mt-1">
-                    <span className="font-semibold">Swap idea:</span> {healthCheckResult.alternative}
-                  </div>
-                )}
-                <div className="text-[11px] text-blue-700 mt-1">{HEALTH_CHECK_COST_CREDITS} credits used.</div>
-              </div>
+      {healthCheckResult && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-blue-100">
+            <div className="px-5 py-4 border-b border-blue-100 flex items-center justify-between">
+              <div className="text-sm font-semibold text-blue-900">Health check</div>
               <button
                 type="button"
                 onClick={() => setHealthCheckResult(null)}
                 className="text-blue-900 text-sm font-semibold px-1"
-                aria-label="Dismiss"
+                aria-label="Close"
               >
                 x
               </button>
             </div>
+            <div className="px-5 py-4 text-sm text-blue-900 whitespace-pre-line">
+              {healthCheckResult.warning}
+            </div>
+            {healthCheckResult.alternative && (
+              <div className="px-5 pb-4 text-sm text-blue-900">
+                <span className="font-semibold">Swap idea:</span> {healthCheckResult.alternative}
+              </div>
+            )}
+            <div className="px-5 pb-4 text-[11px] text-blue-700">{HEALTH_CHECK_COST_CREDITS} credits used.</div>
           </div>
         </div>
       )}
