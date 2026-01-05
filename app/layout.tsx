@@ -133,6 +133,17 @@ export default function RootLayout({
                 try {
                   var splash = document.getElementById('helfi-splash');
                   if (!splash) return;
+                  var hideTimer = null;
+                  var scheduleHide = function(ms) {
+                    try {
+                      if (hideTimer) {
+                        clearTimeout(hideTimer);
+                      }
+                      hideTimer = setTimeout(function() {
+                        hide();
+                      }, ms);
+                    } catch (e) {}
+                  };
                   var show = function(opts) {
                     splash.style.display = 'flex';
                     splash.dataset.visible = '1';
@@ -143,8 +154,10 @@ export default function RootLayout({
                       } catch (e) {
                         delete splash.dataset.targetPath;
                       }
+                      scheduleHide(12000);
                     } else {
                       delete splash.dataset.targetPath;
+                      scheduleHide(6000);
                     }
                   };
                   var hide = function() {
@@ -190,7 +203,9 @@ export default function RootLayout({
 
                   if (isPublic || !isPwa) {
                     hide();
-                  } else if (!coldStart) {
+                  } else if (coldStart) {
+                    scheduleHide(8000);
+                  } else {
                     hide();
                   }
                 } catch (e) {

@@ -291,19 +291,20 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       return () => window.clearTimeout(timer)
     }
     if (!targetPath && coldStart) {
+      if (status === 'loading') return
       const timer = window.setTimeout(() => {
         hideSplash()
         try {
           ;(window as any).__helfiSplashColdStart = ''
         } catch {}
-      }, 200)
+      }, 150)
       return () => window.clearTimeout(timer)
     }
     if (!targetPath && !coldStart) {
       const timer = window.setTimeout(() => hideSplash(), 50)
       return () => window.clearTimeout(timer)
     }
-  }, [pathname, hideSplash])
+  }, [pathname, hideSplash, status])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
