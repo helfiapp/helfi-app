@@ -97,6 +97,9 @@ const formatServingsDisplay = (value: number | null | undefined) => {
   return rounded.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')
 }
 
+const isInlineImageSrc = (src: string | null | undefined) =>
+  typeof src === 'string' && (src.startsWith('data:') || src.startsWith('blob:'))
+
 const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
   if (!Array.isArray(items) || items.length === 0) return ''
 
@@ -13097,6 +13100,7 @@ Please add nutritional information manually if needed.`);
                     }`}
                     loading="eager"
                     priority
+                    unoptimized={isInlineImageSrc(photoPreview)}
                     onLoad={() =>
                       setFoodImagesLoading((prev: Record<string, boolean>) => ({
                         ...prev,
@@ -13330,6 +13334,7 @@ Please add nutritional information manually if needed.`);
                         }`}
                         loading="eager"
                         priority
+                        unoptimized={isInlineImageSrc(photoPreview)}
                         onLoad={() =>
                           setFoodImagesLoading((prev: Record<string, boolean>) => ({
                             ...prev,
@@ -13457,6 +13462,7 @@ Please add nutritional information manually if needed.`);
                               width={300}
                               height={300}
                               className="w-full max-w-sm aspect-square object-cover transition-transform duration-200 group-hover:scale-[1.01]"
+                              unoptimized={isInlineImageSrc(photoPreview)}
                               onError={() => {
                                 if (editingEntry) {
                                   refreshEditingEntryPhoto()
@@ -17929,6 +17935,7 @@ Please add nutritional information manually if needed.`);
                 width={800}
                 height={600}
                 className="max-w-full max-h-full object-contain rounded-lg"
+                unoptimized={isInlineImageSrc(fullSizeImage)}
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
