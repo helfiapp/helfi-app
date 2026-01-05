@@ -85,7 +85,7 @@ type HealthCheckResult = {
   alternative: string | null
 }
 
-const HEALTH_CHECK_THRESHOLDS = { sugar: 25, carbs: 75, fat: 25 } as const
+const HEALTH_CHECK_THRESHOLDS = { sugar: 30, carbs: 90, fat: 35 } as const
 const HEALTH_CHECK_COST_CREDITS = 2
 const HEALTH_CHECK_PROMPT_STORAGE_KEY = 'food:healthCheckPrompted'
 const HEALTH_CHECK_PROMPT_CACHE_LIMIT = 200
@@ -95,6 +95,33 @@ const HEALTH_TRIGGER_META: Record<string, { color: string; accent: string }> = {
   carbs: { color: '#22c55e', accent: 'text-green-600' },
   fat: { color: '#6366f1', accent: 'text-indigo-600' },
 }
+
+const HEALTHY_FAT_KEYWORDS = [
+  'salmon',
+  'sardine',
+  'tuna',
+  'mackerel',
+  'trout',
+  'avocado',
+  'olive oil',
+  'olives',
+  'nuts',
+  'almond',
+  'walnut',
+  'pistachio',
+  'macadamia',
+  'hazelnut',
+  'pecan',
+  'chia',
+  'flax',
+  'linseed',
+  'hemp',
+  'seeds',
+  'sunflower',
+  'pumpkin',
+  'peanut',
+  'tahini',
+] as const
 
 const formatServingsDisplay = (value: number | null | undefined) => {
   const numeric = Number(value)
@@ -108,6 +135,21 @@ const formatServingsDisplay = (value: number | null | undefined) => {
 
 const isInlineImageSrc = (src: string | null | undefined) =>
   typeof src === 'string' && (src.startsWith('data:') || src.startsWith('blob:'))
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const containsHealthyFat = (text: string) => {
+  const lower = text.toLowerCase()
+  return HEALTHY_FAT_KEYWORDS.some((keyword) => {
+    const needle = keyword.toLowerCase()
+    if (needle.includes(' ')) return lower.includes(needle)
+    try {
+      return new RegExp(`\\b${escapeRegex(needle)}\\b`).test(lower)
+    } catch {
+      return lower.includes(needle)
+    }
+  })
+}
 
 const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
   if (!Array.isArray(items) || items.length === 0) return ''
@@ -2977,6 +3019,19 @@ export default function FoodDiary() {
       diabetesType: (userData as any).diabetesType,
     })
   }, [userData])
+
+  const getHealthCheckThresholds = () => {
+    const sugarTarget = Number((dailyTargets as any)?.sugarMax)
+    const carbsTarget = Number(dailyTargets?.carbs)
+    const fatTarget = Number(dailyTargets?.fat)
+    const pick = (target: number, base: number) =>
+      Number.isFinite(target) && target > 0 ? Math.max(base, target * 0.55) : base
+    return {
+      sugar: pick(sugarTarget, HEALTH_CHECK_THRESHOLDS.sugar),
+      carbs: pick(carbsTarget, HEALTH_CHECK_THRESHOLDS.carbs),
+      fat: pick(fatTarget, HEALTH_CHECK_THRESHOLDS.fat),
+    }
+  }
   const applyRecalculatedNutrition = (items: any[]) => {
     const recalculated = recalculateNutritionFromItems(items)
     // Guard rail: only overwrite the original AI totals when we have a
@@ -7976,17 +8031,32 @@ Please add nutritional information manually if needed.`);
     persistHealthCheckPrompted()
   }
 
-  const isHighRiskTotals = (totals: NutritionTotals | null) => {
+  const shouldTriggerHealthCheck = (entry: any, totals: NutritionTotals | null) => {
     if (!totals) return false
+    const thresholds = getHealthCheckThresholds()
     const sugar = typeof totals.sugar === 'number' ? totals.sugar : 0
     const carbs = typeof totals.carbs === 'number' ? totals.carbs : 0
     const fat = typeof totals.fat === 'number' ? totals.fat : 0
-    if (![sugar, carbs, fat].some((value) => Number.isFinite(value) && value > 0)) return false
-    return (
-      sugar > HEALTH_CHECK_THRESHOLDS.sugar ||
-      carbs > HEALTH_CHECK_THRESHOLDS.carbs ||
-      fat > HEALTH_CHECK_THRESHOLDS.fat
-    )
+    const calories = typeof totals.calories === 'number' ? totals.calories : 0
+
+    const sugarHigh = sugar >= thresholds.sugar
+    const carbsHigh = carbs >= thresholds.carbs
+    let fatHigh = fat >= thresholds.fat
+
+    if (fatHigh && !sugarHigh && !carbsHigh) {
+      const entryText = [
+        entry?.description,
+        ...(Array.isArray(entry?.items) ? entry.items.map((item: any) => item?.name || item?.label || '') : []),
+      ]
+        .join(' ')
+        .trim()
+      const hasHealthyFat = entryText ? containsHealthyFat(entryText) : false
+      const margin = hasHealthyFat ? 20 : 12
+      if (fat < thresholds.fat + margin) fatHigh = false
+      if (calories > 0 && calories < 350) fatHigh = false
+    }
+
+    return sugarHigh || carbsHigh || fatHigh
   }
 
   const buildAnalysisHealthCheckKey = (analysisIdValue?: string | null, analysisSeqValue?: number | null) => {
@@ -8014,7 +8084,7 @@ Please add nutritional information manually if needed.`);
       if (healthCheckPromptedRef.current.has(entryKey)) return
 
       const totals = getEntryTotals(entry)
-      if (!isHighRiskTotals(totals)) return
+      if (!shouldTriggerHealthCheck(entry, totals)) return
 
       const description = String(entry?.description || entry?.label || '').trim()
       const items = Array.isArray(entry?.items) ? entry.items : null
@@ -8072,6 +8142,7 @@ Please add nutritional information manually if needed.`);
           description: payload.description,
           totals: payload.totals,
           items: payload.items,
+          thresholds: getHealthCheckThresholds(),
         }),
       })
       if (res.status === 402) {

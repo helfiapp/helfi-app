@@ -127,53 +127,127 @@ const parseHealthCheckJson = (raw: string) => {
 }
 
 const HEALTH_TRIGGER_THRESHOLDS = {
-  sugar: 25,
-  carbs: 75,
-  fat: 25,
+  sugar: 30,
+  carbs: 90,
+  fat: 35,
 } as const
 
-const buildTriggerFlags = (totals: ReturnType<typeof normalizeTotals> | null) => {
+const HEALTHY_FAT_KEYWORDS = [
+  'salmon',
+  'sardine',
+  'tuna',
+  'mackerel',
+  'trout',
+  'avocado',
+  'olive oil',
+  'olives',
+  'nuts',
+  'almond',
+  'walnut',
+  'pistachio',
+  'macadamia',
+  'hazelnut',
+  'pecan',
+  'chia',
+  'flax',
+  'linseed',
+  'hemp',
+  'seeds',
+  'sunflower',
+  'pumpkin',
+  'peanut',
+  'tahini',
+] as const
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const containsHealthyFat = (text: string) => {
+  const lower = text.toLowerCase()
+  return HEALTHY_FAT_KEYWORDS.some((keyword) => {
+    const needle = keyword.toLowerCase()
+    if (needle.includes(' ')) return lower.includes(needle)
+    try {
+      return new RegExp(`\\b${escapeRegex(needle)}\\b`).test(lower)
+    } catch {
+      return lower.includes(needle)
+    }
+  })
+}
+
+const resolveThresholds = (raw: any) => {
+  const sugar = Number(raw?.sugar)
+  const carbs = Number(raw?.carbs)
+  const fat = Number(raw?.fat)
+  return {
+    sugar: Number.isFinite(sugar) && sugar > 0 ? sugar : HEALTH_TRIGGER_THRESHOLDS.sugar,
+    carbs: Number.isFinite(carbs) && carbs > 0 ? carbs : HEALTH_TRIGGER_THRESHOLDS.carbs,
+    fat: Number.isFinite(fat) && fat > 0 ? fat : HEALTH_TRIGGER_THRESHOLDS.fat,
+  }
+}
+
+const buildTriggerFlags = (
+  totals: ReturnType<typeof normalizeTotals> | null,
+  thresholds: ReturnType<typeof resolveThresholds>,
+  options?: { allowHealthyFat?: boolean; itemText?: string }
+) => {
   if (!totals) return []
   const flags: string[] = []
-  if (typeof totals.sugar === 'number' && totals.sugar > HEALTH_TRIGGER_THRESHOLDS.sugar) {
-    flags.push(`Sugar ${formatNumber(totals.sugar)}g > ${HEALTH_TRIGGER_THRESHOLDS.sugar}g`)
+  if (typeof totals.sugar === 'number' && totals.sugar > thresholds.sugar) {
+    flags.push(`Sugar ${formatNumber(totals.sugar)}g > ${thresholds.sugar}g`)
   }
-  if (typeof totals.carbs === 'number' && totals.carbs > HEALTH_TRIGGER_THRESHOLDS.carbs) {
-    flags.push(`Carbs ${formatNumber(totals.carbs)}g > ${HEALTH_TRIGGER_THRESHOLDS.carbs}g`)
+  if (typeof totals.carbs === 'number' && totals.carbs > thresholds.carbs) {
+    flags.push(`Carbs ${formatNumber(totals.carbs)}g > ${thresholds.carbs}g`)
   }
-  if (typeof totals.fat === 'number' && totals.fat > HEALTH_TRIGGER_THRESHOLDS.fat) {
-    flags.push(`Fat ${formatNumber(totals.fat)}g > ${HEALTH_TRIGGER_THRESHOLDS.fat}g`)
+  if (typeof totals.fat === 'number' && totals.fat > thresholds.fat) {
+    const itemText = options?.itemText || ''
+    const allowHealthy = options?.allowHealthyFat !== false
+    const hasHealthyFat = allowHealthy && itemText ? containsHealthyFat(itemText) : false
+    const margin = hasHealthyFat ? 20 : 12
+    if (totals.fat >= thresholds.fat + margin) {
+      flags.push(`Fat ${formatNumber(totals.fat)}g > ${thresholds.fat}g`)
+    }
   }
   return flags
 }
 
-const buildTriggerDetails = (totals: ReturnType<typeof normalizeTotals> | null) => {
+const buildTriggerDetails = (
+  totals: ReturnType<typeof normalizeTotals> | null,
+  thresholds: ReturnType<typeof resolveThresholds>,
+  options?: { allowHealthyFat?: boolean; itemText?: string }
+) => {
   if (!totals) return []
   const triggers: Array<{ key: string; label: string; value: number; limit: number; unit: string }> = []
-  if (typeof totals.sugar === 'number' && totals.sugar > HEALTH_TRIGGER_THRESHOLDS.sugar) {
+  if (typeof totals.sugar === 'number' && totals.sugar > thresholds.sugar) {
     triggers.push({
       key: 'sugar',
       label: 'Sugar',
       value: totals.sugar,
-      limit: HEALTH_TRIGGER_THRESHOLDS.sugar,
+      limit: thresholds.sugar,
       unit: 'g',
     })
   }
-  if (typeof totals.carbs === 'number' && totals.carbs > HEALTH_TRIGGER_THRESHOLDS.carbs) {
+  if (typeof totals.carbs === 'number' && totals.carbs > thresholds.carbs) {
     triggers.push({
       key: 'carbs',
       label: 'Carbs',
       value: totals.carbs,
-      limit: HEALTH_TRIGGER_THRESHOLDS.carbs,
+      limit: thresholds.carbs,
       unit: 'g',
     })
   }
-  if (typeof totals.fat === 'number' && totals.fat > HEALTH_TRIGGER_THRESHOLDS.fat) {
+  if (typeof totals.fat === 'number' && totals.fat > thresholds.fat) {
+    const itemText = options?.itemText || ''
+    const allowHealthy = options?.allowHealthyFat !== false
+    const hasHealthyFat = allowHealthy && itemText ? containsHealthyFat(itemText) : false
+    const margin = hasHealthyFat ? 20 : 12
+    if (totals.fat < thresholds.fat + margin) {
+      return triggers
+    }
     triggers.push({
       key: 'fat',
       label: 'Fat',
       value: totals.fat,
-      limit: HEALTH_TRIGGER_THRESHOLDS.fat,
+      limit: thresholds.fat,
       unit: 'g',
     })
   }
@@ -210,6 +284,8 @@ export async function POST(req: NextRequest) {
         .filter((name: string) => name.length > 0)
         .slice(0, 12)
     : []
+  const thresholds = resolveThresholds(body?.thresholds)
+  const itemText = [description, itemNames.join(' ')].filter(Boolean).join(' ').trim()
 
   if (!description && itemNames.length === 0) {
     return NextResponse.json({ error: 'Missing meal data' }, { status: 400 })
@@ -230,8 +306,8 @@ export async function POST(req: NextRequest) {
     primaryGoal.goalIntensity ? `Goal pace: ${primaryGoal.goalIntensity}` : null,
   ].filter(Boolean)
 
-  const triggerFlags = buildTriggerFlags(totals)
-  const triggerDetails = buildTriggerDetails(totals)
+  const triggerFlags = buildTriggerFlags(totals, thresholds, { itemText })
+  const triggerDetails = buildTriggerDetails(totals, thresholds, { itemText })
   const mealParts = [
     description ? `Meal: ${description}` : null,
     itemNames.length ? `Items: ${itemNames.join(', ')}` : null,
@@ -244,6 +320,7 @@ export async function POST(req: NextRequest) {
   const prompt = [
     'You are a nutrition coach helping a user avoid foods that conflict with their health goals and diets.',
     'Explain why the meal is problematic for each selected health issue separately. Be specific to that issue and tie it to the macros or ingredients.',
+    'If fat is coming from healthier sources (salmon, olive oil, avocado, nuts, seeds), call that out and do not overstate risk unless sugar/carbs are also high.',
     'Write 2-3 sentences per issue, with practical and clear reasoning.',
     'Give one clear swap suggestion that stays similar to the meal, not generic.',
     'If the meal is acceptable, say so briefly and still give a lighter swap.',
