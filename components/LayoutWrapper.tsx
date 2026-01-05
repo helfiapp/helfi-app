@@ -1,7 +1,7 @@
 'use client'
 import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { MouseEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import UsageMeter from '@/components/UsageMeter'
@@ -213,7 +213,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
-  const searchParams = useSearchParams()
+  const lastLocationRef = useRef('')
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = [
@@ -361,16 +361,29 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (status !== 'authenticated') return
     if (publicPages.includes(pathname) || isAdminPanelPath) return
 
+    const locationKey = `${window.location.pathname}?${window.location.search}`
+    if (lastLocationRef.current === locationKey) return
+    lastLocationRef.current = locationKey
+
     try {
-      const params = new URLSearchParams(searchParams?.toString() || '')
+      const params = new URLSearchParams(window.location.search)
       const pendingId = params.get('notificationId')
-      const notificationOpen = params.get('notificationOpen')
+      const notificationOpen = params.get('notificationOpen') === '1'
+      let shouldCheckPending = notificationOpen
+
+      try {
+        if (sessionStorage.getItem('helfi:notification-open') === '1') {
+          shouldCheckPending = true
+        }
+      } catch {
+        // Ignore storage errors
+      }
 
       if (pendingId) {
         storePendingNotificationId(pendingId)
       }
 
-      if (notificationOpen === '1') {
+      if (shouldCheckPending) {
         fetch('/api/notifications/pending-open', { cache: 'no-store' as any })
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
@@ -393,10 +406,18 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`
         window.history.replaceState(null, '', nextUrl)
       }
+
+      if (shouldCheckPending) {
+        try {
+          sessionStorage.removeItem('helfi:notification-open')
+        } catch {
+          // Ignore storage errors
+        }
+      }
     } catch {
       // Ignore URL errors
     }
-  }, [status, pathname, isAdminPanelPath, publicPages, searchParams])
+  })
 
   // Don't show sidebar while session is loading to prevent flickering
   if (status === 'loading') {

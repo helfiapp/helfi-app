@@ -115,6 +115,9 @@ export default function RootLayout({
                         var target = new URL(data.url, window.location.origin);
                         if (target.origin !== window.location.origin) return;
                         if (window.location.href === target.href) return;
+                        try {
+                          sessionStorage.setItem('helfi:notification-open', '1');
+                        } catch (e) {}
                         if (typeof window.__helfiNavigate === 'function') {
                           window.__helfiNavigate(target.href);
                           return;
