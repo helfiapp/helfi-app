@@ -126,6 +126,21 @@ const parseHealthCheckJson = (raw: string) => {
   return null
 }
 
+const buildTriggerFlags = (totals: ReturnType<typeof normalizeTotals> | null) => {
+  if (!totals) return []
+  const flags: string[] = []
+  if (typeof totals.sugar === 'number' && totals.sugar > 25) {
+    flags.push(`Sugar ${formatNumber(totals.sugar)}g > 25g`)
+  }
+  if (typeof totals.carbs === 'number' && totals.carbs > 75) {
+    flags.push(`Carbs ${formatNumber(totals.carbs)}g > 75g`)
+  }
+  if (typeof totals.fat === 'number' && totals.fat > 25) {
+    flags.push(`Fat ${formatNumber(totals.fat)}g > 25g`)
+  }
+  return flags
+}
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -176,18 +191,21 @@ export async function POST(req: NextRequest) {
     primaryGoal.goalIntensity ? `Goal pace: ${primaryGoal.goalIntensity}` : null,
   ].filter(Boolean)
 
+  const triggerFlags = buildTriggerFlags(totals)
   const mealParts = [
     description ? `Meal: ${description}` : null,
     itemNames.length ? `Items: ${itemNames.join(', ')}` : null,
     totals
       ? `Totals: ${formatNumber(totals.calories)} kcal, ${formatNumber(totals.protein)}g protein, ${formatNumber(totals.carbs)}g carbs, ${formatNumber(totals.fat)}g fat, ${formatNumber(totals.fiber)}g fiber, ${formatNumber(totals.sugar)}g sugar`
       : null,
+    triggerFlags.length ? `Triggered by: ${triggerFlags.join('; ')}` : null,
   ].filter(Boolean)
 
   const prompt = [
     'You are a nutrition coach helping a user avoid foods that conflict with their health goals and diets.',
-    'Provide a short warning and one better swap suggestion. Keep it simple and practical.',
-    'If the meal is acceptable, say so briefly and still offer a lighter swap.',
+    'Explain why the meal is problematic for each selected health issue separately. Be specific to that issue.',
+    'Give one clear swap suggestion that stays similar to the meal.',
+    'If the meal is acceptable, say so briefly and still give a lighter swap.',
     '',
     `Health goals/issues: ${selectedIssues.length ? selectedIssues.join(', ') : 'none listed'}.`,
     `Diet preferences: ${dietTypes.length ? dietTypes.join(', ') : 'none listed'}.`,
@@ -195,7 +213,7 @@ export async function POST(req: NextRequest) {
     mealParts.join('\n'),
     '',
     'Return JSON between <HEALTH_CHECK> tags with exactly:',
-    '{"warning":"string","alternative":"string"}',
+    '{"summary":"string","issues":[{"issue":"string","why":"string"}],"alternative":"string"}',
   ]
     .filter(Boolean)
     .join('\n')
@@ -236,9 +254,17 @@ export async function POST(req: NextRequest) {
   }
 
   const parsed = parseHealthCheckJson(content)
-  const warning = typeof parsed?.warning === 'string' ? parsed.warning.trim() : ''
+  const summary = typeof parsed?.summary === 'string' ? parsed.summary.trim() : ''
+  const rawIssues = Array.isArray(parsed?.issues) ? parsed.issues : []
+  const issues = rawIssues
+    .map((item: any) => ({
+      issue: typeof item?.issue === 'string' ? item.issue.trim() : '',
+      why: typeof item?.why === 'string' ? item.why.trim() : '',
+    }))
+    .filter((item: any) => item.issue && item.why)
+    .slice(0, 6)
   const alternative = typeof parsed?.alternative === 'string' ? parsed.alternative.trim() : ''
-  if (!warning && !alternative) {
+  if (!summary && issues.length === 0 && !alternative) {
     return NextResponse.json({ error: 'Invalid AI response' }, { status: 502 })
   }
 
@@ -248,8 +274,10 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    warning: warning || 'This meal may not support your current goals.',
+    summary: summary || 'This meal may not fully support your current goals.',
+    issues,
     alternative: alternative || 'Try a similar meal with less added sugar and more protein.',
+    flags: triggerFlags,
     costCredits: HEALTH_CHECK_COST_CREDITS,
   })
 }

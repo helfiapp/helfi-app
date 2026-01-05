@@ -78,7 +78,9 @@ type HealthCheckPromptPayload = {
 }
 
 type HealthCheckResult = {
-  warning: string
+  summary: string
+  issues: { issue: string; why: string }[]
+  flags: string[]
   alternative: string | null
 }
 
@@ -8073,12 +8075,25 @@ Please add nutritional information manually if needed.`);
         return
       }
       const data = await res.json()
-      const warning = typeof data?.warning === 'string' ? data.warning.trim() : ''
+      const summary = typeof data?.summary === 'string' ? data.summary.trim() : ''
       const alternative = typeof data?.alternative === 'string' ? data.alternative.trim() : ''
+      const flags = Array.isArray(data?.flags)
+        ? data.flags.map((flag: any) => String(flag || '').trim()).filter(Boolean)
+        : []
+      const issues = Array.isArray(data?.issues)
+        ? data.issues
+            .map((item: any) => ({
+              issue: typeof item?.issue === 'string' ? item.issue.trim() : '',
+              why: typeof item?.why === 'string' ? item.why.trim() : '',
+            }))
+            .filter((item: any) => item.issue && item.why)
+        : []
       setHealthCheckPrompt(null)
       setHealthCheckResult({
-        warning: warning || 'This meal may not fully support your current goals.',
+        summary: summary || 'This meal may not fully support your current goals.',
         alternative: alternative || null,
+        issues,
+        flags,
       })
       showQuickToast('Health check complete')
       try {
@@ -11625,8 +11640,26 @@ Please add nutritional information manually if needed.`);
               </button>
             </div>
             <div className="px-5 py-4 text-sm text-blue-900 whitespace-pre-line">
-              {healthCheckResult.warning}
+              {healthCheckResult.summary}
             </div>
+            {healthCheckResult.flags.length > 0 && (
+              <div className="px-5 pb-2 text-[12px] text-blue-800">
+                <span className="font-semibold">Triggered by:</span> {healthCheckResult.flags.join(', ')}
+              </div>
+            )}
+            {healthCheckResult.issues.length > 0 && (
+              <div className="px-5 pb-4 text-sm text-blue-900">
+                <div className="font-semibold mb-2">Why this matters for your goals</div>
+                <div className="space-y-2">
+                  {healthCheckResult.issues.map((issue, idx) => (
+                    <div key={`${issue.issue}-${idx}`}>
+                      <div className="font-semibold">{issue.issue}</div>
+                      <div className="text-sm text-blue-900">{issue.why}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {healthCheckResult.alternative && (
               <div className="px-5 pb-4 text-sm text-blue-900">
                 <span className="font-semibold">Swap idea:</span> {healthCheckResult.alternative}
