@@ -1,7 +1,7 @@
 'use client'
 import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { MouseEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import UsageMeter from '@/components/UsageMeter'
@@ -213,8 +213,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
-  const pendingOpenCheckRef = useRef(0)
-  const pendingOpenBusyRef = useRef(false)
+  const searchParams = useSearchParams()
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = [
@@ -358,65 +357,46 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   }, [status, pathname, isAdminPanelPath, publicPages])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
     if (status !== 'authenticated') return
     if (publicPages.includes(pathname) || isAdminPanelPath) return
-    if (typeof window === 'undefined') return
 
-    const checkPendingOpen = async () => {
-      const now = Date.now()
-      if (pendingOpenBusyRef.current) return
-      if (now - pendingOpenCheckRef.current < 3000) return
-      pendingOpenBusyRef.current = true
-      pendingOpenCheckRef.current = now
-      try {
-        const res = await fetch('/api/notifications/pending-open', { cache: 'no-store' as any })
-        if (!res.ok) return
-        const data = await res.json().catch(() => ({}))
-        const url = typeof data?.url === 'string' ? data.url : ''
-        const pendingId = typeof data?.id === 'string' ? data.id : ''
-        if (pendingId) storePendingNotificationId(pendingId)
-        if (!url) return
-        const target = new URL(url, window.location.origin).href
-        if (window.location.href === target) return
-        window.location.href = target
-      } catch {
-        // Ignore
-      } finally {
-        pendingOpenBusyRef.current = false
-      }
-    }
-
-    checkPendingOpen()
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        checkPendingOpen()
-      }
-    }
-
-    window.addEventListener('focus', checkPendingOpen)
-    document.addEventListener('visibilitychange', handleVisibility)
-
-    return () => {
-      window.removeEventListener('focus', checkPendingOpen)
-      document.removeEventListener('visibilitychange', handleVisibility)
-    }
-  }, [status, pathname, isAdminPanelPath, publicPages])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
     try {
-      const params = new URLSearchParams(window.location.search)
+      const params = new URLSearchParams(searchParams?.toString() || '')
       const pendingId = params.get('notificationId')
-      if (!pendingId) return
-      storePendingNotificationId(pendingId)
-      params.delete('notificationId')
-      const query = params.toString()
-      const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`
-      window.history.replaceState(null, '', nextUrl)
+      const notificationOpen = params.get('notificationOpen')
+
+      if (pendingId) {
+        storePendingNotificationId(pendingId)
+      }
+
+      if (notificationOpen === '1') {
+        fetch('/api/notifications/pending-open', { cache: 'no-store' as any })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (!data) return
+            const url = typeof data?.url === 'string' ? data.url : ''
+            const pending = typeof data?.id === 'string' ? data.id : ''
+            if (pending) storePendingNotificationId(pending)
+            if (!url) return
+            const target = new URL(url, window.location.origin).href
+            if (window.location.href === target) return
+            window.location.href = target
+          })
+          .catch(() => {})
+      }
+
+      if (pendingId || notificationOpen) {
+        params.delete('notificationId')
+        params.delete('notificationOpen')
+        const query = params.toString()
+        const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`
+        window.history.replaceState(null, '', nextUrl)
+      }
     } catch {
       // Ignore URL errors
     }
-  }, [pathname])
+  }, [status, pathname, isAdminPanelPath, publicPages, searchParams])
 
   // Don't show sidebar while session is loading to prevent flickering
   if (status === 'loading') {

@@ -26,7 +26,11 @@ function getSafeLastPath(raw?: string | null) {
   return decoded
 }
 
-export default async function PwaEntryPage() {
+export default async function PwaEntryPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>
+}) {
   const session = await getServerSession(authOptions)
   const email = session?.user?.email?.toLowerCase()
   if (!email) {
@@ -60,18 +64,25 @@ export default async function PwaEntryPage() {
     redirect('/onboarding')
   }
 
-  const pending = await consumePendingNotificationOpen(user.id, {
-    withinMinutes: 60,
-    types: ['checkin_reminder', 'mood_reminder'],
-    sources: ['push'],
-  })
-  if (pending?.url) {
-    let redirectUrl = pending.url
-    if (pending?.id) {
-      const divider = redirectUrl.includes('?') ? '&' : '?'
-      redirectUrl = `${redirectUrl}${divider}notificationId=${encodeURIComponent(pending.id)}`
+  const notificationOpenParam = searchParams?.notificationOpen
+  const notificationOpen =
+    notificationOpenParam === '1' ||
+    (Array.isArray(notificationOpenParam) && notificationOpenParam.includes('1'))
+
+  if (notificationOpen) {
+    const pending = await consumePendingNotificationOpen(user.id, {
+      withinMinutes: 60,
+      types: ['checkin_reminder', 'mood_reminder'],
+      sources: ['push'],
+    })
+    if (pending?.url) {
+      let redirectUrl = pending.url
+      if (pending?.id) {
+        const divider = redirectUrl.includes('?') ? '&' : '?'
+        redirectUrl = `${redirectUrl}${divider}notificationId=${encodeURIComponent(pending.id)}`
+      }
+      redirect(redirectUrl)
     }
-    redirect(redirectUrl)
   }
 
   if (lastPath) {

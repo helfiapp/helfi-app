@@ -39,7 +39,11 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const rawUrl =
     (event.notification && event.notification.data && event.notification.data.url) || '/check-in';
-  const targetUrl = new URL(rawUrl, self.location.origin).href;
+  const target = new URL(rawUrl, self.location.origin);
+  if (!target.searchParams.has('notificationOpen')) {
+    target.searchParams.set('notificationOpen', '1');
+  }
+  const targetUrl = target.href;
   const sameUrl = (a, b) => {
     try {
       return new URL(a).href === new URL(b).href;
