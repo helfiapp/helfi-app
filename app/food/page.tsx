@@ -1973,6 +1973,7 @@ export default function FoodDiary() {
   const [healthCheckResult, setHealthCheckResult] = useState<HealthCheckResult | null>(null)
   const [healthCheckLoading, setHealthCheckLoading] = useState(false)
   const [healthCheckError, setHealthCheckError] = useState<string | null>(null)
+  const [healthCheckPageOpen, setHealthCheckPageOpen] = useState(false)
   const [historySaveError, setHistorySaveError] = useState<string | null>(null)
   const [lastHistoryPayload, setLastHistoryPayload] = useState<any>(null)
   const [historyRetrying, setHistoryRetrying] = useState(false)
@@ -8095,6 +8096,7 @@ Please add nutritional information manually if needed.`);
         issues,
         flags,
       })
+      setHealthCheckPageOpen(true)
       showQuickToast('Health check complete')
       try {
         window.dispatchEvent(new Event('credits:refresh'))
@@ -11625,47 +11627,49 @@ Please add nutritional information manually if needed.`);
           </div>
         </div>
       )}
-      {healthCheckResult && (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-blue-100">
-            <div className="px-5 py-4 border-b border-blue-100 flex items-center justify-between">
-              <div className="text-sm font-semibold text-blue-900">Health check</div>
-              <button
-                type="button"
-                onClick={() => setHealthCheckResult(null)}
-                className="text-blue-900 text-sm font-semibold px-1"
-                aria-label="Close"
-              >
-                x
-              </button>
-            </div>
-            <div className="px-5 py-4 text-sm text-blue-900 whitespace-pre-line">
-              {healthCheckResult.summary}
-            </div>
+      {healthCheckResult && healthCheckPageOpen && (
+        <div className="fixed inset-0 z-[10001] bg-white flex flex-col">
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setHealthCheckPageOpen(false)
+                setHealthCheckResult(null)
+              }}
+              className="p-2 -ml-1 rounded-xl hover:bg-gray-100 text-gray-700"
+              aria-label="Back"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="text-base font-semibold text-gray-900">Health check</div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+            <div className="text-base font-semibold text-gray-900">Summary</div>
+            <div className="text-sm text-gray-800 whitespace-pre-line">{healthCheckResult.summary}</div>
             {healthCheckResult.flags.length > 0 && (
-              <div className="px-5 pb-2 text-[12px] text-blue-800">
+              <div className="text-sm text-gray-800">
                 <span className="font-semibold">Triggered by:</span> {healthCheckResult.flags.join(', ')}
               </div>
             )}
             {healthCheckResult.issues.length > 0 && (
-              <div className="px-5 pb-4 text-sm text-blue-900">
-                <div className="font-semibold mb-2">Why this matters for your goals</div>
-                <div className="space-y-2">
-                  {healthCheckResult.issues.map((issue, idx) => (
-                    <div key={`${issue.issue}-${idx}`}>
-                      <div className="font-semibold">{issue.issue}</div>
-                      <div className="text-sm text-blue-900">{issue.why}</div>
-                    </div>
-                  ))}
-                </div>
+              <div className="space-y-3">
+                <div className="text-base font-semibold text-gray-900">Why this matters for your goals</div>
+                {healthCheckResult.issues.map((issue, idx) => (
+                  <div key={`${issue.issue}-${idx}`} className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div className="text-sm font-semibold text-gray-900">{issue.issue}</div>
+                    <div className="text-sm text-gray-700 mt-1">{issue.why}</div>
+                  </div>
+                ))}
               </div>
             )}
             {healthCheckResult.alternative && (
-              <div className="px-5 pb-4 text-sm text-blue-900">
+              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
                 <span className="font-semibold">Swap idea:</span> {healthCheckResult.alternative}
               </div>
             )}
-            <div className="px-5 pb-4 text-[11px] text-blue-700">{HEALTH_CHECK_COST_CREDITS} credits used.</div>
+            <div className="text-xs text-gray-500">{HEALTH_CHECK_COST_CREDITS} credits used.</div>
           </div>
         </div>
       )}
