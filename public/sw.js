@@ -52,30 +52,54 @@ self.addEventListener('notificationclick', (event) => {
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then(async (clientsArr) => {
-        let navigated = false;
-        if (clientsArr.length) {
-          navigated = true;
-          await Promise.all(
-            clientsArr.map(async (client) => {
-              if (client && client.url && sameUrl(client.url, targetUrl)) {
-                if ('focus' in client) {
-                  client.focus();
-                }
-                return;
-              }
-              try {
-                client.postMessage({ type: 'navigate', url: targetUrl });
-              } catch (e) {
-                // Ignore postMessage failures
-              }
-              if ('focus' in client) {
-                client.focus();
-              }
-            }),
-          );
+        const openWindow = () => {
+          if (self.clients.openWindow) {
+            return self.clients.openWindow(targetUrl);
+          }
+          return undefined;
+        };
+
+        if (!clientsArr.length) {
+          return openWindow();
         }
-        if (!navigated && self.clients.openWindow) {
-          return self.clients.openWindow(targetUrl);
+
+        const alreadyAtTarget = clientsArr.find((client) => client && client.url && sameUrl(client.url, targetUrl));
+        if (alreadyAtTarget) {
+          if ('focus' in alreadyAtTarget) {
+            await alreadyAtTarget.focus();
+          }
+          return undefined;
+        }
+
+        const preferred =
+          clientsArr.find((client) => client && client.focused) ||
+          clientsArr.find((client) => client && client.visibilityState === 'visible') ||
+          clientsArr[0];
+
+        let handled = false;
+        if (preferred) {
+          try {
+            if ('navigate' in preferred) {
+              await preferred.navigate(targetUrl);
+              handled = true;
+            } else {
+              preferred.postMessage({ type: 'navigate', url: targetUrl });
+              handled = true;
+            }
+          } catch (e) {
+            // Ignore navigation failures
+          }
+          try {
+            if ('focus' in preferred) {
+              await preferred.focus();
+            }
+          } catch (e) {
+            // Ignore focus failures
+          }
+        }
+
+        if (!handled) {
+          return openWindow();
         }
         return undefined;
       }),
