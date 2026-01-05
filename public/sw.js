@@ -52,17 +52,6 @@ self.addEventListener('notificationclick', (event) => {
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then(async (clientsArr) => {
-        const openWindow = () => {
-          if (self.clients.openWindow) {
-            return self.clients.openWindow(targetUrl);
-          }
-          return undefined;
-        };
-
-        if (!clientsArr.length) {
-          return openWindow();
-        }
-
         const alreadyAtTarget = clientsArr.find((client) => client && client.url && sameUrl(client.url, targetUrl));
         if (alreadyAtTarget) {
           if ('focus' in alreadyAtTarget) {
@@ -71,35 +60,36 @@ self.addEventListener('notificationclick', (event) => {
           return undefined;
         }
 
-        const preferred =
+        if (self.clients.openWindow) {
+          const opened = await self.clients.openWindow(targetUrl);
+          if (opened && 'focus' in opened) {
+            await opened.focus();
+          }
+          return undefined;
+        }
+
+        const fallback =
           clientsArr.find((client) => client && client.focused) ||
           clientsArr.find((client) => client && client.visibilityState === 'visible') ||
           clientsArr[0];
 
-        let handled = false;
-        if (preferred) {
+        if (fallback) {
           try {
-            if ('navigate' in preferred) {
-              await preferred.navigate(targetUrl);
-              handled = true;
+            if ('navigate' in fallback) {
+              await fallback.navigate(targetUrl);
             } else {
-              preferred.postMessage({ type: 'navigate', url: targetUrl });
-              handled = true;
+              fallback.postMessage({ type: 'navigate', url: targetUrl });
             }
           } catch (e) {
             // Ignore navigation failures
           }
           try {
-            if ('focus' in preferred) {
-              await preferred.focus();
+            if ('focus' in fallback) {
+              await fallback.focus();
             }
           } catch (e) {
             // Ignore focus failures
           }
-        }
-
-        if (!handled) {
-          return openWindow();
         }
         return undefined;
       }),
