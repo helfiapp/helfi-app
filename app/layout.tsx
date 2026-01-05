@@ -102,6 +102,9 @@ export default function RootLayout({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            backgroundImage: 'url(/mobile-assets/STATIC%20SPLASH.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
           }}
         >
           <video
@@ -174,7 +177,20 @@ export default function RootLayout({
                       window.navigator.standalone === true;
                   } catch (e) {}
 
+                  var coldStart = false;
+                  try {
+                    if (window.sessionStorage) {
+                      if (sessionStorage.getItem('helfi:session-active') !== '1') {
+                        sessionStorage.setItem('helfi:session-active', '1');
+                        coldStart = true;
+                      }
+                    }
+                  } catch (e) {}
+                  window.__helfiSplashColdStart = coldStart ? '1' : '';
+
                   if (isPublic || !isPwa) {
+                    hide();
+                  } else if (!coldStart) {
                     hide();
                   }
                 } catch (e) {

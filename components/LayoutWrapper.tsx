@@ -275,19 +275,32 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   useEffect(() => {
     if (typeof window === 'undefined') return
     let targetPath = ''
+    let coldStart = false
     try {
       if (typeof (window as any).__helfiGetSplashTargetPath === 'function') {
         targetPath = String((window as any).__helfiGetSplashTargetPath() || '')
       }
+      coldStart = (window as any).__helfiSplashColdStart === '1'
     } catch {
       targetPath = ''
+      coldStart = false
     }
+    if (status === 'loading') return
     if (targetPath && pathname === targetPath) {
       const timer = window.setTimeout(() => hideSplash(), 150)
       return () => window.clearTimeout(timer)
     }
-    if (!targetPath) {
-      const timer = window.setTimeout(() => hideSplash(), 600)
+    if (!targetPath && coldStart) {
+      const timer = window.setTimeout(() => {
+        hideSplash()
+        try {
+          ;(window as any).__helfiSplashColdStart = ''
+        } catch {}
+      }, 200)
+      return () => window.clearTimeout(timer)
+    }
+    if (!targetPath && !coldStart) {
+      const timer = window.setTimeout(() => hideSplash(), 50)
       return () => window.clearTimeout(timer)
     }
   }, [pathname, hideSplash])
