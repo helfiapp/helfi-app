@@ -126,19 +126,58 @@ const parseHealthCheckJson = (raw: string) => {
   return null
 }
 
+const HEALTH_TRIGGER_THRESHOLDS = {
+  sugar: 25,
+  carbs: 75,
+  fat: 25,
+} as const
+
 const buildTriggerFlags = (totals: ReturnType<typeof normalizeTotals> | null) => {
   if (!totals) return []
   const flags: string[] = []
-  if (typeof totals.sugar === 'number' && totals.sugar > 25) {
-    flags.push(`Sugar ${formatNumber(totals.sugar)}g > 25g`)
+  if (typeof totals.sugar === 'number' && totals.sugar > HEALTH_TRIGGER_THRESHOLDS.sugar) {
+    flags.push(`Sugar ${formatNumber(totals.sugar)}g > ${HEALTH_TRIGGER_THRESHOLDS.sugar}g`)
   }
-  if (typeof totals.carbs === 'number' && totals.carbs > 75) {
-    flags.push(`Carbs ${formatNumber(totals.carbs)}g > 75g`)
+  if (typeof totals.carbs === 'number' && totals.carbs > HEALTH_TRIGGER_THRESHOLDS.carbs) {
+    flags.push(`Carbs ${formatNumber(totals.carbs)}g > ${HEALTH_TRIGGER_THRESHOLDS.carbs}g`)
   }
-  if (typeof totals.fat === 'number' && totals.fat > 25) {
-    flags.push(`Fat ${formatNumber(totals.fat)}g > 25g`)
+  if (typeof totals.fat === 'number' && totals.fat > HEALTH_TRIGGER_THRESHOLDS.fat) {
+    flags.push(`Fat ${formatNumber(totals.fat)}g > ${HEALTH_TRIGGER_THRESHOLDS.fat}g`)
   }
   return flags
+}
+
+const buildTriggerDetails = (totals: ReturnType<typeof normalizeTotals> | null) => {
+  if (!totals) return []
+  const triggers: Array<{ key: string; label: string; value: number; limit: number; unit: string }> = []
+  if (typeof totals.sugar === 'number' && totals.sugar > HEALTH_TRIGGER_THRESHOLDS.sugar) {
+    triggers.push({
+      key: 'sugar',
+      label: 'Sugar',
+      value: totals.sugar,
+      limit: HEALTH_TRIGGER_THRESHOLDS.sugar,
+      unit: 'g',
+    })
+  }
+  if (typeof totals.carbs === 'number' && totals.carbs > HEALTH_TRIGGER_THRESHOLDS.carbs) {
+    triggers.push({
+      key: 'carbs',
+      label: 'Carbs',
+      value: totals.carbs,
+      limit: HEALTH_TRIGGER_THRESHOLDS.carbs,
+      unit: 'g',
+    })
+  }
+  if (typeof totals.fat === 'number' && totals.fat > HEALTH_TRIGGER_THRESHOLDS.fat) {
+    triggers.push({
+      key: 'fat',
+      label: 'Fat',
+      value: totals.fat,
+      limit: HEALTH_TRIGGER_THRESHOLDS.fat,
+      unit: 'g',
+    })
+  }
+  return triggers
 }
 
 export async function POST(req: NextRequest) {
@@ -192,6 +231,7 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean)
 
   const triggerFlags = buildTriggerFlags(totals)
+  const triggerDetails = buildTriggerDetails(totals)
   const mealParts = [
     description ? `Meal: ${description}` : null,
     itemNames.length ? `Items: ${itemNames.join(', ')}` : null,
@@ -203,8 +243,9 @@ export async function POST(req: NextRequest) {
 
   const prompt = [
     'You are a nutrition coach helping a user avoid foods that conflict with their health goals and diets.',
-    'Explain why the meal is problematic for each selected health issue separately. Be specific to that issue.',
-    'Give one clear swap suggestion that stays similar to the meal.',
+    'Explain why the meal is problematic for each selected health issue separately. Be specific to that issue and tie it to the macros or ingredients.',
+    'Write 2-3 sentences per issue, with practical and clear reasoning.',
+    'Give one clear swap suggestion that stays similar to the meal, not generic.',
     'If the meal is acceptable, say so briefly and still give a lighter swap.',
     '',
     `Health goals/issues: ${selectedIssues.length ? selectedIssues.join(', ') : 'none listed'}.`,
@@ -278,6 +319,7 @@ export async function POST(req: NextRequest) {
     issues,
     alternative: alternative || 'Try a similar meal with less added sugar and more protein.',
     flags: triggerFlags,
+    triggers: triggerDetails,
     costCredits: HEALTH_CHECK_COST_CREDITS,
   })
 }

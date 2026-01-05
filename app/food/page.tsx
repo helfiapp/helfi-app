@@ -81,6 +81,7 @@ type HealthCheckResult = {
   summary: string
   issues: { issue: string; why: string }[]
   flags: string[]
+  triggers: { key: string; label: string; value: number; limit: number; unit: string }[]
   alternative: string | null
 }
 
@@ -88,6 +89,12 @@ const HEALTH_CHECK_THRESHOLDS = { sugar: 25, carbs: 75, fat: 25 } as const
 const HEALTH_CHECK_COST_CREDITS = 2
 const HEALTH_CHECK_PROMPT_STORAGE_KEY = 'food:healthCheckPrompted'
 const HEALTH_CHECK_PROMPT_CACHE_LIMIT = 200
+
+const HEALTH_TRIGGER_META: Record<string, { color: string; accent: string }> = {
+  sugar: { color: '#f97316', accent: 'text-orange-600' },
+  carbs: { color: '#22c55e', accent: 'text-green-600' },
+  fat: { color: '#6366f1', accent: 'text-indigo-600' },
+}
 
 const formatServingsDisplay = (value: number | null | undefined) => {
   const numeric = Number(value)
@@ -8091,12 +8098,24 @@ Please add nutritional information manually if needed.`);
             }))
             .filter((item: any) => item.issue && item.why)
         : []
+      const triggers = Array.isArray(data?.triggers)
+        ? data.triggers
+            .map((item: any) => ({
+              key: typeof item?.key === 'string' ? item.key.trim() : '',
+              label: typeof item?.label === 'string' ? item.label.trim() : '',
+              value: Number(item?.value),
+              limit: Number(item?.limit),
+              unit: typeof item?.unit === 'string' ? item.unit.trim() : 'g',
+            }))
+            .filter((item: any) => item.key && item.label && Number.isFinite(item.value) && Number.isFinite(item.limit))
+        : []
       setHealthCheckPrompt(null)
       setHealthCheckResult({
         summary: summary || 'This meal may not fully support your current goals.',
         alternative: alternative || null,
         issues,
         flags,
+        triggers,
       })
       setHealthCheckPageOpen(true)
       showQuickToast('Health check complete')
@@ -11648,26 +11667,68 @@ Please add nutritional information manually if needed.`);
             <div className="text-base font-semibold text-gray-900">Health check</div>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-            <div className="text-base font-semibold text-gray-900">Summary</div>
-            <div className="text-sm text-gray-800 whitespace-pre-line">{healthCheckResult.summary}</div>
-            {healthCheckResult.flags.length > 0 && (
-              <div className="text-sm text-gray-800">
-                <span className="font-semibold">Triggered by:</span> {healthCheckResult.flags.join(', ')}
+            <div className="text-lg font-semibold text-gray-900">Summary</div>
+            <div className="text-base text-gray-800 whitespace-pre-line">{healthCheckResult.summary}</div>
+            {(healthCheckResult.triggers.length > 0 || healthCheckResult.flags.length > 0) && (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 space-y-3">
+                <div className="text-base font-semibold text-gray-900">Triggered by</div>
+                {(healthCheckResult.triggers.length > 0
+                  ? healthCheckResult.triggers
+                  : healthCheckResult.flags.map((flag, idx) => ({
+                      key: `flag-${idx}`,
+                      label: flag,
+                      value: null,
+                      limit: null,
+                      unit: '',
+                    }))
+                ).map((trigger: any) => {
+                  const meta = HEALTH_TRIGGER_META[trigger.key] || { color: '#9ca3af', accent: 'text-gray-600' }
+                  const safeValue = Number.isFinite(trigger.value) ? trigger.value : null
+                  const safeLimit = Number.isFinite(trigger.limit) ? trigger.limit : null
+                  const ratio =
+                    safeValue !== null && safeLimit !== null && safeLimit > 0
+                      ? Math.min(1, safeValue / safeLimit)
+                      : 1
+                  return (
+                    <div key={`${trigger.key}-${trigger.label}`} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm text-gray-700">
+                        <span className="font-semibold text-gray-900">
+                          {trigger.label}
+                        </span>
+                        {safeValue !== null && safeLimit !== null ? (
+                          <span className={meta.accent}>
+                            {Math.round(safeValue)}{trigger.unit} &gt; {Math.round(safeLimit)}{trigger.unit}
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">{trigger.label}</span>
+                        )}
+                      </div>
+                      {safeValue !== null && safeLimit !== null && (
+                        <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${Math.max(12, ratio * 100)}%`, backgroundColor: meta.color }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
             {healthCheckResult.issues.length > 0 && (
               <div className="space-y-3">
-                <div className="text-base font-semibold text-gray-900">Why this matters for your goals</div>
+                <div className="text-lg font-semibold text-gray-900">Why this matters for your goals</div>
                 {healthCheckResult.issues.map((issue, idx) => (
                   <div key={`${issue.issue}-${idx}`} className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                    <div className="text-sm font-semibold text-gray-900">{issue.issue}</div>
-                    <div className="text-sm text-gray-700 mt-1">{issue.why}</div>
+                    <div className="text-base font-semibold text-gray-900">{issue.issue}</div>
+                    <div className="text-base text-gray-700 mt-1">{issue.why}</div>
                   </div>
                 ))}
               </div>
             )}
             {healthCheckResult.alternative && (
-              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-base text-blue-900">
                 <span className="font-semibold">Swap idea:</span> {healthCheckResult.alternative}
               </div>
             )}
