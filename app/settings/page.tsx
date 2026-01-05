@@ -478,6 +478,29 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* Food Diary */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Food Diary</h2>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Health check prompts</span>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Tune when the food diary suggests a paid health check.
+            </p>
+            <Link
+              href="/settings/food-diary"
+              className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-4 hover:border-helfi-green transition-colors"
+            >
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Open Food Diary settings</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Frequency, caps, and trigger levels.</p>
+              </div>
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+
           {/* Notifications */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between mb-2">

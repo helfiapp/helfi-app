@@ -145,6 +145,42 @@ export async function GET(request: NextRequest) {
       console.log('No diet preference found in storage')
     }
 
+    // Get food diary health check settings (optional)
+    let healthCheckSettings = {
+      enabled: true,
+      frequency: 'high',
+      dailyCap: null as number | null,
+      thresholds: { sugar: null as number | null, carbs: null as number | null, fat: null as number | null },
+    }
+    try {
+      const storedHealthCheck = user.healthGoals.find((goal: any) => goal.name === '__FOOD_HEALTH_CHECK_PREFS__')
+      if (storedHealthCheck?.category) {
+        const parsed = JSON.parse(storedHealthCheck.category)
+        const parseOptionalNumber = (value: any) => {
+          const n = Number(value)
+          return Number.isFinite(n) && n > 0 ? n : null
+        }
+        const normalizeFrequency = (value: any) => {
+          const raw = typeof value === 'string' ? value.toLowerCase().trim() : ''
+          if (raw === 'always' || raw === 'never' || raw === 'high') return raw
+          return 'high'
+        }
+        const thresholds = parsed?.thresholds && typeof parsed.thresholds === 'object' ? parsed.thresholds : {}
+        healthCheckSettings = {
+          enabled: parsed?.enabled !== false,
+          frequency: normalizeFrequency(parsed?.frequency),
+          dailyCap: parseOptionalNumber(parsed?.dailyCap),
+          thresholds: {
+            sugar: parseOptionalNumber(thresholds?.sugar),
+            carbs: parseOptionalNumber(thresholds?.carbs),
+            fat: parseOptionalNumber(thresholds?.fat),
+          },
+        }
+      }
+    } catch (e) {
+      console.log('No health check settings found in storage')
+    }
+
     // Get blood results data
     let bloodResultsData = { uploadMethod: 'documents', documents: [], images: [], notes: '', skipped: false };
     try {
@@ -436,6 +472,7 @@ export async function GET(request: NextRequest) {
       allergies: allergyData.allergies,
       diabetesType: allergyData.diabetesType,
       dietTypes,
+      healthCheckSettings,
     }
 
     // Fallback: if primary goal still missing, use the first non-hidden health goal as a soft default
@@ -869,6 +906,53 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error storing diet preference:', error)
+      // Continue with other updates
+    }
+
+    // 3.2. Handle food diary health check settings
+    try {
+      const hasIncomingHealthCheckSettings = Object.prototype.hasOwnProperty.call(
+        data as any,
+        'healthCheckSettings',
+      )
+      if (hasIncomingHealthCheckSettings) {
+        const raw = (data as any).healthCheckSettings
+        const parseOptionalNumber = (value: any) => {
+          const n = Number(value)
+          return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+        }
+        const normalizeFrequency = (value: any) => {
+          const text = typeof value === 'string' ? value.toLowerCase().trim() : ''
+          if (text === 'always' || text === 'never' || text === 'high') return text
+          return 'high'
+        }
+        const rawThresholds = raw && typeof raw === 'object' ? raw.thresholds : {}
+        const normalized = {
+          enabled: raw?.enabled !== false,
+          frequency: normalizeFrequency(raw?.frequency),
+          dailyCap: parseOptionalNumber(raw?.dailyCap),
+          thresholds: {
+            sugar: parseOptionalNumber(rawThresholds?.sugar),
+            carbs: parseOptionalNumber(rawThresholds?.carbs),
+            fat: parseOptionalNumber(rawThresholds?.fat),
+          },
+        }
+
+        await prisma.healthGoal.deleteMany({
+          where: { userId: user.id, name: '__FOOD_HEALTH_CHECK_PREFS__' },
+        })
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__FOOD_HEALTH_CHECK_PREFS__',
+            category: JSON.stringify(normalized),
+            currentRating: 0,
+          },
+        })
+        console.log('Stored health check settings successfully')
+      }
+    } catch (error) {
+      console.error('Error storing health check settings:', error)
       // Continue with other updates
     }
 

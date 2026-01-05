@@ -40,6 +40,7 @@ import { calculateDailyTargets } from '@/lib/daily-targets'
 import { AI_MEAL_RECOMMENDATION_CREDITS } from '@/lib/ai-meal-recommendation'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets'
+import { DEFAULT_HEALTH_CHECK_SETTINGS, normalizeHealthCheckSettings } from '@/lib/food-health-check-settings'
 
 const NUTRIENT_DISPLAY_ORDER: Array<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'> = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']
 
@@ -89,6 +90,7 @@ const HEALTH_CHECK_THRESHOLDS = { sugar: 30, carbs: 90, fat: 35 } as const
 const HEALTH_CHECK_COST_CREDITS = 2
 const HEALTH_CHECK_PROMPT_STORAGE_KEY = 'food:healthCheckPrompted'
 const HEALTH_CHECK_PROMPT_CACHE_LIMIT = 200
+const HEALTH_CHECK_DAILY_CAP_KEY = 'food:healthCheckDailyCap'
 
 const HEALTH_TRIGGER_META: Record<string, { color: string; accent: string }> = {
   sugar: { color: '#f97316', accent: 'text-orange-600' },
@@ -3020,16 +3022,44 @@ export default function FoodDiary() {
     })
   }, [userData])
 
+  const healthCheckSettings = useMemo(() => {
+    const raw = (userData as any)?.healthCheckSettings
+    return normalizeHealthCheckSettings(raw || DEFAULT_HEALTH_CHECK_SETTINGS)
+  }, [userData])
+
+  const hasHealthCheckContext = useMemo(() => {
+    const goals = Array.isArray(userData?.goals) ? userData.goals.filter(Boolean) : []
+    const diets = Array.isArray((userData as any)?.dietTypes)
+      ? (userData as any).dietTypes
+      : Array.isArray((userData as any)?.dietType)
+      ? (userData as any).dietType
+      : []
+    return goals.length > 0 || (Array.isArray(diets) && diets.length > 0)
+  }, [userData])
+
+  useEffect(() => {
+    if (!healthCheckSettings.enabled || healthCheckSettings.frequency === 'never') {
+      if (healthCheckPrompt) setHealthCheckPrompt(null)
+    }
+  }, [healthCheckSettings.enabled, healthCheckSettings.frequency, healthCheckPrompt])
+
   const getHealthCheckThresholds = () => {
     const sugarTarget = Number((dailyTargets as any)?.sugarMax)
     const carbsTarget = Number(dailyTargets?.carbs)
     const fatTarget = Number(dailyTargets?.fat)
     const pick = (target: number, base: number) =>
       Number.isFinite(target) && target > 0 ? Math.max(base, target * 0.55) : base
-    return {
+    const recommended = {
       sugar: pick(sugarTarget, HEALTH_CHECK_THRESHOLDS.sugar),
       carbs: pick(carbsTarget, HEALTH_CHECK_THRESHOLDS.carbs),
       fat: pick(fatTarget, HEALTH_CHECK_THRESHOLDS.fat),
+    }
+    const resolve = (value: number | null | undefined, fallback: number) =>
+      Number.isFinite(value as number) && (value as number) > 0 ? (value as number) : fallback
+    return {
+      sugar: resolve(healthCheckSettings.thresholds.sugar, recommended.sugar),
+      carbs: resolve(healthCheckSettings.thresholds.carbs, recommended.carbs),
+      fat: resolve(healthCheckSettings.thresholds.fat, recommended.fat),
     }
   }
   const applyRecalculatedNutrition = (items: any[]) => {
@@ -8031,8 +8061,64 @@ Please add nutritional information manually if needed.`);
     persistHealthCheckPrompted()
   }
 
+  const getLocalDateKey = () => {
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
+  const readHealthCheckDailyCapState = () => {
+    if (typeof window === 'undefined') return { date: getLocalDateKey(), count: 0 }
+    try {
+      const raw = localStorage.getItem(HEALTH_CHECK_DAILY_CAP_KEY)
+      if (!raw) return { date: getLocalDateKey(), count: 0 }
+      const parsed = JSON.parse(raw)
+      const date = typeof parsed?.date === 'string' ? parsed.date : getLocalDateKey()
+      const count = Number(parsed?.count)
+      if (date !== getLocalDateKey()) {
+        return { date: getLocalDateKey(), count: 0 }
+      }
+      return { date, count: Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0 }
+    } catch {
+      return { date: getLocalDateKey(), count: 0 }
+    }
+  }
+
+  const writeHealthCheckDailyCapState = (next: { date: string; count: number }) => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(HEALTH_CHECK_DAILY_CAP_KEY, JSON.stringify(next))
+    } catch {}
+  }
+
+  const getHealthCheckDailyCap = () => {
+    const cap = Number(healthCheckSettings.dailyCap)
+    return Number.isFinite(cap) && cap > 0 ? Math.round(cap) : null
+  }
+
+  const isHealthCheckCapReached = () => {
+    const cap = getHealthCheckDailyCap()
+    if (!cap) return false
+    const state = readHealthCheckDailyCapState()
+    return state.count >= cap
+  }
+
+  const incrementHealthCheckCapCount = () => {
+    const cap = getHealthCheckDailyCap()
+    if (!cap) return
+    const state = readHealthCheckDailyCapState()
+    const next = { date: state.date, count: state.count + 1 }
+    writeHealthCheckDailyCapState(next)
+  }
+
   const shouldTriggerHealthCheck = (entry: any, totals: NutritionTotals | null) => {
+    if (!healthCheckSettings.enabled) return false
+    if (healthCheckSettings.frequency === 'never') return false
+    if (!hasHealthCheckContext) return false
     if (!totals) return false
+    if (healthCheckSettings.frequency === 'always') return true
     const thresholds = getHealthCheckThresholds()
     const sugar = typeof totals.sugar === 'number' ? totals.sugar : 0
     const carbs = typeof totals.carbs === 'number' ? totals.carbs : 0
@@ -8071,13 +8157,6 @@ Please add nutritional information manually if needed.`);
   const maybeShowHealthCheckPrompt = (entry: any, options?: { entryKey?: string; source?: 'analysis' | 'entry' }) => {
     try {
       if (healthCheckPrompt) return
-      const goals = Array.isArray((userData as any)?.goals)
-        ? (userData as any).goals
-            .map((goal: any) => String(goal || '').trim())
-            .filter((goal: string) => goal.length > 0 && !goal.startsWith('__'))
-        : []
-      const dietIds = normalizeDietTypes((userData as any)?.dietTypes ?? (userData as any)?.dietType)
-      if (!goals.length && !dietIds.length) return
 
       const entryKey = options?.entryKey || getHealthCheckEntryKey(entry)
       if (!entryKey) return
@@ -8085,11 +8164,13 @@ Please add nutritional information manually if needed.`);
 
       const totals = getEntryTotals(entry)
       if (!shouldTriggerHealthCheck(entry, totals)) return
+      if (isHealthCheckCapReached()) return
 
       const description = String(entry?.description || entry?.label || '').trim()
       const items = Array.isArray(entry?.items) ? entry.items : null
 
       markHealthCheckPrompted(entryKey)
+      incrementHealthCheckCapCount()
       setHealthCheckError(null)
       setHealthCheckResult(null)
       setHealthCheckPrompt({

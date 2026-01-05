@@ -16,6 +16,7 @@ import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import MaterialSymbol from '@/components/MaterialSymbol';
 import { DIET_CATEGORIES, DIET_OPTIONS, getDietOption, normalizeDietTypes } from '@/lib/diets';
 import { applyDietMacroRules, calculateDailyTargets } from '@/lib/daily-targets';
+import { normalizeHealthCheckSettings } from '@/lib/food-health-check-settings';
 
 const sanitizeUserDataPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return payload;
@@ -764,6 +765,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const partialSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dietHydratedRef = useRef(false);
   const dietTouchedRef = useRef(false);
+  const [healthCheckSettings, setHealthCheckSettings] = useState(() =>
+    normalizeHealthCheckSettings((initial as any)?.healthCheckSettings),
+  );
+  const healthCheckHydratedRef = useRef(false);
+  const healthCheckTouchedRef = useRef(false);
   const goalDetailsHydratedRef = useRef(false);
   const goalDetailsTouchedRef = useRef(false);
   const allergiesHydratedRef = useRef(false);
@@ -939,6 +945,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         }
       }
     }
+    if (!healthCheckHydratedRef.current) {
+      healthCheckHydratedRef.current = true;
+      if (!healthCheckTouchedRef.current) {
+        setHealthCheckSettings(normalizeHealthCheckSettings((initial as any)?.healthCheckSettings));
+      }
+    }
     if (!diabetesHydratedRef.current && initial.diabetesType) {
       setDiabetesType(initial.diabetesType);
       diabetesHydratedRef.current = true;
@@ -1090,6 +1102,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const initialAllergies: string[] = Array.isArray(baseline?.allergies) ? baseline.allergies : [];
     const initialDiabetesType = (baseline?.diabetesType || '').toString();
     const initialDietTypes = normalizeDietTypes((baseline as any)?.dietTypes ?? (baseline as any)?.dietType).sort();
+    const initialHealthCheckSettings = normalizeHealthCheckSettings((baseline as any)?.healthCheckSettings);
 
     const normalizeArray = (list?: string[]) =>
       Array.isArray(list) ? list.map((v) => (v || '').toString().toLowerCase().trim()).filter(Boolean).sort() : [];
@@ -1099,6 +1112,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const dietChanged =
       (dietHydratedRef.current || dietTouchedRef.current) &&
       JSON.stringify(normalizeDietTypes(dietTypes).sort()) !== JSON.stringify(initialDietTypes);
+    const healthCheckChanged =
+      healthCheckSettings.enabled !== initialHealthCheckSettings.enabled;
 
     const currentWeightKg = getCurrentWeightKgRounded();
     const currentHeightCm = getCurrentHeightCmRounded();
@@ -1122,7 +1137,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       (goalIntensity || 'standard').toString().toLowerCase() !== (initialGoalIntensity || 'standard').toString().toLowerCase() ||
       (birthdate || '').toString().trim() !== (initialBirthdate || '').toString().trim() ||
       allergiesChanged ||
-      (diabetesType || '').toString().toLowerCase().trim() !== (initialDiabetesType || '').toString().toLowerCase().trim();
+      (diabetesType || '').toString().toLowerCase().trim() !== (initialDiabetesType || '').toString().toLowerCase().trim() ||
+      healthCheckChanged;
 
     const hasAny =
       !!(weight || height || feet || inches || bodyType || dietTypes.length || goalChoice || birthdate || allergies.length || diabetesType);
@@ -1131,7 +1147,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if ((changed && hasAny) && onUnsavedChange) {
       onUnsavedChange();
     }
-  }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, initial, unit]);
+  }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, healthCheckSettings, initial, unit]);
 
   const triggerDietSavedNotice = useCallback(() => {
     setShowDietSavedNotice(true);
@@ -1637,6 +1653,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         : {}),
       allergies,
       diabetesType,
+      healthCheckSettings,
     }
   };
 
@@ -1995,6 +2012,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         : {}),
       allergies,
       diabetesType,
+      healthCheckSettings,
       ...(includeDietTypes ? { dietTypes: Array.from(new Set(dietTypes)).sort() } : {}),
     };
     schedulePartialSave(payload);
@@ -2021,6 +2039,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     activeSugarMax,
     allergies,
     diabetesType,
+    healthCheckSettings,
     onPartialSave,
     schedulePartialSave,
   ]);
@@ -2722,6 +2741,30 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       </div>
       <h2 className="text-2xl font-bold mb-2">What is your primary goal?</h2>
       <p className="mb-4 text-gray-600">We’ll tailor your calories and macros to this goal.</p>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Health check prompts</h3>
+          <p className="text-xs text-gray-500">
+            Warn you when a meal may conflict with your goals or diet. Fine-tune in{' '}
+            <Link href="/settings/food-diary" className="text-helfi-green font-semibold underline underline-offset-2">
+              Settings &gt; Food Diary
+            </Link>
+            .
+          </p>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={healthCheckSettings.enabled}
+            onChange={(e) => {
+              healthCheckTouchedRef.current = true;
+              setHealthCheckSettings((prev) => ({ ...prev, enabled: e.target.checked }));
+            }}
+          />
+          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+        </label>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
         {[
           { key: 'lose weight', label: 'Lose weight' },
