@@ -67,6 +67,11 @@ self.addEventListener('notificationclick', (event) => {
 
         if (preferred) {
           try {
+            preferred.postMessage({ type: 'splash', url: targetUrl });
+          } catch (e) {
+            // Ignore message failures
+          }
+          try {
             if ('navigate' in preferred) {
               await preferred.navigate(targetUrl);
             }

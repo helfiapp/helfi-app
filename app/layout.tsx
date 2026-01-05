@@ -91,6 +91,31 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${inter.className}`}>
+        <div
+          id="helfi-splash"
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999999,
+            background: '#000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <video
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            autoPlay
+            muted
+            playsInline
+            loop
+            preload="auto"
+            poster="/mobile-assets/STATIC%20SPLASH.png"
+          >
+            <source src="/mobile-assets/ANIMATED%20SPLASH.mp4" type="video/mp4" />
+          </video>
+        </div>
         <AuthProvider>
           <UserDataProvider>
             <LayoutWrapper>
@@ -101,6 +126,62 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              (function() {
+                try {
+                  var splash = document.getElementById('helfi-splash');
+                  if (!splash) return;
+                  var show = function(opts) {
+                    splash.style.display = 'flex';
+                    splash.dataset.visible = '1';
+                    if (opts && opts.targetUrl) {
+                      try {
+                        var target = new URL(opts.targetUrl, window.location.origin);
+                        splash.dataset.targetPath = target.pathname;
+                      } catch (e) {
+                        delete splash.dataset.targetPath;
+                      }
+                    } else {
+                      delete splash.dataset.targetPath;
+                    }
+                  };
+                  var hide = function() {
+                    splash.style.display = 'none';
+                    splash.dataset.visible = '0';
+                    delete splash.dataset.targetPath;
+                  };
+                  var getTargetPath = function() {
+                    return splash.dataset.targetPath || '';
+                  };
+                  window.__helfiShowSplash = show;
+                  window.__helfiHideSplash = hide;
+                  window.__helfiGetSplashTargetPath = getTargetPath;
+
+                  var path = (window && window.location && window.location.pathname) ? window.location.pathname : '';
+                  var isPublic =
+                    path === '/' ||
+                    path === '/healthapp' ||
+                    path === '/privacy' ||
+                    path === '/terms' ||
+                    path === '/help' ||
+                    path === '/faq' ||
+                    path.indexOf('/auth/') === 0 ||
+                    path.indexOf('/affiliate/') === 0;
+
+                  var isPwa = false;
+                  try {
+                    isPwa =
+                      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+                      window.navigator.standalone === true;
+                  } catch (e) {}
+
+                  if (isPublic || !isPwa) {
+                    hide();
+                  }
+                } catch (e) {
+                  // Ignore splash errors
+                }
+              })();
+
               // Register service worker for push notifications
               (function(){
                 try {
@@ -111,19 +192,24 @@ export default function RootLayout({
                     navigator.serviceWorker.addEventListener('message', function(event) {
                       try {
                         var data = event && event.data ? event.data : null;
-                        if (!data || data.type !== 'navigate' || !data.url) return;
+                        if (!data || !data.type) return;
+                        if (data.type === 'splash' && data.url) {
+                          try {
+                            if (typeof window.__helfiShowSplash === 'function') {
+                              window.__helfiShowSplash({ targetUrl: data.url, reason: 'notification' });
+                            }
+                          } catch (e) {}
+                          return;
+                        }
+                        if (data.type !== 'navigate' || !data.url) return;
                         var target = new URL(data.url, window.location.origin);
                         if (target.origin !== window.location.origin) return;
                         if (window.location.href === target.href) return;
                         try {
-                          if (typeof window.__helfiStartSplash === 'function') {
-                            window.__helfiStartSplash({ targetUrl: target.href, reason: 'notification' });
-                          } else {
-                            window.__helfiPendingSplash = { targetUrl: target.href, reason: 'notification' };
+                          if (typeof window.__helfiShowSplash === 'function') {
+                            window.__helfiShowSplash({ targetUrl: target.href, reason: 'notification' });
                           }
-                        } catch (e) {
-                          // Ignore splash errors
-                        }
+                        } catch (e) {}
                         if (typeof window.__helfiNavigate === 'function') {
                           window.__helfiNavigate(target.href);
                           return;

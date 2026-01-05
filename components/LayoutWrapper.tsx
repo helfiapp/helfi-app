@@ -213,14 +213,8 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
-  const [splashActive, setSplashActive] = useState(false)
-  const splashTargetRef = useRef<string | null>(null)
-  const splashTimeoutRef = useRef<number | null>(null)
-  const splashStartedAtRef = useRef<number>(0)
   const pendingOpenCheckRef = useRef(0)
   const pendingOpenBusyRef = useRef(false)
-  const splashVideoSrc = '/mobile-assets/ANIMATED%20SPLASH.mp4'
-  const splashPosterSrc = '/mobile-assets/STATIC%20SPLASH.png'
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = [
@@ -267,85 +261,36 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     }
   }, [themeAllowed])
 
-  const startSplash = useCallback((payload?: { targetUrl?: string | null; reason?: string }) => {
+  const hideSplash = useCallback(() => {
     if (typeof window === 'undefined') return
-    let targetPath: string | null = null
-    if (payload?.targetUrl) {
-      try {
-        const target = new URL(payload.targetUrl, window.location.origin)
-        targetPath = target.pathname
-      } catch {
-        targetPath = null
+    try {
+      if (typeof (window as any).__helfiHideSplash === 'function') {
+        ;(window as any).__helfiHideSplash()
       }
+    } catch {
+      // Ignore splash errors
     }
-    splashTargetRef.current = targetPath
-    splashStartedAtRef.current = Date.now()
-    setSplashActive(true)
-    if (splashTimeoutRef.current) {
-      window.clearTimeout(splashTimeoutRef.current)
-    }
-    const maxMs = targetPath ? 8000 : 1500
-    splashTimeoutRef.current = window.setTimeout(() => {
-      setSplashActive(false)
-      splashTargetRef.current = null
-    }, maxMs)
   }, [])
 
   useEffect(() => {
-    if (!splashActive) return
-    const targetPath = splashTargetRef.current
-    if (!targetPath) return
-    if (pathname !== targetPath) return
-    const elapsed = Date.now() - splashStartedAtRef.current
-    const delay = Math.max(0, 200 - elapsed)
-    const timer = window.setTimeout(() => {
-      setSplashActive(false)
-      splashTargetRef.current = null
-    }, delay)
-    return () => window.clearTimeout(timer)
-  }, [pathname, splashActive])
-
-  useEffect(() => {
     if (typeof window === 'undefined') return
-    const handler = (payload?: { targetUrl?: string | null; reason?: string }) => {
-      startSplash(payload)
-    }
-    ;(window as any).__helfiStartSplash = handler
+    let targetPath = ''
     try {
-      const pending = (window as any).__helfiPendingSplash
-      if (pending) {
-        delete (window as any).__helfiPendingSplash
-        handler(pending)
+      if (typeof (window as any).__helfiGetSplashTargetPath === 'function') {
+        targetPath = String((window as any).__helfiGetSplashTargetPath() || '')
       }
     } catch {
-      // Ignore pending splash errors
+      targetPath = ''
     }
-    return () => {
-      try {
-        if ((window as any).__helfiStartSplash === handler) {
-          delete (window as any).__helfiStartSplash
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
+    if (targetPath && pathname === targetPath) {
+      const timer = window.setTimeout(() => hideSplash(), 150)
+      return () => window.clearTimeout(timer)
     }
-  }, [startSplash])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    let isColdStart = false
-    try {
-      if (!sessionStorage.getItem('helfi:session-active')) {
-        sessionStorage.setItem('helfi:session-active', '1')
-        isColdStart = true
-      }
-    } catch {
-      // Ignore storage errors
+    if (!targetPath) {
+      const timer = window.setTimeout(() => hideSplash(), 600)
+      return () => window.clearTimeout(timer)
     }
-    if (isColdStart) {
-      startSplash({ reason: 'cold-start' })
-    }
-  }, [startSplash])
+  }, [pathname, hideSplash])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -464,7 +409,13 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         if (!url) return
         const target = new URL(url, window.location.origin).href
         if (window.location.href === target) return
-        startSplash({ targetUrl: target, reason: 'notification' })
+        try {
+          if (typeof (window as any).__helfiShowSplash === 'function') {
+            ;(window as any).__helfiShowSplash({ targetUrl: target, reason: 'notification' })
+          }
+        } catch {
+          // Ignore splash errors
+        }
         window.location.href = target
       } catch {
         // Ignore
@@ -620,26 +571,9 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     }
   }
 
-  const splashOverlay = splashActive ? (
-    <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
-      <video
-        className="w-full h-full object-cover"
-        autoPlay
-        muted
-        playsInline
-        loop
-        preload="auto"
-        poster={splashPosterSrc}
-      >
-        <source src={splashVideoSrc} type="video/mp4" />
-      </video>
-    </div>
-  ) : null
-
   if (shouldShowSidebar) {
     return (
       <div className="flex min-h-screen bg-gray-50">
-        {splashOverlay}
         {/* Desktop Sidebar - Only for authenticated users on app pages */}
         <DesktopSidebar pathname={pathname} onNavigate={handleSidebarNavigate} />
         
@@ -698,7 +632,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   // Public pages or unauthenticated users - no sidebar
   return (
     <div className="min-h-screen">
-      {splashOverlay}
       {children}
       <SupportChatWidget />
     </div>
