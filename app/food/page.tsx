@@ -13129,30 +13129,51 @@ Please add nutritional information manually if needed.`);
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
                     </div>
                   )}
-                  <Image
-                    src={photoPreview}
-                    alt="Food preview"
-                    width={300}
-                    height={300}
-                    className={`w-full aspect-square object-cover rounded-lg shadow-lg transition-opacity duration-300 ${
-                      foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
-                    }`}
-                    loading="eager"
-                    priority
-                    unoptimized={isInlineImageSrc(photoPreview)}
-                    onLoad={() =>
-                      setFoodImagesLoading((prev: Record<string, boolean>) => ({
-                        ...prev,
-                        [photoPreview]: false,
-                      }))
-                    }
-                    onError={() =>
-                      setFoodImagesLoading((prev: Record<string, boolean>) => ({
-                        ...prev,
-                        [photoPreview]: false,
-                      }))
-                    }
-                  />
+                  {isInlineImageSrc(photoPreview) ? (
+                    <img
+                      src={photoPreview}
+                      alt="Food preview"
+                      className={`w-full aspect-square object-cover rounded-lg shadow-lg transition-opacity duration-300 ${
+                        foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
+                      }`}
+                      onLoad={() =>
+                        setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                          ...prev,
+                          [photoPreview]: false,
+                        }))
+                      }
+                      onError={() =>
+                        setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                          ...prev,
+                          [photoPreview]: false,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <Image
+                      src={photoPreview}
+                      alt="Food preview"
+                      width={300}
+                      height={300}
+                      className={`w-full aspect-square object-cover rounded-lg shadow-lg transition-opacity duration-300 ${
+                        foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
+                      }`}
+                      loading="eager"
+                      priority
+                      onLoad={() =>
+                        setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                          ...prev,
+                          [photoPreview]: false,
+                        }))
+                      }
+                      onError={() =>
+                        setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                          ...prev,
+                          [photoPreview]: false,
+                        }))
+                      }
+                    />
+                  )}
                 </div>
                 {/* Always-visible 3-step tracker so progress feels clear even when AI is slow */}
                 <div className="mb-4">
@@ -13363,40 +13384,65 @@ Please add nutritional information manually if needed.`);
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
                         </div>
                       )}
-                      <Image
-                        src={photoPreview}
-                        alt="Analyzed food"
-                        width={300}
-                        height={300}
-                        className={`w-full max-w-sm aspect-square object-cover rounded-xl transition-opacity duration-300 ${
-                          foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
-                        }`}
-                        loading="eager"
-                        priority
-                        unoptimized={isInlineImageSrc(photoPreview)}
-                        onLoad={() =>
-                          setFoodImagesLoading((prev: Record<string, boolean>) => ({
-                            ...prev,
-                            [photoPreview]: false,
-                          }))
-                        }
-                        onLoadStart={() =>
-                          setFoodImagesLoading((prev: Record<string, boolean>) => ({
-                            ...prev,
-                            [photoPreview]: true,
-                          }))
-                        }
-                        onError={() => {
-                          if (!photoPreview) return
-                          setFoodImagesLoading((prev: Record<string, boolean>) => ({
-                            ...prev,
-                            [photoPreview]: false,
-                          }))
-                          if (editingEntry) {
-                            refreshEditingEntryPhoto()
+                      {isInlineImageSrc(photoPreview) ? (
+                        <img
+                          src={photoPreview}
+                          alt="Analyzed food"
+                          className={`w-full max-w-sm aspect-square object-cover rounded-xl transition-opacity duration-300 ${
+                            foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
+                          }`}
+                          onLoad={() =>
+                            setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                              ...prev,
+                              [photoPreview]: false,
+                            }))
                           }
-                        }}
-                      />
+                          onError={() => {
+                            if (!photoPreview) return
+                            setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                              ...prev,
+                              [photoPreview]: false,
+                            }))
+                            if (editingEntry) {
+                              refreshEditingEntryPhoto()
+                            }
+                          }}
+                        />
+                      ) : (
+                        <Image
+                          src={photoPreview}
+                          alt="Analyzed food"
+                          width={300}
+                          height={300}
+                          className={`w-full max-w-sm aspect-square object-cover rounded-xl transition-opacity duration-300 ${
+                            foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
+                          }`}
+                          loading="eager"
+                          priority
+                          onLoad={() =>
+                            setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                              ...prev,
+                              [photoPreview]: false,
+                            }))
+                          }
+                          onLoadStart={() =>
+                            setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                              ...prev,
+                              [photoPreview]: true,
+                            }))
+                          }
+                          onError={() => {
+                            if (!photoPreview) return
+                            setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                              ...prev,
+                              [photoPreview]: false,
+                            }))
+                            if (editingEntry) {
+                              refreshEditingEntryPhoto()
+                            }
+                          }}
+                        />
+                      )}
                       {editingEntry && (
                         <>
                           <div className="hidden lg:flex absolute inset-0 rounded-xl bg-black/20 items-center justify-center group-hover:bg-black/30 transition-colors pointer-events-none" />
@@ -13495,19 +13541,31 @@ Please add nutritional information manually if needed.`);
                               }
                             }}
                           >
-                            <Image
-                              src={photoPreview}
-                              alt="Analyzed food"
-                              width={300}
-                              height={300}
-                              className="w-full max-w-sm aspect-square object-cover transition-transform duration-200 group-hover:scale-[1.01]"
-                              unoptimized={isInlineImageSrc(photoPreview)}
-                              onError={() => {
-                                if (editingEntry) {
-                                  refreshEditingEntryPhoto()
-                                }
-                              }}
-                            />
+                            {isInlineImageSrc(photoPreview) ? (
+                              <img
+                                src={photoPreview}
+                                alt="Analyzed food"
+                                className="w-full max-w-sm aspect-square object-cover transition-transform duration-200 group-hover:scale-[1.01]"
+                                onError={() => {
+                                  if (editingEntry) {
+                                    refreshEditingEntryPhoto()
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <Image
+                                src={photoPreview}
+                                alt="Analyzed food"
+                                width={300}
+                                height={300}
+                                className="w-full max-w-sm aspect-square object-cover transition-transform duration-200 group-hover:scale-[1.01]"
+                                onError={() => {
+                                  if (editingEntry) {
+                                    refreshEditingEntryPhoto()
+                                  }
+                                }}
+                              />
+                            )}
                             {/* Subtle dark overlay on hover */}
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                             {/* Change image pill button */}
@@ -17968,15 +18026,23 @@ Please add nutritional information manually if needed.`);
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-              <Image
-                src={fullSizeImage}
-                alt="Full size food image"
-                width={800}
-                height={600}
-                className="max-w-full max-h-full object-contain rounded-lg"
-                unoptimized={isInlineImageSrc(fullSizeImage)}
-                onClick={(e) => e.stopPropagation()}
-              />
+              {isInlineImageSrc(fullSizeImage) ? (
+                <img
+                  src={fullSizeImage}
+                  alt="Full size food image"
+                  className="max-w-full max-h-full object-contain rounded-lg"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <Image
+                  src={fullSizeImage}
+                  alt="Full size food image"
+                  width={800}
+                  height={600}
+                  className="max-w-full max-h-full object-contain rounded-lg"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
             </div>
           </div>
         )}
