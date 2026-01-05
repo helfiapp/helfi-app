@@ -261,6 +261,34 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     }
   }, [themeAllowed])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handler = (href: string) => {
+      try {
+        const target = new URL(href, window.location.origin)
+        if (target.origin !== window.location.origin) return
+        const next = `${target.pathname}${target.search}${target.hash}`
+        router.push(next)
+      } catch {
+        try {
+          window.location.assign(href)
+        } catch {
+          // Ignore navigation errors
+        }
+      }
+    }
+    ;(window as any).__helfiNavigate = handler
+    return () => {
+      try {
+        if ((window as any).__helfiNavigate === handler) {
+          delete (window as any).__helfiNavigate
+        }
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }, [router])
+
   // ⚠️ HEALTH SETUP GUARD RAIL
   // The 5-minute global Health Setup reminder must:
   // - Only appear for authenticated users on non-public, non-admin pages.

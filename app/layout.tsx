@@ -115,6 +115,10 @@ export default function RootLayout({
                         var target = new URL(data.url, window.location.origin);
                         if (target.origin !== window.location.origin) return;
                         if (window.location.href === target.href) return;
+                        if (typeof window.__helfiNavigate === 'function') {
+                          window.__helfiNavigate(target.href);
+                          return;
+                        }
                         window.location.href = target.href;
                       } catch (e) {
                         // Ignore navigation message errors

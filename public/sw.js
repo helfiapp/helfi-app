@@ -60,35 +60,38 @@ self.addEventListener('notificationclick', (event) => {
           return undefined;
         }
 
-        if (self.clients.openWindow) {
-          const opened = await self.clients.openWindow(targetUrl);
-          if (opened && 'focus' in opened) {
-            await opened.focus();
-          }
-          return undefined;
-        }
-
-        const fallback =
+        const preferred =
           clientsArr.find((client) => client && client.focused) ||
           clientsArr.find((client) => client && client.visibilityState === 'visible') ||
           clientsArr[0];
 
-        if (fallback) {
+        if (preferred) {
           try {
-            if ('navigate' in fallback) {
-              await fallback.navigate(targetUrl);
-            } else {
-              fallback.postMessage({ type: 'navigate', url: targetUrl });
+            if ('navigate' in preferred) {
+              await preferred.navigate(targetUrl);
             }
           } catch (e) {
             // Ignore navigation failures
           }
           try {
-            if ('focus' in fallback) {
-              await fallback.focus();
+            preferred.postMessage({ type: 'navigate', url: targetUrl });
+          } catch (e) {
+            // Ignore message failures
+          }
+          try {
+            if ('focus' in preferred) {
+              await preferred.focus();
             }
           } catch (e) {
             // Ignore focus failures
+          }
+          return undefined;
+        }
+
+        if (self.clients.openWindow) {
+          const opened = await self.clients.openWindow(targetUrl);
+          if (opened && 'focus' in opened) {
+            await opened.focus();
           }
         }
         return undefined;
