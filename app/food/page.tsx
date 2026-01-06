@@ -8200,6 +8200,7 @@ Please add nutritional information manually if needed.`);
       if (healthCheckPromptedRef.current.has(entryKey)) return false
 
       const totals = buildHealthCheckTotals(entry, options?.totalsOverride) || null
+      if (!totals) return false
       if (!shouldTriggerHealthCheck(entry, totals)) return false
       if (isHealthCheckCapReached()) return false
 
