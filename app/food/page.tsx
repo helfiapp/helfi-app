@@ -8002,11 +8002,15 @@ Please add nutritional information manually if needed.`);
       detailParts.push(`servings ${formatNumberInputValue(servings)}`)
     }
     const piecesPerServing = getPiecesPerServing(item)
+    const piecesPerServingValue =
+      typeof piecesPerServing === 'number' && Number.isFinite(piecesPerServing) && piecesPerServing > 0
+        ? piecesPerServing
+        : null
     const piecesValue =
       Number.isFinite(Number(item?.pieces)) && Number(item.pieces) > 0
         ? Number(item.pieces)
-        : Number.isFinite(piecesPerServing) && Number.isFinite(servings)
-        ? piecesPerServing * servings
+        : piecesPerServingValue !== null && Number.isFinite(servings)
+        ? piecesPerServingValue * servings
         : null
     if (Number.isFinite(piecesValue as number) && (piecesValue as number) > 0) {
       const roundedPieces = Math.round((piecesValue as number) * 100) / 100
