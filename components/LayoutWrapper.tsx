@@ -26,7 +26,7 @@ function DesktopSidebar({
   onNavigate: (href: string, e: MouseEvent<HTMLAnchorElement>) => void
 }) {
   return (
-    <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:z-[60] md:w-64 md:flex md:flex-col">
+    <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:z-[9999] md:w-64 md:flex md:flex-col pointer-events-auto">
       <div className="flex flex-col flex-grow bg-[#1f2937] text-white border-r border-gray-800 pt-5 pb-4 overflow-y-auto">
         {/* Logo */}
         <div className="flex items-center flex-shrink-0 px-4">

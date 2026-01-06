@@ -7997,7 +7997,6 @@ export default function Onboarding() {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
           setForm((prev: any) => ({ ...prev, ...parsed }));
-          setAllowAutosave(true);
         }
       }
       const durableRaw = localStorage.getItem('onboarding:durableForm');
@@ -8005,7 +8004,6 @@ export default function Onboarding() {
         const parsed = JSON.parse(durableRaw);
         if (parsed && typeof parsed === 'object') {
           setForm((prev: any) => ({ ...prev, ...parsed }));
-          setAllowAutosave(true);
         }
       }
     } catch (e) {
