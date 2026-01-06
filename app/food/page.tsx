@@ -2117,6 +2117,11 @@ export default function FoodDiary() {
   const officialSearchDebounceRef = useRef<any>(null)
   const analysisSequenceRef = useRef(0)
   const analysisHealthCheckKeyRef = useRef<string | null>(null)
+  const pendingAnalysisHealthCheckRef = useRef<{
+    entryKey: string
+    entry: any
+    totalsOverride: NutritionTotals | null
+  } | null>(null)
   const autoDbMatchAbortRef = useRef<AbortController | null>(null)
   const [officialLastRequest, setOfficialLastRequest] = useState<{
     query: string
@@ -3042,6 +3047,18 @@ export default function FoodDiary() {
       if (healthCheckPrompt) setHealthCheckPrompt(null)
     }
   }, [healthCheckSettings.enabled, healthCheckSettings.frequency, healthCheckPrompt])
+
+  useEffect(() => {
+    if (!userData) return
+    const pending = pendingAnalysisHealthCheckRef.current
+    if (!pending) return
+    pendingAnalysisHealthCheckRef.current = null
+    maybeShowHealthCheckPrompt(pending.entry, {
+      entryKey: pending.entryKey,
+      source: 'analysis',
+      totalsOverride: pending.totalsOverride,
+    })
+  }, [userData, hasHealthCheckContext, healthCheckSettings.enabled, healthCheckSettings.frequency])
 
   const getHealthCheckThresholds = () => {
     const sugarTarget = Number((dailyTargets as any)?.sugarMax)
@@ -7316,12 +7333,7 @@ Please add nutritional information manually if needed.`);
     
     const updatedFoods = [newEntry, ...todaysFoods]
     setTodaysFoods(updatedFoods)
-    const analysisPromptKey = buildAnalysisHealthCheckKey()
-    const shouldSkipHealthCheckPrompt =
-      method === 'photo' &&
-      analysisPromptKey &&
-      analysisPromptKey === analysisHealthCheckKeyRef.current
-    if (!shouldSkipHealthCheckPrompt) {
+    if (method !== 'photo') {
       maybeShowHealthCheckPrompt(newEntry)
     }
 
@@ -7594,6 +7606,7 @@ Please add nutritional information manually if needed.`);
     setShowBarcodeLabelPrompt(false)
     setAutoAnalyzeLabelPhoto(false)
     analysisHealthCheckKeyRef.current = null
+    pendingAnalysisHealthCheckRef.current = null
     if (barcodeLabelTimeoutRef.current) {
       clearTimeout(barcodeLabelTimeoutRef.current)
       barcodeLabelTimeoutRef.current = null
@@ -7994,6 +8007,7 @@ Please add nutritional information manually if needed.`);
     setFeedbackComment('')
     setFeedbackError(null)
     analysisHealthCheckKeyRef.current = null
+    pendingAnalysisHealthCheckRef.current = null
   }
 
   const buildDietTotalsForCheck = (entry: any) => {
@@ -8113,6 +8127,26 @@ Please add nutritional information manually if needed.`);
     writeHealthCheckDailyCapState(next)
   }
 
+  const buildHealthCheckTotals = (entry: any, totalsOverride?: NutritionTotals | null) => {
+    const overrideTotals = totalsOverride ? sanitizeNutritionTotals(totalsOverride) || totalsOverride : null
+    const baseTotals = overrideTotals || sanitizeNutritionTotals(entry?.total || entry?.nutrition || null) || null
+    const itemTotals =
+      Array.isArray(entry?.items) && entry.items.length > 0 ? recalculateNutritionFromItems(entry.items) : null
+
+    if (!itemTotals) return baseTotals
+    if (!baseTotals) return itemTotals
+
+    const merged: NutritionTotals = { ...itemTotals }
+    ;(['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar'] as const).forEach((key) => {
+      const itemValue = itemTotals[key]
+      const baseValue = baseTotals[key]
+      if ((itemValue === null || itemValue === 0) && typeof baseValue === 'number' && baseValue > 0) {
+        merged[key] = baseValue
+      }
+    })
+    return merged
+  }
+
   const shouldTriggerHealthCheck = (entry: any, totals: NutritionTotals | null) => {
     if (!healthCheckSettings.enabled) return false
     if (healthCheckSettings.frequency === 'never') return false
@@ -8154,17 +8188,20 @@ Please add nutritional information manually if needed.`);
     return ''
   }
 
-  const maybeShowHealthCheckPrompt = (entry: any, options?: { entryKey?: string; source?: 'analysis' | 'entry' }) => {
+  const maybeShowHealthCheckPrompt = (
+    entry: any,
+    options?: { entryKey?: string; source?: 'analysis' | 'entry'; totalsOverride?: NutritionTotals | null },
+  ) => {
     try {
-      if (healthCheckPrompt) return
+      if (healthCheckPrompt) return false
 
       const entryKey = options?.entryKey || getHealthCheckEntryKey(entry)
-      if (!entryKey) return
-      if (healthCheckPromptedRef.current.has(entryKey)) return
+      if (!entryKey) return false
+      if (healthCheckPromptedRef.current.has(entryKey)) return false
 
-      const totals = getEntryTotals(entry)
-      if (!shouldTriggerHealthCheck(entry, totals)) return
-      if (isHealthCheckCapReached()) return
+      const totals = buildHealthCheckTotals(entry, options?.totalsOverride) || null
+      if (!shouldTriggerHealthCheck(entry, totals)) return false
+      if (isHealthCheckCapReached()) return false
 
       const description = String(entry?.description || entry?.label || '').trim()
       const items = Array.isArray(entry?.items) ? entry.items : null
@@ -8182,8 +8219,10 @@ Please add nutritional information manually if needed.`);
       if (options?.source === 'analysis') {
         analysisHealthCheckKeyRef.current = entryKey
       }
+      return true
     } catch {
       // non-blocking
+      return false
     }
   }
 
@@ -8200,6 +8239,7 @@ Please add nutritional information manually if needed.`);
     const baseFromItems =
       Array.isArray(payload.items) && payload.items.length > 0 ? buildMealSummaryFromItems(payload.items) : ''
     const description = (baseFromAi || baseFromItems || 'Meal').trim()
+    const totalsOverride = sanitizeNutritionTotals(payload.total ?? payload.nutrition ?? null)
     const entry = {
       id: payload.analysisKey,
       description,
@@ -8207,7 +8247,19 @@ Please add nutritional information manually if needed.`);
       total: payload.total ?? null,
       nutrition: payload.nutrition ?? null,
     }
-    maybeShowHealthCheckPrompt(entry, { entryKey: payload.analysisKey, source: 'analysis' })
+    if (!userData) {
+      pendingAnalysisHealthCheckRef.current = {
+        entryKey: payload.analysisKey,
+        entry,
+        totalsOverride,
+      }
+      return
+    }
+    maybeShowHealthCheckPrompt(entry, {
+      entryKey: payload.analysisKey,
+      source: 'analysis',
+      totalsOverride,
+    })
   }
 
   const runHealthCheck = async (payload: HealthCheckPromptPayload) => {
@@ -8797,6 +8849,37 @@ Please add nutritional information manually if needed.`);
 
   const buildFavoritesDatasets = () => {
     const history = collectHistoryMeals()
+    const resolveEntryCreatedAtMs = (entry: any) => {
+      const entryTs = extractEntryTimestampMs(entry)
+      if (Number.isFinite(entryTs)) return entryTs
+      const dateKey = dateKeyForEntry(entry)
+      if (dateKey) {
+        const fallback = new Date(`${dateKey}T12:00:00`).getTime()
+        if (Number.isFinite(fallback)) return fallback
+      }
+      return 0
+    }
+    const resolveFavoriteCreatedAtMs = (fav: any) => {
+      const rawCreatedAt = fav?.createdAt
+      const createdAtValue =
+        typeof rawCreatedAt === 'string' || rawCreatedAt instanceof Date
+          ? new Date(rawCreatedAt).getTime()
+          : typeof rawCreatedAt === 'number'
+          ? rawCreatedAt
+          : Number(rawCreatedAt)
+      if (Number.isFinite(createdAtValue) && createdAtValue > 946684800000) return createdAtValue
+      const idRaw = fav?.id
+      if (typeof idRaw === 'number' && idRaw > 946684800000) return idRaw
+      const idStr = typeof idRaw === 'string' ? idRaw : ''
+      if (idStr) {
+        const match = idStr.match(/(\d{9,})/)
+        if (match) {
+          const ts = Number(match[1])
+          if (Number.isFinite(ts) && ts > 946684800000) return ts
+        }
+      }
+      return 0
+    }
     const linkedFavoriteIdForEntry = (entry: any) => {
       try {
         const fromNutrition =
@@ -8903,9 +8986,7 @@ Please add nutritional information manually if needed.`);
       const labelKey = normalizeFoodName(String(label || '').trim())
       if (labelKey) usedLabels.add(labelKey)
 
-      const entryTs = extractEntryTimestampMs(entry)
-      const createdAtValue =
-        Number.isFinite(entryTs) ? entryTs : Number(entry?.createdAt) || Number(entry?.id) || Date.now()
+      const createdAtValue = resolveEntryCreatedAtMs(entry)
 
       return {
         id: entry?.dbId ? `log-${entry.dbId}` : entry?.id || `all-${idx}`,
@@ -8962,7 +9043,7 @@ Please add nutritional information manually if needed.`);
         label,
         entry: null,
         favorite: fav,
-        createdAt: Number(fav?.createdAt) || Number(fav?.id) || Date.now(),
+        createdAt: resolveFavoriteCreatedAtMs(fav),
         sourceTag: 'Favorite',
         calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
         serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
@@ -8973,7 +9054,7 @@ Please add nutritional information manually if needed.`);
       id: fav?.id || `fav-${Math.random()}`,
       label: applyFoodNameOverride(fav?.label || fav?.description || 'Favorite meal') || favoriteDisplayLabel(fav) || normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal'),
       favorite: fav,
-      createdAt: fav?.createdAt || fav?.id || Date.now(),
+      createdAt: resolveFavoriteCreatedAtMs(fav),
       sourceTag: 'Favorite',
       calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
       serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
@@ -11950,7 +12031,7 @@ Please add nutritional information manually if needed.`);
 	                        <div className="min-w-0">
 	                          <div className="text-sm font-semibold text-gray-900">Connect a device</div>
 	                          <div className="text-xs text-gray-500 mt-0.5">
-	                            Connect Fitbit or Garmin to automatically log workouts here.
+                            Connect Fitbit or Garmin Connect to automatically log workouts here.
 	                          </div>
 	                        </div>
 	                        <button
@@ -11970,7 +12051,7 @@ Please add nutritional information manually if needed.`);
 	                        <div className="min-w-0">
 	                          <div className="text-sm font-semibold text-gray-900">Device connected</div>
 	                          <div className="text-xs text-gray-600 mt-0.5">
-	                            {fitbitConnected && garminConnected ? 'Fitbit and Garmin' : fitbitConnected ? 'Fitbit' : 'Garmin'} connected. Workouts can be imported.
+                            {fitbitConnected && garminConnected ? 'Fitbit and Garmin Connect' : fitbitConnected ? 'Fitbit' : 'Garmin Connect'} connected. Workouts can be imported.
 	                          </div>
 	                        </div>
 	                        <div className="flex items-center gap-2 flex-shrink-0">
@@ -13216,12 +13297,17 @@ Please add nutritional information manually if needed.`);
                 </button>
               )}
               {photoPreview && (
-                <button
-                  onClick={() => analyzePhoto()}
-                  className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold"
-                >
-                  🤖 Analyze with AI
-                </button>
+                <>
+                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                    ⏱️ <strong>Heads up:</strong> Complex meals can take longer to analyze (sometimes 1+ minute). We prioritize accuracy and will keep working until it finishes.
+                  </div>
+                  <button
+                    onClick={() => analyzePhoto()}
+                    className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold"
+                  >
+                    🤖 Analyze with AI
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -13420,6 +13506,9 @@ Please add nutritional information manually if needed.`);
                   </div>
                 </div>
                 <div className="space-y-3">
+                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 text-left">
+                    ⏱️ <strong>Heads up:</strong> Complex meals can take longer to analyze (sometimes 1+ minute). We prioritize accuracy and will keep working until it finishes.
+                  </div>
                   <button
                     onClick={() => analyzePhoto()}
                     disabled={isAnalyzing}
@@ -13535,11 +13624,6 @@ Please add nutritional information manually if needed.`);
                       🗑️ Delete Photo
                     </button>
                   </div>
-                </div>
-                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-yellow-800 text-sm">
-                    ⏱️ <strong>Heads up:</strong> Complex meals can take longer to analyze (sometimes 1+ minute). We prioritize accuracy and will keep working until it finishes.
-                  </p>
                 </div>
               </div>
             )}
@@ -16086,7 +16170,7 @@ Please add nutritional information manually if needed.`);
 		                    )}
 		                    {garminConnected && (
 		                      <span className="text-[11px] sm:text-xs bg-gray-100 rounded-full px-2 py-1 border border-gray-200">
-		                        Garmin
+		                        Garmin Connect
 		                      </span>
 		                    )}
 		                    {!fitbitConnected && !garminConnected && (
@@ -16166,7 +16250,7 @@ Please add nutritional information manually if needed.`);
 		                              ? Number(entry.distanceKm)
 		                              : null
 		                          const sourceLabel =
-		                            entry?.source === 'FITBIT' ? 'Fitbit' : entry?.source === 'GARMIN' ? 'Garmin' : 'Manual'
+		                            entry?.source === 'FITBIT' ? 'Fitbit' : entry?.source === 'GARMIN' ? 'Garmin Connect' : 'Manual'
 		                          const title = (() => {
 		                            const typeName = String(entry?.exerciseType?.name || '').trim()
 		                            const label = String(entry?.label || '').trim()
