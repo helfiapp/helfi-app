@@ -130,6 +130,7 @@ function buildSupportSystemPrompt(agentName: string, agentRole: string): string 
     '',
     'Rules:',
     '- Use plain English. Keep replies short, warm, and helpful.',
+    '- Do not use markdown. Use simple sentences and plain "-" bullets.',
     '- Start with a brief greeting only if this is your first reply in the conversation; otherwise, skip the greeting and continue naturally.',
     '- Focus on app troubleshooting, not medical advice.',
     '- Do not claim hardware or device integrations that are not currently supported.',
@@ -190,6 +191,7 @@ function supportProductFacts(): string {
     '- Credit packs: $5 for 100 credits or $10 for 150 credits. Credits do not expire and can be used for any analysis.',
     '- Helfi is a web app that works in the browser on mobile and desktop; no download is required.',
     '- Device integrations: Fitbit is available now. Garmin Connect is in evaluation and may be temporarily unavailable until production approval is granted.',
+    '- Sleep tracking is available only through connected devices (Fitbit; Garmin evaluation). There is no built-in sleep monitoring without a device connection.',
     '- Apple Watch, Apple Health, Samsung Health, Oura Ring, and Google Fit are not supported yet. These are planned for future iOS/Android apps.',
   ].join('\n')
 }
@@ -247,15 +249,17 @@ function buildDeterministicSupportReply(options: {
   const passwordTopic = findSupportTopic('password_reset')
   const supportTopic = findSupportTopic('support_and_help')
   const featuresTopic = findSupportTopic('features')
+  const sleepTopic = findSupportTopic('sleep_tracking')
 
   const featuresMatch = /features?|capabilities|what can (i|we) do|what does helfi do|what is included/i.test(text)
   if (featuresMatch) {
     const featureList = [
       'Health intake profile setup (build your health profile).',
-      'Smart health tracking for weight, sleep, mood, energy, and custom metrics.',
+      'Smart health tracking for weight, mood, energy, and custom metrics.',
       'Food logging with photo analysis and meal logging.',
       'Medication and supplement tracking with interaction checks.',
       'AI insights dashboard and personalized recommendations.',
+      'Sleep data from connected devices (Fitbit; Garmin evaluation) and optional sleep quality ratings in mood check-ins.',
       'Symptom analysis with follow-up chat.',
       'Medical image analyzer with follow-up chat.',
       'Lab report upload and analysis (PDF or photos).',
@@ -272,6 +276,18 @@ function buildDeterministicSupportReply(options: {
       ...featureList.map((item) => `- ${item}`),
       '',
       `Full overview: ${featuresUrl}.`,
+    ].join('\n')
+    return addAgentSignOff(reply, options.agent)
+  }
+
+  const sleepMatch = /sleep/i.test(text) && /track|tracking|monitor|monitoring|data|sync/i.test(text)
+  if (sleepMatch) {
+    const devicesUrl = sleepTopic?.links?.devices || 'https://helfi.ai/devices'
+    const reply = [
+      'Sleep is not tracked automatically unless a device is connected.',
+      'If you connect Fitbit, Helfi can sync sleep data. Garmin sleep is in evaluation.',
+      'Without a device, sleep is only an optional self-rating in mood check-ins.',
+      `Devices page: ${devicesUrl}.`,
     ].join('\n')
     return addAgentSignOff(reply, options.agent)
   }

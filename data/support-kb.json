@@ -51,6 +51,14 @@
       "links": {
         "overview": "https://helfi.ai/#features"
       }
+    },
+    {
+      "id": "sleep_tracking",
+      "title": "Sleep Tracking",
+      "summary": "Sleep data is available only when a device is connected.",
+      "links": {
+        "devices": "https://helfi.ai/devices"
+      }
     }
   ]
 }
