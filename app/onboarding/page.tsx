@@ -7996,14 +7996,14 @@ export default function Onboarding() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
-          setForm((prev: any) => ({ ...prev, ...parsed }));
+          setForm((prev: any) => ({ ...parsed, ...prev }));
         }
       }
       const durableRaw = localStorage.getItem('onboarding:durableForm');
       if (durableRaw) {
         const parsed = JSON.parse(durableRaw);
         if (parsed && typeof parsed === 'object') {
-          setForm((prev: any) => ({ ...prev, ...parsed }));
+          setForm((prev: any) => ({ ...parsed, ...prev }));
         }
       }
     } catch (e) {

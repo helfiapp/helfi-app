@@ -4,6 +4,7 @@ import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { MouseEvent, ReactNode, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import UsageMeter from '@/components/UsageMeter'
 import SupportChatWidget from '@/components/support/SupportChatWidget'
 import WeeklyReportReadyModal from '@/components/WeeklyReportReadyModal'
@@ -214,6 +215,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
   const lastLocationRef = useRef('')
+  const [sidebarPortal, setSidebarPortal] = useState<HTMLElement | null>(null)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = [
@@ -290,6 +292,17 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       }
     }
   }, [router])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    let portal = document.getElementById('desktop-sidebar-portal') as HTMLElement | null
+    if (!portal) {
+      portal = document.createElement('div')
+      portal.id = 'desktop-sidebar-portal'
+      document.body.appendChild(portal)
+    }
+    setSidebarPortal(portal)
+  }, [])
 
   // ⚠️ HEALTH SETUP GUARD RAIL
   // The 5-minute global Health Setup reminder must:
@@ -545,7 +558,12 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     return (
       <div className="flex min-h-screen bg-gray-50">
         {/* Desktop Sidebar - Only for authenticated users on app pages */}
-        <DesktopSidebar pathname={pathname} onNavigate={handleSidebarNavigate} />
+        {sidebarPortal
+          ? createPortal(
+              <DesktopSidebar pathname={pathname} onNavigate={handleSidebarNavigate} />,
+              sidebarPortal
+            )
+          : null}
         
         {/* Main Content */}
         <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto relative">

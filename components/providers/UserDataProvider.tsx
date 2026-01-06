@@ -131,6 +131,26 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session, status, loadData])
 
+  // Keep data fresh when the user returns to the app or tab.
+  useEffect(() => {
+    if (!session) return
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+    const handleFocus = () => {
+      refreshData()
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshData()
+      }
+    }
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [session, refreshData])
+
   // Allow other parts of the app to force a refresh (e.g., after insights updates)
   useEffect(() => {
     const handler = () => {
