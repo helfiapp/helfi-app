@@ -8147,12 +8147,11 @@ Please add nutritional information manually if needed.`);
     return merged
   }
 
-  const shouldTriggerHealthCheck = (entry: any, totals: NutritionTotals | null) => {
-    if (!healthCheckSettings.enabled) return false
-    if (healthCheckSettings.frequency === 'never') return false
-    if (!hasHealthCheckContext) return false
-    if (!totals) return false
-    if (healthCheckSettings.frequency === 'always') return true
+  const buildHealthCheckTriggerPreview = (
+    entry: any,
+    totals: NutritionTotals | null,
+  ): Array<{ key: 'sugar' | 'carbs' | 'fat'; label: string; value: number; limit: number; unit: string }> => {
+    if (!totals) return []
     const thresholds = getHealthCheckThresholds()
     const sugar = typeof totals.sugar === 'number' ? totals.sugar : 0
     const carbs = typeof totals.carbs === 'number' ? totals.carbs : 0
@@ -8176,7 +8175,26 @@ Please add nutritional information manually if needed.`);
       if (calories > 0 && calories < 350) fatHigh = false
     }
 
-    return sugarHigh || carbsHigh || fatHigh
+    const triggers: Array<{ key: 'sugar' | 'carbs' | 'fat'; label: string; value: number; limit: number; unit: string }> = []
+    if (sugarHigh) {
+      triggers.push({ key: 'sugar', label: 'Sugar', value: sugar, limit: thresholds.sugar, unit: 'g' })
+    }
+    if (carbsHigh) {
+      triggers.push({ key: 'carbs', label: 'Carbs', value: carbs, limit: thresholds.carbs, unit: 'g' })
+    }
+    if (fatHigh) {
+      triggers.push({ key: 'fat', label: 'Fat', value: fat, limit: thresholds.fat, unit: 'g' })
+    }
+    return triggers
+  }
+
+  const shouldTriggerHealthCheck = (entry: any, totals: NutritionTotals | null) => {
+    if (!healthCheckSettings.enabled) return false
+    if (healthCheckSettings.frequency === 'never') return false
+    if (!totals) return false
+    if (healthCheckSettings.frequency === 'always') return true
+    const triggers = buildHealthCheckTriggerPreview(entry, totals)
+    return triggers.length > 0
   }
 
   const buildAnalysisHealthCheckKey = (analysisIdValue?: string | null, analysisSeqValue?: number | null) => {
@@ -11831,57 +11849,91 @@ Please add nutritional information manually if needed.`);
           </div>
         </div>
       )}
-      {healthCheckPrompt && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[94%] max-w-2xl">
-          <div className="relative overflow-hidden rounded-3xl border border-amber-200/70 bg-white/95 shadow-2xl backdrop-blur">
-            <div className="absolute inset-0 bg-gradient-to-r from-amber-50 via-white to-emerald-50 opacity-80" />
-            <div className="relative flex items-start gap-4 p-4 sm:p-5">
-              <div className="h-11 w-11 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-sm">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M5.07 19h13.86c1.2 0 1.96-1.3 1.35-2.32L13.4 4.64c-.6-1.04-2.08-1.04-2.68 0L3.72 16.68c-.6 1.02.15 2.32 1.35 2.32z" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm sm:text-base font-semibold text-gray-900">Health check recommended</div>
-                <p className="mt-1 text-sm text-gray-700">
-                  High-risk meal detected (sugar/carbs/fat). Run a quick check aligned to your goals?
-                </p>
-                {healthCheckError && (
-                  <div className="mt-2 text-xs text-amber-700">{healthCheckError}</div>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => runHealthCheck(healthCheckPrompt)}
-                    disabled={healthCheckLoading}
-                    className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                  >
-                    {healthCheckLoading ? 'Checking...' : `Review (${HEALTH_CHECK_COST_CREDITS})`}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHealthCheckPrompt(null)}
-                    className="px-4 py-2 rounded-full border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50"
-                  >
-                    Not now
-                  </button>
-                  <span className="text-xs text-gray-500">{HEALTH_CHECK_COST_CREDITS} credits</span>
+      {healthCheckPrompt && (() => {
+        const promptEntry = {
+          description: healthCheckPrompt.description,
+          items: healthCheckPrompt.items,
+        }
+        const triggerPreview = buildHealthCheckTriggerPreview(promptEntry, healthCheckPrompt.totals)
+        const hasTriggers = triggerPreview.length > 0
+        return (
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[94%] max-w-2xl">
+            <div className="relative overflow-hidden rounded-3xl border border-amber-200/70 bg-white/95 shadow-2xl backdrop-blur">
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-50 via-white to-emerald-50 opacity-80" />
+              <div className="relative flex items-start gap-4 p-4 sm:p-5">
+                <div className="h-11 w-11 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-sm">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M5.07 19h13.86c1.2 0 1.96-1.3 1.35-2.32L13.4 4.64c-.6-1.04-2.08-1.04-2.68 0L3.72 16.68c-.6 1.02.15 2.32 1.35 2.32z" />
+                  </svg>
                 </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm sm:text-base font-semibold text-gray-900">Health check recommended</div>
+                  <p className="mt-1 text-sm text-gray-700">
+                    {hasTriggers
+                      ? 'High-risk meal detected (sugar/carbs/fat). Run a quick check aligned to your settings?'
+                      : 'Health check is enabled for this meal. Run a quick check aligned to your settings?'}
+                  </p>
+                  {hasTriggers && (
+                    <div className="mt-3 space-y-2">
+                      {triggerPreview.map((trigger) => {
+                        const meta = HEALTH_TRIGGER_META[trigger.key] || { color: '#9ca3af', accent: 'text-gray-600' }
+                        const ratio = trigger.limit > 0 ? Math.min(1, trigger.value / trigger.limit) : 1
+                        return (
+                          <div key={`${trigger.key}-${trigger.label}`} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs text-gray-700">
+                              <span className="font-semibold text-gray-900">{trigger.label}</span>
+                              <span className={meta.accent}>
+                                {Math.round(trigger.value)}{trigger.unit} &gt; {Math.round(trigger.limit)}{trigger.unit}
+                              </span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+                              <div
+                                className="h-full"
+                                style={{ width: `${Math.round(ratio * 100)}%`, backgroundColor: meta.color }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {healthCheckError && (
+                    <div className="mt-2 text-xs text-amber-700">{healthCheckError}</div>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => runHealthCheck(healthCheckPrompt)}
+                      disabled={healthCheckLoading}
+                      className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      {healthCheckLoading ? 'Checking...' : `Review (${HEALTH_CHECK_COST_CREDITS})`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHealthCheckPrompt(null)}
+                      className="px-4 py-2 rounded-full border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                    >
+                      Not now
+                    </button>
+                    <span className="text-xs text-gray-500">{HEALTH_CHECK_COST_CREDITS} credits</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHealthCheckPrompt(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                  aria-label="Dismiss"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setHealthCheckPrompt(null)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label="Dismiss"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
       {healthCheckResult && healthCheckPageOpen && (
         <div className="fixed inset-0 z-[10001] bg-white flex flex-col">
           <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3">
