@@ -2000,6 +2000,10 @@ export default function FoodDiary() {
   const [feedbackComment, setFeedbackComment] = useState('')
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
   const [feedbackError, setFeedbackError] = useState<string | null>(null)
+  const [feedbackRescanState, setFeedbackRescanState] = useState<{
+    scope: 'overall' | 'item'
+    itemIndex?: number | null
+  } | null>(null)
   const [showAnalysisModeModal, setShowAnalysisModeModal] = useState(false)
   const [showAnalysisExitConfirm, setShowAnalysisExitConfirm] = useState(false)
   const [pendingPhotoPicker, setPendingPhotoPicker] = useState(false)
@@ -7986,19 +7990,152 @@ Please add nutritional information manually if needed.`);
     setFeedbackError(null)
   }
 
-  const triggerFeedbackRescan = async (reasons: string[], focusItem?: string | null) => {
+  const buildFeedbackItemDescription = (item: any) => {
+    if (!item) return ''
+    const name = String(item?.name || '').trim()
+    if (!name) return ''
+    const detailParts: string[] = []
+    const servingSize = String(item?.serving_size || '').trim()
+    if (servingSize) detailParts.push(`serving size ${servingSize}`)
+    const servings = Number(item?.servings)
+    if (Number.isFinite(servings) && servings > 0 && Math.abs(servings - 1) > 0.01) {
+      detailParts.push(`servings ${formatNumberInputValue(servings)}`)
+    }
+    const piecesPerServing = getPiecesPerServing(item)
+    const piecesValue =
+      Number.isFinite(Number(item?.pieces)) && Number(item.pieces) > 0
+        ? Number(item.pieces)
+        : Number.isFinite(piecesPerServing) && Number.isFinite(servings)
+        ? piecesPerServing * servings
+        : null
+    if (Number.isFinite(piecesValue as number) && (piecesValue as number) > 0) {
+      const roundedPieces = Math.round((piecesValue as number) * 100) / 100
+      detailParts.push(`${formatNumberInputValue(roundedPieces)} piece${roundedPieces === 1 ? '' : 's'}`)
+    }
+    const weightAmount = Number(item?.weightAmount)
+    const weightUnit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+    if (Number.isFinite(weightAmount) && weightAmount > 0) {
+      detailParts.push(`total weight ${formatNumberInputValue(weightAmount)} ${weightUnit}`)
+    }
+    const detail = detailParts.length > 0 ? ` (${detailParts.join(', ')})` : ''
+    return `${name}${detail}`
+  }
+
+  const pickBestFeedbackItem = (items: any[], targetName: string) => {
+    if (!Array.isArray(items) || items.length === 0) return null
+    const targetKey = normalizeFoodName(targetName || '')
+    if (!targetKey) return items[0]
+    let best = items[0]
+    let bestScore = -1
+    items.forEach((candidate) => {
+      const key = normalizeFoodName(candidate?.name || '')
+      if (!key) return
+      let score = 0
+      if (key === targetKey) score += 6
+      if (key.includes(targetKey) || targetKey.includes(key)) score += 3
+      const tokens = targetKey.split(' ').filter(Boolean)
+      tokens.forEach((t) => {
+        if (key.includes(t)) score += 1
+      })
+      if (score > bestScore) {
+        bestScore = score
+        best = candidate
+      }
+    })
+    return best
+  }
+
+  const mergeRescannedItem = (existing: any, incoming: any) => {
+    const merged: any = { ...incoming }
+    const keepNumber = (value: any, fallback: any, min = 0) => {
+      const numeric = Number(value)
+      if (Number.isFinite(numeric) && numeric > min) return numeric
+      return fallback
+    }
+    const keepValue = (value: any, fallback: any) => (value !== null && value !== undefined ? value : fallback)
+    merged.servings = keepNumber(existing?.servings, merged.servings, 0)
+    merged.portionMode = keepValue(existing?.portionMode, merged.portionMode)
+    merged.weightAmount = keepNumber(existing?.weightAmount, merged.weightAmount, 0)
+    merged.weightUnit = keepValue(existing?.weightUnit, merged.weightUnit)
+    merged.customGramsPerServing = keepNumber(existing?.customGramsPerServing, merged.customGramsPerServing, 0)
+    merged.customMlPerServing = keepNumber(existing?.customMlPerServing, merged.customMlPerServing, 0)
+    merged.pieces = keepNumber(existing?.pieces, merged.pieces, 0)
+    merged.piecesPerServing = keepNumber(existing?.piecesPerServing, merged.piecesPerServing, 0)
+    merged.servingOptions = Array.isArray(existing?.servingOptions) && existing.servingOptions.length > 0 ? existing.servingOptions : merged.servingOptions
+    merged.selectedServingId = keepValue(existing?.selectedServingId, merged.selectedServingId)
+    return merged
+  }
+
+  const triggerOverallFeedbackRescan = async (reasons: string[]) => {
     if (isAnalyzing) return
     if (!photoFile) return
     if (analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)) return
     const message = reasons.some((reason) => /missing ingredients/i.test(String(reason)))
       ? 'Rechecking for missing ingredients…'
       : 'Rechecking analysis…'
+    setFeedbackRescanState({ scope: 'overall', itemIndex: null })
     showQuickToast(message)
-    await analyzePhoto(photoFile, {
-      feedbackRescan: true,
-      feedbackReasons: reasons,
-      feedbackFocusItem: focusItem || null,
-    })
+    try {
+      await analyzePhoto(photoFile, {
+        feedbackRescan: true,
+        feedbackReasons: reasons,
+        feedbackFocusItem: null,
+      })
+    } finally {
+      setFeedbackRescanState(null)
+    }
+  }
+
+  const triggerItemFeedbackRescan = async (itemIndex: number, reasons: string[]) => {
+    if (analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)) {
+      showQuickToast('Item re-analysis is unavailable for label scans.')
+      return false
+    }
+    const item = analyzedItems[itemIndex]
+    if (!item) return false
+    const description = buildFeedbackItemDescription(item)
+    if (!description) return false
+    setFeedbackRescanState({ scope: 'item', itemIndex })
+    try {
+      const response = await fetch('/api/analyze-food', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          textDescription: description,
+          foodType: 'single',
+          isReanalysis: true,
+          multi: false,
+          returnItems: true,
+          analysisMode: 'meal',
+          feedbackDown: true,
+          feedbackReasons: reasons,
+          feedbackItems: [String(item?.name || '').trim()].filter(Boolean),
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        console.error('Item re-analysis failed:', result?.error || response.statusText)
+        return false
+      }
+      const returnedItems = Array.isArray(result?.items) ? result.items : []
+      if (returnedItems.length === 0) return false
+      const best = pickBestFeedbackItem(returnedItems, String(item?.name || ''))
+      if (!best) return false
+      const normalized = normalizeDiscreteItem(best)
+      setAnalyzedItems((prev) => {
+        const next = prev.map((current, idx) =>
+          idx === itemIndex ? mergeRescannedItem(current, normalized) : current,
+        )
+        applyRecalculatedNutrition(next)
+        return next
+      })
+      return true
+    } catch (err) {
+      console.error('Item re-analysis error:', err)
+      return false
+    } finally {
+      setFeedbackRescanState(null)
+    }
   }
 
   const resetAnalysisFeedbackState = () => {
@@ -8012,6 +8149,12 @@ Please add nutritional information manually if needed.`);
     analysisHealthCheckKeyRef.current = null
     pendingAnalysisHealthCheckRef.current = null
   }
+
+  const isFeedbackRescanning =
+    feedbackRescanState?.scope === 'item' &&
+    feedbackPrompt?.scope === 'item' &&
+    feedbackRescanState?.itemIndex === feedbackPrompt?.itemIndex
+  const isFeedbackModalLocked = feedbackSubmitting || isFeedbackRescanning
 
   const buildDietTotalsForCheck = (entry: any) => {
     const rawTotal = entry?.total
@@ -8873,9 +9016,30 @@ Please add nutritional information manually if needed.`);
 
   const buildFavoritesDatasets = () => {
     const history = collectHistoryMeals()
+    const parseEntryTimeToMs = (entry: any) => {
+      const dateKey = dateKeyForEntry(entry)
+      if (!dateKey) return NaN
+      const raw = typeof entry?.time === 'string' ? entry.time.trim() : ''
+      if (!raw) return NaN
+      const match = raw.match(/^(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?$/)
+      if (!match) return NaN
+      let hours = Number(match[1])
+      const minutes = Number(match[2])
+      const meridiem = match[3] ? match[3].toLowerCase() : ''
+      if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return NaN
+      if (meridiem) {
+        if (hours === 12) hours = meridiem === 'am' ? 0 : 12
+        else if (meridiem === 'pm') hours += 12
+      }
+      const iso = `${dateKey}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`
+      const ms = new Date(iso).getTime()
+      return Number.isFinite(ms) ? ms : NaN
+    }
     const resolveEntryCreatedAtMs = (entry: any) => {
       const entryTs = extractEntryTimestampMs(entry)
       if (Number.isFinite(entryTs)) return entryTs
+      const timeBased = parseEntryTimeToMs(entry)
+      if (Number.isFinite(timeBased)) return timeBased
       const dateKey = dateKeyForEntry(entry)
       if (dateKey) {
         const fallback = new Date(`${dateKey}T12:00:00`).getTime()
@@ -9024,32 +9188,7 @@ Please add nutritional information manually if needed.`);
       }
     })
 
-    const allMealsUnique = (() => {
-      const byKey = new Map<string, any>()
-      const pickBetter = (a: any, b: any) => {
-        const aFav = Boolean(a?.favorite)
-        const bFav = Boolean(b?.favorite)
-        if (aFav !== bFav) return aFav ? a : b
-        const aHasCalories = Number.isFinite(Number(a?.calories))
-        const bHasCalories = Number.isFinite(Number(b?.calories))
-        if (aHasCalories !== bHasCalories) return aHasCalories ? a : b
-        return (a?.createdAt || 0) >= (b?.createdAt || 0) ? a : b
-      }
-      allMealsRaw.forEach((item) => {
-        const rawLabel = String(item?.label || '').trim()
-        const key =
-          simplifyKey(rawLabel) ||
-          normalizeFoodName(rawLabel) ||
-          `__id:${String(item?.id || Math.random())}`
-        const existing = byKey.get(key)
-        if (!existing) {
-          byKey.set(key, item)
-          return
-        }
-        byKey.set(key, pickBetter(existing, item))
-      })
-      return Array.from(byKey.values())
-    })()
+    const allMealsUnique = allMealsRaw
 
     // "All" should show every meal, including favorites that aren't in history yet.
     const allMealsWithFavorites = [...allMealsUnique]
@@ -14781,6 +14920,14 @@ Please add nutritional information manually if needed.`);
                           </div>
                         );
                       })}
+                      {feedbackRescanState?.scope === 'overall' && isAnalyzing && (
+                        <div className="px-4 sm:px-6 py-3">
+                          <div className="w-full max-w-sm mx-auto rounded-xl bg-emerald-50 text-emerald-700 text-sm font-semibold px-4 py-2 flex items-center justify-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Re-analyzing full meal…
+                          </div>
+                        </div>
+                      )}
                       </div>
                     </div>
                   ) : (
@@ -15602,6 +15749,7 @@ Please add nutritional information manually if needed.`);
                     </div>
                     <button
                       onClick={() => {
+                        if (isFeedbackModalLocked) return
                         setFeedbackPrompt(null)
                         setFeedbackReasons([])
                         setFeedbackComment('')
@@ -15650,6 +15798,7 @@ Please add nutritional information manually if needed.`);
                     <div className="flex items-center justify-end gap-2 pt-2">
                       <button
                         onClick={() => {
+                          if (isFeedbackModalLocked) return
                           setFeedbackPrompt(null)
                           setFeedbackReasons([])
                           setFeedbackComment('')
@@ -15661,13 +15810,14 @@ Please add nutritional information manually if needed.`);
                       </button>
                       <button
                         onClick={async () => {
-                          if (feedbackSubmitting) return
+                          if (feedbackSubmitting || isFeedbackRescanning) return
                           if (feedbackReasons.length === 0) {
                             setFeedbackError('Please select at least one reason.')
                             return
                           }
                           const reasonsSnapshot = [...feedbackReasons]
                           const scope = feedbackPrompt.scope
+                          const itemIndex = feedbackPrompt.itemIndex ?? null
                           setFeedbackSubmitting(true)
                           await submitFoodAnalysisFeedback({
                             scope: feedbackPrompt.scope,
@@ -15678,29 +15828,34 @@ Please add nutritional information manually if needed.`);
                           })
                           if (scope === 'overall') {
                             setAnalysisFeedbackOverall('down')
-                          } else if (feedbackPrompt.itemIndex !== null && feedbackPrompt.itemIndex !== undefined) {
-                            setAnalysisFeedbackItems((prev) => ({ ...prev, [feedbackPrompt.itemIndex as number]: 'down' }))
+                          } else if (itemIndex !== null && itemIndex !== undefined) {
+                            setAnalysisFeedbackItems((prev) => ({ ...prev, [itemIndex as number]: 'down' }))
                           }
-                          setFeedbackPrompt(null)
-                          setFeedbackReasons([])
-                          setFeedbackComment('')
-                          setFeedbackError(null)
                           setFeedbackSubmitting(false)
                           showQuickToast('Thanks for the feedback!')
                           if (scope === 'overall') {
-                            await triggerFeedbackRescan(reasonsSnapshot)
+                            setFeedbackPrompt(null)
+                            setFeedbackReasons([])
+                            setFeedbackComment('')
+                            setFeedbackError(null)
+                            await triggerOverallFeedbackRescan(reasonsSnapshot)
                           } else if (scope === 'item') {
-                            const focusName =
-                              feedbackPrompt.itemIndex !== null && feedbackPrompt.itemIndex !== undefined
-                                ? String(analyzedItems[feedbackPrompt.itemIndex]?.name || '').trim()
-                                : ''
-                            await triggerFeedbackRescan(reasonsSnapshot, focusName)
+                            if (itemIndex === null || itemIndex === undefined) return
+                            const success = await triggerItemFeedbackRescan(itemIndex, reasonsSnapshot)
+                            if (success) {
+                              setFeedbackPrompt(null)
+                              setFeedbackReasons([])
+                              setFeedbackComment('')
+                              setFeedbackError(null)
+                            } else {
+                              setFeedbackError('Could not re-analyze that item. Please try again.')
+                            }
                           }
                         }}
                         className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                        disabled={feedbackSubmitting}
+                        disabled={feedbackSubmitting || isFeedbackRescanning}
                       >
-                        {feedbackSubmitting ? 'Sending…' : 'Submit'}
+                        {feedbackSubmitting ? 'Sending…' : isFeedbackRescanning ? 'Re-analyzing…' : 'Submit'}
                       </button>
                     </div>
                   </div>
