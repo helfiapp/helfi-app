@@ -26,7 +26,7 @@ function DesktopSidebar({
   onNavigate: (href: string, e: MouseEvent<HTMLAnchorElement>) => void
 }) {
   return (
-    <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:w-64 md:flex md:flex-col">
+    <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:z-[60] md:w-64 md:flex md:flex-col">
       <div className="flex flex-col flex-grow bg-[#1f2937] text-white border-r border-gray-800 pt-5 pb-4 overflow-y-auto">
         {/* Logo */}
         <div className="flex items-center flex-shrink-0 px-4">
@@ -521,9 +521,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         const hasUnsaved =
           !!(window as any).__helfiOnboardingPhysicalHasUnsavedChanges ||
           !!(window as any).__helfiOnboardingHasUnsavedChanges
-        const autoUpdateOnExit = !!(window as any).__helfiOnboardingAutoUpdateOnExit
+        const autoUpdateFlag = (window as any).__helfiOnboardingAutoUpdateOnExit
+        const allowBackgroundExit = autoUpdateFlag !== false
         if (hasUnsaved) {
-          if (!autoUpdateOnExit) {
+          if (!allowBackgroundExit) {
             window.postMessage({ type: 'OPEN_ONBOARDING_UPDATE_POPUP', navigateTo: href }, '*')
             return
           }

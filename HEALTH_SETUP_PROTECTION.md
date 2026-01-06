@@ -5,6 +5,7 @@
 - ✅ **Durable + warm cache** for onboarding fields (birthdate included) stays enabled; autosave begins only after data load to avoid wiping birthdate.
 - ✅ **Desktop sidebar navigation:** When auto-update-on-exit is enabled, do not block the left sidebar. Allow navigation and let the exit save/regeneration run in the background. Only show the “Update Insights / Add more” prompt when auto-update-on-exit is disabled.
 - ✅ **Cross-device sync:** Health Setup must always pull the latest server data on load (do not rely only on cached data). Cached data may be used for faster first paint, but must be refreshed.
+- ✅ **Save on exit:** When auto-update-on-exit is enabled and there are unsaved changes, Health Setup must still save the latest data even if no insight regeneration is needed.
 - ✅ **Background auto-regens** are OFF (do not enable `ENABLE_INSIGHTS_BACKGROUND_REGEN` without explicit approval). “Update Insights” uses `/api/insights/regenerate-targeted` only.
 - ✅ **Insights LLM** is enabled (`ENABLE_INSIGHTS_LLM=true`).
 - 🚩 **Current live issue:** targeted regen intermittently returns `504 Gateway Timeout` (seen 6 Dec 2025 on Hair Loss). Do not claim success until sections show fresh data. When debugging, capture the `runId` and full response from `POST /api/insights/regenerate-targeted`.

@@ -7778,7 +7778,6 @@ export default function Onboarding() {
 
     const currentForm = formRef.current || {}
     const changeTypes = detectChangedInsightTypes(formBaselineRef.current, currentForm)
-    if (!changeTypes.length) return
 
     exitUpdateTriggeredRef.current = true
     const payload = sanitizeUserDataPayload(currentForm)
@@ -7798,7 +7797,9 @@ export default function Onboarding() {
       })
       .catch(() => {})
       .finally(() => {
-        fireAndForgetInsightsRegen(changeTypes)
+        if (changeTypes.length > 0) {
+          fireAndForgetInsightsRegen(changeTypes)
+        }
       })
   }, [updateUserData])
 
