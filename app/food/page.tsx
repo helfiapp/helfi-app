@@ -13538,7 +13538,7 @@ Please add nutritional information manually if needed.`);
                 </div>
                 <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-yellow-800 text-sm">
-                    💡 <strong>Tip:</strong> Our AI will identify the food and provide nutritional information!
+                    ⏱️ <strong>Heads up:</strong> Complex meals can take longer to analyze (sometimes 1+ minute). We prioritize accuracy and will keep working until it finishes.
                   </p>
                 </div>
               </div>

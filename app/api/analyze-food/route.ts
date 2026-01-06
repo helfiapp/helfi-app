@@ -2793,11 +2793,7 @@ CRITICAL REQUIREMENTS:
     // Default is env-controlled; admin can set a per-user override via __FOOD_ANALYZER_MODEL__.
     // Temperature is set to 0 for maximum consistency between runs on the same meal.
     const envModelRaw = (process.env.OPENAI_FOOD_MODEL || '').trim()
-    const envImageModelRaw = (process.env.OPENAI_FOOD_IMAGE_MODEL || '').trim()
-    const defaultImageModel = envImageModelRaw || 'gpt-4o-mini'
-    const defaultModel = imageDataUrl
-      ? (packagedMode || labelScan || feedbackDown ? 'gpt-4o' : defaultImageModel)
-      : (envModelRaw || 'gpt-5.2')
+    const defaultModel = imageDataUrl ? 'gpt-4o' : (envModelRaw || 'gpt-5.2')
     let model = defaultModel
     try {
       const goal = await prisma.healthGoal.findFirst({
@@ -3100,25 +3096,6 @@ CRITICAL REQUIREMENTS:
       analysis: analysis.trim(),
     };
     const isImageAnalysis = Boolean(imageDataUrl);
-    const shouldLimitImageFollowUps = isImageAnalysis && !packagedMode && !labelScan;
-    let followUpBudget = shouldLimitImageFollowUps ? (feedbackDown || feedbackMissing ? 1 : 0) : Number.POSITIVE_INFINITY;
-    let followUpUsed = 0;
-    let guardRailFollowUpUsed = false;
-    const consumeFollowUp = (reason: string, guardRail = false) => {
-      if (!shouldLimitImageFollowUps) return true;
-      if (guardRail) {
-        if (guardRailFollowUpUsed) return false;
-        guardRailFollowUpUsed = true;
-        console.log(`⏩ Guard-rail follow-up allowed (${reason}).`);
-        return true;
-      }
-      if (followUpUsed >= 1) return false;
-      if (followUpBudget <= 0) return false;
-      followUpUsed += 1;
-      if (followUpBudget > 0) followUpBudget -= 1;
-      console.log(`⏩ Follow-up allowed (${reason}).`);
-      return true;
-    };
     let itemsSource: string = 'none';
     let itemsQuality: 'valid' | 'weak' | 'none' = 'none';
     let analysisTextForFollowUp = analysis;
@@ -3365,9 +3342,6 @@ CRITICAL REQUIREMENTS:
         looksLikeMultiIngredientSummary(resp.items) ||
         resp.items.length < listedComponents.length;
       if (needsComponentBound) {
-        if (!consumeFollowUp('component_bound')) {
-          console.log('⏩ Skipping component-bound follow-up (speed mode).');
-        } else {
         try {
           console.warn('⚠️ Analyzer: running component-bound vision follow-up.');
           const componentBoundPrompt =
@@ -3466,7 +3440,6 @@ CRITICAL REQUIREMENTS:
         } catch (componentErr) {
           console.warn('Component-bound vision follow-up failed (non-fatal):', componentErr);
         }
-        }
       }
     }
 
@@ -3490,9 +3463,6 @@ CRITICAL REQUIREMENTS:
         looksLikeMultiIngredientSummary(resp.items) ||
         missingFromList)
     ) {
-      if (!consumeFollowUp('multi_item')) {
-        console.log('⏩ Skipping multi-item follow-up (speed mode).');
-      } else {
       try {
         console.warn('⚠️ Analyzer: generic/missing/summary items detected; running multi-item follow-up.');
         console.log('ℹ️ Enforcing multi-item breakdown via structure-only follow-up');
@@ -3578,7 +3548,6 @@ CRITICAL REQUIREMENTS:
       } catch (multiErr) {
         console.warn('Multi-item follow-up failed (non-fatal):', multiErr);
       }
-      }
     }
 
     // Final safety net for image analyses: if we still have no usable items,
@@ -3593,9 +3562,6 @@ CRITICAL REQUIREMENTS:
         looksLikeSingleGenericItem(resp.items) ||
         looksLikeMultiIngredientSummary(resp.items))
     ) {
-      if (!consumeFollowUp('forced_image')) {
-        console.log('⏩ Skipping forced image follow-up (speed mode).');
-      } else {
       try {
         const forcedComponents = normalizeComponentList(
           listedComponents.length > 1
@@ -3678,7 +3644,6 @@ CRITICAL REQUIREMENTS:
       } catch (forcedErr) {
         console.warn('Forced image follow-up failed (non-fatal):', forcedErr);
       }
-      }
     }
 
     // Absolute last resort: if we still have no usable items, run a text-only
@@ -3693,9 +3658,6 @@ CRITICAL REQUIREMENTS:
         looksLikeSingleGenericItem(resp.items) ||
         looksLikeMultiIngredientSummary(resp.items))
     ) {
-      if (isImageAnalysis && !consumeFollowUp('text_only_fallback')) {
-        console.log('⏩ Skipping text-only fallback (speed mode).');
-      } else {
       try {
         const fallbackComponents = normalizeComponentList(
           extractComponentsFromDelimitedText(analysisTextForFollowUp),
@@ -3757,16 +3719,12 @@ CRITICAL REQUIREMENTS:
       } catch (fallbackErr) {
         console.warn('Text-only fallback failed (non-fatal):', fallbackErr);
       }
-      }
     }
 
     // If the analysis text clearly lists components that are missing from ITEMS_JSON,
     // backfill those components so the user can edit/remove them.
     if (!itemsReady && wantStructured && preferMultiDetect && !componentBoundApplied) {
       if (listedComponents.length > 0) {
-        if (!consumeFollowUp('component_backfill')) {
-          console.log('⏩ Skipping component backfill follow-up (speed mode).');
-        } else {
         const existing = resp.items || [];
         const existingFiltered = existing.filter(
           (item: any) =>
@@ -3872,7 +3830,6 @@ CRITICAL REQUIREMENTS:
             console.warn('Missing component AI follow-up failed (non-fatal):', missingErr);
           }
         }
-        }
       }
     }
 
@@ -3902,9 +3859,6 @@ CRITICAL REQUIREMENTS:
       ).slice(0, 12);
 
       if (forcedComponents.length > 1) {
-        if (!consumeFollowUp('component_bound_repair', true)) {
-          console.log('⏩ Skipping component-bound repair follow-up (speed mode).');
-        } else {
         try {
           const componentPrompt =
             'Return JSON only. Use the component list and output exactly one item per component.\n' +
@@ -3987,7 +3941,6 @@ CRITICAL REQUIREMENTS:
           }
         } catch (repairErr) {
           console.warn('Component split repair failed (non-fatal):', repairErr);
-        }
         }
       }
     }
@@ -4259,9 +4212,6 @@ CRITICAL REQUIREMENTS:
       const minTotalWithCue = hasFriedCue ? Math.max(minTotal, 300) : minTotal;
 
       if (Number.isFinite(totalCalories) && totalCalories > 0 && totalCalories < minTotalWithCue) {
-        if (!consumeFollowUp('consistency_repair')) {
-          console.log('⏩ Skipping consistency repair follow-up (speed mode).');
-        } else {
         try {
           const repairComponents = normalizeComponentList(
             listedComponents.length > 0
@@ -4320,7 +4270,6 @@ CRITICAL REQUIREMENTS:
           }
         } catch (repairErr) {
           console.warn('Consistency repair failed (non-fatal):', repairErr);
-        }
         }
       }
     }

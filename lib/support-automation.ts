@@ -33,7 +33,7 @@ type SupportTopic = {
   id?: string
   title?: string
   summary?: string
-  links?: Record<string, string>
+  links?: Record<string, string | undefined>
 }
 
 type SupportKnowledgeBase = {
