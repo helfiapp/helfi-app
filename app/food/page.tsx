@@ -5483,6 +5483,15 @@ const applyStructuredItems = (
     }
   }, [showFavoritesPicker])
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = feedbackPrompt ? 'hidden' : previousOverflow
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [feedbackPrompt])
+
   // Ensure diary is considered hydrated once data is loaded through any path
   useEffect(() => {
     if (foodDiaryLoaded) {
@@ -6926,9 +6935,23 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     return `${rounded}${unit}`
   }
 
+  const buildFeedbackHint = (baseHint: string, comment: string) => {
+    const trimmedBase = String(baseHint || '').trim()
+    const trimmedComment = String(comment || '').trim()
+    if (!trimmedComment) return trimmedBase
+    if (!trimmedBase) return `User feedback: ${trimmedComment}`
+    if (trimmedBase.toLowerCase().includes(trimmedComment.toLowerCase())) return trimmedBase
+    return `${trimmedBase}\nUser feedback: ${trimmedComment}`
+  }
+
   const analyzePhoto = async (
     fileOverride?: File,
-    options?: { feedbackRescan?: boolean; feedbackReasons?: string[]; feedbackFocusItem?: string | null },
+    options?: {
+      feedbackRescan?: boolean
+      feedbackReasons?: string[]
+      feedbackFocusItem?: string | null
+      feedbackComment?: string | null
+    },
   ) => {
     const isFeedbackRescan = Boolean(options?.feedbackRescan)
     const fileToAnalyze = fileOverride || photoFile
@@ -6988,9 +7011,10 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       if (wantsLabelAccuracy) {
         formData.append('labelScan', '1');
       }
-      const trimmedHint = analysisHint.trim()
-      if (trimmedHint && analysisMode !== 'packaged') {
-        formData.append('analysisHint', trimmedHint)
+      const feedbackComment = String(options?.feedbackComment || '').trim()
+      const combinedHint = buildFeedbackHint(analysisHint, feedbackComment)
+      if (combinedHint && analysisMode !== 'packaged') {
+        formData.append('analysisHint', combinedHint)
       }
       const feedbackRescan = Boolean(options?.feedbackRescan)
       const feedbackReasons = Array.isArray(options?.feedbackReasons)
@@ -8070,7 +8094,7 @@ Please add nutritional information manually if needed.`);
     return merged
   }
 
-  const triggerOverallFeedbackRescan = async (reasons: string[]) => {
+  const triggerOverallFeedbackRescan = async (reasons: string[], comment?: string) => {
     if (isAnalyzing) return
     if (!photoFile) return
     if (analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)) return
@@ -8084,13 +8108,14 @@ Please add nutritional information manually if needed.`);
         feedbackRescan: true,
         feedbackReasons: reasons,
         feedbackFocusItem: null,
+        feedbackComment: comment,
       })
     } finally {
       setFeedbackRescanState(null)
     }
   }
 
-  const triggerItemFeedbackRescan = async (itemIndex: number, reasons: string[]) => {
+  const triggerItemFeedbackRescan = async (itemIndex: number, reasons: string[], comment?: string) => {
     if (analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)) {
       showQuickToast('Item re-analysis is unavailable for label scans.')
       return false
@@ -8099,6 +8124,7 @@ Please add nutritional information manually if needed.`);
     if (!item) return false
     const description = buildFeedbackItemDescription(item)
     if (!description) return false
+    const mergedHint = buildFeedbackHint(analysisHint, comment || '')
     setFeedbackRescanState({ scope: 'item', itemIndex })
     try {
       const response = await fetch('/api/analyze-food', {
@@ -8111,6 +8137,7 @@ Please add nutritional information manually if needed.`);
           multi: false,
           returnItems: true,
           analysisMode: 'meal',
+          analysisHint: mergedHint,
           feedbackDown: true,
           feedbackReasons: reasons,
           feedbackItems: [String(item?.name || '').trim()].filter(Boolean),
@@ -9015,7 +9042,53 @@ Please add nutritional information manually if needed.`);
       const desc = (entry?.description || entry?.label || '').toString().trim()
       return desc.length > 0
     }
-    return dedupeEntries(pool.filter(isValidEntry), { fallbackDate: selectedDate })
+    const dedupeFavoritesHistoryEntries = (entries: any[]) => {
+      if (!Array.isArray(entries)) return []
+      const preferred = new Map<string, any>()
+      const unkeyed: any[] = []
+      const pickPreferredEntry = (existing: any, entry: any) => {
+        if (!existing) return entry
+        if (!entry) return existing
+        const existingDb = Boolean(existing?.dbId)
+        const entryDb = Boolean(entry?.dbId)
+        if (existingDb !== entryDb) return entryDb ? entry : existing
+        const existingClient = Boolean(getEntryClientId(existing))
+        const entryClient = Boolean(getEntryClientId(entry))
+        if (existingClient !== entryClient) return entryClient ? entry : existing
+        const existingHasItems = Array.isArray(existing?.items) && existing.items.length > 0
+        const entryHasItems = Array.isArray(entry?.items) && entry.items.length > 0
+        if (existingHasItems !== entryHasItems) return entryHasItems ? entry : existing
+        const existingHasTotals = Boolean(existing?.nutrition || existing?.total)
+        const entryHasTotals = Boolean(entry?.nutrition || entry?.total)
+        if (existingHasTotals !== entryHasTotals) return entryHasTotals ? entry : existing
+        const existingTs = extractEntryTimestampMs(existing)
+        const entryTs = extractEntryTimestampMs(entry)
+        if (Number.isFinite(existingTs) && Number.isFinite(entryTs) && entryTs !== existingTs) {
+          return entryTs > existingTs ? entry : existing
+        }
+        return existing
+      }
+      const buildKey = (entry: any) => {
+        const dbId = (entry as any)?.dbId
+        if (dbId) return `db:${dbId}`
+        const clientId = getEntryClientId(entry)
+        if (clientId) return `client:${clientId}`
+        if (entry?.id !== null && entry?.id !== undefined) return `id:${entry.id}`
+        return ''
+      }
+      entries.forEach((entry) => {
+        if (isEntryDeleted(entry)) return
+        const key = buildKey(entry)
+        if (!key) {
+          unkeyed.push(entry)
+          return
+        }
+        const existing = preferred.get(key)
+        preferred.set(key, pickPreferredEntry(existing, entry))
+      })
+      return [...preferred.values(), ...unkeyed]
+    }
+    return dedupeFavoritesHistoryEntries(pool.filter(isValidEntry))
   }
 
   const buildFavoritesDatasets = () => {
@@ -9023,13 +9096,32 @@ Please add nutritional information manually if needed.`);
     const parseEntryTimeToMs = (entry: any) => {
       const dateKey = dateKeyForEntry(entry)
       if (!dateKey) return NaN
-      const raw = typeof entry?.time === 'string' ? entry.time.trim() : ''
-      if (!raw) return NaN
-      const match = raw.match(/^(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?$/)
-      if (!match) return NaN
-      let hours = Number(match[1])
-      const minutes = Number(match[2])
-      const meridiem = match[3] ? match[3].toLowerCase() : ''
+      const rawValue = typeof entry?.time === 'string' ? entry.time : ''
+      if (!rawValue) return NaN
+      let cleaned = rawValue
+        .toString()
+        .trim()
+        .replace(/[\u00A0\u2007\u202F]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .toLowerCase()
+      cleaned = cleaned.replace(/\b([ap])\s*\.?\s*m\.?\b/g, '$1m')
+      cleaned = cleaned.replace(/(\d)\.(\d{2})/g, '$1:$2')
+      cleaned = cleaned.replace(/\s+/g, ' ').trim()
+      let match = cleaned.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/)
+      let hours = NaN
+      let minutes = NaN
+      let meridiem = ''
+      if (match) {
+        hours = Number(match[1])
+        minutes = Number(match[2])
+        meridiem = match[4] || ''
+      } else {
+        match = cleaned.match(/^(\d{1,2})\s*(am|pm)$/)
+        if (!match) return NaN
+        hours = Number(match[1])
+        minutes = 0
+        meridiem = match[2] || ''
+      }
       if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return NaN
       if (meridiem) {
         if (hours === 12) hours = meridiem === 'am' ? 0 : 12
@@ -15741,7 +15833,7 @@ Please add nutritional information manually if needed.`);
             {/* Feedback Modal */}
             {feedbackPrompt && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col">
                   <div className="p-5 border-b border-gray-100 flex items-start justify-between">
                     <div>
                       <div className="text-lg font-semibold text-gray-900">What was the problem?</div>
@@ -15766,7 +15858,7 @@ Please add nutritional information manually if needed.`);
                       </svg>
                     </button>
                   </div>
-                  <div className="p-5 space-y-4">
+                  <div className="p-5 space-y-4 overflow-y-auto overscroll-contain min-h-0">
                     <div className="space-y-2">
                       {FEEDBACK_REASONS.map((reason) => (
                         <label key={reason} className="flex items-center gap-2 text-sm text-gray-700">
@@ -15820,6 +15912,7 @@ Please add nutritional information manually if needed.`);
                             return
                           }
                           const reasonsSnapshot = [...feedbackReasons]
+                          const commentSnapshot = feedbackComment.trim()
                           const scope = feedbackPrompt.scope
                           const itemIndex = feedbackPrompt.itemIndex ?? null
                           setFeedbackSubmitting(true)
@@ -15842,10 +15935,10 @@ Please add nutritional information manually if needed.`);
                             setFeedbackReasons([])
                             setFeedbackComment('')
                             setFeedbackError(null)
-                            await triggerOverallFeedbackRescan(reasonsSnapshot)
+                            await triggerOverallFeedbackRescan(reasonsSnapshot, commentSnapshot)
                           } else if (scope === 'item') {
                             if (itemIndex === null || itemIndex === undefined) return
-                            const success = await triggerItemFeedbackRescan(itemIndex, reasonsSnapshot)
+                            const success = await triggerItemFeedbackRescan(itemIndex, reasonsSnapshot, commentSnapshot)
                             if (success) {
                               setFeedbackPrompt(null)
                               setFeedbackReasons([])
