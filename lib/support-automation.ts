@@ -193,7 +193,7 @@ function supportProductFacts(): string {
 }
 
 function supportKnowledgeBaseFacts(): string {
-  const kb = supportKnowledgeBase as SupportKnowledgeBase
+  const kb = supportKnowledgeBase as unknown as SupportKnowledgeBase
   const lines: string[] = ['SUPPORT KNOWLEDGE BASE (public, verified):']
   if (kb?.version) {
     lines.push(`Version: ${kb.version}`)
