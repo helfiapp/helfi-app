@@ -246,6 +246,35 @@ function buildDeterministicSupportReply(options: {
   const authTopic = findSupportTopic('auth_signin_signup')
   const passwordTopic = findSupportTopic('password_reset')
   const supportTopic = findSupportTopic('support_and_help')
+  const featuresTopic = findSupportTopic('features')
+
+  const featuresMatch = /features?|capabilities|what can (i|we) do|what does helfi do|what is included/i.test(text)
+  if (featuresMatch) {
+    const featureList = [
+      'Health intake profile setup (build your health profile).',
+      'Smart health tracking for weight, sleep, mood, energy, and custom metrics.',
+      'Food logging with photo analysis and meal logging.',
+      'Medication and supplement tracking with interaction checks.',
+      'AI insights dashboard and personalized recommendations.',
+      'Symptom analysis with follow-up chat.',
+      'Medical image analyzer with follow-up chat.',
+      'Lab report upload and analysis (PDF or photos).',
+      'Mood tracking and quick mood check-in.',
+      'Daily check-ins and rating history.',
+      'Talk to AI (voice chat).',
+      'Health tips.',
+      'Device connections (Fitbit available; Garmin evaluation in progress).',
+    ]
+    const featuresUrl = featuresTopic?.links?.overview || 'https://helfi.ai/#features'
+    const reply = [
+      'Here is a clear list of Helfi features:',
+      '',
+      ...featureList.map((item) => `- ${item}`),
+      '',
+      `Full overview: ${featuresUrl}.`,
+    ].join('\n')
+    return addAgentSignOff(reply, options.agent)
+  }
 
   const affiliateMatch = /affiliate|referral|partner program|refer/i.test(text)
   if (affiliateMatch) {

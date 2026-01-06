@@ -22,6 +22,7 @@ function normalizePriority(value: string | undefined): TicketPriority {
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   const email = session?.user?.email
+  const userId = session?.user?.id
   if (!email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const activeOnly = searchParams.get('activeOnly') !== '0'
 
-  const whereClause: any = { userEmail: email }
+  const whereClause: any = userId ? { userId } : { userEmail: email }
   if (activeOnly) {
     whereClause.status = { notIn: ['RESOLVED', 'CLOSED'] }
   }

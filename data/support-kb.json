@@ -43,6 +43,14 @@
         "help": "https://helfi.ai/help",
         "faq": "https://helfi.ai/faq"
       }
+    },
+    {
+      "id": "features",
+      "title": "App Features",
+      "summary": "Use this overview link for a full feature list.",
+      "links": {
+        "overview": "https://helfi.ai/#features"
+      }
     }
   ]
 }

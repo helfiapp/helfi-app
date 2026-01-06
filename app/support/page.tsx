@@ -16,6 +16,7 @@ type SupportAttachment = {
 }
 
 const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
+const URL_REGEX = /https?:\/\/[^\s]+/g
 
 export default function SupportPage() {
   const { data: session } = useSession()
@@ -52,6 +53,47 @@ export default function SupportPage() {
       navigator.vibrate(8)
     }
   }, [])
+
+  const renderMessageWithLinks = (text: string) => {
+    if (!text) return text
+    const matches = Array.from(text.matchAll(URL_REGEX))
+    if (matches.length === 0) return text
+    const nodes: Array<string | JSX.Element> = []
+    let lastIndex = 0
+    matches.forEach((match, index) => {
+      const start = match.index ?? 0
+      const rawUrl = match[0]
+      if (start > lastIndex) {
+        nodes.push(text.slice(lastIndex, start))
+      }
+      let url = rawUrl
+      let trailing = ''
+      const trailingMatch = url.match(/[),.;!?]+$/)
+      if (trailingMatch) {
+        trailing = trailingMatch[0]
+        url = url.slice(0, -trailing.length)
+      }
+      nodes.push(
+        <a
+          key={`url-${index}-${start}`}
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-helfi-green underline break-words"
+        >
+          {url}
+        </a>
+      )
+      if (trailing) {
+        nodes.push(trailing)
+      }
+      lastIndex = start + rawUrl.length
+    })
+    if (lastIndex < text.length) {
+      nodes.push(text.slice(lastIndex))
+    }
+    return nodes
+  }
   
   const [formData, setFormData] = useState({
     name: '',
@@ -609,7 +651,9 @@ export default function SupportPage() {
                       </span>
                       <span>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</span>
                     </div>
-                    <p className="text-gray-700 whitespace-pre-wrap">{item.message}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap break-words">
+                      {renderMessageWithLinks(item.message)}
+                    </p>
                     {item.attachments?.length > 0 && (
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {item.attachments.map((att: SupportAttachment) => (

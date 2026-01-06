@@ -15,6 +15,8 @@ type SupportAttachment = {
   size?: number
 }
 
+const URL_REGEX = /https?:\/\/[^\s]+/g
+
 const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
 
 const STORAGE_KEYS = {
@@ -549,7 +551,7 @@ export default function SupportChatWidget() {
   }
 
   if (shouldHideWidget) return null
-  if (isLoggedIn && !ticket) return null
+  if (isLoggedIn) return null
   if (!hasReachedAnchor) return null
 
   const handleHideWidget = () => {
@@ -713,7 +715,9 @@ export default function SupportChatWidget() {
                   </span>
                   <span>{item.createdAt ? new Date(item.createdAt).toLocaleTimeString() : ''}</span>
                 </div>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.message}</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                  {renderMessageWithLinks(item.message)}
+                </p>
                 {item.attachments?.length > 0 && (
                   <div className="mt-3 grid grid-cols-1 gap-2">
                     {item.attachments.map((att: SupportAttachment) => (
@@ -908,3 +912,43 @@ export default function SupportChatWidget() {
     </div>
   )
 }
+  const renderMessageWithLinks = (text: string) => {
+    if (!text) return text
+    const matches = Array.from(text.matchAll(URL_REGEX))
+    if (matches.length === 0) return text
+    const nodes: Array<string | JSX.Element> = []
+    let lastIndex = 0
+    matches.forEach((match, index) => {
+      const start = match.index ?? 0
+      const rawUrl = match[0]
+      if (start > lastIndex) {
+        nodes.push(text.slice(lastIndex, start))
+      }
+      let url = rawUrl
+      let trailing = ''
+      const trailingMatch = url.match(/[),.;!?]+$/)
+      if (trailingMatch) {
+        trailing = trailingMatch[0]
+        url = url.slice(0, -trailing.length)
+      }
+      nodes.push(
+        <a
+          key={`url-${index}-${start}`}
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-helfi-green underline break-words"
+        >
+          {url}
+        </a>
+      )
+      if (trailing) {
+        nodes.push(trailing)
+      }
+      lastIndex = start + rawUrl.length
+    })
+    if (lastIndex < text.length) {
+      nodes.push(text.slice(lastIndex))
+    }
+    return nodes
+  }
