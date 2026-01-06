@@ -2127,6 +2127,7 @@ export async function POST(req: NextRequest) {
     let imageMeta: ReturnType<typeof getImageMetadata> | null = null;
     let imageBytes: number | null = null;
     let imageMime: string | null = null;
+    let visionDetail: "low" | "high" = "low";
     
     // Check authentication - pass request headers for proper session resolution
     const session = await getServerSession(authOptions);
@@ -2497,6 +2498,7 @@ CRITICAL REQUIREMENTS:
       // For image analysis, request structured items and multi-detect by default
       wantStructured = true;
       preferMultiDetect = true;
+      visionDetail = labelScan || packagedMode ? "high" : "low";
 
       const cleanedHint = String(analysisHint || '').trim();
       const hintBlock =
@@ -2695,7 +2697,7 @@ CRITICAL REQUIREMENTS:
               type: "image_url",
               image_url: {
                 url: imageDataUrl,
-                detail: labelScan || packagedMode ? "high" : "low"
+                detail: visionDetail
               }
             }
           ]
@@ -3358,7 +3360,7 @@ CRITICAL REQUIREMENTS:
               role: 'user',
               content: [
                 { type: 'text', text: componentBoundPrompt },
-                { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+                { type: 'image_url', image_url: { url: imageDataUrl, detail: visionDetail } },
               ],
             },
           ];
@@ -3490,7 +3492,7 @@ CRITICAL REQUIREMENTS:
                 role: 'user',
                 content: [
                   { type: 'text', text: followUpPrompt },
-                  { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+                  { type: 'image_url', image_url: { url: imageDataUrl, detail: visionDetail } },
                 ],
               },
             ]
@@ -3588,14 +3590,14 @@ CRITICAL REQUIREMENTS:
           ? await runVisionCompletion({
               model,
               messages: [
-                {
-                  role: 'user',
-                  content: [
-                    { type: 'text', text: forcedPrompt },
-                    { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
-                  ],
-                },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: forcedPrompt },
+                { type: 'image_url', image_url: { url: imageDataUrl, detail: visionDetail } },
               ],
+            },
+          ],
               max_tokens: 420,
               temperature: 0,
               responseMimeType: 'application/json',
