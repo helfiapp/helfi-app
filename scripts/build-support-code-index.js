@@ -21,6 +21,7 @@ const MAX_LINES_TAIL = 120
 
 function shouldIncludeFile(filePath) {
   if (filePath.includes(`${path.sep}prisma${path.sep}migrations${path.sep}`)) return false
+  if (filePath.endsWith(`${path.sep}data${path.sep}support-code-index.json`)) return false
   const ext = path.extname(filePath)
   return EXTENSIONS.has(ext)
 }

@@ -29,15 +29,17 @@ type SupportAiResult = {
   suggestedPriority?: string
 }
 
+type SupportTopic = {
+  id?: string
+  title?: string
+  summary?: string
+  links?: Record<string, string>
+}
+
 type SupportKnowledgeBase = {
   version?: string
   rules?: string[]
-  topics?: Array<{
-    id?: string
-    title?: string
-    summary?: string
-    links?: Record<string, string>
-  }>
+  topics?: SupportTopic[]
 }
 
 type SupportAutomationInput = {
@@ -196,7 +198,7 @@ function getSupportKnowledgeBase(): SupportKnowledgeBase {
   return supportKnowledgeBase as unknown as SupportKnowledgeBase
 }
 
-function findSupportTopic(id: string): SupportKnowledgeBase['topics'][number] | undefined {
+function findSupportTopic(id: string): SupportTopic | undefined {
   const kb = getSupportKnowledgeBase()
   return kb.topics?.find((topic) => topic.id === id)
 }
