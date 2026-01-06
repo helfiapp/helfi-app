@@ -7713,6 +7713,9 @@ export default function Onboarding() {
   const hasGlobalUnsavedChangesRef = useRef(false);
   const [showGlobalUpdatePopup, setShowGlobalUpdatePopup] = useState(false);
   const [isGlobalGenerating, setIsGlobalGenerating] = useState(false);
+  const [blockerFinderActive, setBlockerFinderActive] = useState(false);
+  const [blockerFinderResult, setBlockerFinderResult] = useState<string | null>(null);
+  const blockerFinderActiveRef = useRef(false);
   // Track if the user has dismissed the first-time modal during this visit,
   // so they can actually complete the intake instead of being stuck.
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
@@ -7739,6 +7742,52 @@ export default function Onboarding() {
       }
     };
   }, [hasGlobalUnsavedChanges]);
+
+  useEffect(() => {
+    blockerFinderActiveRef.current = blockerFinderActive;
+  }, [blockerFinderActive]);
+
+  useEffect(() => {
+    if (!blockerFinderActive) return;
+    if (typeof document === 'undefined') return;
+    const handleClick = (event: MouseEvent) => {
+      try {
+        event.preventDefault();
+        event.stopPropagation();
+        const target = document.elementFromPoint(event.clientX, event.clientY);
+        if (!target) {
+          setBlockerFinderResult('BLOCKER|not_found');
+          setBlockerFinderActive(false);
+          return;
+        }
+        const style = window.getComputedStyle(target as Element);
+        const rect = (target as Element).getBoundingClientRect();
+        const className =
+          typeof (target as HTMLElement).className === 'string'
+            ? (target as HTMLElement).className
+            : '';
+        const info = [
+          'BLOCKER',
+          `tag:${(target as Element).tagName.toLowerCase()}`,
+          `id:${(target as Element).id || '-'}`,
+          `class:${className || '-'}`,
+          `z:${style.zIndex || '-'}`,
+          `pos:${style.position || '-'}`,
+          `pe:${style.pointerEvents || '-'}`,
+          `rect:${Math.round(rect.left)},${Math.round(rect.top)},${Math.round(rect.width)},${Math.round(rect.height)}`,
+        ].join('|');
+        setBlockerFinderResult(info);
+      } catch {
+        setBlockerFinderResult('BLOCKER|error');
+      } finally {
+        setBlockerFinderActive(false);
+      }
+    };
+    document.addEventListener('click', handleClick, true);
+    return () => {
+      document.removeEventListener('click', handleClick, true);
+    };
+  }, [blockerFinderActive]);
 
   useEffect(() => {
     try {
@@ -8298,6 +8347,55 @@ export default function Onboarding() {
 
   return (
     <div className="relative min-h-screen bg-gray-50 dark:bg-gray-900 overflow-y-auto overflow-x-hidden" id="onboarding-container">
+      <div className="hidden md:block fixed bottom-4 left-72 z-[9999]">
+        <button
+          type="button"
+          onClick={() => {
+            setBlockerFinderResult(null);
+            setBlockerFinderActive(true);
+          }}
+          className="px-3 py-2 rounded-md bg-black text-white text-xs font-semibold shadow-lg hover:opacity-90"
+        >
+          Find Blocker
+        </button>
+      </div>
+      {blockerFinderActive && (
+        <div className="hidden md:block fixed bottom-16 left-72 z-[9999]">
+          <div className="bg-white border border-gray-200 rounded-md px-3 py-2 text-xs text-gray-800 shadow-lg">
+            Now click the left menu area.
+          </div>
+        </div>
+      )}
+      {blockerFinderResult && (
+        <div className="hidden md:block fixed bottom-16 left-72 z-[9999]">
+          <div className="bg-white border border-gray-200 rounded-md px-3 py-2 text-xs text-gray-800 shadow-lg max-w-sm">
+            <div className="font-semibold text-gray-900 mb-1">Copy this and send it to me:</div>
+            <div className="break-all bg-gray-50 border border-gray-200 rounded p-2 text-[11px] text-gray-700 mb-2">
+              {blockerFinderResult}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    navigator.clipboard.writeText(blockerFinderResult);
+                  } catch {}
+                }}
+                className="px-2 py-1 rounded bg-helfi-green text-white text-[11px] font-semibold"
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={() => setBlockerFinderResult(null)}
+                className="px-2 py-1 rounded border border-gray-300 text-[11px] text-gray-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showFirstTimeModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-xl bg-white shadow-xl p-6">
