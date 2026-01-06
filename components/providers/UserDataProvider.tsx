@@ -50,8 +50,34 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       setUserData(cached.data)
     }
 
+    const fetchLatest = async () => {
+      try {
+        const response = await fetch('/api/user-data', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+
+          if (result.data) {
+            setUserData(result.data)
+            if (cacheKey) {
+              writeClientCache(cacheKey, result.data)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('UserDataProvider: Error loading data:', error)
+      }
+    }
+
     if (!force && cached && isCacheFresh(cached, USER_DATA_CACHE_TTL_MS)) {
       setIsLoading(false)
+      // Keep data in sync across devices, even when the cache is fresh.
+      void fetchLatest()
       return
     }
 
@@ -60,25 +86,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await fetch('/api/user-data', {
-        cache: 'no-cache',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        
-        if (result.data) {
-          setUserData(result.data)
-          if (cacheKey) {
-            writeClientCache(cacheKey, result.data)
-          }
-        }
-      }
-    } catch (error) {
-      console.error('UserDataProvider: Error loading data:', error)
+      await fetchLatest()
     } finally {
       setIsLoading(false)
     }

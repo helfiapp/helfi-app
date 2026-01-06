@@ -207,8 +207,9 @@ the user.
 ### 2.6 Health Setup Desktop Sidebar (Dec 2025 – Locked)
 
 - Health Setup (`/onboarding`) must show the standard desktop left menu so users can move around the app like other pages.
-- Leaving Health Setup via the left menu must still trigger the “Update Insights / Add more” prompt when there are unsaved changes.
-- Do NOT allow silent navigation away from Health Setup when unsaved changes exist.
+- When auto‑update‑on‑exit is enabled, the left menu must still work immediately; the save/regeneration should run in the background as the user leaves.
+- If auto‑update‑on‑exit is disabled, leaving via the left menu must trigger the “Update Insights / Add more” prompt when there are unsaved changes.
+- Do NOT allow silent navigation away from Health Setup when auto‑update‑on‑exit is disabled.
 
 ### 2.7 Weekly 7‑Day Health Report (Jan 2026 – Locked)
 

@@ -7740,6 +7740,21 @@ export default function Onboarding() {
     };
   }, [hasGlobalUnsavedChanges]);
 
+  useEffect(() => {
+    try {
+      (window as any).__helfiOnboardingAutoUpdateOnExit = AUTO_UPDATE_INSIGHTS_ON_EXIT;
+    } catch {
+      // ignore
+    }
+    return () => {
+      try {
+        (window as any).__helfiOnboardingAutoUpdateOnExit = false;
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
   const runPendingNavigation = useCallback(() => {
     const fn = pendingNavigationRef.current;
     pendingNavigationRef.current = null;
@@ -7937,7 +7952,7 @@ export default function Onboarding() {
   const loadUserData = async () => {
     let mergedForBaseline: any = null;
     try {
-      const response = await fetch('/api/user-data');
+      const response = await fetch('/api/user-data', { cache: 'no-store' as any });
       if (response.ok) {
         const userData = await response.json();
         console.log('Loaded user data from database:', userData);

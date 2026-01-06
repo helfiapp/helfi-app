@@ -231,6 +231,9 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     '/faq',
     '/affiliate/terms',
   ]
+
+  const isFeaturePath = pathname.startsWith('/features')
+  const isPublicPage = publicPages.includes(pathname) || isFeaturePath
   
   // Admin panel paths should never show user sidebar
   const isAdminPanelPath =
@@ -242,7 +245,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const themeAllowed =
     status === 'authenticated' &&
     !isAdminPanelPath &&
-    (!publicPages.includes(pathname) || isOnboardingPath)
+    (!isPublicPage || isOnboardingPath)
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -302,7 +305,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   // their account by choosing "Don't ask me again".
   useEffect(() => {
     if (status !== 'authenticated') return
-    if (publicPages.includes(pathname) || isAdminPanelPath) return
+    if (isPublicPage || isAdminPanelPath) return
     if ((session as any)?.user?.needsVerification) return
 
     try {
@@ -336,13 +339,13 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
 
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, pathname, isAdminPanelPath, publicPages, session])
+  }, [status, pathname, isAdminPanelPath, isPublicPage, session])
 
   // Track the last in-app page the user visited (for “resume where I left off”).
   // We only store non-public, non-admin paths so onboarding / auth pages are excluded.
   useEffect(() => {
     if (status !== 'authenticated') return
-    if (publicPages.includes(pathname) || isAdminPanelPath) return
+    if (isPublicPage || isAdminPanelPath) return
     if (typeof window === 'undefined') return
     try {
       const fullPath = window.location.pathname + window.location.search
@@ -354,12 +357,12 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     } catch {
       // Ignore storage errors
     }
-  }, [status, pathname, isAdminPanelPath, publicPages])
+  }, [status, pathname, isAdminPanelPath, isPublicPage])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (status !== 'authenticated') return
-    if (publicPages.includes(pathname) || isAdminPanelPath) return
+    if (isPublicPage || isAdminPanelPath) return
 
     const locationKey = `${window.location.pathname}?${window.location.search}`
     if (lastLocationRef.current === locationKey) return
@@ -429,7 +432,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   }
   
   // Check if authenticated user needs email verification
-  if (status === 'authenticated' && session?.user?.needsVerification && !publicPages.includes(pathname) && !isAdminPanelPath) {
+  if (status === 'authenticated' && session?.user?.needsVerification && !isPublicPage && !isAdminPanelPath) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
@@ -485,7 +488,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     )
   }
   
-  if (status === 'unauthenticated' && !publicPages.includes(pathname) && !isAdminPanelPath) {
+  if (status === 'unauthenticated' && !isPublicPage && !isAdminPanelPath) {
     if (typeof window !== 'undefined') {
       window.location.href = '/auth/signin'
     }
@@ -505,7 +508,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const shouldShowSidebar =
     status === 'authenticated' &&
     !isAdminPanelPath &&
-    (!publicPages.includes(pathname) || isOnboardingPath)
+    (!isPublicPage || isOnboardingPath)
 
   const handleSidebarNavigate = (href: string, e: MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault()
@@ -518,9 +521,12 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         const hasUnsaved =
           !!(window as any).__helfiOnboardingPhysicalHasUnsavedChanges ||
           !!(window as any).__helfiOnboardingHasUnsavedChanges
+        const autoUpdateOnExit = !!(window as any).__helfiOnboardingAutoUpdateOnExit
         if (hasUnsaved) {
-          window.postMessage({ type: 'OPEN_ONBOARDING_UPDATE_POPUP', navigateTo: href }, '*')
-          return
+          if (!autoUpdateOnExit) {
+            window.postMessage({ type: 'OPEN_ONBOARDING_UPDATE_POPUP', navigateTo: href }, '*')
+            return
+          }
         }
       } catch {
         // fall through
