@@ -2695,7 +2695,7 @@ CRITICAL REQUIREMENTS:
               type: "image_url",
               image_url: {
                 url: imageDataUrl,
-                detail: "auto"
+                detail: labelScan || packagedMode ? "high" : "low"
               }
             }
           ]
