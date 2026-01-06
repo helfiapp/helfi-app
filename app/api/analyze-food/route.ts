@@ -2793,7 +2793,11 @@ CRITICAL REQUIREMENTS:
     // Default is env-controlled; admin can set a per-user override via __FOOD_ANALYZER_MODEL__.
     // Temperature is set to 0 for maximum consistency between runs on the same meal.
     const envModelRaw = (process.env.OPENAI_FOOD_MODEL || '').trim()
-    const defaultModel = imageDataUrl ? 'gpt-4o' : (envModelRaw || 'gpt-5.2')
+    const envImageModelRaw = (process.env.OPENAI_FOOD_IMAGE_MODEL || '').trim()
+    const defaultImageModel = envImageModelRaw || 'gpt-4o-mini'
+    const defaultModel = imageDataUrl
+      ? (packagedMode || labelScan || feedbackDown ? 'gpt-4o' : defaultImageModel)
+      : (envModelRaw || 'gpt-5.2')
     let model = defaultModel
     try {
       const goal = await prisma.healthGoal.findFirst({
