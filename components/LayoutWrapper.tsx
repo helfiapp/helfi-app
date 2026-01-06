@@ -20,12 +20,14 @@ function storePendingNotificationId(id?: string | null) {
 }
 
 // Desktop Sidebar Navigation Component  
+type SidebarNavigateEvent = Event | ReactMouseEvent<HTMLAnchorElement>
+
 function DesktopSidebar({
   pathname,
   onNavigate,
 }: {
   pathname: string
-  onNavigate: (href: string, e: ReactMouseEvent<HTMLAnchorElement>) => void
+  onNavigate: (href: string, e: SidebarNavigateEvent) => void
 }) {
   return (
     <aside
@@ -219,6 +221,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
   const lastLocationRef = useRef('')
+  const sidebarNavLockRef = useRef(0)
   const [sidebarPortal, setSidebarPortal] = useState<HTMLElement | null>(null)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
@@ -449,9 +452,14 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     (!isPublicPage || isOnboardingPath)
 
   const handleSidebarNavigate = useCallback(
-    (href: string, e: ReactMouseEvent<HTMLAnchorElement> | globalThis.MouseEvent) => {
-      e.preventDefault()
+    (href: string, e: SidebarNavigateEvent) => {
+      try {
+        e.preventDefault()
+      } catch {}
       if (typeof href !== 'string' || !href) return
+      const now = Date.now()
+      if (now - sidebarNavLockRef.current < 350) return
+      sidebarNavLockRef.current = now
 
       // Health Setup / Onboarding: if there are unsaved changes, ask the user once
       // before leaving the section (the onboarding page owns the popup).
@@ -486,7 +494,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (typeof document === 'undefined') return
     if (!shouldShowSidebar || !isOnboardingPath) return
 
-    const handler = (event: globalThis.MouseEvent) => {
+    const handler = (event: Event) => {
       const target = event.target as Element | null
       if (!target) return
       const sidebar = document.querySelector('[data-helfi-sidebar="true"]') as HTMLElement | null
@@ -495,13 +503,21 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       if (!anchor) return
       const href = anchor.getAttribute('href')
       if (!href) return
-      event.preventDefault()
-      event.stopPropagation()
+      try {
+        event.preventDefault()
+      } catch {}
+      try {
+        ;(event as Event).stopPropagation?.()
+      } catch {}
       handleSidebarNavigate(href, event)
     }
 
+    document.addEventListener('pointerdown', handler, true)
+    document.addEventListener('mousedown', handler, true)
     document.addEventListener('click', handler, true)
     return () => {
+      document.removeEventListener('pointerdown', handler, true)
+      document.removeEventListener('mousedown', handler, true)
       document.removeEventListener('click', handler, true)
     }
   }, [shouldShowSidebar, isOnboardingPath, handleSidebarNavigate])
