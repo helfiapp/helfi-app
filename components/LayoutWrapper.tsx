@@ -3,7 +3,8 @@ import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { MouseEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import UsageMeter from '@/components/UsageMeter'
 import SupportChatWidget from '@/components/support/SupportChatWidget'
@@ -24,7 +25,7 @@ function DesktopSidebar({
   onNavigate,
 }: {
   pathname: string
-  onNavigate: (href: string, e: MouseEvent<HTMLAnchorElement>) => void
+  onNavigate: (href: string, e: ReactMouseEvent<HTMLAnchorElement>) => void
 }) {
   return (
     <aside
@@ -448,7 +449,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     (!isPublicPage || isOnboardingPath)
 
   const handleSidebarNavigate = useCallback(
-    (href: string, e: MouseEvent<HTMLAnchorElement> | MouseEvent) => {
+    (href: string, e: ReactMouseEvent<HTMLAnchorElement> | globalThis.MouseEvent) => {
       e.preventDefault()
       if (typeof href !== 'string' || !href) return
 
@@ -485,7 +486,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (typeof document === 'undefined') return
     if (!shouldShowSidebar || !isOnboardingPath) return
 
-    const handler = (event: MouseEvent) => {
+    const handler = (event: globalThis.MouseEvent) => {
       const target = event.target as Element | null
       if (!target) return
       const sidebar = document.querySelector('[data-helfi-sidebar="true"]') as HTMLElement | null
