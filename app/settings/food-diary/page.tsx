@@ -239,10 +239,10 @@ export default function FoodDiarySettingsPage() {
               <h3 className="font-medium text-gray-900 dark:text-white">Prompt frequency</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">Only high risk is recommended.</p>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-2xl bg-gray-100 dark:bg-gray-700/40 p-1 flex gap-1">
               {[
                 { key: 'always', label: 'Always' },
-                { key: 'high', label: 'Only high risk' },
+                { key: 'high', label: 'High risk' },
                 { key: 'never', label: 'Never' },
               ].map((option) => (
                 <button
@@ -254,10 +254,10 @@ export default function FoodDiarySettingsPage() {
                       frequency: option.key as HealthCheckSettings['frequency'],
                     })
                   }
-                  className={`w-full py-2 rounded-xl border text-sm font-semibold ${
+                  className={`flex-1 min-h-[44px] rounded-xl text-sm font-semibold leading-tight ${
                     settings.frequency === option.key
-                      ? 'bg-helfi-green text-white border-helfi-green'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700'
+                      ? 'bg-helfi-green text-white shadow-sm'
+                      : 'text-gray-700 hover:bg-white/70 dark:text-gray-200 dark:hover:bg-gray-700'
                   } transition-colors`}
                 >
                   {option.label}
