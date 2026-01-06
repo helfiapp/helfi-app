@@ -2977,10 +2977,13 @@ export default function FoodDiary() {
       if (!raw) return
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
-        parsed
+        const cleaned = parsed
           .map((id) => String(id || '').trim())
-          .filter((id) => id.length > 0)
-          .forEach((id) => healthCheckPromptedRef.current.add(id))
+          .filter((id) => id.length > 0 && !id.startsWith('analysis:'))
+        cleaned.forEach((id) => healthCheckPromptedRef.current.add(id))
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(HEALTH_CHECK_PROMPT_STORAGE_KEY, JSON.stringify(cleaned))
+        }
       }
     } catch {}
   }, [])
@@ -8058,7 +8061,7 @@ Please add nutritional information manually if needed.`);
     } catch {}
   }
 
-  const markHealthCheckPrompted = (entryKey: string) => {
+  const markHealthCheckPrompted = (entryKey: string, options?: { persist?: boolean }) => {
     if (!entryKey) return
     const set = healthCheckPromptedRef.current
     if (set.has(entryKey)) return
@@ -8072,7 +8075,9 @@ Please add nutritional information manually if needed.`);
         if (removed >= overflow) break
       }
     }
-    persistHealthCheckPrompted()
+    if (options?.persist !== false) {
+      persistHealthCheckPrompted()
+    }
   }
 
   const getLocalDateKey = () => {
@@ -8225,7 +8230,7 @@ Please add nutritional information manually if needed.`);
       const description = String(entry?.description || entry?.label || '').trim()
       const items = Array.isArray(entry?.items) ? entry.items : null
 
-      markHealthCheckPrompted(entryKey)
+      markHealthCheckPrompted(entryKey, { persist: options?.source !== 'analysis' })
       incrementHealthCheckCapCount()
       setHealthCheckError(null)
       setHealthCheckResult(null)
