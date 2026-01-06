@@ -1,0 +1,48 @@
+{
+  "version": "2026-01-10",
+  "rules": [
+    "Use these links and steps as the source of truth for customer replies.",
+    "If a user is not logged in, explain they must create an account first.",
+    "Always provide the most direct link and the next step to complete the task."
+  ],
+  "topics": [
+    {
+      "id": "affiliate_program",
+      "title": "Affiliate Program",
+      "summary": "To become an affiliate, the user must create an account, submit an application, and wait for approval before using the portal.",
+      "links": {
+        "signup": "https://helfi.ai/auth/signin?mode=signup",
+        "apply": "https://helfi.ai/affiliate/apply",
+        "terms": "https://helfi.ai/affiliate/terms",
+        "portal": "https://helfi.ai/affiliate"
+      }
+    },
+    {
+      "id": "auth_signin_signup",
+      "title": "Sign in or create account",
+      "summary": "Sign in at the main login page. New users should use the sign-up mode.",
+      "links": {
+        "signin": "https://helfi.ai/auth/signin",
+        "signup": "https://helfi.ai/auth/signin?mode=signup"
+      }
+    },
+    {
+      "id": "password_reset",
+      "title": "Password reset",
+      "summary": "If a user forgot their password, start at the forgot password page and follow the email link.",
+      "links": {
+        "forgot_password": "https://helfi.ai/auth/forgot-password"
+      }
+    },
+    {
+      "id": "support_and_help",
+      "title": "Support and help",
+      "summary": "Support chat is available on the homepage and inside the app. The main support page, help page, and FAQ are available below.",
+      "links": {
+        "support": "https://helfi.ai/support",
+        "help": "https://helfi.ai/help",
+        "faq": "https://helfi.ai/faq"
+      }
+    }
+  ]
+}

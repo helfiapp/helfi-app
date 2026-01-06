@@ -44,8 +44,9 @@ const STOPWORDS = new Set([
   'user',
 ])
 
-const MAX_SNIPPETS = 3
-const MAX_SNIPPET_CHARS = 900
+const MAX_SNIPPETS = 8
+const MAX_SNIPPET_CHARS = 1200
+const MAX_KEYWORDS = 12
 
 function extractKeywords(text: string): string[] {
   return text
@@ -54,7 +55,7 @@ function extractKeywords(text: string): string[] {
     .split(/\s+/)
     .map((word) => word.trim())
     .filter((word) => word.length > 3 && !STOPWORDS.has(word))
-    .slice(0, 8)
+    .slice(0, MAX_KEYWORDS)
 }
 
 function scoreEntry(entry: SupportCodeIndexEntry, keywords: string[]): number {

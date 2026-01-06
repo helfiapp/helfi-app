@@ -14,7 +14,7 @@ const EXCLUDE_DIRS = new Set([
   'database-backup',
   'openai-usage',
 ])
-const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.json', '.prisma'])
+const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.json', '.prisma', '.md', '.txt'])
 const MAX_BYTES = 200 * 1024
 const MAX_LINES_HEAD = 200
 const MAX_LINES_TAIL = 120
@@ -36,7 +36,11 @@ function walkDir(dirPath, entries) {
       continue
     }
     if (shouldIncludeFile(fullPath)) {
-      entries.push(fullPath)
+      if (typeof entries.add === 'function') {
+        entries.add(fullPath)
+      } else {
+        entries.push(fullPath)
+      }
     }
   }
 }
@@ -59,17 +63,28 @@ function readFileContent(filePath) {
   }
 }
 
+function addRootDocs(entries) {
+  const items = fs.readdirSync(ROOT, { withFileTypes: true })
+  for (const item of items) {
+    if (!item.isFile()) continue
+    const ext = path.extname(item.name)
+    if (!EXTENSIONS.has(ext)) continue
+    entries.add(path.join(ROOT, item.name))
+  }
+}
+
 function buildIndex() {
-  const filePaths = []
-  INCLUDE_DIRS.forEach((dir) => walkDir(path.join(ROOT, dir), filePaths))
+  const filePathSet = new Set()
+  INCLUDE_DIRS.forEach((dir) => walkDir(path.join(ROOT, dir), filePathSet))
   INCLUDE_FILES.forEach((fileName) => {
     const fullPath = path.join(ROOT, fileName)
     if (fs.existsSync(fullPath)) {
-      filePaths.push(fullPath)
+      filePathSet.add(fullPath)
     }
   })
+  addRootDocs(filePathSet)
 
-  const entries = filePaths
+  const entries = Array.from(filePathSet)
     .map((fullPath) => {
       const relativePath = path.relative(ROOT, fullPath).replace(/\\/g, '/')
       const data = readFileContent(fullPath)

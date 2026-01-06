@@ -7,6 +7,7 @@ import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { getEmailFooter } from '@/lib/email-footer'
 import { buildSupportCodeContext } from '@/lib/support-code-search'
 import { getSupportAgentForTimestamp } from '@/lib/support-agents'
+import supportKnowledgeBase from '@/data/support-kb.json'
 
 const SUPPORT_AI_MODEL = process.env.SUPPORT_AI_MODEL || 'gpt-4o-mini'
 const SUPPORT_COPY_EMAIL = 'support@helfi.ai'
@@ -26,6 +27,17 @@ type SupportAiResult = {
   internalNotes?: string
   suggestedCategory?: string
   suggestedPriority?: string
+}
+
+type SupportKnowledgeBase = {
+  version?: string
+  rules?: string[]
+  topics?: Array<{
+    id?: string
+    title?: string
+    summary?: string
+    links?: Record<string, string>
+  }>
 }
 
 type SupportAutomationInput = {
@@ -112,7 +124,7 @@ function isIdentityVerified(responses: Array<{ message: string; isAdminResponse:
 function buildSupportSystemPrompt(agentName: string, agentRole: string): string {
   return [
     `You are ${agentName}, a careful and friendly support agent for ${agentRole}.`,
-    'Your goal is to troubleshoot app issues, ask for missing details, and keep the user safe.',
+    'Your goal is to troubleshoot app issues, confirm expected behavior from the app, ask only for missing details, and keep the user safe.',
     '',
     'Rules:',
     '- Use plain English. Keep replies short, warm, and helpful.',
@@ -121,17 +133,22 @@ function buildSupportSystemPrompt(agentName: string, agentRole: string): string 
     '- Do not claim hardware or device integrations that are not currently supported.',
     '- If asked about Apple devices or Apple Watch, explain they are not supported in the web app and are planned for the future native apps.',
     '- Never mention code or internal details in the customer reply.',
+    '- Use the Support Knowledge Base for verified links and steps. Always provide the most direct link when relevant.',
+    '- If the user mentions the affiliate program or referrals, always explain: sign up first, apply, approval required, then portal access.',
     '- Never ask for passwords, payment card numbers, or full security answers.',
     '- Do not claim you made account changes. Only provide guidance and request verification when needed.',
     '- If the issue involves account access, billing, subscription changes, email change, password change, or deleting data, you MUST require identity verification.',
     '- If verification is pending, ask the user to reply with the 6-digit code we emailed them.',
     '- For troubleshooting, ask for steps to reproduce, device type, OS version, browser/app version, and screenshots when relevant.',
     '- If a bug is likely, tell the user we are investigating and provide clear internal notes for the team.',
+    '- If the user already provided steps or a link they clicked, do not ask for the same info again. Move to the next helpful step.',
     '- Use the product facts below when answering questions about trials, pricing, credits, or features.',
     '- If you are not sure about a detail, say you will confirm and loop in the team.',
     `- Sign off with "${agentName} from ${agentRole}".`,
     '',
     supportProductFacts(),
+    '',
+    supportKnowledgeBaseFacts(),
     '',
     'Output strict JSON only with these fields:',
     '{ "customerReply": string, "shouldEscalate": boolean, "escalationReason": string, "needsIdentityCheck": boolean, "needsMoreInfo": boolean, "requestedInfo": string[], "internalNotes": string, "suggestedCategory": string, "suggestedPriority": string }',
@@ -149,6 +166,7 @@ function supportCodeMap(): string {
     '- Support tickets: app/support/page.tsx, app/api/admin/tickets/route.ts, app/api/tickets/webhook/route.ts, prisma/schema.prisma (SupportTicket)',
     '- Billing / subscriptions: app/api/billing/*, app/billing/*, stripe docs',
     '- AI chats: app/api/chat/voice/route.ts, lib/metered-openai.ts, lib/ai-usage-logger.ts',
+    '- Affiliate program: app/affiliate/*, app/api/affiliate/*, lib/affiliate-*',
     '- Food logging: app/food/*, app/api/food-*',
     '- Medical images: app/medical-images/*, app/api/medical-images/*',
     '- Symptoms: app/symptoms/*, app/api/analyze-symptoms/*',
@@ -174,6 +192,32 @@ function supportProductFacts(): string {
   ].join('\n')
 }
 
+function supportKnowledgeBaseFacts(): string {
+  const kb = supportKnowledgeBase as SupportKnowledgeBase
+  const lines: string[] = ['SUPPORT KNOWLEDGE BASE (public, verified):']
+  if (kb?.version) {
+    lines.push(`Version: ${kb.version}`)
+  }
+  if (kb?.rules?.length) {
+    lines.push('Rules:')
+    kb.rules.forEach((rule) => lines.push(`- ${rule}`))
+  }
+  if (kb?.topics?.length) {
+    lines.push('Topics:')
+    kb.topics.forEach((topic) => {
+      const title = topic.title || topic.id || 'Topic'
+      const summary = topic.summary ? ` ${topic.summary}` : ''
+      lines.push(`- ${title}.${summary}`)
+      const links = topic.links || {}
+      const linkEntries = Object.entries(links)
+      linkEntries.forEach(([label, url]) => {
+        lines.push(`  - ${label}: ${url}`)
+      })
+    })
+  }
+  return lines.join('\n')
+}
+
 function buildSupportUserPrompt(input: {
   ticket: any
   latestMessage: string
@@ -182,6 +226,8 @@ function buildSupportUserPrompt(input: {
   verificationPending: boolean
   verificationJustCompleted: boolean
   hasPriorSupportReply: boolean
+  userLoggedIn: boolean
+  source?: string
   codeContext: string
   conversation: string
 }): string {
@@ -194,6 +240,8 @@ function buildSupportUserPrompt(input: {
     `Status: ${ticket.status}`,
     `User Email: ${ticket.userEmail}`,
     `User Name: ${ticket.userName || 'Not provided'}`,
+    `Channel: ${input.source || 'unknown'}`,
+    `User logged in: ${input.userLoggedIn ? 'yes' : 'no'}`,
     '',
     `Identity verified: ${input.identityVerified ? 'yes' : 'no'}`,
     `Verification pending: ${input.verificationPending ? 'yes' : 'no'}`,
@@ -761,7 +809,8 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
   let latestMessage = stripHtml(parsedLatest.text)
   const rawLatestMessage = latestMessage
 
-  let identityVerified = isIdentityVerified(ticket.responses || []) || Boolean(ticket.userId)
+  const userLoggedIn = Boolean(ticket.userId || ticket.user?.id)
+  let identityVerified = isIdentityVerified(ticket.responses || []) || userLoggedIn
   let verificationPending = await hasPendingVerification(ticket.id, ticket.userEmail)
   let verificationJustCompleted = false
 
@@ -800,6 +849,8 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
       verificationPending,
       verificationJustCompleted,
       hasPriorSupportReply,
+      userLoggedIn,
+      source: input.source,
       codeContext,
       conversation,
     })

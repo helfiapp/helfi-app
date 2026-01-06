@@ -32,7 +32,7 @@ function BackToTopButton() {
   return (
     <button
       onClick={scrollToTop}
-      className={`fixed bottom-5 right-5 z-50 bg-helfi-green text-white p-3 rounded-full shadow-lg hover:bg-helfi-green/90 transition-all duration-300 transform ${
+      className={`fixed bottom-5 right-5 z-50 hidden md:inline-flex bg-helfi-green text-white p-3 rounded-full shadow-lg hover:bg-helfi-green/90 transition-all duration-300 transform ${
         isVisible ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'
       }`}
       aria-label="Back to top"
@@ -836,7 +836,7 @@ export default function SplashPage() {
                 What devices can I connect to Helfi?
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Helfi integrates with popular fitness and health devices including Fitbit, Apple Watch, Oura Ring, Garmin watches, 
+                Helfi integrates with popular fitness and health devices including Fitbit, Apple Watch, Oura Ring, Garmin Connect, 
                 Google Fit, Samsung Health, Withings smart scales, and Polar heart rate monitors. These integrations provide 
                 automatic tracking of steps, heart rate, sleep patterns, weight, and exercise data, giving our AI more comprehensive 
                 information to provide better health insights and recommendations.
