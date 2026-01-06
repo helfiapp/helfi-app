@@ -192,8 +192,24 @@ function supportProductFacts(): string {
   ].join('\n')
 }
 
+function getSupportKnowledgeBase(): SupportKnowledgeBase {
+  return supportKnowledgeBase as unknown as SupportKnowledgeBase
+}
+
+function findSupportTopic(id: string): SupportKnowledgeBase['topics'][number] | undefined {
+  const kb = getSupportKnowledgeBase()
+  return kb.topics?.find((topic) => topic.id === id)
+}
+
+function addAgentSignOff(message: string, agent?: { name: string; role: string }) {
+  if (!agent) return message.trim()
+  const signOff = `${agent.name} from ${agent.role}`
+  if (message.includes(signOff)) return message.trim()
+  return `${message.trim()}\n\n${signOff}`
+}
+
 function supportKnowledgeBaseFacts(): string {
-  const kb = supportKnowledgeBase as unknown as SupportKnowledgeBase
+  const kb = getSupportKnowledgeBase()
   const lines: string[] = ['SUPPORT KNOWLEDGE BASE (public, verified):']
   if (kb?.version) {
     lines.push(`Version: ${kb.version}`)
@@ -216,6 +232,82 @@ function supportKnowledgeBaseFacts(): string {
     })
   }
   return lines.join('\n')
+}
+
+function buildDeterministicSupportReply(options: {
+  message: string
+  userLoggedIn: boolean
+  agent?: { name: string; role: string }
+}): string | null {
+  const text = options.message.toLowerCase()
+  const affiliateTopic = findSupportTopic('affiliate_program')
+  const authTopic = findSupportTopic('auth_signin_signup')
+  const passwordTopic = findSupportTopic('password_reset')
+  const supportTopic = findSupportTopic('support_and_help')
+
+  const affiliateMatch = /affiliate|referral|partner program|refer/i.test(text)
+  if (affiliateMatch) {
+    const signupUrl = affiliateTopic?.links?.signup || authTopic?.links?.signup || 'https://helfi.ai/auth/signin?mode=signup'
+    const applyUrl = affiliateTopic?.links?.apply || 'https://helfi.ai/affiliate/apply'
+    const portalUrl = affiliateTopic?.links?.portal || 'https://helfi.ai/affiliate'
+    const termsUrl = affiliateTopic?.links?.terms || 'https://helfi.ai/affiliate/terms'
+    const loginIntro = options.userLoggedIn
+      ? ''
+      : `To get started, create a Helfi account first: ${signupUrl}.\n\n`
+    const reply = [
+      'Yes — we have an affiliate program.',
+      '',
+      `${loginIntro}Apply here: ${applyUrl}.`,
+      'We review applications before approval.',
+      `After approval, your portal is: ${portalUrl}.`,
+      `Terms: ${termsUrl}.`,
+    ].join('\n')
+    return addAgentSignOff(reply, options.agent)
+  }
+
+  const signupMatch = /sign up|signup|create account|register/i.test(text)
+  if (signupMatch) {
+    const signupUrl = authTopic?.links?.signup || 'https://helfi.ai/auth/signin?mode=signup'
+    const signinUrl = authTopic?.links?.signin || 'https://helfi.ai/auth/signin'
+    const reply = [
+      `Create your account here: ${signupUrl}.`,
+      `Already have an account? Sign in here: ${signinUrl}.`,
+    ].join('\n')
+    return addAgentSignOff(reply, options.agent)
+  }
+
+  const signinMatch = /sign in|signin|log in|login/i.test(text)
+  if (signinMatch) {
+    const signinUrl = authTopic?.links?.signin || 'https://helfi.ai/auth/signin'
+    const signupUrl = authTopic?.links?.signup || 'https://helfi.ai/auth/signin?mode=signup'
+    const reply = [
+      `Sign in here: ${signinUrl}.`,
+      `If you need a new account, sign up here: ${signupUrl}.`,
+    ].join('\n')
+    return addAgentSignOff(reply, options.agent)
+  }
+
+  const passwordMatch = /password|reset password|forgot password/i.test(text)
+  if (passwordMatch) {
+    const forgotUrl = passwordTopic?.links?.forgot_password || 'https://helfi.ai/auth/forgot-password'
+    const reply = `Start your password reset here: ${forgotUrl}. We will email you a secure reset link.`
+    return addAgentSignOff(reply, options.agent)
+  }
+
+  const supportMatch = /support|help|contact/i.test(text)
+  if (supportMatch) {
+    const supportUrl = supportTopic?.links?.support || 'https://helfi.ai/support'
+    const helpUrl = supportTopic?.links?.help || 'https://helfi.ai/help'
+    const faqUrl = supportTopic?.links?.faq || 'https://helfi.ai/faq'
+    const reply = [
+      `Support page: ${supportUrl}.`,
+      `Help page: ${helpUrl}.`,
+      `FAQ: ${faqUrl}.`,
+    ].join('\n')
+    return addAgentSignOff(reply, options.agent)
+  }
+
+  return null
 }
 
 function buildSupportUserPrompt(input: {
@@ -777,7 +869,32 @@ export async function sendSupportFeedbackEmail(options: {
   })
 }
 
-function fallbackSupportReply(): SupportAiResult {
+function fallbackSupportReply(options?: {
+  message?: string
+  userLoggedIn?: boolean
+  agent?: { name: string; role: string }
+}): SupportAiResult {
+  const directReply = options?.message
+    ? buildDeterministicSupportReply({
+        message: options.message,
+        userLoggedIn: Boolean(options.userLoggedIn),
+        agent: options.agent,
+      })
+    : null
+  if (directReply) {
+    return {
+      customerReply: directReply,
+      shouldEscalate: false,
+      escalationReason: '',
+      needsIdentityCheck: false,
+      needsMoreInfo: false,
+      requestedInfo: [],
+      internalNotes: 'Deterministic support reply used (AI unavailable).',
+      suggestedCategory: '',
+      suggestedPriority: '',
+    }
+  }
+
   return {
     customerReply: 'Thanks for reaching out. I am unable to access the support assistant right now. I have flagged your request for a human review and will follow up as soon as possible.',
     shouldEscalate: true,
@@ -836,8 +953,24 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
   const openai = getOpenAIClient()
   let aiResult: SupportAiResult
 
-  if (!openai) {
-    aiResult = fallbackSupportReply()
+  const directReply = latestMessage
+    ? buildDeterministicSupportReply({ message: latestMessage, userLoggedIn, agent })
+    : null
+
+  if (directReply) {
+    aiResult = {
+      customerReply: directReply,
+      shouldEscalate: false,
+      escalationReason: '',
+      needsIdentityCheck: false,
+      needsMoreInfo: false,
+      requestedInfo: [],
+      internalNotes: 'Deterministic support reply used.',
+      suggestedCategory: '',
+      suggestedPriority: '',
+    }
+  } else if (!openai) {
+    aiResult = fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
   } else {
     const systemPrompt = buildSupportSystemPrompt(agent.name, agent.role)
     const codeContext = buildSupportCodeContext([ticket.subject, latestMessage].filter(Boolean).join(' '))
@@ -864,6 +997,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.2,
+        response_format: { type: 'json_object' },
         max_tokens: 500,
       },
       {
@@ -877,7 +1011,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
     )
 
     const rawText = completion?.choices?.[0]?.message?.content || ''
-    aiResult = safeParseSupportJson(rawText) || fallbackSupportReply()
+    aiResult = safeParseSupportJson(rawText) || fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
   }
 
   if (aiResult.needsIdentityCheck && !identityVerified) {
