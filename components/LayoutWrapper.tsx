@@ -3,7 +3,7 @@ import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { MouseEvent, ReactNode, useEffect, useRef, useState } from 'react'
+import { MouseEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import UsageMeter from '@/components/UsageMeter'
 import SupportChatWidget from '@/components/support/SupportChatWidget'
@@ -27,7 +27,10 @@ function DesktopSidebar({
   onNavigate: (href: string, e: MouseEvent<HTMLAnchorElement>) => void
 }) {
   return (
-    <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:z-[9999] md:w-64 md:flex md:flex-col pointer-events-auto">
+    <aside
+      data-helfi-sidebar="true"
+      className="hidden md:fixed md:inset-y-0 md:left-0 md:z-[9999] md:w-64 md:flex md:flex-col pointer-events-auto"
+    >
       <div className="flex flex-col flex-grow bg-[#1f2937] text-white border-r border-gray-800 pt-5 pb-4 overflow-y-auto">
         {/* Logo */}
         <div className="flex items-center flex-shrink-0 px-4">
@@ -523,36 +526,63 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     !isAdminPanelPath &&
     (!isPublicPage || isOnboardingPath)
 
-  const handleSidebarNavigate = (href: string, e: MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault()
-    if (typeof href !== 'string' || !href) return
+  const handleSidebarNavigate = useCallback(
+    (href: string, e: MouseEvent<HTMLAnchorElement> | MouseEvent) => {
+      e.preventDefault()
+      if (typeof href !== 'string' || !href) return
 
-    // Health Setup / Onboarding: if there are unsaved changes, ask the user once
-    // before leaving the section (the onboarding page owns the popup).
-    if (isOnboardingPath) {
-      try {
-        const hasUnsaved =
-          !!(window as any).__helfiOnboardingPhysicalHasUnsavedChanges ||
-          !!(window as any).__helfiOnboardingHasUnsavedChanges
-        const autoUpdateFlag = (window as any).__helfiOnboardingAutoUpdateOnExit
-        const allowBackgroundExit = autoUpdateFlag !== false
-        if (hasUnsaved) {
-          if (!allowBackgroundExit) {
-            window.postMessage({ type: 'OPEN_ONBOARDING_UPDATE_POPUP', navigateTo: href }, '*')
-            return
+      // Health Setup / Onboarding: if there are unsaved changes, ask the user once
+      // before leaving the section (the onboarding page owns the popup).
+      if (isOnboardingPath) {
+        try {
+          const hasUnsaved =
+            !!(window as any).__helfiOnboardingPhysicalHasUnsavedChanges ||
+            !!(window as any).__helfiOnboardingHasUnsavedChanges
+          const autoUpdateFlag = (window as any).__helfiOnboardingAutoUpdateOnExit
+          const allowBackgroundExit = autoUpdateFlag !== false
+          if (hasUnsaved) {
+            if (!allowBackgroundExit) {
+              window.postMessage({ type: 'OPEN_ONBOARDING_UPDATE_POPUP', navigateTo: href }, '*')
+              return
+            }
           }
+        } catch {
+          // fall through
         }
-      } catch {
-        // fall through
       }
+
+      try {
+        router.push(href)
+      } catch {
+        window.location.assign(href)
+      }
+    },
+    [isOnboardingPath, router]
+  )
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    if (!shouldShowSidebar || !isOnboardingPath) return
+
+    const handler = (event: MouseEvent) => {
+      const target = event.target as Element | null
+      if (!target) return
+      const sidebar = document.querySelector('[data-helfi-sidebar="true"]') as HTMLElement | null
+      if (!sidebar || !sidebar.contains(target)) return
+      const anchor = (target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null
+      if (!anchor) return
+      const href = anchor.getAttribute('href')
+      if (!href) return
+      event.preventDefault()
+      event.stopPropagation()
+      handleSidebarNavigate(href, event)
     }
 
-    try {
-      router.push(href)
-    } catch {
-      window.location.assign(href)
+    document.addEventListener('click', handler, true)
+    return () => {
+      document.removeEventListener('click', handler, true)
     }
-  }
+  }, [shouldShowSidebar, isOnboardingPath, handleSidebarNavigate])
 
   if (shouldShowSidebar) {
     return (
