@@ -10625,7 +10625,6 @@ Please add nutritional information manually if needed.`);
     const now = Date.now()
     const loggedAtIso = new Date(now).toISOString()
     const addedOrder = now
-    const addedOrder = now
     triggerHaptic(10)
     setQuickToast(`Adding to ${categoryLabel(category)}...`)
     const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
