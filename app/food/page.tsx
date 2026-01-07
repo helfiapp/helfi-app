@@ -5810,13 +5810,30 @@ const applyStructuredItems = (
     loadHistory();
   }, [selectedDate, isViewingToday]);
 
-  const mapLogsToEntries = (logs: any[], fallbackDate: string) =>
+  const mapLogsToEntries = (
+    logs: any[],
+    fallbackDate: string,
+    options?: { preferCreatedAtDate?: boolean },
+  ) =>
     logs.map((l: any) => {
       const rawCat = (l as any)?.meal || (l as any)?.category || (l as any)?.mealType
       const category = normalizeCategory(rawCat)
+      let resolvedLocalDate =
+        typeof (l as any)?.localDate === 'string' && (l as any).localDate.length >= 8
+          ? String((l as any).localDate).slice(0, 10)
+          : ''
+      if (!resolvedLocalDate && options?.preferCreatedAtDate) {
+        const createdAtMs = l?.createdAt ? new Date(l.createdAt).getTime() : NaN
+        if (Number.isFinite(createdAtMs)) {
+          resolvedLocalDate = formatDateFromMs(createdAtMs)
+        }
+      }
+      if (!resolvedLocalDate) {
+        resolvedLocalDate = fallbackDate
+      }
       const createdAtIso = alignTimestampToLocalDate(
         l.createdAt ? new Date(l.createdAt).toISOString() : new Date().toISOString(),
-        (l as any).localDate || fallbackDate,
+        resolvedLocalDate,
       )
       const storedClientId = normalizeClientId((l as any)?.nutrients?.__clientId)
       const storedOrigin = (() => {
@@ -5852,7 +5869,7 @@ const applyStructuredItems = (
         category,
         persistedCategory: category,
         createdAt: createdAtIso,
-        localDate: (l as any).localDate || fallbackDate,
+        localDate: resolvedLocalDate,
       }
     })
 
@@ -8791,7 +8808,7 @@ Please add nutritional information manually if needed.`);
       const json = await res.json().catch(() => ({} as any))
       const logs = Array.isArray(json.logs) ? json.logs : []
       if (!logs.length) return
-      const mapped = mapLogsToEntries(logs, selectedDate).map((entry: any) => {
+      const mapped = mapLogsToEntries(logs, selectedDate, { preferCreatedAtDate: true }).map((entry: any) => {
         const derived = deriveDateFromEntryTimestamp(entry)
         if (!derived) return entry
         return { ...entry, localDate: derived }
@@ -8840,7 +8857,7 @@ Please add nutritional information manually if needed.`);
         const json = await res.json().catch(() => ({} as any))
         const logs = Array.isArray(json.logs) ? json.logs : []
         if (!logs.length) return
-        const mapped = mapLogsToEntries(logs, selectedDate)
+        const mapped = mapLogsToEntries(logs, selectedDate, { preferCreatedAtDate: true })
         const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate })
         const normalized = deduped.map((entry: any) => {
           const derived = deriveDateFromEntryTimestamp(entry)
