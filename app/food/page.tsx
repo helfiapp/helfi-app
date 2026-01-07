@@ -1772,8 +1772,7 @@ export default function FoodDiary() {
     if (fromNutrition) return fromNutrition
     return ''
   }
-  const getEntryClientIdTimestampMs = (entry: any) => {
-    const clientId = getEntryClientId(entry)
+  const parseClientIdTimestampMs = (clientId: string) => {
     if (!clientId) return NaN
     const parts = clientId.split('-')
     if (parts.length < 2) return NaN
@@ -1781,6 +1780,10 @@ export default function FoodDiary() {
     if (!base36) return NaN
     const ms = parseInt(base36, 36)
     return Number.isFinite(ms) ? ms : NaN
+  }
+  const getEntryClientIdTimestampMs = (entry: any) => {
+    const clientId = getEntryClientId(entry)
+    return clientId ? parseClientIdTimestampMs(clientId) : NaN
   }
   const attachClientIdToTotals = (totals: any, clientId: string) => {
     if (!clientId) return totals
@@ -1803,16 +1806,50 @@ export default function FoodDiary() {
     if ((totals as any).__loggedAt) return totals
     return { ...(totals as any), __loggedAt: loggedAt }
   }
-  const ensureEntryLoggedAt = (entry: any, loggedAt: string | number) => {
+  const getEntryAddedOrderRaw = (entry: any) => {
+    if (!entry || typeof entry !== 'object') return NaN
+    const direct = (entry as any)?.__addedOrder
+    if (Number.isFinite(Number(direct))) return Number(direct)
+    const fromNutrition = (entry as any)?.nutrition?.__addedOrder
+    if (Number.isFinite(Number(fromNutrition))) return Number(fromNutrition)
+    const fromTotal = (entry as any)?.total?.__addedOrder
+    if (Number.isFinite(Number(fromTotal))) return Number(fromTotal)
+    return NaN
+  }
+  const attachAddedOrderToTotals = (totals: any, orderStamp: number) => {
+    if (!totals || typeof totals !== 'object') return totals
+    if ((totals as any).__addedOrder) return totals
+    return { ...(totals as any), __addedOrder: orderStamp }
+  }
+  const ensureEntryLoggedAt = (entry: any, loggedAt: string | number, addedOrder?: number) => {
     if (!entry || typeof entry !== 'object') return entry
-    const existing = getEntryLoggedAtRaw(entry)
-    const stamp = existing || loggedAt
-    if (!stamp) return entry
-    const next: any = { ...(entry as any), __sourceCreatedAt: stamp }
-    const withNutrition = attachLoggedAtToTotals((entry as any)?.nutrition, stamp)
-    const withTotal = attachLoggedAtToTotals((entry as any)?.total, stamp)
-    if (withNutrition !== (entry as any)?.nutrition) next.nutrition = withNutrition
-    if (withTotal !== (entry as any)?.total) next.total = withTotal
+    const existingLogged = getEntryLoggedAtRaw(entry)
+    const loggedStamp = existingLogged || loggedAt
+    const existingOrder = getEntryAddedOrderRaw(entry)
+    const derivedOrder =
+      Number.isFinite(existingOrder)
+        ? existingOrder
+        : Number.isFinite(Number(addedOrder))
+        ? Number(addedOrder)
+        : (() => {
+            const fromLogged =
+              typeof loggedStamp === 'number' && Number.isFinite(loggedStamp)
+                ? loggedStamp
+                : loggedStamp
+                ? new Date(loggedStamp).getTime()
+                : NaN
+            return Number.isFinite(fromLogged) ? fromLogged : NaN
+          })()
+    if (!loggedStamp && !Number.isFinite(derivedOrder)) return entry
+    const next: any = { ...(entry as any) }
+    if (loggedStamp) next.__sourceCreatedAt = loggedStamp
+    if (Number.isFinite(derivedOrder)) next.__addedOrder = derivedOrder
+    const withNutrition = loggedStamp ? attachLoggedAtToTotals((entry as any)?.nutrition, loggedStamp) : (entry as any)?.nutrition
+    const withTotal = loggedStamp ? attachLoggedAtToTotals((entry as any)?.total, loggedStamp) : (entry as any)?.total
+    const withNutritionOrder = Number.isFinite(derivedOrder) ? attachAddedOrderToTotals(withNutrition, derivedOrder) : withNutrition
+    const withTotalOrder = Number.isFinite(derivedOrder) ? attachAddedOrderToTotals(withTotal, derivedOrder) : withTotal
+    if (withNutritionOrder !== (entry as any)?.nutrition) next.nutrition = withNutritionOrder
+    if (withTotalOrder !== (entry as any)?.total) next.total = withTotalOrder
     return next
   }
   const entryAllowsDuplicate = (entry: any) =>
@@ -5886,6 +5923,18 @@ const applyStructuredItems = (
         }
         return ''
       })()
+      const addedOrderRaw = (l as any)?.nutrients?.__addedOrder
+      const addedOrderFromNutrients = Number.isFinite(Number(addedOrderRaw)) ? Number(addedOrderRaw) : NaN
+      const loggedOrder = loggedAtIso ? new Date(loggedAtIso).getTime() : NaN
+      const clientOrder = storedClientId ? parseClientIdTimestampMs(storedClientId) : NaN
+      const addedOrder =
+        Number.isFinite(addedOrderFromNutrients)
+          ? addedOrderFromNutrients
+          : Number.isFinite(loggedOrder)
+          ? loggedOrder
+          : Number.isFinite(clientOrder)
+          ? clientOrder
+          : NaN
       const method =
         storedOrigin === 'meal-builder'
           ? 'meal-builder'
@@ -5912,6 +5961,7 @@ const applyStructuredItems = (
         persistedCategory: category,
         createdAt: createdAtIso,
         __sourceCreatedAt: loggedAtIso || sourceCreatedAtIso,
+        __addedOrder: Number.isFinite(addedOrder) ? addedOrder : undefined,
         localDate: resolvedLocalDate,
       }
     })
@@ -7441,28 +7491,33 @@ Please add nutritional information manually if needed.`);
     const category = normalizeCategory(selectedAddCategory)
     const opStamp = Date.now()
     const loggedAtIso = new Date().toISOString()
+    const addedOrder = Date.now()
     const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const newEntry = ensureEntryLoggedAt(
-      applyEntryClientId({
-      id: makeUniqueLocalEntryId(
-        new Date(createdAtIso).getTime(),
+      applyEntryClientId(
+        {
+          id: makeUniqueLocalEntryId(
+            new Date(createdAtIso).getTime(),
+            `entry:${opStamp}|${selectedDate}|${category}|${normalizedDescription(finalDescription)}`,
+          ),
+          localDate: selectedDate, // pin to the date the user is viewing when saving
+          description: finalDescription,
+          time: displayTime,
+          method,
+          photo: method === 'photo' ? photoPreview : null,
+          nutrition: nutrition || analyzedNutrition,
+          items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : null, // Store structured items
+          total: analyzedTotal || null, // Store total nutrition
+          meal: category,
+          category,
+          persistedCategory: category,
+          createdAt: createdAtIso,
+        },
         `entry:${opStamp}|${selectedDate}|${category}|${normalizedDescription(finalDescription)}`,
       ),
-      localDate: selectedDate, // pin to the date the user is viewing when saving
-      description: finalDescription,
-      time: displayTime,
-      method,
-      photo: method === 'photo' ? photoPreview : null,
-      nutrition: nutrition || analyzedNutrition,
-      items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : null, // Store structured items
-      total: analyzedTotal || null, // Store total nutrition
-      meal: category,
-      category,
-      persistedCategory: category,
-      createdAt: createdAtIso,
-      }, `entry:${opStamp}|${selectedDate}|${category}|${normalizedDescription(finalDescription)}`),
       loggedAtIso,
+      addedOrder,
     );
     
     // Prevent duplicates: check if entry with same ID already exists
@@ -9313,6 +9368,12 @@ Please add nutritional information manually if needed.`);
       return Number.isFinite(ms) ? ms : NaN
     }
     const resolveEntryCreatedAtMs = (entry: any) => {
+      const addedRaw =
+        entry?.__addedOrder ||
+        entry?.nutrition?.__addedOrder ||
+        entry?.total?.__addedOrder
+      const addedTs = Number.isFinite(Number(addedRaw)) ? Number(addedRaw) : NaN
+      if (Number.isFinite(addedTs)) return addedTs
       const loggedRaw =
         entry?.__sourceCreatedAt ||
         entry?.nutrition?.__loggedAt ||
@@ -9790,6 +9851,7 @@ Please add nutritional information manually if needed.`);
     const category = normalizeCategory(selectedAddCategory)
     const opStamp = Date.now()
     const loggedAtIso = new Date().toISOString()
+    const addedOrder = Date.now()
     const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const item = buildBarcodeIngredientItem(food, code)
@@ -9812,25 +9874,29 @@ Please add nutritional information manually if needed.`);
       [food?.name, food?.brand].filter(Boolean).join(' – ') ||
       'Scanned food'
     const entry = ensureEntryLoggedAt(
-      applyEntryClientId({
-      id: makeUniqueLocalEntryId(
-        new Date(createdAtIso).getTime(),
+      applyEntryClientId(
+        {
+          id: makeUniqueLocalEntryId(
+            new Date(createdAtIso).getTime(),
+            `barcode:${opStamp}|${selectedDate}|${category}|${normalizedDescription(description)}`,
+          ),
+          localDate: selectedDate,
+          description,
+          time: displayTime,
+          method: 'text',
+          photo: null,
+          nutrition: totals,
+          total: totalsForStorage,
+          items,
+          meal: category,
+          category,
+          persistedCategory: category,
+          createdAt: createdAtIso,
+        },
         `barcode:${opStamp}|${selectedDate}|${category}|${normalizedDescription(description)}`,
       ),
-      localDate: selectedDate,
-      description,
-      time: displayTime,
-      method: 'text',
-      photo: null,
-      nutrition: totals,
-      total: totalsForStorage,
-      items,
-      meal: category,
-      category,
-      persistedCategory: category,
-      createdAt: createdAtIso,
-      }, `barcode:${opStamp}|${selectedDate}|${category}|${normalizedDescription(description)}`),
       loggedAtIso,
+      addedOrder,
     )
     const updated = dedupeEntries([entry, ...todaysFoods], { fallbackDate: selectedDate })
     setTodaysFoods(updated)
@@ -10558,6 +10624,8 @@ Please add nutritional information manually if needed.`);
     const category = normalizeCategory(targetCategory || selectedAddCategory)
     const now = Date.now()
     const loggedAtIso = new Date(now).toISOString()
+    const addedOrder = now
+    const addedOrder = now
     triggerHaptic(10)
     setQuickToast(`Adding to ${categoryLabel(category)}...`)
     const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
@@ -10588,25 +10656,29 @@ Please add nutritional information manually if needed.`);
       return null
     })()
     const newEntry = ensureEntryLoggedAt(
-      applyEntryClientId({
-      id: makeUniqueLocalEntryId(
-        new Date(createdAtIso).getTime(),
+      applyEntryClientId(
+        {
+          id: makeUniqueLocalEntryId(
+            new Date(createdAtIso).getTime(),
+            `insert:${now}|${selectedDate}|${category}|${normalizedDescription(description)}`,
+          ),
+          localDate: selectedDate,
+          description,
+          time: displayTime,
+          method: source?.method || 'text',
+          photo: source?.photo || source?.entry?.photo || null,
+          nutrition: totals,
+          total: totals,
+          items,
+          meal: category,
+          category,
+          persistedCategory: category,
+          createdAt: createdAtIso,
+        },
         `insert:${now}|${selectedDate}|${category}|${normalizedDescription(description)}`,
       ),
-      localDate: selectedDate,
-      description,
-      time: displayTime,
-      method: source?.method || 'text',
-      photo: source?.photo || source?.entry?.photo || null,
-      nutrition: totals,
-      total: totals,
-      items,
-      meal: category,
-      category,
-      persistedCategory: category,
-      createdAt: createdAtIso,
-      }, `insert:${now}|${selectedDate}|${category}|${normalizedDescription(description)}`),
       loggedAtIso,
+      addedOrder,
     )
     const pendingKey = buildPendingSaveKey(newEntry, selectedDate)
     const pendingEntry = markEntryPendingSave(newEntry, pendingKey)
@@ -10752,36 +10824,40 @@ Please add nutritional information manually if needed.`);
       return next
     }
     const entry = ensureEntryLoggedAt(
-      applyEntryClientId({
-      id: makeUniqueLocalEntryId(
-        new Date(createdAtIso).getTime(),
+      applyEntryClientId(
+        {
+          id: makeUniqueLocalEntryId(
+            new Date(createdAtIso).getTime(),
+            `favorite:${now}|${selectedDate}|${category}|${normalizedDescription(baseDescription)}`,
+          ),
+          localDate: selectedDate,
+          description: baseDescription,
+          time: new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          method: favorite.method || 'text',
+          photo: favorite.photo || null,
+          nutrition: attachMeta(favorite.nutrition || favorite.total || null),
+          items: Array.isArray(clonedItems)
+            ? clonedItems
+            : typeof (favorite as any)?.items === 'string'
+            ? (() => {
+                try {
+                  const parsed = JSON.parse(String((favorite as any).items))
+                  return Array.isArray(parsed) ? parsed : null
+                } catch {
+                  return null
+                }
+              })()
+            : null,
+          total: favorite.total || favorite.nutrition || null,
+          meal: category,
+          category,
+          persistedCategory: category,
+          createdAt: createdAtIso,
+        },
         `favorite:${now}|${selectedDate}|${category}|${normalizedDescription(baseDescription)}`,
       ),
-      localDate: selectedDate,
-      description: baseDescription,
-      time: new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      method: favorite.method || 'text',
-      photo: favorite.photo || null,
-      nutrition: attachMeta(favorite.nutrition || favorite.total || null),
-      items: Array.isArray(clonedItems)
-        ? clonedItems
-        : typeof (favorite as any)?.items === 'string'
-        ? (() => {
-            try {
-              const parsed = JSON.parse(String((favorite as any).items))
-              return Array.isArray(parsed) ? parsed : null
-            } catch {
-              return null
-            }
-          })()
-        : null,
-      total: favorite.total || favorite.nutrition || null,
-      meal: category,
-      category,
-      persistedCategory: category,
-      createdAt: createdAtIso,
-      }, `favorite:${now}|${selectedDate}|${category}|${normalizedDescription(baseDescription)}`),
       loggedAtIso,
+      addedOrder,
     )
     const pendingKey = buildPendingSaveKey(entry, selectedDate)
     const pendingEntry = markEntryPendingSave(entry, pendingKey)
@@ -10923,6 +10999,7 @@ Please add nutritional information manually if needed.`);
     const nowBucket = Math.floor(nowTs / 60000)
     const baseTs = sourceBucket !== null && sourceBucket === nowBucket ? nowTs + 60000 : nowTs
     const loggedAtIso = new Date(baseTs).toISOString()
+    const addedOrder = baseTs
     const createdAtIso = alignTimestampToLocalDate(loggedAtIso, targetDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const clonedItems =
@@ -10932,28 +11009,29 @@ Please add nutritional information manually if needed.`);
     const copiedEntry = markEntryAllowDuplicate(
       ensureEntryLoggedAt(
         applyEntryClientId(
-      {
-        ...source,
-        clientId: undefined,
-        id: makeUniqueLocalEntryId(
-          new Date(createdAtIso).getTime(),
+          {
+            ...source,
+            clientId: undefined,
+            id: makeUniqueLocalEntryId(
+              new Date(createdAtIso).getTime(),
+              `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
+            ),
+            dbId: undefined,
+            localDate: targetDate,
+            time: displayTime,
+            meal: category,
+            category,
+            persistedCategory: category,
+            items: clonedItems,
+            description: baseDescription,
+            createdAt: createdAtIso,
+          },
           `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
+          { forceNew: true },
         ),
-        dbId: undefined,
-        localDate: targetDate,
-        time: displayTime,
-        meal: category,
-        category,
-        persistedCategory: category,
-        items: clonedItems,
-        description: baseDescription,
-        createdAt: createdAtIso,
-      },
-      `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
-      { forceNew: true },
+        loggedAtIso,
+        addedOrder,
       ),
-      loggedAtIso,
-    ),
     )
     const pendingKey = buildPendingSaveKey(copiedEntry, targetDate)
     const pendingEntry = markEntryPendingSave(copiedEntry, pendingKey)
@@ -11034,6 +11112,7 @@ Please add nutritional information manually if needed.`);
       const baseTs = Date.now()
       // Offset each entry slightly to avoid de-dupe collapsing them (description/time collisions).
       const adjusted = Number.isFinite(baseTs) ? new Date(baseTs + idx * 60000).toISOString() : new Date().toISOString()
+      const addedOrder = Number.isFinite(baseTs) ? baseTs + idx * 60000 : Date.now()
       const anchored = alignTimestampToLocalDate(adjusted, targetDate)
       const time = new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       const baseDescription = entry.description || entry.label || 'Duplicated meal'
@@ -11045,28 +11124,29 @@ Please add nutritional information manually if needed.`);
       const baseEntry = markEntryAllowDuplicate(
         ensureEntryLoggedAt(
           applyEntryClientId(
-        {
-          ...entry,
-          clientId: undefined,
-          id: makeUniqueLocalEntryId(
-            baseMs,
+            {
+              ...entry,
+              clientId: undefined,
+              id: makeUniqueLocalEntryId(
+                baseMs,
+                `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
+              ),
+              dbId: undefined,
+              localDate: targetDate,
+              createdAt: anchored,
+              time,
+              meal: category,
+              category,
+              persistedCategory: category,
+              items: clonedItems,
+              description: baseDescription,
+            },
             `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
+            { forceNew: true },
           ),
-          dbId: undefined,
-          localDate: targetDate,
-          createdAt: anchored,
-          time,
-          meal: category,
-          category,
-          persistedCategory: category,
-          items: clonedItems,
-          description: baseDescription,
-        },
-        `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
-        { forceNew: true },
+          adjusted,
+          addedOrder,
         ),
-        adjusted,
-      ),
       )
       const pendingKey = buildPendingSaveKey(baseEntry, targetDate)
       return markEntryPendingSave(baseEntry, pendingKey)
@@ -12036,6 +12116,7 @@ Please add nutritional information manually if needed.`);
       const adjusted = Number.isFinite(baseTs) ? new Date(baseTs + idx * 60000).toISOString() : new Date().toISOString()
       const anchored = alignTimestampToLocalDate(adjusted, targetDate)
       const loggedAtIso = new Date(pasteStamp + idx * 60000).toISOString()
+      const addedOrder = pasteStamp + idx * 60000
       const baseMs = new Date(anchored).getTime()
       const time =
         item?.time ||
@@ -12044,29 +12125,30 @@ Please add nutritional information manually if needed.`);
       const baseEntry = markEntryAllowDuplicate(
         ensureEntryLoggedAt(
           applyEntryClientId(
-        {
-          id: makeUniqueLocalEntryId(
-            baseMs,
+            {
+              id: makeUniqueLocalEntryId(
+                baseMs,
+                `paste:${pasteStamp}|${targetDate}|${category}|${normalizedDescription(description)}|${idx}`,
+              ),
+              dbId: undefined,
+              localDate: targetDate,
+              createdAt: anchored,
+              time,
+              meal: category,
+              category,
+              persistedCategory: category,
+              description,
+              nutrition: item?.nutrition ?? null,
+              total: item?.total ?? null,
+              items: Array.isArray(item?.items) && item.items.length > 0 ? item.items : null,
+              photo: item?.photo ?? null,
+              method: item?.method ?? 'copied',
+            },
             `paste:${pasteStamp}|${targetDate}|${category}|${normalizedDescription(description)}|${idx}`,
-          ),
-          dbId: undefined,
-          localDate: targetDate,
-          createdAt: anchored,
-          time,
-          meal: category,
-          category,
-          persistedCategory: category,
-          description,
-          nutrition: item?.nutrition ?? null,
-          total: item?.total ?? null,
-          items: Array.isArray(item?.items) && item.items.length > 0 ? item.items : null,
-          photo: item?.photo ?? null,
-          method: item?.method ?? 'copied',
-        },
-        `paste:${pasteStamp}|${targetDate}|${category}|${normalizedDescription(description)}|${idx}`,
-        { forceNew: true },
+            { forceNew: true },
           ),
           loggedAtIso,
+          addedOrder,
         ),
       )
       const pendingKey = buildPendingSaveKey(baseEntry, targetDate)
