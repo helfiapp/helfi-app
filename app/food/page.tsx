@@ -10797,6 +10797,7 @@ Please add nutritional information manually if needed.`);
     const category = normalizeCategory(targetCategory || selectedAddCategory)
     const now = Date.now()
     const loggedAtIso = new Date(now).toISOString()
+    const addedOrder = now
     const debounceKey = `${favorite?.id || favorite?.label || 'favorite'}|${selectedDate}|${category}`
     const last = favoriteInsertDebounceRef.current[debounceKey] || 0
     // Mobile browsers can fire multiple taps/clicks; guard to avoid triple inserts.
