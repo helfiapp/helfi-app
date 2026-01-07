@@ -1088,6 +1088,33 @@ If you touch any area related to these fixes, you must:
 2) Get explicit approval, and  
 3) Re-test the affected flows before deployment.
 
+## 7. Food Diary Favorites "All" Ordering (Jan 2026 - Locked)
+
+**Goal (non-negotiable):** The most recently added entry must appear at the top
+of Favorites -> All, regardless of meal date or time (including adding to past
+days after midnight).
+
+**Do not:**
+- Sort by `localDate`, `time`, or meal category time.
+- Rebuild the Favorites -> All list from cached/snapshot data that can override
+  the latest ordering.
+- Remove or ignore the "added order" stamp.
+
+**Must keep (source of truth):**
+- `app/food/page.tsx` uses an added order stamp (`__addedOrder`) for each entry.
+- The list sort always prefers `__addedOrder` over any date/time fields.
+- `__addedOrder` is saved on the entry and copied into `nutrition`/`total` so it
+  survives merges and rehydration.
+
+**If this breaks again, fix checklist (only in `app/food/page.tsx`):**
+1) Ensure every entry creation path sets `addedOrder = Date.now()` and passes it
+   into `ensureEntryLoggedAt(...)`.
+2) Confirm `mapLogsToEntries(...)` reads `nutrients.__addedOrder` (if present)
+   and assigns `entry.__addedOrder`.
+3) Confirm `resolveEntryCreatedAtMs(...)` uses `__addedOrder` first.
+4) Confirm `ensureEntryLoggedAt(...)` writes `__addedOrder` onto the entry and
+   into `nutrition`/`total`.
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
