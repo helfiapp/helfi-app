@@ -5831,10 +5831,8 @@ const applyStructuredItems = (
       if (!resolvedLocalDate) {
         resolvedLocalDate = fallbackDate
       }
-      const createdAtIso = alignTimestampToLocalDate(
-        l.createdAt ? new Date(l.createdAt).toISOString() : new Date().toISOString(),
-        resolvedLocalDate,
-      )
+      const sourceCreatedAtIso = l.createdAt ? new Date(l.createdAt).toISOString() : new Date().toISOString()
+      const createdAtIso = alignTimestampToLocalDate(sourceCreatedAtIso, resolvedLocalDate)
       const storedClientId = normalizeClientId((l as any)?.nutrients?.__clientId)
       const storedOrigin = (() => {
         const n = (l as any)?.nutrients
@@ -5869,6 +5867,7 @@ const applyStructuredItems = (
         category,
         persistedCategory: category,
         createdAt: createdAtIso,
+        __sourceCreatedAt: sourceCreatedAtIso,
         localDate: resolvedLocalDate,
       }
     })
@@ -9266,10 +9265,19 @@ Please add nutritional information manually if needed.`);
       return Number.isFinite(ms) ? ms : NaN
     }
     const resolveEntryCreatedAtMs = (entry: any) => {
-      const timeBased = parseEntryTimeToMs(entry)
-      if (Number.isFinite(timeBased)) return timeBased
+      const sourceRaw = entry?.__sourceCreatedAt
+      const sourceTs = sourceRaw ? new Date(sourceRaw).getTime() : NaN
+      if (Number.isFinite(sourceTs)) {
+        const sourceDate = formatDateFromMs(sourceTs)
+        const localDate = dateKeyForEntry(entry)
+        if (localDate && sourceDate && localDate !== sourceDate) {
+          return sourceTs
+        }
+      }
       const entryTs = extractEntryTimestampMs(entry)
       if (Number.isFinite(entryTs)) return entryTs
+      const timeBased = parseEntryTimeToMs(entry)
+      if (Number.isFinite(timeBased)) return timeBased
       const idCandidate = typeof entry?.id === 'number' ? entry.id : Number(entry?.id)
       const idTs = Number.isFinite(idCandidate) && idCandidate > 946684800000 ? idCandidate : NaN
       if (Number.isFinite(idTs)) return idTs
