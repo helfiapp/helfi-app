@@ -9047,13 +9047,17 @@ Please add nutritional information manually if needed.`);
 
   const collectHistoryMeals = () => {
     const pool: any[] = []
-    if (Array.isArray(todaysFoods)) pool.push(...todaysFoods)
-    if (Array.isArray(historyFoods)) pool.push(...historyFoods)
-    if (Array.isArray(foodLibrary)) pool.push(...foodLibrary)
+    const tagEntry = (entry: any, source: 'today' | 'history' | 'library' | 'snapshot') => {
+      if (!entry || typeof entry !== 'object') return entry
+      return { ...entry, __favoritesSource: source }
+    }
+    if (Array.isArray(todaysFoods)) pool.push(...todaysFoods.map((e) => tagEntry(e, 'today')))
+    if (Array.isArray(historyFoods)) pool.push(...historyFoods.map((e) => tagEntry(e, 'history')))
+    if (Array.isArray(foodLibrary)) pool.push(...foodLibrary.map((e) => tagEntry(e, 'library')))
     if (persistentDiarySnapshot?.byDate) {
       Object.values(persistentDiarySnapshot.byDate).forEach((snap: any) => {
         if (Array.isArray((snap as any)?.entries)) {
-          pool.push(...(snap as any).entries)
+          pool.push(...(snap as any).entries.map((e: any) => tagEntry(e, 'snapshot')))
         }
       })
     }
@@ -9066,9 +9070,19 @@ Please add nutritional information manually if needed.`);
       if (!Array.isArray(entries)) return []
       const preferred = new Map<string, any>()
       const unkeyed: any[] = []
+      const sourceRank = (entry: any) => {
+        const source = String(entry?.__favoritesSource || '')
+        if (source === 'today') return 3
+        if (source === 'history') return 2
+        if (source === 'snapshot') return 1
+        return 0
+      }
       const pickPreferredEntry = (existing: any, entry: any) => {
         if (!existing) return entry
         if (!entry) return existing
+        const existingRank = sourceRank(existing)
+        const entryRank = sourceRank(entry)
+        if (existingRank !== entryRank) return entryRank > existingRank ? entry : existing
         const existingDb = Boolean(existing?.dbId)
         const entryDb = Boolean(entry?.dbId)
         if (existingDb !== entryDb) return entryDb ? entry : existing
