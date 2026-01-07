@@ -8748,11 +8748,12 @@ Please add nutritional information manually if needed.`);
     return sorted.slice(0, FOOD_LIBRARY_MAX_ENTRIES)
   }
 
-  const refreshFoodLibraryFromServer = useCallback(async () => {
+  const refreshFoodLibraryFromServer = useCallback(
+    async (options?: { force?: boolean; replace?: boolean }) => {
     if (typeof window === 'undefined') return
     const now = Date.now()
     if (foodLibraryRefreshRef.current.inFlight) return
-    if (now - foodLibraryRefreshRef.current.last < 5 * 60 * 1000) return
+    if (!options?.force && now - foodLibraryRefreshRef.current.last < 5 * 60 * 1000) return
     foodLibraryRefreshRef.current.inFlight = true
     try {
       const res = await fetch('/api/food-log/library?limit=5000', { cache: 'no-store' })
@@ -8760,15 +8761,25 @@ Please add nutritional information manually if needed.`);
       const json = await res.json().catch(() => ({} as any))
       const logs = Array.isArray(json.logs) ? json.logs : []
       if (!logs.length) return
-      const mapped = mapLogsToEntries(logs, selectedDate)
-      setFoodLibrary((prev) => mergeFoodLibraryEntries(prev, mapped, selectedDate))
+      const mapped = mapLogsToEntries(logs, selectedDate).map((entry: any) => {
+        const derived = deriveDateFromEntryTimestamp(entry)
+        if (!derived) return entry
+        return { ...entry, localDate: derived }
+      })
+      if (options?.replace) {
+        setFoodLibrary(mergeFoodLibraryEntries([], mapped, selectedDate))
+      } else {
+        setFoodLibrary((prev) => mergeFoodLibraryEntries(prev, mapped, selectedDate))
+      }
     } catch (err) {
       console.warn('Food library refresh failed', err)
     } finally {
       foodLibraryRefreshRef.current.last = now
       foodLibraryRefreshRef.current.inFlight = false
     }
-  }, [mapLogsToEntries, mergeFoodLibraryEntries, selectedDate])
+  },
+  [mapLogsToEntries, mergeFoodLibraryEntries, selectedDate],
+  )
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -8781,7 +8792,7 @@ Please add nutritional information manually if needed.`);
 
   useEffect(() => {
     if (!showFavoritesPicker) return
-    refreshFoodLibraryFromServer()
+    refreshFoodLibraryFromServer({ force: true, replace: true })
   }, [showFavoritesPicker, refreshFoodLibraryFromServer])
 
   const foodNameOverrideMap = useMemo(() => {
