@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import type { FeaturePageContent, FeaturePageSegment } from '@/data/feature-pages'
+import PublicHeader from '@/components/marketing/PublicHeader'
 
 type FeaturePageProps = {
   page: FeaturePageContent
@@ -11,24 +12,30 @@ type FeaturePageProps = {
 function PhoneFrame({
   image,
   priority = false,
+  size = 'section',
 }: {
   image: FeaturePageSegment['image']
   priority?: boolean
+  size?: 'hero' | 'section'
 }) {
+  const sizeClass =
+    size === 'hero'
+      ? 'max-w-[260px] sm:max-w-[300px] lg:max-w-[340px]'
+      : 'max-w-[220px] sm:max-w-[260px] lg:max-w-[300px]'
+
   return (
-    <div className="relative w-full max-w-sm mx-auto">
-      <div className="relative aspect-[9/19] rounded-[2.8rem] border border-gray-200 bg-gray-900 shadow-[0_20px_50px_rgba(15,23,42,0.25)]">
-        <div className="absolute inset-2 rounded-[2.3rem] overflow-hidden bg-black">
+    <div className={`relative w-full ${sizeClass} mx-auto`}>
+      <div className="relative aspect-[9/19] rounded-[2.6rem] border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
+        <div className="absolute inset-2 rounded-[2.1rem] overflow-hidden bg-white">
           <Image
             src={image.src}
             alt={image.alt}
             fill
-            sizes="(max-width: 768px) 80vw, 360px"
+            sizes="(max-width: 768px) 70vw, 320px"
             className="object-cover"
             priority={priority}
           />
         </div>
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-24 h-4 rounded-full bg-black/60" />
       </div>
     </div>
   )
@@ -37,50 +44,11 @@ function PhoneFrame({
 export default function FeaturePage({ page, related }: FeaturePageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-50">
-      <nav className="px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <Image
-              src="/mobile-assets/LOGOS/helfi-01-01.png"
-              alt="Helfi logo"
-              width={56}
-              height={56}
-              className="w-12 h-12 object-contain"
-              priority
-            />
-            <span className="text-lg font-semibold text-gray-900">Helfi</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-            <Link href="/features" className="hover:text-helfi-green transition-colors">
-              Features
-            </Link>
-            <Link href="/#pricing" className="hover:text-helfi-green transition-colors">
-              Pricing
-            </Link>
-            <Link href="/faq" className="hover:text-helfi-green transition-colors">
-              FAQ
-            </Link>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/auth/signin"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/auth/signin?mode=signup"
-              className="text-sm font-semibold px-4 py-2 rounded-full bg-helfi-green text-white hover:bg-helfi-green/90 transition-colors"
-            >
-              Create account
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <PublicHeader />
 
       <main>
         <section className="px-6 pt-10 pb-16">
-          <div className="max-w-6xl mx-auto grid gap-10 lg:grid-cols-[1.05fr_0.95fr] items-center">
+          <div className="max-w-6xl mx-auto grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4">
                 Feature overview
@@ -88,12 +56,17 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
               <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-5">
                 {page.title}
               </h1>
-              <p className="text-xl text-gray-700 mb-6">
+              <p className="text-xl text-gray-700 mb-5">
                 {page.subtitle}
               </p>
-              <p className="text-base text-gray-600 leading-relaxed mb-8">
+              <p className="text-base text-gray-600 leading-relaxed mb-5">
                 {page.intro}
               </p>
+              <div className="space-y-4 text-base text-gray-600 leading-relaxed mb-8">
+                {page.overview.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
               <div className="flex flex-wrap gap-3">
                 <Link
                   href={page.primaryCta.href}
@@ -109,7 +82,37 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                 </Link>
               </div>
             </div>
-            <PhoneFrame image={page.heroImage} priority />
+            <PhoneFrame image={page.heroImage} priority size="hero" />
+          </div>
+        </section>
+
+        <section className="px-6 pb-20">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">
+                  Key capabilities
+                </p>
+                <h2 className="text-3xl font-bold text-gray-900">
+                  Built for deeper health context
+                </h2>
+              </div>
+            </div>
+            <div className="grid gap-6 md:grid-cols-3">
+              {page.capabilities.map((capability) => (
+                <div
+                  key={capability.title}
+                  className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm"
+                >
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {capability.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    {capability.description}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -131,9 +134,16 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                     <h2 className="text-3xl font-bold text-gray-900 mb-4">
                       {segment.title}
                     </h2>
-                    <p className="text-base text-gray-600 leading-relaxed mb-6">
+                    <p className="text-base text-gray-600 leading-relaxed mb-5">
                       {segment.description}
                     </p>
+                    {segment.details && segment.details.length > 0 && (
+                      <div className="space-y-4 text-sm text-gray-600 leading-relaxed mb-6">
+                        {segment.details.map((detail) => (
+                          <p key={detail}>{detail}</p>
+                        ))}
+                      </div>
+                    )}
                     <ul className="space-y-3 text-sm text-gray-700">
                       {segment.bullets.map((bullet) => (
                         <li key={bullet} className="flex items-start gap-3">
@@ -144,11 +154,30 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                     </ul>
                   </div>
                   <div className={isReversed ? 'lg:col-start-1' : ''}>
-                    <PhoneFrame image={segment.image} />
+                    <PhoneFrame image={segment.image} size="section" />
                   </div>
                 </div>
               )
             })}
+          </div>
+        </section>
+
+        <section className="px-6 pb-20">
+          <div className="max-w-6xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-10 md:p-12">
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
+              Outcomes
+            </p>
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">
+              What this feature unlocks
+            </h3>
+            <ul className="grid gap-4 md:grid-cols-2 text-sm text-gray-700 leading-relaxed">
+              {page.outcomes.map((outcome) => (
+                <li key={outcome} className="flex items-start gap-3">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
+                  <span>{outcome}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 

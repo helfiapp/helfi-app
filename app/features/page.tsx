@@ -1,7 +1,7 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
+import PublicHeader from '@/components/marketing/PublicHeader'
 import { featurePages } from '@/data/feature-pages'
 
 export const metadata: Metadata = {
@@ -12,46 +12,7 @@ export const metadata: Metadata = {
 export default function FeaturesIndexPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-50">
-      <nav className="px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <Image
-              src="/mobile-assets/LOGOS/helfi-01-01.png"
-              alt="Helfi logo"
-              width={56}
-              height={56}
-              className="w-12 h-12 object-contain"
-              priority
-            />
-            <span className="text-lg font-semibold text-gray-900">Helfi</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-            <Link href="/#pricing" className="hover:text-helfi-green transition-colors">
-              Pricing
-            </Link>
-            <Link href="/faq" className="hover:text-helfi-green transition-colors">
-              FAQ
-            </Link>
-            <Link href="/help" className="hover:text-helfi-green transition-colors">
-              Help
-            </Link>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/auth/signin"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/auth/signin?mode=signup"
-              className="text-sm font-semibold px-4 py-2 rounded-full bg-helfi-green text-white hover:bg-helfi-green/90 transition-colors"
-            >
-              Create account
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <PublicHeader />
 
       <main className="px-6 pt-10 pb-16">
         <div className="max-w-6xl mx-auto">
