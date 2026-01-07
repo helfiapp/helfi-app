@@ -761,19 +761,44 @@ export default function SplashPage() {
 
       {/* Affiliate Program Section */}
       <section id="affiliate" className="px-6 py-20 bg-gradient-to-br from-emerald-50 to-white">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4">
               Affiliate program
             </p>
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
-              Earn by sharing Helfi
+              Earn recurring revenue by sharing Helfi
             </h2>
-            <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-              Join the Helfi affiliate program and earn 50% of net revenue on first-month
-              subscriptions and top-ups. We use last-click attribution with a 30-day window and
-              pay out on a Net-30 schedule once you reach the $50 minimum.
+            <p className="text-lg text-gray-600 mb-6 leading-relaxed">
+              Partner with Helfi and get paid for every qualified referral. The program is built
+              for coaches, clinics, wellness creators, and anyone guiding clients toward better
+              health habits. You get a unique tracking link, an affiliate dashboard, and clear
+              monthly reporting so you can see performance at a glance.
             </p>
+            <p className="text-base text-gray-600 mb-8 leading-relaxed">
+              We pay 50% of net revenue on first-month subscriptions and every top-up purchase.
+              Attribution is last-click with a 30-day window. Commissions become payable after
+              30 days, with a $50 minimum, and are paid out monthly via Stripe Connect. Refunds or
+              disputes within the 30-day window are voided to keep payouts accurate.
+            </p>
+            <div className="grid gap-4 mb-8">
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-emerald-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">How it works</h3>
+                <ol className="space-y-2 text-sm text-gray-600">
+                  <li>1. Apply and get approved with your preferred channel.</li>
+                  <li>2. Share your unique Helfi link in content, newsletters, or client portals.</li>
+                  <li>3. Track clicks, conversions, and payouts in your affiliate dashboard.</li>
+                </ol>
+              </div>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-emerald-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Why partners choose us</h3>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li>High-value health analytics and reports your audience can trust.</li>
+                  <li>Privacy-first attribution with anonymized reporting.</li>
+                  <li>Clear terms, predictable payouts, and long-term product updates.</li>
+                </ul>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/affiliate/apply"
@@ -793,11 +818,11 @@ export default function SplashPage() {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
               <h3 className="text-xl font-semibold text-gray-900 mb-2">50% net revenue</h3>
               <p className="text-gray-600">
-                Earn 50% of net revenue on first-month subscriptions and every top-up purchase.
+                Earn 50% of net revenue on the first subscription payment and every top-up.
               </p>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">30-day window</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">30-day attribution</h3>
               <p className="text-gray-600">
                 Last-click attribution stays active for 30 days after each referral click.
               </p>
@@ -806,6 +831,12 @@ export default function SplashPage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Net-30 payouts</h3>
               <p className="text-gray-600">
                 Commissions become payable after 30 days, with a $50 minimum payout threshold.
+              </p>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Monthly transfers</h3>
+              <p className="text-gray-600">
+                Payouts are sent monthly through Stripe Connect once commissions clear.
               </p>
             </div>
           </div>
