@@ -493,6 +493,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   useEffect(() => {
     if (typeof document === 'undefined') return
     if (!shouldShowSidebar || !isOnboardingPath) return
+    if ((window as any).__helfiOnboardingSidebarOverride) return
 
     const handler = (event: Event) => {
       const target = event.target as Element | null

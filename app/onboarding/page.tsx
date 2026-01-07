@@ -7731,6 +7731,7 @@ export default function Onboarding() {
   const pendingNavigationRef = useRef<(() => void) | null>(null);
   const exitUpdateTriggeredRef = useRef(false);
   const triggerInsightsUpdateOnExitRef = useRef<(reason: string) => void>(() => {});
+  const sidebarHandlersRef = useRef<Array<{ el: HTMLAnchorElement; handler: (event: Event) => void }> | null>(null);
 
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
   useEffect(() => {
@@ -7761,6 +7762,82 @@ export default function Onboarding() {
       } catch {
         // ignore
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).__helfiOnboardingSidebarOverride = true;
+    return () => {
+      try {
+        delete (window as any).__helfiOnboardingSidebarOverride;
+      } catch {}
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (typeof window === 'undefined') return;
+    if (!window.location.pathname.startsWith('/onboarding')) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      if (sidebarHandlersRef.current) {
+        sidebarHandlersRef.current.forEach(({ el, handler }) => {
+          el.removeEventListener('pointerdown', handler, true);
+          el.removeEventListener('click', handler, true);
+        });
+        sidebarHandlersRef.current = null;
+      }
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
+    };
+
+    const attachHandlers = () => {
+      if (cancelled) return;
+      const sidebar = document.querySelector('[data-helfi-sidebar="true"]') as HTMLElement | null;
+      if (!sidebar) {
+        if (attempts < 12) {
+          attempts += 1;
+          retryTimer = setTimeout(attachHandlers, 150);
+        }
+        return;
+      }
+      const anchors = Array.from(sidebar.querySelectorAll('a[href]')) as HTMLAnchorElement[];
+      const handlers = anchors.map((el) => {
+        const handler = (event: Event) => {
+          const href = el.getAttribute('href');
+          if (!href) return;
+          try {
+            event.preventDefault();
+          } catch {}
+          try {
+            event.stopPropagation();
+          } catch {}
+          try {
+            triggerInsightsUpdateOnExitRef.current('sidebar');
+          } catch {}
+          try {
+            window.location.assign(href);
+          } catch {
+            window.location.href = href;
+          }
+        };
+        el.addEventListener('pointerdown', handler, true);
+        el.addEventListener('click', handler, true);
+        return { el, handler };
+      });
+      sidebarHandlersRef.current = handlers;
+    };
+
+    attachHandlers();
+    return () => {
+      cancelled = true;
+      cleanup();
     };
   }, []);
 
