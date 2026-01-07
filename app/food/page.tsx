@@ -8355,7 +8355,6 @@ Please add nutritional information manually if needed.`);
     const sugar = typeof totals.sugar === 'number' ? totals.sugar : 0
     const carbs = typeof totals.carbs === 'number' ? totals.carbs : 0
     const fat = typeof totals.fat === 'number' ? totals.fat : 0
-    const calories = typeof totals.calories === 'number' ? totals.calories : 0
 
     const sugarHigh = sugar >= thresholds.sugar
     const carbsHigh = carbs >= thresholds.carbs
@@ -8369,9 +8368,10 @@ Please add nutritional information manually if needed.`);
         .join(' ')
         .trim()
       const hasHealthyFat = entryText ? containsHealthyFat(entryText) : false
-      const margin = hasHealthyFat ? 20 : 12
-      if (fat < thresholds.fat + margin) fatHigh = false
-      if (calories > 0 && calories < 350) fatHigh = false
+      if (hasHealthyFat) {
+        const margin = 20
+        if (fat < thresholds.fat + margin) fatHigh = false
+      }
     }
 
     const triggers: Array<{ key: 'sugar' | 'carbs' | 'fat'; label: string; value: number; limit: number; unit: string }> = []
@@ -9152,12 +9152,13 @@ Please add nutritional information manually if needed.`);
       return Number.isFinite(ms) ? ms : NaN
     }
     const resolveEntryCreatedAtMs = (entry: any) => {
+      const timeBased = parseEntryTimeToMs(entry)
+      if (Number.isFinite(timeBased)) return timeBased
       const entryTs = extractEntryTimestampMs(entry)
+      if (Number.isFinite(entryTs)) return entryTs
       const idCandidate = typeof entry?.id === 'number' ? entry.id : Number(entry?.id)
       const idTs = Number.isFinite(idCandidate) && idCandidate > 946684800000 ? idCandidate : NaN
-      const timeBased = parseEntryTimeToMs(entry)
-      const candidates = [entryTs, idTs, timeBased].filter((value) => Number.isFinite(value))
-      if (candidates.length > 0) return Math.max(...candidates)
+      if (Number.isFinite(idTs)) return idTs
       const dateKey = dateKeyForEntry(entry)
       if (dateKey) {
         const fallback = new Date(`${dateKey}T12:00:00`).getTime()
@@ -9300,6 +9301,7 @@ Please add nutritional information manually if needed.`);
         entry,
         favorite,
         createdAt: createdAtValue,
+        sortPriority: 2,
         sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
         calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
         serving: entry?.items?.[0]?.serving_size || entry?.serving || entry?.items?.[0]?.servings || '',
@@ -9325,6 +9327,7 @@ Please add nutritional information manually if needed.`);
         entry: null,
         favorite: fav,
         createdAt: resolveFavoriteCreatedAtMs(fav),
+        sortPriority: 1,
         sourceTag: 'Favorite',
         calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
         serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
@@ -9336,6 +9339,7 @@ Please add nutritional information manually if needed.`);
       label: applyFoodNameOverride(fav?.label || fav?.description || 'Favorite meal') || favoriteDisplayLabel(fav) || normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal'),
       favorite: fav,
       createdAt: resolveFavoriteCreatedAtMs(fav),
+      sortPriority: 1,
       sourceTag: 'Favorite',
       calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
       serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
@@ -17876,7 +17880,12 @@ Please add nutritional information manually if needed.`);
                     )
                   }
                   const sortList = (list: any[]) =>
-                    [...list].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+                    [...list].sort((a, b) => {
+                      const aPriority = Number(a?.sortPriority) || 0
+                      const bPriority = Number(b?.sortPriority) || 0
+                      if (aPriority !== bPriority) return bPriority - aPriority
+                      return (Number(b?.createdAt) || 0) - (Number(a?.createdAt) || 0)
+                    })
                   let data: any[] = []
                   if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
                   if (favoritesActiveTab === 'favorites')
