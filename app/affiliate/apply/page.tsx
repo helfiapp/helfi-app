@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 
 export default function AffiliateApplyPage() {
   const termsVersion = '2025-12-22'
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -71,14 +71,41 @@ export default function AffiliateApplyPage() {
     }
   }
 
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen p-6">
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-2xl font-bold text-gray-900">Affiliate Application</h1>
+          <p className="text-gray-600 mt-2">Loading your account…</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!session?.user) {
     return (
       <div className="min-h-screen p-6">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold text-gray-900">Affiliate Application</h1>
           <p className="text-gray-600 mt-2">
-            Please <Link className="text-helfi-green underline" href="/auth/signin">sign in</Link> to apply.
+            Create an account to start your application or sign in if you already have one.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              replace
+              className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+              href="/auth/signin?mode=signup"
+            >
+              Create account
+            </Link>
+            <Link
+              replace
+              className="px-5 py-2.5 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
+              href="/auth/signin"
+            >
+              Sign in
+            </Link>
+          </div>
         </div>
       </div>
     )
