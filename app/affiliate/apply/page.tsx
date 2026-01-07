@@ -8,7 +8,7 @@ export default function AffiliateApplyPage() {
   const termsVersion = '2025-12-22'
   const { data: session, status } = useSession()
   const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState<any>(null)
+  const [applicationStatus, setApplicationStatus] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [name, setName] = useState('')
@@ -27,7 +27,7 @@ export default function AffiliateApplyPage() {
       const res = await fetch('/api/affiliate/application', { cache: 'no-store' })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.error || 'Failed to load application status')
-      setStatus(json)
+      setApplicationStatus(json)
     } catch (e: any) {
       setError(e?.message || 'Failed to load application status')
     } finally {
@@ -111,7 +111,7 @@ export default function AffiliateApplyPage() {
     )
   }
 
-  const alreadyAffiliate = !!status?.affiliate
+  const alreadyAffiliate = !!applicationStatus?.affiliate
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -141,19 +141,19 @@ export default function AffiliateApplyPage() {
           </div>
         )}
 
-        {!loading && !error && !alreadyAffiliate && status?.application && (
+        {!loading && !error && !alreadyAffiliate && applicationStatus?.application && (
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900">Application Status</h2>
             <div className="mt-2 text-sm text-gray-700">
-              <div>Status: <span className="font-semibold">{status.application.status}</span></div>
-              <div>Risk: <span className="font-semibold">{status.application.riskLevel || '—'}</span></div>
-              <div>Recommendation: <span className="font-semibold">{status.application.recommendation || '—'}</span></div>
+              <div>Status: <span className="font-semibold">{applicationStatus.application.status}</span></div>
+              <div>Risk: <span className="font-semibold">{applicationStatus.application.riskLevel || '—'}</span></div>
+              <div>Recommendation: <span className="font-semibold">{applicationStatus.application.recommendation || '—'}</span></div>
             </div>
-            <p className="text-gray-600 mt-3">{status.application.aiReasoning || 'We’ll review your application and get back to you.'}</p>
+            <p className="text-gray-600 mt-3">{applicationStatus.application.aiReasoning || 'We’ll review your application and get back to you.'}</p>
           </div>
         )}
 
-        {!loading && !error && !alreadyAffiliate && !status?.application && (
+        {!loading && !error && !alreadyAffiliate && !applicationStatus?.application && (
           <form onSubmit={submit} className="bg-white rounded-xl p-6 shadow-sm space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Name</label>
