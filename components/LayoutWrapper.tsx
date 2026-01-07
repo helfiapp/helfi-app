@@ -72,6 +72,17 @@ function DesktopSidebar({
             </svg>
             Insights
           </a>
+
+          <a
+            href="/chat"
+            onClick={(e) => onNavigate('/chat', e)}
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+            <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+            Talk to AI
+          </a>
           
           <a
             href="/health-tips"
@@ -146,9 +157,9 @@ function DesktopSidebar({
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
             </svg>
-            Health Setup
+            Health Intake
           </a>
           
           <div className="border-t border-gray-700 mt-6 pt-6">
@@ -196,12 +207,42 @@ function DesktopSidebar({
               Quick Mood Check‑In
             </a>
           <a
+            href="/profile"
+            onClick={(e) => onNavigate('/profile', e)}
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+              <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Profile
+            </a>
+          <a
             href="/settings"
             onClick={(e) => onNavigate('/settings', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
               <Cog6ToothIcon className="text-gray-300 group-hover:text-white mr-3 h-6 w-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
               Settings
+            </a>
+          <a
+            href="/billing"
+            onClick={(e) => onNavigate('/billing', e)}
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+              <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              Billing
+            </a>
+          <a
+            href="/help"
+            onClick={(e) => onNavigate('/help', e)}
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+              <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Help & Support
             </a>
             
           </div>
