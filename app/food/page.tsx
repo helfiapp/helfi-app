@@ -5484,11 +5484,31 @@ const applyStructuredItems = (
   }, [showFavoritesPicker])
 
   useEffect(() => {
+    if (!feedbackPrompt) return
     if (typeof document === 'undefined') return
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = feedbackPrompt ? 'hidden' : previousOverflow
+    const { body, documentElement } = document
+    const previous = {
+      bodyOverflow: body.style.overflow,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyWidth: body.style.width,
+      htmlOverflow: documentElement.style.overflow,
+    }
+    const scrollY = typeof window !== 'undefined' ? window.scrollY || 0 : 0
+    body.style.overflow = 'hidden'
+    documentElement.style.overflow = 'hidden'
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.width = '100%'
     return () => {
-      document.body.style.overflow = previousOverflow
+      body.style.overflow = previous.bodyOverflow
+      body.style.position = previous.bodyPosition
+      body.style.top = previous.bodyTop
+      body.style.width = previous.bodyWidth
+      documentElement.style.overflow = previous.htmlOverflow
+      if (typeof window !== 'undefined') {
+        window.scrollTo(0, scrollY)
+      }
     }
   }, [feedbackPrompt])
 
@@ -9133,9 +9153,11 @@ Please add nutritional information manually if needed.`);
     }
     const resolveEntryCreatedAtMs = (entry: any) => {
       const entryTs = extractEntryTimestampMs(entry)
-      if (Number.isFinite(entryTs)) return entryTs
+      const idCandidate = typeof entry?.id === 'number' ? entry.id : Number(entry?.id)
+      const idTs = Number.isFinite(idCandidate) && idCandidate > 946684800000 ? idCandidate : NaN
       const timeBased = parseEntryTimeToMs(entry)
-      if (Number.isFinite(timeBased)) return timeBased
+      const candidates = [entryTs, idTs, timeBased].filter((value) => Number.isFinite(value))
+      if (candidates.length > 0) return Math.max(...candidates)
       const dateKey = dateKeyForEntry(entry)
       if (dateKey) {
         const fallback = new Date(`${dateKey}T12:00:00`).getTime()
@@ -15832,8 +15854,9 @@ Please add nutritional information manually if needed.`);
 
             {/* Feedback Modal */}
             {feedbackPrompt && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col">
+              <div className="fixed inset-0 z-50 bg-black bg-opacity-50 overflow-y-auto">
+                <div className="min-h-[100dvh] flex items-start justify-center p-4 sm:items-center">
+                  <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[85dvh] overflow-hidden flex flex-col">
                   <div className="p-5 border-b border-gray-100 flex items-start justify-between">
                     <div>
                       <div className="text-lg font-semibold text-gray-900">What was the problem?</div>
@@ -15858,7 +15881,7 @@ Please add nutritional information manually if needed.`);
                       </svg>
                     </button>
                   </div>
-                  <div className="p-5 space-y-4 overflow-y-auto overscroll-contain min-h-0">
+                    <div className="p-5 space-y-4 overflow-y-auto overscroll-contain min-h-0">
                     <div className="space-y-2">
                       {FEEDBACK_REASONS.map((reason) => (
                         <label key={reason} className="flex items-center gap-2 text-sm text-gray-700">
@@ -15955,6 +15978,7 @@ Please add nutritional information manually if needed.`);
                         {feedbackSubmitting ? 'Sending…' : isFeedbackRescanning ? 'Re-analyzing…' : 'Submit'}
                       </button>
                     </div>
+                  </div>
                   </div>
                 </div>
               </div>
