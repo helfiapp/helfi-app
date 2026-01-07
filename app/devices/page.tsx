@@ -78,24 +78,64 @@ export default function DevicesPage() {
       if (err === 'disabled') {
         alert('Garmin Connect is temporarily unavailable while production access is pending.')
       } else {
-        alert('Garmin connection failed: ' + err)
+        alert('Garmin Connect connection failed: ' + err)
       }
       window.history.replaceState({}, '', '/devices')
+    }
+
+    const cleanupFitbitPopup = () => {
+      if (popupRef.current && !popupRef.current.closed) {
+        try {
+          popupRef.current.close()
+        } catch (e) {}
+      }
+      if (closedCheckRef.current) {
+        clearInterval(closedCheckRef.current)
+        closedCheckRef.current = null
+      }
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current)
+        checkIntervalRef.current = null
+      }
+      setPopupOpen(false)
+      setCheckingStatus(false)
+    }
+
+    const cleanupGarminPopup = () => {
+      if (garminPopupRef.current && !garminPopupRef.current.closed) {
+        try {
+          garminPopupRef.current.close()
+        } catch (e) {}
+      }
+      if (garminClosedCheckRef.current) {
+        clearInterval(garminClosedCheckRef.current)
+        garminClosedCheckRef.current = null
+      }
+      if (garminCheckIntervalRef.current) {
+        clearInterval(garminCheckIntervalRef.current)
+        garminCheckIntervalRef.current = null
+      }
+      setGarminPopupOpen(false)
+      setGarminCheckingStatus(false)
     }
 
     // Listen for messages from popup window
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'FITBIT_CONNECTED' && event.data.success) {
+        cleanupFitbitPopup()
         checkFitbitStatus()
         setFitbitLoading(false)
       } else if (event.data?.type === 'FITBIT_ERROR') {
+        cleanupFitbitPopup()
         alert('Fitbit connection failed: ' + event.data.error)
         setFitbitLoading(false)
       } else if (event.data?.type === 'GARMIN_CONNECTED' && event.data.success) {
+        cleanupGarminPopup()
         if (garminConnectEnabled) checkGarminStatus()
         setGarminLoading(false)
       } else if (event.data?.type === 'GARMIN_ERROR') {
-        alert('Garmin connection failed: ' + event.data.error)
+        cleanupGarminPopup()
+        alert('Garmin Connect connection failed: ' + event.data.error)
         setGarminLoading(false)
       }
     }
@@ -331,12 +371,12 @@ export default function DevicesPage() {
 
       const popup = window.open(
         '/api/auth/garmin/authorize',
-        'Garmin Authorization',
+        'Garmin Connect Authorization',
         `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
       )
 
       if (!popup) {
-        alert('Please allow popups for this site to connect Garmin')
+        alert('Please allow popups for this site to connect Garmin Connect')
         setGarminLoading(false)
         setGarminPopupOpen(false)
         setGarminCheckingStatus(false)
@@ -400,7 +440,7 @@ export default function DevicesPage() {
       }, 180000)
     } catch (error) {
       console.error('Error connecting Garmin:', error)
-      alert('Failed to connect Garmin. Please try again.')
+      alert('Failed to connect Garmin Connect. Please try again.')
       setGarminLoading(false)
       setGarminPopupOpen(false)
       setGarminCheckingStatus(false)
@@ -433,7 +473,7 @@ export default function DevicesPage() {
     } else {
       setGarminLoading(false)
       setGarminCheckingStatus(false)
-      alert('Garmin connection not detected. Please try connecting again.')
+      alert('Garmin Connect connection not detected. Please try connecting again.')
     }
   }
 
@@ -478,7 +518,7 @@ export default function DevicesPage() {
   }
 
   const handleDisconnectGarmin = async () => {
-    if (!confirm('Disconnect Garmin? This will stop new data from reaching Helfi.')) {
+    if (!confirm('Disconnect Garmin Connect? This will stop new data from reaching Helfi.')) {
       return
     }
 
@@ -487,13 +527,13 @@ export default function DevicesPage() {
       const response = await fetch('/api/garmin/status', { method: 'DELETE' })
       if (response.ok) {
         setGarminConnected(false)
-        alert('Garmin account disconnected successfully')
+        alert('Garmin Connect account disconnected successfully')
       } else {
         throw new Error('Failed to disconnect Garmin')
       }
     } catch (error) {
       console.error('Error disconnecting Garmin:', error)
-      alert('Failed to disconnect Garmin. Please try again.')
+      alert('Failed to disconnect Garmin Connect. Please try again.')
     } finally {
       setGarminLoading(false)
     }
@@ -809,7 +849,7 @@ export default function DevicesPage() {
                     {garminCheckingStatus ? 'Checking connection status...' : 'Popup window is open'}
                   </p>
                   <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
-                    Complete the Garmin login in the popup window. If it gets stuck, click below to close it and re-check.
+                    Complete the Garmin Connect login in the popup window. If it gets stuck, click below to close it and re-check.
                   </p>
                   <button
                     onClick={handleCloseGarminPopupAndCheck}
@@ -861,15 +901,17 @@ export default function DevicesPage() {
                 </button>
               </div>
 
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Webhook endpoint: <span className="font-mono">/api/garmin/webhook</span> (auto-registered). Data is stored in raw form for downstream mapping.
-              </p>
+              {adminToken && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Webhook endpoint: <span className="font-mono">/api/garmin/webhook</span> (auto-registered). Data is stored in raw form for downstream mapping.
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
               <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-lg">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  Connect your Garmin Connect account to allow Helfi to receive daily, sleep, and activity data directly from the Garmin Health API.
+                  Connect your Garmin Connect account to allow Helfi to receive daily, sleep, and activity data directly from Garmin Connect.
                 </p>
                 <button
                   onClick={handleConnectGarmin}

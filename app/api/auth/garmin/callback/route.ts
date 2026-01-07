@@ -111,16 +111,27 @@ export async function GET(request: NextRequest) {
       <!DOCTYPE html>
       <html>
         <body style="font-family: sans-serif; padding: 20px;">
-          <h3>Garmin Connected</h3>
-          <p>You can close this window.</p>
+          <p>Connected. This window will close automatically.</p>
           <script>
-            try {
-              if (window.opener) {
-                window.opener.postMessage({ type: 'GARMIN_CONNECTED', success: true }, '*');
-                window.opener.location.href = '/devices?garmin_connected=true';
-              }
-            } catch (e) {}
-            setTimeout(function() { window.location.href = '/devices?garmin_connected=true'; }, 500);
+            (function () {
+              try {
+                if (window.opener && !window.opener.closed) {
+                  window.opener.postMessage({ type: 'GARMIN_CONNECTED', success: true }, '*');
+                  window.opener.focus();
+                }
+              } catch (e) {}
+              try {
+                window.close();
+              } catch (e) {}
+              setTimeout(function () {
+                try {
+                  window.close();
+                } catch (e) {}
+                if (!window.closed) {
+                  window.location.replace('/devices?garmin_connected=true');
+                }
+              }, 400);
+            })();
           </script>
         </body>
       </html>
