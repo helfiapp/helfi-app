@@ -125,6 +125,17 @@ const HEALTHY_FAT_KEYWORDS = [
   'tahini',
 ] as const
 
+const UNHEALTHY_FAT_KEYWORDS = [
+  'fried',
+  'deep fried',
+  'deep-fried',
+  'battered',
+  'breaded',
+  'tempura',
+  'crispy',
+  'fries',
+] as const
+
 const formatServingsDisplay = (value: number | null | undefined) => {
   const numeric = Number(value)
   if (!Number.isFinite(numeric) || numeric <= 0) return '1'
@@ -143,6 +154,19 @@ const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$
 const containsHealthyFat = (text: string) => {
   const lower = text.toLowerCase()
   return HEALTHY_FAT_KEYWORDS.some((keyword) => {
+    const needle = keyword.toLowerCase()
+    if (needle.includes(' ')) return lower.includes(needle)
+    try {
+      return new RegExp(`\\b${escapeRegex(needle)}\\b`).test(lower)
+    } catch {
+      return lower.includes(needle)
+    }
+  })
+}
+
+const containsUnhealthyFat = (text: string) => {
+  const lower = text.toLowerCase()
+  return UNHEALTHY_FAT_KEYWORDS.some((keyword) => {
     const needle = keyword.toLowerCase()
     if (needle.includes(' ')) return lower.includes(needle)
     try {
@@ -2214,6 +2238,8 @@ export default function FoodDiary() {
   const favoriteClickBlockRef = useRef<Record<string, boolean>>({})
   const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>('all')
   const [favoritesSearch, setFavoritesSearch] = useState('')
+  const [favoritesAllServerEntries, setFavoritesAllServerEntries] = useState<any[] | null>(null)
+  const [favoritesAllServerLoading, setFavoritesAllServerLoading] = useState(false)
   const [showRenameModal, setShowRenameModal] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [renameOriginal, setRenameOriginal] = useState('')
@@ -8368,7 +8394,8 @@ Please add nutritional information manually if needed.`);
         .join(' ')
         .trim()
       const hasHealthyFat = entryText ? containsHealthyFat(entryText) : false
-      if (hasHealthyFat) {
+      const hasUnhealthyFat = entryText ? containsUnhealthyFat(entryText) : false
+      if (hasHealthyFat && !hasUnhealthyFat) {
         const margin = 20
         if (fat < thresholds.fat + margin) fatHigh = false
       }
@@ -8705,6 +8732,9 @@ Please add nutritional information manually if needed.`);
   }
 
   const FOOD_LIBRARY_MAX_ENTRIES = 5000
+  const foodLibraryUpdateRef = useRef<{ source: 'server' | 'user' | 'local'; updatedAt: number } | null>(
+    null,
+  )
   const buildFoodLibraryEntry = (entry: any, fallbackDate: string) => {
     const compacted = compactEntryForSnapshot(entry, fallbackDate)
     if (!compacted || typeof compacted !== 'object') return null
@@ -8794,6 +8824,40 @@ Please add nutritional information manually if needed.`);
     if (!showFavoritesPicker) return
     refreshFoodLibraryFromServer({ force: true, replace: true })
   }, [showFavoritesPicker, refreshFoodLibraryFromServer])
+
+  useEffect(() => {
+    if (!showFavoritesPicker) {
+      setFavoritesAllServerEntries(null)
+      setFavoritesAllServerLoading(false)
+      return
+    }
+    let cancelled = false
+    setFavoritesAllServerLoading(true)
+    ;(async () => {
+      try {
+        const res = await fetch('/api/food-log/library?limit=5000', { cache: 'no-store' })
+        if (!res.ok) return
+        const json = await res.json().catch(() => ({} as any))
+        const logs = Array.isArray(json.logs) ? json.logs : []
+        if (!logs.length) return
+        const mapped = mapLogsToEntries(logs, selectedDate)
+        const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate })
+        const normalized = deduped.map((entry: any) => {
+          const derived = deriveDateFromEntryTimestamp(entry)
+          if (!derived) return entry
+          return { ...entry, localDate: derived }
+        })
+        if (!cancelled) setFavoritesAllServerEntries(normalized)
+      } catch (err) {
+        console.warn('Favorites list refresh failed', err)
+      } finally {
+        if (!cancelled) setFavoritesAllServerLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [showFavoritesPicker, selectedDate])
 
   const foodNameOverrideMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -9056,21 +9120,26 @@ Please add nutritional information manually if needed.`);
     return 'CRDB'
   }
 
-  const collectHistoryMeals = () => {
+  const collectHistoryMeals = (options?: { baseEntries?: any[] }) => {
     const pool: any[] = []
-    const tagEntry = (entry: any, source: 'today' | 'history' | 'library' | 'snapshot') => {
+    const tagEntry = (entry: any, source: 'today' | 'history' | 'library' | 'snapshot' | 'server') => {
       if (!entry || typeof entry !== 'object') return entry
       return { ...entry, __favoritesSource: source }
     }
+    if (Array.isArray(options?.baseEntries)) {
+      pool.push(...options!.baseEntries.map((e: any) => tagEntry(e, 'server')))
+    }
     if (Array.isArray(todaysFoods)) pool.push(...todaysFoods.map((e) => tagEntry(e, 'today')))
     if (Array.isArray(historyFoods)) pool.push(...historyFoods.map((e) => tagEntry(e, 'history')))
-    if (Array.isArray(foodLibrary)) pool.push(...foodLibrary.map((e) => tagEntry(e, 'library')))
-    if (persistentDiarySnapshot?.byDate) {
-      Object.values(persistentDiarySnapshot.byDate).forEach((snap: any) => {
-        if (Array.isArray((snap as any)?.entries)) {
-          pool.push(...(snap as any).entries.map((e: any) => tagEntry(e, 'snapshot')))
-        }
-      })
+    if (!Array.isArray(options?.baseEntries)) {
+      if (Array.isArray(foodLibrary)) pool.push(...foodLibrary.map((e) => tagEntry(e, 'library')))
+      if (persistentDiarySnapshot?.byDate) {
+        Object.values(persistentDiarySnapshot.byDate).forEach((snap: any) => {
+          if (Array.isArray((snap as any)?.entries)) {
+            pool.push(...(snap as any).entries.map((e: any) => tagEntry(e, 'snapshot')))
+          }
+        })
+      }
     }
     const isValidEntry = (entry: any) => {
       if (!entry) return false
@@ -9083,8 +9152,9 @@ Please add nutritional information manually if needed.`);
       const unkeyed: any[] = []
       const sourceRank = (entry: any) => {
         const source = String(entry?.__favoritesSource || '')
-        if (source === 'today') return 3
-        if (source === 'history') return 2
+        if (source === 'today') return 4
+        if (source === 'history') return 3
+        if (source === 'server') return 2
         if (source === 'snapshot') return 1
         return 0
       }
@@ -9137,7 +9207,9 @@ Please add nutritional information manually if needed.`);
   }
 
   const buildFavoritesDatasets = () => {
-    const history = collectHistoryMeals()
+    const serverEntries =
+      Array.isArray(favoritesAllServerEntries) && favoritesAllServerEntries.length > 0 ? favoritesAllServerEntries : null
+    const history = collectHistoryMeals(serverEntries ? { baseEntries: serverEntries } : undefined)
     const parseEntryTimeToMs = (entry: any) => {
       const dateKey = dateKeyForEntry(entry)
       if (!dateKey) return NaN
