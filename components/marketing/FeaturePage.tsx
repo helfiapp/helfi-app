@@ -67,7 +67,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
                 What you get from this feature
               </h2>
-              <ul className="space-y-3 text-sm text-gray-700">
+              <ul className="space-y-2 text-sm text-gray-700">
                 {highlights.map((item) => (
                   <li key={item} className="flex items-start gap-3">
                     <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
@@ -162,7 +162,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                       ))}
                     </div>
                   )}
-                  <ul className="grid gap-3 md:grid-cols-2 text-sm text-gray-700">
+                  <ul className="grid gap-y-2 gap-x-4 md:grid-cols-2 md:gap-x-6 text-sm text-gray-700">
                     {segment.bullets.map((bullet) => (
                       <li key={bullet} className="flex items-start gap-3">
                         <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
@@ -207,7 +207,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
               What this feature unlocks
             </h2>
-            <ul className="grid gap-4 md:grid-cols-2 text-sm text-gray-700 leading-relaxed">
+            <ul className="grid gap-y-2 gap-x-4 md:grid-cols-2 md:gap-x-6 text-sm text-gray-700 leading-relaxed">
               {page.outcomes.map((outcome) => (
                 <li key={outcome} className="flex items-start gap-3">
                   <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
