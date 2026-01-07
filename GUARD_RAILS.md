@@ -210,6 +210,26 @@ the user.
 - When auto‑update‑on‑exit is enabled, the left menu must still work immediately; the save/regeneration should run in the background as the user leaves.
 - If auto‑update‑on‑exit is disabled, leaving via the left menu must trigger the “Update Insights / Add more” prompt when there are unsaved changes.
 - Do NOT allow silent navigation away from Health Setup when auto‑update‑on‑exit is disabled.
+- **HARD LOCK (do not touch without explicit owner approval):** The desktop left menu must remain clickable *inside* Health Setup at all times. Any change that interferes with this is forbidden.
+
+**Protected files (extra locked):**
+- `components/LayoutWrapper.tsx`
+- `app/onboarding/page.tsx`
+
+**Why this is hard‑locked (do not ignore):**
+- This area broke recently and blocked all left‑menu clicks on desktop while in Health Setup. It was extremely difficult to restore.
+
+**Do NOT change or remove:**
+- The sidebar click override in `app/onboarding/page.tsx` that directly listens to left‑menu clicks while on `/onboarding` and forces navigation.
+- The `window.__helfiOnboardingSidebarOverride` flag that prevents `LayoutWrapper` from double‑handling sidebar clicks during Health Setup.
+- The `data-helfi-sidebar="true"` attribute on the sidebar container used for the click override.
+- The background save + insights update on exit (must run when leaving Health Setup, including sidebar navigation).
+
+**If this ever breaks again, restore in this order (do not improvise):**
+1) Ensure `app/onboarding/page.tsx` attaches click handlers to the left‑menu links and calls the background save/insights update before navigation.
+2) Ensure `components/LayoutWrapper.tsx` does **not** intercept sidebar clicks when `window.__helfiOnboardingSidebarOverride` is set.
+3) Ensure the left sidebar container keeps `data-helfi-sidebar="true"`.
+4) Re‑test: left menu click from Health Setup → navigates immediately, and insights update runs in the background.
 
 ### 2.7 Weekly 7‑Day Health Report (Jan 2026 – Locked)
 
