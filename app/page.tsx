@@ -322,66 +322,79 @@ export default function SplashPage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
-              Everything you need for optimal health
+              Explore the Helfi platform
             </h2>
             <p className="text-xl text-gray-600">
-              Comprehensive health tracking meets artificial intelligence
+              Each module has its own feature page with detailed walkthroughs.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            <div
-              className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-              data-chat-anchor="food-photo-analysis"
+            <Link
+              href="/features/health-tracking"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
             >
               <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Smart Health Tracking</h3>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Health Tracking and Wearables</h3>
               <p className="text-gray-600 leading-relaxed">
-                Track weight, sleep, mood, energy levels, and custom health metrics with intelligent pattern recognition. Connect wearables for automatic data sync.
+                Sync Fitbit and Garmin data alongside daily check-ins and trends.
               </p>
-            </div>
+            </Link>
 
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+            <Link
+              href="/features/ai-insights"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+            >
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">AI-Powered Insights</h3>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">AI Insights and Weekly Reports</h3>
               <p className="text-gray-600 leading-relaxed">
-                Get personalized recommendations based on your unique health patterns and goals. Advanced AI analyzes correlations across nutrition, supplements, sleep, and symptoms.
+                Weekly reports built from your last 7 days of data.
               </p>
-            </div>
+            </Link>
 
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Medication & Supplement Safety</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Track supplements and medications with photo recognition. Automatic interaction checking alerts you to dangerous combinations and optimal timing recommendations.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+            <Link
+              href="/features/nutrition-food"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+              data-chat-anchor="food-photo-analysis"
+            >
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Food Photo Analysis</h3>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Food Analysis and Nutrition</h3>
               <p className="text-gray-600 leading-relaxed">
-                Simply snap a photo of your meal. AI identifies ingredients, estimates portions, and calculates complete nutritional breakdown including macros, vitamins, and minerals.
+                Photo-assisted meal logging with flexible edits and trends.
               </p>
-            </div>
+            </Link>
 
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+            <Link
+              href="/features/supplement-safety"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Supplements and Medication Safety</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Track your stack and review possible interactions.
+              </p>
+            </Link>
+
+            <Link
+              href="/features/lab-reports"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+            >
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -389,21 +402,95 @@ export default function SplashPage() {
               </div>
               <h3 className="text-2xl font-bold text-helfi-black mb-4">Lab Report Analysis</h3>
               <p className="text-gray-600 leading-relaxed">
-                Upload PDF lab reports or photos. AI extracts and tracks biomarkers over time, identifying trends and flagging values that need attention. Encrypted and secure.
+                Upload labs and follow biomarkers over time.
               </p>
-            </div>
+            </Link>
 
-            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+            <Link
+              href="/features/medical-imaging"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Medical Image Analysis</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Store medical images with structured summaries.
+              </p>
+            </Link>
+
+            <Link
+              href="/features/symptom-tracking"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+            >
               <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Symptom Tracking & Analysis</h3>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Symptom Tracking</h3>
               <p className="text-gray-600 leading-relaxed">
-                Log symptoms with photos and descriptions. AI identifies patterns, correlates with your nutrition and supplement intake, and suggests potential causes.
+                Log symptoms with context and spot patterns.
               </p>
-            </div>
+            </Link>
+
+            <Link
+              href="/features/mood-tracking"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21a9 9 0 110-18 9 9 0 010 18z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.5 10.5h.01M15.5 10.5h.01" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15c1 1 2.2 1.5 3 1.5s2-.5 3-1.5" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Mood Tracking</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Quick mood check-ins with journaling and trends.
+              </p>
+            </Link>
+
+            <Link
+              href="/features/daily-check-ins"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M5 19h14M7 11v8m10-8v8" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Daily Check-ins and Health Tips</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Simple daily ratings that power weekly insights.
+              </p>
+            </Link>
+
+            <Link
+              href="/features/voice-ai"
+              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Voice AI Assistant</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Log updates and ask questions hands-free.
+              </p>
+            </Link>
+          </div>
+
+          <div className="mt-10 flex justify-center">
+            <Link
+              href="/features"
+              className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
+            >
+              See all feature pages
+            </Link>
           </div>
         </div>
       </section>
@@ -549,9 +636,9 @@ export default function SplashPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-helfi-black mb-3">Instant Health Insights</h3>
+              <h3 className="text-xl font-bold text-helfi-black mb-3">Weekly Health Insights</h3>
               <p className="text-gray-600 text-sm">
-                Get real-time analysis of how your lifestyle choices affect your energy, mood, sleep quality, and overall wellbeing.
+                Review weekly patterns across energy, mood, sleep quality, and nutrition to understand what is working.
               </p>
             </div>
 
@@ -561,9 +648,9 @@ export default function SplashPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-helfi-black mb-3">Predictive Health Analytics</h3>
+              <h3 className="text-xl font-bold text-helfi-black mb-3">Pattern-Based Health Analytics</h3>
               <p className="text-gray-600 text-sm">
-                Identify health trends before they become problems with advanced pattern recognition and predictive modeling.
+                Spot trends earlier with pattern summaries built from your weekly data.
               </p>
             </div>
 
@@ -575,7 +662,7 @@ export default function SplashPage() {
               </div>
               <h3 className="text-xl font-bold text-helfi-black mb-3">Safety & Interaction Alerts</h3>
               <p className="text-gray-600 text-sm">
-                Stay safe with automatic detection of dangerous drug interactions, supplement conflicts, and personalized warnings.
+                Surface potential drug and supplement interactions and keep a clear record of what you are taking.
               </p>
             </div>
           </div>
@@ -591,8 +678,7 @@ export default function SplashPage() {
                 Meet Your AI Health Assistant
               </h2>
               <p className="text-xl text-gray-600 mb-8">
-                Experience the future of health tracking with our revolutionary voice AI technology. 
-                Simply speak naturally and let Helfi handle the complex analysis.
+                Log updates by voice and ask questions about your week. Helfi helps you capture context without typing.
               </p>
               
               <div className="space-y-6">
@@ -618,8 +704,8 @@ export default function SplashPage() {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Instant Analysis</h4>
-                      <p className="text-gray-600 text-sm">"I'm feeling tired after lunch, what might be causing this?"</p>
+                      <h4 className="font-semibold text-gray-900 mb-2">Contextual Questions</h4>
+                      <p className="text-gray-600 text-sm">"I'm feeling tired after lunch. What should I watch this week?"</p>
                     </div>
                   </div>
                 </div>
@@ -632,8 +718,8 @@ export default function SplashPage() {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Smart Recommendations</h4>
-                      <p className="text-gray-600 text-sm">"Based on your pattern, try taking magnesium 2 hours before your usual sleep time."</p>
+                      <h4 className="font-semibold text-gray-900 mb-2">Guided Suggestions</h4>
+                      <p className="text-gray-600 text-sm">"Based on your week, try taking magnesium 2 hours before sleep."</p>
                     </div>
                   </div>
                 </div>
@@ -770,6 +856,59 @@ export default function SplashPage() {
         </div>
       </section>
 
+      {/* Affiliate Program Section */}
+      <section id="affiliate" className="px-6 py-20 bg-gradient-to-br from-emerald-50 to-white">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4">
+              Affiliate program
+            </p>
+            <h2 className="text-4xl font-bold text-helfi-black mb-6">
+              Earn by sharing Helfi
+            </h2>
+            <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+              Join the Helfi affiliate program and earn 50% of net revenue on first-month
+              subscriptions and top-ups. We use last-click attribution with a 30-day window and
+              pay out on a Net-30 schedule once you reach the $50 minimum.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/affiliate/apply"
+                className="px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+              >
+                Apply to the program
+              </Link>
+              <Link
+                href="/affiliate/terms"
+                className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
+              >
+                View affiliate terms
+              </Link>
+            </div>
+          </div>
+          <div className="grid gap-4">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">50% net revenue</h3>
+              <p className="text-gray-600">
+                Earn 50% of net revenue on first-month subscriptions and every top-up purchase.
+              </p>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">30-day window</h3>
+              <p className="text-gray-600">
+                Last-click attribution stays active for 30 days after each referral click.
+              </p>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Net-30 payouts</h3>
+              <p className="text-gray-600">
+                Commissions become payable after 30 days, with a $50 minimum payout threshold.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ Section */}
       <section id="faq" className="px-6 py-20 bg-white">
         <div className="max-w-6xl mx-auto">
@@ -788,10 +927,9 @@ export default function SplashPage() {
                 How does Helfi's AI analyze my health data?
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Our advanced AI engine uses machine learning algorithms to analyze patterns in your nutrition, supplement intake, 
-                sleep, exercise, and mood data. It identifies correlations that humans might miss, providing personalized insights 
-                about what works best for your unique body and lifestyle. The more data you provide, the more accurate and 
-                personalized your recommendations become.
+                Helfi looks at the data you log across nutrition, supplements, sleep, check-ins, and symptoms. Each week we
+                build a report from your last 7 days and surface patterns that are easier to miss in day-to-day tracking. The
+                more consistent your logging, the clearer the weekly trends become.
               </p>
             </div>
 
@@ -800,10 +938,9 @@ export default function SplashPage() {
                 Is my health data secure and private?
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Absolutely. Your health data is encrypted using bank-level security (AES-256 encryption) and stored in 
-                HIPAA-compliant servers. We never sell your personal information to third parties, and you maintain complete 
-                control over your data. You can export or delete your information at any time. Our AI processing happens 
-                securely on our servers, ensuring your sensitive health information never leaves our protected environment.
+                We encrypt stored data and use strict access controls. We never sell your personal information to third
+                parties, and you can export or delete your data at any time. See our Privacy Policy for details on how data
+                is handled.
               </p>
             </div>
 
@@ -812,10 +949,9 @@ export default function SplashPage() {
                 Can Helfi detect dangerous supplement and medication interactions?
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Yes! One of Helfi's most important features is our comprehensive interaction checker. Our database contains 
-                thousands of known interactions between supplements, medications, and nutrients. When you log new supplements 
-                or medications, Helfi automatically checks for potential conflicts and alerts you immediately. This includes 
-                interactions that affect absorption, effectiveness, or could cause adverse effects.
+                Helfi surfaces potential interactions based on known sources and your logged stack. It is designed to help you
+                ask better questions, not replace medical advice. Always confirm interactions with a qualified healthcare
+                provider.
               </p>
             </div>
 
@@ -824,10 +960,9 @@ export default function SplashPage() {
                 How accurate is the food photo recognition?
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Our AI food recognition system has been trained on millions of food images and achieves over 85% accuracy for 
-                common foods. It can identify ingredients, estimate portion sizes, and calculate nutritional content including 
-                calories, macronutrients, vitamins, and minerals. For best results, take photos in good lighting and include 
-                reference objects for size. You can always edit the AI's suggestions to ensure accuracy.
+                Food photo analysis provides estimates that you can review and edit. For best results, take clear photos and
+                adjust ingredients or portions before saving. The goal is speed and consistency, with you in control of final
+                entries.
               </p>
             </div>
 
@@ -836,10 +971,8 @@ export default function SplashPage() {
                 What devices can I connect to Helfi?
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Helfi integrates with popular fitness and health devices including Fitbit, Apple Watch, Oura Ring, Garmin Connect, 
-                Google Fit, Samsung Health, Withings smart scales, and Polar heart rate monitors. These integrations provide 
-                automatic tracking of steps, heart rate, sleep patterns, weight, and exercise data, giving our AI more comprehensive 
-                information to provide better health insights and recommendations.
+                Fitbit and Garmin Connect are supported today. You can also share interest in other devices, and we will notify
+                you as new integrations roll out.
               </p>
             </div>
 
@@ -848,10 +981,8 @@ export default function SplashPage() {
                 How does the voice AI feature work?
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Our voice AI assistant allows you to interact with Helfi using natural speech. Simply say commands like 
-                "Hey Helfi, I just took my morning vitamins" or "I'm feeling tired, what might be causing this?" The AI 
-                processes your speech, logs relevant information automatically, and provides instant analysis and recommendations. 
-                It's designed to understand context and natural language, making health tracking as simple as having a conversation.
+                The voice assistant lets you speak naturally to log entries or ask questions about your week. You can review
+                what gets saved, and it is designed to help you capture context quickly without typing.
               </p>
             </div>
           </div>
