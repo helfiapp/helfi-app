@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 
@@ -20,6 +20,35 @@ type CreditStatusCacheEntry = {
 
 const creditStatusCache: Record<string, CreditStatusCacheEntry> = {}
 const CREDIT_STATUS_TTL_MS = 60 * 1000
+const CREDIT_STATUS_STORAGE_PREFIX = 'helfi:credits:status'
+
+const buildCreditStatusStorageKey = (userKey: string, feature?: string) =>
+  `${CREDIT_STATUS_STORAGE_PREFIX}:${userKey}:${feature || 'all'}`
+
+const readStoredCreditStatus = (userKey: string, feature?: string): CreditStatusCacheEntry | null => {
+  if (!userKey || typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(buildCreditStatusStorageKey(userKey, feature))
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed?.data) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const writeStoredCreditStatus = (userKey: string, feature?: string, data?: any) => {
+  if (!userKey || !data || typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(
+      buildCreditStatusStorageKey(userKey, feature),
+      JSON.stringify({ data, fetchedAt: Date.now() }),
+    )
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 async function fetchCreditStatus(feature?: string, forceRefresh?: boolean): Promise<any | null> {
   const key = feature || 'all'
@@ -55,18 +84,42 @@ async function fetchCreditStatus(feature?: string, forceRefresh?: boolean): Prom
 
 export default function UsageMeter({ compact = false, showResetDate = false, inline = false, className = '', refreshTrigger = 0, feature }: UsageMeterProps) {
   const { data: session } = useSession()
-  const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(null)
-  const [walletRefreshAt, setWalletRefreshAt] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [hasAccess, setHasAccess] = useState(false)
-  const [totalAvailableCents, setTotalAvailableCents] = useState<number>(0)
-  const [monthlyUsedCents, setMonthlyUsedCents] = useState<number>(0)
-  const [monthlyCapCents, setMonthlyCapCents] = useState<number>(0)
+  const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
+  const initialStatus = (() => {
+    if (typeof window === 'undefined') return null
+    const key = feature || 'all'
+    const stored = userCacheKey ? readStoredCreditStatus(userCacheKey, feature) : null
+    const cached = creditStatusCache[key]?.data ? { data: creditStatusCache[key]?.data, fetchedAt: creditStatusCache[key]?.fetchedAt } : null
+    return stored?.data ? stored : cached
+  })()
+  const initialData = initialStatus?.data
+  const initialCredits = initialData?.credits
+  const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(
+    typeof initialData?.percentUsed === 'number' ? initialData.percentUsed : null,
+  )
+  const [walletRefreshAt, setWalletRefreshAt] = useState<string | null>(initialData?.refreshAt || null)
+  const [loading, setLoading] = useState(!initialData)
+  const [hasAccess, setHasAccess] = useState(Boolean(initialData))
+  const [totalAvailableCents, setTotalAvailableCents] = useState<number>(
+    typeof initialData?.totalAvailableCents === 'number' ? initialData.totalAvailableCents : 0,
+  )
+  const [monthlyUsedCents, setMonthlyUsedCents] = useState<number>(
+    typeof initialData?.monthlyUsedCents === 'number' ? initialData.monthlyUsedCents : 0,
+  )
+  const [monthlyCapCents, setMonthlyCapCents] = useState<number>(
+    typeof initialData?.monthlyCapCents === 'number' ? initialData.monthlyCapCents : 0,
+  )
   // Credits (credits == cents) - numeric remaining for display
-  const [creditsTotal, setCreditsTotal] = useState<number | null>(null)
-  const [creditsDailyRemaining, setCreditsDailyRemaining] = useState<number | null>(null)
-  const [creditsAdditionalRemaining, setCreditsAdditionalRemaining] = useState<number | null>(null)
-  const [creditData, setCreditData] = useState<any>(null) // Store full API response for free credits check
+  const [creditsTotal, setCreditsTotal] = useState<number | null>(
+    typeof initialCredits?.total === 'number' ? initialCredits.total : null,
+  )
+  const [creditsDailyRemaining, setCreditsDailyRemaining] = useState<number | null>(
+    typeof initialCredits?.dailyRemaining === 'number' ? initialCredits.dailyRemaining : null,
+  )
+  const [creditsAdditionalRemaining, setCreditsAdditionalRemaining] = useState<number | null>(
+    typeof initialCredits?.additionalRemaining === 'number' ? initialCredits.additionalRemaining : null,
+  )
+  const [creditData, setCreditData] = useState<any>(initialData ?? null) // Store full API response for free credits check
   // Listen for global refresh events so sidebar meter updates immediately after charges
   const [eventTick, setEventTick] = useState(0)
   useEffect(() => {
@@ -80,6 +133,46 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     }
   }, [])
 
+  const applyCreditStatus = useCallback((data: any) => {
+    if (!data) return
+    // Treat any successful status response for a logged‑in user as
+    // sufficient to show the meter. Billing enforcement lives in the
+    // analyzer APIs; this meter is purely a visibility/UX layer.
+    setHasAccess(true)
+    if (typeof data.percentUsed === 'number') {
+      setWalletPercentUsed(data.percentUsed)
+    }
+    if (data.refreshAt) {
+      setWalletRefreshAt(data.refreshAt)
+    }
+    if (typeof data.totalAvailableCents === 'number') {
+      setTotalAvailableCents(data.totalAvailableCents)
+    }
+    if (typeof data.monthlyUsedCents === 'number') {
+      setMonthlyUsedCents(data.monthlyUsedCents)
+    }
+    if (typeof data.monthlyCapCents === 'number') {
+      setMonthlyCapCents(data.monthlyCapCents)
+    }
+    if (data.credits) {
+      if (typeof data.credits.total === 'number') setCreditsTotal(data.credits.total)
+      if (typeof data.credits.dailyRemaining === 'number') setCreditsDailyRemaining(data.credits.dailyRemaining)
+      if (typeof data.credits.additionalRemaining === 'number') setCreditsAdditionalRemaining(data.credits.additionalRemaining)
+    }
+    // Store full data for free credits check
+    setCreditData(data)
+  }, [])
+
+  useEffect(() => {
+    if (!userCacheKey) return
+    if (creditData) return
+    const stored = readStoredCreditStatus(userCacheKey, feature)
+    if (stored?.data) {
+      applyCreditStatus(stored.data)
+      setLoading(false)
+    }
+  }, [userCacheKey, feature, creditData, applyCreditStatus])
+
   useEffect(() => {
     const loadStatus = async () => {
       if (!session?.user) {
@@ -90,33 +183,10 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
         const forceRefresh = Boolean((refreshTrigger || 0) > 0 || eventTick > 0)
         const data = await fetchCreditStatus(feature, forceRefresh)
         if (data) {
-          // Treat any successful status response for a logged‑in user as
-          // sufficient to show the meter. Billing enforcement lives in the
-          // analyzer APIs; this meter is purely a visibility/UX layer.
-          setHasAccess(true)
-
-          if (typeof data.percentUsed === 'number') {
-            setWalletPercentUsed(data.percentUsed)
+          applyCreditStatus(data)
+          if (userCacheKey) {
+            writeStoredCreditStatus(userCacheKey, feature, data)
           }
-          if (data.refreshAt) {
-            setWalletRefreshAt(data.refreshAt)
-          }
-          if (typeof data.totalAvailableCents === 'number') {
-            setTotalAvailableCents(data.totalAvailableCents)
-          }
-          if (typeof data.monthlyUsedCents === 'number') {
-            setMonthlyUsedCents(data.monthlyUsedCents)
-          }
-          if (typeof data.monthlyCapCents === 'number') {
-            setMonthlyCapCents(data.monthlyCapCents)
-          }
-          if (data.credits) {
-            if (typeof data.credits.total === 'number') setCreditsTotal(data.credits.total)
-            if (typeof data.credits.dailyRemaining === 'number') setCreditsDailyRemaining(data.credits.dailyRemaining)
-            if (typeof data.credits.additionalRemaining === 'number') setCreditsAdditionalRemaining(data.credits.additionalRemaining)
-          }
-          // Store full data for free credits check
-          setCreditData(data)
         } else {
           setHasAccess(false)
         }
@@ -129,7 +199,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     loadStatus()
     
     return () => {}
-  }, [session, refreshTrigger, eventTick]) // include eventTick for global refresh
+  }, [session, refreshTrigger, eventTick, feature, userCacheKey, applyCreditStatus]) // include eventTick for global refresh
 
   // Don't render if not authenticated, still loading, or no access
   if (!session || loading || !hasAccess) {
