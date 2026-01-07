@@ -9,14 +9,24 @@ type FeaturePageProps = {
 }
 
 export default function FeaturePage({ page, related }: FeaturePageProps) {
+  const sectionLinks = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'capabilities', label: 'Capabilities' },
+    { id: 'walkthrough', label: 'How it works' },
+    { id: 'use-cases', label: 'Use cases' },
+    { id: 'outcomes', label: 'Outcomes' },
+  ]
+
+  const highlights = page.outcomes.slice(0, 3)
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-50">
       <PublicHeader />
 
       <main>
-        <section className="px-6 pt-10 pb-12">
-          <div className="max-w-6xl mx-auto">
-            <div className="max-w-4xl">
+        <section id="overview" className="px-6 pt-10 pb-12">
+          <div className="max-w-6xl mx-auto grid gap-10 lg:grid-cols-[1.2fr_0.8fr] items-start">
+            <div className="max-w-3xl">
               <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4">
                 Feature overview
               </p>
@@ -29,12 +39,12 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
               <p className="text-base text-gray-600 leading-relaxed mb-5">
                 {page.intro}
               </p>
-              <div className="space-y-4 text-base text-gray-600 leading-relaxed mb-8">
+              <div className="space-y-4 text-base text-gray-600 leading-relaxed">
                 {page.overview.map((paragraph) => (
                   <p key={paragraph}>{paragraph}</p>
                 ))}
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-3 mt-8">
                 <Link
                   href={page.primaryCta.href}
                   className="px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
@@ -49,22 +59,62 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                 </Link>
               </div>
             </div>
+
+            <aside className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-8">
+              <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
+                At a glance
+              </p>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                What you get from this feature
+              </h2>
+              <ul className="space-y-3 text-sm text-gray-700">
+                {highlights.map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="border-t border-gray-100 mt-6 pt-6">
+                <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
+                  Best for
+                </p>
+                <div className="space-y-3 text-sm text-gray-600">
+                  {page.useCases.slice(0, 2).map((useCase) => (
+                    <p key={useCase.title}>
+                      <span className="font-semibold text-gray-900">{useCase.title}:</span> {useCase.description}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </aside>
           </div>
         </section>
 
-        <section className="px-6 pb-16">
+        <div className="border-y border-gray-200 bg-white/80">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex flex-wrap items-center gap-4 text-sm">
+            <span className="text-gray-500 font-medium">On this page</span>
+            {sectionLinks.map((link) => (
+              <a
+                key={link.id}
+                href={`#${link.id}`}
+                className="text-gray-700 hover:text-helfi-green transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <section id="capabilities" className="px-6 py-16">
           <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">
-                  Key capabilities
-                </p>
-                <h2 className="text-3xl font-bold text-gray-900">
-                  Built for deeper health context
-                </h2>
-              </div>
-            </div>
-            <div className="grid gap-6 md:grid-cols-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
+              Key capabilities
+            </p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-8">
+              Built for deeper health context
+            </h2>
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {page.capabilities.map((capability) => (
                 <div
                   key={capability.title}
@@ -82,7 +132,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
           </div>
         </section>
 
-        <section className="px-6 pb-16">
+        <section id="walkthrough" className="px-6 pb-16">
           <div className="max-w-6xl mx-auto">
             <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
               How it works
@@ -90,9 +140,12 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
             <h2 className="text-3xl font-bold text-gray-900 mb-8">
               A detailed walkthrough
             </h2>
-            <div className="space-y-10">
+            <div className="space-y-8">
               {page.segments.map((segment, index) => (
-                <div key={segment.title} className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 shadow-sm">
+                <div
+                  key={segment.title}
+                  className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 shadow-sm"
+                >
                   <p className="text-xs uppercase tracking-[0.2em] text-helfi-green mb-3">
                     Step {String(index + 1).padStart(2, '0')}
                   </p>
@@ -123,7 +176,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
           </div>
         </section>
 
-        <section className="px-6 pb-16">
+        <section id="use-cases" className="px-6 pb-16">
           <div className="max-w-6xl mx-auto">
             <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
               Use cases
@@ -146,7 +199,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
           </div>
         </section>
 
-        <section className="px-6 pb-16">
+        <section id="outcomes" className="px-6 pb-16">
           <div className="max-w-6xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-10 md:p-12">
             <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
               Outcomes

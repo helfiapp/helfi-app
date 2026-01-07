@@ -66,6 +66,7 @@ export const featurePages: FeaturePageContent[] = [
     overview: [
       'You can capture the basics each day and see them alongside activity, sleep, and wellness metrics pulled from supported devices.',
       'Fitbit and Garmin Connect are supported today, and you can share interest in other integrations as the device roster expands.',
+      'As a health tracking app, Helfi keeps wearable health data and daily check-ins connected in a single timeline.',
       'Because the data lives in one place, you can move from daily tracking to weekly review without digging through multiple apps.',
     ],
     summary: 'Daily dashboards and device syncs that keep trends visible.',
@@ -219,6 +220,7 @@ export const featurePages: FeaturePageContent[] = [
       'Weekly reporting keeps the focus on consistent patterns rather than noisy daily fluctuations.',
       'Insights are designed to help you ask better questions and stay aligned with your health goals.',
       'Issue-specific views break down nutrition, supplements, sleep, exercise, and lifestyle inputs in one place.',
+      'This AI health insights layer turns daily tracking into a weekly health report you can act on.',
     ],
     summary: 'Weekly reports and focused insights built from your last 7 days.',
     heroImage: {
@@ -371,6 +373,7 @@ export const featurePages: FeaturePageContent[] = [
       'Helfi is built to reduce the friction of meal logging while keeping the data accurate enough to review each week.',
       'Photo-assisted analysis gives you a starting point, and manual edits keep the final entry under your control.',
       'Consistent food logging feeds into weekly insights and makes nutrition trends more meaningful.',
+      'As a food diary app and nutrition tracking app, it supports macro tracking, packaged foods, and manual entries in one flow.',
     ],
     summary: 'Photo-assisted meal logging with flexible edits and trends.',
     heroImage: {
@@ -394,6 +397,11 @@ export const featurePages: FeaturePageContent[] = [
         title: 'Nutrition trends',
         description:
           'Track macros, calories, and nutrient trends alongside your health goals.',
+      },
+      {
+        title: 'Packaged food lookup',
+        description:
+          'Scan barcodes or search branded foods to log packaged items quickly.',
       },
     ],
     useCases: [
@@ -506,6 +514,27 @@ export const featurePages: FeaturePageContent[] = [
           alt: 'Food recommendations overview',
         },
       },
+      {
+        title: 'Packaged foods and barcode scanning',
+        description:
+          'Log packaged foods faster with barcode lookup and branded product entries.',
+        details: [
+          'Barcode lookup pulls nutrition data from multiple sources so you can add packaged items without manual entry.',
+          'Branded foods stay in your diary with serving sizes and nutrition details you can edit.',
+          'This keeps packaged food logging consistent with your photo and manual entries.',
+        ],
+        bullets: [
+          'Barcode scanning for packaged foods',
+          'Branded product nutrition details',
+          'Fast add to your food diary',
+          'Edit portions and serving sizes',
+          'Keeps entries aligned with weekly insights',
+        ],
+        image: {
+          src: '/screenshots/hero/FOOD ANALYSIS.png',
+          alt: 'Packaged food logging overview',
+        },
+      },
     ],
     seo: {
       title: 'Food Analysis and Nutrition Logging',
@@ -523,6 +552,7 @@ export const featurePages: FeaturePageContent[] = [
       'A clean supplement and medication list makes it easier to stay consistent and avoid overlap.',
       'Helfi surfaces potential conflicts to support safer decisions, not replace medical advice.',
       'Weekly reviews keep your stack aligned with your goals and any recent health changes.',
+      'Think of it as a supplement interaction checker and medication interaction checker built into your daily tracking.',
     ],
     summary: 'Track supplements and medications with safety-focused summaries.',
     heroImage: {
@@ -675,6 +705,7 @@ export const featurePages: FeaturePageContent[] = [
       'Upload PDFs or photos of lab results and keep them organized by date.',
       'Trends help you see how markers change between visits so you can plan follow-up conversations.',
       'Lab summaries connect to your weekly health view so you can track progress over time.',
+      'The lab report analysis workflow supports biomarker tracking without manual spreadsheets.',
     ],
     summary: 'Upload lab reports and track biomarkers over time.',
     heroImage: {
@@ -827,6 +858,7 @@ export const featurePages: FeaturePageContent[] = [
       'Medical images can be scattered across different providers and portals. Helfi keeps them in one place.',
       'Structured summaries help you remember what was discussed so you can prepare for future visits.',
       'The goal is to keep your imaging history visible alongside the rest of your health timeline.',
+      'This medical image analysis workspace keeps your scans and notes organized and easy to revisit.',
     ],
     summary: 'Centralize medical images with AI-assisted summaries.',
     heroImage: {
@@ -979,6 +1011,7 @@ export const featurePages: FeaturePageContent[] = [
       'Structured symptom tracking helps you avoid vague notes that are hard to compare later.',
       'Helfi connects symptom entries with your nutrition, sleep, and supplement data for better context.',
       'Weekly summaries turn daily entries into trends you can act on.',
+      'As a symptom tracker, it keeps your history organized and ready for review.',
     ],
     summary: 'Track symptoms and connect them to nutrition, sleep, and routines.',
     heroImage: {
@@ -1131,6 +1164,7 @@ export const featurePages: FeaturePageContent[] = [
       'Quick mood check-ins keep you consistent without slowing you down.',
       'Helfi pairs mood entries with your broader health data so weekly insights have more depth.',
       'Mood history helps you connect emotional wellbeing with sleep, nutrition, and routines.',
+      'It works as a mood tracker app that stays aligned with your overall health tracking.',
     ],
     summary: 'Quick mood check-ins with journaling and trend views.',
     heroImage: {
@@ -1283,6 +1317,7 @@ export const featurePages: FeaturePageContent[] = [
       'The daily check-in flow keeps tracking lightweight while still capturing the signals that matter most.',
       'Health tips help you stay engaged with small improvements that align with your long-term goals.',
       'The combination builds a reliable weekly story you can review and act on.',
+      'If you need a simple daily health check-in habit, this is designed to stay effortless.',
     ],
     summary: 'Daily check-ins paired with tips and trend history.',
     heroImage: {
@@ -1435,6 +1470,7 @@ export const featurePages: FeaturePageContent[] = [
       'Voice AI keeps your tracking consistent when you are on the move or short on time.',
       'You can review what gets saved so your data stays accurate and intentional.',
       'Voice conversations can be used alongside traditional logging for flexibility.',
+      'Think of it as a voice health assistant that fits into your daily routine.',
     ],
     summary: 'Hands-free logging and voice-based questions for your health data.',
     heroImage: {
