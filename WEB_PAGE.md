@@ -16,6 +16,8 @@ Legend: ✅ completed, ⬜ pending.
 10. ⬜ Increase and place CTAs across sections with clear primary/secondary actions.
 11. ⬜ Implement analytics for page views, time on page, and click tracking (choose tool and opt-in policy).
 12. ⬜ QA pass: accuracy, accessibility, mobile, and performance.
+13. ⬜ Fix food diary banner carousel (desktop smooth auto-scroll + lightbox close button).
+14. ⬜ Normalize public header styling to match homepage header across all pages.
 
 ## Website Audit (Current State)
 - Homepage lives in `app/page.tsx` and is entirely client-rendered, with sections for hero video, screenshot carousel, feature grid, "Why Helfi", benefits, voice AI, pricing, and FAQ.
@@ -71,9 +73,14 @@ Mega menu grouping (future state, after pages exist):
 
 ## Completed Updates (Recent)
 - Feature pages and the `/features` index are live, using a shared PublicHeader.
+- Mega menu UI exists in the PublicHeader (icons + grouping), pending final layout polish.
 - Homepage copy updated for weekly insights, device support, and affiliate program CTA.
 - Feature page layout upgraded with a richer structure (overview, capabilities, walkthrough, use cases, outcomes).
-- Food diary feature page now uses curated imagery and a dedicated expanded overview layout.
+- Food diary feature page now uses curated imagery, banner background, and a carousel region on top of the banner (fixes still needed; see handover).
+
+## Active Issues (Handover)
+- Food diary banner carousel: desktop smooth auto-scroll not visible; lightbox close button not clickable.
+- Public header has a light green gradient near the logo; must match homepage header exactly on every page.
 
 ## Feature Page Layout Rules (Apply to Future Pages)
 - Use an expanded overview layout when imagery is strong: hero image + overview text, followed by two horizontal cards ("At a glance" and "Best for") to avoid empty space.
