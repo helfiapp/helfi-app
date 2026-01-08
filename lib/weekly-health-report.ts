@@ -394,7 +394,7 @@ export async function backfillWeeklyReportState(limit = 50) {
          AND (
            EXISTS (
              SELECT 1 FROM "HealthGoal" g
-             WHERE g."userId" = u.id AND g.name NOT LIKE '__%'
+             WHERE g."userId" = u.id AND g.name NOT LIKE '\\_\\_%' ESCAPE '\\'
            )
            OR EXISTS (
              SELECT 1 FROM "HealthGoal" g

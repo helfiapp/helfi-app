@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getLatestWeeklyReport, getWeeklyReportState } from '@/lib/weekly-health-report'
+import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete } from '@/lib/weekly-health-report'
+import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -9,10 +10,54 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const [state, latest] = await Promise.all([
+  let [state, latest] = await Promise.all([
     getWeeklyReportState(session.user.id),
     getLatestWeeklyReport(session.user.id),
   ])
+
+  if (!state?.nextReportDueAt) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        gender: true,
+        weight: true,
+        height: true,
+        healthGoals: { select: { name: true, category: true } },
+      },
+    })
+
+    if (user) {
+      const hasBasicProfile = !!(user.gender && user.weight && user.height)
+      const visibleGoals = user.healthGoals.filter((goal) => !goal.name.startsWith('__'))
+      const selectedRecord = user.healthGoals.find((goal) => goal.name === '__SELECTED_ISSUES__')
+      let hasSelectedIssues = false
+      if (selectedRecord?.category) {
+        try {
+          const parsed = JSON.parse(selectedRecord.category)
+          hasSelectedIssues = Array.isArray(parsed) && parsed.filter(Boolean).length > 0
+        } catch {
+          hasSelectedIssues = false
+        }
+      }
+
+      let hasCheckinIssues = false
+      try {
+        const rows: Array<{ count: number }> = await prisma.$queryRawUnsafe(
+          'SELECT COUNT(*)::int AS count FROM CheckinIssues WHERE userid = $1',
+          session.user.id
+        )
+        hasCheckinIssues = (rows?.[0]?.count || 0) > 0
+      } catch {
+        hasCheckinIssues = false
+      }
+
+      const eligible = hasBasicProfile && (visibleGoals.length > 0 || hasSelectedIssues || hasCheckinIssues)
+      if (eligible) {
+        await markWeeklyReportOnboardingComplete(session.user.id)
+        state = await getWeeklyReportState(session.user.id)
+      }
+    }
+  }
 
   const reportReady = latest?.status === 'READY'
   const reportLocked = latest?.status === 'LOCKED'
