@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
+import { getWeeklyReportState, markWeeklyReportOnboardingComplete } from '@/lib/weekly-health-report'
 import InsightsLandingClient from './InsightLandingClient'
 
 export default async function InsightsPage() {
@@ -52,6 +53,11 @@ export default async function InsightsPage() {
         </div>
       </div>
     )
+  }
+
+  const weeklyState = await getWeeklyReportState(session.user.id)
+  if (!weeklyState?.nextReportDueAt) {
+    await markWeeklyReportOnboardingComplete(session.user.id)
   }
 
   return (
