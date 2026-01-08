@@ -69,29 +69,28 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
 
       <main>
         {hasBanner && page.bannerImage && (
-          <section className="relative w-full h-56 md:h-72 lg:h-80">
-            <Image
-              src={page.bannerImage.src}
-              alt={page.bannerImage.alt}
-              fill
-              sizes="100vw"
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-black/20" />
-          </section>
-        )}
-
-        {hasCarousel && page.carouselImages && (
-          <section id="gallery" className="px-6 py-12 bg-white">
-            <div className="max-w-6xl mx-auto">
-              <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
-                Food diary gallery
-              </p>
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">
-                Food diary mobile mockups
-              </h2>
-              <MockupCarousel images={page.carouselImages} />
+          <section id="gallery" className="relative w-full overflow-hidden">
+            <div className="absolute inset-0">
+              <Image
+                src={page.bannerImage.src}
+                alt={page.bannerImage.alt}
+                fill
+                sizes="100vw"
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0 bg-black/35" />
+            </div>
+            <div className="relative z-10 px-6 py-12 md:py-16">
+              <div className="max-w-6xl mx-auto">
+                {hasCarousel && page.carouselImages ? (
+                  <div className="rounded-3xl bg-white/85 backdrop-blur-md shadow-xl border border-white/70 p-4 md:p-6">
+                    <MockupCarousel images={page.carouselImages} />
+                  </div>
+                ) : (
+                  <div className="h-36 md:h-44" />
+                )}
+              </div>
             </div>
           </section>
         )}

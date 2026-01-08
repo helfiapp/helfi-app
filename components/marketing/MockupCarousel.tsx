@@ -131,7 +131,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
 
   return (
     <div
-      className="relative"
+      className="relative px-8 md:px-12"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       aria-label={ariaLabel}
@@ -139,7 +139,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
       <div className="overflow-hidden">
         <div
           ref={scrollContainerRef}
-          className="flex gap-4 scroll-smooth"
+          className="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory"
           role="region"
           aria-roledescription="carousel"
         >
@@ -149,9 +149,9 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
               type="button"
               data-carousel-item
               onClick={() => handleImageClick(image)}
-              className="rounded-2xl bg-white shadow-sm border border-gray-100 overflow-hidden focus:outline-none focus:ring-2 focus:ring-helfi-green/40"
+              className="rounded-2xl bg-white shadow-sm border border-gray-100 overflow-hidden focus:outline-none focus:ring-2 focus:ring-helfi-green/40 snap-start"
               style={{
-                flex: isMobile ? '0 0 100%' : '0 0 calc((100% - 4rem) / 5)',
+                flex: isMobile ? '0 0 100%' : '0 0 calc((100% - 6rem) / 5)',
               }}
             >
               <Image
@@ -173,7 +173,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
           <button
             type="button"
             onClick={() => handleArrowClick(-1)}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 h-10 w-10 rounded-full bg-white shadow-md border border-emerald-100 flex items-center justify-center hover:bg-emerald-50 transition-colors"
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-8 h-10 w-10 rounded-full bg-white shadow-md border border-emerald-100 flex items-center justify-center hover:bg-emerald-50 transition-colors z-10"
             aria-label="Previous mockup"
           >
             <svg viewBox="0 0 20 20" className="h-4 w-4 text-gray-700" fill="currentColor" aria-hidden="true">
@@ -183,7 +183,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
           <button
             type="button"
             onClick={() => handleArrowClick(1)}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 h-10 w-10 rounded-full bg-white shadow-md border border-emerald-100 flex items-center justify-center hover:bg-emerald-50 transition-colors"
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-8 h-10 w-10 rounded-full bg-white shadow-md border border-emerald-100 flex items-center justify-center hover:bg-emerald-50 transition-colors z-10"
             aria-label="Next mockup"
           >
             <svg viewBox="0 0 20 20" className="h-4 w-4 text-gray-700" fill="currentColor" aria-hidden="true">
