@@ -26,6 +26,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const [isUpdating, setIsUpdating] = useState(false)
   const [updateMessage, setUpdateMessage] = useState<string | null>(null)
   const [weeklyStatus, setWeeklyStatus] = useState<any>(null)
+  const [countdown, setCountdown] = useState<string | null>(null)
   const lastLoaded = generatedAt
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
@@ -57,6 +58,42 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       mounted = false
     }
   }, [])
+
+  useEffect(() => {
+    const dueRaw = weeklyStatus?.nextReportDueAt
+    if (!dueRaw) {
+      setCountdown(null)
+      return
+    }
+    const dueAt = new Date(dueRaw).getTime()
+    if (Number.isNaN(dueAt)) {
+      setCountdown(null)
+      return
+    }
+
+    const formatCountdown = (ms: number) => {
+      if (ms <= 0) return 'Due now'
+      const totalSeconds = Math.floor(ms / 1000)
+      const days = Math.floor(totalSeconds / 86400)
+      const hours = Math.floor((totalSeconds % 86400) / 3600)
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+      const seconds = totalSeconds % 60
+      const parts = []
+      if (days > 0) parts.push(`${days}d`)
+      if (hours > 0 || days > 0) parts.push(`${hours}h`)
+      parts.push(`${minutes}m`)
+      parts.push(`${seconds}s`)
+      return parts.join(' ')
+    }
+
+    const tick = () => {
+      const remaining = dueAt - Date.now()
+      setCountdown(formatCountdown(remaining))
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [weeklyStatus?.nextReportDueAt])
 
   async function handleUpdateInsights() {
     if (isUpdating) return
@@ -177,7 +214,8 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
               )}
               {!weeklyStatus?.reportReady && !weeklyStatus?.reportLocked && weeklyStatus?.nextReportDueAt && (
                 <p className="text-sm text-gray-500 mt-2">
-                  Next report due {new Date(weeklyStatus.nextReportDueAt).toLocaleDateString()}.
+                  Next report due {new Date(weeklyStatus.nextReportDueAt).toLocaleDateString()}
+                  {countdown ? ` (in ${countdown})` : '.'}
                 </p>
               )}
             </div>
