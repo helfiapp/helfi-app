@@ -8,6 +8,7 @@ export type FeaturePageImage = {
   alt: string
   width?: number
   height?: number
+  kind?: 'phone' | 'photo'
 }
 
 export type FeaturePageCapability = {
@@ -39,6 +40,7 @@ export type FeaturePageContent = {
   heroImage: FeaturePageImage
   showHeroImage?: boolean
   showSegmentImages?: boolean
+  overviewLayout?: 'default' | 'expanded'
   primaryCta: FeaturePageCta
   secondaryCta: FeaturePageCta
   capabilities: FeaturePageCapability[]
@@ -66,6 +68,7 @@ const foodDiaryPhone = (src: string, alt: string): FeaturePageImage => ({
   alt,
   width: 1419,
   height: 2796,
+  kind: 'phone',
 })
 
 const foodDiaryPhoto = (src: string, alt: string): FeaturePageImage => ({
@@ -73,6 +76,7 @@ const foodDiaryPhoto = (src: string, alt: string): FeaturePageImage => ({
   alt,
   width: 1200,
   height: 896,
+  kind: 'photo',
 })
 
 export const featurePages: FeaturePageContent[] = [
@@ -395,12 +399,13 @@ export const featurePages: FeaturePageContent[] = [
       'As a food diary app and nutrition tracking app, it supports macro tracking, packaged foods, and manual entries in one flow.',
     ],
     summary: 'Photo-assisted meal logging with flexible edits and trends.',
-    heroImage: foodDiaryPhone(
-      '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
-      'Food diary entries on a phone'
+    heroImage: foodDiaryPhoto(
+      '/WEBSITE IMAGES/FOOD DIARY/WOMAN ANALYZING HER FOOD.png',
+      'Reviewing a meal with the Helfi app'
     ),
     showHeroImage: true,
     showSegmentImages: true,
+    overviewLayout: 'expanded',
     primaryCta,
     secondaryCta,
     capabilities: [
@@ -452,7 +457,38 @@ export const featurePages: FeaturePageContent[] = [
     ],
     segments: [
       {
-        title: 'Photo-assisted meal logging',
+        title: 'Capture meals in real life',
+        description:
+          'Log meals wherever you eat so the diary stays accurate without interrupting the moment.',
+        details: [
+          'Snap meals at home, in the office, or out at a restaurant to keep the log realistic.',
+          'Photos give you visual context later when you review trends or spot patterns.',
+          'You can capture quickly and add detail once you have time.',
+        ],
+        bullets: [
+          'Designed for real-world meals',
+          'Works at home or while dining out',
+          'Keeps a visual record for later review',
+          'Pairs with the AI scan step next',
+          'No heavy typing to get started',
+        ],
+        image: foodDiaryPhoto(
+          '/WEBSITE IMAGES/FOOD DIARY/WOMAN MAKING FOOD.jpg',
+          'Preparing a meal at home'
+        ),
+        images: [
+          foodDiaryPhoto(
+            '/WEBSITE IMAGES/FOOD DIARY/WOMAN MAKING FOOD.jpg',
+            'Preparing a meal at home'
+          ),
+          foodDiaryPhoto(
+            '/WEBSITE IMAGES/FOOD DIARY/FOOD ANALYZER IN ACTION.jpg',
+            'Meal captured in the moment'
+          ),
+        ],
+      },
+      {
+        title: 'AI photo scan and ingredient breakdown',
         description:
           'Upload a meal photo and start with a structured breakdown.',
         details: [
@@ -463,9 +499,9 @@ export const featurePages: FeaturePageContent[] = [
         bullets: [
           'Quick capture from your phone',
           'Review suggested items before saving',
-          'Keep a visual food record',
-          'Works alongside manual entries',
+          'Ingredient cards auto-populate',
           'Built for fast daily use',
+          'Keeps the diary consistent',
         ],
         image: foodDiaryPhone(
           '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD IMAGE AI SCAN-portrait.png',
@@ -479,14 +515,6 @@ export const featurePages: FeaturePageContent[] = [
           foodDiaryPhone(
             '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN IN ACTION-portrait.png',
             'Food scan in action on a phone'
-          ),
-          foodDiaryPhoto(
-            '/WEBSITE IMAGES/FOOD DIARY/FOOD ANALYZER IN ACTION.jpg',
-            'Food analyzer in action during a meal'
-          ),
-          foodDiaryPhoto(
-            '/WEBSITE IMAGES/FOOD DIARY/SALMON EXAMPLE 2.png',
-            'Salmon meal analysis example'
           ),
         ],
       },
@@ -519,14 +547,6 @@ export const featurePages: FeaturePageContent[] = [
             '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/EXPANDED INGREDIENT CARD-portrait.png',
             'Expanded ingredient card details'
           ),
-          foodDiaryPhone(
-            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ADD MEAL MENU-portrait.png',
-            'Add meal options menu'
-          ),
-          foodDiaryPhoto(
-            '/WEBSITE IMAGES/FOOD DIARY/WOMAN MAKING FOOD.jpg',
-            'Preparing a meal at home'
-          ),
         ],
       },
       {
@@ -557,41 +577,6 @@ export const featurePages: FeaturePageContent[] = [
           foodDiaryPhone(
             '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ENERGY SUMMARY CIRCLES-portrait.png',
             'Energy summary rings and trends'
-          ),
-          foodDiaryPhone(
-            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
-            'Daily food diary entries list'
-          ),
-        ],
-      },
-      {
-        title: 'Food recommendations and context',
-        description:
-          'Use the recommendation tools to explore options that match your goals.',
-        details: [
-          'Helfi can explain how different foods align with your targets or recent trends.',
-          'This helps you make informed choices without starting from scratch every meal.',
-          'Recommendations are meant to support decision making, not replace professional advice.',
-        ],
-        bullets: [
-          'Goal-aligned suggestions',
-          'Explanation views for transparency',
-          'Faster meal planning decisions',
-          'Helps reduce guesswork',
-          'Built around your tracking history',
-        ],
-        image: foodDiaryPhone(
-          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD HEALTH WARNING-portrait.png',
-          'Nutrition context and health warning'
-        ),
-        images: [
-          foodDiaryPhone(
-            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD HEALTH WARNING-portrait.png',
-            'Nutrition context and health warning'
-          ),
-          foodDiaryPhoto(
-            '/WEBSITE IMAGES/FOOD DIARY/WOMAN ANALYZING HER FOOD.png',
-            'Analyzing food choices with the app'
           ),
         ],
       },
@@ -624,13 +609,32 @@ export const featurePages: FeaturePageContent[] = [
             '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON 2-portrait.png',
             'Barcode scan results for a packaged meal'
           ),
-          foodDiaryPhoto(
-            '/WEBSITE IMAGES/FOOD DIARY/FOOD ANALYZER BURGER.png',
-            'Packaged food analysis example'
-          ),
-          foodDiaryPhoto(
-            '/WEBSITE IMAGES/FOOD DIARY/SALMON EXAMPLE 1.png',
-            'Nutrition breakdown example for salmon'
+        ],
+      },
+      {
+        title: 'Food recommendations and context',
+        description:
+          'Use the recommendation tools to explore options that match your goals.',
+        details: [
+          'Helfi can explain how different foods align with your targets or recent trends.',
+          'This helps you make informed choices without starting from scratch every meal.',
+          'Recommendations are meant to support decision making, not replace professional advice.',
+        ],
+        bullets: [
+          'Goal-aligned suggestions',
+          'Explanation views for transparency',
+          'Faster meal planning decisions',
+          'Helps reduce guesswork',
+          'Built around your tracking history',
+        ],
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD HEALTH WARNING-portrait.png',
+          'Nutrition context and health warning'
+        ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD HEALTH WARNING-portrait.png',
+            'Nutrition context and health warning'
           ),
         ],
       },
