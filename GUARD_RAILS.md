@@ -1118,21 +1118,41 @@ days after midnight).
 ## 7.1 Credits Bar Reload Jitter (Jan 2026 - Locked)
 
 **Goal (non-negotiable):** The Credits Remaining bar must **not** reload and
-shift the Food Diary screen when you leave and return. It should appear
-instantly and update quietly in the background.
+shift food flows when you leave and return (Food Diary, Food Analysis, Build Meal,
+Add Ingredient). It should appear instantly and update quietly in the background.
 
 **Do not:**
 - Clear the saved credits display on every return to the page.
 - Render the meter only after a fresh network call.
 
 **Must keep (source of truth):**
-- The credits bar reads a stored value first (from the same session) and shows
-  it immediately.
+- The credits bar reads a stored value first (same session) and shows it
+  immediately across food flows (even if the component remounts).
 - The network call runs after, then updates the bar without a layout jump.
 
 **If this breaks again, fix checklist:**
 1) Restore the "show stored value first" behavior for the credits bar.
 2) Keep the background refresh, but do **not** block initial render on it.
+3) Ensure the cached value is reused on food sub-pages (analysis, build meal,
+   add ingredient) rather than only the main diary view.
+
+## 7.2 Exercise Modal Draft Persistence (Jan 2026 - Locked)
+
+**Goal (non-negotiable):** The "Add exercise" modal must keep the user's
+in-progress inputs when they close and reopen it (manual entry flow), instead of
+resetting to defaults every time.
+
+**Do not:**
+- Reset the draft state on every modal open for new manual entries.
+- Clear user-entered values unless the user explicitly changes them or saves.
+
+**Must keep (source of truth):**
+- Draft state persists for the manual exercise modal between open/close.
+- Editing an existing exercise entry still loads the entry values (not the draft).
+
+**If this breaks again, fix checklist:**
+1) Restore draft persistence for manual exercise entries.
+2) Keep edit-mode hydration (existing entry data overrides the draft).
 
 ## 8. Rules for Future Modifications
 
