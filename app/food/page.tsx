@@ -16584,6 +16584,7 @@ Please add nutritional information manually if needed.`);
 
                 const consumedInUnit = convertKcalToUnit(consumedKcal, energyUnit)
                 const allowanceInUnit = convertKcalToUnit(allowanceWithExercise, energyUnit)
+                const baseAllowanceInUnit = convertKcalToUnit(allowanceCalories, energyUnit)
                 const remainingInUnit =
                   allowanceInUnit !== null && consumedInUnit !== null
                     ? Math.max(0, allowanceInUnit - consumedInUnit)
@@ -16712,11 +16713,11 @@ Please add nutritional information manually if needed.`);
                                   color="#ef4444"
                                 />
                               </div>
-                              {allowanceInUnit !== null && (
+                              {baseAllowanceInUnit !== null && (
                                 <div className="mt-3 text-[11px] text-gray-500 text-center col-span-2">
                                   Daily allowance:{' '}
                                   <span className="font-semibold">
-                                    {Math.round(allowanceInUnit)} {energyUnit}
+                                    {Math.round(baseAllowanceInUnit)} {energyUnit}
                                   </span>
                                 </div>
                               )}
