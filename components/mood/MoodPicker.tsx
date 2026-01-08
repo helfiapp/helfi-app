@@ -33,7 +33,7 @@ export default function MoodPicker({
       </div>
 
       <div className="mt-4 w-full overflow-x-auto no-scrollbar">
-        <div className="flex items-end gap-4 min-w-max px-1 pb-2">
+        <div className="flex items-end gap-4 min-w-max px-1 py-3">
           {MOOD_FACE_OPTIONS.map((o) => {
             const isSelected = o.value === value
             return (
