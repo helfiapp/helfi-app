@@ -26,7 +26,6 @@ export default function RecommendedExplainClient() {
     const qs = new URLSearchParams()
     qs.set('date', date)
     qs.set('category', category)
-    qs.set('generate', '1')
     return `/food/recommended?${qs.toString()}`
   }, [date, category, returnTo])
 
@@ -80,7 +79,7 @@ export default function RecommendedExplainClient() {
               onClick={() => router.push(continueHref)}
               className="flex-1 px-4 py-3 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
             >
-              Continue &amp; Generate Recommendation
+              Continue
             </button>
             <button
               type="button"

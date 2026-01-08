@@ -818,6 +818,8 @@ export async function PUT(req: NextRequest) {
       ? (rawRec as any).tags.map((t: any) => String(t || '').trim()).filter(Boolean).slice(0, 12)
       : []
     const why = typeof (rawRec as any).why === 'string' ? String((rawRec as any).why).trim() : ''
+    const imageUrlRaw = typeof (rawRec as any).imageUrl === 'string' ? String((rawRec as any).imageUrl).trim() : ''
+    const imageUrl = imageUrlRaw ? imageUrlRaw : null
 
     const record: RecommendedMealRecord = {
       id,
@@ -827,6 +829,7 @@ export async function PUT(req: NextRequest) {
       mealName: safeMealName || `AI Recommended ${category}`,
       tags,
       why,
+      imageUrl,
       recipe,
       items: itemsWithNameFixes,
       totals,
@@ -1142,16 +1145,9 @@ export async function POST(req: NextRequest) {
 
   const fitItems = scaleToFitCalories(itemsWithNameFixes, caloriesCap)
   const totals = computeTotalsFromItems(fitItems)
-  const imagePrompt = buildMealImagePrompt(safeMealName || `AI Recommended ${category}`, fitItems)
-
-  // Charge credits only after we have a usable recommendation.
-  const charged = await cm.chargeCents(AI_MEAL_RECOMMENDATION_CREDITS)
-  if (!charged) {
-    return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
-  }
-
   let imageUrl: string | null = null
   try {
+    const imagePrompt = buildMealImagePrompt(safeMealName || `AI Recommended ${category}`, fitItems)
     const imageResponse = await openai.images.generate({
       model: 'gpt-image-1',
       prompt: imagePrompt,
@@ -1164,6 +1160,15 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     console.warn('[ai-meal-recommendation] image generation failed (non-fatal)', err)
+  }
+  if (!imageUrl) {
+    return NextResponse.json({ error: 'Image generation failed' }, { status: 502 })
+  }
+
+  // Charge credits only after we have a usable recommendation.
+  const charged = await cm.chargeCents(AI_MEAL_RECOMMENDATION_CREDITS)
+  if (!charged) {
+    return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
   }
 
   const record: RecommendedMealRecord = {
