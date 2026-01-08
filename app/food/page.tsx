@@ -2472,6 +2472,19 @@ export default function FoodDiary() {
   const [exercisePreviewLoading, setExercisePreviewLoading] = useState<boolean>(false)
   const [exercisePreviewError, setExercisePreviewError] = useState<string | null>(null)
   const [editingExerciseEntry, setEditingExerciseEntry] = useState<any>(null)
+  const exerciseDraftRef = useRef<{
+    selectedExerciseType: any
+    exerciseDurationHours: number
+    exerciseDurationMins: number
+    exerciseDistanceKm: string
+    exerciseDistanceUnit: 'km' | 'mi'
+    exerciseTimeOfDay: string
+    exerciseCaloriesOverride: string
+    exercisePickerCategory: string | null
+    exerciseTypeSearch: string
+    exerciseTypeResults: any[]
+  } | null>(null)
+  const exerciseModalInitRef = useRef(false)
   const autoExerciseSyncRef = useRef<Record<string, boolean>>({})
   const [macroPopup, setMacroPopup] = useState<{
     title: string
@@ -2736,16 +2749,21 @@ export default function FoodDiary() {
   }
 
   useEffect(() => {
-    if (!showAddExerciseModal) return
+    if (!showAddExerciseModal) {
+      exerciseModalInitRef.current = false
+      return
+    }
+    if (exerciseModalInitRef.current) return
+    exerciseModalInitRef.current = true
 
     setExerciseSaveError(null)
-    setExerciseTypeSearch('')
-    setExerciseTypeResults([])
     setExerciseTypeError(null)
     setExercisePreviewKcal(null)
     setExercisePreviewError(null)
 
     if (editingExerciseEntry?.id) {
+      setExerciseTypeSearch('')
+      setExerciseTypeResults([])
       const mins = Number(editingExerciseEntry?.durationMinutes) || 0
       const hours = Math.max(0, Math.min(23, Math.floor(mins / 60)))
       const minutes = Math.max(0, Math.min(59, mins % 60))
@@ -2802,6 +2820,23 @@ export default function FoodDiary() {
       return
     }
 
+    if (exerciseDraftRef.current) {
+      const draft = exerciseDraftRef.current
+      setSelectedExerciseType(draft.selectedExerciseType)
+      setExercisePickerCategory(draft.exercisePickerCategory)
+      setExerciseTypeSearch(draft.exerciseTypeSearch)
+      setExerciseTypeResults(draft.exerciseTypeResults)
+      setExerciseDurationHours(draft.exerciseDurationHours)
+      setExerciseDurationMins(draft.exerciseDurationMins)
+      setExerciseDistanceKm(draft.exerciseDistanceKm)
+      setExerciseDistanceUnit(draft.exerciseDistanceUnit)
+      setExerciseTimeOfDay(draft.exerciseTimeOfDay)
+      setExerciseCaloriesOverride(draft.exerciseCaloriesOverride)
+      return
+    }
+
+    setExerciseTypeSearch('')
+    setExerciseTypeResults([])
     setSelectedExerciseType(null)
     setExercisePickerCategory(null)
     setExerciseDurationHours(0)
@@ -2811,6 +2846,36 @@ export default function FoodDiary() {
     setExerciseTimeOfDay('')
     setExerciseCaloriesOverride('')
   }, [showAddExerciseModal, editingExerciseEntry?.id, energyUnit])
+
+  useEffect(() => {
+    if (!showAddExerciseModal) return
+    if (editingExerciseEntry?.id) return
+    exerciseDraftRef.current = {
+      selectedExerciseType,
+      exerciseDurationHours,
+      exerciseDurationMins,
+      exerciseDistanceKm,
+      exerciseDistanceUnit,
+      exerciseTimeOfDay,
+      exerciseCaloriesOverride,
+      exercisePickerCategory,
+      exerciseTypeSearch,
+      exerciseTypeResults,
+    }
+  }, [
+    showAddExerciseModal,
+    editingExerciseEntry?.id,
+    selectedExerciseType,
+    exerciseDurationHours,
+    exerciseDurationMins,
+    exerciseDistanceKm,
+    exerciseDistanceUnit,
+    exerciseTimeOfDay,
+    exerciseCaloriesOverride,
+    exercisePickerCategory,
+    exerciseTypeSearch,
+    exerciseTypeResults,
+  ])
 
   useEffect(() => {
     if (!showAddExerciseModal) return

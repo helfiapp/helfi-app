@@ -25,10 +25,26 @@ const CREDIT_STATUS_STORAGE_PREFIX = 'helfi:credits:status'
 const buildCreditStatusStorageKey = (userKey: string, feature?: string) =>
   `${CREDIT_STATUS_STORAGE_PREFIX}:${userKey}:${feature || 'all'}`
 
+const buildLastCreditStatusStorageKey = (feature?: string) =>
+  `${CREDIT_STATUS_STORAGE_PREFIX}:last:${feature || 'all'}`
+
 const readStoredCreditStatus = (userKey: string, feature?: string): CreditStatusCacheEntry | null => {
   if (!userKey || typeof window === 'undefined') return null
   try {
     const raw = window.sessionStorage.getItem(buildCreditStatusStorageKey(userKey, feature))
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed?.data) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const readLastStoredCreditStatus = (feature?: string): CreditStatusCacheEntry | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(buildLastCreditStatusStorageKey(feature))
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed?.data) return null
@@ -43,6 +59,10 @@ const writeStoredCreditStatus = (userKey: string, feature?: string, data?: any) 
   try {
     window.sessionStorage.setItem(
       buildCreditStatusStorageKey(userKey, feature),
+      JSON.stringify({ data, fetchedAt: Date.now() }),
+    )
+    window.sessionStorage.setItem(
+      buildLastCreditStatusStorageKey(feature),
       JSON.stringify({ data, fetchedAt: Date.now() }),
     )
   } catch {
@@ -89,8 +109,11 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     if (typeof window === 'undefined') return null
     const key = feature || 'all'
     const stored = userCacheKey ? readStoredCreditStatus(userCacheKey, feature) : null
+    const lastStored = !stored?.data ? readLastStoredCreditStatus(feature) : null
     const cached = creditStatusCache[key]?.data ? { data: creditStatusCache[key]?.data, fetchedAt: creditStatusCache[key]?.fetchedAt } : null
-    return stored?.data ? stored : cached
+    if (stored?.data) return stored
+    if (lastStored?.data) return lastStored
+    return cached
   })()
   const initialData = initialStatus?.data
   const initialCredits = initialData?.credits
@@ -164,9 +187,8 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   }, [])
 
   useEffect(() => {
-    if (!userCacheKey) return
     if (creditData) return
-    const stored = readStoredCreditStatus(userCacheKey, feature)
+    const stored = userCacheKey ? readStoredCreditStatus(userCacheKey, feature) : readLastStoredCreditStatus(feature)
     if (stored?.data) {
       applyCreditStatus(stored.data)
       setLoading(false)
@@ -202,7 +224,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   }, [session, refreshTrigger, eventTick, feature, userCacheKey, applyCreditStatus]) // include eventTick for global refresh
 
   // Don't render if not authenticated, still loading, or no access
-  if (!session || loading || !hasAccess) {
+  if ((!session && !initialData) || loading || !hasAccess) {
     return null
   }
 
