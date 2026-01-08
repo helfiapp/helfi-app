@@ -14908,7 +14908,7 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {editingEntry && aiSavedMealMeta && aiEntryTab !== 'ingredients' ? (
+                  {editingEntry && aiSavedMealMeta && aiEntryTab !== 'ingredients' && (
                     <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4">
                       {aiEntryTab === 'recipe' ? (
                         <>
@@ -14929,7 +14929,7 @@ Please add nutritional information manually if needed.`);
                           })()}
                           {aiSavedMealMeta.recipe?.steps?.length ? (
                             <ol className="space-y-2 text-sm text-gray-700 list-decimal pl-5">
-                              {aiSavedMealMeta.recipe.steps.slice(0, 12).map((step, i) => (
+                              {aiSavedMealMeta.recipe.steps.slice(0, 12).map((step: string, i: number) => (
                                 <li key={i} className="leading-relaxed">
                                   {step}
                                 </li>
@@ -14948,7 +14948,9 @@ Please add nutritional information manually if needed.`);
                         </>
                       )}
                     </div>
-                  ) : (
+                  )}
+
+                  {(!editingEntry || !aiSavedMealMeta || aiEntryTab === 'ingredients') && (
                     <>
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
@@ -15615,12 +15617,12 @@ Please add nutritional information manually if needed.`);
                             const finalText = normalized || 'Description not available yet.';
 
                             return finalText;
-                  })()}
-                            </div>
+                          })()}
                         </div>
                       </div>
-                    </>
+                    </div>
                   )}
+                    </>
                   )}
                     {aiDescription && /(Insufficient credits|trial limit)/i.test(aiDescription) && (
                       <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
