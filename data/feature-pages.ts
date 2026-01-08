@@ -38,6 +38,8 @@ export type FeaturePageContent = {
   overview: string[]
   summary: string
   heroImage: FeaturePageImage
+  bannerImage?: FeaturePageImage
+  carouselImages?: FeaturePageImage[]
   showHeroImage?: boolean
   showSegmentImages?: boolean
   overviewLayout?: 'default' | 'expanded'
@@ -403,6 +405,64 @@ export const featurePages: FeaturePageContent[] = [
       '/WEBSITE IMAGES/FOOD DIARY/WOMAN ANALYZING HER FOOD.png',
       'Reviewing a meal with the Helfi app'
     ),
+    bannerImage: foodDiaryPhoto(
+      '/WEBSITE IMAGES/FOOD DIARY/FOOD DIARY BANNER.jpg',
+      'Food diary banner'
+    ),
+    carouselImages: [
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
+        'Food diary entries list'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD IMAGE AI SCAN-portrait.png',
+        'AI food photo scan'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN IN ACTION-portrait.png',
+        'Food scan in action'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON MEAL-portrait.png',
+        'Food scan results for a salmon meal'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON 2-portrait.png',
+        'Food scan details for salmon'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON 3-portrait.png',
+        'Food scan nutrition breakdown'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/INGREDIENT CARDS-portrait.png',
+        'Ingredient cards view'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/EXPANDED INGREDIENT CARD-portrait.png',
+        'Expanded ingredient card'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ADD MEAL MENU-portrait.png',
+        'Add meal menu'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/COPY-DUPLICATE MEALS-portrait.png',
+        'Copy or duplicate meals'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD HEALTH WARNING-portrait.png',
+        'Food health warning'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ENERGY SUMMARY MACROS-portrait.png',
+        'Macro summary view'
+      ),
+      foodDiaryPhone(
+        '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ENERGY SUMMARY CIRCLES-portrait.png',
+        'Energy summary circles'
+      ),
+    ],
     showHeroImage: true,
     showSegmentImages: true,
     overviewLayout: 'expanded',

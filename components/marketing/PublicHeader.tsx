@@ -251,20 +251,20 @@ export default function PublicHeader() {
                 <path d="M5.5 7.5l4.5 4.5 4.5-4.5" />
               </svg>
             </Link>
-            <div className="absolute left-1/2 top-full z-50 mt-0 w-[min(96vw,1120px)] -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:pointer-events-auto pt-6">
+            <div className="absolute left-1/2 top-full z-50 mt-0 w-[min(96vw,1120px)] -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:pointer-events-auto pt-8">
               <div className="rounded-2xl border border-emerald-100 bg-white shadow-xl p-5">
-                <div className="grid gap-8 md:grid-cols-3 lg:grid-cols-5">
+                <div className="grid gap-10 md:grid-cols-3 lg:grid-cols-5">
                   {megaMenuSections.map((section) => (
                     <div key={section.title} className="space-y-2">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
                         {section.title}
                       </p>
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {section.items.map((item) => (
                           <Link
                             key={item.href}
                             href={item.href}
-                            className="group/item flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-emerald-50 transition-colors"
+                            className="group/item flex items-start gap-3 rounded-lg px-2 py-2.5 hover:bg-emerald-50 transition-colors"
                           >
                             <span className="mt-1">{item.icon}</span>
                             <span>

@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 import type { FeaturePageContent } from '@/data/feature-pages'
 import PublicHeader from '@/components/marketing/PublicHeader'
+import MockupCarousel from '@/components/marketing/MockupCarousel'
 
 type FeaturePageProps = {
   page: FeaturePageContent
@@ -23,6 +24,8 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   const showSegmentImages = page.showSegmentImages === true
   const heroIsPhoto = page.heroImage.kind === 'photo'
   const isExpandedOverview = page.overviewLayout === 'expanded'
+  const hasBanner = !!page.bannerImage
+  const hasCarousel = !!page.carouselImages && page.carouselImages.length > 0
 
   const overviewContent = (
     <div className="max-w-3xl">
@@ -65,6 +68,33 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
       <PublicHeader />
 
       <main>
+        {hasBanner && page.bannerImage && (
+          <section className="relative w-full h-56 md:h-72 lg:h-80">
+            <Image
+              src={page.bannerImage.src}
+              alt={page.bannerImage.alt}
+              fill
+              sizes="100vw"
+              className="object-cover"
+              priority
+            />
+            <div className="absolute inset-0 bg-black/20" />
+          </section>
+        )}
+
+        {hasCarousel && page.carouselImages && (
+          <section id="gallery" className="px-6 py-12 bg-white">
+            <div className="max-w-6xl mx-auto">
+              <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
+                Food diary gallery
+              </p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-6">
+                Food diary mobile mockups
+              </h2>
+              <MockupCarousel images={page.carouselImages} />
+            </div>
+          </section>
+        )}
         <section id="overview" className="px-6 pt-10 pb-12">
           <div className="max-w-6xl mx-auto">
             {isExpandedOverview ? (
