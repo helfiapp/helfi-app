@@ -15243,7 +15243,7 @@ Please add nutritional information manually if needed.`);
                           <div
                             key={index}
                             data-analysis-ingredient-card="1"
-                            className={`bg-white border-gray-200 ${cardPaddingClass} border-b ${index === 0 ? 'border-t' : ''} rounded-none ${isCollapsed ? 'cursor-pointer' : ''}`}
+                            className={`bg-white border-gray-200 ${cardPaddingClass} border-b ${index === 0 ? 'border-t' : ''} rounded-none ${isCollapsed ? 'cursor-pointer' : ''} overflow-hidden min-w-0`}
                             role={isCollapsed ? 'button' : undefined}
                             tabIndex={isCollapsed ? 0 : undefined}
                             onClick={isCollapsed ? toggleExpand : undefined}
@@ -15261,7 +15261,7 @@ Please add nutritional information manually if needed.`);
                             {/* Header row with actions, title, and description */}
                             {isCollapsed ? (
                               <div className="flex items-center justify-between gap-2">
-                                <div className="font-semibold text-gray-900 text-base leading-tight">
+                                <div className="font-semibold text-gray-900 text-base leading-tight break-words">
                                   {displayName}
                                 </div>
                                 <button
@@ -15350,14 +15350,14 @@ Please add nutritional information manually if needed.`);
                                     </button>
                                   )}
                                 </div>
-                                <div className="font-semibold text-gray-900 text-base mt-1">
+                                <div className="font-semibold text-gray-900 text-base mt-1 break-words">
                                   {displayName}
                                 </div>
                                 {item.brand && (
                                   <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
                                 )}
                                 <div 
-                                  className="text-sm text-gray-500 mt-1 md:cursor-default cursor-pointer active:opacity-70"
+                                  className="text-sm text-gray-500 mt-1 md:cursor-default cursor-pointer active:opacity-70 break-words"
                                   onClick={() => {
                                     // On mobile, clicking serving size focuses weight input
                                     if (window.innerWidth < 768) {

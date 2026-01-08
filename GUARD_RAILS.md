@@ -642,6 +642,14 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - Admin user list must surface `totalAvailableCredits` including additional credits (not just top-ups); do not change this aggregation without approval.
 - Any billing/credit change requires explicit user approval and retesting on a Premium account with admin-added credits to confirm the meter and admin modal both show the added amount immediately.
 
+### 3.12 AI Recommended Meals (Jan 2026 – Locked)
+- **Files:** `app/food/recommended/RecommendedMealClient.tsx`, `app/food/page.tsx`, `app/api/ai-meal-recommendation/route.ts`.
+- The Recommended Meal screen must always open on the **Generate** button (no auto-show of the last meal). The Food Diary “Recommended” action passes a `fresh=<timestamp>` query to force a reset. Do not remove this.
+- Saved AI meals must show **Recipe** and **Reason** tabs in the Food Diary:
+  - On save, the meal stores metadata in `nutrition`: `__origin: 'ai-recommended'`, `__aiRecipe`, `__aiWhy`, and `__aiMealId`.
+  - For older saves with no metadata, the diary fetches AI history from `/api/ai-meal-recommendation?date&category` (stored under `AI_MEAL_RECOMMENDATION_GOAL_NAME`) and matches by id/name/items.
+- Do not strip or overwrite these fields or the fallback matching logic; the tabs depend on them.
+
 ---
 
 ## 4. Macros Progress Bars & Remaining Calories Ring (Locked)
