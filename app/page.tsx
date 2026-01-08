@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import HeroCarousel from '@/components/HeroCarousel'
 import PublicHeader from '@/components/marketing/PublicHeader'
 // Back to Top Button Component
 function BackToTopButton() {
@@ -214,10 +213,6 @@ export default function SplashPage() {
           </div>
         </div>
 
-        {/* Full-Screen Horizontal Scrolling Carousel */}
-        <div className="relative z-10 w-full">
-          <HeroCarousel />
-        </div>
       </section>
 
       {/* Features Section */}
