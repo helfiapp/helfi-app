@@ -203,11 +203,6 @@ export default function PublicHeader() {
       ],
     },
   ]
-  const megaMenuColumns: MegaMenuSection[][] = [
-    [megaMenuSections[0], megaMenuSections[1]],
-    [megaMenuSections[2], megaMenuSections[3]],
-    [megaMenuSections[4]],
-  ]
 
   const scrollToSection = (id: string) => {
     if (typeof window === 'undefined') return
@@ -220,7 +215,7 @@ export default function PublicHeader() {
   }
 
   return (
-    <nav className="relative z-10 px-6 py-1">
+    <nav className="relative z-50 px-6 py-1">
       <div className="max-w-6xl mx-auto flex justify-between items-center">
         <div className="flex items-center">
           <button
@@ -256,41 +251,37 @@ export default function PublicHeader() {
                 <path d="M5.5 7.5l4.5 4.5 4.5-4.5" />
               </svg>
             </Link>
-            <div className="absolute left-0 top-full z-20 mt-3 w-[min(92vw,760px)] translate-y-2 opacity-0 pointer-events-none transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:pointer-events-auto">
-              <div className="rounded-2xl border border-emerald-100 bg-white shadow-xl p-5">
-                <div className="grid gap-6 md:grid-cols-3">
-                  {megaMenuColumns.map((column, columnIndex) => (
-                    <div key={`mega-column-${columnIndex}`} className="space-y-5">
-                      {column.map((section) => (
-                        <div key={section.title} className="space-y-2">
-                          <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
-                            {section.title}
-                          </p>
-                          <div className="space-y-2">
-                            {section.items.map((item) => (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                className="group/item flex items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-emerald-50 transition-colors"
-                              >
-                                <span className="mt-1">{item.icon}</span>
-                                <span>
-                                  <span className="block text-sm font-semibold text-gray-900 group-hover/item:text-helfi-green">
-                                    {item.label}
-                                  </span>
-                                  <span className="block text-xs text-gray-500 leading-relaxed">
-                                    {item.description}
-                                  </span>
-                                </span>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+            <div className="absolute left-1/2 top-full z-50 mt-3 w-[min(96vw,1040px)] -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:pointer-events-auto">
+              <div className="rounded-2xl border border-emerald-100 bg-white shadow-xl p-4">
+                <div className="grid gap-5 md:grid-cols-3 lg:grid-cols-5">
+                  {megaMenuSections.map((section) => (
+                    <div key={section.title} className="space-y-2">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+                        {section.title}
+                      </p>
+                      <div className="space-y-1.5">
+                        {section.items.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className="group/item flex items-start gap-2 rounded-lg px-2 py-1 hover:bg-emerald-50 transition-colors"
+                          >
+                            <span className="mt-1">{item.icon}</span>
+                            <span>
+                              <span className="block text-sm font-semibold text-gray-900 group-hover/item:text-helfi-green">
+                                {item.label}
+                              </span>
+                              <span className="block text-[11px] text-gray-500 leading-snug">
+                                {item.description}
+                              </span>
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 flex items-center justify-between rounded-2xl bg-emerald-50/80 px-4 py-3">
+                <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50/80 px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Explore all features</p>
                     <p className="text-xs text-gray-600">See the full platform breakdown in one place.</p>

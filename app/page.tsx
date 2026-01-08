@@ -159,7 +159,7 @@ export default function SplashPage() {
       <PublicHeader />
 
       {/* Hero Section */}
-      <section className="relative w-full min-h-screen flex flex-col overflow-visible bg-gray-900" style={{ overflow: 'visible' }}>
+      <section className="relative w-full min-h-[72vh] md:min-h-[78vh] flex flex-col justify-center overflow-visible bg-gray-900" style={{ overflow: 'visible' }}>
         {/* Full-Width Background Video */}
         <div className="absolute inset-0 z-0">
           <video
@@ -191,9 +191,9 @@ export default function SplashPage() {
         </div>
 
         {/* Content Container */}
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 md:pt-8 pb-2 md:pb-4">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
           {/* Text Content */}
-          <div className="text-center mb-6">
+          <div className="text-center">
             <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
               Your Personal <span className="text-helfi-green">Health Intelligence Platform</span>
             </h1>
