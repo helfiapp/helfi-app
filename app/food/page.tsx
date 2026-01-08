@@ -2466,6 +2466,7 @@ export default function FoodDiary() {
   const [exerciseDistanceKm, setExerciseDistanceKm] = useState<string>('')
   const [exerciseDistanceUnit, setExerciseDistanceUnit] = useState<'km' | 'mi'>('km')
   const [exerciseTimeOfDay, setExerciseTimeOfDay] = useState<string>('')
+  const [exerciseCaloriesOverride, setExerciseCaloriesOverride] = useState<string>('')
   const [exerciseSaveError, setExerciseSaveError] = useState<string | null>(null)
   const [exercisePreviewKcal, setExercisePreviewKcal] = useState<number | null>(null)
   const [exercisePreviewLoading, setExercisePreviewLoading] = useState<boolean>(false)
@@ -2774,6 +2775,15 @@ export default function FoodDiary() {
         setExerciseTimeOfDay('')
       }
 
+      const overrideRaw = (editingExerciseEntry as any)?.rawPayload?.caloriesOverride
+      const overrideValue = Number(overrideRaw)
+      if (Number.isFinite(overrideValue) && overrideValue > 0) {
+        const display = convertKcalToUnit(overrideValue, energyUnit)
+        setExerciseCaloriesOverride(display !== null ? String(Math.round(display)) : '')
+      } else {
+        setExerciseCaloriesOverride('')
+      }
+
       const type = editingExerciseEntry?.exerciseType
       if (type?.id) {
         setSelectedExerciseType(type)
@@ -2799,7 +2809,8 @@ export default function FoodDiary() {
     setExerciseDistanceKm('')
     setExerciseDistanceUnit('km')
     setExerciseTimeOfDay('')
-  }, [showAddExerciseModal, editingExerciseEntry?.id])
+    setExerciseCaloriesOverride('')
+  }, [showAddExerciseModal, editingExerciseEntry?.id, energyUnit])
 
   useEffect(() => {
     if (!showAddExerciseModal) return
@@ -2954,6 +2965,26 @@ export default function FoodDiary() {
         // ignore
       }
     }
+
+    const caloriesOverrideRaw = exerciseCaloriesOverride.trim()
+    let caloriesOverride: number | null = null
+    if (caloriesOverrideRaw.length > 0) {
+      const parsed = Number(caloriesOverrideRaw)
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        setExerciseSaveError('Please enter a valid calorie value.')
+        return
+      }
+      const inKcal = energyUnit === 'kJ' ? parsed / KCAL_TO_KJ : parsed
+      const rounded = Math.round(inKcal)
+      if (!Number.isFinite(rounded) || rounded <= 0 || rounded > 50_000) {
+        setExerciseSaveError('Please enter a valid calorie value.')
+        return
+      }
+      caloriesOverride = rounded
+    }
+    const existingOverrideRaw = (editingExerciseEntry as any)?.rawPayload?.caloriesOverride
+    const existingOverride = Number(existingOverrideRaw)
+    const hasExistingOverride = Number.isFinite(existingOverride) && existingOverride > 0
     try {
       const isEditing = Boolean(editingExerciseEntry?.id)
       const endpoint = isEditing ? `/api/exercise-entries/${encodeURIComponent(editingExerciseEntry.id)}` : '/api/exercise-entries'
@@ -2964,6 +2995,9 @@ export default function FoodDiary() {
         startTime: startTime || null,
       }
       if (!isEditing) payload.date = selectedDate
+      if (caloriesOverrideRaw.length > 0 || hasExistingOverride) {
+        payload.caloriesOverride = caloriesOverride
+      }
 
       const res = await fetch(endpoint, {
         method: isEditing ? 'PATCH' : 'POST',
@@ -12965,22 +12999,40 @@ Please add nutritional information manually if needed.`);
 	                      />
 	                    </div>
 
-	                    {(exercisePreviewLoading || exercisePreviewKcal !== null || exercisePreviewError) && (
-	                      <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
-	                        <div className="text-xs text-gray-500">Estimated calories</div>
-	                        {exercisePreviewLoading ? (
-	                          <div className="text-sm font-semibold text-gray-700">Calculating…</div>
-	                        ) : exercisePreviewError ? (
-	                          <div className="text-sm font-semibold text-red-600">{exercisePreviewError}</div>
-	                        ) : (
-	                          <div className="text-lg font-semibold text-gray-900">
-	                            {Math.round(convertKcalToUnit(exercisePreviewKcal || 0, energyUnit) || 0)} {energyUnit}
-	                          </div>
-	                        )}
-	                      </div>
-	                    )}
+                    {(exercisePreviewLoading || exercisePreviewKcal !== null || exercisePreviewError) && (
+                      <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                        <div className="text-xs text-gray-500">Estimated calories</div>
+                        {exercisePreviewLoading ? (
+                          <div className="text-sm font-semibold text-gray-700">Calculating…</div>
+                        ) : exercisePreviewError ? (
+                          <div className="text-sm font-semibold text-red-600">{exercisePreviewError}</div>
+                        ) : (
+                          <div className="text-lg font-semibold text-gray-900">
+                            {Math.round(convertKcalToUnit(exercisePreviewKcal || 0, energyUnit) || 0)} {energyUnit}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-	                    {exerciseSaveError && <div className="text-sm text-red-600">{exerciseSaveError}</div>}
+                    <div className="space-y-1">
+                      <label className="block text-sm font-semibold text-gray-900">Calories burned (optional)</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={exerciseCaloriesOverride}
+                          onChange={(e) => setExerciseCaloriesOverride(e.target.value)}
+                          placeholder={`e.g., ${energyUnit === 'kJ' ? '500' : '150'}`}
+                          className="w-full pr-14 px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                        />
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-semibold">
+                          {energyUnit}
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500">Leave blank to use the estimate.</div>
+                    </div>
+
+                    {exerciseSaveError && <div className="text-sm text-red-600">{exerciseSaveError}</div>}
 
 	                    <div className="grid grid-cols-2 gap-3 pt-1">
 	                      <button

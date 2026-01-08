@@ -66,6 +66,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     body = null
   }
 
+  const hasCaloriesOverride = body && Object.prototype.hasOwnProperty.call(body, 'caloriesOverride')
+  const caloriesOverrideRaw = hasCaloriesOverride ? body.caloriesOverride : undefined
+  const caloriesOverride =
+    caloriesOverrideRaw === null || caloriesOverrideRaw === undefined || caloriesOverrideRaw === ''
+      ? null
+      : Number(caloriesOverrideRaw)
+
   const durationMinutes = body?.durationMinutes !== undefined ? Number(body.durationMinutes) : existing.durationMinutes
   const hasDistanceKm = body && Object.prototype.hasOwnProperty.call(body, 'distanceKm')
   const distanceKm = hasDistanceKm
@@ -88,6 +95,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (distanceKm !== null && (!Number.isFinite(distanceKm) || distanceKm <= 0 || distanceKm > 500)) {
     return NextResponse.json({ error: 'Invalid distanceKm' }, { status: 400 })
   }
+  if (
+    hasCaloriesOverride &&
+    caloriesOverride !== null &&
+    (!Number.isFinite(caloriesOverride) || caloriesOverride <= 0 || caloriesOverride > 50_000)
+  ) {
+    return NextResponse.json({ error: 'Invalid caloriesOverride' }, { status: 400 })
+  }
   if (startTime && Number.isNaN(startTime.getTime())) {
     return NextResponse.json({ error: 'Invalid startTime' }, { status: 400 })
   }
@@ -104,15 +118,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Exercise type not found' }, { status: 404 })
   }
 
-  const health = await getHealthProfileForUser(session.user.id)
-  const weightToUse = health.weightKg
-  if (!weightToUse) {
-    return NextResponse.json(
-      { error: 'Please update your weight in Health Setup to log exercise calories.' },
-      { status: 400 },
-    )
-  }
-
   const inferred = inferMetAndLabel({
     exerciseName: type.name,
     baseMet: type.met,
@@ -120,11 +125,51 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     distanceKm: distanceKm ?? null,
   })
 
-  const calories = calculateExerciseCalories({
-    met: inferred.met,
-    weightKg: weightToUse,
-    durationMinutes: inferred.durationMinutes,
-  })
+  const existingOverrideRaw = (existing.rawPayload as any)?.caloriesOverride
+  const existingOverride = Number(existingOverrideRaw)
+  const hasExistingOverride = Number.isFinite(existingOverride) && existingOverride > 0 && existingOverride <= 50_000
+  const caloriesOverrideRounded = caloriesOverride !== null ? Math.round(caloriesOverride) : null
+  const effectiveOverride = hasCaloriesOverride
+    ? caloriesOverrideRounded
+    : hasExistingOverride
+      ? Math.round(existingOverride)
+      : null
+
+  let calories: number
+  if (effectiveOverride !== null) {
+    if (!Number.isFinite(effectiveOverride) || effectiveOverride <= 0 || effectiveOverride > 50_000) {
+      return NextResponse.json({ error: 'Invalid caloriesOverride' }, { status: 400 })
+    }
+    calories = effectiveOverride
+  } else {
+    const health = await getHealthProfileForUser(session.user.id)
+    const weightToUse = health.weightKg
+    if (!weightToUse) {
+      return NextResponse.json(
+        { error: 'Please update your weight in Health Setup to log exercise calories.' },
+        { status: 400 },
+      )
+    }
+    calories = calculateExerciseCalories({
+      met: inferred.met,
+      weightKg: weightToUse,
+      durationMinutes: inferred.durationMinutes,
+    })
+  }
+
+  let nextRawPayload = existing.rawPayload
+  if (hasCaloriesOverride) {
+    const base =
+      existing.rawPayload && typeof existing.rawPayload === 'object' && !Array.isArray(existing.rawPayload)
+        ? { ...(existing.rawPayload as Record<string, any>) }
+        : {}
+    if (caloriesOverrideRounded !== null) {
+      base.caloriesOverride = caloriesOverrideRounded
+    } else {
+      delete base.caloriesOverride
+    }
+    nextRawPayload = Object.keys(base).length > 0 ? base : null
+  }
 
   const updated = await prisma.exerciseEntry.update({
     where: { id: existing.id },
@@ -136,6 +181,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       label: inferred.label,
       met: inferred.met,
       calories,
+      rawPayload: nextRawPayload,
     },
     include: { exerciseType: true },
   })

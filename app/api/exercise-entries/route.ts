@@ -52,6 +52,11 @@ export async function POST(request: NextRequest) {
   const durationMinutes = Number(body?.durationMinutes)
   const distanceKmRaw = body?.distanceKm
   const distanceKm = distanceKmRaw === null || distanceKmRaw === undefined ? null : Number(distanceKmRaw)
+  const caloriesOverrideRaw = body?.caloriesOverride
+  const caloriesOverride =
+    caloriesOverrideRaw === null || caloriesOverrideRaw === undefined || caloriesOverrideRaw === ''
+      ? null
+      : Number(caloriesOverrideRaw)
   const date = normalizeLocalDate(body?.date || '')
   const startTime = body?.startTime ? new Date(String(body.startTime)) : null
 
@@ -63,6 +68,12 @@ export async function POST(request: NextRequest) {
   }
   if (distanceKm !== null && (!Number.isFinite(distanceKm) || distanceKm <= 0 || distanceKm > 500)) {
     return NextResponse.json({ error: 'Invalid distanceKm' }, { status: 400 })
+  }
+  if (
+    caloriesOverride !== null &&
+    (!Number.isFinite(caloriesOverride) || caloriesOverride <= 0 || caloriesOverride > 50_000)
+  ) {
+    return NextResponse.json({ error: 'Invalid caloriesOverride' }, { status: 400 })
   }
   if (!date) {
     return NextResponse.json({ error: 'Missing or invalid date (YYYY-MM-DD)' }, { status: 400 })
@@ -76,14 +87,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Exercise type not found' }, { status: 404 })
   }
 
-  const health = await getHealthProfileForUser(session.user.id)
-  if (!health.weightKg) {
-    return NextResponse.json(
-      { error: 'Please update your weight in Health Setup to log exercise calories.' },
-      { status: 400 },
-    )
-  }
-
   const inferred = inferMetAndLabel({
     exerciseName: type.name,
     baseMet: type.met,
@@ -91,11 +94,28 @@ export async function POST(request: NextRequest) {
     distanceKm: distanceKm ?? null,
   })
 
-  const calories = calculateExerciseCalories({
-    met: inferred.met,
-    weightKg: health.weightKg,
-    durationMinutes: inferred.durationMinutes,
-  })
+  const caloriesOverrideRounded = caloriesOverride !== null ? Math.round(caloriesOverride) : null
+  let calories: number
+
+  if (caloriesOverrideRounded !== null) {
+    if (caloriesOverrideRounded <= 0 || caloriesOverrideRounded > 50_000) {
+      return NextResponse.json({ error: 'Invalid caloriesOverride' }, { status: 400 })
+    }
+    calories = caloriesOverrideRounded
+  } else {
+    const health = await getHealthProfileForUser(session.user.id)
+    if (!health.weightKg) {
+      return NextResponse.json(
+        { error: 'Please update your weight in Health Setup to log exercise calories.' },
+        { status: 400 },
+      )
+    }
+    calories = calculateExerciseCalories({
+      met: inferred.met,
+      weightKg: health.weightKg,
+      durationMinutes: inferred.durationMinutes,
+    })
+  }
 
   const entry = await prisma.exerciseEntry.create({
     data: {
@@ -109,6 +129,7 @@ export async function POST(request: NextRequest) {
       label: inferred.label,
       met: inferred.met,
       calories,
+      rawPayload: caloriesOverrideRounded !== null ? { caloriesOverride: caloriesOverrideRounded } : null,
     },
   })
 
