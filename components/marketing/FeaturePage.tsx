@@ -84,9 +84,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
             <div className="relative z-10 px-6 py-12 md:py-16">
               <div className="max-w-6xl mx-auto">
                 {hasCarousel && page.carouselImages ? (
-                  <div className="rounded-3xl bg-white/85 backdrop-blur-md shadow-xl border border-white/70 p-4 md:p-6">
-                    <MockupCarousel images={page.carouselImages} />
-                  </div>
+                  <MockupCarousel images={page.carouselImages} />
                 ) : (
                   <div className="h-36 md:h-44" />
                 )}
