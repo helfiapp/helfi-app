@@ -76,7 +76,7 @@ Mega menu grouping (future state, after pages exist):
 - Mega menu UI exists in the PublicHeader (icons + grouping), pending final layout polish.
 - Homepage copy updated for weekly insights, device support, and affiliate program CTA.
 - Feature page layout upgraded with a richer structure (overview, capabilities, walkthrough, use cases, outcomes).
-- Food diary feature page now uses curated imagery, banner background, and a carousel region on top of the banner (fixes still needed; see handover).
+- Food diary feature page now uses curated imagery, banner background, and a carousel region on top of the banner (fixes still needed; see active issues below).
 
 ## Active Issues (Handover)
 - Food diary banner carousel: desktop smooth auto-scroll not visible; lightbox close button not clickable.
