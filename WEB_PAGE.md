@@ -6,9 +6,10 @@ Legend: ✅ completed, ⬜ pending.
 1. ✅ Audit current website (homepage + public pages) for navigation, copy, CTAs, imagery, and SEO gaps.
 2. ✅ Inventory app features and routes to align marketing content with real workflows.
 3. ✅ Define new information architecture: feature pages + hover mega menu for "Features".
-4. ⬜ Separate features into dedicated pages and wire them into navigation + footer.
-5. ⬜ Rebuild homepage hero and mockups with updated PWA-style device frames/screens.
-6. ⬜ Rewrite homepage + feature copy to match current product behavior (7-day insights, pricing, data flow).
+4. ✅ Separate features into dedicated pages and add a feature index.
+5. ⬜ Implement mega menu for "Features" once all feature pages are finalized.
+6. ⬜ Rebuild homepage hero and mockups with updated PWA-style device frames/screens.
+7. ✅ Rewrite homepage + feature copy to match current product behavior (7-day insights, pricing, data flow).
 7. ⬜ Expand FAQ into a comprehensive dedicated page and remove/shorten homepage FAQ.
 8. ⬜ SEO overhaul: per-page metadata, OG tags, sitemap/robots, schema, internal linking, and non-generic copy.
 9. ⬜ Add a health imagery library and place images strategically across the site.
@@ -67,3 +68,17 @@ Mega menu grouping (future state, after pages exist):
 - Understand: AI Insights, Supplement Safety
 - Assist: Voice AI
 - Programs: Affiliate Program (link), FAQ, Help
+
+## Completed Updates (Recent)
+- Feature pages and the `/features` index are live, using a shared PublicHeader.
+- Homepage copy updated for weekly insights, device support, and affiliate program CTA.
+- Feature page layout upgraded with a richer structure (overview, capabilities, walkthrough, use cases, outcomes).
+- Food diary feature page now uses curated imagery and a dedicated expanded overview layout.
+
+## Feature Page Layout Rules (Apply to Future Pages)
+- Use an expanded overview layout when imagery is strong: hero image + overview text, followed by two horizontal cards ("At a glance" and "Best for") to avoid empty space.
+- Do not mix lifestyle photos with phone mockups inside the same step. If a step uses photos, make it a full-width photo gallery. If it uses phones, keep them in a phone-only grid.
+- Use fewer, higher-impact images rather than every available asset. Each image must clearly match the step content.
+- Lifestyle photos should feel large and premium (full-width cards with object-cover). Phone mockups should be contained (object-contain) and never oversized.
+- Keep step layouts balanced: text left, imagery right; maintain consistent spacing and align CTA rows.
+- Avoid visual clutter and unused whitespace; every block should feel intentional and content-dense.
