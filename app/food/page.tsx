@@ -2255,6 +2255,8 @@ export default function FoodDiary() {
   } | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [aiEntryTab, setAiEntryTab] = useState<'ingredients' | 'recipe' | 'reason'>('ingredients')
+  const [aiMealHistory, setAiMealHistory] = useState<any[]>([])
+  const [aiMealHistoryCategory, setAiMealHistoryCategory] = useState<string>('')
   const [isDeletingEditingEntry, setIsDeletingEditingEntry] = useState(false)
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
@@ -12445,14 +12447,17 @@ Please add nutritional information manually if needed.`);
 
     const storedGoals = Array.isArray((userData as any)?.healthGoals) ? (userData as any).healthGoals : []
     const stored = storedGoals.find((goal: any) => goal?.name === AI_MEAL_RECOMMENDATION_GOAL_NAME)
-    if (!stored?.category) return null
     let parsed: any = null
-    try {
-      parsed = JSON.parse(stored.category)
-    } catch {
-      parsed = null
+    if (stored?.category) {
+      try {
+        parsed = JSON.parse(stored.category)
+      } catch {
+        parsed = null
+      }
     }
-    const history = Array.isArray(parsed?.history) ? parsed.history : Array.isArray(parsed) ? parsed : []
+    const historyFromGoals = Array.isArray(parsed?.history) ? parsed.history : Array.isArray(parsed) ? parsed : []
+    const historyFromState = Array.isArray(aiMealHistory) ? aiMealHistory : []
+    const history = historyFromGoals.length > 0 ? historyFromGoals : historyFromState
     if (!history.length) return null
 
     const normalize = (value: string) =>
@@ -12481,6 +12486,7 @@ Please add nutritional information manually if needed.`);
       const recItemNames = recItems.map((item: any) => normalize(String(item?.name || ''))).filter(Boolean)
       const overlap = recItemNames.filter((name: string) => entryItemSet.has(name)).length
       const strongNameMatch = entryName && recName && recName === entryName
+      if (strongNameMatch && entryItemSet.size === 0) return true
       const overlapNeeded = entryItemSet.size <= 1 ? 1 : 2
       return (strongNameMatch && overlap >= overlapNeeded) || overlap >= Math.max(2, overlapNeeded)
     }
@@ -12505,7 +12511,43 @@ Please add nutritional information manually if needed.`);
     const hasWhy = Boolean(whyRaw)
     if (!hasRecipe && !hasWhy) return null
     return { recipe: hasRecipe ? recipe : null, why: whyRaw }
-  }, [editingEntry?.nutrition, editingEntry?.items, editingEntry?.description, editingEntry?.meal, userData?.healthGoals])
+  }, [
+    editingEntry?.nutrition,
+    editingEntry?.items,
+    editingEntry?.description,
+    editingEntry?.meal,
+    userData?.healthGoals,
+    aiMealHistory,
+  ])
+
+  const hasAiSavedMealMeta = Boolean(aiSavedMealMeta)
+
+  useEffect(() => {
+    if (!editingEntry) return
+    if (hasAiSavedMealMeta) return
+    const cat = normalizeCategory(editingEntry?.meal || editingEntry?.category)
+    if (!cat) return
+    if (aiMealHistoryCategory === cat && aiMealHistory.length > 0) return
+    const qs = new URLSearchParams()
+    qs.set('date', selectedDate)
+    qs.set('category', cat)
+    fetch(`/api/ai-meal-recommendation?${qs.toString()}`, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || !Array.isArray(data.history)) return
+        setAiMealHistory(data.history)
+        setAiMealHistoryCategory(cat)
+      })
+      .catch(() => {})
+  }, [
+    editingEntry?.id,
+    editingEntry?.meal,
+    editingEntry?.category,
+    selectedDate,
+    hasAiSavedMealMeta,
+    aiMealHistoryCategory,
+    aiMealHistory.length,
+  ])
 
   useEffect(() => {
     setAiEntryTab('ingredients')
