@@ -21,6 +21,14 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
   const animationFrameRef = useRef<number | null>(null)
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    images.forEach((image) => {
+      const preload = new window.Image()
+      preload.src = image.src
+    })
+  }, [images])
+
+  useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
     }
@@ -107,11 +115,12 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
     const container = scrollContainerRef.current
     if (!container) return
 
-    const speed = 0.35
+    const speed = 0.45
     const animate = () => {
       if (!scrollContainerRef.current) return
-      const maxScroll = scrollContainerRef.current.scrollWidth / 2
-      if (scrollContainerRef.current.scrollLeft >= maxScroll) {
+      const slideWidth = getScrollAmount() || scrollContainerRef.current.clientWidth
+      const loopPoint = slideWidth * images.length
+      if (scrollContainerRef.current.scrollLeft >= loopPoint) {
         scrollContainerRef.current.scrollLeft = 0
       }
       scrollContainerRef.current.scrollLeft += speed
@@ -210,7 +219,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
               type="button"
               data-carousel-item
               onClick={() => handleImageClick(index % images.length)}
-              className="rounded-2xl bg-black/20 shadow-lg backdrop-blur-sm border border-white/30 overflow-hidden focus:outline-none focus:ring-2 focus:ring-white/70 transition-transform hover:-translate-y-1"
+              className="rounded-2xl bg-transparent border border-transparent overflow-hidden focus:outline-none focus:ring-2 focus:ring-white/70 transition-transform hover:-translate-y-1"
               style={{
                 flex: isMobile ? '0 0 100%' : '0 0 calc((100% - 6rem) / 5)',
               }}
@@ -280,11 +289,19 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
       )}
 
       {expandedIndex !== null && !isMobile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6 cursor-zoom-out"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setExpandedIndex(null)}
+        >
           <button
             type="button"
-            onClick={() => setExpandedIndex(null)}
-            className="absolute top-6 right-6 h-10 w-10 rounded-full bg-white/90 text-gray-700 hover:bg-white"
+            onClick={(event) => {
+              event.stopPropagation()
+              setExpandedIndex(null)
+            }}
+            className="absolute top-6 right-6 h-11 w-11 rounded-full bg-white text-gray-700 hover:bg-gray-100 shadow-md"
             aria-label="Close image preview"
           >
             <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
@@ -293,7 +310,10 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
           </button>
           <button
             type="button"
-            onClick={() => setExpandedIndex((prev) => (prev === null ? prev : (prev - 1 + images.length) % images.length))}
+            onClick={(event) => {
+              event.stopPropagation()
+              setExpandedIndex((prev) => (prev === null ? prev : (prev - 1 + images.length) % images.length))
+            }}
             className="absolute left-8 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white"
             aria-label="Previous image"
           >
@@ -301,7 +321,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
               <path d="M12.5 5l-5 5 5 5" />
             </svg>
           </button>
-          <div className="max-w-6xl w-full px-6">
+          <div className="max-w-6xl w-full px-6" onClick={(event) => event.stopPropagation()}>
             <Image
               src={images[expandedIndex].src}
               alt={images[expandedIndex].alt}
@@ -314,7 +334,10 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
           </div>
           <button
             type="button"
-            onClick={() => setExpandedIndex((prev) => (prev === null ? prev : (prev + 1) % images.length))}
+            onClick={(event) => {
+              event.stopPropagation()
+              setExpandedIndex((prev) => (prev === null ? prev : (prev + 1) % images.length))
+            }}
             className="absolute right-8 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white"
             aria-label="Next image"
           >
