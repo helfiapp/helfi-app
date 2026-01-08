@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { calculateExerciseCalories } from '@/lib/exercise/calories'
 import { getHealthProfileForUser } from '@/lib/exercise/health-profile'
@@ -170,6 +171,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
     nextRawPayload = Object.keys(base).length > 0 ? base : null
   }
+  const rawPayloadUpdate = hasCaloriesOverride
+    ? nextRawPayload === null
+      ? Prisma.DbNull
+      : nextRawPayload
+    : undefined
 
   const updated = await prisma.exerciseEntry.update({
     where: { id: existing.id },
@@ -181,7 +187,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       label: inferred.label,
       met: inferred.met,
       calories,
-      rawPayload: nextRawPayload,
+      rawPayload: rawPayloadUpdate,
     },
     include: { exerciseType: true },
   })

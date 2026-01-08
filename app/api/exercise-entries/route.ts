@@ -117,6 +117,9 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  const rawPayload =
+    caloriesOverrideRounded !== null ? { caloriesOverride: caloriesOverrideRounded } : undefined
+
   const entry = await prisma.exerciseEntry.create({
     data: {
       userId: session.user.id,
@@ -129,7 +132,7 @@ export async function POST(request: NextRequest) {
       label: inferred.label,
       met: inferred.met,
       calories,
-      rawPayload: caloriesOverrideRounded !== null ? { caloriesOverride: caloriesOverrideRounded } : null,
+      rawPayload,
     },
   })
 
