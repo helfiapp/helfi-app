@@ -301,12 +301,10 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
               event.stopPropagation()
               setExpandedIndex(null)
             }}
-            className="absolute top-6 right-6 h-11 w-11 rounded-full bg-white text-gray-700 hover:bg-gray-100 shadow-md"
+            className="absolute top-6 right-6 h-11 w-11 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md flex items-center justify-center text-2xl leading-none"
             aria-label="Close image preview"
           >
-            <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
-              <path d="M6 6l8 8M14 6l-8 8" />
-            </svg>
+            <span aria-hidden="true">×</span>
           </button>
           <button
             type="button"
