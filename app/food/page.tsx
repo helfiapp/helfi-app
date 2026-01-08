@@ -2102,6 +2102,7 @@ export default function FoodDiary() {
     scope: 'overall' | 'item'
     itemIndex?: number | null
   } | null>(null)
+  const [feedbackRescanMessage, setFeedbackRescanMessage] = useState<string | null>(null)
   const [showAnalysisModeModal, setShowAnalysisModeModal] = useState(false)
   const [showAnalysisExitConfirm, setShowAnalysisExitConfirm] = useState(false)
   const [pendingPhotoPicker, setPendingPhotoPicker] = useState(false)
@@ -4769,6 +4770,7 @@ const applyStructuredItems = (
     barcodeTag?: { barcode: string; source?: string }
     analysisSeq?: number
     autoMatchEnabled?: boolean
+    preserveExplicitCountsFrom?: any[]
   },
 ) => {
   let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
@@ -4778,6 +4780,7 @@ const applyStructuredItems = (
   const barcodeTag = options?.barcodeTag
   const analysisSeq = options?.analysisSeq ?? null
   const autoMatchEnabled = options?.autoMatchEnabled ?? false
+  const preserveExplicitCountsFrom = options?.preserveExplicitCountsFrom ?? null
 
   console.log('🔍 applyStructuredItems called:', {
     itemsFromApiCount: Array.isArray(itemsFromApi) ? itemsFromApi.length : 0,
@@ -5013,14 +5016,57 @@ const applyStructuredItems = (
     }
   })
 
-  const hasLabelReviewFlag = scrubbedItems.some((item: any) => item?.labelNeedsReview)
+  const stabilizeExplicitCounts = (items: any[], priorItems: any[] | null | undefined) => {
+    if (!Array.isArray(items) || items.length === 0) return items
+    if (!Array.isArray(priorItems) || priorItems.length === 0) return items
+    const normalizeCountKey = (value: string) =>
+      normalizeFoodName(String(value || ''))
+        .replace(/\b\d+(?:\.\d+)?\b/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    const candidates = priorItems
+      .map((item, index) => {
+        const label = `${item?.name || ''} ${item?.serving_size || ''}`.trim()
+        if (!hasExplicitPieceCountInLabel(label)) return null
+        const key = normalizeCountKey(item?.name || '')
+        if (!key) return null
+        const pieces = getPiecesPerServing(item)
+        if (!pieces || pieces <= 1) return null
+        return { index, key, pieces }
+      })
+      .filter(Boolean) as Array<{ index: number; key: string; pieces: number }>
+    if (candidates.length === 0) return items
+    const used = new Set<number>()
+    return items.map((item) => {
+      const label = `${item?.name || ''} ${item?.serving_size || ''}`.trim()
+      if (hasExplicitPieceCountInLabel(label)) return item
+      const key = normalizeCountKey(item?.name || '')
+      if (!key) return item
+      const match = candidates.find((candidate) => candidate.key === key && !used.has(candidate.index))
+      if (!match) return item
+      used.add(match.index)
+      return {
+        ...item,
+        piecesPerServing: match.pieces,
+        pieces: match.pieces,
+        servings: 1,
+      }
+    })
+  }
+
+  const stabilizedItems =
+    Array.isArray(preserveExplicitCountsFrom) && preserveExplicitCountsFrom.length > 0
+      ? stabilizeExplicitCounts(scrubbedItems, preserveExplicitCountsFrom)
+      : scrubbedItems
+
+  const hasLabelReviewFlag = stabilizedItems.some((item: any) => item?.labelNeedsReview)
   if (hasLabelReviewFlag) {
     finalTotal = null
   }
 
-  setAnalyzedItems(scrubbedItems)
+  setAnalyzedItems(stabilizedItems)
   if (analysisSeq && autoMatchEnabled) {
-    autoMatchItemsToDatabase(scrubbedItems, analysisSeq, analysisText)
+    autoMatchItemsToDatabase(stabilizedItems, analysisSeq, analysisText)
   }
 
   console.log('📊 Processing totals:', {
@@ -5035,8 +5081,8 @@ const applyStructuredItems = (
   // 3. Extracted from analysis text (fallback)
   let totalsToUse: NutritionTotals | null = null
 
-  if (scrubbedItems.length > 0) {
-    const fromItems = recalculateNutritionFromItems(scrubbedItems)
+  if (stabilizedItems.length > 0) {
+    const fromItems = recalculateNutritionFromItems(stabilizedItems)
     console.log(
       '📊 Recalculated totals from enriched items:',
       fromItems ? JSON.stringify(fromItems) : 'null',
@@ -5064,9 +5110,9 @@ const applyStructuredItems = (
     setAnalyzedNutrition(totalsToUse)
     setAnalyzedTotal(convertTotalsForStorage(totalsToUse))
     console.log('✅ Set nutrition totals:', JSON.stringify(totalsToUse))
-  } else if (scrubbedItems.length > 0) {
+  } else if (stabilizedItems.length > 0) {
     // If we have items but no totals, recalculate one more time as a last resort
-    const lastResortTotals = recalculateNutritionFromItems(scrubbedItems)
+    const lastResortTotals = recalculateNutritionFromItems(stabilizedItems)
     if (lastResortTotals) {
       setAnalyzedNutrition(lastResortTotals)
       setAnalyzedTotal(convertTotalsForStorage(lastResortTotals))
@@ -7233,6 +7279,14 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     const isFeedbackRescan = Boolean(options?.feedbackRescan)
     const fileToAnalyze = fileOverride || photoFile
     if (!fileToAnalyze) return;
+
+    const previousSnapshot = isFeedbackRescan
+      ? {
+          items: Array.isArray(analyzedItems) ? analyzedItems.map((item) => ({ ...item })) : [],
+          totals: analyzedNutrition ? { ...analyzedNutrition } : null,
+          description: aiDescription,
+        }
+      : null
     
     setShowAnalysisModeModal(false);
     setIsAnalyzing(true);
@@ -7396,12 +7450,30 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
           ? { barcode: barcodeLabelFlow.barcode, source: 'label-photo' }
           : undefined
         const analysisSeq = ++analysisSequenceRef.current
-        applyStructuredItems(result.items, result.total, result.analysis, {
+        const applied = applyStructuredItems(result.items, result.total, result.analysis, {
           barcodeTag,
           allowTextFallback: false,
           analysisSeq,
           autoMatchEnabled: false,
+          preserveExplicitCountsFrom: previousSnapshot?.items,
         });
+        if (isFeedbackRescan && previousSnapshot?.totals && applied?.total) {
+          const prevCalories = Number(previousSnapshot.totals.calories ?? 0)
+          const nextCalories = Number(applied.total.calories ?? 0)
+          if (prevCalories > 0 && nextCalories > 0) {
+            const ratio = nextCalories / prevCalories
+            const isOutsideBand = ratio < 0.6 || ratio > 1.6
+            if (isOutsideBand) {
+              setAnalyzedItems(previousSnapshot.items)
+              setAnalyzedNutrition(previousSnapshot.totals)
+              setAnalyzedTotal(convertTotalsForStorage(previousSnapshot.totals))
+              if (previousSnapshot.description) {
+                setAiDescription(previousSnapshot.description)
+              }
+              showQuickToast('Re-check result looked very different. Keeping your previous result.')
+            }
+          }
+        }
         // Set warnings and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
@@ -8207,6 +8279,14 @@ Please add nutritional information manually if needed.`);
     setTimeout(() => setQuickToast(null), 1400)
   }
 
+  const blurActiveElement = () => {
+    if (typeof document === 'undefined') return
+    try {
+      const active = document.activeElement as HTMLElement | null
+      active?.blur?.()
+    } catch {}
+  }
+
   const FEEDBACK_REASONS = [
     'Wrong food detected',
     'Missing ingredients',
@@ -8388,6 +8468,7 @@ Please add nutritional information manually if needed.`);
       ? 'Rechecking for missing ingredients…'
       : 'Rechecking analysis…'
     setFeedbackRescanState({ scope: 'overall', itemIndex: null })
+    setFeedbackRescanMessage(message)
     showQuickToast(message)
     try {
       await analyzePhoto(photoFile, {
@@ -8398,6 +8479,7 @@ Please add nutritional information manually if needed.`);
       })
     } finally {
       setFeedbackRescanState(null)
+      setFeedbackRescanMessage(null)
     }
   }
 
@@ -14661,6 +14743,19 @@ Please add nutritional information manually if needed.`);
                 
                 {/* Premium Nutrition Display */}
                 <div className="p-4 sm:p-6">
+                  {feedbackRescanMessage && (
+                    <div className="sticky top-3 z-20 mb-4">
+                      <div className="mx-auto w-full max-w-xl rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                          {feedbackRescanMessage}
+                        </div>
+                        <div className="mt-1 text-xs text-emerald-700">
+                          This can take up to 2 minutes. Please keep this page open.
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {barcodeLabelFlow && (
                     <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
@@ -16509,6 +16604,7 @@ Please add nutritional information manually if needed.`);
                     <button
                       onClick={() => {
                         if (isFeedbackModalLocked) return
+                        blurActiveElement()
                         setFeedbackPrompt(null)
                         setFeedbackReasons([])
                         setFeedbackComment('')
@@ -16549,7 +16645,7 @@ Please add nutritional information manually if needed.`);
                         value={feedbackComment}
                         onChange={(e) => setFeedbackComment(e.target.value)}
                         rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         placeholder="Tell us what went wrong (optional)"
                       />
                     </div>
@@ -16558,6 +16654,7 @@ Please add nutritional information manually if needed.`);
                       <button
                         onClick={() => {
                           if (isFeedbackModalLocked) return
+                          blurActiveElement()
                           setFeedbackPrompt(null)
                           setFeedbackReasons([])
                           setFeedbackComment('')
@@ -16594,6 +16691,7 @@ Please add nutritional information manually if needed.`);
                           setFeedbackSubmitting(false)
                           showQuickToast('Thanks for the feedback!')
                           if (scope === 'overall') {
+                            blurActiveElement()
                             setFeedbackPrompt(null)
                             setFeedbackReasons([])
                             setFeedbackComment('')
@@ -16603,6 +16701,7 @@ Please add nutritional information manually if needed.`);
                             if (itemIndex === null || itemIndex === undefined) return
                             const success = await triggerItemFeedbackRescan(itemIndex, reasonsSnapshot, commentSnapshot)
                             if (success) {
+                              blurActiveElement()
                               setFeedbackPrompt(null)
                               setFeedbackReasons([])
                               setFeedbackComment('')
