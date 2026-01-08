@@ -50,6 +50,7 @@ type RecommendedMealRecord = {
   mealName: string
   tags: string[]
   why: string
+  imageUrl?: string | null
   recipe?: {
     servings?: number | null
     prepMinutes?: number | null
@@ -394,6 +395,24 @@ const truncate = (value: string, maxChars: number) => {
 }
 
 const safeJsonCompact = (value: any, maxChars: number) => truncate(JSON.stringify(value ?? null), maxChars)
+
+const buildMealImagePrompt = (mealName: string, items: RecommendedItem[]) => {
+  const safeName = mealName || 'healthy meal'
+  const ingredientList = items
+    .map((item) => String(item?.name || '').trim())
+    .filter(Boolean)
+    .slice(0, 8)
+  const ingredientsLine = ingredientList.length > 0 ? `The dish should visibly include: ${ingredientList.join(', ')}.` : ''
+  return [
+    `Photorealistic overhead food photo of a plated ${safeName}.`,
+    ingredientsLine,
+    'Serve on a single ceramic plate on a clean, neutral surface.',
+    'Natural daylight, realistic textures, no text, no hands, no packaging.',
+    'Keep portions realistic and appetizing.',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
 
 const extractTotalsFromNutrients = (nutrients: any): MacroTotals => {
   if (!nutrients || typeof nutrients !== 'object') {
@@ -1123,11 +1142,28 @@ export async function POST(req: NextRequest) {
 
   const fitItems = scaleToFitCalories(itemsWithNameFixes, caloriesCap)
   const totals = computeTotalsFromItems(fitItems)
+  const imagePrompt = buildMealImagePrompt(safeMealName || `AI Recommended ${category}`, fitItems)
 
   // Charge credits only after we have a usable recommendation.
   const charged = await cm.chargeCents(AI_MEAL_RECOMMENDATION_CREDITS)
   if (!charged) {
     return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+  }
+
+  let imageUrl: string | null = null
+  try {
+    const imageResponse = await openai.images.generate({
+      model: 'gpt-image-1',
+      prompt: imagePrompt,
+      size: '1024x1024',
+      response_format: 'b64_json',
+    } as any)
+    const b64 = (imageResponse as any)?.data?.[0]?.b64_json
+    if (typeof b64 === 'string' && b64.trim()) {
+      imageUrl = `data:image/png;base64,${b64}`
+    }
+  } catch (err) {
+    console.warn('[ai-meal-recommendation] image generation failed (non-fatal)', err)
   }
 
   const record: RecommendedMealRecord = {
@@ -1138,6 +1174,7 @@ export async function POST(req: NextRequest) {
     mealName: safeMealName || `AI Recommended ${category}`,
     tags,
     why,
+    imageUrl,
     recipe,
     items: fitItems,
     totals,

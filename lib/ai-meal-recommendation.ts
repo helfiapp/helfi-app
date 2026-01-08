@@ -2,7 +2,7 @@ export type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncate
 
 // Fixed, disclosed cost for generating an AI meal recommendation.
 // Credits are wallet "cents" in Helfi's billing system.
-export const AI_MEAL_RECOMMENDATION_CREDITS = 6
+export const AI_MEAL_RECOMMENDATION_CREDITS = 13
 
 export const AI_MEAL_RECOMMENDATION_GOAL_NAME = '__AI_MEAL_RECOMMENDATIONS__'
 
