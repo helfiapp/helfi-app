@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import type { FeaturePageImage } from '@/data/feature-pages'
 
@@ -16,8 +17,10 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
   const [isHovering, setIsHovering] = useState(false)
   const [manualPause, setManualPause] = useState(false)
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const animationFrameRef = useRef<number | null>(null)
+  const scrollOffsetRef = useRef(0)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -26,6 +29,11 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
       preload.src = image.src
     })
   }, [images])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setPortalTarget(document.body)
+  }, [])
 
   useEffect(() => {
     const checkMobile = () => {
@@ -98,7 +106,8 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
     const container = scrollContainerRef.current
     if (!container) return
 
-    const speed = 0.45
+    scrollOffsetRef.current = container.scrollLeft
+    const speed = 0.7
     const animate = () => {
       const activeContainer = scrollContainerRef.current
       if (!activeContainer) return
@@ -109,8 +118,9 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
         return
       }
       const loopPoint = totalScrollWidth / 2
-      const nextScroll = activeContainer.scrollLeft + speed
-      activeContainer.scrollLeft = nextScroll >= loopPoint ? nextScroll - loopPoint : nextScroll
+      const nextScroll = scrollOffsetRef.current + speed
+      scrollOffsetRef.current = nextScroll >= loopPoint ? nextScroll - loopPoint : nextScroll
+      activeContainer.scrollLeft = scrollOffsetRef.current
       animationFrameRef.current = requestAnimationFrame(animate)
     }
     animationFrameRef.current = requestAnimationFrame(animate)
@@ -272,62 +282,58 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
         </div>
       )}
 
-      {expandedIndex !== null && !isMobile && (
-        <>
-          <div
-            className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/85 p-6 cursor-zoom-out"
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setExpandedIndex(null)}
-          >
+      {expandedIndex !== null && !isMobile && portalTarget &&
+        createPortal(
+          <div className="fixed inset-0 z-[2000]" role="dialog" aria-modal="true">
+            <div className="absolute inset-0 bg-black/85 cursor-zoom-out" onClick={() => setExpandedIndex(null)} />
             <button
               type="button"
-              onClick={(event) => {
-                event.stopPropagation()
+              onClick={() => setExpandedIndex(null)}
+              className="absolute top-6 right-6 z-[2010] h-11 w-11 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md flex items-center justify-center text-2xl leading-none"
+              aria-label="Close image preview"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setExpandedIndex((prev) => (prev === null ? prev : (prev - 1 + images.length) % images.length))
               }}
-              className="absolute left-8 top-1/2 -translate-y-1/2 z-[1010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white pointer-events-auto"
+              className="absolute left-8 top-1/2 -translate-y-1/2 z-[2010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white"
               aria-label="Previous image"
             >
               <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
                 <path d="M12.5 5l-5 5 5 5" />
               </svg>
             </button>
-            <div className="max-w-6xl w-full px-6" onClick={(event) => event.stopPropagation()}>
-              <Image
-                src={images[expandedIndex].src}
-                alt={images[expandedIndex].alt}
-                width={images[expandedIndex].width ?? 1419}
-                height={images[expandedIndex].height ?? 2796}
-                sizes="90vw"
-                className="w-full h-auto max-h-[85vh] object-contain rounded-2xl"
-                priority
-              />
+            <div className="relative z-[2010] flex h-full items-center justify-center px-6">
+              <div className="max-w-6xl w-full">
+                <Image
+                  src={images[expandedIndex].src}
+                  alt={images[expandedIndex].alt}
+                  width={images[expandedIndex].width ?? 1419}
+                  height={images[expandedIndex].height ?? 2796}
+                  sizes="90vw"
+                  className="w-full h-auto max-h-[85vh] object-contain rounded-2xl"
+                  priority
+                />
+              </div>
             </div>
             <button
               type="button"
-              onClick={(event) => {
-                event.stopPropagation()
+              onClick={() => {
                 setExpandedIndex((prev) => (prev === null ? prev : (prev + 1) % images.length))
               }}
-              className="absolute right-8 top-1/2 -translate-y-1/2 z-[1010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white pointer-events-auto"
+              className="absolute right-8 top-1/2 -translate-y-1/2 z-[2010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white"
               aria-label="Next image"
             >
               <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
                 <path d="M7.5 5l5 5-5 5" />
               </svg>
             </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setExpandedIndex(null)}
-            className="fixed top-6 right-6 z-[2000] h-11 w-11 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md flex items-center justify-center text-2xl leading-none"
-            aria-label="Close image preview"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        </>
-      )}
+          </div>,
+          portalTarget
+        )}
     </div>
   )
 }
