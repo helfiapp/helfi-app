@@ -2695,6 +2695,25 @@ export default function FoodDiary() {
     setShowAddExerciseModal(true)
   }
 
+  const resetExerciseDraft = () => {
+    exerciseDraftRef.current = null
+    setExerciseSaveError(null)
+    setExerciseTypeError(null)
+    setExercisePreviewKcal(null)
+    setExercisePreviewError(null)
+    setExercisePreviewLoading(false)
+    setExerciseTypeSearch('')
+    setExerciseTypeResults([])
+    setSelectedExerciseType(null)
+    setExercisePickerCategory(null)
+    setExerciseDurationHours(0)
+    setExerciseDurationMins(30)
+    setExerciseDistanceKm('')
+    setExerciseDistanceUnit('km')
+    setExerciseTimeOfDay('')
+    setExerciseCaloriesOverride('')
+  }
+
   const openEditExercise = (entry: any) => {
     if (!entry?.id) return
     if (String(entry?.source || '').toUpperCase() !== 'MANUAL') {
@@ -12706,18 +12725,29 @@ Please add nutritional information manually if needed.`);
 	                  {editingExerciseEntry?.id ? 'Edit exercise' : 'Add exercise'}
 	                </div>
 	              </div>
-	              <button
-	                onClick={() => {
-	                  setShowAddExerciseModal(false)
-	                  setEditingExerciseEntry(null)
-	                }}
-	                className="p-2 rounded-xl hover:bg-gray-100"
-	                aria-label="Close"
-	              >
-	                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-	                </svg>
-	              </button>
+                <div className="flex items-center gap-2">
+                  {!editingExerciseEntry?.id && (
+                    <button
+                      type="button"
+                      onClick={resetExerciseDraft}
+                      className="px-2 py-1 text-xs font-semibold text-gray-500 hover:text-gray-700"
+                    >
+                      Reset
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowAddExerciseModal(false)
+                      setEditingExerciseEntry(null)
+                    }}
+                    className="p-2 rounded-xl hover:bg-gray-100"
+                    aria-label="Close"
+                  >
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
 	            </div>
 
 	            <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 pb-10">
