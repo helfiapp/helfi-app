@@ -16579,10 +16579,11 @@ Please add nutritional information manually if needed.`);
                     ? Number(exerciseCaloriesKcal)
                     : 0
                 const allowanceCalories = baseTargetCalories && baseTargetCalories > 0 ? baseTargetCalories : null
-                const netUsedKcal = Math.max(0, consumedKcal - exerciseKcal)
+                const allowanceWithExercise =
+                  allowanceCalories !== null ? allowanceCalories + exerciseKcal : null
 
-                const consumedInUnit = convertKcalToUnit(netUsedKcal, energyUnit)
-                const allowanceInUnit = convertKcalToUnit(allowanceCalories, energyUnit)
+                const consumedInUnit = convertKcalToUnit(consumedKcal, energyUnit)
+                const allowanceInUnit = convertKcalToUnit(allowanceWithExercise, energyUnit)
                 const remainingInUnit =
                   allowanceInUnit !== null && consumedInUnit !== null
                     ? Math.max(0, allowanceInUnit - consumedInUnit)
