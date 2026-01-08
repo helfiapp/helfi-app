@@ -103,7 +103,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                       className={
                         heroIsPhoto
                           ? 'rounded-3xl overflow-hidden shadow-lg'
-                          : 'bg-white/90 rounded-3xl p-4 shadow-sm border border-white/60'
+                          : 'rounded-3xl p-4 bg-transparent shadow-none border border-transparent'
                       }
                     >
                       <Image
@@ -158,7 +158,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                 {overviewContent}
                 <div className="space-y-6">
                   {showHeroImage && (
-                    <div className="bg-white/90 rounded-3xl p-4 shadow-sm border border-white/60">
+                    <div className="rounded-3xl p-4 bg-transparent shadow-none border border-transparent">
                       <Image
                         src={page.heroImage.src}
                         alt={page.heroImage.alt}
@@ -328,7 +328,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                             {segmentImages.map((image) => (
                               <div
                                 key={`${segment.title}-${image.src}`}
-                                className="rounded-2xl bg-white shadow-md overflow-hidden"
+                                className="rounded-2xl bg-transparent shadow-none overflow-hidden"
                               >
                                 <Image
                                   src={image.src}
