@@ -37,7 +37,7 @@ import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import { STARTER_FOODS } from '@/data/foods-starter'
 import { COMMON_USDA_FOODS } from '@/data/usda-common'
 import { calculateDailyTargets } from '@/lib/daily-targets'
-import { AI_MEAL_RECOMMENDATION_CREDITS } from '@/lib/ai-meal-recommendation'
+import { AI_MEAL_RECOMMENDATION_CREDITS, AI_MEAL_RECOMMENDATION_GOAL_NAME } from '@/lib/ai-meal-recommendation'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets'
 import { DEFAULT_HEALTH_CHECK_SETTINGS, normalizeHealthCheckSettings } from '@/lib/food-health-check-settings'
@@ -12421,10 +12421,75 @@ Please add nutritional information manually if needed.`);
 
   const aiSavedMealMeta = useMemo(() => {
     const nutrition = editingEntry?.nutrition
-    if (!nutrition || typeof nutrition !== 'object') return null
-    const origin = typeof (nutrition as any).__origin === 'string' ? String((nutrition as any).__origin).toLowerCase() : ''
-    const whyRaw = typeof (nutrition as any).__aiWhy === 'string' ? String((nutrition as any).__aiWhy).trim() : ''
-    const recipeRaw = (nutrition as any).__aiRecipe
+    if (nutrition && typeof nutrition === 'object') {
+      const origin = typeof (nutrition as any).__origin === 'string' ? String((nutrition as any).__origin).toLowerCase() : ''
+      const whyRaw = typeof (nutrition as any).__aiWhy === 'string' ? String((nutrition as any).__aiWhy).trim() : ''
+      const recipeRaw = (nutrition as any).__aiRecipe
+      const recipe =
+        recipeRaw && typeof recipeRaw === 'object'
+          ? {
+              prepMinutes: Number.isFinite(Number((recipeRaw as any).prepMinutes)) ? Number((recipeRaw as any).prepMinutes) : null,
+              cookMinutes: Number.isFinite(Number((recipeRaw as any).cookMinutes)) ? Number((recipeRaw as any).cookMinutes) : null,
+              servings: Number.isFinite(Number((recipeRaw as any).servings)) ? Number((recipeRaw as any).servings) : null,
+              steps: Array.isArray((recipeRaw as any).steps)
+                ? (recipeRaw as any).steps.map((step: any) => String(step || '').trim()).filter(Boolean)
+                : [],
+            }
+          : null
+      const hasRecipe = Boolean(recipe && recipe.steps && recipe.steps.length > 0)
+      const hasWhy = Boolean(whyRaw)
+      if (origin === 'ai-recommended' && (hasRecipe || hasWhy)) {
+        return { recipe: hasRecipe ? recipe : null, why: whyRaw }
+      }
+    }
+
+    const storedGoals = Array.isArray((userData as any)?.healthGoals) ? (userData as any).healthGoals : []
+    const stored = storedGoals.find((goal: any) => goal?.name === AI_MEAL_RECOMMENDATION_GOAL_NAME)
+    if (!stored?.category) return null
+    let parsed: any = null
+    try {
+      parsed = JSON.parse(stored.category)
+    } catch {
+      parsed = null
+    }
+    const history = Array.isArray(parsed?.history) ? parsed.history : Array.isArray(parsed) ? parsed : []
+    if (!history.length) return null
+
+    const normalize = (value: string) =>
+      String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+
+    const entryNameRaw = String(editingEntry?.description || editingEntry?.name || '')
+    const entryName = normalize(entryNameRaw)
+    const entryCategory = String(editingEntry?.meal || editingEntry?.category || '').toLowerCase()
+    const entryItems = Array.isArray(editingEntry?.items) ? editingEntry.items : []
+    const entryItemNames = entryItems
+      .map((item: any) => normalize(String(item?.name || '')))
+      .filter(Boolean)
+    const entryItemSet = new Set(entryItemNames)
+
+    const aiMealId = nutrition && typeof nutrition === 'object' ? String((nutrition as any).__aiMealId || '').trim() : ''
+
+    const pickMatch = (rec: any) => {
+      const recCategory = String(rec?.category || '').toLowerCase()
+      if (entryCategory && recCategory && recCategory !== entryCategory) return false
+      if (aiMealId && String(rec?.id || '') === aiMealId) return true
+      const recName = normalize(String(rec?.mealName || ''))
+      const recItems = Array.isArray(rec?.items) ? rec.items : []
+      const recItemNames = recItems.map((item: any) => normalize(String(item?.name || ''))).filter(Boolean)
+      const overlap = recItemNames.filter((name: string) => entryItemSet.has(name)).length
+      const strongNameMatch = entryName && recName && recName === entryName
+      const overlapNeeded = entryItemSet.size <= 1 ? 1 : 2
+      return (strongNameMatch && overlap >= overlapNeeded) || overlap >= Math.max(2, overlapNeeded)
+    }
+
+    const match = history.find((rec: any) => pickMatch(rec))
+    if (!match) return null
+
+    const whyRaw = typeof match?.why === 'string' ? String(match.why).trim() : ''
+    const recipeRaw = match?.recipe
     const recipe =
       recipeRaw && typeof recipeRaw === 'object'
         ? {
@@ -12438,9 +12503,9 @@ Please add nutritional information manually if needed.`);
         : null
     const hasRecipe = Boolean(recipe && recipe.steps && recipe.steps.length > 0)
     const hasWhy = Boolean(whyRaw)
-    if (origin !== 'ai-recommended' && !hasRecipe && !hasWhy) return null
+    if (!hasRecipe && !hasWhy) return null
     return { recipe: hasRecipe ? recipe : null, why: whyRaw }
-  }, [editingEntry?.nutrition])
+  }, [editingEntry?.nutrition, editingEntry?.items, editingEntry?.description, editingEntry?.meal, userData?.healthGoals])
 
   useEffect(() => {
     setAiEntryTab('ingredients')
@@ -13852,10 +13917,11 @@ Please add nutritional information manually if needed.`);
 	                    onClick={() => {
 	                      setShowPhotoOptions(false)
 	                      setPhotoOptionsAnchor(null)
+                        const fresh = Date.now()
 	                      router.push(
 	                        `/food/recommended?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
 	                          selectedAddCategory,
-	                        )}&generate=1`,
+	                        )}&generate=1&fresh=${fresh}`,
 	                      )
 	                    }}
 	                    className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -17753,10 +17819,11 @@ Please add nutritional information manually if needed.`);
 	                                        onClick={() => {
 	                                          setShowPhotoOptions(false)
 	                                          setPhotoOptionsAnchor(null)
+                                            const fresh = Date.now()
 	                                          router.push(
 	                                            `/food/recommended?date=${encodeURIComponent(
 	                                              selectedDate,
-	                                            )}&category=${encodeURIComponent(cat.key)}&generate=1`,
+	                                            )}&category=${encodeURIComponent(cat.key)}&generate=1&fresh=${fresh}`,
 	                                          )
 	                                        }}
 	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -18060,15 +18127,16 @@ Please add nutritional information manually if needed.`);
 
 		                                      <button
 		                                        type="button"
-		                                        onClick={() => {
-		                                          setShowPhotoOptions(false)
-		                                          setPhotoOptionsAnchor(null)
-		                                          router.push(
-		                                            `/food/recommended?date=${encodeURIComponent(
-		                                              selectedDate,
-		                                            )}&category=${encodeURIComponent(cat.key)}&generate=1`,
-		                                          )
-		                                        }}
+		                                            onClick={() => {
+		                                              setShowPhotoOptions(false)
+		                                              setPhotoOptionsAnchor(null)
+                                                const fresh = Date.now()
+		                                              router.push(
+		                                                `/food/recommended?date=${encodeURIComponent(
+		                                                  selectedDate,
+		                                                )}&category=${encodeURIComponent(cat.key)}&generate=1&fresh=${fresh}`,
+		                                              )
+		                                            }}
 		                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
 		                                      >
 	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mr-3 text-purple-700">

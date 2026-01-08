@@ -147,6 +147,7 @@ export default function RecommendedMealClient() {
 
   const date = searchParams.get('date') || buildTodayIso()
   const category = normalizeMealCategory(searchParams.get('category'))
+  const freshKey = searchParams.get('fresh') || ''
   const categoryLabel = CATEGORY_LABELS[category]
 
   const [loadingContext, setLoadingContext] = useState(true)
@@ -257,9 +258,12 @@ export default function RecommendedMealClient() {
   }
 
   useEffect(() => {
+    setActive(null)
+    setItemsDraft(null)
+    setError(null)
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, category])
+  }, [date, category, freshKey])
 
   useEffect(() => {
     // New date/category should be treated as a fresh screen.
@@ -416,6 +420,7 @@ export default function RecommendedMealClient() {
       __origin: 'ai-recommended',
       __aiRecipe: active.recipe || null,
       __aiWhy: active.why || '',
+      __aiMealId: active.id || '',
     }
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), date)
     const payload = {
