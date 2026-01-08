@@ -222,7 +222,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
               type="button"
               data-carousel-item
               onClick={() => handleImageClick(index % images.length)}
-              className="rounded-2xl bg-transparent border border-transparent overflow-hidden focus:outline-none focus:ring-2 focus:ring-white/70 transition-transform hover:-translate-y-1"
+              className="rounded-2xl bg-transparent border border-transparent overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-transform hover:-translate-y-1"
               style={{
                 flex: isMobile ? '0 0 100%' : '0 0 calc((100% - 6rem) / 5)',
               }}
