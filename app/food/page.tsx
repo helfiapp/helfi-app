@@ -2254,6 +2254,7 @@ export default function FoodDiary() {
     maxHeight?: number
   } | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
+  const [aiEntryTab, setAiEntryTab] = useState<'ingredients' | 'recipe' | 'reason'>('ingredients')
   const [isDeletingEditingEntry, setIsDeletingEditingEntry] = useState(false)
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
@@ -12417,6 +12418,33 @@ Please add nutritional information manually if needed.`);
     if (editingEntry?.description) return editingEntry.description;
     return '';
   }, [aiDescription, editingEntry]);
+
+  const aiSavedMealMeta = useMemo(() => {
+    const nutrition = editingEntry?.nutrition
+    if (!nutrition || typeof nutrition !== 'object') return null
+    const origin = typeof (nutrition as any).__origin === 'string' ? String((nutrition as any).__origin).toLowerCase() : ''
+    const whyRaw = typeof (nutrition as any).__aiWhy === 'string' ? String((nutrition as any).__aiWhy).trim() : ''
+    const recipeRaw = (nutrition as any).__aiRecipe
+    const recipe =
+      recipeRaw && typeof recipeRaw === 'object'
+        ? {
+            prepMinutes: Number.isFinite(Number((recipeRaw as any).prepMinutes)) ? Number((recipeRaw as any).prepMinutes) : null,
+            cookMinutes: Number.isFinite(Number((recipeRaw as any).cookMinutes)) ? Number((recipeRaw as any).cookMinutes) : null,
+            servings: Number.isFinite(Number((recipeRaw as any).servings)) ? Number((recipeRaw as any).servings) : null,
+            steps: Array.isArray((recipeRaw as any).steps)
+              ? (recipeRaw as any).steps.map((step: any) => String(step || '').trim()).filter(Boolean)
+              : [],
+          }
+        : null
+    const hasRecipe = Boolean(recipe && recipe.steps && recipe.steps.length > 0)
+    const hasWhy = Boolean(whyRaw)
+    if (origin !== 'ai-recommended' && !hasRecipe && !hasWhy) return null
+    return { recipe: hasRecipe ? recipe : null, why: whyRaw }
+  }, [editingEntry?.nutrition])
+
+  useEffect(() => {
+    setAiEntryTab('ingredients')
+  }, [editingEntry?.id])
   const shouldShowAddPanel = showAddFood && !isAddMenuOpen
 
   // Debug logging to track state changes
@@ -14853,6 +14881,75 @@ Please add nutritional information manually if needed.`);
                     )
                   })()}
 
+                  {editingEntry && aiSavedMealMeta && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-center flex-wrap gap-2">
+                        {[
+                          { key: 'ingredients' as const, label: 'Ingredients' },
+                          { key: 'recipe' as const, label: 'Recipe' },
+                          { key: 'reason' as const, label: 'Reason' },
+                        ].map((tab) => {
+                          const isActive = aiEntryTab === tab.key
+                          return (
+                            <button
+                              key={tab.key}
+                              type="button"
+                              onClick={() => setAiEntryTab(tab.key)}
+                              className={`px-3 py-2 text-sm font-semibold rounded-xl ${
+                                isActive ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              aria-pressed={isActive}
+                            >
+                              {tab.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {editingEntry && aiSavedMealMeta && aiEntryTab !== 'ingredients' ? (
+                    <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4">
+                      {aiEntryTab === 'recipe' ? (
+                        <>
+                          {(() => {
+                            const recipe = aiSavedMealMeta.recipe
+                            if (!recipe) return null
+                            const parts: string[] = []
+                            if (typeof recipe.prepMinutes === 'number' && Number.isFinite(recipe.prepMinutes)) {
+                              parts.push(`Prep ${Math.round(recipe.prepMinutes)} min`)
+                            }
+                            if (typeof recipe.cookMinutes === 'number' && Number.isFinite(recipe.cookMinutes)) {
+                              parts.push(`Cook ${Math.round(recipe.cookMinutes)} min`)
+                            }
+                            if (typeof recipe.servings === 'number' && Number.isFinite(recipe.servings)) {
+                              parts.push(`${Math.round(recipe.servings)} serving${Math.round(recipe.servings) === 1 ? '' : 's'}`)
+                            }
+                            return parts.length > 0 ? <div className="text-xs text-gray-500 mb-2">{parts.join(' • ')}</div> : null
+                          })()}
+                          {aiSavedMealMeta.recipe?.steps?.length ? (
+                            <ol className="space-y-2 text-sm text-gray-700 list-decimal pl-5">
+                              {aiSavedMealMeta.recipe.steps.slice(0, 12).map((step, i) => (
+                                <li key={i} className="leading-relaxed">
+                                  {step}
+                                </li>
+                              ))}
+                            </ol>
+                          ) : (
+                            <div className="text-sm text-gray-600">No recipe steps saved.</div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-sm font-semibold text-gray-900">Why this meal was chosen</div>
+                          <div className="mt-2 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                            {aiSavedMealMeta.why || 'No reason saved.'}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <>
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
                     <div
@@ -15518,10 +15615,12 @@ Please add nutritional information manually if needed.`);
                             const finalText = normalized || 'Description not available yet.';
 
                             return finalText;
-                          })()}
+                  })()}
+                            </div>
                         </div>
                       </div>
-                    </div>
+                    </>
+                  )}
                   )}
                     {aiDescription && /(Insufficient credits|trial limit)/i.test(aiDescription) && (
                       <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">

@@ -191,9 +191,8 @@ export default function RecommendedMealClient() {
       setSeenExplain(typeof data.seenExplain === 'boolean' ? data.seenExplain : null)
       const nextHistory = Array.isArray(data.history) ? data.history : []
       setHistory(nextHistory)
-      const defaultActive =
-        nextHistory.find((h) => h && h.category === category) || nextHistory[0] || null
-      setActive(defaultActive)
+      setActive(null)
+      setItemsDraft(null)
     } catch (e: any) {
       setError(e?.message || 'Unable to load recommendations right now.')
     } finally {
@@ -412,10 +411,16 @@ export default function RecommendedMealClient() {
   const addToDiary = async () => {
     if (!active) return
     const totals = normalizeTotalsForFoodLog(draftTotals)
+    const nutritionPayload = {
+      ...totals,
+      __origin: 'ai-recommended',
+      __aiRecipe: active.recipe || null,
+      __aiWhy: active.why || '',
+    }
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), date)
     const payload = {
       description: active.mealName || `AI Recommended ${categoryLabel}`,
-      nutrition: totals,
+      nutrition: nutritionPayload,
       imageUrl: null,
       items: currentItems,
       localDate: date,
