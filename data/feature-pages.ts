@@ -6,6 +6,8 @@ export type FeaturePageCta = {
 export type FeaturePageImage = {
   src: string
   alt: string
+  width?: number
+  height?: number
 }
 
 export type FeaturePageCapability = {
@@ -24,6 +26,7 @@ export type FeaturePageSegment = {
   details?: string[]
   bullets: string[]
   image: FeaturePageImage
+  images?: FeaturePageImage[]
 }
 
 export type FeaturePageContent = {
@@ -34,6 +37,8 @@ export type FeaturePageContent = {
   overview: string[]
   summary: string
   heroImage: FeaturePageImage
+  showHeroImage?: boolean
+  showSegmentImages?: boolean
   primaryCta: FeaturePageCta
   secondaryCta: FeaturePageCta
   capabilities: FeaturePageCapability[]
@@ -55,6 +60,20 @@ const secondaryCta: FeaturePageCta = {
   label: 'View pricing',
   href: '/#pricing',
 }
+
+const foodDiaryPhone = (src: string, alt: string): FeaturePageImage => ({
+  src,
+  alt,
+  width: 1419,
+  height: 2796,
+})
+
+const foodDiaryPhoto = (src: string, alt: string): FeaturePageImage => ({
+  src,
+  alt,
+  width: 1200,
+  height: 896,
+})
 
 export const featurePages: FeaturePageContent[] = [
   {
@@ -376,10 +395,12 @@ export const featurePages: FeaturePageContent[] = [
       'As a food diary app and nutrition tracking app, it supports macro tracking, packaged foods, and manual entries in one flow.',
     ],
     summary: 'Photo-assisted meal logging with flexible edits and trends.',
-    heroImage: {
-      src: '/screenshots/hero/FOOD ANALYSIS.png',
-      alt: 'Food analysis on a phone',
-    },
+    heroImage: foodDiaryPhone(
+      '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
+      'Food diary entries on a phone'
+    ),
+    showHeroImage: true,
+    showSegmentImages: true,
     primaryCta,
     secondaryCta,
     capabilities: [
@@ -446,10 +467,28 @@ export const featurePages: FeaturePageContent[] = [
           'Works alongside manual entries',
           'Built for fast daily use',
         ],
-        image: {
-          src: '/screenshots/hero/FOOD ANALYSIS.png',
-          alt: 'Meal photo analysis on a phone',
-        },
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD IMAGE AI SCAN-portrait.png',
+          'AI meal scan on a phone'
+        ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD IMAGE AI SCAN-portrait.png',
+            'AI meal scan on a phone'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN IN ACTION-portrait.png',
+            'Food scan in action on a phone'
+          ),
+          foodDiaryPhoto(
+            '/WEBSITE IMAGES/FOOD DIARY/FOOD ANALYZER IN ACTION.jpg',
+            'Food analyzer in action during a meal'
+          ),
+          foodDiaryPhoto(
+            '/WEBSITE IMAGES/FOOD DIARY/SALMON EXAMPLE 2.png',
+            'Salmon meal analysis example'
+          ),
+        ],
       },
       {
         title: 'Manual edits and build-a-meal',
@@ -467,10 +506,28 @@ export const featurePages: FeaturePageContent[] = [
           'Full control over your log',
           'Aligned with your nutrition goals',
         ],
-        image: {
-          src: '/screenshots/hero/MORE MENU.png',
-          alt: 'Manual meal logging on a phone',
-        },
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/INGREDIENT CARDS-portrait.png',
+          'Ingredient cards in the food diary'
+        ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/INGREDIENT CARDS-portrait.png',
+            'Ingredient cards in the food diary'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/EXPANDED INGREDIENT CARD-portrait.png',
+            'Expanded ingredient card details'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ADD MEAL MENU-portrait.png',
+            'Add meal options menu'
+          ),
+          foodDiaryPhoto(
+            '/WEBSITE IMAGES/FOOD DIARY/WOMAN MAKING FOOD.jpg',
+            'Preparing a meal at home'
+          ),
+        ],
       },
       {
         title: 'Nutrition diary and trends',
@@ -488,10 +545,24 @@ export const featurePages: FeaturePageContent[] = [
           'Works with check-ins and mood tracking',
           'Supports long-term trend review',
         ],
-        image: {
-          src: '/screenshots/hero/INSIGHTS ENERGY.png',
-          alt: 'Nutrition trends on a phone',
-        },
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ENERGY SUMMARY MACROS-portrait.png',
+          'Macro summary view on a phone'
+        ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ENERGY SUMMARY MACROS-portrait.png',
+            'Macro summary view on a phone'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ENERGY SUMMARY CIRCLES-portrait.png',
+            'Energy summary rings and trends'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
+            'Daily food diary entries list'
+          ),
+        ],
       },
       {
         title: 'Food recommendations and context',
@@ -509,10 +580,20 @@ export const featurePages: FeaturePageContent[] = [
           'Helps reduce guesswork',
           'Built around your tracking history',
         ],
-        image: {
-          src: '/screenshots/hero/ASK AI.png',
-          alt: 'Food recommendations overview',
-        },
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD HEALTH WARNING-portrait.png',
+          'Nutrition context and health warning'
+        ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD HEALTH WARNING-portrait.png',
+            'Nutrition context and health warning'
+          ),
+          foodDiaryPhoto(
+            '/WEBSITE IMAGES/FOOD DIARY/WOMAN ANALYZING HER FOOD.png',
+            'Analyzing food choices with the app'
+          ),
+        ],
       },
       {
         title: 'Packaged foods and barcode scanning',
@@ -530,10 +611,28 @@ export const featurePages: FeaturePageContent[] = [
           'Edit portions and serving sizes',
           'Keeps entries aligned with weekly insights',
         ],
-        image: {
-          src: '/screenshots/hero/FOOD ANALYSIS.png',
-          alt: 'Packaged food logging overview',
-        },
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON MEAL-portrait.png',
+          'Packaged food scan summary on a phone'
+        ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON MEAL-portrait.png',
+            'Packaged food scan summary on a phone'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON 2-portrait.png',
+            'Barcode scan results for a packaged meal'
+          ),
+          foodDiaryPhoto(
+            '/WEBSITE IMAGES/FOOD DIARY/FOOD ANALYZER BURGER.png',
+            'Packaged food analysis example'
+          ),
+          foodDiaryPhoto(
+            '/WEBSITE IMAGES/FOOD DIARY/SALMON EXAMPLE 1.png',
+            'Nutrition breakdown example for salmon'
+          ),
+        ],
       },
     ],
     seo: {

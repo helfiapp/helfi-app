@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 
 import type { FeaturePageContent } from '@/data/feature-pages'
@@ -18,6 +19,8 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   ]
 
   const highlights = page.outcomes.slice(0, 3)
+  const showHeroImage = page.showHeroImage === true
+  const showSegmentImages = page.showSegmentImages === true
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-50">
@@ -60,34 +63,49 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
               </div>
             </div>
 
-            <aside className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-8">
-              <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
-                At a glance
-              </p>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                What you get from this feature
-              </h2>
-              <ul className="space-y-2 text-sm text-gray-700">
-                {highlights.map((item) => (
-                  <li key={item} className="flex items-start gap-3">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="border-t border-gray-100 mt-6 pt-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
-                  Best for
-                </p>
-                <div className="space-y-3 text-sm text-gray-600">
-                  {page.useCases.slice(0, 2).map((useCase) => (
-                    <p key={useCase.title}>
-                      <span className="font-semibold text-gray-900">{useCase.title}:</span> {useCase.description}
-                    </p>
-                  ))}
+            <div className="space-y-6">
+              {showHeroImage && (
+                <div className="bg-white/90 rounded-3xl p-4 shadow-sm border border-white/60">
+                  <Image
+                    src={page.heroImage.src}
+                    alt={page.heroImage.alt}
+                    width={page.heroImage.width ?? 1450}
+                    height={page.heroImage.height ?? 2936}
+                    sizes="(min-width: 1024px) 35vw, 90vw"
+                    className="w-full h-auto max-h-[520px] object-contain rounded-2xl"
+                    priority
+                  />
                 </div>
-              </div>
-            </aside>
+              )}
+              <aside className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-8">
+                <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
+                  At a glance
+                </p>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  What you get from this feature
+                </h2>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  {highlights.map((item) => (
+                    <li key={item} className="flex items-start gap-3">
+                      <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="border-t border-gray-100 mt-6 pt-6">
+                  <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">
+                    Best for
+                  </p>
+                  <div className="space-y-3 text-sm text-gray-600">
+                    {page.useCases.slice(0, 2).map((useCase) => (
+                      <p key={useCase.title}>
+                        <span className="font-semibold text-gray-900">{useCase.title}:</span> {useCase.description}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </aside>
+            </div>
           </div>
         </section>
 
@@ -141,37 +159,68 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
               A detailed walkthrough
             </h2>
             <div className="space-y-8">
-              {page.segments.map((segment, index) => (
-                <div
-                  key={segment.title}
-                  className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 shadow-sm"
-                >
-                  <p className="text-xs uppercase tracking-[0.2em] text-helfi-green mb-3">
-                    Step {String(index + 1).padStart(2, '0')}
-                  </p>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    {segment.title}
-                  </h3>
-                  <p className="text-base text-gray-600 leading-relaxed mb-4">
-                    {segment.description}
-                  </p>
-                  {segment.details && segment.details.length > 0 && (
-                    <div className="space-y-4 text-sm text-gray-600 leading-relaxed mb-5">
-                      {segment.details.map((detail) => (
-                        <p key={detail}>{detail}</p>
-                      ))}
+              {page.segments.map((segment, index) => {
+                const segmentImages = showSegmentImages
+                  ? (segment.images && segment.images.length > 0 ? segment.images : [segment.image])
+                  : []
+                const hasImages = segmentImages.length > 0
+
+                return (
+                  <div
+                    key={segment.title}
+                    className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 shadow-sm"
+                  >
+                    <div className={hasImages ? 'grid gap-8 lg:grid-cols-[1.15fr_0.85fr] items-start' : ''}>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-helfi-green mb-3">
+                          Step {String(index + 1).padStart(2, '0')}
+                        </p>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                          {segment.title}
+                        </h3>
+                        <p className="text-base text-gray-600 leading-relaxed mb-4">
+                          {segment.description}
+                        </p>
+                        {segment.details && segment.details.length > 0 && (
+                          <div className="space-y-4 text-sm text-gray-600 leading-relaxed mb-5">
+                            {segment.details.map((detail) => (
+                              <p key={detail}>{detail}</p>
+                            ))}
+                          </div>
+                        )}
+                        <ul className="grid gap-y-2 text-sm text-gray-700">
+                          {segment.bullets.map((bullet) => (
+                            <li key={bullet} className="flex items-start gap-3">
+                              <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
+                              <span>{bullet}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      {hasImages && (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {segmentImages.map((image) => (
+                            <div
+                              key={`${segment.title}-${image.src}`}
+                              className="rounded-2xl bg-white shadow-md overflow-hidden"
+                            >
+                              <Image
+                                src={image.src}
+                                alt={image.alt}
+                                width={image.width ?? 1450}
+                                height={image.height ?? 2936}
+                                sizes="(min-width: 1024px) 30vw, 90vw"
+                                className="w-full h-auto max-h-[520px] object-contain"
+                                loading="lazy"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <ul className="grid gap-y-2 text-sm text-gray-700">
-                    {segment.bullets.map((bullet) => (
-                      <li key={bullet} className="flex items-start gap-3">
-                        <span className="mt-1 h-2 w-2 rounded-full bg-helfi-green" />
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </section>
