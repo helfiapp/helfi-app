@@ -50,6 +50,26 @@ export default function SplashPage() {
   const [checkoutError, setCheckoutError] = useState('')
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const attemptPlay = () => {
+      const playPromise = video.play()
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.then(() => setVideoLoaded(true)).catch(() => {})
+      }
+    }
+
+    attemptPlay()
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        attemptPlay()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
   // Handle subscription plan selection
   const handlePlanSelection = async (planId: string) => {
@@ -172,6 +192,7 @@ export default function SplashPage() {
             poster="/screenshots/hero/hero-poster.jpg"
             className="absolute inset-0 w-full h-full object-cover z-0"
             onCanPlay={() => setVideoLoaded(true)}
+            onCanPlayThrough={() => setVideoLoaded(true)}
             onLoadedData={() => setVideoLoaded(true)}
             onError={(e) => {
               console.error('Video error:', e)
