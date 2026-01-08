@@ -1040,9 +1040,10 @@ export async function POST(req: NextRequest) {
       'Recent AI recommended ingredient hints (avoid repeating):',
     safeJsonCompact(recentIngredientHints.map((n) => truncate(n, 48)).slice(0, opts.recentIngredientsLimit), 900),
       '',
-      'Constraints:',
-      '- Provide 2–6 ingredients.',
-      '- Use common, realistic foods and portions; keep ingredient list concise.',
+    'Constraints:',
+    '- Provide 2–6 ingredients.',
+    '- Use common, realistic foods and portions; keep ingredient list concise.',
+    '- Set "servings" to 1 for every item. If there are multiple pieces, put the count into "serving_size" (e.g., "2 slices").',
     '- Tags must be short (1–3 words), informational (e.g., "Low sugar", "High protein", "Gut-friendly").',
     '- The "why" must be 2–5 sentences in plain English referencing goals and remaining macros.',
     ]
@@ -1140,10 +1141,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid AI response' }, { status: 502 })
   }
 
-  const { mealName: safeMealName, items: itemsWithNameFixes } = applyMealNameConsistency(category, mealName, itemsInitial)
+  const itemsDefaulted = itemsInitial.map((item) => ({ ...item, servings: 1 }))
+  const { mealName: safeMealName, items: itemsWithNameFixes } = applyMealNameConsistency(category, mealName, itemsDefaulted)
   const recipe = normalizeRecipe(parsed?.recipe) || buildFallbackRecipe(category, itemsWithNameFixes)
 
-  const fitItems = scaleToFitCalories(itemsWithNameFixes, caloriesCap)
+  const fitItems = itemsWithNameFixes
   const totals = computeTotalsFromItems(fitItems)
   let imageUrl: string | null = null
   const imagePrompt = buildMealImagePrompt(safeMealName || `AI Recommended ${category}`, fitItems)

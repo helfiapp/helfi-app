@@ -80,7 +80,7 @@ export default function RecommendedIngredientCard({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 overflow-hidden">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="font-semibold text-gray-900 text-base break-words">{item.name}</div>
@@ -89,7 +89,7 @@ export default function RecommendedIngredientCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:self-start">
+        <div className="flex flex-wrap items-center gap-2 sm:self-start max-w-full">
           <span className="text-xs text-gray-500">Servings</span>
           <input
             value={inputValue}
@@ -103,7 +103,7 @@ export default function RecommendedIngredientCard({
               setInputValue(formatServingsDisplay(servings))
             }}
             inputMode="decimal"
-            className="w-20 px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-900"
+            className="w-20 max-w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-900 text-center"
             aria-label={`Servings for ${item.name}`}
           />
         </div>
