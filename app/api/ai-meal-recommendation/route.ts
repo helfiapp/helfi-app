@@ -50,7 +50,6 @@ type RecommendedMealRecord = {
   mealName: string
   tags: string[]
   why: string
-  imageUrl?: string | null
   recipe?: {
     servings?: number | null
     prepMinutes?: number | null
@@ -66,6 +65,11 @@ type StoredState = {
   history: RecommendedMealRecord[]
   seenExplainAt?: string | null
   committedIds?: string[] | null
+  lastGenerated?: {
+    mealName: string
+    items: RecommendedItem[]
+    createdAt: string
+  } | null
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -396,24 +400,6 @@ const truncate = (value: string, maxChars: number) => {
 
 const safeJsonCompact = (value: any, maxChars: number) => truncate(JSON.stringify(value ?? null), maxChars)
 
-const buildMealImagePrompt = (mealName: string, items: RecommendedItem[]) => {
-  const safeName = mealName || 'healthy meal'
-  const ingredientList = items
-    .map((item) => String(item?.name || '').trim())
-    .filter(Boolean)
-    .slice(0, 8)
-  const ingredientsLine = ingredientList.length > 0 ? `The dish should visibly include: ${ingredientList.join(', ')}.` : ''
-  return [
-    `Photorealistic overhead food photo of a plated ${safeName}.`,
-    ingredientsLine,
-    'Serve on a single ceramic plate on a clean, neutral surface.',
-    'Natural daylight, realistic textures, no text, no hands, no packaging.',
-    'Keep portions realistic and appetizing.',
-  ]
-    .filter(Boolean)
-    .join(' ')
-}
-
 const extractTotalsFromNutrients = (nutrients: any): MacroTotals => {
   if (!nutrients || typeof nutrients !== 'object') {
     return { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
@@ -484,7 +470,7 @@ const loadStoredState = async (userId: string): Promise<StoredState> => {
     select: { category: true },
   })
   if (!stored?.category) {
-    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null, committedIds: [] }
+    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null, committedIds: [], lastGenerated: null }
   }
   try {
     const parsed = JSON.parse(stored.category)
@@ -495,17 +481,27 @@ const loadStoredState = async (userId: string): Promise<StoredState> => {
       const committedIds = Array.isArray((parsed as any).committedIds)
         ? (parsed as any).committedIds.map((v: any) => String(v || '').trim()).filter(Boolean)
         : []
+      const lastGeneratedRaw = (parsed as any).lastGenerated
+      const lastGenerated =
+        lastGeneratedRaw && typeof lastGeneratedRaw === 'object'
+          ? {
+              mealName: String(lastGeneratedRaw.mealName || '').trim(),
+              items: Array.isArray(lastGeneratedRaw.items) ? lastGeneratedRaw.items : [],
+              createdAt: String(lastGeneratedRaw.createdAt || ''),
+            }
+          : null
       return {
         version: Number((parsed as any).version) || AI_MEAL_RECOMMENDATION_STORAGE_VERSION,
         history,
         seenExplainAt,
         committedIds,
+        lastGenerated,
       }
     }
     const history = Array.isArray(parsed) ? parsed.filter(Boolean) : []
-    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history, seenExplainAt: null, committedIds: [] }
+    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history, seenExplainAt: null, committedIds: [], lastGenerated: null }
   } catch {
-    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null, committedIds: [] }
+    return { version: AI_MEAL_RECOMMENDATION_STORAGE_VERSION, history: [], seenExplainAt: null, committedIds: [], lastGenerated: null }
   }
 }
 
@@ -525,6 +521,13 @@ const saveStoredState = async (userId: string, state: StoredState) => {
     history: trimmedHistory,
     seenExplainAt: state.seenExplainAt || null,
     committedIds: Array.from(committedIdSet).slice(0, AI_MEAL_RECOMMENDATION_HISTORY_LIMIT),
+    lastGenerated: state.lastGenerated
+      ? {
+          mealName: String(state.lastGenerated.mealName || ''),
+          items: Array.isArray(state.lastGenerated.items) ? state.lastGenerated.items : [],
+          createdAt: String(state.lastGenerated.createdAt || ''),
+        }
+      : null,
   })
   const existing = await prisma.healthGoal.findFirst({
     where: { userId, name: AI_MEAL_RECOMMENDATION_GOAL_NAME },
@@ -685,6 +688,42 @@ const loadFoodLogsForDate = async (userId: string, date: string, tzOffsetMin: nu
   return filtered
 }
 
+const normalizeNameKey = (value: string) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+const buildItemSet = (items: RecommendedItem[]) =>
+  new Set(
+    items
+      .map((item) => normalizeNameKey(item?.name || ''))
+      .filter(Boolean),
+  )
+
+const jaccard = (a: Set<string>, b: Set<string>) => {
+  if (a.size === 0 || b.size === 0) return 0
+  let intersection = 0
+  for (const val of a) {
+    if (b.has(val)) intersection += 1
+  }
+  const union = a.size + b.size - intersection
+  return union > 0 ? intersection / union : 0
+}
+
+const isSimilarMeal = (a: { mealName: string; items: RecommendedItem[] }, b: { mealName: string; items: RecommendedItem[] }) => {
+  const nameA = normalizeNameKey(a.mealName)
+  const nameB = normalizeNameKey(b.mealName)
+  if (nameA && nameA === nameB) return true
+  const nameSetA = new Set(nameA.split(' ').filter(Boolean))
+  const nameSetB = new Set(nameB.split(' ').filter(Boolean))
+  if (jaccard(nameSetA, nameSetB) >= 0.8) return true
+  const itemsA = buildItemSet(a.items)
+  const itemsB = buildItemSet(b.items)
+  if (itemsA.size > 0 && itemsB.size > 0 && jaccard(itemsA, itemsB) >= 0.6) return true
+  return false
+}
+
 const normalizeAndValidateItems = (items: any[]): RecommendedItem[] => {
   const safe: RecommendedItem[] = []
   for (const raw of Array.isArray(items) ? items : []) {
@@ -818,9 +857,6 @@ export async function PUT(req: NextRequest) {
       ? (rawRec as any).tags.map((t: any) => String(t || '').trim()).filter(Boolean).slice(0, 12)
       : []
     const why = typeof (rawRec as any).why === 'string' ? String((rawRec as any).why).trim() : ''
-    const imageUrlRaw = typeof (rawRec as any).imageUrl === 'string' ? String((rawRec as any).imageUrl).trim() : ''
-    const imageUrl = imageUrlRaw ? imageUrlRaw : null
-
     const record: RecommendedMealRecord = {
       id,
       createdAt,
@@ -829,7 +865,6 @@ export async function PUT(req: NextRequest) {
       mealName: safeMealName || `AI Recommended ${category}`,
       tags,
       why,
-      imageUrl,
       recipe,
       items: itemsWithNameFixes,
       totals,
@@ -977,6 +1012,9 @@ export async function POST(req: NextRequest) {
     todaysFoodsLimit: number
     recentNamesLimit: number
     recentIngredientsLimit: number
+    avoidNames: string[]
+    avoidIngredients: string[]
+    strictAvoidance: boolean
   }) => {
     const supplementsForPrompt = supplements
       .slice(0, opts.supplementsLimit)
@@ -1037,138 +1075,202 @@ export async function POST(req: NextRequest) {
       '',
       'Recent AI recommended meal names (avoid repeating):',
     safeJsonCompact(recentNames.map((n) => truncate(n, 70)).slice(0, opts.recentNamesLimit), 600),
+      'Saved/favorite meal names (never repeat):',
+    safeJsonCompact(opts.avoidNames.map((n) => truncate(n, 70)), 600),
       'Recent AI recommended ingredient hints (avoid repeating):',
     safeJsonCompact(recentIngredientHints.map((n) => truncate(n, 48)).slice(0, opts.recentIngredientsLimit), 900),
+      'Saved/favorite ingredient hints (never repeat):',
+    safeJsonCompact(opts.avoidIngredients.map((n) => truncate(n, 48)), 900),
       '',
-    'Constraints:',
-    '- Provide 2–6 ingredients.',
-    '- Use common, realistic foods and portions; keep ingredient list concise.',
-    '- Set "servings" to 1 for every item. If there are multiple pieces, put the count into "serving_size" (e.g., "2 slices").',
-    '- Tags must be short (1–3 words), informational (e.g., "Low sugar", "High protein", "Gut-friendly").',
-    '- The "why" must be 2–5 sentences in plain English referencing goals and remaining macros.',
+      'Constraints:',
+      '- Provide 2–6 ingredients.',
+      '- Use common, realistic foods and portions; keep ingredient list concise.',
+      '- Set "servings" to 1 for every item. If there are multiple pieces, put the count into "serving_size" (e.g., "2 slices").',
+      opts.strictAvoidance ? '- Do NOT reuse any meal name or ingredient combination from the avoid lists. Choose a clearly different meal.' : '',
+      '- Tags must be short (1–3 words), informational (e.g., "Low sugar", "High protein", "Gut-friendly").',
+      '- The "why" must be 2–5 sentences in plain English referencing goals and remaining macros.',
     ]
     .filter(Boolean)
     .join('\n')
     return userPrompt
   }
 
-  let userPrompt = buildUserPrompt({
-    supplementsLimit: 18,
-    medicationsLimit: 18,
-    healthSituationsMaxChars: 900,
-    todaysFoodsLimit: 8,
-    recentNamesLimit: 8,
-    recentIngredientsLimit: 24,
-  })
+  const favoriteMeals = (() => {
+    try {
+      const storedFavorites = (user as any)?.healthGoals?.find((goal: any) => goal?.name === '__FOOD_FAVORITES__')
+      if (!storedFavorites?.category) return []
+      const parsed = JSON.parse(storedFavorites.category)
+      if (Array.isArray(parsed?.favorites)) return parsed.favorites
+      if (Array.isArray(parsed)) return parsed
+      return []
+    } catch {
+      return []
+    }
+  })()
 
-  // Guard rail: keep the prompt within a cost envelope so the fixed credit price
-  // maintains required profit margins. We compute a conservative upper-bound cost
-  // based on prompt length + max output tokens.
-  let maxOutputTokens = 650
-  const estimateVendorCost = () => {
-    const estPromptTokens = estimateTokensFromText(`${system}\n${userPrompt}`)
-    const estVendorCostCents = openaiCostCentsForTokens(model, {
-      promptTokens: estPromptTokens,
-      completionTokens: maxOutputTokens,
-    })
-    return { estPromptTokens, estVendorCostCents }
-  }
+  const favoriteNames = favoriteMeals
+    .map((fav: any) => String(fav?.label || fav?.description || '').trim())
+    .filter(Boolean)
+    .slice(0, 40)
+  const favoriteIngredientHints = favoriteMeals
+    .flatMap((fav: any) => (Array.isArray(fav?.items) ? fav.items.slice(0, 6) : []))
+    .map((item: any) => String(item?.name || '').trim())
+    .filter(Boolean)
+    .slice(0, 40)
 
-  let estimate = estimateVendorCost()
-  if (MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS > 0 && estimate.estVendorCostCents > MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS) {
-    // First trim pass: cut verbose fields further.
-    userPrompt = buildUserPrompt({
-      supplementsLimit: 10,
-      medicationsLimit: 10,
-      healthSituationsMaxChars: 500,
-      todaysFoodsLimit: 5,
-      recentNamesLimit: 6,
-      recentIngredientsLimit: 16,
-    })
-    estimate = estimateVendorCost()
-  }
+  const lastGeneratedCandidate = (() => {
+    const last = storedState.lastGenerated
+    if (!last || typeof last !== 'object') return null
+    const items = normalizeAndValidateItems(last.items)
+    if (!items.length) return null
+    return { mealName: String(last.mealName || '').trim(), items }
+  })()
 
-  if (MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS > 0 && estimate.estVendorCostCents > MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS) {
-    // Second trim pass: reduce output cap (most expensive part for these models).
-    maxOutputTokens = 500
-    estimate = estimateVendorCost()
-  }
-
-  if (MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS > 0 && estimate.estVendorCostCents > MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS) {
-    console.warn('[ai-meal-recommendation] prompt still too large for fixed credit price; proceeding with strict caps', {
-      estPromptTokens: estimate.estPromptTokens,
-      estVendorCostCents: estimate.estVendorCostCents,
-      maxVendorCostCents: MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS,
-      maxOutputTokens,
-    })
-  }
+  const lastGeneratedIngredientHints = lastGeneratedCandidate
+    ? lastGeneratedCandidate.items.map((item) => String(item?.name || '').trim()).filter(Boolean)
+    : []
+  const avoidNames = Array.from(new Set([...recentNames, ...favoriteNames, lastGeneratedCandidate?.mealName || ''].filter(Boolean)))
+  const avoidIngredients = Array.from(
+    new Set([...recentIngredientHints, ...favoriteIngredientHints, ...lastGeneratedIngredientHints].filter(Boolean)),
+  )
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  let record: RecommendedMealRecord | null = null
+  const maxAttempts = 3
 
-  let content = ''
-  try {
-    const completion = await runChatCompletionWithLogging(
-      openai,
-      {
-        model,
-        temperature: 0.5,
-        ...(model.toLowerCase().includes('gpt-5') ? { max_completion_tokens: maxOutputTokens } : { max_tokens: maxOutputTokens }),
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: userPrompt },
-        ],
-      } as any,
-      {
-        feature: 'food:ai-meal-recommendation',
-        userId: user.id,
-        userLabel: user.email,
-        endpoint: '/api/ai-meal-recommendation',
-      },
-    )
-    const raw = (completion as any)?.choices?.[0]?.message?.content
-    content = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.map((p: any) => p?.text || '').join('') : ''
-  } catch (err: any) {
-    console.error('[ai-meal-recommendation] LLM call failed', err)
-    return NextResponse.json({ error: 'AI failed' }, { status: 500 })
-  }
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    let userPrompt = buildUserPrompt({
+      supplementsLimit: 18,
+      medicationsLimit: 18,
+      healthSituationsMaxChars: 900,
+      todaysFoodsLimit: 8,
+      recentNamesLimit: 8,
+      recentIngredientsLimit: 24,
+      avoidNames,
+      avoidIngredients,
+      strictAvoidance: attempt > 0,
+    })
 
-  const parsed = parseJsonRelaxed(content)
-  const mealName = typeof parsed?.mealName === 'string' ? parsed.mealName.trim() : ''
-  const tags = Array.isArray(parsed?.tags) ? parsed.tags.map((t: any) => String(t || '').trim()).filter(Boolean).slice(0, 12) : []
-  const why = typeof parsed?.why === 'string' ? parsed.why.trim() : ''
-  const itemsInitial = normalizeAndValidateItems(parsed?.items)
-  if (!itemsInitial || itemsInitial.length === 0) {
-    return NextResponse.json({ error: 'Invalid AI response' }, { status: 502 })
-  }
-
-  const itemsDefaulted = itemsInitial.map((item) => ({ ...item, servings: 1 }))
-  const { mealName: safeMealName, items: itemsWithNameFixes } = applyMealNameConsistency(category, mealName, itemsDefaulted)
-  const recipe = normalizeRecipe(parsed?.recipe) || buildFallbackRecipe(category, itemsWithNameFixes)
-
-  const fitItems = itemsWithNameFixes
-  const totals = computeTotalsFromItems(fitItems)
-  let imageUrl: string | null = null
-  const imagePrompt = buildMealImagePrompt(safeMealName || `AI Recommended ${category}`, fitItems)
-  const imageModels = ['gpt-image-1', 'dall-e-3']
-  for (const imageModel of imageModels) {
-    try {
-      const imageResponse = await openai.images.generate({
-        model: imageModel,
-        prompt: imagePrompt,
-        size: '1024x1024',
-        response_format: 'b64_json',
-      } as any)
-      const b64 = (imageResponse as any)?.data?.[0]?.b64_json
-      if (typeof b64 === 'string' && b64.trim()) {
-        imageUrl = `data:image/png;base64,${b64}`
-        break
-      }
-    } catch (err) {
-      console.warn(`[ai-meal-recommendation] image generation failed for ${imageModel}`, err)
+    // Guard rail: keep the prompt within a cost envelope so the fixed credit price
+    // maintains required profit margins. We compute a conservative upper-bound cost
+    // based on prompt length + max output tokens.
+    let maxOutputTokens = 650
+    const estimateVendorCost = () => {
+      const estPromptTokens = estimateTokensFromText(`${system}\n${userPrompt}`)
+      const estVendorCostCents = openaiCostCentsForTokens(model, {
+        promptTokens: estPromptTokens,
+        completionTokens: maxOutputTokens,
+      })
+      return { estPromptTokens, estVendorCostCents }
     }
+
+    let estimate = estimateVendorCost()
+    if (MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS > 0 && estimate.estVendorCostCents > MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS) {
+      // First trim pass: cut verbose fields further.
+      userPrompt = buildUserPrompt({
+        supplementsLimit: 10,
+        medicationsLimit: 10,
+        healthSituationsMaxChars: 500,
+        todaysFoodsLimit: 5,
+        recentNamesLimit: 6,
+        recentIngredientsLimit: 16,
+        avoidNames,
+        avoidIngredients,
+        strictAvoidance: attempt > 0,
+      })
+      estimate = estimateVendorCost()
+    }
+
+    if (MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS > 0 && estimate.estVendorCostCents > MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS) {
+      // Second trim pass: reduce output cap (most expensive part for these models).
+      maxOutputTokens = 500
+      estimate = estimateVendorCost()
+    }
+
+    if (MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS > 0 && estimate.estVendorCostCents > MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS) {
+      console.warn('[ai-meal-recommendation] prompt still too large for fixed credit price; proceeding with strict caps', {
+        estPromptTokens: estimate.estPromptTokens,
+        estVendorCostCents: estimate.estVendorCostCents,
+        maxVendorCostCents: MAX_VENDOR_COST_CENTS_FOR_FIXED_CREDITS,
+        maxOutputTokens,
+      })
+    }
+
+    let content = ''
+    try {
+      const completion = await runChatCompletionWithLogging(
+        openai,
+        {
+          model,
+          temperature: 0.5,
+          ...(model.toLowerCase().includes('gpt-5') ? { max_completion_tokens: maxOutputTokens } : { max_tokens: maxOutputTokens }),
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: userPrompt },
+          ],
+        } as any,
+        {
+          feature: 'food:ai-meal-recommendation',
+          userId: user.id,
+          userLabel: user.email,
+          endpoint: '/api/ai-meal-recommendation',
+        },
+      )
+      const raw = (completion as any)?.choices?.[0]?.message?.content
+      content = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.map((p: any) => p?.text || '').join('') : ''
+    } catch (err: any) {
+      console.error('[ai-meal-recommendation] LLM call failed', err)
+      return NextResponse.json({ error: 'AI failed' }, { status: 500 })
+    }
+
+    const parsed = parseJsonRelaxed(content)
+    const mealName = typeof parsed?.mealName === 'string' ? parsed.mealName.trim() : ''
+    const tags = Array.isArray(parsed?.tags) ? parsed.tags.map((t: any) => String(t || '').trim()).filter(Boolean).slice(0, 12) : []
+    const why = typeof parsed?.why === 'string' ? parsed.why.trim() : ''
+    const itemsInitial = normalizeAndValidateItems(parsed?.items)
+    if (!itemsInitial || itemsInitial.length === 0) {
+      continue
+    }
+
+    const itemsDefaulted = itemsInitial.map((item) => ({ ...item, servings: 1 }))
+    const { mealName: safeMealName, items: itemsWithNameFixes } = applyMealNameConsistency(category, mealName, itemsDefaulted)
+    const recipe = normalizeRecipe(parsed?.recipe) || buildFallbackRecipe(category, itemsWithNameFixes)
+    const fitItems = itemsWithNameFixes
+    const totals = computeTotalsFromItems(fitItems)
+
+    const candidate = { mealName: safeMealName || `AI Recommended ${category}`, items: fitItems }
+    const comparisons: Array<{ mealName: string; items: RecommendedItem[] }> = []
+    if (lastGeneratedCandidate) comparisons.push(lastGeneratedCandidate)
+    historyAll.forEach((h) => comparisons.push({ mealName: h.mealName, items: h.items }))
+    favoriteMeals.forEach((fav: any) => {
+      const favItems = normalizeAndValidateItems(fav?.items)
+      if (favItems.length > 0) {
+        comparisons.push({ mealName: String(fav?.label || fav?.description || '').trim(), items: favItems })
+      }
+    })
+
+    const isDuplicate = comparisons.some((comp) => isSimilarMeal(candidate, comp))
+    if (isDuplicate) {
+      continue
+    }
+
+    record = {
+      id: `air-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      createdAt: new Date().toISOString(),
+      date,
+      category,
+      mealName: candidate.mealName,
+      tags,
+      why,
+      recipe,
+      items: fitItems,
+      totals,
+    }
+    break
   }
-  if (!imageUrl) {
-    return NextResponse.json({ error: 'Image generation failed' }, { status: 502 })
+
+  if (!record) {
+    return NextResponse.json({ error: 'Unable to generate a unique meal right now.' }, { status: 502 })
   }
 
   // Charge credits only after we have a usable recommendation.
@@ -1177,27 +1279,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
   }
 
-  const record: RecommendedMealRecord = {
-    id: `air-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    createdAt: new Date().toISOString(),
-    date,
-    category,
-    mealName: safeMealName || `AI Recommended ${category}`,
-    tags,
-    why,
-    imageUrl,
-    recipe,
-    items: fitItems,
-    totals,
-  }
-
-  // Draft-only generation: do not persist into history unless the user explicitly saves.
-  if (!storedState.seenExplainAt) {
-    try {
-      await saveStoredState(user.id, { ...storedState, seenExplainAt: new Date().toISOString() })
-    } catch (e) {
-      console.warn('[ai-meal-recommendation] failed to mark explain as seen (non-fatal)', e)
-    }
+  try {
+    await saveStoredState(user.id, {
+      ...storedState,
+      seenExplainAt: storedState.seenExplainAt || new Date().toISOString(),
+      lastGenerated: { mealName: record.mealName, items: record.items, createdAt: record.createdAt },
+    })
+  } catch (e) {
+    console.warn('[ai-meal-recommendation] failed to update last generated (non-fatal)', e)
   }
 
   const remainingAfter = subtractTotals(targets, used)

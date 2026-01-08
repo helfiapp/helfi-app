@@ -42,7 +42,6 @@ type RecommendedMealRecord = {
   mealName: string
   tags: string[]
   why: string
-  imageUrl?: string | null
   recipe?: {
     servings?: number | null
     prepMinutes?: number | null
@@ -502,7 +501,7 @@ export default function RecommendedMealClient() {
   )
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white overflow-x-hidden">
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="px-4 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -588,16 +587,6 @@ export default function RecommendedMealClient() {
               {active ? (
                 <>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                    {active.imageUrl ? (
-                      <div className="mb-4 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
-                        <img
-                          src={active.imageUrl}
-                          alt={`Plated ${active.mealName || pageTitle}`}
-                          className="w-full h-auto object-cover"
-                          loading="lazy"
-                        />
-                      </div>
-                    ) : null}
                     <div className="flex flex-col gap-4">
                       <div className="min-w-0">
                         <div className="text-xs text-gray-500">Meal</div>

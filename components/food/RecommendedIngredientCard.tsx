@@ -89,7 +89,7 @@ export default function RecommendedIngredientCard({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:self-start max-w-full">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:self-start max-w-full w-full sm:w-auto">
           <span className="text-xs text-gray-500">Servings</span>
           <input
             value={inputValue}
@@ -103,7 +103,7 @@ export default function RecommendedIngredientCard({
               setInputValue(formatServingsDisplay(servings))
             }}
             inputMode="decimal"
-            className="w-20 max-w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-900 text-center"
+            className="w-24 max-w-full px-2 py-2 rounded-lg border border-gray-200 text-[16px] text-gray-900 text-center flex-shrink-0"
             aria-label={`Servings for ${item.name}`}
           />
         </div>
