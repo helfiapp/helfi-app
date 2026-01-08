@@ -1146,20 +1146,24 @@ export async function POST(req: NextRequest) {
   const fitItems = scaleToFitCalories(itemsWithNameFixes, caloriesCap)
   const totals = computeTotalsFromItems(fitItems)
   let imageUrl: string | null = null
-  try {
-    const imagePrompt = buildMealImagePrompt(safeMealName || `AI Recommended ${category}`, fitItems)
-    const imageResponse = await openai.images.generate({
-      model: 'gpt-image-1',
-      prompt: imagePrompt,
-      size: '1024x1024',
-      response_format: 'b64_json',
-    } as any)
-    const b64 = (imageResponse as any)?.data?.[0]?.b64_json
-    if (typeof b64 === 'string' && b64.trim()) {
-      imageUrl = `data:image/png;base64,${b64}`
+  const imagePrompt = buildMealImagePrompt(safeMealName || `AI Recommended ${category}`, fitItems)
+  const imageModels = ['gpt-image-1', 'dall-e-3']
+  for (const imageModel of imageModels) {
+    try {
+      const imageResponse = await openai.images.generate({
+        model: imageModel,
+        prompt: imagePrompt,
+        size: '1024x1024',
+        response_format: 'b64_json',
+      } as any)
+      const b64 = (imageResponse as any)?.data?.[0]?.b64_json
+      if (typeof b64 === 'string' && b64.trim()) {
+        imageUrl = `data:image/png;base64,${b64}`
+        break
+      }
+    } catch (err) {
+      console.warn(`[ai-meal-recommendation] image generation failed for ${imageModel}`, err)
     }
-  } catch (err) {
-    console.warn('[ai-meal-recommendation] image generation failed (non-fatal)', err)
   }
   if (!imageUrl) {
     return NextResponse.json({ error: 'Image generation failed' }, { status: 502 })
