@@ -8464,9 +8464,7 @@ Please add nutritional information manually if needed.`);
     if (isAnalyzing) return
     if (!photoFile) return
     if (analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)) return
-    const message = reasons.some((reason) => /missing ingredients/i.test(String(reason)))
-      ? 'Rechecking for missing ingredients…'
-      : 'Rechecking analysis…'
+    const message = 'Re-analyzing... Please keep this page open.'
     setFeedbackRescanState({ scope: 'overall', itemIndex: null })
     setFeedbackRescanMessage(message)
     showQuickToast(message)
@@ -14749,9 +14747,6 @@ Please add nutritional information manually if needed.`);
                         <div className="flex items-center gap-2 font-semibold">
                           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                           {feedbackRescanMessage}
-                        </div>
-                        <div className="mt-1 text-xs text-emerald-700">
-                          This can take up to 2 minutes. Please keep this page open.
                         </div>
                       </div>
                     </div>
