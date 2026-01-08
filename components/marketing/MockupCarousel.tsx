@@ -17,7 +17,6 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
   const [manualPause, setManualPause] = useState(false)
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const animationFrameRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -95,35 +94,23 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
 
   useEffect(() => {
     if (images.length <= 1) return
-    if (isMobile) {
-      if (isHovering || manualPause) return
-      if (autoScrollRef.current) {
-        clearInterval(autoScrollRef.current)
-      }
-      autoScrollRef.current = setInterval(() => {
-        advance(1)
-      }, 5000)
-      return () => {
-        if (autoScrollRef.current) {
-          clearInterval(autoScrollRef.current)
-          autoScrollRef.current = null
-        }
-      }
-    }
-
-    if (isHovering || manualPause) return
+    if (isMobile || isHovering || manualPause) return
     const container = scrollContainerRef.current
     if (!container) return
 
     const speed = 0.45
     const animate = () => {
-      if (!scrollContainerRef.current) return
-      const slideWidth = getScrollAmount() || scrollContainerRef.current.clientWidth
-      const loopPoint = slideWidth * images.length
-      if (scrollContainerRef.current.scrollLeft >= loopPoint) {
-        scrollContainerRef.current.scrollLeft = 0
+      const activeContainer = scrollContainerRef.current
+      if (!activeContainer) return
+      const totalScrollWidth = activeContainer.scrollWidth
+      const visibleWidth = activeContainer.clientWidth
+      if (totalScrollWidth <= visibleWidth) {
+        animationFrameRef.current = requestAnimationFrame(animate)
+        return
       }
-      scrollContainerRef.current.scrollLeft += speed
+      const loopPoint = totalScrollWidth / 2
+      const nextScroll = activeContainer.scrollLeft + speed
+      activeContainer.scrollLeft = nextScroll >= loopPoint ? nextScroll - loopPoint : nextScroll
       animationFrameRef.current = requestAnimationFrame(animate)
     }
     animationFrameRef.current = requestAnimationFrame(animate)
@@ -133,7 +120,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
         animationFrameRef.current = null
       }
     }
-  }, [advance, images.length, isMobile, isHovering, manualPause])
+  }, [images.length, isMobile, isHovering, manualPause])
 
   useEffect(() => {
     if (!isMobile) return
@@ -153,9 +140,6 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
     return () => {
       if (resumeTimeoutRef.current) {
         clearTimeout(resumeTimeoutRef.current)
-      }
-      if (autoScrollRef.current) {
-        clearInterval(autoScrollRef.current)
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
@@ -289,61 +273,60 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
       )}
 
       {expandedIndex !== null && !isMobile && (
-        <div
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/85 p-6 cursor-zoom-out"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setExpandedIndex(null)}
-        >
+        <>
+          <div
+            className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/85 p-6 cursor-zoom-out"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setExpandedIndex(null)}
+          >
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                setExpandedIndex((prev) => (prev === null ? prev : (prev - 1 + images.length) % images.length))
+              }}
+              className="absolute left-8 top-1/2 -translate-y-1/2 z-[1010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white pointer-events-auto"
+              aria-label="Previous image"
+            >
+              <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
+                <path d="M12.5 5l-5 5 5 5" />
+              </svg>
+            </button>
+            <div className="max-w-6xl w-full px-6" onClick={(event) => event.stopPropagation()}>
+              <Image
+                src={images[expandedIndex].src}
+                alt={images[expandedIndex].alt}
+                width={images[expandedIndex].width ?? 1419}
+                height={images[expandedIndex].height ?? 2796}
+                sizes="90vw"
+                className="w-full h-auto max-h-[85vh] object-contain rounded-2xl"
+                priority
+              />
+            </div>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                setExpandedIndex((prev) => (prev === null ? prev : (prev + 1) % images.length))
+              }}
+              className="absolute right-8 top-1/2 -translate-y-1/2 z-[1010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white pointer-events-auto"
+              aria-label="Next image"
+            >
+              <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
+                <path d="M7.5 5l5 5-5 5" />
+              </svg>
+            </button>
+          </div>
           <button
             type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              setExpandedIndex(null)
-            }}
-            className="absolute top-6 right-6 z-[1010] h-11 w-11 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md flex items-center justify-center text-2xl leading-none pointer-events-auto"
+            onClick={() => setExpandedIndex(null)}
+            className="fixed top-6 right-6 z-[2000] h-11 w-11 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md flex items-center justify-center text-2xl leading-none"
             aria-label="Close image preview"
           >
             <span aria-hidden="true">×</span>
           </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              setExpandedIndex((prev) => (prev === null ? prev : (prev - 1 + images.length) % images.length))
-            }}
-            className="absolute left-8 top-1/2 -translate-y-1/2 z-[1010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white pointer-events-auto"
-            aria-label="Previous image"
-          >
-            <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
-              <path d="M12.5 5l-5 5 5 5" />
-            </svg>
-          </button>
-          <div className="max-w-6xl w-full px-6" onClick={(event) => event.stopPropagation()}>
-            <Image
-              src={images[expandedIndex].src}
-              alt={images[expandedIndex].alt}
-              width={images[expandedIndex].width ?? 1419}
-              height={images[expandedIndex].height ?? 2796}
-              sizes="90vw"
-              className="w-full h-auto max-h-[85vh] object-contain rounded-2xl"
-              priority
-            />
-          </div>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              setExpandedIndex((prev) => (prev === null ? prev : (prev + 1) % images.length))
-            }}
-            className="absolute right-8 top-1/2 -translate-y-1/2 z-[1010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white pointer-events-auto"
-            aria-label="Next image"
-          >
-            <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
-              <path d="M7.5 5l5 5-5 5" />
-            </svg>
-          </button>
-        </div>
+        </>
       )}
     </div>
   )

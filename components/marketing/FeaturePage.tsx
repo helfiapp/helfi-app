@@ -64,7 +64,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
       <PublicHeader />
 
       <main>
