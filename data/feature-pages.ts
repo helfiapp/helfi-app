@@ -696,6 +696,10 @@ export const featurePages: FeaturePageContent[] = [
             '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD HEALTH WARNING-portrait.png',
             'Nutrition context and health warning'
           ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/RECOMMENDED MEAL-portrait.png',
+            'AI recommended meal details'
+          ),
         ],
       },
     ],
