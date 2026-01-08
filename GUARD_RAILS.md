@@ -1115,6 +1115,25 @@ days after midnight).
 4) Confirm `ensureEntryLoggedAt(...)` writes `__addedOrder` onto the entry and
    into `nutrition`/`total`.
 
+## 7.1 Credits Bar Reload Jitter (Jan 2026 - Locked)
+
+**Goal (non-negotiable):** The Credits Remaining bar must **not** reload and
+shift the Food Diary screen when you leave and return. It should appear
+instantly and update quietly in the background.
+
+**Do not:**
+- Clear the saved credits display on every return to the page.
+- Render the meter only after a fresh network call.
+
+**Must keep (source of truth):**
+- The credits bar reads a stored value first (from the same session) and shows
+  it immediately.
+- The network call runs after, then updates the bar without a layout jump.
+
+**If this breaks again, fix checklist:**
+1) Restore the "show stored value first" behavior for the credits bar.
+2) Keep the background refresh, but do **not** block initial render on it.
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
