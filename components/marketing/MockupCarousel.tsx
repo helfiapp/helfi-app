@@ -209,7 +209,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
       <div className="overflow-hidden">
         <div
           ref={scrollContainerRef}
-          className="flex gap-6 overflow-hidden"
+          className="flex gap-6 overflow-x-auto scrollbar-hide"
           role="region"
           aria-roledescription="carousel"
         >
@@ -290,7 +290,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
 
       {expandedIndex !== null && !isMobile && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6 cursor-zoom-out"
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/85 p-6 cursor-zoom-out"
           role="dialog"
           aria-modal="true"
           onClick={() => setExpandedIndex(null)}
@@ -301,7 +301,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
               event.stopPropagation()
               setExpandedIndex(null)
             }}
-            className="absolute top-6 right-6 h-11 w-11 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md flex items-center justify-center text-2xl leading-none"
+            className="absolute top-6 right-6 z-[1010] h-11 w-11 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md flex items-center justify-center text-2xl leading-none pointer-events-auto"
             aria-label="Close image preview"
           >
             <span aria-hidden="true">×</span>
@@ -312,7 +312,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
               event.stopPropagation()
               setExpandedIndex((prev) => (prev === null ? prev : (prev - 1 + images.length) % images.length))
             }}
-            className="absolute left-8 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white"
+            className="absolute left-8 top-1/2 -translate-y-1/2 z-[1010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white pointer-events-auto"
             aria-label="Previous image"
           >
             <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
@@ -336,7 +336,7 @@ export default function MockupCarousel({ images, ariaLabel = 'Food diary mockups
               event.stopPropagation()
               setExpandedIndex((prev) => (prev === null ? prev : (prev + 1) % images.length))
             }}
-            className="absolute right-8 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white"
+            className="absolute right-8 top-1/2 -translate-y-1/2 z-[1010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white pointer-events-auto"
             aria-label="Next image"
           >
             <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
