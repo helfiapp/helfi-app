@@ -328,6 +328,16 @@ type DeviceStatusSnapshotStore = Record<string, DeviceStatusSnapshot>
 const DEVICE_STATUS_TTL_MS = 5 * 60 * 1000
 const DEVICE_STATUS_SNAPSHOT_KEY = 'foodDiary:deviceStatus'
 
+type FavoritesAllSnapshot = {
+  entries: any[]
+  savedAt: number
+}
+
+type FavoritesAllSnapshotStore = Record<string, FavoritesAllSnapshot>
+
+const FAVORITES_ALL_SNAPSHOT_TTL_MS = 5 * 60 * 1000
+const FAVORITES_ALL_SNAPSHOT_KEY = 'foodDiary:favoritesAllSnapshot'
+
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
   try {
@@ -368,6 +378,37 @@ const writeExerciseSnapshot = (dateKey: string, entries: any[], caloriesKcal: nu
       savedAt: Date.now(),
     }
     sessionStorage.setItem('foodDiary:exerciseSnapshot', JSON.stringify(parsed))
+  } catch {}
+}
+
+const readFavoritesAllSnapshot = (userKey?: string): any[] | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(FAVORITES_ALL_SNAPSHOT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as FavoritesAllSnapshotStore
+    const key = userKey || 'last'
+    const entry = parsed?.[key] || parsed?.last
+    if (!entry || !Array.isArray(entry.entries)) return null
+    const savedAt = Number(entry.savedAt) || 0
+    if (!savedAt || Date.now() - savedAt > FAVORITES_ALL_SNAPSHOT_TTL_MS) return null
+    return entry.entries
+  } catch {
+    return null
+  }
+}
+
+const writeFavoritesAllSnapshot = (userKey: string | null | undefined, entries: any[]) => {
+  if (typeof window === 'undefined') return
+  if (!Array.isArray(entries)) return
+  try {
+    const raw = sessionStorage.getItem(FAVORITES_ALL_SNAPSHOT_KEY)
+    const parsed = raw ? (JSON.parse(raw) as FavoritesAllSnapshotStore) : {}
+    const key = userKey || 'last'
+    const payload: FavoritesAllSnapshot = { entries, savedAt: Date.now() }
+    parsed[key] = payload
+    parsed.last = payload
+    sessionStorage.setItem(FAVORITES_ALL_SNAPSHOT_KEY, JSON.stringify(parsed))
   } catch {}
 }
 
@@ -1771,6 +1812,7 @@ export default function FoodDiary() {
   const { userData, profileImage, updateUserData } = useUserData()
   const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
   const initialDeviceStatus = useMemo(() => readDeviceStatusSnapshot(userCacheKey), [userCacheKey])
+  const initialFavoritesAllSnapshot = useMemo(() => readFavoritesAllSnapshot(userCacheKey), [userCacheKey])
   const [persistentDiarySnapshotVersion, setPersistentDiarySnapshotVersion] = useState(0)
   const refreshPersistentDiarySnapshot = useCallback(() => {
     setPersistentDiarySnapshotVersion((prev) => prev + 1)
@@ -2400,8 +2442,12 @@ export default function FoodDiary() {
   const favoriteClickBlockRef = useRef<Record<string, boolean>>({})
   const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>('all')
   const [favoritesSearch, setFavoritesSearch] = useState('')
-  const [favoritesAllServerEntries, setFavoritesAllServerEntries] = useState<any[] | null>(null)
-  const [favoritesAllServerLoading, setFavoritesAllServerLoading] = useState(false)
+  const [favoritesAllServerEntries, setFavoritesAllServerEntries] = useState<any[] | null>(
+    () => (initialFavoritesAllSnapshot && initialFavoritesAllSnapshot.length > 0 ? initialFavoritesAllSnapshot : null),
+  )
+  const [favoritesAllServerLoading, setFavoritesAllServerLoading] = useState<boolean>(
+    () => !(initialFavoritesAllSnapshot && initialFavoritesAllSnapshot.length > 0),
+  )
   const [showRenameModal, setShowRenameModal] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [renameOriginal, setRenameOriginal] = useState('')
@@ -9263,12 +9309,19 @@ Please add nutritional information manually if needed.`);
 
   useEffect(() => {
     if (!showFavoritesPicker) {
-      setFavoritesAllServerEntries(null)
+      const cached = readFavoritesAllSnapshot(userCacheKey)
+      setFavoritesAllServerEntries(cached && cached.length > 0 ? cached : null)
       setFavoritesAllServerLoading(false)
       return
     }
     let cancelled = false
-    setFavoritesAllServerLoading(true)
+    const cached = readFavoritesAllSnapshot(userCacheKey)
+    if (cached && cached.length > 0) {
+      setFavoritesAllServerEntries(cached)
+      setFavoritesAllServerLoading(false)
+    } else {
+      setFavoritesAllServerLoading(true)
+    }
     ;(async () => {
       try {
         const res = await fetch('/api/food-log/library?limit=5000', { cache: 'no-store' })
@@ -9283,7 +9336,10 @@ Please add nutritional information manually if needed.`);
           if (!derived) return entry
           return { ...entry, localDate: derived }
         })
-        if (!cancelled) setFavoritesAllServerEntries(normalized)
+        if (!cancelled) {
+          setFavoritesAllServerEntries(normalized)
+          writeFavoritesAllSnapshot(userCacheKey, normalized)
+        }
       } catch (err) {
         console.warn('Favorites list refresh failed', err)
       } finally {
@@ -9293,7 +9349,7 @@ Please add nutritional information manually if needed.`);
     return () => {
       cancelled = true
     }
-  }, [showFavoritesPicker, selectedDate])
+  }, [showFavoritesPicker, selectedDate, userCacheKey])
 
   const foodNameOverrideMap = useMemo(() => {
     const map = new Map<string, string>()
