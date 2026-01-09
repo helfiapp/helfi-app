@@ -181,6 +181,10 @@ function extractMetricsFromRecord(baseType: string, record: any) {
   return out
 }
 
+function isEpochType(baseType: string) {
+  return baseType.toLowerCase().includes('epoch')
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -264,12 +268,20 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  const byDate = new Map<string, ReturnType<typeof extractMetricsFromRecord>>()
+  const byDate = new Map<string, ReturnType<typeof extractMetricsFromRecord> & {
+    stepsEpochSum?: number
+    caloriesEpochSum?: number
+    distanceKmEpochSum?: number
+    stepsSummary?: number
+    caloriesSummary?: number
+    distanceKmSummary?: number
+  }>()
 
   for (const log of logs) {
     const baseType = (log.dataType || 'default').split('/')[0]
     const payload = unwrapPayload(log.payload)
     const arrays = findCandidateArrays(payload, baseType)
+    const isEpoch = isEpochType(baseType)
 
     const considerRecords = (records: any[]) => {
       for (const record of records) {
@@ -282,9 +294,15 @@ export async function GET(request: NextRequest) {
         const current = byDate.get(date) || ({ date } as any)
         const next: any = { ...current }
 
-        if (next.steps == null && extracted.steps != null) next.steps = extracted.steps
-        if (next.calories == null && extracted.calories != null) next.calories = extracted.calories
-        if (next.distanceKm == null && extracted.distanceKm != null) next.distanceKm = extracted.distanceKm
+        if (isEpoch) {
+          if (extracted.steps != null) next.stepsEpochSum = (next.stepsEpochSum ?? 0) + extracted.steps
+          if (extracted.calories != null) next.caloriesEpochSum = (next.caloriesEpochSum ?? 0) + extracted.calories
+          if (extracted.distanceKm != null) next.distanceKmEpochSum = (next.distanceKmEpochSum ?? 0) + extracted.distanceKm
+        } else {
+          if (next.stepsSummary == null && extracted.steps != null) next.stepsSummary = extracted.steps
+          if (next.caloriesSummary == null && extracted.calories != null) next.caloriesSummary = extracted.calories
+          if (next.distanceKmSummary == null && extracted.distanceKm != null) next.distanceKmSummary = extracted.distanceKm
+        }
         if (next.restingHeartRate == null && extracted.restingHeartRate != null) next.restingHeartRate = extracted.restingHeartRate
         if (next.sleepMinutes == null && extracted.sleepMinutes != null) next.sleepMinutes = extracted.sleepMinutes
         if (next.weightKg == null && extracted.weightKg != null) next.weightKg = extracted.weightKg
@@ -307,11 +325,14 @@ export async function GET(request: NextRequest) {
     if (!row) continue
 
     if (requestedTypes.includes('steps')) {
+      const steps = row.stepsSummary ?? row.stepsEpochSum
+      const calories = row.caloriesSummary ?? row.caloriesEpochSum
+      const distanceKm = row.distanceKmSummary ?? row.distanceKmEpochSum
       series.steps[i] = {
         date: d,
-        steps: row.steps ?? undefined,
-        calories: row.calories ?? undefined,
-        distanceKm: row.distanceKm ?? undefined,
+        steps: steps ?? undefined,
+        calories: calories ?? undefined,
+        distanceKm: distanceKm ?? undefined,
       }
     }
     if (requestedTypes.includes('heartrate')) {
