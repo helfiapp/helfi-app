@@ -947,13 +947,11 @@ export default function DevicesPage() {
           </p>
         </div>
 
-        {/* Coming Soon Devices */}
+        {/* Other Devices */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Coming Soon</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Other devices under review</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { key: 'appleWatch', icon: '⌚', name: 'Apple Watch', detail: 'Apple Health sync' },
-              { key: 'samsung', icon: '📱', name: 'Samsung Health', detail: 'Android health data' },
               { key: 'googleFit', icon: '🏃', name: 'Google Fit', detail: 'Android fitness' },
               { key: 'oura', icon: '💍', name: 'Oura Ring', detail: 'Recovery & sleep' },
               { key: 'polar', icon: '🧭', name: 'Polar', detail: 'Training insights' },

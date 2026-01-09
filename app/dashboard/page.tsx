@@ -672,7 +672,7 @@ export default function Dashboard() {
       {/* Main Content - Add padding bottom for mobile nav */}
       <main className="flex-1 pb-24 md:pb-8">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 md:py-8">
-          <div className="bg-white rounded-lg shadow-sm p-8">
+          <div className="bg-transparent md:bg-white rounded-none md:rounded-lg shadow-none md:shadow-sm p-0 md:p-8">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-helfi-black dark:text-white mb-4">
                 Welcome to Your Health Dashboard
@@ -684,7 +684,7 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
               <Link href="/check-in" className="block">
-              <div className="bg-white md:bg-emerald-50 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-emerald-200 hover:md:border-emerald-300 shadow-sm md:shadow-none transition-colors">
+              <div className="bg-transparent md:bg-emerald-50 p-5 md:p-6 rounded-2xl border border-gray-200 md:border-2 md:border-emerald-200 hover:md:border-emerald-300 shadow-none transition-colors">
                 <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">✅ Daily Check-In</h3>
                 <p className="text-[13px] text-gray-600">Rate your health issues for today</p>
                 <div className="mt-3">
@@ -694,21 +694,21 @@ export default function Dashboard() {
               </Link>
 
               <Link href="/health-tracking" className="block">
-              <div className="bg-white md:bg-helfi-green/5 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-helfi-green/20 hover:md:border-helfi-green/40 shadow-sm md:shadow-none transition-colors">
+              <div className="bg-transparent md:bg-helfi-green/5 p-5 md:p-6 rounded-2xl border border-gray-200 md:border-2 md:border-helfi-green/20 hover:md:border-helfi-green/40 shadow-none transition-colors">
                 <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">🎯 Health Tracking</h3>
                 <p className="text-[13px] text-gray-600">Track your daily metrics and progress</p>
                 <div className="mt-3">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-helfi-green/10 text-helfi-green">Coming Soon</span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">Active</span>
                 </div>
               </div>
               </Link>
 
               <Link href="/insights" className="block">
-              <div className="bg-white md:bg-blue-50 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-blue-200 hover:md:border-blue-300 shadow-sm md:shadow-none transition-colors">
+              <div className="bg-transparent md:bg-blue-50 p-5 md:p-6 rounded-2xl border border-gray-200 md:border-2 md:border-blue-200 hover:md:border-blue-300 shadow-none transition-colors">
                 <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">🤖 AI Insights</h3>
                 <p className="text-[13px] text-gray-600">Personalized health recommendations</p>
                 <div className="mt-3">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-600">Coming Soon</span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">Active</span>
                 </div>
               </div>
               </Link>
@@ -724,7 +724,7 @@ export default function Dashboard() {
 
             {/* Device Integration Section */}
             {onboardingData && (
-              <div className="mb-8 bg-gradient-to-r from-blue-50 to-green-50 dark:bg-none dark:bg-gray-800 rounded-lg p-4 md:p-6 border border-blue-200 dark:border-gray-700">
+              <div className="mb-8 rounded-lg md:rounded-2xl p-0 md:p-6 bg-transparent md:bg-gradient-to-r md:from-blue-50 md:to-green-50 dark:bg-none dark:bg-gray-800 border-0 md:border md:border-blue-200 dark:border-gray-700">
                 <div className="mb-3 md:mb-4">
                   {/* Mobile: centered heading and badge */}
                   <div className="md:hidden text-center">
@@ -736,14 +736,14 @@ export default function Dashboard() {
                     <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white">📱 Connect Your Devices</h3>
                     <span className="text-[12px] md:text-sm text-green-600 font-medium whitespace-nowrap">Enhanced Analytics</span>
                   </div>
-                  <p className="text-[13px] text-gray-600 text-center mt-2">Sync your smartwatch and fitness devices for better health insights</p>
+                  <p className="text-[13px] text-gray-600 text-center mt-2">Connect Fitbit or Garmin to sync activity and sleep data.</p>
                 </div>
                 
                 {/* Mobile grouped list */}
                 <div className="md:hidden mb-4">
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-100">
+                  <div className="bg-transparent rounded-none border-0 shadow-none divide-y divide-gray-200">
                     {/* Fitbit - First since it's the only working integration */}
-                    <div className="px-4 py-3">
+                    <div className="px-2 sm:px-3 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">🏃</div>
                         <div className="flex-1">
@@ -762,19 +762,8 @@ export default function Dashboard() {
                         </button>
                       )}
                     </div>
-                    {/* Apple Watch */}
-                    <div className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">⌚</div>
-                        <div>
-                          <div className="text-[15px] font-medium text-gray-900">Apple Watch</div>
-                          <div className="text-[12px] text-gray-500">Sync with Apple Health</div>
-                        </div>
-                      </div>
-                      <button onClick={() => toggleInterest('appleWatch')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}</button>
-                    </div>
                   {/* Garmin */}
-                  <div className="px-4 py-3">
+                  <div className="px-2 sm:px-3 py-3">
                     <div className="flex items-center gap-3">
                       <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={24} height={24} className="rounded-md" />
                       <div>
@@ -800,21 +789,10 @@ export default function Dashboard() {
                       <Link href="/devices" className="mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-helfi-green text-white block hover:bg-green-600 transition-colors">
                         Connect Garmin Connect
                       </Link>
-                    )}
-                  </div>
-                    {/* Samsung Health */}
-                    <div className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">📱</div>
-                        <div>
-                          <div className="text-[15px] font-medium text-gray-900">Samsung Health</div>
-                          <div className="text-[12px] text-gray-500">Android health sync</div>
-                        </div>
-                      </div>
-                      <button onClick={() => toggleInterest('samsung')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.samsung ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.samsung ? 'Interested ✓' : "I'm interested"}</button>
+                      )}
                     </div>
                     {/* Google Fit */}
-                    <div className="px-4 py-3">
+                    <div className="px-2 sm:px-3 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">🤖</div>
                         <div>
@@ -825,7 +803,7 @@ export default function Dashboard() {
                       <button onClick={() => toggleInterest('googleFit')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                     {/* Oura Ring */}
-                    <div className="px-4 py-3">
+                    <div className="px-2 sm:px-3 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">💍</div>
                         <div>
@@ -836,7 +814,7 @@ export default function Dashboard() {
                       <button onClick={() => toggleInterest('oura')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.oura ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                     {/* Polar */}
-                    <div className="px-4 py-3">
+                    <div className="px-2 sm:px-3 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">🧭</div>
                         <div>
@@ -852,7 +830,7 @@ export default function Dashboard() {
                 {/* Desktop grid */}
                 <div className="hidden md:grid grid-cols-4 gap-4 mb-4">
                   {/* Fitbit - First since it's the only working integration */}
-                  <div className={`bg-white p-4 rounded-2xl border ${fitbitConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
+                  <div className={`bg-transparent p-4 rounded-2xl border ${fitbitConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">🏃</div>
                       <div className="text-xs font-medium text-gray-700 mb-2 flex items-center justify-center gap-1">
@@ -878,25 +856,8 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Apple Watch */}
-                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.appleWatch ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}> 
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">⌚</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">Apple Watch</div>
-                      <button
-                        onClick={() => toggleInterest('appleWatch')}
-                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
-                          deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                        disabled={!!savingInterest}
-                      >
-                        {deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Garmin */}
-                  <div className={`bg-white p-4 rounded-2xl border ${garminConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
+                  <div className={`bg-transparent p-4 rounded-2xl border ${garminConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
                     <div className="text-center">
                       <div className="flex justify-center mb-2">
                         <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={28} height={28} className="rounded-md" />
@@ -933,25 +894,8 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Samsung Health */}
-                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.samsung ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">📱</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">Samsung Health</div>
-                      <button
-                        onClick={() => toggleInterest('samsung')}
-                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
-                          deviceInterest.samsung ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                        disabled={!!savingInterest}
-                      >
-                        {deviceInterest.samsung ? 'Interested ✓' : "I'm interested"}
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Google Fit */}
-                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.googleFit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
+                  <div className={`bg-transparent p-4 rounded-2xl border ${deviceInterest.googleFit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">🤖</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Google Fit</div>
@@ -968,7 +912,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* Oura Ring */}
-                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.oura ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
+                  <div className={`bg-transparent p-4 rounded-2xl border ${deviceInterest.oura ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">💍</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Oura Ring</div>
@@ -985,7 +929,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* Polar */}
-                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.polar ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
+                  <div className={`bg-transparent p-4 rounded-2xl border ${deviceInterest.polar ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">🧭</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Polar</div>
@@ -1003,7 +947,7 @@ export default function Dashboard() {
                 </div>
                 
                 <div className="text-xs text-gray-500 text-center">
-                  Device integration coming soon - enhanced health monitoring with real-time data
+                  Fitbit and Garmin are available now. Other integrations are under review.
                 </div>
               </div>
             )}
