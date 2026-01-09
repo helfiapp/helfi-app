@@ -248,15 +248,21 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                     </div>
                     <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-400 rounded-full shadow-[0_0_12px_rgba(52,211,153,0.6)] transition-all duration-500"
-                        style={{ width: `${countdown.percent}%` }}
+                        className="h-full rounded-full shadow-[0_0_12px_rgba(77,175,80,0.6)] transition-all duration-500"
+                        style={{ width: `${countdown.percent}%`, backgroundColor: '#4DAF50' }}
                       ></div>
                     </div>
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div className="flex items-center gap-2 text-sm text-gray-500">
                         <span className="flex h-2 w-2 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          <span
+                            className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                            style={{ backgroundColor: '#4DAF50' }}
+                          ></span>
+                          <span
+                            className="relative inline-flex rounded-full h-2 w-2"
+                            style={{ backgroundColor: '#4DAF50' }}
+                          ></span>
                         </span>
                         <span>
                           Next report due{' '}
