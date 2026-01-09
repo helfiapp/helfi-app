@@ -28,12 +28,13 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string }
 type ChatThread = { id: string; title: string | null; createdAt: string; updatedAt: string }
 
 export default function VoiceChat({ context, onCostEstimate, className = '' }: VoiceChatProps) {
+  const VOICE_CHAT_COST_CREDITS = 10
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
-  const [estimatedCost, setEstimatedCost] = useState<number | null>(null)
+  const [estimatedCost] = useState<number>(VOICE_CHAT_COST_CREDITS)
   const [lastChargedCost, setLastChargedCost] = useState<number | null>(null)
   const [lastChargedAt, setLastChargedAt] = useState<string | null>(null)
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
@@ -145,7 +146,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         const newThreadId = data.threadId
         setCurrentThreadId(newThreadId)
         setMessages([])
-        setEstimatedCost(null)
         setLastChargedCost(null)
         setLastChargedAt(null)
         // Reload threads
@@ -182,7 +182,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
             } else {
               setCurrentThreadId(null)
               setMessages([])
-              setEstimatedCost(null)
               setLastChargedCost(null)
               setLastChargedAt(null)
             }
@@ -211,7 +210,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   }, [currentThreadId])
 
   useEffect(() => {
-    setEstimatedCost(null)
     setLastChargedCost(null)
     setLastChargedAt(null)
   }, [currentThreadId])
@@ -349,28 +347,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       setMessages(nextMessages)
       setInput('')
 
-      // Estimate cost before sending
-      const estimateRes = await fetch('/api/chat/voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, estimateOnly: true }),
-      })
-      
-      if (estimateRes.status === 402) {
-        const estimateData = await estimateRes.json()
-        setError(`Insufficient credits. Estimated cost: ${(estimateData.estimatedCost / 100).toFixed(2)} credits. Available: ${(estimateData.availableCredits / 100).toFixed(2)} credits.`)
-        setLoading(false)
-        return
-      }
-      
-      if (estimateRes.ok) {
-        const estimateData = await estimateRes.json()
-        const cost = estimateData.estimatedCost || 0
-        setEstimatedCost(cost)
-        if (onCostEstimate) {
-          onCostEstimate(cost)
-        }
-      }
+      if (onCostEstimate) onCostEstimate(VOICE_CHAT_COST_CREDITS)
 
       const url = `/api/chat/voice`
       const res = await fetch(url, {
@@ -386,7 +363,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
 
       if (res.status === 402) {
         const data = await res.json()
-        setError(`Insufficient credits. Estimated cost: ${(data.estimatedCost / 100).toFixed(2)} credits. Available: ${(data.availableCredits / 100).toFixed(2)} credits.`)
+        setError(`Insufficient credits. Estimated cost: ${data.estimatedCost} credits. Available: ${data.availableCredits} credits.`)
         setLoading(false)
         return
       }
@@ -488,7 +465,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       setLoading(true)
       setError(null)
       setMessages([])
-      setEstimatedCost(null)
       setLastChargedCost(null)
       setLastChargedAt(null)
       stopListening()
@@ -569,8 +545,18 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
           + New
         </button>
       </div>
-      {/* Messages Area - ChatGPT style */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
+      <section className="flex flex-col flex-1 min-h-0">
+        {/* Messages Area - ChatGPT style */}
+        <div
+          ref={containerRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0"
+          aria-live="polite"
+          style={{
+            maxWidth: '100%',
+            wordWrap: 'break-word',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
+          }}
+        >
         {messages.length === 0 && !loading && (
           <div className="max-w-3xl mx-auto">
             {hasHealthTipContext ? (
@@ -757,22 +743,21 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         <div ref={endRef} />
       </div>
 
-      {/* Input Area - ChatGPT style */}
-      <div className="border-t border-gray-200 bg-white">
-        {error && (
-          <div className="px-4 py-2 text-sm text-red-600 bg-red-50">{error}</div>
-        )}
-        {(estimatedCost !== null || lastChargedCost !== null) && (
-          <div className="px-4 pt-2">
-            <div className="max-w-3xl mx-auto flex flex-wrap gap-4 text-xs text-gray-500">
+        <form
+          className="sticky bottom-0 left-0 right-0 border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] flex-shrink-0"
+          onSubmit={handleSubmit}
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+        >
+          {(estimatedCost !== null || lastChargedCost !== null) && (
+            <div className="max-w-3xl mx-auto flex flex-wrap gap-4 text-xs text-gray-500 mb-2">
               {estimatedCost !== null && (
                 <span>
-                  Estimated: <span className="font-semibold text-gray-700">{(estimatedCost / 100).toFixed(2)} credits</span>
+                  Estimated: <span className="font-semibold text-gray-700">{estimatedCost} credits</span> per response
                 </span>
               )}
               {lastChargedCost !== null && (
                 <span>
-                  Charged: <span className="font-semibold text-gray-700">{(lastChargedCost / 100).toFixed(2)} credits</span>
+                  Charged: <span className="font-semibold text-gray-700">{lastChargedCost} credits</span>
                 </span>
               )}
               {lastChargedAt && (
@@ -781,10 +766,8 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 </span>
               )}
             </div>
-          </div>
-        )}
-        <form className="px-4 py-3" onSubmit={handleSubmit}>
-          <div className="max-w-3xl mx-auto flex items-center gap-2">
+          )}
+          <div className="flex items-center gap-2 w-full max-w-3xl mx-auto">
             {messages.length > 0 && (
               <button
                 type="button"
@@ -831,7 +814,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 onKeyDown={onComposerKeyDown}
                 placeholder="Ask anything"
                 rows={1}
-                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-base leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-base leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none min-h-[52px] max-h-[200px]"
               />
             </div>
             <button
@@ -845,8 +828,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
               </svg>
             </button>
           </div>
+          {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
         </form>
-      </div>
+      </section>
     </div>
   )
 }

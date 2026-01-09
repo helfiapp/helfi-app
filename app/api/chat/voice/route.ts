@@ -4,12 +4,13 @@ import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
-import { capMaxTokensToBudget, costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { logAIUsage } from '@/lib/ai-usage-logger'
 import { ensureTalkToAITables, listMessages, appendMessage, createThread, updateThreadTitle, listThreads } from '@/lib/talk-to-ai-chat-store'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+
+const VOICE_CHAT_COST_CENTS = 10
 
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
@@ -182,6 +183,13 @@ function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContex
   }
 
   parts.push(
+    'CLINICAL STYLE (CRITICAL):',
+    '- Act like a careful primary care clinician talking to a patient.',
+    '- When a new symptom is raised, start with 3-6 short, targeted questions before long advice.',
+    '- Use the user\'s medications, supplements, goals, recent logs, and issues to shape your questions and guidance.',
+    '- Surface likely interactions or triggers (heat, dehydration, sleep loss, exercise, alcohol/caffeine) without being asked.',
+    '- Keep responses concise and focused. Aim for <120 words unless the user asks for detail.',
+    '',
     'RESPONSE FORMATTING (CRITICAL - FOLLOW EXACTLY):',
     '',
     'You MUST format all responses with proper structure. Example format:',
@@ -345,7 +353,7 @@ export async function POST(req: NextRequest) {
 
     const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
     // Add formatting reminder to user message for better compliance
-    const enhancedQuestion = `${question}\n\nPlease format your response with proper paragraphs, line breaks, and structure.`
+    const enhancedQuestion = `${question}\n\nPlease format your response with proper paragraphs, line breaks, and structure. Keep it concise and ask any clarifying questions first.`
     const chatMessages = [
       { role: 'system' as const, content: systemPrompt },
       ...historyMessages,
@@ -363,11 +371,6 @@ export async function POST(req: NextRequest) {
       await updateThreadTitle(threadId, title)
     }
 
-    // Estimate cost (2x for user)
-    const promptText = `${systemPrompt}\n${question}`
-    const estimateCents = costCentsEstimateFromText(model, promptText, 1000 * 4)
-    const userCostCents = estimateCents * 2 // Double the cost for user
-
     // Check wallet
     const cm = new CreditManager(user.id)
     const wallet = await cm.getWalletStatus()
@@ -375,48 +378,46 @@ export async function POST(req: NextRequest) {
     // If only estimating, return cost
     if (body?.estimateOnly) {
       return NextResponse.json({
-        estimatedCost: userCostCents,
+        estimatedCost: allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS,
         availableCredits: wallet.totalAvailableCents,
+        freeUseApplied: allowViaFreeUse,
       })
     }
 
-    let maxTokens = 1000
-    if (!allowViaFreeUse) {
-      const budgetCents = Math.floor(wallet.totalAvailableCents / 2)
-      const cappedMaxTokens = capMaxTokensToBudget(model, promptText, maxTokens, budgetCents)
-      if (cappedMaxTokens <= 0) {
-        return NextResponse.json(
-          {
-            error: 'Insufficient credits',
-            estimatedCost: userCostCents,
-            availableCredits: wallet.totalAvailableCents,
-          },
-          { status: 402 }
-        )
-      }
-      maxTokens = cappedMaxTokens
+    if (!allowViaFreeUse && wallet.totalAvailableCents < VOICE_CHAT_COST_CENTS) {
+      return NextResponse.json(
+        {
+          error: 'Insufficient credits',
+          estimatedCost: VOICE_CHAT_COST_CENTS,
+          availableCredits: wallet.totalAvailableCents,
+        },
+        { status: 402 }
+      )
     }
+
+    const maxTokens = 500
 
     if (wantsStream) {
       const wrapped = await chatCompletionWithCost(openai, {
         model,
         messages: chatMessages,
         max_tokens: maxTokens,
-        temperature: 0.4,
+        temperature: 0.3,
       } as any)
 
       const assistantMessage =
         wrapped.completion.choices?.[0]?.message?.content ||
         'I apologize, but I could not generate a response.'
 
-      const actualUserCostCents = wrapped.costCents * 2
+      const apiCostCents = wrapped.costCents * 2
+      const chargedCents = allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS
       if (!allowViaFreeUse) {
-        const ok = await cm.chargeCents(actualUserCostCents)
+        const ok = await cm.chargeCents(chargedCents)
         if (!ok) {
           return NextResponse.json(
             {
               error: 'Insufficient credits',
-              estimatedCost: actualUserCostCents,
+              estimatedCost: VOICE_CHAT_COST_CENTS,
               availableCredits: wallet.totalAvailableCents,
             },
             { status: 402 }
@@ -436,7 +437,7 @@ export async function POST(req: NextRequest) {
           model,
           promptTokens: wrapped.promptTokens,
           completionTokens: wrapped.completionTokens,
-          costCents: actualUserCostCents,
+          costCents: apiCostCents,
         })
       } catch {
         // Ignore logging failures
@@ -450,7 +451,7 @@ export async function POST(req: NextRequest) {
             const payload = JSON.stringify({ token: chunk })
             controller.enqueue(enc.encode(`data: ${payload}\n\n`))
           }
-          const chargePayload = JSON.stringify({ chargedCents: actualUserCostCents })
+          const chargePayload = JSON.stringify({ chargedCents })
           controller.enqueue(enc.encode(`event: charged\ndata: ${chargePayload}\n\n`))
           controller.enqueue(enc.encode('event: end\n\n'))
           controller.close()
@@ -470,18 +471,18 @@ export async function POST(req: NextRequest) {
         model,
         messages: chatMessages,
         max_tokens: maxTokens,
-        temperature: 0.4,
+        temperature: 0.3,
       })
 
-      // Charge user (2x cost)
-      const userCostCents = wrapped.costCents * 2
+      const apiCostCents = wrapped.costCents * 2
+      const chargedCents = allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS
       if (!allowViaFreeUse) {
-        const ok = await cm.chargeCents(userCostCents)
+        const ok = await cm.chargeCents(chargedCents)
         if (!ok) {
           return NextResponse.json(
             {
               error: 'Insufficient credits',
-              estimatedCost: userCostCents,
+              estimatedCost: VOICE_CHAT_COST_CENTS,
               availableCredits: wallet.totalAvailableCents,
             },
             { status: 402 }
@@ -498,7 +499,7 @@ export async function POST(req: NextRequest) {
           model,
           promptTokens: wrapped.promptTokens,
           completionTokens: wrapped.completionTokens,
-          costCents: userCostCents,
+          costCents: apiCostCents,
         })
       } catch {
         // Ignore logging failures
@@ -511,8 +512,8 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         assistant: assistantMessage,
-        estimatedCost: userCostCents,
-        chargedCostCents: userCostCents,
+        estimatedCost: chargedCents,
+        chargedCostCents: chargedCents,
         threadId,
       })
     }
