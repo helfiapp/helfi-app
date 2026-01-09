@@ -32,6 +32,8 @@ const REPORT_SECTIONS = [
 ] as const
 
 type ReportSectionKey = (typeof REPORT_SECTIONS)[number]
+type ReportItem = { name?: string; reason?: string }
+type ReportSectionBucket = { working: ReportItem[]; suggested: ReportItem[]; avoid: ReportItem[] }
 
 const TALK_TO_AI_TOPICS: Array<{ topic: string; section: ReportSectionKey; keywords: string[] }> = [
   { topic: 'supplements', section: 'supplements', keywords: ['supplement', 'vitamin', 'mineral', 'magnesium', 'creatine', 'omega', 'probiotic'] },
@@ -72,12 +74,12 @@ function safeJsonParse(text: string): any | null {
   }
 }
 
-function buildDefaultSections() {
-  const section = { working: [], suggested: [], avoid: [] }
+function buildDefaultSections(): Record<ReportSectionKey, ReportSectionBucket> {
+  const section: ReportSectionBucket = { working: [], suggested: [], avoid: [] }
   return REPORT_SECTIONS.reduce((acc, key) => {
     acc[key] = { ...section }
     return acc
-  }, {} as Record<ReportSectionKey, typeof section>)
+  }, {} as Record<ReportSectionKey, ReportSectionBucket>)
 }
 
 function buildNutritionSummary(foodLogs: Array<{ name: string | null; nutrients: any; createdAt: Date }>) {
