@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { formatChatContent } from '@/lib/chatFormatting'
 import UsageMeter from '@/components/UsageMeter'
 
@@ -29,6 +30,7 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string }
 type ChatThread = { id: string; title: string | null; chargedOnce: boolean; createdAt: string; updatedAt: string }
 
 export default function VoiceChat({ context, onCostEstimate, className = '' }: VoiceChatProps) {
+  const router = useRouter()
   const VOICE_CHAT_COST_CREDITS = 10
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -111,6 +113,14 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       { label: 'Older', items: groups.older },
     ]
   }, [threads])
+
+  const handleExit = useCallback(() => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
+    }
+    router.push('/dashboard')
+  }, [router])
   
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -634,23 +644,23 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
               <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
                 {group.label}
               </h3>
-              {group.items.map((thread) => (
-                <div key={thread.id} className="flex items-center gap-2 group">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectThread(thread.id)}
-                    className={`flex-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
-                      currentThreadId === thread.id
-                        ? 'bg-white shadow-sm border border-gray-100'
-                        : 'hover:bg-gray-100/80'
-                    }`}
-                  >
-                    <span className={`flex-1 truncate text-[13px] font-medium ${
-                      currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
-                    }`}>
-                      {thread.title || 'New chat'}
-                    </span>
-                  </button>
+                  {group.items.map((thread) => (
+                    <div key={thread.id} className="flex items-center gap-2 group">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectThread(thread.id)}
+                        className={`flex-1 min-w-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                          currentThreadId === thread.id
+                            ? 'bg-white shadow-sm border border-gray-100'
+                            : 'hover:bg-gray-100/80'
+                        }`}
+                      >
+                        <span className={`flex-1 min-w-0 truncate text-[13px] font-medium ${
+                          currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
+                        }`}>
+                          {thread.title || 'New chat'}
+                        </span>
+                      </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteThread(thread.id)}
@@ -679,6 +689,14 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     <div className={wrapperClass} style={expanded ? { paddingTop: 'env(safe-area-inset-top, 0px)' } : undefined}>
       <header className="sticky top-0 z-30 flex items-center justify-between bg-[#f6f8f7]/95 backdrop-blur px-4 py-3 border-b border-gray-200/60">
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExit}
+            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-gray-100 lg:hidden"
+            aria-label="Exit chat"
+          >
+            <span className="material-symbols-outlined text-2xl text-gray-700">arrow_back</span>
+          </button>
           <button
             type="button"
             onClick={() => setThreadsOpen(true)}
@@ -756,6 +774,15 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                   ) : (
                     <>
                       <h1 className="text-2xl font-bold tracking-tight text-gray-900">How can I help you today?</h1>
+                      <div className="mt-4 w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-4 text-left text-sm text-gray-600 shadow-sm">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">How Talk to AI works</div>
+                        <ul className="mt-3 space-y-2 text-[13px] text-gray-600">
+                          <li>Each chat costs 10 credits once (not per response).</li>
+                          <li>We show the estimate before sending and confirm the charge after the first response.</li>
+                          <li>Your chat topics and key questions are summarized into your 7‑day report.</li>
+                          <li>We connect those topics to your food, exercise, symptoms, mood, and check-ins.</li>
+                        </ul>
+                      </div>
                       <div className="mt-8 w-full max-w-sm">
                         <div className="flex items-center justify-center gap-2 mb-3">
                           <span className="material-symbols-outlined text-[#10a27e] text-xl">lightbulb</span>
@@ -799,12 +826,12 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                     {m.role === 'assistant' ? (
                       <div className="space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
                         <div className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Health Assistant</div>
-                        <div className="text-[15px] leading-7 text-gray-800">
+                        <div className="text-[16px] md:text-[15px] leading-7 text-gray-800">
                           {renderFormattedContent(m.content)}
                         </div>
                       </div>
                     ) : (
-                      <div className="text-[15px] leading-7 text-gray-900 font-medium">
+                      <div className="text-[16px] md:text-[15px] leading-7 text-gray-900 font-medium">
                         {renderFormattedContent(m.content)}
                       </div>
                     )}
