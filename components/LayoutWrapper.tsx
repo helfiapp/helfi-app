@@ -299,9 +299,11 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
+  const [goalSyncNotice, setGoalSyncNotice] = useState<string | null>(null)
   const lastLocationRef = useRef('')
   const sidebarNavLockRef = useRef(0)
   const [sidebarPortal, setSidebarPortal] = useState<HTMLElement | null>(null)
+  const goalSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = [
@@ -380,6 +382,27 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       }
     }
   }, [router])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handler = () => {
+      setGoalSyncNotice('We refreshed your goal from your latest saved data to keep devices in sync.')
+      if (goalSyncTimeoutRef.current) {
+        clearTimeout(goalSyncTimeoutRef.current)
+      }
+      goalSyncTimeoutRef.current = setTimeout(() => {
+        setGoalSyncNotice(null)
+      }, 6000)
+    }
+    window.addEventListener('userData:goalSync', handler as EventListener)
+    return () => {
+      window.removeEventListener('userData:goalSync', handler as EventListener)
+      if (goalSyncTimeoutRef.current) {
+        clearTimeout(goalSyncTimeoutRef.current)
+        goalSyncTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -700,6 +723,14 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
             isChatPage ? 'overflow-hidden h-[100dvh]' : 'overflow-y-auto'
           }`}
         >
+          {goalSyncNotice && (
+            <div className="fixed top-4 right-4 z-50 max-w-xs w-full mx-4 md:mx-0">
+              <div className="bg-white border border-emerald-200 shadow-lg rounded-lg p-3">
+                <div className="text-sm font-semibold text-gray-900">Goal updated</div>
+                <div className="text-xs text-gray-600 mt-1">{goalSyncNotice}</div>
+              </div>
+            </div>
+          )}
           {showHealthSetupReminder && (
             <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full mx-4 md:mx-0">
               <div className="bg-white border border-helfi-green/30 shadow-xl rounded-lg p-4">

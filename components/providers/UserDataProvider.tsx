@@ -64,6 +64,19 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
           const result = await response.json()
 
           if (result.data) {
+            try {
+              const cachedGoal = String(cached?.data?.goalChoice || '').trim().toLowerCase()
+              const freshGoal = String(result.data?.goalChoice || '').trim().toLowerCase()
+              const cachedIntensity = String(cached?.data?.goalIntensity || '').trim().toLowerCase()
+              const freshIntensity = String(result.data?.goalIntensity || '').trim().toLowerCase()
+              const goalChanged = cachedGoal && freshGoal && cachedGoal !== freshGoal
+              const intensityChanged = cachedIntensity && freshIntensity && cachedIntensity !== freshIntensity
+              if (goalChanged || intensityChanged) {
+                window.dispatchEvent(new CustomEvent('userData:goalSync', { detail: { goal: freshGoal } }))
+              }
+            } catch {
+              // Ignore sync notice errors
+            }
             setUserData(result.data)
             if (cacheKey) {
               writeClientCache(cacheKey, result.data)

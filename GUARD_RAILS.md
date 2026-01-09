@@ -1029,6 +1029,29 @@ If changes are requested, explain them to the user first, get explicit approval,
 
 ---
 
+## 12.1 Primary Goal Sync (Jan 2026 – Locked)
+
+**Protected files:**
+- `components/providers/UserDataProvider.tsx`
+- `components/LayoutWrapper.tsx`
+- `app/onboarding/page.tsx`
+- `app/food/page.tsx`
+- `app/settings/food-diary/page.tsx`
+
+**Problem this prevents:** goal choice shows differently across devices (e.g., Maintain weight on mobile, Get shredded on desktop), causing wrong daily allowance.
+
+**Rules (do not change without owner approval):**
+- The server value for `goalChoice` and `goalIntensity` is the source of truth on load.
+- Cached/local values must be replaced by the server value unless the user just edited the goal on that device.
+- If a mismatch is detected, the app must re-sync immediately and show a brief “Goal updated” notice.
+
+**Required checks before claiming success:**
+1) Change goal on device A.
+2) Open onboarding/food diary on device B.
+3) Both devices must show the same goal and allowance.
+
+---
+
 ## 13. Pre-Launch Audit Fixes (Locked)
 
 **Primary reference:** `AUDIT.md`
