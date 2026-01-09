@@ -1163,7 +1163,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
             )}
 
             {renameOpen && (
-              <div className="px-4 py-4">
+              <div className="px-4 py-4 overflow-hidden">
                 <div className="text-sm font-semibold text-gray-900 mb-3">Rename chat</div>
                 <input
                   type="text"
@@ -1176,7 +1176,8 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                     }
                   }}
                   placeholder="Chat title"
-                  className="w-full max-w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                  className="w-full min-w-0 max-w-full rounded-lg border border-gray-200 px-3 py-2 text-[16px] leading-6 focus:outline-none focus:ring-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                  style={{ WebkitTextSizeAdjust: '100%' }}
                 />
                 <div className="mt-4 flex gap-2">
                   <button
