@@ -323,6 +323,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
 
   const isFeaturePath = pathname.startsWith('/features')
   const isPublicPage = publicPages.includes(pathname) || isFeaturePath
+  const isChatPage = pathname === '/chat'
   
   // Admin panel paths should never show user sidebar
   const isAdminPanelPath =
@@ -694,7 +695,11 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           : null}
         
         {/* Main Content */}
-        <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto relative">
+        <div
+          className={`md:pl-64 flex flex-col flex-1 relative ${
+            isChatPage ? 'overflow-hidden h-[100dvh]' : 'overflow-y-auto'
+          }`}
+        >
           {showHealthSetupReminder && (
             <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full mx-4 md:mx-0">
               <div className="bg-white border border-helfi-green/30 shadow-xl rounded-lg p-4">

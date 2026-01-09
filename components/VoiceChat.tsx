@@ -85,6 +85,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     resizeRafRef.current = requestAnimationFrame(() => {
       const textarea = textareaRef.current
       if (!textarea) return
+      const container = containerRef.current
+      const shouldStick =
+        container && container.scrollHeight - container.scrollTop - container.clientHeight < 24
       const minHeight = 52
       const maxHeight = 200
       textarea.style.height = 'auto'
@@ -93,6 +96,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         textarea.style.height = `${desired}px`
       }
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+      if (shouldStick && container) {
+        container.scrollTop = container.scrollHeight
+      }
     })
   }, [])
 
@@ -487,11 +493,21 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     try {
       setLoading(true)
       setError(null)
+      stopListening()
       setMessages([])
       setLastChargedCost(null)
       setLastChargedAt(null)
-      stopListening()
       try { localStorage.removeItem(storageKey) } catch {}
+      if (currentThreadId) {
+        try {
+          await fetch('/api/chat/threads', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ threadId: currentThreadId }),
+          })
+        } catch {}
+      }
+      await handleNewChat()
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -578,7 +594,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
           style={{
             maxWidth: '100%',
             wordWrap: 'break-word',
-            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
           }}
         >
         {messages.length === 0 && !loading && (
@@ -769,7 +784,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       </div>
 
         <form
-          className="sticky bottom-0 left-0 right-0 border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] flex-shrink-0"
+          className="border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] flex-shrink-0"
           onSubmit={handleSubmit}
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
         >

@@ -42,6 +42,9 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     resizeRafRef.current = requestAnimationFrame(() => {
       const textarea = textareaRef.current
       if (!textarea) return
+      const container = containerRef.current
+      const shouldStick =
+        container && container.scrollHeight - container.scrollTop - container.clientHeight < 24
       const minHeight = 52
       const maxHeight = 200
       textarea.style.height = 'auto'
@@ -55,6 +58,9 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       // Using scrollHeight which reflects actual content height
       const shouldShow = textarea.scrollHeight > 140 || (textarea.value.match(/\n/g) || []).length >= 2
       setShowExpandControl(shouldShow)
+      if (shouldStick && container) {
+        container.scrollTop = container.scrollHeight
+      }
     })
   }, [])
 
@@ -424,8 +430,8 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
   if (!enabled) return null
   const sectionClass = expanded
-    ? 'fixed inset-0 z-[9999] bg-white flex flex-col h-[100dvh]'
-    : 'flex flex-col h-[calc(100vh-140px)] md:h-auto bg-white md:rounded-2xl md:border md:shadow-sm relative'
+    ? 'fixed inset-0 z-[9999] bg-white flex flex-col h-[100dvh] overflow-hidden'
+    : 'flex flex-col h-[70dvh] md:h-[640px] bg-white md:rounded-2xl md:border md:shadow-sm relative overflow-hidden'
 
   const chatUI = (
     <div
@@ -509,12 +515,11 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       </div>
       <div
         ref={containerRef}
-        className={`overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto ${expanded ? 'flex-1 min-h-0' : 'min-h-[220px] md:overflow-visible'}`}
+        className="overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto flex-1 min-h-0"
         aria-live="polite"
         style={{
           maxWidth: '100%',
           wordWrap: 'break-word',
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
         }}
       >
         {messages.length === 0 && !loading && (
@@ -670,7 +675,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           <div className="px-4 py-2 text-sm text-red-600 bg-red-50">{error}</div>
         )}
         <form
-          className="px-4 py-3 sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] flex-shrink-0"
+          className="px-4 py-3 bg-white border-t border-gray-200 z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] flex-shrink-0"
           onSubmit={handleSubmit}
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
         >
