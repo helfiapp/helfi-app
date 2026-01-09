@@ -46,7 +46,13 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [threadsOpen, setThreadsOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [actionThreadId, setActionThreadId] = useState<string | null>(null)
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameValue, setRenameValue] = useState('')
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
   const storageKey = useMemo(() => 'helfi:chat:talk', [])
+  const archivedKey = useMemo(() => 'helfi:chat:talk:archived', [])
   const hasHealthTipContext = !!context?.healthTipSummary
   const healthTipTitle = context?.healthTipTitle
   const healthTipCategory = context?.healthTipCategory
@@ -82,17 +88,19 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     if (!currentThreadId) return 'New chat'
     return threads.find((thread) => thread.id === currentThreadId)?.title || 'New chat'
   }, [currentThreadId, threads])
+  const actionThread = actionThreadId ? threads.find((thread) => thread.id === actionThreadId) : null
 
   const threadGroups = useMemo(() => {
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
+    const visibleThreads = threads.filter((thread) => !archivedThreadIds.includes(thread.id))
     const groups = {
       today: [] as ChatThread[],
       yesterday: [] as ChatThread[],
       week: [] as ChatThread[],
       older: [] as ChatThread[],
     }
-    threads.forEach((thread) => {
+    visibleThreads.forEach((thread) => {
       const updated = new Date(thread.updatedAt)
       updated.setHours(0, 0, 0, 0)
       const diffDays = Math.floor((startOfToday.getTime() - updated.getTime()) / 86400000)
@@ -112,7 +120,8 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       { label: 'Previous 7 days', items: groups.week },
       { label: 'Older', items: groups.older },
     ]
-  }, [threads])
+  }, [threads, archivedThreadIds])
+  const hasVisibleThreads = threadGroups.some((group) => group.items.length > 0)
 
   const handleExit = useCallback(() => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -127,6 +136,8 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const recognitionRef = useRef<any>(null)
   const resizeRafRef = useRef<number | null>(null)
+  const longPressTimerRef = useRef<number | null>(null)
+  const longPressTriggeredRef = useRef(false)
 
   // Smooth, single-frame resize to avoid jumpiness when typing.
   const resizeTextarea = useCallback(() => {
@@ -229,7 +240,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   }
 
   async function handleDeleteThread(threadId: string) {
-    if (!confirm('Delete this chat?')) return
     try {
       const res = await fetch('/api/chat/threads', {
         method: 'DELETE',
@@ -263,6 +273,73 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     } catch (err) {
       console.error('Failed to delete thread:', err)
     }
+  }
+
+  async function handleRenameThread(threadId: string, nextTitle: string) {
+    const trimmed = nextTitle.trim()
+    if (!trimmed) return
+    try {
+      const res = await fetch('/api/chat/threads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId, title: trimmed }),
+      })
+      if (res.ok) {
+        const threadsRes = await fetch('/api/chat/threads')
+        if (threadsRes.ok) {
+          const threadsData = await threadsRes.json()
+          if (threadsData.threads) setThreads(threadsData.threads)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to rename thread:', err)
+    }
+  }
+
+  function openThreadActions(threadId: string) {
+    setActionThreadId(threadId)
+    setRenameOpen(false)
+    setDeleteConfirmOpen(false)
+    longPressTriggeredRef.current = true
+  }
+
+  function closeThreadActions() {
+    setActionThreadId(null)
+    setRenameOpen(false)
+    setDeleteConfirmOpen(false)
+    longPressTriggeredRef.current = false
+  }
+
+  function startLongPress(event: React.PointerEvent, threadId: string) {
+    if (event.pointerType !== 'touch') return
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current)
+    }
+    longPressTimerRef.current = window.setTimeout(() => {
+      openThreadActions(threadId)
+    }, 500)
+  }
+
+  function endLongPress() {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current)
+    }
+  }
+
+  function handleArchiveThread(threadId: string) {
+    const nextArchived = archivedThreadIds.includes(threadId)
+      ? archivedThreadIds
+      : [...archivedThreadIds, threadId]
+    setArchivedThreadIds(nextArchived)
+    if (currentThreadId === threadId) {
+      const nextThread = threads.find((thread) => !nextArchived.includes(thread.id))
+      if (nextThread) {
+        handleSelectThread(nextThread.id)
+      } else {
+        handleNewChat()
+      }
+    }
+    closeThreadActions()
   }
 
   // Load saved conversation on mount
@@ -363,10 +440,40 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     setIsClient(true)
   }, [])
 
+  useEffect(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem(archivedKey) : null
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) {
+          setArchivedThreadIds(parsed.filter((id) => typeof id === 'string'))
+        }
+      }
+    } catch {}
+  }, [archivedKey])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(archivedKey, JSON.stringify(archivedThreadIds))
+    } catch {}
+  }, [archivedThreadIds, archivedKey])
+
+  useEffect(() => {
+    if (!currentThreadId) return
+    if (!archivedThreadIds.includes(currentThreadId)) return
+    const nextThread = threads.find((thread) => !archivedThreadIds.includes(thread.id))
+    if (nextThread) {
+      handleSelectThread(nextThread.id)
+    } else {
+      handleNewChat()
+    }
+  }, [archivedThreadIds, currentThreadId, threads])
+
   // Auto-scroll
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+    if (messages.length === 0 && !loading) return
     container.scrollTop = container.scrollHeight
     return () => {
       if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
@@ -648,7 +755,20 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                     <div key={thread.id} className="flex items-center gap-2 group">
                       <button
                         type="button"
-                        onClick={() => handleSelectThread(thread.id)}
+                        onClick={() => {
+                          if (longPressTriggeredRef.current) {
+                            longPressTriggeredRef.current = false
+                            return
+                          }
+                          handleSelectThread(thread.id)
+                        }}
+                        onPointerDown={(event) => startLongPress(event, thread.id)}
+                        onPointerUp={endLongPress}
+                        onPointerCancel={endLongPress}
+                        onContextMenu={(event) => {
+                          event.preventDefault()
+                          openThreadActions(thread.id)
+                        }}
                         className={`flex-1 min-w-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
                           currentThreadId === thread.id
                             ? 'bg-white shadow-sm border border-gray-100'
@@ -661,20 +781,12 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                           {thread.title || 'New chat'}
                         </span>
                       </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteThread(thread.id)}
-                    className="text-gray-300 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                    aria-label="Delete chat"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
-                  </button>
-                </div>
-              ))}
+                    </div>
+                  ))}
             </div>
           ) : null
         ))}
-        {threads.length === 0 && (
+        {!hasVisibleThreads && (
           <div className="px-3 text-xs text-gray-400">No chats yet.</div>
         )}
       </div>
@@ -749,9 +861,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
             <div className="mx-auto flex max-w-3xl flex-col gap-10">
               {messages.length === 0 && !loading && (
                 <div className="flex flex-col items-center justify-center text-center">
-                  <div className="size-16 bg-[#10a27e] rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-[#10a27e]/20">
-                    <span className="material-symbols-outlined text-4xl">health_and_safety</span>
-                  </div>
                   {hasHealthTipContext ? (
                     <>
                       <h1 className="text-2xl font-bold tracking-tight text-gray-900">Questions about this tip</h1>
@@ -773,7 +882,10 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                     </>
                   ) : (
                     <>
-                      <h1 className="text-2xl font-bold tracking-tight text-gray-900">How can I help you today?</h1>
+                      <div className="w-full max-w-md">
+                        <UsageMeter inline className="w-full" feature="voiceChat" />
+                      </div>
+                      <h1 className="mt-6 text-2xl font-bold tracking-tight text-gray-900">How can I help you today?</h1>
                       <div className="mt-4 w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-4 text-left text-sm text-gray-600 shadow-sm">
                         <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">How Talk to AI works</div>
                         <ul className="mt-3 space-y-2 text-[13px] text-gray-600">
@@ -952,6 +1064,110 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
               </button>
             </div>
             {threadList}
+          </div>
+        </div>
+      )}
+
+      {actionThreadId && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/30"
+            onClick={closeThreadActions}
+            aria-label="Close chat actions"
+          />
+          <div className="relative w-full max-w-sm bg-white rounded-t-2xl shadow-xl">
+            {!renameOpen && !deleteConfirmOpen && (
+              <div className="px-2 py-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenameValue(actionThread?.title || '')
+                    setRenameOpen(true)
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-gray-900 hover:bg-gray-50 rounded-lg"
+                >
+                  Rename
+                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 20 }}>edit_square</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => actionThreadId && handleArchiveThread(actionThreadId)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-gray-900 hover:bg-gray-50 rounded-lg"
+                >
+                  Archive
+                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 20 }}>archive</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 rounded-lg"
+                >
+                  Delete
+                  <span className="material-symbols-outlined text-red-500" style={{ fontSize: 20 }}>delete</span>
+                </button>
+              </div>
+            )}
+
+            {renameOpen && (
+              <div className="px-4 py-4">
+                <div className="text-sm font-semibold text-gray-900 mb-3">Rename chat</div>
+                <input
+                  type="text"
+                  value={renameValue}
+                  onChange={(event) => setRenameValue(event.target.value)}
+                  placeholder="Chat title"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-0"
+                />
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={closeThreadActions}
+                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!actionThreadId) return
+                      await handleRenameThread(actionThreadId, renameValue)
+                      closeThreadActions()
+                    }}
+                    className="flex-1 rounded-lg bg-black px-3 py-2 text-sm text-white hover:bg-gray-800"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {deleteConfirmOpen && (
+              <div className="px-4 py-4">
+                <div className="text-sm font-semibold text-gray-900 mb-2">Delete this chat?</div>
+                <div className="text-xs text-gray-500 mb-4">This can’t be undone.</div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={closeThreadActions}
+                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!actionThreadId) return
+                      await handleDeleteThread(actionThreadId)
+                      closeThreadActions()
+                    }}
+                    className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
