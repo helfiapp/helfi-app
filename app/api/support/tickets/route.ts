@@ -57,8 +57,9 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const action = String(body?.action || '').trim()
   const message = String(body?.message || '').trim()
+  const requiresMessage = action === 'create' || action === 'add_response'
 
-  if (!message) {
+  if (requiresMessage && !message) {
     return NextResponse.json({ error: 'Message is required' }, { status: 400 })
   }
 

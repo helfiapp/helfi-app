@@ -618,7 +618,7 @@ export default function SupportPage() {
             )}
 
             {!isLoadingTicket && (
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[55vh] md:max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
                 {isChatClosed && (
                   <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
                     This chat is closed. If you need more help, start a new ticket below.
