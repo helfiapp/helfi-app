@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { formatChatContent } from '@/lib/chatFormatting'
 import UsageMeter from '@/components/UsageMeter'
 
@@ -75,22 +75,23 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const recognitionRef = useRef<any>(null)
-  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const resizeRafRef = useRef<number | null>(null)
 
-  // Debounced resize function to prevent pulsating
+  // Smooth, single-frame resize to avoid jumpiness when typing.
   const resizeTextarea = useCallback(() => {
-    if (resizeTimeoutRef.current) {
-      clearTimeout(resizeTimeoutRef.current)
-    }
-    resizeTimeoutRef.current = setTimeout(() => {
+    if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    resizeRafRef.current = requestAnimationFrame(() => {
       const textarea = textareaRef.current
       if (!textarea) return
-      textarea.style.height = 'auto'
+      const minHeight = 52
       const maxHeight = 200
-      const newHeight = Math.min(textarea.scrollHeight, maxHeight)
-      textarea.style.height = `${newHeight}px`
+      textarea.style.height = 'auto'
+      const desired = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)
+      if (textarea.style.height !== `${desired}px`) {
+        textarea.style.height = `${desired}px`
+      }
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
-    }, 50) // Debounce resize by 50ms
+    })
   }, [])
 
   // Load threads and current thread on mount
@@ -287,10 +288,19 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     const container = containerRef.current
     if (!container) return
     container.scrollTop = container.scrollHeight
+    return () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    }
   }, [messages, loading])
 
-  // Auto-resize textarea with debounce
   useEffect(() => {
+    return () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    }
+  }, [])
+
+  // Auto-resize textarea pre-paint to reduce visible flicker
+  useLayoutEffect(() => {
     resizeTextarea()
   }, [input, resizeTextarea])
 
@@ -822,7 +832,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 placeholder="Ask anything"
                 rows={1}
                 className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-base leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
-                style={{ height: '52px' }}
               />
             </div>
             <button
