@@ -743,6 +743,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [goalIntensity, setGoalIntensity] = useState<'mild' | 'standard' | 'aggressive'>(
     (initial?.goalIntensity as any) || 'standard',
   );
+  const goalChoiceTouchedRef = useRef(false);
+  const goalIntensityTouchedRef = useRef(false);
   const [showGoalDetails, setShowGoalDetails] = useState(false);
   const [goalTargetWeightUnit, setGoalTargetWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [goalTargetWeightInput, setGoalTargetWeightInput] = useState('');
@@ -929,7 +931,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       }
       bodyTypeHydratedRef.current = true;
     }
-    if (!goalChoice && initial.goalChoice) {
+    if (
+      typeof initial.goalChoice === 'string' &&
+      initial.goalChoice.trim().length > 0 &&
+      !goalChoiceTouchedRef.current &&
+      initial.goalChoice !== goalChoice
+    ) {
       setGoalChoice(initial.goalChoice);
     }
     if (!allergiesHydratedRef.current && Array.isArray(initial.allergies)) {
@@ -955,7 +962,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       setDiabetesType(initial.diabetesType);
       diabetesHydratedRef.current = true;
     }
-    if (initial.goalIntensity && !goalIntensity) {
+    if (
+      initial.goalIntensity &&
+      !goalIntensityTouchedRef.current &&
+      initial.goalIntensity !== goalIntensity
+    ) {
       setGoalIntensity(initial.goalIntensity);
     }
 
@@ -1787,6 +1798,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   const handleGoalChoiceSelect = useCallback(
     (choice: string) => {
+      goalChoiceTouchedRef.current = true;
       setGoalChoice(choice);
       const isSimpleGoal =
         choice === 'lose weight' || choice === 'gain weight' || choice === 'maintain weight';
@@ -2830,7 +2842,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                     ? 'bg-gray-900 text-white border-gray-900'
                     : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                 } transition-colors text-sm font-semibold`}
-                onClick={() => setGoalIntensity(option.key as any)}
+                onClick={() => {
+                  goalIntensityTouchedRef.current = true;
+                  setGoalIntensity(option.key as any);
+                }}
                 type="button"
               >
                 {option.label}
