@@ -89,6 +89,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     return threads.find((thread) => thread.id === currentThreadId)?.title || 'New chat'
   }, [currentThreadId, threads])
   const actionThread = actionThreadId ? threads.find((thread) => thread.id === actionThreadId) : null
+  const actionThreadArchived = actionThreadId ? archivedThreadIds.includes(actionThreadId) : false
 
   const threadGroups = useMemo(() => {
     const startOfToday = new Date()
@@ -122,6 +123,10 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     ]
   }, [threads, archivedThreadIds])
   const hasVisibleThreads = threadGroups.some((group) => group.items.length > 0)
+  const archivedThreads = useMemo(
+    () => threads.filter((thread) => archivedThreadIds.includes(thread.id)),
+    [threads, archivedThreadIds]
+  )
 
   const handleExit = useCallback(() => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -327,11 +332,12 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   }
 
   function handleArchiveThread(threadId: string) {
-    const nextArchived = archivedThreadIds.includes(threadId)
-      ? archivedThreadIds
+    const isArchived = archivedThreadIds.includes(threadId)
+    const nextArchived = isArchived
+      ? archivedThreadIds.filter((id) => id !== threadId)
       : [...archivedThreadIds, threadId]
     setArchivedThreadIds(nextArchived)
-    if (currentThreadId === threadId) {
+    if (!isArchived && currentThreadId === threadId) {
       const nextThread = threads.find((thread) => !nextArchived.includes(thread.id))
       if (nextThread) {
         handleSelectThread(nextThread.id)
@@ -774,6 +780,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                             ? 'bg-white shadow-sm border border-gray-100'
                             : 'hover:bg-gray-100/80'
                         }`}
+                        style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
                       >
                         <span className={`flex-1 min-w-0 truncate text-[13px] font-medium ${
                           currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
@@ -786,7 +793,47 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
             </div>
           ) : null
         ))}
-        {!hasVisibleThreads && (
+        {archivedThreads.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
+              Archived
+            </h3>
+            {archivedThreads.map((thread) => (
+              <div key={thread.id} className="flex items-center gap-2 group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (longPressTriggeredRef.current) {
+                      longPressTriggeredRef.current = false
+                      return
+                    }
+                    handleSelectThread(thread.id)
+                  }}
+                  onPointerDown={(event) => startLongPress(event, thread.id)}
+                  onPointerUp={endLongPress}
+                  onPointerCancel={endLongPress}
+                  onContextMenu={(event) => {
+                    event.preventDefault()
+                    openThreadActions(thread.id)
+                  }}
+                  className={`flex-1 min-w-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                    currentThreadId === thread.id
+                      ? 'bg-white shadow-sm border border-gray-100'
+                      : 'hover:bg-gray-100/80'
+                  }`}
+                  style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
+                >
+                  <span className={`flex-1 min-w-0 truncate text-[13px] font-medium ${
+                    currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
+                  }`}>
+                    {thread.title || 'New chat'}
+                  </span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {!hasVisibleThreads && archivedThreads.length === 0 && (
           <div className="px-3 text-xs text-gray-400">No chats yet.</div>
         )}
       </div>
@@ -1095,8 +1142,10 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                   onClick={() => actionThreadId && handleArchiveThread(actionThreadId)}
                   className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-gray-900 hover:bg-gray-50 rounded-lg"
                 >
-                  Archive
-                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 20 }}>archive</span>
+                  {actionThreadArchived ? 'Unarchive' : 'Archive'}
+                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 20 }}>
+                    {actionThreadArchived ? 'unarchive' : 'archive'}
+                  </span>
                 </button>
                 <button
                   type="button"
