@@ -309,6 +309,14 @@ type DiarySnapshot = {
   byDate: Record<string, DiarySnapshotDate>
 }
 
+type ExerciseSnapshot = {
+  entries: any[]
+  caloriesKcal: number
+  savedAt: number
+}
+
+type ExerciseSnapshotStore = Record<string, ExerciseSnapshot>
+
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
   try {
@@ -320,6 +328,36 @@ const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   } catch {
     return null
   }
+}
+
+const readExerciseSnapshot = (dateKey: string): ExerciseSnapshot | null => {
+  if (typeof window === 'undefined') return null
+  if (!dateKey) return null
+  try {
+    const raw = sessionStorage.getItem('foodDiary:exerciseSnapshot')
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as ExerciseSnapshotStore
+    const entry = parsed?.[dateKey]
+    if (!entry || !Array.isArray(entry.entries)) return null
+    return entry
+  } catch {
+    return null
+  }
+}
+
+const writeExerciseSnapshot = (dateKey: string, entries: any[], caloriesKcal: number) => {
+  if (typeof window === 'undefined') return
+  if (!dateKey) return
+  try {
+    const raw = sessionStorage.getItem('foodDiary:exerciseSnapshot')
+    const parsed = raw ? (JSON.parse(raw) as ExerciseSnapshotStore) : {}
+    parsed[dateKey] = {
+      entries: Array.isArray(entries) ? entries : [],
+      caloriesKcal: Number(caloriesKcal) || 0,
+      savedAt: Date.now(),
+    }
+    sessionStorage.setItem('foodDiary:exerciseSnapshot', JSON.stringify(parsed))
+  } catch {}
 }
 
 const writePersistentDiarySnapshot = (snapshot: DiarySnapshot) => {
@@ -2616,8 +2654,17 @@ export default function FoodDiary() {
 
   const loadExerciseEntriesForDate = async (dateKey: string, options?: { silent?: boolean }) => {
     if (!dateKey) return
+    const cached = readExerciseSnapshot(dateKey)
+    if (cached && Array.isArray(cached.entries)) {
+      setExerciseEntries(cached.entries)
+      setExerciseCaloriesKcal(Number(cached.caloriesKcal) || 0)
+    }
     if (!options?.silent) {
-      setExerciseLoading(true)
+      if (!cached) {
+        setExerciseLoading(true)
+      } else {
+        setExerciseLoading(false)
+      }
       setExerciseError(null)
     }
     try {
@@ -2628,8 +2675,11 @@ export default function FoodDiary() {
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to load exercise')
       }
-      setExerciseEntries(Array.isArray(data?.entries) ? data.entries : [])
-      setExerciseCaloriesKcal(Number(data?.exerciseCalories) || 0)
+      const entries = Array.isArray(data?.entries) ? data.entries : []
+      const calories = Number(data?.exerciseCalories) || 0
+      setExerciseEntries(entries)
+      setExerciseCaloriesKcal(calories)
+      writeExerciseSnapshot(dateKey, entries, calories)
     } catch (err: any) {
       if (!options?.silent) {
         setExerciseError(err?.message || 'Failed to load exercise')
@@ -2669,8 +2719,11 @@ export default function FoodDiary() {
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to sync exercise')
       }
-      setExerciseEntries(Array.isArray(data?.entries) ? data.entries : [])
-      setExerciseCaloriesKcal(Number(data?.exerciseCalories) || 0)
+      const entries = Array.isArray(data?.entries) ? data.entries : []
+      const calories = Number(data?.exerciseCalories) || 0
+      setExerciseEntries(entries)
+      setExerciseCaloriesKcal(calories)
+      writeExerciseSnapshot(selectedDate, entries, calories)
     } catch (err: any) {
       if (!options?.silent) {
         setExerciseError(err?.message || 'Failed to sync exercise')
