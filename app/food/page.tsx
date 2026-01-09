@@ -317,6 +317,17 @@ type ExerciseSnapshot = {
 
 type ExerciseSnapshotStore = Record<string, ExerciseSnapshot>
 
+type DeviceStatusSnapshot = {
+  fitbitConnected: boolean
+  garminConnected: boolean
+  savedAt: number
+}
+
+type DeviceStatusSnapshotStore = Record<string, DeviceStatusSnapshot>
+
+const DEVICE_STATUS_TTL_MS = 5 * 60 * 1000
+const DEVICE_STATUS_SNAPSHOT_KEY = 'foodDiary:deviceStatus'
+
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
   try {
@@ -357,6 +368,39 @@ const writeExerciseSnapshot = (dateKey: string, entries: any[], caloriesKcal: nu
       savedAt: Date.now(),
     }
     sessionStorage.setItem('foodDiary:exerciseSnapshot', JSON.stringify(parsed))
+  } catch {}
+}
+
+const readDeviceStatusSnapshot = (userKey?: string): DeviceStatusSnapshot | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(DEVICE_STATUS_SNAPSHOT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as DeviceStatusSnapshotStore
+    const key = userKey || 'last'
+    const entry = parsed?.[key] || parsed?.last
+    if (!entry) return null
+    const savedAt = Number(entry.savedAt) || 0
+    if (!savedAt || Date.now() - savedAt > DEVICE_STATUS_TTL_MS) return null
+    return {
+      fitbitConnected: Boolean(entry.fitbitConnected),
+      garminConnected: Boolean(entry.garminConnected),
+      savedAt,
+    }
+  } catch {
+    return null
+  }
+}
+
+const writeDeviceStatusSnapshot = (userKey: string | null | undefined, snapshot: DeviceStatusSnapshot) => {
+  if (typeof window === 'undefined') return
+  try {
+    const raw = sessionStorage.getItem(DEVICE_STATUS_SNAPSHOT_KEY)
+    const parsed = raw ? (JSON.parse(raw) as DeviceStatusSnapshotStore) : {}
+    const key = userKey || 'last'
+    parsed[key] = snapshot
+    parsed.last = snapshot
+    sessionStorage.setItem(DEVICE_STATUS_SNAPSHOT_KEY, JSON.stringify(parsed))
   } catch {}
 }
 
@@ -1723,8 +1767,10 @@ export default function FoodDiary() {
   const pathname = usePathname()
   const router = useRouter()
   const isAnalysisRoute = pathname === '/food/analysis'
+  const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
   const { userData, profileImage, updateUserData } = useUserData()
   const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
+  const initialDeviceStatus = useMemo(() => readDeviceStatusSnapshot(userCacheKey), [userCacheKey])
   const [persistentDiarySnapshotVersion, setPersistentDiarySnapshotVersion] = useState(0)
   const refreshPersistentDiarySnapshot = useCallback(() => {
     setPersistentDiarySnapshotVersion((prev) => prev + 1)
@@ -2494,8 +2540,9 @@ export default function FoodDiary() {
   const [exerciseLoading, setExerciseLoading] = useState<boolean>(false)
   const [exerciseError, setExerciseError] = useState<string | null>(null)
   const [exerciseSyncing, setExerciseSyncing] = useState<boolean>(false)
-  const [fitbitConnected, setFitbitConnected] = useState<boolean>(false)
-  const [garminConnected, setGarminConnected] = useState<boolean>(false)
+  const [fitbitConnected, setFitbitConnected] = useState<boolean>(() => Boolean(initialDeviceStatus?.fitbitConnected))
+  const [garminConnected, setGarminConnected] = useState<boolean>(() => Boolean(initialDeviceStatus?.garminConnected))
+  const deviceStatusHydratedRef = useRef(false)
   const [showAddExerciseModal, setShowAddExerciseModal] = useState<boolean>(false)
   const [exerciseTypeSearch, setExerciseTypeSearch] = useState<string>('')
   const [exerciseTypeResults, setExerciseTypeResults] = useState<any[]>([])
@@ -2652,6 +2699,14 @@ export default function FoodDiary() {
     return () => window.removeEventListener('resize', updateIsMobile)
   }, [])
 
+  useEffect(() => {
+    if (deviceStatusHydratedRef.current) return
+    const snapshot = readDeviceStatusSnapshot(userCacheKey)
+    if (!snapshot) return
+    setFitbitConnected(Boolean(snapshot.fitbitConnected))
+    setGarminConnected(Boolean(snapshot.garminConnected))
+  }, [userCacheKey])
+
   const loadExerciseEntriesForDate = async (dateKey: string, options?: { silent?: boolean }) => {
     if (!dateKey) return
     const cached = readExerciseSnapshot(dateKey)
@@ -2697,8 +2752,16 @@ export default function FoodDiary() {
       ])
       const fitbit = fitbitRes ? await fitbitRes.json().catch(() => ({})) : {}
       const garmin = garminRes ? await garminRes.json().catch(() => ({})) : {}
-      setFitbitConnected(Boolean(fitbit?.connected))
-      setGarminConnected(Boolean(garmin?.connected))
+      const fitbitConnectedNext = Boolean(fitbit?.connected)
+      const garminConnectedNext = Boolean(garmin?.connected)
+      setFitbitConnected(fitbitConnectedNext)
+      setGarminConnected(garminConnectedNext)
+      deviceStatusHydratedRef.current = true
+      writeDeviceStatusSnapshot(userCacheKey, {
+        fitbitConnected: fitbitConnectedNext,
+        garminConnected: garminConnectedNext,
+        savedAt: Date.now(),
+      })
     } catch {
       // best-effort
     }
