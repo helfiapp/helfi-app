@@ -565,6 +565,89 @@ const dedupeComponentList = (items: string[]) => {
   return unique;
 };
 
+const replaceWordNumbersSimple = (value: string) => {
+  const map: Record<string, string> = {
+    one: '1',
+    two: '2',
+    three: '3',
+    four: '4',
+    five: '5',
+    six: '6',
+    seven: '7',
+    eight: '8',
+    nine: '9',
+    ten: '10',
+    eleven: '11',
+    twelve: '12',
+  };
+  return String(value || '').replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi, (m) => {
+    const repl = map[m.toLowerCase()];
+    return repl || m;
+  });
+};
+
+const normalizePlaceholderLabel = (value: string) =>
+  replaceWordNumbersSimple(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const isGenericPlaceholderName = (value: string) => {
+  const normalized = normalizePlaceholderLabel(value);
+  if (!normalized) return false;
+  const roots = ['dessert', 'item', 'component', 'ingredient', 'food', 'dish', 'plate', 'meal'];
+  const rootPattern = new RegExp(`^(?:${roots.join('|')})s?$`);
+  const rootNumberPattern = new RegExp(`^(?:${roots.join('|')})s?\\s*\\d+$`);
+  if (rootPattern.test(normalized)) return true;
+  if (rootNumberPattern.test(normalized)) return true;
+  if (normalized === 'unknown' || normalized === 'unknown item' || normalized === 'unknown food') return true;
+  return false;
+};
+
+const renameGenericItemsWithComponents = (
+  items: any[] | null | undefined,
+  components: string[] | null | undefined,
+): { items: any[]; changed: boolean; renamed: number } => {
+  if (!Array.isArray(items) || items.length === 0) return { items: items || [], changed: false, renamed: 0 };
+  if (!Array.isArray(components) || components.length === 0) return { items, changed: false, renamed: 0 };
+
+  const normalizedComponents = dedupeComponentList(normalizeComponentList(components));
+  const candidates = normalizedComponents
+    .map((raw) => ({
+      raw,
+      key: normalizeComponentName(raw),
+      isGeneric: isGenericPlaceholderName(raw),
+    }))
+    .filter((entry) => entry.key);
+  const available = candidates.filter((entry) => !entry.isGeneric);
+  if (available.length === 0) return { items, changed: false, renamed: 0 };
+
+  const used = new Set<string>();
+  items.forEach((item) => {
+    const name = String(item?.name || '').trim();
+    if (!name || isGenericPlaceholderName(name)) return;
+    const key = normalizeComponentName(name);
+    if (!key) return;
+    if (available.some((entry) => entry.key === key)) {
+      used.add(key);
+    }
+  });
+
+  let renamed = 0;
+  const nextItems = items.map((item) => {
+    const name = String(item?.name || '').trim();
+    if (!name || !isGenericPlaceholderName(name)) return item;
+    const replacement = available.find((entry) => !used.has(entry.key));
+    if (!replacement) return item;
+    used.add(replacement.key);
+    renamed += 1;
+    return { ...item, name: replacement.raw };
+  });
+
+  return { items: nextItems, changed: renamed > 0, renamed };
+};
+
 const buildComponentBoundSchema = (components: string[]) => ({
   name: 'food_component_items',
   schema: {
@@ -2384,11 +2467,11 @@ PACKAGED / BRANDED FOODS (VERY IMPORTANT):
 ${packagedEmphasisBlock}
 
 Keep your explanation concise (2-3 sentences). After the explanation, include a single line exactly in this format:
-Components: component 1, component 2, component 3
+Components: grilled chicken, white rice, steamed broccoli
 - Use plain ingredient names only (no quantities).
 - Include every distinct component you mentioned or can see.
 - Even for a single-item meal, include one component.
-- Do not use placeholders like "component 1" in the final output.
+- Do not use placeholders like "component 1", "item 1", or "dessert 1" in the final output.
 - The Components line must match the ITEMS_JSON items exactly (no extras, no missing).
 Then include a single nutrition line at the end in this exact format:
 
@@ -2411,6 +2494,7 @@ CRITICAL STRUCTURED OUTPUT RULES:
 - ALWAYS return the ITEMS_JSON block and include fiber_g and sugar_g for each item (do not leave as 0 unless truly 0).
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
 - Item "name" must be the plain ingredient name only (e.g., "grilled salmon", "white rice"). Do NOT prefix names with "several components:", "components:", "meal:", etc.
+- Do NOT use placeholder names like "dessert 1", "item 1", or "component 1". Use specific descriptive food names.
 - Do NOT treat weights as counts: "8 oz" means weight, NOT "8 pieces". Never prefix an item name with a weight number.
 - Only use pieces when a clear count is stated/visible; otherwise use weight/serving size.
 - For foods like fries, wedges, rice, pasta, and salads: use weight/serving, not pieces.
@@ -2557,6 +2641,7 @@ CRITICAL STRUCTURED OUTPUT RULES:
 - ALWAYS return the ITEMS_JSON block and include fiber_g and sugar_g for each item (do not leave as 0 unless truly 0).
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
 - Item "name" must be the plain ingredient name only (e.g., "grilled salmon", "white rice"). Do NOT prefix names with "several components:", "components:", "meal:", etc.
+- Do NOT use placeholder names like "dessert 1", "item 1", or "component 1". Use specific descriptive food names.
 - Only use pieces when a clear count is visible/stated; otherwise use grams/serving size.
 - If the count is 1, still write it explicitly (e.g., "1 egg").
 - For foods like fries, wedges, rice, pasta, and salads: use weight/serving, not pieces.
@@ -2645,11 +2730,11 @@ OUTPUT REQUIREMENTS:
 - ALWAYS end with a single nutrition line in this exact format:
 
 Keep your explanation concise (2-3 sentences). After the explanation, include a single line exactly in this format:
-Components: component 1, component 2, component 3
+Components: grilled chicken, white rice, steamed broccoli
 - Use plain ingredient names only (no quantities).
 - Include every distinct component you mentioned or can see.
 - Even for a single-item meal, include one component.
-- Do not use placeholders like "component 1" in the final output.
+- Do not use placeholders like "component 1", "item 1", or "dessert 1" in the final output.
 - The Components line must match the ITEMS_JSON items exactly (no extras, no missing).
 Then include a single nutrition line at the end in this exact format:
 
@@ -3949,6 +4034,18 @@ CRITICAL REQUIREMENTS:
     const burgerEnriched = ensureBurgerComponents(resp.items || [], resp.analysis);
     resp.items = burgerEnriched.items;
     resp.total = burgerEnriched.total || resp.total;
+
+    if (resp.items && Array.isArray(resp.items) && listedComponents.length > 0) {
+      const renamed = renameGenericItemsWithComponents(resp.items, listedComponents);
+      if (renamed.changed) {
+        resp.items = sanitizeStructuredItems(renamed.items);
+        itemsSource = itemsSource === 'none' ? 'component_rename' : `${itemsSource}+component_rename`;
+        itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+        console.log('ℹ️ Renamed generic item labels using components list.', {
+          renamed: renamed.renamed,
+        });
+      }
+    }
 
     // Intentionally do NOT add inferred “plausible” components from the prose.
     // This was a major source of hallucinations (e.g., fries or sauces not actually visible).
