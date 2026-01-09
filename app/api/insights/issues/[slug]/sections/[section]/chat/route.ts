@@ -230,11 +230,13 @@ export async function POST(
 
       const enc = new TextEncoder()
       const chunks = text.match(/[\s\S]{1,200}/g) || ['']
+      const costPayload = JSON.stringify({ costCents: wrapped.costCents, covered: allowViaFreeUse })
       const stream = new ReadableStream({
         start(controller) {
           for (const chunk of chunks) {
             controller.enqueue(enc.encode(`data: ${chunk}\n\n`))
           }
+          controller.enqueue(enc.encode(`data: __cost__${costPayload}\n\n`))
           controller.enqueue(enc.encode('event: end\n\n'))
           controller.close()
         },
@@ -291,7 +293,12 @@ export async function POST(
 
     const text = wrapped.completion.choices?.[0]?.message?.content || ''
     await appendMessage(thread.id, 'assistant', text)
-    return NextResponse.json({ assistant: text })
+    return NextResponse.json({
+      assistant: text,
+      threadId: thread.id,
+      costCents: wrapped.costCents,
+      covered: allowViaFreeUse,
+    })
   }
   } catch (error) {
     console.error('[chat.POST] error', error)

@@ -13,8 +13,12 @@ interface SectionChatProps {
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 type ChatThread = { id: string; title: string | null; createdAt: string; updatedAt: string }
 
+const COST_PREFIX = '__cost__'
+
 export default function SectionChat({ issueSlug, section, issueName }: SectionChatProps) {
   const storageKey = useMemo(() => `helfi:insights:thread:${issueSlug}:${section}`, [issueSlug, section])
+  const archivedKey = useMemo(() => `helfi:insights:archived:${issueSlug}:${section}`, [issueSlug, section])
+  const costKey = useMemo(() => `helfi:insights:costs:${issueSlug}:${section}`, [issueSlug, section])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,10 +27,15 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [threadId, setThreadId] = useState<string | null>(null)
   const [threadsOpen, setThreadsOpen] = useState(false)
+  const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameValue, setRenameValue] = useState('')
+  const [renameCleared, setRenameCleared] = useState(false)
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [actionThreadId, setActionThreadId] = useState<string | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [threadChargeMap, setThreadChargeMap] = useState<Record<string, { cost: number; covered: boolean; at: string }>>({})
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const enabled = (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true').toLowerCase() === 'true' || (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || '') === '1'
@@ -35,22 +44,32 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [isClient, setIsClient] = useState(false)
   const longPressTimerRef = useRef<number | null>(null)
   const longPressTriggeredRef = useRef(false)
+  const pendingCostRef = useRef<{ cost: number; covered: boolean } | null>(null)
 
   const currentThreadTitle = useMemo(() => {
     if (!threadId) return 'New chat'
     return threads.find((thread) => thread.id === threadId)?.title || 'New chat'
   }, [threadId, threads])
 
+  const currentCharge = useMemo(() => {
+    if (!threadId) return null
+    return threadChargeMap[threadId] || null
+  }, [threadChargeMap, threadId])
+
+  const actionThread = actionThreadId ? threads.find((thread) => thread.id === actionThreadId) : null
+  const actionThreadArchived = actionThreadId ? archivedThreadIds.includes(actionThreadId) : false
+
   const threadGroups = useMemo(() => {
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
+    const visibleThreads = threads.filter((thread) => !archivedThreadIds.includes(thread.id))
     const groups = {
       today: [] as ChatThread[],
       yesterday: [] as ChatThread[],
       week: [] as ChatThread[],
       older: [] as ChatThread[],
     }
-    threads.forEach((thread) => {
+    visibleThreads.forEach((thread) => {
       const updated = new Date(thread.updatedAt)
       updated.setHours(0, 0, 0, 0)
       const diffDays = Math.floor((startOfToday.getTime() - updated.getTime()) / 86400000)
@@ -70,9 +89,13 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       { label: 'Previous 7 days', items: groups.week },
       { label: 'Older', items: groups.older },
     ]
-  }, [threads])
+  }, [threads, archivedThreadIds])
 
   const hasThreads = threadGroups.some((group) => group.items.length > 0)
+  const archivedThreads = useMemo(
+    () => threads.filter((thread) => archivedThreadIds.includes(thread.id)),
+    [threads, archivedThreadIds]
+  )
   // Smooth single-frame resize to prevent jitter when text grows/shrinks quickly
   const resizeTextarea = useCallback(() => {
     if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
@@ -162,6 +185,64 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = localStorage.getItem(archivedKey)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          setArchivedThreadIds(parsed.filter((id) => typeof id === 'string'))
+        }
+      }
+    } catch {}
+  }, [archivedKey])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = localStorage.getItem(costKey)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          setThreadChargeMap(parsed)
+        }
+      }
+    } catch {}
+  }, [costKey])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(archivedKey, JSON.stringify(archivedThreadIds))
+    } catch {}
+  }, [archivedKey, archivedThreadIds])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(costKey, JSON.stringify(threadChargeMap))
+    } catch {}
+  }, [costKey, threadChargeMap])
+
+  useEffect(() => {
+    if (!threads.length) return
+    setArchivedThreadIds((prev) => prev.filter((id) => threads.some((thread) => thread.id === id)))
+  }, [threads])
+
+  useEffect(() => {
+    if (!threads.length) return
+    setThreadChargeMap((prev) => {
+      const next = { ...prev }
+      Object.keys(next).forEach((id) => {
+        if (!threads.some((thread) => thread.id === id)) {
+          delete next[id]
+        }
+      })
+      return next
+    })
+  }, [threads])
 
   // Auto-resize textarea pre-paint to reduce flicker
   useLayoutEffect(() => {
@@ -261,12 +342,14 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
   function openThreadActions(targetThreadId: string) {
     setActionThreadId(targetThreadId)
+    setRenameOpen(false)
     setDeleteConfirmOpen(false)
     longPressTriggeredRef.current = true
   }
 
   function closeThreadActions() {
     setActionThreadId(null)
+    setRenameOpen(false)
     setDeleteConfirmOpen(false)
     longPressTriggeredRef.current = false
   }
@@ -312,6 +395,43 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     }
   }
 
+  function handleArchiveThread(targetThreadId: string) {
+    const isArchived = archivedThreadIds.includes(targetThreadId)
+    const nextArchived = isArchived
+      ? archivedThreadIds.filter((id) => id !== targetThreadId)
+      : [...archivedThreadIds, targetThreadId]
+    setArchivedThreadIds(nextArchived)
+
+    if (!isArchived && threadId === targetThreadId) {
+      const nextThread = threads.find((thread) => !nextArchived.includes(thread.id) && thread.id !== targetThreadId)
+      if (nextThread) {
+        setThreadId(nextThread.id)
+        loadThreadMessages(nextThread.id)
+      } else {
+        handleNewChat()
+      }
+    }
+  }
+
+  async function handleRenameThread(threadIdToRename: string, title: string) {
+    const nextTitle = title.trim()
+    if (!nextTitle) return
+    try {
+      const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: threadIdToRename, title: nextTitle }),
+      })
+      if (res.ok) {
+        setThreads((prev) =>
+          prev.map((thread) => (thread.id === threadIdToRename ? { ...thread, title: nextTitle } : thread))
+        )
+      }
+    } catch (err) {
+      console.error('Failed to rename thread:', err)
+    }
+  }
+
   async function handleDeleteThread(threadIdToDelete: string) {
     try {
       const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, {
@@ -336,6 +456,12 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
             }
           }
         }
+        setArchivedThreadIds((prev) => prev.filter((id) => id !== threadIdToDelete))
+        setThreadChargeMap((prev) => {
+          const next = { ...prev }
+          delete next[threadIdToDelete]
+          return next
+        })
         setThreadsOpen(false)
       }
     } catch (err) {
@@ -415,20 +541,44 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           buffer = parts.pop() || ''
           for (const chunk of parts) {
             if (chunk.startsWith('data: ')) {
-              const raw = chunk.slice(6).trim()
+              const raw = chunk.slice(6)
+              const trimmed = raw.trim()
+              if (trimmed.startsWith(COST_PREFIX)) {
+                try {
+                  const payload = JSON.parse(trimmed.slice(COST_PREFIX.length))
+                  if (payload && typeof payload.costCents === 'number') {
+                    if (!threadId) {
+                      pendingCostRef.current = {
+                        cost: payload.costCents,
+                        covered: Boolean(payload.covered),
+                      }
+                    } else {
+                      setThreadChargeMap((prev) => ({
+                        ...prev,
+                        [threadId]: {
+                          cost: payload.costCents,
+                          covered: Boolean(payload.covered),
+                          at: new Date().toISOString(),
+                        },
+                      }))
+                    }
+                  }
+                } catch {}
+                continue
+              }
               let token = ''
               // Prefer JSON payloads to preserve newlines; fall back to raw
               try {
-                const parsed = JSON.parse(raw)
+                const parsed = JSON.parse(trimmed)
                 if (typeof parsed === 'string') {
                   token = parsed
                 } else if (parsed && typeof parsed.token === 'string') {
                   token = parsed.token
                 } else {
-                  token = raw
+                  token = trimmed
                 }
               } catch {
-                token = raw
+                token = trimmed
               }
               if (!hasAssistant) {
                 setMessages((prev) => [...prev, { role: 'assistant', content: token }])
@@ -449,7 +599,19 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                   setThreads(threadsData.threads)
                   // Update threadId if we created a new thread
                   if (!threadId && threadsData.threads.length > 0) {
-                    setThreadId(threadsData.threads[0].id)
+                    const nextId = threadsData.threads[0].id
+                    setThreadId(nextId)
+                    if (pendingCostRef.current) {
+                      setThreadChargeMap((prev) => ({
+                        ...prev,
+                        [nextId]: {
+                          cost: pendingCostRef.current!.cost,
+                          covered: pendingCostRef.current!.covered,
+                          at: new Date().toISOString(),
+                        },
+                      }))
+                      pendingCostRef.current = null
+                    }
                   }
                 }
               }
@@ -471,6 +633,21 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           if (threadsRes.ok) {
             const threadsData = await threadsRes.json()
             if (threadsData.threads) setThreads(threadsData.threads)
+          }
+        }
+        if (typeof data?.costCents === 'number') {
+          const targetId = data?.threadId || threadId
+          if (targetId) {
+            setThreadChargeMap((prev) => ({
+              ...prev,
+              [targetId]: {
+                cost: data.costCents,
+                covered: Boolean(data.covered),
+                at: new Date().toISOString(),
+              },
+            }))
+          } else {
+            pendingCostRef.current = { cost: data.costCents, covered: Boolean(data.covered) }
           }
         }
       }
@@ -544,7 +721,47 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
             </div>
           ) : null
         ))}
-        {!hasThreads && (
+        {archivedThreads.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
+              Archived
+            </h3>
+            {archivedThreads.map((thread) => (
+              <div key={thread.id} className="flex items-center gap-2 group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (longPressTriggeredRef.current) {
+                      longPressTriggeredRef.current = false
+                      return
+                    }
+                    handleSelectThread(thread.id)
+                  }}
+                  onPointerDown={(event) => startLongPress(event, thread.id)}
+                  onPointerUp={endLongPress}
+                  onPointerCancel={endLongPress}
+                  onContextMenu={(event) => {
+                    event.preventDefault()
+                    openThreadActions(thread.id)
+                  }}
+                  className={`flex-1 min-w-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                    threadId === thread.id
+                      ? 'bg-white shadow-sm border border-gray-100'
+                      : 'hover:bg-gray-100/80'
+                  }`}
+                  style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
+                >
+                  <span className={`flex-1 min-w-0 truncate text-[13px] font-medium ${
+                    threadId === thread.id ? 'text-gray-900' : 'text-gray-500'
+                  }`}>
+                    {thread.title || 'New chat'}
+                  </span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {!hasThreads && archivedThreads.length === 0 && (
           <div className="px-3 text-xs text-gray-400">No chats yet.</div>
         )}
       </div>
@@ -612,10 +829,6 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
             aria-live="polite"
           >
             <div className="mx-auto flex max-w-3xl flex-col gap-10">
-              <div className="text-[11px] text-gray-400">
-                AI replies use credits (billed at 2× OpenAI cost). Typical: 2–4 credits per reply.
-              </div>
-
               {messages.length === 0 && !loading && (
                 <div className="flex flex-col items-center justify-center text-center">
                   <h2 className="text-2xl font-bold tracking-tight text-gray-900">How can I help you today?</h2>
@@ -816,6 +1029,16 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
           <div className="relative bg-gradient-to-t from-[#f6f8f7] via-[#f6f8f7]/95 to-transparent pt-8 pb-6">
             <div className="mx-auto max-w-3xl px-4">
+              <div className="flex flex-wrap gap-4 text-[11px] text-gray-500 mb-3">
+                <span>AI replies use credits (billed at 2× OpenAI cost). Cost depends on length.</span>
+                {currentCharge && (
+                  <span>
+                    {currentCharge.covered ? 'Estimated' : 'Charged'}{' '}
+                    <span className="font-semibold text-gray-700">{currentCharge.cost} credits</span>
+                    {currentCharge.covered ? ' (covered)' : ''}
+                  </span>
+                )}
+              </div>
               <form
                 className="relative flex w-full flex-col rounded-2xl border border-gray-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all focus-within:shadow-lg focus-within:border-gray-300"
                 onSubmit={handleSubmit}
@@ -899,8 +1122,30 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
             aria-label="Close chat actions"
           />
           <div className="relative w-full max-w-sm bg-white rounded-t-2xl shadow-xl">
-            {!deleteConfirmOpen && (
+            {!renameOpen && !deleteConfirmOpen && (
               <div className="px-2 py-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenameValue(actionThread?.title || '')
+                    setRenameOpen(true)
+                    setRenameCleared(false)
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-gray-900 hover:bg-gray-50 rounded-lg"
+                >
+                  Rename
+                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 20 }}>edit_square</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => actionThreadId && handleArchiveThread(actionThreadId)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-gray-900 hover:bg-gray-50 rounded-lg"
+                >
+                  {actionThreadArchived ? 'Unarchive' : 'Archive'}
+                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 20 }}>
+                    {actionThreadArchived ? 'unarchive' : 'archive'}
+                  </span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setDeleteConfirmOpen(true)}
@@ -909,6 +1154,46 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                   Delete
                   <span className="material-symbols-outlined text-red-500" style={{ fontSize: 20 }}>delete</span>
                 </button>
+              </div>
+            )}
+
+            {renameOpen && (
+              <div className="px-4 py-4 overflow-hidden">
+                <div className="text-sm font-semibold text-gray-900 mb-3">Rename chat</div>
+                <input
+                  type="text"
+                  value={renameValue}
+                  onChange={(event) => setRenameValue(event.target.value)}
+                  onFocus={() => {
+                    if (!renameCleared) {
+                      setRenameValue('')
+                      setRenameCleared(true)
+                    }
+                  }}
+                  placeholder="Chat title"
+                  className="w-full min-w-0 max-w-full rounded-lg border border-gray-200 px-3 py-2 text-[16px] leading-6 focus:outline-none focus:ring-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                  style={{ WebkitTextSizeAdjust: '100%' }}
+                />
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={closeThreadActions}
+                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!actionThreadId) return
+                      await handleRenameThread(actionThreadId, renameValue)
+                      closeThreadActions()
+                    }}
+                    className="flex-1 rounded-lg bg-black px-3 py-2 text-sm text-white hover:bg-gray-800"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
             )}
 
