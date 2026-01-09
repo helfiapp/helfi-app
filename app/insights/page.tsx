@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
-import { getWeeklyReportState, markWeeklyReportOnboardingComplete } from '@/lib/weekly-health-report'
+import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete } from '@/lib/weekly-health-report'
 import InsightsLandingClient from './InsightLandingClient'
 
 export default async function InsightsPage() {
@@ -59,6 +59,12 @@ export default async function InsightsPage() {
   if (!weeklyState?.nextReportDueAt) {
     await markWeeklyReportOnboardingComplete(session.user.id)
   }
+  const [latestReport, refreshedState] = await Promise.all([
+    getLatestWeeklyReport(session.user.id),
+    getWeeklyReportState(session.user.id),
+  ])
+  const reportReady = latestReport?.status === 'READY'
+  const reportLocked = latestReport?.status === 'LOCKED'
 
   return (
     <InsightsLandingClient
@@ -71,6 +77,11 @@ export default async function InsightsPage() {
       generatedAt={payload.generatedAt}
       onboardingComplete={payload.onboardingComplete}
       dataNeeds={payload.dataNeeds}
+      initialWeeklyStatus={{
+        reportReady,
+        reportLocked,
+        nextReportDueAt: refreshedState?.nextReportDueAt ?? null,
+      }}
     />
   )
 }

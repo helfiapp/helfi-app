@@ -17,15 +17,20 @@ interface InsightsLandingClientProps {
   generatedAt: string
   onboardingComplete: boolean
   dataNeeds: InsightDataNeed[]
+  initialWeeklyStatus?: {
+    reportReady?: boolean
+    reportLocked?: boolean
+    nextReportDueAt?: string | null
+  } | null
 }
 
-export default function InsightsLandingClient({ sessionUser, issues, generatedAt, onboardingComplete, dataNeeds }: InsightsLandingClientProps) {
+export default function InsightsLandingClient({ sessionUser, issues, generatedAt, onboardingComplete, dataNeeds, initialWeeklyStatus }: InsightsLandingClientProps) {
   const router = useRouter()
   const [pendingSlug, setPendingSlug] = useState<string | null>(null)
   const [isNavigating, startTransition] = useTransition()
   const [isUpdating, setIsUpdating] = useState(false)
   const [updateMessage, setUpdateMessage] = useState<string | null>(null)
-  const [weeklyStatus, setWeeklyStatus] = useState<any>(null)
+  const [weeklyStatus, setWeeklyStatus] = useState<any>(initialWeeklyStatus || null)
   const [countdown, setCountdown] = useState<string | null>(null)
   const lastLoaded = generatedAt
 
