@@ -9,7 +9,10 @@ async function ensureChatTables(): Promise<void> {
   if (tablesEnsured) return
   try {
     await prisma.$executeRawUnsafe(
-      'CREATE TABLE IF NOT EXISTS "TalkToAIChatThread" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "title" TEXT, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+      'CREATE TABLE IF NOT EXISTS "TalkToAIChatThread" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "title" TEXT, "chargedOnce" BOOLEAN NOT NULL DEFAULT FALSE, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+    )
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "TalkToAIChatThread" ADD COLUMN IF NOT EXISTS "chargedOnce" BOOLEAN NOT NULL DEFAULT FALSE'
     )
     await prisma.$executeRawUnsafe(
       'CREATE TABLE IF NOT EXISTS "TalkToAIChatMessage" ("id" TEXT PRIMARY KEY, "threadId" TEXT NOT NULL, "role" TEXT NOT NULL, "content" TEXT NOT NULL, "tokenCount" INTEGER NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), CONSTRAINT "TalkToAIChatMessage_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "TalkToAIChatThread"("id") ON DELETE CASCADE)'
@@ -34,7 +37,7 @@ function uuid(): string {
   })
 }
 
-export type ChatThread = { id: string; title: string | null; createdAt: string; updatedAt: string }
+export type ChatThread = { id: string; title: string | null; chargedOnce: boolean; createdAt: string; updatedAt: string }
 
 export async function GET(_request: Request) {
   try {
@@ -43,11 +46,18 @@ export async function GET(_request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     await ensureChatTables()
-    const rows: Array<{ id: string; title: string | null; createdAt: Date; updatedAt: Date }> = await prisma.$queryRawUnsafe(
-      'SELECT "id","title","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "userId" = $1 ORDER BY "updatedAt" DESC LIMIT 50',
+    const rows: Array<{ id: string; title: string | null; chargedOnce: boolean; createdAt: Date; updatedAt: Date }> =
+      await prisma.$queryRawUnsafe(
+        'SELECT "id","title","chargedOnce","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "userId" = $1 ORDER BY "updatedAt" DESC LIMIT 50',
       session.user.id
     )
-    const threads = rows.map((r) => ({ id: r.id, title: r.title, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString() }))
+    const threads = rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      chargedOnce: Boolean(r.chargedOnce),
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    }))
     return NextResponse.json({ threads }, { status: 200 })
   } catch (error) {
     console.error('[talk-to-ai-threads.GET] error', error)
@@ -127,4 +137,3 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
-

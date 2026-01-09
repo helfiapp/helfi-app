@@ -425,7 +425,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   if (!enabled) return null
   const sectionClass = expanded
     ? 'fixed inset-0 z-[9999] bg-white flex flex-col h-[100dvh]'
-    : 'flex flex-col h-[calc(100vh-140px)] md:h-full bg-white md:rounded-2xl md:border md:shadow-sm relative'
+    : 'flex flex-col h-[calc(100vh-140px)] md:h-auto bg-white md:rounded-2xl md:border md:shadow-sm relative'
 
   const chatUI = (
     <div
@@ -509,7 +509,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       </div>
       <div
         ref={containerRef}
-        className={`overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto ${expanded ? 'flex-1 min-h-0' : 'min-h-[220px]'}`}
+        className={`overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto ${expanded ? 'flex-1 min-h-0' : 'min-h-[220px] md:overflow-visible'}`}
         aria-live="polite"
         style={{
           maxWidth: '100%',
@@ -714,14 +714,11 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
               <textarea
                 ref={textareaRef}
                 value={input}
-                onChange={(event) => {
-                  setInput(event.target.value)
-                  resizeTextarea()
-                }}
+                onChange={(event) => setInput(event.target.value)}
                 onKeyDown={onComposerKeyDown}
                 placeholder="Ask anything"
                 rows={1}
-                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none min-h-[52px] max-h-[200px]"
               />
               {false && (
                 <button

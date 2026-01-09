@@ -223,7 +223,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
 
       <div
         ref={containerRef}
-        className={`px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto ${expanded ? 'flex-1 min-h-0' : 'min-h-[220px]'}`}
+        className={`px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto ${expanded ? 'flex-1 min-h-0' : 'min-h-[220px] md:overflow-visible'}`}
         aria-live="polite"
         style={{
           maxWidth: '100%',
@@ -400,14 +400,11 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
             <textarea
               ref={textareaRef}
               value={input}
-              onChange={(event) => {
-                setInput(event.target.value)
-                resizeTextarea()
-              }}
+              onChange={(event) => setInput(event.target.value)}
               onKeyDown={onComposerKeyDown}
               placeholder="Message AI about your medical image analysis"
               rows={1}
-              className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+              className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none min-h-[52px] max-h-[200px]"
             />
             {false && (
               <button

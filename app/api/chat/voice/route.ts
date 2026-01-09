@@ -6,7 +6,16 @@ import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { logAIUsage } from '@/lib/ai-usage-logger'
-import { ensureTalkToAITables, listMessages, appendMessage, createThread, updateThreadTitle, listThreads } from '@/lib/talk-to-ai-chat-store'
+import {
+  ensureTalkToAITables,
+  listMessages,
+  appendMessage,
+  createThread,
+  updateThreadTitle,
+  listThreads,
+  getThreadChargeStatus,
+  markThreadCharged,
+} from '@/lib/talk-to-ai-chat-store'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
 
@@ -297,19 +306,6 @@ export async function POST(req: NextRequest) {
     const hasPurchasedCredits = user.creditTopUps?.some(
       (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
     )
-    const hasFreeChatCredits = await hasFreeCredits(user.id, 'VOICE_CHAT')
-    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && hasFreeChatCredits
-    if (!isPremium && !hasPurchasedCredits && !hasFreeChatCredits) {
-      return NextResponse.json(
-        {
-          error: 'Payment required',
-          message: 'You\'ve used all your free voice chat uses. Subscribe to a monthly plan or purchase credits to continue.',
-          requiresPayment: true,
-          exhaustedFreeCredits: true,
-        },
-        { status: 402 }
-      )
-    }
 
     // Get or create thread
     await ensureTalkToAITables()
@@ -331,6 +327,22 @@ export async function POST(req: NextRequest) {
         const thread = await createThread(session.user.id)
         threadId = thread.id
       }
+    }
+
+    const threadAlreadyCharged = await getThreadChargeStatus(threadId)
+    const shouldCharge = !threadAlreadyCharged
+    const hasFreeChatCredits = shouldCharge ? await hasFreeCredits(user.id, 'VOICE_CHAT') : false
+    const allowViaFreeUse = shouldCharge && !isPremium && !hasPurchasedCredits && hasFreeChatCredits
+    if (shouldCharge && !isPremium && !hasPurchasedCredits && !hasFreeChatCredits) {
+      return NextResponse.json(
+        {
+          error: 'Payment required',
+          message: 'You\'ve used all your free voice chat uses. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true,
+          exhaustedFreeCredits: true,
+        },
+        { status: 402 }
+      )
     }
 
     // Load message history for context
@@ -378,13 +390,13 @@ export async function POST(req: NextRequest) {
     // If only estimating, return cost
     if (body?.estimateOnly) {
       return NextResponse.json({
-        estimatedCost: allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS,
+        estimatedCost: shouldCharge ? (allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS) : 0,
         availableCredits: wallet.totalAvailableCents,
         freeUseApplied: allowViaFreeUse,
       })
     }
 
-    if (!allowViaFreeUse && wallet.totalAvailableCents < VOICE_CHAT_COST_CENTS) {
+    if (shouldCharge && !allowViaFreeUse && wallet.totalAvailableCents < VOICE_CHAT_COST_CENTS) {
       return NextResponse.json(
         {
           error: 'Insufficient credits',
@@ -410,21 +422,24 @@ export async function POST(req: NextRequest) {
         'I apologize, but I could not generate a response.'
 
       const apiCostCents = wrapped.costCents * 2
-      const chargedCents = allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS
-      if (!allowViaFreeUse) {
-        const ok = await cm.chargeCents(chargedCents)
-        if (!ok) {
-          return NextResponse.json(
-            {
-              error: 'Insufficient credits',
-              estimatedCost: VOICE_CHAT_COST_CENTS,
-              availableCredits: wallet.totalAvailableCents,
-            },
-            { status: 402 }
-          )
+      const chargedCents = shouldCharge ? (allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS) : 0
+      if (shouldCharge) {
+        if (!allowViaFreeUse) {
+          const ok = await cm.chargeCents(chargedCents)
+          if (!ok) {
+            return NextResponse.json(
+              {
+                error: 'Insufficient credits',
+                estimatedCost: VOICE_CHAT_COST_CENTS,
+                availableCredits: wallet.totalAvailableCents,
+              },
+              { status: 402 }
+            )
+          }
+        } else {
+          await consumeFreeCredit(user.id, 'VOICE_CHAT')
         }
-      } else {
-        await consumeFreeCredit(user.id, 'VOICE_CHAT')
+        await markThreadCharged(threadId)
       }
 
       // Save assistant message
@@ -451,7 +466,7 @@ export async function POST(req: NextRequest) {
             const payload = JSON.stringify({ token: chunk })
             controller.enqueue(enc.encode(`data: ${payload}\n\n`))
           }
-          const chargePayload = JSON.stringify({ chargedCents })
+          const chargePayload = JSON.stringify({ chargedCents, chargedOnce: true })
           controller.enqueue(enc.encode(`event: charged\ndata: ${chargePayload}\n\n`))
           controller.enqueue(enc.encode('event: end\n\n'))
           controller.close()
@@ -475,21 +490,24 @@ export async function POST(req: NextRequest) {
       })
 
       const apiCostCents = wrapped.costCents * 2
-      const chargedCents = allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS
-      if (!allowViaFreeUse) {
-        const ok = await cm.chargeCents(chargedCents)
-        if (!ok) {
-          return NextResponse.json(
-            {
-              error: 'Insufficient credits',
-              estimatedCost: VOICE_CHAT_COST_CENTS,
-              availableCredits: wallet.totalAvailableCents,
-            },
-            { status: 402 }
-          )
+      const chargedCents = shouldCharge ? (allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS) : 0
+      if (shouldCharge) {
+        if (!allowViaFreeUse) {
+          const ok = await cm.chargeCents(chargedCents)
+          if (!ok) {
+            return NextResponse.json(
+              {
+                error: 'Insufficient credits',
+                estimatedCost: VOICE_CHAT_COST_CENTS,
+                availableCredits: wallet.totalAvailableCents,
+              },
+              { status: 402 }
+            )
+          }
+        } else {
+          await consumeFreeCredit(user.id, 'VOICE_CHAT')
         }
-      } else {
-        await consumeFreeCredit(user.id, 'VOICE_CHAT')
+        await markThreadCharged(threadId)
       }
 
       // Log AI usage for cost tracking (voice chat, non-streaming)
@@ -514,6 +532,7 @@ export async function POST(req: NextRequest) {
         assistant: assistantMessage,
         estimatedCost: chargedCents,
         chargedCostCents: chargedCents,
+        chargedOnce: true,
         threadId,
       })
     }

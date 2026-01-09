@@ -7,11 +7,11 @@ import Link from 'next/link'
 
 export default function ChatPage() {
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="bg-white flex flex-col flex-1 min-h-0">
       <PageHeader title="Talk to AI" />
 
       {/* Main Content - Full height chat */}
-      <div className="flex-1 flex flex-col overflow-hidden pb-24 md:pb-8">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden pb-24 md:pb-8">
         <VoiceChat className="flex-1" />
       </div>
 
@@ -61,4 +61,3 @@ export default function ChatPage() {
     </div>
   )
 }
-

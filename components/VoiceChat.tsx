@@ -25,7 +25,7 @@ interface VoiceChatProps {
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
-type ChatThread = { id: string; title: string | null; createdAt: string; updatedAt: string }
+type ChatThread = { id: string; title: string | null; chargedOnce: boolean; createdAt: string; updatedAt: string }
 
 export default function VoiceChat({ context, onCostEstimate, className = '' }: VoiceChatProps) {
   const VOICE_CHAT_COST_CREDITS = 10
@@ -34,7 +34,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
-  const [estimatedCost] = useState<number>(VOICE_CHAT_COST_CREDITS)
+  const [currentThreadCharged, setCurrentThreadCharged] = useState(false)
   const [lastChargedCost, setLastChargedCost] = useState<number | null>(null)
   const [lastChargedAt, setLastChargedAt] = useState<string | null>(null)
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
@@ -46,6 +46,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const healthTipTitle = context?.healthTipTitle
   const healthTipCategory = context?.healthTipCategory
   const healthTipSuggestedQuestions = context?.healthTipSuggestedQuestions
+  const estimatedCost = currentThreadCharged ? 0 : VOICE_CHAT_COST_CREDITS
 
   const healthTipSuggestionQuestions = useMemo(() => {
     if (!hasHealthTipContext) return []
@@ -106,8 +107,10 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
             setThreads(data.threads)
             if (data.threads.length > 0 && !currentThreadId) {
               // Load most recent thread
-              const threadId = data.threads[0].id
+              const latestThread = data.threads[0]
+              const threadId = latestThread.id
               setCurrentThreadId(threadId)
+              setCurrentThreadCharged(Boolean(latestThread.chargedOnce))
               loadThreadMessages(threadId)
             }
           }
@@ -145,6 +148,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         const data = await res.json()
         const newThreadId = data.threadId
         setCurrentThreadId(newThreadId)
+        setCurrentThreadCharged(false)
         setMessages([])
         setLastChargedCost(null)
         setLastChargedAt(null)
@@ -176,11 +180,14 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
           if (threadsData.threads) {
             setThreads(threadsData.threads)
             if (threadsData.threads.length > 0) {
-              const newThreadId = threadsData.threads[0].id
+              const nextThread = threadsData.threads[0]
+              const newThreadId = nextThread.id
               setCurrentThreadId(newThreadId)
+              setCurrentThreadCharged(Boolean(nextThread.chargedOnce))
               loadThreadMessages(newThreadId)
             } else {
               setCurrentThreadId(null)
+              setCurrentThreadCharged(false)
               setMessages([])
               setLastChargedCost(null)
               setLastChargedAt(null)
@@ -213,6 +220,12 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     setLastChargedCost(null)
     setLastChargedAt(null)
   }, [currentThreadId])
+
+  useEffect(() => {
+    if (!currentThreadId) return
+    const thread = threads.find((t) => t.id === currentThreadId)
+    if (thread) setCurrentThreadCharged(Boolean(thread.chargedOnce))
+  }, [currentThreadId, threads])
 
   // Initialize speech recognition
   useEffect(() => {
@@ -347,7 +360,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       setMessages(nextMessages)
       setInput('')
 
-      if (onCostEstimate) onCostEstimate(VOICE_CHAT_COST_CREDITS)
+      if (onCostEstimate) onCostEstimate(estimatedCost)
 
       const url = `/api/chat/voice`
       const res = await fetch(url, {
@@ -393,6 +406,11 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 if (typeof payload?.chargedCents === 'number') {
                   setLastChargedCost(payload.chargedCents)
                   setLastChargedAt(new Date().toISOString())
+                  if (typeof payload?.chargedOnce === 'boolean') {
+                    setCurrentThreadCharged(payload.chargedOnce)
+                  } else if (payload.chargedCents >= 0) {
+                    setCurrentThreadCharged(true)
+                  }
                   try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
                 }
               } catch {
@@ -450,6 +468,11 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         if (typeof data?.chargedCostCents === 'number') {
           setLastChargedCost(data.chargedCostCents)
           setLastChargedAt(new Date().toISOString())
+          if (typeof data?.chargedOnce === 'boolean') {
+            setCurrentThreadCharged(data.chargedOnce)
+          } else {
+            setCurrentThreadCharged(true)
+          }
           try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
         }
       }
@@ -477,7 +500,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   }
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
+    <div className={`flex flex-col h-full min-h-0 ${className}`}>
       {/* Thread Selector Header */}
       <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between relative">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -511,6 +534,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                     type="button"
                     onClick={() => {
                       setCurrentThreadId(thread.id)
+                      setCurrentThreadCharged(Boolean(thread.chargedOnce))
                       loadThreadMessages(thread.id)
                       setShowThreadMenu(false)
                     }}
@@ -549,7 +573,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         {/* Messages Area - ChatGPT style */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0"
           aria-live="polite"
           style={{
             maxWidth: '100%',
@@ -589,7 +613,8 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 <div className="max-w-3xl mx-auto mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
                   <div className="font-semibold text-gray-900">How Talk to AI works</div>
                   <ul className="mt-2 space-y-1 text-sm text-gray-600">
-                    <li>We estimate credits before sending and show the actual charge after each response.</li>
+                    <li>Each chat costs 10 credits once (not per response).</li>
+                    <li>We show the estimate before sending and confirm the charge after the first response.</li>
                     <li>Your chat topics and key questions are summarized into your 7‑day report.</li>
                     <li>We connect those topics to your food, exercise, symptoms, mood, and check-ins.</li>
                   </ul>
@@ -752,12 +777,14 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
             <div className="max-w-3xl mx-auto flex flex-wrap gap-4 text-xs text-gray-500 mb-2">
               {estimatedCost !== null && (
                 <span>
-                  Estimated: <span className="font-semibold text-gray-700">{estimatedCost} credits</span> per response
+                  Estimated: <span className="font-semibold text-gray-700">{estimatedCost} credits</span>{' '}
+                  {currentThreadCharged ? '(already covered)' : 'per chat'}
                 </span>
               )}
               {lastChargedCost !== null && (
                 <span>
                   Charged: <span className="font-semibold text-gray-700">{lastChargedCost} credits</span>
+                  {lastChargedCost === 0 && currentThreadCharged ? ' (already charged this chat)' : ''}
                 </span>
               )}
               {lastChargedAt && (
@@ -807,10 +834,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
               <textarea
                 ref={textareaRef}
                 value={input}
-                onChange={(event) => {
-                  setInput(event.target.value)
-                  resizeTextarea()
-                }}
+                onChange={(event) => setInput(event.target.value)}
                 onKeyDown={onComposerKeyDown}
                 placeholder="Ask anything"
                 rows={1}
