@@ -135,14 +135,17 @@ function buildSupportSystemPrompt(agentName: string, agentRole: string): string 
     '- Focus on app troubleshooting, not medical advice.',
     '- Do not claim hardware or device integrations that are not currently supported.',
     '- If asked about Apple devices or Apple Watch, explain they are not supported in the web app and are planned for the future native apps.',
-    '- Never mention code or internal details in the customer reply.',
+    '- Do not show code snippets or internal file paths in the customer reply.',
     '- Use the Support Knowledge Base for verified links and steps. Always provide the most direct link when relevant.',
     '- If the user mentions the affiliate program or referrals, always explain: sign up first, apply, approval required, then portal access.',
     '- Never ask for passwords, payment card numbers, or full security answers.',
     '- Do not claim you made account changes. Only provide guidance and request verification when needed.',
     '- If the issue involves account access, billing, subscription changes, email change, password change, or deleting data, you MUST require identity verification.',
     '- If verification is pending, ask the user to reply with the 6-digit code we emailed them.',
-    '- For troubleshooting, ask for steps to reproduce, device type, OS version, browser/app version, and screenshots when relevant.',
+    '- For troubleshooting, ask for at most two missing details. Prefer which page/chat and whether it happens on mobile or desktop.',
+    '- Only ask for OS/browser versions or screenshots if the issue cannot be investigated without them.',
+    '- If the user is frustrated or says they already answered, do not repeat questions. Move forward with investigation and explain what you will check.',
+    '- Never say you cannot check the latest app build. Say you are checking it now and will confirm with the team.',
     '- If a bug is likely, tell the user we are investigating and provide clear internal notes for the team.',
     '- If the user already provided steps or a link they clicked, do not ask for the same info again. Move to the next helpful step.',
     '- Use the product facts below when answering questions about trials, pricing, credits, or features.',
@@ -169,6 +172,7 @@ function supportCodeMap(): string {
     '- Support tickets: app/support/page.tsx, app/api/admin/tickets/route.ts, app/api/tickets/webhook/route.ts, prisma/schema.prisma (SupportTicket)',
     '- Billing / subscriptions: app/api/billing/*, app/billing/*, stripe docs',
     '- AI chats: app/api/chat/voice/route.ts, lib/metered-openai.ts, lib/ai-usage-logger.ts',
+    '- Chat UI: components/VoiceChat.tsx, app/symptoms/SymptomChat.tsx, app/medical-images/MedicalImageChat.tsx, app/insights/issues/[issueSlug]/SectionChat.tsx',
     '- Affiliate program: app/affiliate/*, app/api/affiliate/*, lib/affiliate-*',
     '- Food logging: app/food/*, app/api/food-*',
     '- Medical images: app/medical-images/*, app/api/medical-images/*',
@@ -238,6 +242,76 @@ function supportKnowledgeBaseFacts(): string {
   return lines.join('\n')
 }
 
+type ChatBugAnalysis = {
+  isChatBug: boolean
+  isFrustrated: boolean
+  hasChatArea: boolean
+  hasMobile: boolean
+  hasDesktop: boolean
+  areas: string[]
+  devices: string[]
+}
+
+function analyzeChatBugMessage(message: string): ChatBugAnalysis {
+  const text = message.toLowerCase()
+  const isChatBug =
+    /(chat|chatbot|chatbox|chat box|text field|text input|message field|input)/i.test(text) &&
+    /(bug|buggy|broken|not working|doesn.t work|does not work|issue|problem|glitch|jump|jumping|move|moving|disappear|off the screen|off-screen|weird)/i.test(text)
+  const hasMobile = /(iphone|ipad|ios|android|mobile)/i.test(text)
+  const hasDesktop = /(mac|windows|desktop|laptop|browser)/i.test(text)
+  const hasChatArea = /(symptom|medical image|image analyzer|insight|talk to ai|voice|support chat)/i.test(text)
+  const isFrustrated = /(repeating|already told|stop asking|check your code|check the code|loop|looping)/i.test(text)
+  const areas: string[] = []
+  if (/support chat|support widget|support/i.test(text)) {
+    areas.push('Support chat widget')
+  }
+  if (/symptom/i.test(text)) {
+    areas.push('Symptoms chat')
+  }
+  if (/medical image|image analyzer|medical/i.test(text)) {
+    areas.push('Medical image chat')
+  }
+  if (/insight/i.test(text)) {
+    areas.push('Insights chat')
+  }
+  if (/talk to ai|voice/i.test(text)) {
+    areas.push('Talk to AI chat')
+  }
+  const devices: string[] = []
+  if (/iphone|ipad|ios/i.test(text)) devices.push('iOS')
+  if (/android/i.test(text)) devices.push('Android')
+  if (/mac/i.test(text)) devices.push('macOS')
+  if (/windows/i.test(text)) devices.push('Windows')
+  if (/desktop/i.test(text)) devices.push('Desktop')
+  if (/mobile/i.test(text)) devices.push('Mobile')
+
+  return {
+    isChatBug,
+    isFrustrated,
+    hasChatArea,
+    hasMobile,
+    hasDesktop,
+    areas: Array.from(new Set(areas)),
+    devices: Array.from(new Set(devices)),
+  }
+}
+
+function buildChatBugInternalNotes(chatBug: ChatBugAnalysis): string {
+  const lines = ['Chat input UI issue reported: input jumps, moves, or disappears while typing.']
+  if (chatBug.areas.length > 0) {
+    lines.push(`Reported area: ${chatBug.areas.join(', ')}.`)
+  }
+  if (chatBug.devices.length > 0) {
+    lines.push(`Reported devices: ${chatBug.devices.join(', ')}.`)
+  }
+  lines.push('Check chat input container sizing, scroll anchoring, and keyboard handling.')
+  lines.push('Likely files: components/VoiceChat.tsx, app/symptoms/SymptomChat.tsx, app/medical-images/MedicalImageChat.tsx, app/insights/issues/[issueSlug]/SectionChat.tsx.')
+  if (chatBug.areas.includes('Support chat widget')) {
+    lines.push('Also check components/support/SupportChatWidget.tsx and app/support/page.tsx.')
+  }
+  return lines.join(' ')
+}
+
 function buildDeterministicSupportReply(options: {
   message: string
   userLoggedIn: boolean
@@ -250,6 +324,34 @@ function buildDeterministicSupportReply(options: {
   const supportTopic = findSupportTopic('support_and_help')
   const featuresTopic = findSupportTopic('features')
   const sleepTopic = findSupportTopic('sleep_tracking')
+
+  const chatBug = analyzeChatBugMessage(text)
+  if (chatBug.isChatBug) {
+    const followups: string[] = []
+    if (!chatBug.hasChatArea) {
+      followups.push('Which chat is it in? (Talk to AI, Symptoms, Medical Image, or Insights)')
+    }
+    if (!chatBug.hasMobile && !chatBug.hasDesktop) {
+      followups.push('Does it happen on mobile, desktop, or both?')
+    }
+
+    const lines = [
+      'Thanks for reporting this. I can see how frustrating that is.',
+      'I am checking the latest app build and the chat module now so we can fix this.',
+      'If the input is jumping or disappearing, a quick refresh usually brings it back while we investigate.',
+    ]
+
+    if (followups.length > 0) {
+      if (chatBug.isFrustrated) {
+        lines.push('If you want to add one helpful detail later, this is the most useful:')
+      } else {
+        lines.push('If you can, please tell me:')
+      }
+      followups.forEach((item) => lines.push(`- ${item}`))
+    }
+
+    return addAgentSignOff(lines.join('\n'), options.agent)
+  }
 
   const featuresMatch = /features?|capabilities|what can (i|we) do|what does helfi do|what is included/i.test(text)
   if (featuresMatch) {
@@ -997,6 +1099,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
     const message = String(response.message || '')
     return response.isAdminResponse && !message.startsWith('[SYSTEM]') && !message.startsWith('[FEEDBACK]')
   })
+  const chatBug = latestMessage ? analyzeChatBugMessage(latestMessage) : null
   const openai = getOpenAIClient()
   let aiResult: SupportAiResult
 
@@ -1059,6 +1162,21 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
 
     const rawText = completion?.choices?.[0]?.message?.content || ''
     aiResult = safeParseSupportJson(rawText) || fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
+  }
+
+  if (chatBug?.isChatBug) {
+    const bugNotes = buildChatBugInternalNotes(chatBug)
+    aiResult.internalNotes = aiResult.internalNotes ? `${aiResult.internalNotes}\n${bugNotes}` : bugNotes
+    if (!aiResult.suggestedCategory) {
+      aiResult.suggestedCategory = 'BUG_REPORT'
+    }
+    if (!aiResult.suggestedPriority) {
+      aiResult.suggestedPriority = 'MEDIUM'
+    }
+    if (!aiResult.shouldEscalate) {
+      aiResult.shouldEscalate = true
+      aiResult.escalationReason = aiResult.escalationReason || 'User reported chat input UI bug.'
+    }
   }
 
   if (aiResult.needsIdentityCheck && !identityVerified) {
