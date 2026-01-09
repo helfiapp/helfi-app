@@ -49,6 +49,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [actionThreadId, setActionThreadId] = useState<string | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
+  const [renameCleared, setRenameCleared] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
   const storageKey = useMemo(() => 'helfi:chat:talk', [])
@@ -305,6 +306,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     setActionThreadId(threadId)
     setRenameOpen(false)
     setDeleteConfirmOpen(false)
+    setRenameCleared(false)
     longPressTriggeredRef.current = true
   }
 
@@ -312,6 +314,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     setActionThreadId(null)
     setRenameOpen(false)
     setDeleteConfirmOpen(false)
+    setRenameCleared(false)
     longPressTriggeredRef.current = false
   }
 
@@ -1131,6 +1134,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                   onClick={() => {
                     setRenameValue(actionThread?.title || '')
                     setRenameOpen(true)
+                    setRenameCleared(false)
                   }}
                   className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-gray-900 hover:bg-gray-50 rounded-lg"
                 >
@@ -1165,8 +1169,14 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                   type="text"
                   value={renameValue}
                   onChange={(event) => setRenameValue(event.target.value)}
+                  onFocus={() => {
+                    if (!renameCleared) {
+                      setRenameValue('')
+                      setRenameCleared(true)
+                    }
+                  }}
                   placeholder="Chat title"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-0"
+                  className="w-full max-w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-0 overflow-hidden text-ellipsis whitespace-nowrap"
                 />
                 <div className="mt-4 flex gap-2">
                   <button
