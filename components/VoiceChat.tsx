@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { formatChatContent } from '@/lib/chatFormatting'
+import UsageMeter from '@/components/UsageMeter'
 
 interface VoiceChatContext {
   symptoms?: string[]
@@ -33,6 +34,8 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [error, setError] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null)
+  const [lastChargedCost, setLastChargedCost] = useState<number | null>(null)
+  const [lastChargedAt, setLastChargedAt] = useState<string | null>(null)
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
@@ -141,6 +144,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         const newThreadId = data.threadId
         setCurrentThreadId(newThreadId)
         setMessages([])
+        setEstimatedCost(null)
+        setLastChargedCost(null)
+        setLastChargedAt(null)
         // Reload threads
         const threadsRes = await fetch('/api/chat/threads')
         if (threadsRes.ok) {
@@ -175,6 +181,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
             } else {
               setCurrentThreadId(null)
               setMessages([])
+              setEstimatedCost(null)
+              setLastChargedCost(null)
+              setLastChargedAt(null)
             }
           }
         }
@@ -198,6 +207,12 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentThreadId])
+
+  useEffect(() => {
+    setEstimatedCost(null)
+    setLastChargedCost(null)
+    setLastChargedAt(null)
   }, [currentThreadId])
 
   // Initialize speech recognition
@@ -317,6 +332,8 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       setLoading(true)
       setError(null)
       stopListening()
+      setLastChargedCost(null)
+      setLastChargedAt(null)
       
       const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }]
       setMessages(nextMessages)
@@ -378,7 +395,23 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
           const parts = buffer.split('\n\n')
           buffer = parts.pop() || ''
           for (const chunk of parts) {
-            if (chunk.startsWith('data: ')) {
+            if (chunk.startsWith('event: charged')) {
+              const dataLine = chunk
+                .split('\n')
+                .map((line) => line.trim())
+                .find((line) => line.startsWith('data:'))
+              const raw = dataLine ? dataLine.replace(/^data:\s*/, '') : ''
+              try {
+                const payload = JSON.parse(raw)
+                if (typeof payload?.chargedCents === 'number') {
+                  setLastChargedCost(payload.chargedCents)
+                  setLastChargedAt(new Date().toISOString())
+                  try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
+                }
+              } catch {
+                // Ignore malformed charge payloads
+              }
+            } else if (chunk.startsWith('data: ')) {
               const raw = chunk.slice(6).trim()
               let token = ''
               // Prefer JSON payloads to preserve newlines; fall back to raw
@@ -427,6 +460,11 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         if (textOut) {
           setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
         }
+        if (typeof data?.chargedCostCents === 'number') {
+          setLastChargedCost(data.chargedCostCents)
+          setLastChargedAt(new Date().toISOString())
+          try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
@@ -440,6 +478,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       setLoading(true)
       setError(null)
       setMessages([])
+      setEstimatedCost(null)
+      setLastChargedCost(null)
+      setLastChargedAt(null)
       stopListening()
       try { localStorage.removeItem(storageKey) } catch {}
     } catch (err) {
@@ -507,6 +548,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
             </div>
           )}
         </div>
+        <div className="flex items-center justify-center px-2">
+          <UsageMeter compact={true} className="mt-0" feature="voiceChat" />
+        </div>
         <button
           type="button"
           onClick={handleNewChat}
@@ -546,6 +590,14 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
               </>
             ) : (
               <>
+                <div className="max-w-3xl mx-auto mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                  <div className="font-semibold text-gray-900">How Talk to AI works</div>
+                  <ul className="mt-2 space-y-1 text-sm text-gray-600">
+                    <li>We estimate credits before sending and show the actual charge after each response.</li>
+                    <li>Your chat topics and key questions are summarized into your 7‑day report.</li>
+                    <li>We connect those topics to your food, exercise, symptoms, mood, and check-ins.</li>
+                  </ul>
+                </div>
                 <div className="text-center mb-8">
                   <h2 className="text-2xl font-semibold text-gray-900 mb-2">
                     How can I help you today?
@@ -699,6 +751,27 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       <div className="border-t border-gray-200 bg-white">
         {error && (
           <div className="px-4 py-2 text-sm text-red-600 bg-red-50">{error}</div>
+        )}
+        {(estimatedCost !== null || lastChargedCost !== null) && (
+          <div className="px-4 pt-2">
+            <div className="max-w-3xl mx-auto flex flex-wrap gap-4 text-xs text-gray-500">
+              {estimatedCost !== null && (
+                <span>
+                  Estimated: <span className="font-semibold text-gray-700">{(estimatedCost / 100).toFixed(2)} credits</span>
+                </span>
+              )}
+              {lastChargedCost !== null && (
+                <span>
+                  Charged: <span className="font-semibold text-gray-700">{(lastChargedCost / 100).toFixed(2)} credits</span>
+                </span>
+              )}
+              {lastChargedAt && (
+                <span className="text-gray-400">
+                  {new Date(lastChargedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+          </div>
         )}
         <form className="px-4 py-3" onSubmit={handleSubmit}>
           <div className="max-w-3xl mx-auto flex items-center gap-2">

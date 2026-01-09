@@ -62,7 +62,19 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
   }, [report])
 
   const sections = payload?.sections || {}
+  const wins = Array.isArray(payload?.wins) ? payload.wins : []
+  const gaps = Array.isArray(payload?.gaps) ? payload.gaps : []
   const dataWarning = (report?.dataSummary as any)?.dataWarning as string | null
+  const talkToAiSummary = (report?.dataSummary as any)?.talkToAiSummary as
+    | {
+        messageCount?: number
+        userMessageCount?: number
+        assistantMessageCount?: number
+        activeDays?: number
+        topics?: Array<{ topic?: string; section?: string; count?: number }>
+        highlights?: Array<{ content?: string; createdAt?: string }>
+      }
+    | undefined
   const coverage = (report?.dataSummary as any)?.coverage as
     | {
         daysActive?: number
@@ -73,6 +85,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
         symptomCount?: number
         exerciseCount?: number
         labCount?: number
+        talkToAiCount?: number
       }
     | undefined
   const pdfHref = useMemo(() => {
@@ -191,6 +204,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
     { label: 'Symptoms', value: coverage?.symptomCount ?? 0 },
     { label: 'Exercise', value: coverage?.exerciseCount ?? 0 },
     { label: 'Lab uploads', value: coverage?.labCount ?? 0 },
+    { label: 'AI chats', value: coverage?.talkToAiCount ?? 0 },
   ]
   const maxCoverage = Math.max(1, ...coverageItems.map((item) => item.value))
   const daysActive = Math.min(7, Math.max(0, coverage?.daysActive ?? 0))
@@ -272,6 +286,70 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
           <h2 className="text-lg font-semibold text-gray-900">Weekly summary</h2>
           <p className="text-sm text-gray-600 mt-2">{report.summary || payload?.summary || 'Summary coming soon.'}</p>
         </div>
+
+        {talkToAiSummary?.userMessageCount ? (
+          <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-blue-900">Talk to AI highlights</h2>
+            <p className="text-sm text-blue-800 mt-2">
+              {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
+              {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}.
+            </p>
+            {talkToAiSummary.topics && talkToAiSummary.topics.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {talkToAiSummary.topics.map((topic, idx) => (
+                  <span key={`${topic.topic}-${idx}`} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs text-blue-900">
+                    {topic.topic}
+                    {topic.count ? ` • ${topic.count}` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+            {talkToAiSummary.highlights && talkToAiSummary.highlights.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {talkToAiSummary.highlights.slice(-3).map((item, idx) => (
+                  <div key={`talk-${idx}`} className="rounded-xl border border-blue-100 bg-white p-3 text-sm text-blue-900">
+                    {item.content}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {(wins.length > 0 || gaps.length > 0) && (
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-emerald-900">Areas improving</h3>
+              <p className="text-xs text-emerald-700 mt-1">What moved in the right direction this week.</p>
+              <div className="mt-4 space-y-3">
+                {wins.length === 0 && (
+                  <div className="text-sm text-emerald-700">Keep logging to highlight real wins here.</div>
+                )}
+                {wins.map((item: any, idx: number) => (
+                  <div key={`win-${idx}`} className="rounded-xl border border-emerald-100 bg-white p-4">
+                    <div className="font-semibold text-emerald-900">{item.name || 'Win'}</div>
+                    <p className="text-sm text-emerald-800 mt-1">{item.reason || ''}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-amber-900">Areas to work on</h3>
+              <p className="text-xs text-amber-700 mt-1">The biggest gaps holding back the report.</p>
+              <div className="mt-4 space-y-3">
+                {gaps.length === 0 && (
+                  <div className="text-sm text-amber-700">No big gaps flagged this week.</div>
+                )}
+                {gaps.map((item: any, idx: number) => (
+                  <div key={`gap-${idx}`} className="rounded-xl border border-amber-100 bg-white p-4">
+                    <div className="font-semibold text-amber-900">{item.name || 'Gap'}</div>
+                    <p className="text-sm text-amber-800 mt-1">{item.reason || ''}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 flex flex-wrap gap-2">
           {SECTIONS.map((section) => (

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
+import { ensureTalkToAITables } from '@/lib/talk-to-ai-chat-store'
 import {
   createWeeklyReportRecord,
   getNextDueAt,
@@ -31,6 +32,16 @@ const REPORT_SECTIONS = [
 ] as const
 
 type ReportSectionKey = (typeof REPORT_SECTIONS)[number]
+
+const TALK_TO_AI_TOPICS: Array<{ topic: string; section: ReportSectionKey; keywords: string[] }> = [
+  { topic: 'supplements', section: 'supplements', keywords: ['supplement', 'vitamin', 'mineral', 'magnesium', 'creatine', 'omega', 'probiotic'] },
+  { topic: 'medications', section: 'medications', keywords: ['medication', 'meds', 'prescription', 'dosage', 'side effect', 'interaction'] },
+  { topic: 'nutrition', section: 'nutrition', keywords: ['diet', 'nutrition', 'food', 'meal', 'protein', 'carb', 'calorie', 'fiber', 'sugar'] },
+  { topic: 'exercise', section: 'exercise', keywords: ['exercise', 'workout', 'training', 'cardio', 'strength', 'lifting', 'run', 'cycling', 'yoga'] },
+  { topic: 'sleep & stress', section: 'lifestyle', keywords: ['sleep', 'insomnia', 'stress', 'cortisol', 'relax'] },
+  { topic: 'mood & focus', section: 'mood', keywords: ['mood', 'focus', 'brain fog', 'motivation', 'depression', 'anxiety'] },
+  { topic: 'symptoms', section: 'symptoms', keywords: ['pain', 'bloating', 'gas', 'fatigue', 'tired', 'headache', 'nausea', 'reflux', 'constipation', 'diarrhea'] },
+]
 
 function isAuthorized(request: NextRequest) {
   const authHeader = request.headers.get('authorization') || ''
@@ -126,6 +137,70 @@ function buildNutritionSummary(foodLogs: Array<{ name: string | null; nutrients:
   }
 }
 
+function clipText(value: string, max = 220) {
+  const compact = String(value || '').replace(/\s+/g, ' ').trim()
+  if (compact.length <= max) return compact
+  return `${compact.slice(0, Math.max(0, max - 3)).trim()}...`
+}
+
+function buildTalkToAiSummary(
+  messages: Array<{ role: string; content: string; createdAt: Date }>
+) {
+  if (!messages.length) {
+    return {
+      messageCount: 0,
+      userMessageCount: 0,
+      assistantMessageCount: 0,
+      activeDays: 0,
+      lastMessageAt: null,
+      topics: [],
+      highlights: [],
+    }
+  }
+
+  const sorted = [...messages].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  const userMessages = sorted.filter((m) => m.role === 'user')
+  const assistantMessages = sorted.filter((m) => m.role === 'assistant')
+  const days = new Set<string>()
+  sorted.forEach((m) => days.add(m.createdAt.toISOString().slice(0, 10)))
+
+  const topicCounts = new Map<string, { topic: string; section: ReportSectionKey; count: number }>()
+  userMessages.forEach((m) => {
+    const lower = String(m.content || '').toLowerCase()
+    TALK_TO_AI_TOPICS.forEach((topic) => {
+      if (topic.keywords.some((k) => lower.includes(k))) {
+        const existing = topicCounts.get(topic.topic) || { ...topic, count: 0 }
+        existing.count += 1
+        topicCounts.set(topic.topic, existing)
+      }
+    })
+  })
+
+  const topics = Array.from(topicCounts.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6)
+    .map(({ topic, section, count }) => ({ topic, section, count }))
+
+  const highlights = userMessages
+    .slice(0, 10)
+    .map((m) => ({
+      role: 'user',
+      createdAt: m.createdAt.toISOString(),
+      content: clipText(m.content, 240),
+    }))
+    .reverse()
+
+  return {
+    messageCount: sorted.length,
+    userMessageCount: userMessages.length,
+    assistantMessageCount: assistantMessages.length,
+    activeDays: days.size,
+    lastMessageAt: sorted[0]?.createdAt?.toISOString() || null,
+    topics,
+    highlights,
+  }
+}
+
 function buildFallbackReport(context: any) {
   const sections = buildDefaultSections()
   const supplementItems = Array.isArray(context?.supplements)
@@ -144,8 +219,62 @@ function buildFallbackReport(context: any) {
   sections.supplements.working = supplementItems
   sections.medications.working = medicationItems
 
+  const wins: Array<{ name: string; reason: string }> = []
+  const gaps: Array<{ name: string; reason: string }> = []
+  const coverage = context?.coverage || {}
+  if ((coverage.daysActive || 0) >= 4) {
+    wins.push({
+      name: 'Consistent tracking',
+      reason: `You logged data on ${coverage.daysActive} days this week, which makes trends clearer.`,
+    })
+  }
+  if ((coverage.foodCount || 0) >= 4) {
+    wins.push({
+      name: 'Food logging streak',
+      reason: 'Multiple food entries were captured, giving the report real nutrition context.',
+    })
+  }
+  if ((coverage.checkinCount || 0) >= 3) {
+    wins.push({
+      name: 'Check-in momentum',
+      reason: 'You kept up with check-ins, so we can connect how you feel to your goals.',
+    })
+  }
+  if ((coverage.daysActive || 0) <= 2) {
+    gaps.push({
+      name: 'Low tracking frequency',
+      reason: 'There were only a few active days, so insights will be lighter than usual.',
+    })
+  }
+  if ((coverage.labCount || 0) === 0) {
+    gaps.push({
+      name: 'No lab updates',
+      reason: 'Upload lab results when you have them so we can track markers over time.',
+    })
+  }
+  if ((coverage.exerciseCount || 0) === 0) {
+    gaps.push({
+      name: 'Exercise not captured',
+      reason: 'Add workouts to help us understand how activity affects your focus areas.',
+    })
+  }
+
+  const talkToAi = context?.talkToAi
+  if (talkToAi?.userMessageCount) {
+    const topicLabels = Array.isArray(talkToAi.topics)
+      ? talkToAi.topics.map((t: any) => t.topic).slice(0, 3)
+      : []
+    const topicText = topicLabels.length ? `Recent AI chats focused on ${topicLabels.join(', ')}.` : 'You chatted with the AI this week.'
+    sections.overview.working.unshift({
+      name: 'AI chat focus',
+      reason: `${topicText} Keep logging so we can connect these questions to your trends.`,
+    })
+  }
+
   return {
     summary: 'We created a basic report based on the data available. Keep logging daily so we can make this more detailed next week.',
+    wins,
+    gaps,
     sections,
   }
 }
@@ -272,6 +401,21 @@ export async function POST(request: NextRequest) {
     take: 20,
   })
 
+  await ensureTalkToAITables()
+  const talkToAiMessages: Array<{ role: string; content: string; createdAt: Date }> =
+    await prisma.$queryRawUnsafe(
+      `SELECT m."role", m."content", m."createdAt"
+       FROM "TalkToAIChatMessage" m
+       JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
+       WHERE t."userId" = $1 AND m."createdAt" >= $2 AND m."createdAt" <= $3
+       ORDER BY m."createdAt" DESC
+       LIMIT 120`,
+      userId,
+      periodStart,
+      periodEnd
+    ).catch(() => [])
+  const talkToAiSummary = buildTalkToAiSummary(talkToAiMessages)
+
   const dataDays = new Set<string>()
   const stamp = (d: Date | string) => {
     const date = typeof d === 'string' ? new Date(d) : d
@@ -285,6 +429,7 @@ export async function POST(request: NextRequest) {
   moodRows?.forEach((m) => stamp(m.timestamp))
   symptomAnalyses?.forEach((s) => stamp(s.createdAt))
   labReports?.forEach((r) => stamp(r.createdAt))
+  talkToAiMessages?.forEach((m) => stamp(m.createdAt))
 
   const coverage = {
     daysActive: dataDays.size,
@@ -294,13 +439,17 @@ export async function POST(request: NextRequest) {
       (user.exerciseLogs?.length || 0) +
       (user.exerciseEntries?.length || 0) +
       (moodRows?.length || 0) +
-      (symptomAnalyses?.length || 0),
+      (symptomAnalyses?.length || 0) +
+      (talkToAiMessages?.length || 0),
     foodCount: user.foodLogs?.length || 0,
     moodCount: moodRows?.length || 0,
     checkinCount: user.healthLogs?.length || 0,
     symptomCount: symptomAnalyses?.length || 0,
     exerciseCount: (user.exerciseLogs?.length || 0) + (user.exerciseEntries?.length || 0),
     labCount: labReports?.length || 0,
+    talkToAiCount: talkToAiMessages?.length || 0,
+    talkToAiUserCount: talkToAiSummary.userMessageCount,
+    talkToAiDays: talkToAiSummary.activeDays,
   }
 
   const dataWarning = summarizeCoverage({
@@ -389,6 +538,7 @@ export async function POST(request: NextRequest) {
       createdAt: e.createdAt,
     })),
     coverage,
+    talkToAi: talkToAiSummary,
   }
 
   const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
@@ -405,6 +555,8 @@ export async function POST(request: NextRequest) {
 Generate a 7-day health report in plain language with this exact JSON shape:
 {
   "summary": "2-4 sentences that explain the main patterns and key wins",
+  "wins": [{"name": "", "reason": ""}],
+  "gaps": [{"name": "", "reason": ""}],
   "sections": {
     "overview": { "working": [{"name": "", "reason": ""}], "suggested": [{"name": "", "reason": ""}], "avoid": [{"name": "", "reason": ""}] },
     "supplements": { "working": [], "suggested": [], "avoid": [] },
@@ -420,8 +572,11 @@ Generate a 7-day health report in plain language with this exact JSON shape:
 
 Rules:
 - Keep each item short and specific (1-2 sentences).
+- Use real signals from the JSON data. No generic advice.
 - If a section has no data, leave all arrays empty.
+- If you cannot support a win or gap with data, leave that list empty.
 - Only use information from the JSON. Do not invent labs or diagnoses.
+- If talkToAi data exists, connect it to logged data in the relevant sections and summary.
 - Use supportive, non-alarming language.
 
 JSON data:
@@ -453,6 +608,8 @@ ${JSON.stringify(reportContext)}
   }
 
   const sections = buildDefaultSections()
+  const wins = Array.isArray(reportPayload?.wins) ? reportPayload.wins : []
+  const gaps = Array.isArray(reportPayload?.gaps) ? reportPayload.gaps : []
   const incomingSections = reportPayload.sections || {}
   REPORT_SECTIONS.forEach((key) => {
     if (incomingSections[key]) {
@@ -465,6 +622,8 @@ ${JSON.stringify(reportContext)}
   })
 
   reportPayload.sections = sections
+  reportPayload.wins = wins
+  reportPayload.gaps = gaps
 
   const charged = await cm.chargeCents(costCredits)
   if (!charged) {
@@ -474,6 +633,7 @@ ${JSON.stringify(reportContext)}
       dataSummary: {
         coverage,
         dataWarning,
+        talkToAiSummary,
         lockedReason: 'insufficient_credits',
       },
       report: null,
@@ -490,6 +650,7 @@ ${JSON.stringify(reportContext)}
     dataSummary: {
       coverage,
       dataWarning,
+      talkToAiSummary,
     },
     report: reportPayload,
     model,

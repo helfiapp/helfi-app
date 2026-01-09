@@ -208,6 +208,8 @@ function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContex
     '- Use numbered lists (1. 2. 3.) for sequential items',
     '- Use bullet points (- or •) for non-sequential items',
     '- Use **bold** for section headings and key terms',
+    '- Do NOT use single asterisks for italics',
+    '- Never put list markers or asterisks on their own line',
     '- NEVER write responses as one continuous paragraph',
     '- Keep paragraphs to 2-4 sentences maximum',
     '- Break up long explanations into multiple paragraphs',
@@ -448,6 +450,8 @@ export async function POST(req: NextRequest) {
             const payload = JSON.stringify({ token: chunk })
             controller.enqueue(enc.encode(`data: ${payload}\n\n`))
           }
+          const chargePayload = JSON.stringify({ chargedCents: actualUserCostCents })
+          controller.enqueue(enc.encode(`event: charged\ndata: ${chargePayload}\n\n`))
           controller.enqueue(enc.encode('event: end\n\n'))
           controller.close()
         },
@@ -508,6 +512,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         assistant: assistantMessage,
         estimatedCost: userCostCents,
+        chargedCostCents: userCostCents,
         threadId,
       })
     }
