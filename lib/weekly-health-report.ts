@@ -104,42 +104,65 @@ export async function ensureWeeklyReportTables() {
   }
 }
 
+function readRowValue(row: any, key: string) {
+  if (!row) return undefined
+  if (row[key] !== undefined) return row[key]
+  const lower = key.toLowerCase()
+  return row[lower]
+}
+
 function normalizeReportRow(row: any): WeeklyReportRecord | null {
   if (!row) return null
+  const periodStart = readRowValue(row, 'periodStart')
+  const periodEnd = readRowValue(row, 'periodEnd')
+  const readyAt = readRowValue(row, 'readyAt')
+  const notifyAt = readRowValue(row, 'notifyAt')
+  const emailSentAt = readRowValue(row, 'emailSentAt')
+  const pushSentAt = readRowValue(row, 'pushSentAt')
+  const createdAt = readRowValue(row, 'createdAt')
+  const updatedAt = readRowValue(row, 'updatedAt')
+  const lastShownAt = readRowValue(row, 'lastShownAt')
+  const dismissedAt = readRowValue(row, 'dismissedAt')
+  const dontShowAt = readRowValue(row, 'dontShowAt')
+  const viewedAt = readRowValue(row, 'viewedAt')
   return {
-    id: row.id,
-    userId: row.userId,
-    periodStart: row.periodStart ? new Date(row.periodStart).toISOString().slice(0, 10) : '',
-    periodEnd: row.periodEnd ? new Date(row.periodEnd).toISOString().slice(0, 10) : '',
-    status: row.status,
-    summary: row.summary ?? null,
-    dataSummary: row.dataSummary ?? null,
-    report: row.report ?? null,
-    model: row.model ?? null,
-    creditsCharged: row.creditsCharged ?? null,
-    error: row.error ?? null,
-    readyAt: row.readyAt ? new Date(row.readyAt).toISOString() : null,
-    notifyAt: row.notifyAt ? new Date(row.notifyAt).toISOString() : null,
-    emailSentAt: row.emailSentAt ? new Date(row.emailSentAt).toISOString() : null,
-    pushSentAt: row.pushSentAt ? new Date(row.pushSentAt).toISOString() : null,
-    createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
-    updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : new Date().toISOString(),
-    lastShownAt: row.lastShownAt ? new Date(row.lastShownAt).toISOString() : null,
-    dismissedAt: row.dismissedAt ? new Date(row.dismissedAt).toISOString() : null,
-    dontShowAt: row.dontShowAt ? new Date(row.dontShowAt).toISOString() : null,
-    viewedAt: row.viewedAt ? new Date(row.viewedAt).toISOString() : null,
+    id: readRowValue(row, 'id'),
+    userId: readRowValue(row, 'userId'),
+    periodStart: periodStart ? new Date(periodStart).toISOString().slice(0, 10) : '',
+    periodEnd: periodEnd ? new Date(periodEnd).toISOString().slice(0, 10) : '',
+    status: readRowValue(row, 'status'),
+    summary: readRowValue(row, 'summary') ?? null,
+    dataSummary: readRowValue(row, 'dataSummary') ?? null,
+    report: readRowValue(row, 'report') ?? null,
+    model: readRowValue(row, 'model') ?? null,
+    creditsCharged: readRowValue(row, 'creditsCharged') ?? null,
+    error: readRowValue(row, 'error') ?? null,
+    readyAt: readyAt ? new Date(readyAt).toISOString() : null,
+    notifyAt: notifyAt ? new Date(notifyAt).toISOString() : null,
+    emailSentAt: emailSentAt ? new Date(emailSentAt).toISOString() : null,
+    pushSentAt: pushSentAt ? new Date(pushSentAt).toISOString() : null,
+    createdAt: createdAt ? new Date(createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: updatedAt ? new Date(updatedAt).toISOString() : new Date().toISOString(),
+    lastShownAt: lastShownAt ? new Date(lastShownAt).toISOString() : null,
+    dismissedAt: dismissedAt ? new Date(dismissedAt).toISOString() : null,
+    dontShowAt: dontShowAt ? new Date(dontShowAt).toISOString() : null,
+    viewedAt: viewedAt ? new Date(viewedAt).toISOString() : null,
   }
 }
 
 function normalizeStateRow(row: any): WeeklyReportState | null {
   if (!row) return null
+  const onboardingCompletedAt = readRowValue(row, 'onboardingCompletedAt')
+  const nextReportDueAt = readRowValue(row, 'nextReportDueAt')
+  const lastReportAt = readRowValue(row, 'lastReportAt')
+  const lastAttemptAt = readRowValue(row, 'lastAttemptAt')
   return {
-    userId: row.userId,
-    onboardingCompletedAt: row.onboardingCompletedAt ? new Date(row.onboardingCompletedAt).toISOString() : null,
-    nextReportDueAt: row.nextReportDueAt ? new Date(row.nextReportDueAt).toISOString() : null,
-    lastReportAt: row.lastReportAt ? new Date(row.lastReportAt).toISOString() : null,
-    lastAttemptAt: row.lastAttemptAt ? new Date(row.lastAttemptAt).toISOString() : null,
-    lastStatus: row.lastStatus ?? null,
+    userId: readRowValue(row, 'userId'),
+    onboardingCompletedAt: onboardingCompletedAt ? new Date(onboardingCompletedAt).toISOString() : null,
+    nextReportDueAt: nextReportDueAt ? new Date(nextReportDueAt).toISOString() : null,
+    lastReportAt: lastReportAt ? new Date(lastReportAt).toISOString() : null,
+    lastAttemptAt: lastAttemptAt ? new Date(lastAttemptAt).toISOString() : null,
+    lastStatus: readRowValue(row, 'lastStatus') ?? null,
   }
 }
 
