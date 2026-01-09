@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { formatChatContent } from '@/lib/chatFormatting'
 import UsageMeter from '@/components/UsageMeter'
 
@@ -40,7 +41,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
-  const [showThreadMenu, setShowThreadMenu] = useState(false)
+  const [threadsOpen, setThreadsOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [isClient, setIsClient] = useState(false)
   const storageKey = useMemo(() => 'helfi:chat:talk', [])
   const hasHealthTipContext = !!context?.healthTipSummary
   const healthTipTitle = context?.healthTipTitle
@@ -72,6 +75,42 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       `How could I adapt the "${titleSnippet}" tip to better fit my daily routine and preferences?`,
     ]
   }, [hasHealthTipContext, healthTipTitle, healthTipCategory, healthTipSuggestedQuestions])
+
+  const currentThreadTitle = useMemo(() => {
+    if (!currentThreadId) return 'New chat'
+    return threads.find((thread) => thread.id === currentThreadId)?.title || 'New chat'
+  }, [currentThreadId, threads])
+
+  const threadGroups = useMemo(() => {
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+    const groups = {
+      today: [] as ChatThread[],
+      yesterday: [] as ChatThread[],
+      week: [] as ChatThread[],
+      older: [] as ChatThread[],
+    }
+    threads.forEach((thread) => {
+      const updated = new Date(thread.updatedAt)
+      updated.setHours(0, 0, 0, 0)
+      const diffDays = Math.floor((startOfToday.getTime() - updated.getTime()) / 86400000)
+      if (diffDays <= 0) {
+        groups.today.push(thread)
+      } else if (diffDays === 1) {
+        groups.yesterday.push(thread)
+      } else if (diffDays < 7) {
+        groups.week.push(thread)
+      } else {
+        groups.older.push(thread)
+      }
+    })
+    return [
+      { label: 'Today', items: groups.today },
+      { label: 'Yesterday', items: groups.yesterday },
+      { label: 'Previous 7 days', items: groups.week },
+      { label: 'Older', items: groups.older },
+    ]
+  }, [threads])
   
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -143,6 +182,14 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     }
   }
 
+  function handleSelectThread(threadId: string) {
+    const thread = threads.find((item) => item.id === threadId)
+    setCurrentThreadId(threadId)
+    setCurrentThreadCharged(Boolean(thread?.chargedOnce))
+    loadThreadMessages(threadId)
+    setThreadsOpen(false)
+  }
+
   async function handleNewChat() {
     try {
       const res = await fetch('/api/chat/threads', {
@@ -158,6 +205,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         setMessages([])
         setLastChargedCost(null)
         setLastChargedAt(null)
+        setThreadsOpen(false)
         // Reload threads
         const threadsRes = await fetch('/api/chat/threads')
         if (threadsRes.ok) {
@@ -200,6 +248,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
             }
           }
         }
+        setThreadsOpen(false)
       }
     } catch (err) {
       console.error('Failed to delete thread:', err)
@@ -298,6 +347,10 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         recognitionRef.current.stop()
       }
     }
+  }, [])
+
+  useEffect(() => {
+    setIsClient(true)
   }, [])
 
   // Auto-scroll
@@ -489,387 +542,398 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     }
   }
 
-  async function handleClear() {
-    try {
-      setLoading(true)
-      setError(null)
-      stopListening()
-      setMessages([])
-      setLastChargedCost(null)
-      setLastChargedAt(null)
-      try { localStorage.removeItem(storageKey) } catch {}
-      if (currentThreadId) {
-        try {
-          await fetch('/api/chat/threads', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ threadId: currentThreadId }),
-          })
-        } catch {}
-      }
-      await handleNewChat()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
+  const renderFormattedContent = (content: string) => {
+    const formatted = formatChatContent(content)
+    const paragraphs = formatted.split(/\n\n+/)
+    return paragraphs.map((para, paraIdx) => {
+      const trimmed = para.trim()
+      if (!trimmed) return null
+      const lines = trimmed.split('\n')
+      return (
+        <div key={paraIdx} className={paraIdx > 0 ? 'mt-4' : ''}>
+          {lines.map((line, lineIdx) => {
+            const lineTrimmed = line.trim()
+            if (!lineTrimmed) return <div key={lineIdx} className="h-2" />
+
+            if (lineTrimmed.startsWith('**') && lineTrimmed.endsWith('**') && lineTrimmed.length > 4) {
+              return (
+                <div key={lineIdx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
+                  {lineTrimmed.slice(2, -2)}
+                </div>
+              )
+            }
+
+            const numberedMatch = lineTrimmed.match(/^(\d+)\.\s+(.+)$/)
+            if (numberedMatch) {
+              const parts = numberedMatch[2].split(/(\*\*.*?\*\*)/g)
+              return (
+                <div key={lineIdx} className="ml-4 mb-1.5">
+                  <span className="font-medium">{numberedMatch[1]}.</span>{' '}
+                  {parts.map((part, j) => {
+                    if (part.startsWith('**') && part.endsWith('**')) {
+                      return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
+                    }
+                    return <span key={j}>{part}</span>
+                  })}
+                </div>
+              )
+            }
+
+            const bulletMatch = lineTrimmed.match(/^[-•*]\s+(.+)$/)
+            if (bulletMatch) {
+              const parts = bulletMatch[1].split(/(\*\*.*?\*\*)/g)
+              return (
+                <div key={lineIdx} className="ml-4 mb-1.5">
+                  <span className="mr-2">•</span>
+                  {parts.map((part, j) => {
+                    if (part.startsWith('**') && part.endsWith('**')) {
+                      return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
+                    }
+                    return <span key={j}>{part}</span>
+                  })}
+                </div>
+              )
+            }
+
+            const parts = lineTrimmed.split(/(\*\*.*?\*\*)/g)
+            return (
+              <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
+                {parts.map((part, j) => {
+                  if (part.startsWith('**') && part.endsWith('**')) {
+                    return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
+                  }
+                  return <span key={j}>{part}</span>
+                })}
+              </div>
+            )
+          })}
+        </div>
+      )
+    })
   }
 
-  return (
-    <div className={`flex flex-col h-full min-h-0 ${className}`}>
-      {/* Thread Selector Header */}
-      <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between relative">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <button
-            type="button"
-            onClick={() => setShowThreadMenu(!showThreadMenu)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors min-w-0 flex-1"
-          >
-            <span className="truncate text-sm font-medium text-gray-700">
-              {currentThreadId ? threads.find(t => t.id === currentThreadId)?.title || 'New Chat' : 'New Chat'}
-            </span>
-            <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {showThreadMenu && (
-            <div className="absolute left-4 top-12 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto min-w-[200px]">
-              <button
-                type="button"
-                onClick={() => {
-                  handleNewChat()
-                  setShowThreadMenu(false)
-                }}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 border-b border-gray-100"
-              >
-                + New Chat
-              </button>
-              {threads.map((thread) => (
-                <div key={thread.id} className="flex items-center group">
+  const threadList = (
+    <div className="flex flex-col h-full">
+      <div className="p-3">
+        <button
+          type="button"
+          onClick={handleNewChat}
+          className="flex w-full items-center justify-between gap-3 overflow-hidden rounded-lg bg-white border border-gray-200/60 shadow-sm hover:shadow-md hover:border-gray-300 h-10 px-3 transition-all duration-200"
+        >
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-gray-400" style={{ fontSize: 20 }}>add</span>
+            <span className="text-sm font-medium text-gray-600">New chat</span>
+          </div>
+          <span className="material-symbols-outlined text-gray-300" style={{ fontSize: 18 }}>edit_square</span>
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-5">
+        {threadGroups.map((group) => (
+          group.items.length > 0 ? (
+            <div key={group.label} className="flex flex-col gap-1">
+              <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
+                {group.label}
+              </h3>
+              {group.items.map((thread) => (
+                <div key={thread.id} className="flex items-center gap-2 group">
                   <button
                     type="button"
-                    onClick={() => {
-                      setCurrentThreadId(thread.id)
-                      setCurrentThreadCharged(Boolean(thread.chargedOnce))
-                      loadThreadMessages(thread.id)
-                      setShowThreadMenu(false)
-                    }}
-                    className={`flex-1 px-4 py-2 text-left text-sm hover:bg-gray-100 truncate ${
-                      currentThreadId === thread.id ? 'bg-gray-50' : ''
+                    onClick={() => handleSelectThread(thread.id)}
+                    className={`flex-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                      currentThreadId === thread.id
+                        ? 'bg-white shadow-sm border border-gray-100'
+                        : 'hover:bg-gray-100/80'
                     }`}
                   >
-                    {thread.title || 'New Chat'}
+                    <span className={`flex-1 truncate text-[13px] font-medium ${
+                      currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
+                    }`}>
+                      {thread.title || 'New chat'}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteThread(thread.id)}
-                    className="px-2 py-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-gray-300 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Delete chat"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
                   </button>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-        <div className="flex items-center justify-center px-2">
-          <UsageMeter compact={true} className="mt-0" feature="voiceChat" />
-        </div>
-        <button
-          type="button"
-          onClick={handleNewChat}
-          className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          + New
-        </button>
-      </div>
-      <section className="flex flex-col flex-1 min-h-0">
-        {/* Messages Area - ChatGPT style */}
-        <div
-          ref={containerRef}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0"
-          aria-live="polite"
-          style={{
-            maxWidth: '100%',
-            wordWrap: 'break-word',
-          }}
-        >
-        {messages.length === 0 && !loading && (
-          <div className="max-w-3xl mx-auto">
-            {hasHealthTipContext ? (
-              <>
-                <div className="text-center mb-6">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Questions about this tip
-                  </h2>
-                  {healthTipTitle && (
-                    <p className="mt-1 text-sm text-gray-600 line-clamp-2">
-                      “{healthTipTitle}”
-                    </p>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {healthTipSuggestionQuestions.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => setInput(q)}
-                      className="text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm text-gray-700 transition-colors"
-                      type="button"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="max-w-3xl mx-auto mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-                  <div className="font-semibold text-gray-900">How Talk to AI works</div>
-                  <ul className="mt-2 space-y-1 text-sm text-gray-600">
-                    <li>Each chat costs 10 credits once (not per response).</li>
-                    <li>We show the estimate before sending and confirm the charge after the first response.</li>
-                    <li>Your chat topics and key questions are summarized into your 7‑day report.</li>
-                    <li>We connect those topics to your food, exercise, symptoms, mood, and check-ins.</li>
-                  </ul>
-                </div>
-                <div className="text-center mb-8">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                    How can I help you today?
-                  </h2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[
-                    'What supplements should I take?',
-                    'How are my medications interacting?',
-                    'Why am I feeling tired?',
-                    'What should I eat today?',
-                  ].map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => setInput(q)}
-                      className="text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm text-gray-700 transition-colors"
-                      type="button"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-        {messages.map((m, idx) => (
-          <div key={idx} className={`flex gap-4 max-w-3xl mx-auto ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-              {m.role === 'user' ? (
-                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-              ) : (
-                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                </svg>
-              )}
-            </div>
-            <div className={`flex-1 min-w-0 ${m.role === 'user' ? 'text-right' : ''}`}>
-              <div className={`inline-block max-w-full px-4 py-2.5 rounded-2xl ${
-                m.role === 'user' 
-                  ? 'bg-gray-900 text-white' 
-                  : 'bg-gray-100 text-gray-900'
-              }`} style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-                <div className="text-lg leading-relaxed break-words">
-                  {(() => {
-                    const formatted = formatChatContent(m.content)
-                    // Split by double newlines first to get paragraphs
-                    const paragraphs = formatted.split(/\n\n+/)
-                    return paragraphs.map((para, paraIdx) => {
-                      const trimmed = para.trim()
-                      if (!trimmed) return null
-                      
-                      // Split paragraph into lines
-                      const lines = trimmed.split('\n')
-                      
-                      return (
-                        <div key={paraIdx} className={paraIdx > 0 ? 'mt-4' : ''}>
-                          {lines.map((line, lineIdx) => {
-                            const lineTrimmed = line.trim()
-                            if (!lineTrimmed) return <div key={lineIdx} className="h-2" />
-                            
-                            // Check for bold heading (entire line is bold)
-                            if (lineTrimmed.startsWith('**') && lineTrimmed.endsWith('**') && lineTrimmed.length > 4) {
-                              return (
-                                <div key={lineIdx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
-                                  {lineTrimmed.slice(2, -2)}
-                                </div>
-                              )
-                            }
-                            
-                            // Check for numbered list
-                            const numberedMatch = lineTrimmed.match(/^(\d+)\.\s+(.+)$/)
-                            if (numberedMatch) {
-                              const parts = numberedMatch[2].split(/(\*\*.*?\*\*)/g)
-                              return (
-                                <div key={lineIdx} className="ml-4 mb-1.5">
-                                  <span className="font-medium">{numberedMatch[1]}.</span>{' '}
-                                  {parts.map((part, j) => {
-                                    if (part.startsWith('**') && part.endsWith('**')) {
-                                      return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                    }
-                                    return <span key={j}>{part}</span>
-                                  })}
-                                </div>
-                              )
-                            }
-                            
-                            // Check for bullet point
-                            const bulletMatch = lineTrimmed.match(/^[-•*]\s+(.+)$/)
-                            if (bulletMatch) {
-                              const parts = bulletMatch[1].split(/(\*\*.*?\*\*)/g)
-                              return (
-                                <div key={lineIdx} className="ml-4 mb-1.5">
-                                  <span className="mr-2">•</span>
-                                  {parts.map((part, j) => {
-                                    if (part.startsWith('**') && part.endsWith('**')) {
-                                      return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                    }
-                                    return <span key={j}>{part}</span>
-                                  })}
-                                </div>
-                              )
-                            }
-                            
-                            // Regular paragraph line - parse inline bold
-                            const parts = lineTrimmed.split(/(\*\*.*?\*\*)/g)
-                            return (
-                              <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
-                                {parts.map((part, j) => {
-                                  if (part.startsWith('**') && part.endsWith('**')) {
-                                    return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                  }
-                                  return <span key={j}>{part}</span>
-                                })}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )
-                    })
-                  })()}
-                </div>
-              </div>
-            </div>
-          </div>
+          ) : null
         ))}
-        {loading && (
-          <div className="flex gap-4 max-w-3xl mx-auto">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-              <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="inline-block px-4 py-2.5 rounded-2xl bg-gray-100">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                </div>
-              </div>
-            </div>
-          </div>
+        {threads.length === 0 && (
+          <div className="px-3 text-xs text-gray-400">No chats yet.</div>
         )}
-        <div ref={endRef} />
       </div>
-
-        <form
-          className="border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] flex-shrink-0"
-          onSubmit={handleSubmit}
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
-        >
-          {(estimatedCost !== null || lastChargedCost !== null) && (
-            <div className="max-w-3xl mx-auto flex flex-wrap gap-4 text-xs text-gray-500 mb-2">
-              {estimatedCost !== null && (
-                <span>
-                  Estimated: <span className="font-semibold text-gray-700">{estimatedCost} credits</span>{' '}
-                  {currentThreadCharged ? '(already covered)' : 'per chat'}
-                </span>
-              )}
-              {lastChargedCost !== null && (
-                <span>
-                  Charged: <span className="font-semibold text-gray-700">{lastChargedCost} credits</span>
-                  {lastChargedCost === 0 && currentThreadCharged ? ' (already charged this chat)' : ''}
-                </span>
-              )}
-              {lastChargedAt && (
-                <span className="text-gray-400">
-                  {new Date(lastChargedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-            </div>
-          )}
-          <div className="flex items-center gap-2 w-full max-w-3xl mx-auto">
-            {messages.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClear}
-                disabled={loading}
-                className="px-3 h-10 rounded-full text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
-                aria-label="Clear chat"
-              >
-                Reset
-              </button>
-            )}
-            {hasSpeechRecognition && (
-              <button
-                type="button"
-                onClick={isListening ? stopListening : startListening}
-                disabled={loading}
-                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                  isListening
-                    ? 'bg-red-500 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-                aria-label={isListening ? 'Stop listening' : 'Start voice input'}
-              >
-                {isListening ? (
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                  </svg>
-                )}
-              </button>
-            )}
-            <div className="flex-1 relative flex items-center min-w-0">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                onKeyDown={onComposerKeyDown}
-                placeholder="Ask anything"
-                rows={1}
-                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-base leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none min-h-[52px] max-h-[200px]"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !input.trim() || isListening}
-              className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              aria-label="Send message"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
-          </div>
-          {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
-        </form>
-      </section>
     </div>
   )
+
+  const wrapperClass = expanded
+    ? `fixed inset-0 z-[9999] bg-[#f6f8f7] flex flex-col min-h-0 ${className}`
+    : `flex flex-col min-h-0 h-full ${className}`
+
+  const chatUI = (
+    <div className={wrapperClass} style={expanded ? { paddingTop: 'env(safe-area-inset-top, 0px)' } : undefined}>
+      <header className="sticky top-0 z-30 flex items-center justify-between bg-[#f6f8f7]/95 backdrop-blur px-4 py-3 border-b border-gray-200/60">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setThreadsOpen(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-gray-100 lg:hidden"
+            aria-label="Open chat list"
+          >
+            <span className="material-symbols-outlined text-2xl text-gray-700">menu</span>
+          </button>
+        </div>
+        <div className="flex-1 text-center">
+          <div className="text-sm font-semibold text-gray-900">Talk to AI</div>
+          <div className="text-[11px] text-gray-400 hidden md:block truncate">{currentThreadTitle}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="hidden md:flex">
+            <UsageMeter compact={true} className="mt-0" feature="voiceChat" />
+          </div>
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-gray-100"
+            aria-label="New chat"
+          >
+            <span className="material-symbols-outlined text-2xl text-gray-700">edit_square</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-gray-100"
+            aria-label={expanded ? 'Exit full screen' : 'Full screen'}
+          >
+            <span className="material-symbols-outlined text-2xl text-gray-700">
+              {expanded ? 'close_fullscreen' : 'open_in_full'}
+            </span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex flex-1 min-h-0">
+        <aside className="hidden lg:flex w-[260px] flex-col bg-[#f9fafb] border-r border-gray-100">
+          {threadList}
+        </aside>
+
+        <section className="flex flex-col flex-1 min-h-0">
+          <div
+            ref={containerRef}
+            className="flex-1 min-h-0 overflow-y-auto px-4 py-6"
+            aria-live="polite"
+          >
+            <div className="mx-auto flex max-w-3xl flex-col gap-10">
+              {messages.length === 0 && !loading && (
+                <div className="flex flex-col items-center justify-center text-center">
+                  <div className="size-16 bg-[#10a27e] rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-[#10a27e]/20">
+                    <span className="material-symbols-outlined text-4xl">health_and_safety</span>
+                  </div>
+                  {hasHealthTipContext ? (
+                    <>
+                      <h1 className="text-2xl font-bold tracking-tight text-gray-900">Questions about this tip</h1>
+                      {healthTipTitle && (
+                        <p className="mt-2 text-sm text-gray-500 max-w-md">“{healthTipTitle}”</p>
+                      )}
+                      <div className="mt-8 grid w-full max-w-md gap-3">
+                        {healthTipSuggestionQuestions.map((q) => (
+                          <button
+                            key={q}
+                            onClick={() => setInput(q)}
+                            className="rounded-xl border border-gray-200 bg-white p-4 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-[0.98]"
+                            type="button"
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <h1 className="text-2xl font-bold tracking-tight text-gray-900">How can I help you today?</h1>
+                      <div className="mt-8 w-full max-w-sm">
+                        <div className="flex items-center justify-center gap-2 mb-3">
+                          <span className="material-symbols-outlined text-[#10a27e] text-xl">lightbulb</span>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Examples</h3>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          {[
+                            'What supplements should I take?',
+                            'How are my medications interacting?',
+                            'Why am I feeling tired?',
+                            'What should I eat today?',
+                          ].map((q) => (
+                            <button
+                              key={q}
+                              onClick={() => setInput(q)}
+                              className="rounded-xl border border-gray-200 bg-white p-4 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-[0.98]"
+                              type="button"
+                            >
+                              “{q}”
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {messages.map((m, idx) => (
+                <div key={idx} className={`group flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                    m.role === 'user'
+                      ? 'bg-black text-white shadow-md'
+                      : 'border border-gray-100 bg-white text-black shadow-sm'
+                  }`}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                      {m.role === 'user' ? 'person' : 'smart_toy'}
+                    </span>
+                  </div>
+                  <div className={`${m.role === 'user' ? 'max-w-[85%] text-right' : 'flex-1'}`}>
+                    {m.role === 'assistant' ? (
+                      <div className="space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Health Assistant</div>
+                        <div className="text-[15px] leading-7 text-gray-800">
+                          {renderFormattedContent(m.content)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[15px] leading-7 text-gray-900 font-medium">
+                        {renderFormattedContent(m.content)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {loading && (
+                <div className="group flex gap-4">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-100 bg-white text-black shadow-sm">
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>smart_toy</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="inline-block rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={endRef} />
+            </div>
+          </div>
+
+          <div className="relative bg-gradient-to-t from-[#f6f8f7] via-[#f6f8f7]/95 to-transparent pt-8 pb-6">
+            <div className="mx-auto max-w-3xl px-4">
+              {(estimatedCost !== null || lastChargedCost !== null) && (
+                <div className="flex flex-wrap gap-4 text-[11px] text-gray-500 mb-3">
+                  {estimatedCost !== null && (
+                    <span>
+                      Estimated <span className="font-semibold text-gray-700">{estimatedCost} credits</span>{' '}
+                      {currentThreadCharged ? '(already covered)' : 'per chat'}
+                    </span>
+                  )}
+                  {lastChargedCost !== null && (
+                    <span>
+                      Charged <span className="font-semibold text-gray-700">{lastChargedCost} credits</span>
+                      {lastChargedCost === 0 && currentThreadCharged ? ' (already charged this chat)' : ''}
+                    </span>
+                  )}
+                  {lastChargedAt && (
+                    <span className="text-gray-400">
+                      {new Date(lastChargedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+              )}
+              <form
+                className="relative flex w-full flex-col rounded-2xl border border-gray-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all focus-within:shadow-lg focus-within:border-gray-300"
+                onSubmit={handleSubmit}
+                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
+              >
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={onComposerKeyDown}
+                  placeholder="Message AI Assistant..."
+                  rows={1}
+                  className="max-h-[200px] min-h-[60px] w-full resize-none bg-transparent px-4 py-[18px] text-[16px] text-black placeholder-gray-400 focus:outline-none border-none focus:ring-0"
+                />
+                <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
+                  {hasSpeechRecognition && (
+                    <button
+                      type="button"
+                      onClick={isListening ? stopListening : startListening}
+                      disabled={loading}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                        isListening
+                          ? 'bg-red-500 text-white'
+                          : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                      } disabled:opacity-50`}
+                      aria-label={isListening ? 'Stop listening' : 'Start voice input'}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 20 }}>mic</span>
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={loading || !input.trim() || isListening}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 transition-all shadow-sm"
+                    aria-label="Send message"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_upward</span>
+                  </button>
+                </div>
+              </form>
+              {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
+              <div className="mt-3 text-center text-[11px] text-gray-400">
+                AI can make mistakes. Please verify important information.
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {threadsOpen && (
+        <div className="fixed inset-0 z-[9999] lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setThreadsOpen(false)}
+            aria-label="Close chat list"
+          />
+          <div className="absolute left-0 top-0 h-full w-[280px] bg-white shadow-xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <div className="text-sm font-semibold text-gray-900">Chats</div>
+              <button
+                type="button"
+                onClick={() => setThreadsOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-gray-100"
+                aria-label="Close chat list"
+              >
+                <span className="material-symbols-outlined text-xl text-gray-700">close</span>
+              </button>
+            </div>
+            {threadList}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  if (expanded && isClient && typeof document !== 'undefined') {
+    return createPortal(chatUI, document.body)
+  }
+
+  return chatUI
 }
