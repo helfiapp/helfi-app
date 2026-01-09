@@ -1800,6 +1800,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       if (onPartialSave) {
         onPartialSave({ goalChoice: choice, goalIntensity: nextIntensity });
       }
+      fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goalChoice: choice, goalIntensity: nextIntensity }),
+        keepalive: true,
+      }).catch(() => {});
     },
     [goalIntensity, onPartialSave],
   );
