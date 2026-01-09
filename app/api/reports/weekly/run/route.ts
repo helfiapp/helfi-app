@@ -404,8 +404,9 @@ export async function POST(request: NextRequest) {
   })
 
   await ensureTalkToAITables()
-  const talkToAiMessages: Array<{ role: string; content: string; createdAt: Date }> =
-    await prisma.$queryRawUnsafe(
+  const talkToAiMessages = await prisma.$queryRawUnsafe<
+    Array<{ role: string; content: string; createdAt: Date }>
+  >(
       `SELECT m."role", m."content", m."createdAt"
        FROM "TalkToAIChatMessage" m
        JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
