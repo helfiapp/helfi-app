@@ -38,6 +38,42 @@ type UsageCacheEntry = {
 
 const usageCache: Record<string, UsageCacheEntry> = {}
 const USAGE_CACHE_TTL_MS = 2000
+const USAGE_SNAPSHOT_TTL_MS = 5 * 60 * 1000
+
+type FeatureUsageSnapshot = {
+  usage: FeatureUsage
+  hasSubscription: boolean
+  fetchedAt: number
+}
+
+const buildSnapshotKey = (featureName: FeatureKey) => `featureUsageSnapshot:${featureName}`
+
+const readFeatureUsageSnapshot = (featureName: FeatureKey): FeatureUsageSnapshot | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(buildSnapshotKey(featureName))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as FeatureUsageSnapshot
+    if (!parsed || typeof parsed !== 'object') return null
+    if (!parsed.usage || typeof parsed.fetchedAt !== 'number') return null
+    if (Date.now() - parsed.fetchedAt > USAGE_SNAPSHOT_TTL_MS) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const writeFeatureUsageSnapshot = (featureName: FeatureKey, usage: FeatureUsage, hasSubscription: boolean) => {
+  if (typeof window === 'undefined') return
+  try {
+    const payload: FeatureUsageSnapshot = {
+      usage,
+      hasSubscription,
+      fetchedAt: Date.now(),
+    }
+    sessionStorage.setItem(buildSnapshotKey(featureName), JSON.stringify(payload))
+  } catch {}
+}
 
 async function fetchFeatureUsage(featureName: FeatureKey, forceRefresh: boolean): Promise<FeatureUsageData | null> {
   const key = String(featureName)
@@ -64,9 +100,10 @@ async function fetchFeatureUsage(featureName: FeatureKey, forceRefresh: boolean)
 }
 
 export default function FeatureUsageDisplay({ featureName, featureLabel, refreshTrigger }: FeatureUsageDisplayProps) {
-  const [usage, setUsage] = useState<FeatureUsage | null>(null)
-  const [hasSubscription, setHasSubscription] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const cachedSnapshot = readFeatureUsageSnapshot(featureName)
+  const [usage, setUsage] = useState<FeatureUsage | null>(() => cachedSnapshot?.usage ?? null)
+  const [hasSubscription, setHasSubscription] = useState(() => cachedSnapshot?.hasSubscription ?? false)
+  const [loading, setLoading] = useState(() => !cachedSnapshot?.usage)
   const [eventTick, setEventTick] = useState(0)
 
   useEffect(() => {
@@ -81,14 +118,19 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
 
   useEffect(() => {
     const fetchUsage = async () => {
-      setLoading(true)
+      if (!usage) setLoading(true)
       try {
         const forceRefresh = Boolean((refreshTrigger || 0) > 0 || eventTick > 0)
         const data = await fetchFeatureUsage(featureName, forceRefresh)
         if (data) {
           const value = data.featureUsage[featureName]
-          setUsage(value ?? null)
-          setHasSubscription(data.hasSubscription)
+          if (value) {
+            setUsage(value)
+            setHasSubscription(data.hasSubscription)
+            writeFeatureUsageSnapshot(featureName, value, data.hasSubscription)
+          } else {
+            setUsage(null)
+          }
         }
       } catch (err) {
         console.error('Failed to fetch feature usage:', err)
