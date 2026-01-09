@@ -63,6 +63,18 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
 
   const sections = payload?.sections || {}
   const dataWarning = (report?.dataSummary as any)?.dataWarning as string | null
+  const coverage = (report?.dataSummary as any)?.coverage as
+    | {
+        daysActive?: number
+        totalEvents?: number
+        foodCount?: number
+        moodCount?: number
+        checkinCount?: number
+        symptomCount?: number
+        exerciseCount?: number
+        labCount?: number
+      }
+    | undefined
   const pdfHref = useMemo(() => {
     if (!report) return null
     const params = new URLSearchParams()
@@ -172,6 +184,18 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
     )
   }
 
+  const coverageItems = [
+    { label: 'Food logs', value: coverage?.foodCount ?? 0 },
+    { label: 'Check-ins', value: coverage?.checkinCount ?? 0 },
+    { label: 'Mood entries', value: coverage?.moodCount ?? 0 },
+    { label: 'Symptoms', value: coverage?.symptomCount ?? 0 },
+    { label: 'Exercise', value: coverage?.exerciseCount ?? 0 },
+    { label: 'Lab uploads', value: coverage?.labCount ?? 0 },
+  ]
+  const maxCoverage = Math.max(1, ...coverageItems.map((item) => item.value))
+  const daysActive = Math.min(7, Math.max(0, coverage?.daysActive ?? 0))
+  const activityPercent = Math.round((daysActive / 7) * 100)
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 py-10 pb-20">
@@ -207,6 +231,42 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
             {dataWarning}
           </div>
         )}
+
+        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Data used this week</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Last 7 days • {daysActive} active days • {coverage?.totalEvents ?? 0} total entries
+              </p>
+            </div>
+            <div className="text-sm font-semibold text-emerald-600">
+              {activityPercent}% activity strength
+            </div>
+          </div>
+          <div className="mt-4 h-3 w-full rounded-full bg-gray-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-500"
+              style={{ width: `${activityPercent}%` }}
+            ></div>
+          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            {coverageItems.map((item) => (
+              <div key={item.label} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                <div className="flex items-center justify-between text-sm text-gray-700">
+                  <span>{item.label}</span>
+                  <span className="font-semibold text-gray-900">{item.value}</span>
+                </div>
+                <div className="mt-2 h-2 w-full rounded-full bg-white">
+                  <div
+                    className="h-full rounded-full bg-emerald-300"
+                    style={{ width: `${Math.round((item.value / maxCoverage) * 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Weekly summary</h2>
