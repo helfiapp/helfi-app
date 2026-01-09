@@ -2,7 +2,6 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline'
 import { formatChatContent } from '@/lib/chatFormatting'
 
 interface SymptomChatProps {
@@ -28,8 +27,6 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   const [error, setError] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const [showExpandControl, setShowExpandControl] = useState(false)
-  const scrollPositionRef = useRef<number>(0)
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -55,10 +52,6 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
       }
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
 
-      // Show expand control when textarea height exceeds ~3-4 lines (around 156px for 3 lines)
-      // Using scrollHeight which reflects actual content height
-      const shouldShow = textarea.scrollHeight > 140 || (textarea.value.match(/\n/g) || []).length >= 2
-      setShowExpandControl(shouldShow)
       if (shouldStick && container) {
         container.scrollTop = container.scrollHeight
       }
@@ -163,6 +156,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     const container = containerRef.current
     if (!container) return
     // Scroll inside the chat container only, avoid scrolling the whole page
+    if (messages.length === 0 && !loading) return
     container.scrollTop = container.scrollHeight
 
     return () => {
@@ -275,8 +269,8 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   }
 
   const sectionClass = expanded
-    ? 'fixed inset-0 z-[9999] bg-white flex flex-col h-[100dvh] overflow-hidden'
-    : 'bg-white mt-6 overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[70dvh] md:h-[640px]'
+    ? 'fixed inset-0 z-[9999] bg-[#f6f8f7] flex flex-col h-[100dvh] overflow-hidden'
+    : 'bg-[#f6f8f7] mt-6 overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[70dvh] md:h-[640px]'
 
   const chatUI = (
     <section
@@ -290,215 +284,241 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
           : undefined
       }
     >
-      <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 w-full max-w-3xl mx-auto">
+      <header className="sticky top-0 z-20 flex items-center justify-between bg-[#f6f8f7]/95 backdrop-blur px-4 py-3 border-b border-gray-200/60">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">Chat about your symptom analysis</h3>
-          <p className="text-xs text-gray-500">Ask follow-up questions – history saved locally</p>
+          <div className="text-sm font-semibold text-gray-900">Symptom chat</div>
+          <div className="text-[11px] text-gray-400">Follow-up questions</div>
         </div>
         <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={loading}
+              className="text-xs rounded-lg border border-gray-200 px-2.5 py-1 text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Reset
+            </button>
+          )}
           <button
-            onClick={handleClear}
-            disabled={loading}
-            className="text-xs rounded-md border border-gray-300 px-2 py-1 text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-gray-100"
+            aria-label={expanded ? 'Exit full screen' : 'Full screen'}
           >
-            Reset
+            <span className="material-symbols-outlined text-xl text-gray-700">
+              {expanded ? 'close_fullscreen' : 'open_in_full'}
+            </span>
           </button>
         </div>
       </header>
 
       <div
         ref={containerRef}
-        className="px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto flex-1 min-h-0"
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-6"
         aria-live="polite"
-        style={{
-          maxWidth: '100%',
-          wordWrap: 'break-word',
-        }}
       >
-        {messages.length === 0 && !loading && (
-          <div className="text-sm text-gray-400">
-            Ask follow‑ups like:
-            <div className="mt-3 flex flex-wrap gap-2">
-              {[
-                'What should I do about these red flags?',
-                'Can you explain these likely causes in more detail?',
-                'When should I see a doctor?',
-                'What lifestyle changes can help?',
-              ].map((q) => (
-                <button
-                  key={q}
-                  onClick={() => setInput(q)}
-                  className="text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm text-gray-700 transition-colors"
-                  type="button"
-                >
-                  {q}
-                </button>
-              ))}
+        <div className="mx-auto flex max-w-3xl flex-col gap-10">
+          {messages.length === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center text-center">
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">Need more detail?</h1>
+              <p className="mt-2 text-sm text-gray-500">
+                Ask about causes, red flags, or next steps.
+              </p>
+              <div className="mt-6 grid w-full max-w-md gap-3">
+                {[
+                  'What should I do about these red flags?',
+                  'Can you explain these likely causes in more detail?',
+                  'When should I see a doctor?',
+                  'What lifestyle changes can help?',
+                ].map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => setInput(q)}
+                    className="rounded-xl border border-gray-200 bg-white p-4 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-[0.98]"
+                    type="button"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-        {messages.map((m, idx) => (
-          <div key={idx} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-              {m.role === 'user' ? (
-                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-              ) : (
-                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                </svg>
-              )}
+          )}
+
+          {messages.map((m, idx) => (
+            <div key={idx} className={`group flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                m.role === 'user'
+                  ? 'bg-black text-white shadow-md'
+                  : 'border border-gray-100 bg-white text-black shadow-sm'
+              }`}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                  {m.role === 'user' ? 'person' : 'smart_toy'}
+                </span>
+              </div>
+              <div className={`${m.role === 'user' ? 'max-w-[85%] text-right' : 'flex-1'}`}>
+                {m.role === 'assistant' ? (
+                  <div className="space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Symptom analysis</div>
+                    <div className="text-[16px] md:text-[15px] leading-7 text-gray-800">
+                      {formatChatContent(m.content).split('\n').map((line, lineIdx) => {
+                        const trimmed = line.trim()
+                        if (!trimmed) {
+                          return <div key={lineIdx} className="h-3" />
+                        }
+
+                        if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
+                          return (
+                            <div key={lineIdx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
+                              {trimmed.slice(2, -2)}
+                            </div>
+                          )
+                        }
+
+                        const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
+                        if (numberedMatch) {
+                          return (
+                            <div key={lineIdx} className="ml-4 mb-1.5">
+                              <span className="font-medium">{numberedMatch[1]}.</span> {numberedMatch[2]}
+                            </div>
+                          )
+                        }
+
+                        const bulletMatch = trimmed.match(/^[-•*]\s+(.+)$/)
+                        if (bulletMatch) {
+                          return (
+                            <div key={lineIdx} className="ml-4 mb-1.5">
+                              <span className="mr-2">•</span> {bulletMatch[1]}
+                            </div>
+                          )
+                        }
+
+                        const parts = trimmed.split(/(\*\*.*?\*\*)/g)
+                        return (
+                          <div key={lineIdx} className="mb-2">
+                            {parts.map((part, j) => {
+                              if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
+                              }
+                              return <span key={j}>{part}</span>
+                            })}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[16px] md:text-[15px] leading-7 text-gray-900 font-medium">
+                    {formatChatContent(m.content).split('\n').map((line, lineIdx) => {
+                      const trimmed = line.trim()
+                      if (!trimmed) {
+                        return <div key={lineIdx} className="h-3" />
+                      }
+
+                      const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
+                      if (numberedMatch) {
+                        return (
+                          <div key={lineIdx} className="ml-4 mb-1.5">
+                            <span className="font-medium">{numberedMatch[1]}.</span> {numberedMatch[2]}
+                          </div>
+                        )
+                      }
+
+                      const bulletMatch = trimmed.match(/^[-•*]\s+(.+)$/)
+                      if (bulletMatch) {
+                        return (
+                          <div key={lineIdx} className="ml-4 mb-1.5">
+                            <span className="mr-2">•</span> {bulletMatch[1]}
+                          </div>
+                        )
+                      }
+
+                      const parts = trimmed.split(/(\*\*.*?\*\*)/g)
+                      return (
+                        <div key={lineIdx} className="mb-2">
+                          {parts.map((part, j) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                              return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
+                            }
+                            return <span key={j}>{part}</span>
+                          })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className={`flex-1 min-w-0 ${m.role === 'user' ? 'text-right' : ''}`}>
-              <div className={`inline-block max-w-full px-4 py-2.5 rounded-2xl ${
-                m.role === 'user' 
-                  ? 'bg-gray-900 text-white' 
-                  : 'bg-gray-100 text-gray-900'
-              }`} style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-                <div className="text-lg leading-relaxed break-words" style={{ whiteSpace: 'pre-wrap' }}>
-                  {formatChatContent(m.content).split('\n').map((line, idx) => {
-                    const trimmed = line.trim()
-                    if (!trimmed) {
-                      return <div key={idx} className="h-3" />
-                    }
-                    
-                    if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
-                      return (
-                        <div key={idx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
-                          {trimmed.slice(2, -2)}
-                        </div>
-                      )
-                    }
-                    
-                    const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
-                    if (numberedMatch) {
-                      return (
-                        <div key={idx} className="ml-4 mb-1.5">
-                          <span className="font-medium">{numberedMatch[1]}.</span> {numberedMatch[2]}
-                        </div>
-                      )
-                    }
-                    
-                    const bulletMatch = trimmed.match(/^[-•*]\s+(.+)$/)
-                    if (bulletMatch) {
-                      return (
-                        <div key={idx} className="ml-4 mb-1.5">
-                          <span className="mr-2">•</span> {bulletMatch[1]}
-                        </div>
-                      )
-                    }
-                    
-                    const parts = trimmed.split(/(\*\*.*?\*\*)/g)
-                    return (
-                      <div key={idx} className="mb-2">
-                        {parts.map((part, j) => {
-                          if (part.startsWith('**') && part.endsWith('**')) {
-                            return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                          }
-                          return <span key={j}>{part}</span>
-                        })}
-                      </div>
-                    )
-                  })}
+          ))}
+
+          {loading && (
+            <div className="group flex gap-4">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-100 bg-white text-black shadow-sm">
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>smart_toy</span>
+              </div>
+              <div className="flex-1">
+                <div className="inline-block rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-        {loading && (
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-              <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="inline-block px-4 py-2.5 rounded-2xl bg-gray-100">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={endRef} />
+          )}
+          <div ref={endRef} />
+        </div>
       </div>
 
-      <form
-        className="border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] flex-shrink-0"
-        onSubmit={handleSubmit}
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
-      >
-        <div className="flex items-center gap-2 w-full max-w-3xl mx-auto">
-          {recognitionRef.current && (
-            <button
-              type="button"
-              onClick={isListening ? stopListening : startListening}
-              disabled={loading}
-              className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                isListening
-                  ? 'bg-red-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-              aria-label={isListening ? 'Stop listening' : 'Start voice input'}
-            >
-              {isListening ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                </svg>
-              )}
-            </button>
-          )}
-          <div className="flex-1 relative flex items-center">
+      <div className="relative bg-gradient-to-t from-[#f6f8f7] via-[#f6f8f7]/95 to-transparent pt-8 pb-6">
+        <div className="mx-auto max-w-3xl px-4">
+          <form
+            className="relative flex w-full flex-col rounded-2xl border border-gray-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all focus-within:shadow-lg focus-within:border-gray-300"
+            onSubmit={handleSubmit}
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
+          >
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={onComposerKeyDown}
-              placeholder={recognitionRef.current ? "Type or use voice input..." : "Message AI about your symptom analysis"}
+              placeholder={recognitionRef.current ? 'Type or use voice input...' : 'Message AI about your symptom analysis'}
               rows={1}
-              className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none min-h-[52px] max-h-[200px]"
+              className="max-h-[200px] min-h-[60px] w-full resize-none bg-transparent px-4 py-[18px] text-[16px] text-black placeholder-gray-400 focus:outline-none border-none focus:ring-0"
             />
-            {false && (
+            <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
+              {recognitionRef.current && (
+                <button
+                  type="button"
+                  onClick={isListening ? stopListening : startListening}
+                  disabled={loading}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                    isListening
+                      ? 'bg-red-500 text-white'
+                      : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                  } disabled:opacity-50`}
+                  aria-label={isListening ? 'Stop listening' : 'Start voice input'}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>mic</span>
+                </button>
+              )}
               <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setExpanded((v) => !v)
-                }}
-                className="absolute right-14 top-2.5 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors z-10"
-                aria-label={expanded ? 'Exit expanded chat view' : 'Expand chat area'}
+                type="submit"
+                disabled={loading || !input.trim() || isListening}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 transition-all shadow-sm"
+                aria-label="Send message"
               >
-                {expanded ? (
-                  <ArrowsPointingInIcon className="w-4 h-4" />
-                ) : (
-                  <ArrowsPointingOutIcon className="w-4 h-4" />
-                )}
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_upward</span>
               </button>
-            )}
-            <button
-              type="submit"
-              disabled={loading || !input.trim() || isListening}
-              className="absolute right-2 bottom-2 w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              aria-label="Send message"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
+            </div>
+          </form>
+          {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
+          <div className="mt-3 text-center text-[11px] text-gray-400">
+            AI can make mistakes. Please verify important information.
           </div>
         </div>
-        {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
-      </form>
+      </div>
     </section>
   )
 
