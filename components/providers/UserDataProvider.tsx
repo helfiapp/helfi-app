@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { clearClientCache, isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
+import { markAppHidden } from '@/lib/app-visibility'
 
 interface UserData {
   profileImage?: string
@@ -139,15 +140,24 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       refreshData()
     }
     const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        markAppHidden()
+        return
+      }
       if (document.visibilityState === 'visible') {
         refreshData()
       }
     }
+    const handlePageHide = () => {
+      markAppHidden()
+    }
     window.addEventListener('focus', handleFocus)
     document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('pagehide', handlePageHide)
     return () => {
       window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('pagehide', handlePageHide)
     }
   }, [session, refreshData])
 

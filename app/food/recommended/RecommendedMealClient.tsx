@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import RecommendedIngredientCard from '@/components/food/RecommendedIngredientCard'
+import { readAppHiddenAt } from '@/lib/app-visibility'
 import {
   AI_MEAL_RECOMMENDATION_CREDITS,
   CATEGORY_LABELS,
@@ -149,12 +150,14 @@ type RecommendedLastView = {
   itemsDraft: RecommendedItem[] | null
   activeTab: 'ingredients' | 'recipe' | 'why'
   history: RecommendedMealRecord[]
+  seenExplain?: boolean | null
 }
 
 type RecommendedLastViewStore = Record<string, RecommendedLastView>
 
 const RECOMMENDED_LAST_VIEW_STORAGE_KEY = 'food:recommended:lastView'
 const RECOMMENDED_LAST_VIEW_TTL_MS = 6 * 60 * 60 * 1000
+const RECOMMENDED_RESUME_KEY = 'food:resume:last:recommended'
 
 const buildRecommendedViewKey = (date: string, category: MealCategory) => `${date || ''}:${category || ''}`
 
@@ -187,6 +190,32 @@ const writeRecommendedLastView = (payload: RecommendedLastView) => {
   }
 }
 
+const readRecommendedResumeStamp = (): number => {
+  if (typeof window === 'undefined') return 0
+  try {
+    const raw = window.sessionStorage.getItem(RECOMMENDED_RESUME_KEY)
+    const parsed = raw ? Number(raw) : 0
+    return Number.isFinite(parsed) ? parsed : 0
+  } catch {
+    return 0
+  }
+}
+
+const shouldRefreshOnResume = (): boolean => {
+  if (typeof window === 'undefined') return false
+  const hiddenAt = readAppHiddenAt()
+  if (!hiddenAt) return false
+  const lastHandled = readRecommendedResumeStamp()
+  return hiddenAt > lastHandled
+}
+
+const markResumeHandled = () => {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(RECOMMENDED_RESUME_KEY, String(Date.now()))
+  } catch {}
+}
+
 export default function RecommendedMealClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -205,12 +234,26 @@ export default function RecommendedMealClient() {
   const [active, setActive] = useState<RecommendedMealRecord | null>(() => cachedLastView?.active || null)
   const [itemsDraft, setItemsDraft] = useState<RecommendedItem[] | null>(() => cachedLastView?.itemsDraft || null)
   const [savingDiary, setSavingDiary] = useState(false)
-  const [seenExplain, setSeenExplain] = useState<boolean | null>(null)
+  const [seenExplain, setSeenExplain] = useState<boolean | null>(() =>
+    typeof cachedLastView?.seenExplain === 'boolean' ? cachedLastView.seenExplain : null,
+  )
   const [commitSaving, setCommitSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'ingredients' | 'recipe' | 'why'>(() => cachedLastView?.activeTab || 'ingredients')
+  const [resumeTick, setResumeTick] = useState(0)
   const skipActiveResetRef = useRef(false)
 
   const tzOffsetMin = useMemo(() => String(new Date().getTimezoneOffset()), [])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      if (!readAppHiddenAt()) return
+      setResumeTick((prev) => prev + 1)
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
   const draftTotals = useMemo(() => {
     const items = itemsDraft || active?.items || []
@@ -224,7 +267,7 @@ export default function RecommendedMealClient() {
     return history.some((h) => h && h.id === active.id)
   }, [active?.id, history])
 
-  const load = async (preserveActive: boolean) => {
+  const load = async (preserveActive: boolean, markResume: boolean) => {
     setLoadingContext(true)
     setError(null)
     try {
@@ -244,6 +287,9 @@ export default function RecommendedMealClient() {
       if (!preserveActive) {
         setActive(null)
         setItemsDraft(null)
+      }
+      if (markResume) {
+        markResumeHandled()
       }
     } catch (e: any) {
       setError(e?.message || 'Unable to load recommendations right now.')
@@ -312,19 +358,31 @@ export default function RecommendedMealClient() {
     setError(null)
     const cached = readRecommendedLastView(date, category)
     const shouldPreserve = Boolean(cached?.active)
-    if (cached) {
+    const shouldResumeRefresh = shouldRefreshOnResume()
+    const hasCached = Boolean(
+      (cached?.active && cached.active.items && cached.active.items.length > 0) ||
+        (cached?.history && cached.history.length > 0),
+    )
+    const isManualRefresh = Boolean(freshKey)
+    if (cached && !isManualRefresh) {
       skipActiveResetRef.current = true
       if (Array.isArray(cached.history)) setHistory(cached.history)
       setActive(cached.active || null)
       setItemsDraft(cached.itemsDraft || null)
       if (cached.activeTab) setActiveTab(cached.activeTab)
+      if (typeof cached.seenExplain === 'boolean') setSeenExplain(cached.seenExplain)
     } else {
       setActive(null)
       setItemsDraft(null)
     }
-    load(shouldPreserve)
+    const shouldLoad = isManualRefresh || !hasCached || shouldResumeRefresh
+    if (!shouldLoad) {
+      setLoadingContext(false)
+      return
+    }
+    load(shouldPreserve && !isManualRefresh, shouldResumeRefresh)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, category, freshKey])
+  }, [date, category, freshKey, resumeTick])
 
   useEffect(() => {
     // New date/category should be treated as a fresh screen.
@@ -368,9 +426,10 @@ export default function RecommendedMealClient() {
       itemsDraft,
       activeTab,
       history: Array.isArray(history) ? history.slice(0, 12) : [],
+      seenExplain,
     }
     writeRecommendedLastView(payload)
-  }, [date, category, active, itemsDraft, activeTab, history])
+  }, [date, category, active, itemsDraft, activeTab, history, seenExplain])
 
   const currentItems = itemsDraft || active?.items || []
 

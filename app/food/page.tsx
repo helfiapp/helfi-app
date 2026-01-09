@@ -41,6 +41,7 @@ import { AI_MEAL_RECOMMENDATION_CREDITS, AI_MEAL_RECOMMENDATION_GOAL_NAME } from
 import { SolidMacroRing } from '@/components/SolidMacroRing'
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets'
 import { DEFAULT_HEALTH_CHECK_SETTINGS, normalizeHealthCheckSettings } from '@/lib/food-health-check-settings'
+import { readAppHiddenAt } from '@/lib/app-visibility'
 
 const NUTRIENT_DISPLAY_ORDER: Array<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'> = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']
 
@@ -337,6 +338,7 @@ type FavoritesAllSnapshotStore = Record<string, FavoritesAllSnapshot>
 
 const FAVORITES_ALL_SNAPSHOT_TTL_MS = 5 * 60 * 1000
 const FAVORITES_ALL_SNAPSHOT_KEY = 'foodDiary:favoritesAllSnapshot'
+const FOOD_RESUME_LAST_PREFIX = 'food:resume:last:'
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
@@ -396,6 +398,34 @@ const readFavoritesAllSnapshot = (userKey?: string): any[] | null => {
   } catch {
     return null
   }
+}
+
+const readFoodResumeStamp = (scope: string): number => {
+  if (typeof window === 'undefined') return 0
+  if (!scope) return 0
+  try {
+    const raw = window.sessionStorage.getItem(`${FOOD_RESUME_LAST_PREFIX}${scope}`)
+    const parsed = raw ? Number(raw) : 0
+    return Number.isFinite(parsed) ? parsed : 0
+  } catch {
+    return 0
+  }
+}
+
+const shouldRefreshOnResume = (scope: string): boolean => {
+  if (typeof window === 'undefined') return false
+  const hiddenAt = readAppHiddenAt()
+  if (!hiddenAt) return false
+  const lastHandled = readFoodResumeStamp(scope)
+  return hiddenAt > lastHandled
+}
+
+const markResumeHandled = (scope: string) => {
+  if (typeof window === 'undefined') return
+  if (!scope) return
+  try {
+    window.sessionStorage.setItem(`${FOOD_RESUME_LAST_PREFIX}${scope}`, String(Date.now()))
+  } catch {}
 }
 
 const writeFavoritesAllSnapshot = (userKey: string | null | undefined, entries: any[]) => {
@@ -2365,6 +2395,7 @@ export default function FoodDiary() {
   const [manualMealBuildMode, setManualMealBuildMode] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
+  const [resumeTick, setResumeTick] = useState(0)
   
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
@@ -2746,6 +2777,17 @@ export default function FoodDiary() {
   }, [])
 
   useEffect(() => {
+    if (typeof document === 'undefined') return
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      if (!readAppHiddenAt()) return
+      setResumeTick((prev) => prev + 1)
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
+  useEffect(() => {
     if (deviceStatusHydratedRef.current) return
     const snapshot = readDeviceStatusSnapshot(userCacheKey)
     if (!snapshot) return
@@ -2756,6 +2798,7 @@ export default function FoodDiary() {
   const loadExerciseEntriesForDate = async (dateKey: string, options?: { silent?: boolean }) => {
     if (!dateKey) return
     const cached = readExerciseSnapshot(dateKey)
+    const shouldRefresh = shouldRefreshOnResume('exercise')
     if (cached && Array.isArray(cached.entries)) {
       setExerciseEntries(cached.entries)
       setExerciseCaloriesKcal(Number(cached.caloriesKcal) || 0)
@@ -2767,6 +2810,9 @@ export default function FoodDiary() {
         setExerciseLoading(false)
       }
       setExerciseError(null)
+    }
+    if (!shouldRefresh && cached && Array.isArray(cached.entries)) {
+      return
     }
     try {
       const res = await fetch(`/api/exercise-entries?date=${encodeURIComponent(dateKey)}`, {
@@ -2781,6 +2827,9 @@ export default function FoodDiary() {
       setExerciseEntries(entries)
       setExerciseCaloriesKcal(calories)
       writeExerciseSnapshot(dateKey, entries, calories)
+      if (shouldRefresh) {
+        markResumeHandled('exercise')
+      }
     } catch (err: any) {
       if (!options?.silent) {
         setExerciseError(err?.message || 'Failed to load exercise')
@@ -2791,6 +2840,13 @@ export default function FoodDiary() {
   }
 
   const refreshDeviceStatus = async () => {
+    const shouldRefresh = shouldRefreshOnResume('deviceStatus')
+    if (!shouldRefresh && initialDeviceStatus) {
+      setFitbitConnected(Boolean(initialDeviceStatus.fitbitConnected))
+      setGarminConnected(Boolean(initialDeviceStatus.garminConnected))
+      deviceStatusHydratedRef.current = true
+      return
+    }
     try {
       const [fitbitRes, garminRes] = await Promise.all([
         fetch('/api/fitbit/status', { method: 'GET' }).catch(() => null),
@@ -2808,6 +2864,9 @@ export default function FoodDiary() {
         garminConnected: garminConnectedNext,
         savedAt: Date.now(),
       })
+      if (shouldRefresh) {
+        markResumeHandled('deviceStatus')
+      }
     } catch {
       // best-effort
     }
@@ -2898,7 +2957,7 @@ export default function FoodDiary() {
     loadExerciseEntriesForDate(selectedDate)
     // Keep device pills updated when switching dates (low-cost, cached by browser).
     refreshDeviceStatus()
-  }, [selectedDate])
+  }, [selectedDate, resumeTick])
 
   useEffect(() => {
     const today = buildTodayIso()
@@ -6037,7 +6096,7 @@ const applyStructuredItems = (
       }
       refreshEntriesFromServer()
     }
-  }, [userData, isViewingToday, selectedDate]);
+  }, [userData, isViewingToday, selectedDate, resumeTick]);
 
   // Auto-rebuild ingredient cards from aiDescription when needed
   useEffect(() => {
@@ -6211,7 +6270,7 @@ const applyStructuredItems = (
       }
     };
     loadHistory();
-  }, [selectedDate, isViewingToday]);
+  }, [selectedDate, isViewingToday, resumeTick]);
 
   const mapLogsToEntries = (
     logs: any[],
@@ -9265,7 +9324,10 @@ Please add nutritional information manually if needed.`);
     if (typeof window === 'undefined') return
     const now = Date.now()
     if (foodLibraryRefreshRef.current.inFlight) return
-    if (!options?.force && now - foodLibraryRefreshRef.current.last < 5 * 60 * 1000) return
+    const shouldRefresh = shouldRefreshOnResume('library')
+    const hasLocal = Array.isArray(foodLibrary) && foodLibrary.length > 0
+    if (!options?.force && !shouldRefresh && hasLocal) return
+    if (!options?.force && !shouldRefresh && now - foodLibraryRefreshRef.current.last < 5 * 60 * 1000) return
     foodLibraryRefreshRef.current.inFlight = true
     try {
       const res = await fetch('/api/food-log/library?limit=5000', { cache: 'no-store' })
@@ -9283,6 +9345,9 @@ Please add nutritional information manually if needed.`);
       } else {
         setFoodLibrary((prev) => mergeFoodLibraryEntries(prev, mapped, selectedDate))
       }
+      if (shouldRefresh) {
+        markResumeHandled('library')
+      }
     } catch (err) {
       console.warn('Food library refresh failed', err)
     } finally {
@@ -9290,7 +9355,7 @@ Please add nutritional information manually if needed.`);
       foodLibraryRefreshRef.current.inFlight = false
     }
   },
-  [mapLogsToEntries, mergeFoodLibraryEntries, selectedDate],
+  [mapLogsToEntries, mergeFoodLibraryEntries, selectedDate, foodLibrary],
   )
 
   useEffect(() => {
@@ -9300,7 +9365,7 @@ Please add nutritional information manually if needed.`);
       refreshFoodLibraryFromServer()
     }, 900)
     return () => window.clearTimeout(handle)
-  }, [diaryHydrated, refreshFoodLibraryFromServer])
+  }, [diaryHydrated, refreshFoodLibraryFromServer, resumeTick])
 
   useEffect(() => {
     if (!showFavoritesPicker) return
@@ -9316,9 +9381,16 @@ Please add nutritional information manually if needed.`);
     }
     let cancelled = false
     const cached = readFavoritesAllSnapshot(userCacheKey)
-    if (cached && cached.length > 0) {
+    const shouldRefresh = shouldRefreshOnResume('favoritesAll')
+    const hasCached = Boolean(cached && cached.length > 0)
+    if (hasCached) {
       setFavoritesAllServerEntries(cached)
       setFavoritesAllServerLoading(false)
+      if (!shouldRefresh) {
+        return () => {
+          cancelled = true
+        }
+      }
     } else {
       setFavoritesAllServerLoading(true)
     }
@@ -9339,6 +9411,7 @@ Please add nutritional information manually if needed.`);
         if (!cancelled) {
           setFavoritesAllServerEntries(normalized)
           writeFavoritesAllSnapshot(userCacheKey, normalized)
+          markResumeHandled('favoritesAll')
         }
       } catch (err) {
         console.warn('Favorites list refresh failed', err)
@@ -9349,7 +9422,7 @@ Please add nutritional information manually if needed.`);
     return () => {
       cancelled = true
     }
-  }, [showFavoritesPicker, selectedDate, userCacheKey])
+  }, [showFavoritesPicker, selectedDate, userCacheKey, resumeTick])
 
   const foodNameOverrideMap = useMemo(() => {
     const map = new Map<string, string>()
