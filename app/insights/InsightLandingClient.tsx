@@ -218,10 +218,14 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                 </p>
               )}
               {!weeklyStatus?.reportReady && !weeklyStatus?.reportLocked && weeklyStatus?.nextReportDueAt && (
-                <p className="text-sm text-gray-500 mt-2">
-                  Next report due {new Date(weeklyStatus.nextReportDueAt).toLocaleDateString()}
-                  {countdown ? ` (in ${countdown})` : '.'}
-                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                  <span>Next report due {new Date(weeklyStatus.nextReportDueAt).toLocaleDateString()}</span>
+                  {countdown && (
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                      {countdown === 'Due now' ? 'Due now' : `In ${countdown}`}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
             <div className="flex gap-3">
