@@ -2707,6 +2707,7 @@ export default function FoodDiary() {
   const diaryRefreshingRef = useRef<boolean>(false)
   const [pullOffset, setPullOffset] = useState<number>(0)
   const pullStartYRef = useRef<number | null>(null)
+  const pullOffsetRef = useRef<number>(0)
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
@@ -6937,33 +6938,41 @@ const applyStructuredItems = (
       setIsDiaryRefreshing(false)
     }
   }
-  const PULL_REFRESH_THRESHOLD = 120
-  const PULL_REFRESH_MAX = 180
+  const PULL_REFRESH_ACTIVATE = 20
+  const PULL_REFRESH_THRESHOLD = 160
+  const PULL_REFRESH_MAX = 240
   const handlePullStart = (e: React.TouchEvent) => {
     if (typeof window === 'undefined') return
     if (window.scrollY > 0) return
     if (syncPausedRef.current || diaryRefreshingRef.current) return
+    pullOffsetRef.current = 0
+    setPullOffset(0)
     pullStartYRef.current = e.touches[0]?.clientY ?? null
   }
   const handlePullMove = (e: React.TouchEvent) => {
     if (pullStartYRef.current === null) return
     if (typeof window !== 'undefined' && window.scrollY > 0) {
       pullStartYRef.current = null
+      pullOffsetRef.current = 0
       setPullOffset(0)
       return
     }
     const currentY = e.touches[0]?.clientY ?? 0
     const delta = currentY - (pullStartYRef.current || 0)
-    if (delta <= 0) {
+    if (delta <= PULL_REFRESH_ACTIVATE) {
+      pullOffsetRef.current = 0
       setPullOffset(0)
       return
     }
-    setPullOffset(Math.min(PULL_REFRESH_MAX, delta))
+    const nextOffset = Math.min(PULL_REFRESH_MAX, delta - PULL_REFRESH_ACTIVATE)
+    pullOffsetRef.current = nextOffset
+    setPullOffset(nextOffset)
   }
   const handlePullEnd = async () => {
     if (pullStartYRef.current === null) return
-    const shouldRefresh = pullOffset >= PULL_REFRESH_THRESHOLD
+    const shouldRefresh = pullOffsetRef.current >= PULL_REFRESH_THRESHOLD
     pullStartYRef.current = null
+    pullOffsetRef.current = 0
     setPullOffset(0)
     if (shouldRefresh) {
       await refreshDiaryNow()

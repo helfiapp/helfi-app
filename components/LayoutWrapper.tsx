@@ -285,6 +285,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const goalSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const pullStartYRef = useRef<number | null>(null)
+  const pullOffsetRef = useRef(0)
   const pullResetTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pullRefreshingRef = useRef(false)
   const [pullOffset, setPullOffset] = useState(0)
@@ -542,8 +543,9 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     (!isPublicPage || isOnboardingPath)
 
   const pullRefreshEnabled = shouldShowSidebar && !isChatPage && !isFoodDiaryPage
-  const PULL_REFRESH_THRESHOLD = 120
-  const PULL_REFRESH_MAX = 180
+  const PULL_REFRESH_ACTIVATE = 20
+  const PULL_REFRESH_THRESHOLD = 160
+  const PULL_REFRESH_MAX = 240
 
   const isEditableElement = (target: EventTarget | null) => {
     if (typeof document === 'undefined') return false
@@ -560,6 +562,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
 
   const clearPullState = () => {
     pullStartYRef.current = null
+    pullOffsetRef.current = 0
     setPullOffset(0)
   }
 
@@ -583,6 +586,8 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (event.touches.length !== 1) return
     if (getScrollTop() > 0) return
     if (isEditableElement(event.target) || isEditableElement(document.activeElement)) return
+    pullOffsetRef.current = 0
+    setPullOffset(0)
     pullStartYRef.current = event.touches[0]?.clientY ?? null
   }
 
@@ -595,11 +600,14 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     }
     const currentY = event.touches[0]?.clientY ?? 0
     const delta = currentY - (pullStartYRef.current || 0)
-    if (delta <= 0) {
+    if (delta <= PULL_REFRESH_ACTIVATE) {
+      pullOffsetRef.current = 0
       setPullOffset(0)
       return
     }
-    setPullOffset(Math.min(PULL_REFRESH_MAX, delta))
+    const nextOffset = Math.min(PULL_REFRESH_MAX, delta - PULL_REFRESH_ACTIVATE)
+    pullOffsetRef.current = nextOffset
+    setPullOffset(nextOffset)
   }
 
   const handlePullEnd = () => {
@@ -608,7 +616,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       return
     }
     if (pullStartYRef.current === null) return
-    const shouldRefresh = pullOffset >= PULL_REFRESH_THRESHOLD
+    const shouldRefresh = pullOffsetRef.current >= PULL_REFRESH_THRESHOLD
     clearPullState()
     if (shouldRefresh) {
       triggerPullRefresh()
