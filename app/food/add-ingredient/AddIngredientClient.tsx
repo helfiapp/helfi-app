@@ -100,6 +100,12 @@ const triggerHaptic = (duration = 10) => {
   } catch {}
 }
 
+const normalizeBrandToken = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
+    .trim()
+
 export default function AddIngredientClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -121,6 +127,58 @@ export default function AddIngredientClient() {
   const servingPendingRef = useRef<Set<string>>(new Set())
   const seqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
+
+  const cleanSingleFoodQuery = (value: string) =>
+    value
+      .replace(/[^\w\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const singularizeToken = (value: string) => {
+    const lower = value.toLowerCase()
+    if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
+    if (
+      lower.endsWith('es') &&
+      value.length > 3 &&
+      !lower.endsWith('ses') &&
+      !lower.endsWith('xes') &&
+      !lower.endsWith('zes') &&
+      !lower.endsWith('ches') &&
+      !lower.endsWith('shes')
+    ) {
+      return value.slice(0, -2)
+    }
+    if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
+    return value
+  }
+
+  const buildSingleFoodFallback = (value: string) => {
+    const cleaned = cleanSingleFoodQuery(value)
+    if (!cleaned) return null
+    const parts = cleaned.split(' ').filter(Boolean)
+    if (parts.length === 0) return null
+    const last = parts[parts.length - 1]
+    const singular = singularizeToken(last)
+    if (singular === last) return null
+    parts[parts.length - 1] = singular
+    const candidate = parts.join(' ')
+    if (candidate.toLowerCase() === cleaned.toLowerCase()) return null
+    return candidate
+  }
+
+  const buildSearchDisplay = (item: NormalizedFoodItem, searchQuery: string) => {
+    const name = String(item?.name || 'Food').trim()
+    const brand = String(item?.brand || '').trim()
+    if (!brand) return { title: name, showBrandSuffix: false }
+    const queryFirst = String(searchQuery || '').trim().split(/\s+/)[0] || ''
+    const normalizedQuery = normalizeBrandToken(queryFirst)
+    const normalizedBrand = normalizeBrandToken(brand)
+    const normalizedName = normalizeBrandToken(name)
+    if (normalizedQuery && normalizedBrand && normalizedQuery === normalizedBrand && !normalizedName.startsWith(normalizedBrand)) {
+      return { title: `${brand} ${name}`.trim(), showBrandSuffix: false }
+    }
+    return { title: name, showBrandSuffix: true }
+  }
 
   useEffect(() => {
     return () => {
@@ -233,14 +291,20 @@ export default function AddIngredientClient() {
     const seq = ++seqRef.current
 
     try {
-      const params = new URLSearchParams({
-        source: 'auto',
-        q,
-        kind: k,
-        limit: '20',
-      })
-      const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET', signal: controller.signal })
-      const data = await res.json().catch(() => ({}))
+      const sourceParam = k === 'single' ? 'usda' : 'auto'
+      const fetchItems = async (searchQuery: string) => {
+        const params = new URLSearchParams({
+          source: sourceParam,
+          q: searchQuery,
+          kind: k,
+          limit: '20',
+        })
+        const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET', signal: controller.signal })
+        const data = await res.json().catch(() => ({}))
+        return { res, data }
+      }
+
+      let { res, data } = await fetchItems(q)
       if (!res.ok) {
         const msg =
           typeof data?.error === 'string'
@@ -252,7 +316,21 @@ export default function AddIngredientClient() {
         return
       }
       if (seqRef.current !== seq) return
-      setResults(Array.isArray(data?.items) ? data.items : [])
+      let nextResults = Array.isArray(data?.items) ? data.items : []
+      if (k === 'single') {
+        nextResults = nextResults.filter((item: NormalizedFoodItem) => item?.source === 'usda')
+        if (nextResults.length === 0) {
+          const fallback = buildSingleFoodFallback(q)
+          if (fallback) {
+            const retry = await fetchItems(fallback)
+            if (retry.res.ok) {
+              const retryItems = Array.isArray(retry.data?.items) ? retry.data.items : []
+              nextResults = retryItems.filter((item: NormalizedFoodItem) => item?.source === 'usda')
+            }
+          }
+        }
+      }
+      setResults(nextResults)
     } catch (e: any) {
       if (e?.name === 'AbortError') return
       setError('Search failed. Please try again.')
@@ -486,25 +564,34 @@ export default function AddIngredientClient() {
 
       <div className="px-4 py-4">
         <div className="w-full max-w-3xl mx-auto space-y-4">
+          {/* PROTECTED: ADD_INGREDIENT_SEARCH START */}
           <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
             <div className="text-sm font-semibold text-gray-900">
-              Search foods (USDA + FatSecret + OpenFoodFacts)
+              Search foods (USDA for single foods, FatSecret + OpenFoodFacts for packaged)
             </div>
 
-            <div className="flex gap-2">
+            <div className="relative">
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="e.g. pizza"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
               <button
                 type="button"
+                aria-label="Search"
                 disabled={loading || query.trim().length === 0}
                 onClick={() => runSearch()}
-                className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold disabled:opacity-60"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
               >
-                {loading ? 'Searching…' : 'Search'}
+                {loading ? (
+                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 20l-3.5-3.5" />
+                  </svg>
+                )}
               </button>
             </div>
 
@@ -540,7 +627,9 @@ export default function AddIngredientClient() {
             {error && <div className="text-sm text-red-600">{error}</div>}
 
             {!loading && !error && results.length === 0 && query.trim() && (
-              <div className="text-sm text-gray-500">No results yet. Try a different search.</div>
+              <div className="text-sm text-gray-500">
+                No results yet. Try a different search. Plurals are OK — we auto-try the single word.
+              </div>
             )}
 
             {results.length > 0 && (
@@ -548,12 +637,13 @@ export default function AddIngredientClient() {
                 {results.map((r, idx) => {
                   const id = `${r.source}:${r.id}:${idx}`
                   const busy = addingId === `${r.source}:${r.id}`
+                  const display = buildSearchDisplay(r, query)
                   return (
                     <div key={id} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-gray-900 truncate">
-                          {r.name}
-                          {r.brand ? ` – ${r.brand}` : ''}
+                          {display.title}
+                          {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                         </div>
                         <div className="mt-0.5 text-xs text-gray-600">
                           {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
@@ -577,6 +667,7 @@ export default function AddIngredientClient() {
               </div>
             )}
           </div>
+          {/* PROTECTED: ADD_INGREDIENT_SEARCH END */}
 
           <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-2">
             <div className="text-sm font-semibold text-gray-900">Or use AI photo analysis</div>

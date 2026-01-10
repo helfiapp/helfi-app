@@ -89,6 +89,12 @@ const toNumber = (v: any): number | null => {
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
+const normalizeBrandToken = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
+    .trim()
+
 const triggerHaptic = (duration = 10) => {
   try {
     if (typeof window === 'undefined') return
@@ -406,6 +412,20 @@ export default function MealBuilderClient() {
     } catch {}
   }
 
+  const buildSearchDisplay = (item: NormalizedFoodItem, searchQuery: string) => {
+    const name = String(item?.name || 'Food').trim()
+    const brand = String(item?.brand || '').trim()
+    if (!brand) return { title: name, showBrandSuffix: false }
+    const queryFirst = String(searchQuery || '').trim().split(/\s+/)[0] || ''
+    const normalizedQuery = normalizeBrandToken(queryFirst)
+    const normalizedBrand = normalizeBrandToken(brand)
+    const normalizedName = normalizeBrandToken(name)
+    if (normalizedQuery && normalizedBrand && normalizedQuery === normalizedBrand && !normalizedName.startsWith(normalizedBrand)) {
+      return { title: `${brand} ${name}`.trim(), showBrandSuffix: false }
+    }
+    return { title: name, showBrandSuffix: true }
+  }
+
   const runSearch = async () => {
     const q = query.trim()
     if (!q) {
@@ -425,8 +445,9 @@ export default function MealBuilderClient() {
     const seq = ++seqRef.current
 
     try {
+      const sourceParam = kind === 'single' ? 'usda' : 'auto'
       const params = new URLSearchParams({
-        source: 'auto',
+        source: sourceParam,
         q: q,
         kind,
         limit: '20',
@@ -1811,26 +1832,29 @@ export default function MealBuilderClient() {
 
           {results.length > 0 && (
             <div className="max-h-72 overflow-y-auto space-y-2 pt-1">
-              {results.map((r) => (
-                <div key={`${r.source}:${r.id}`} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-gray-900 truncate">
-                      {r.name}
-                      {r.brand ? ` – ${r.brand}` : ''}
+              {results.map((r) => {
+                const display = buildSearchDisplay(r, query)
+                return (
+                  <div key={`${r.source}:${r.id}`} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 truncate">
+                        {display.title}
+                        {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
+                      </div>
+                      <div className="text-[11px] text-gray-500">
+                        {r.serving_size ? `Serving: ${r.serving_size}` : 'Serving: (unknown)'}
+                      </div>
                     </div>
-                    <div className="text-[11px] text-gray-500">
-                      {r.serving_size ? `Serving: ${r.serving_size}` : 'Serving: (unknown)'}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addItem(r)}
+                      className="ml-3 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
+                    >
+                      Add
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => addItem(r)}
-                    className="ml-3 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
-                  >
-                    Add
-                  </button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

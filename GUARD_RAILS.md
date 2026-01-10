@@ -460,6 +460,21 @@ Rules that must stay locked:
 
 - The grey swipe bar must not appear when scrolling left to right in the energy summary.
 
+#### 3.4.10 Add Ingredient Search UI (Jan 2026 - Locked)
+
+**Protected files:**
+- `app/food/page.tsx` (Add Ingredient modal search UI)
+- `app/food/add-ingredient/AddIngredientClient.tsx` (standalone Add Ingredient search UI)
+
+These regions are guarded in `scripts/protect-regions.js` using hashes.
+
+**Do not change** without explicit approval. If an intentional change is needed:
+1) Set the relevant override env var for the build:
+   - `ALLOW_ADD_INGREDIENT_MODAL_SEARCH_EDIT=true` (modal)
+   - `ALLOW_ADD_INGREDIENT_SEARCH_EDIT=true` (standalone)
+2) Update the hash in `scripts/protect-regions.js` to match the new region.
+3) Remove the override env var after the deployment.
+
 ### 3.5 Testing Requirements
 
 Before modifying food diary loading logic, agents must test:

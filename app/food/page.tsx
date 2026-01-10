@@ -4883,6 +4883,64 @@ export default function FoodDiary() {
     showQuickToast(`Updated to ${nextItem.name}`)
   }
 
+  const cleanSingleFoodQuery = (value: string) =>
+    value
+      .replace(/[^\w\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const singularizeToken = (value: string) => {
+    const lower = value.toLowerCase()
+    if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
+    if (
+      lower.endsWith('es') &&
+      value.length > 3 &&
+      !lower.endsWith('ses') &&
+      !lower.endsWith('xes') &&
+      !lower.endsWith('zes') &&
+      !lower.endsWith('ches') &&
+      !lower.endsWith('shes')
+    ) {
+      return value.slice(0, -2)
+    }
+    if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
+    return value
+  }
+
+  const buildSingleFoodFallback = (value: string) => {
+    const cleaned = cleanSingleFoodQuery(value)
+    if (!cleaned) return null
+    const parts = cleaned.split(' ').filter(Boolean)
+    if (parts.length === 0) return null
+    const last = parts[parts.length - 1]
+    const singular = singularizeToken(last)
+    if (singular === last) return null
+    parts[parts.length - 1] = singular
+    const candidate = parts.join(' ')
+    if (candidate.toLowerCase() === cleaned.toLowerCase()) return null
+    return candidate
+  }
+
+  const normalizeBrandToken = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '')
+      .trim()
+
+  const buildOfficialSearchDisplay = (item: any, searchQuery: string) => {
+    const name = String(item?.name || 'Food').trim()
+    const brand = String(item?.brand || '').trim()
+    if (!brand) return { title: name, showBrandSuffix: false }
+    const queryFirst = String(searchQuery || '').trim().split(/\s+/)[0] || ''
+    const normalizedQuery = normalizeBrandToken(queryFirst)
+    const normalizedBrand = normalizeBrandToken(brand)
+    const normalizedName = normalizeBrandToken(name)
+    if (normalizedQuery && normalizedBrand && normalizedQuery === normalizedBrand && !normalizedName.startsWith(normalizedBrand)) {
+      return { title: `${brand} ${name}`.trim(), showBrandSuffix: false }
+    }
+    return { title: name, showBrandSuffix: true }
+  }
+
   const handleOfficialSearch = async (mode: 'packaged' | 'single', queryOverride?: string) => {
     const query = (queryOverride ?? officialSearchQuery).trim()
     if (!query) {
@@ -4904,13 +4962,23 @@ export default function FoodDiary() {
     setOfficialSource(mode)
 
     try {
-      const params = new URLSearchParams({
-        source: 'auto',
-        q: query,
-        kind: mode,
-        limit: '20',
-      })
-      const url = `/api/food-data?${params.toString()}`
+      const sourceParam = mode === 'single' ? 'usda' : 'auto'
+      const fetchItems = async (searchQuery: string) => {
+        const params = new URLSearchParams({
+          source: sourceParam,
+          q: searchQuery,
+          kind: mode,
+          limit: '20',
+        })
+        const url = `/api/food-data?${params.toString()}`
+        const res = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal,
+        })
+        return { res, url }
+      }
+
+      const { res, url } = await fetchItems(query)
       setOfficialLastRequest({
         query,
         mode,
@@ -4920,11 +4988,6 @@ export default function FoodDiary() {
         source: null,
         errorText: null,
         at: Date.now(),
-      })
-
-      const res = await fetch(url, {
-        method: 'GET',
-        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -4945,11 +5008,27 @@ export default function FoodDiary() {
         return
       }
 
-      const data = await res.json()
+      let data = await res.json()
       // Ignore late responses from older searches.
       if (officialSearchSeqRef.current !== seq) return
 
-      setOfficialResults(Array.isArray(data.items) ? data.items : [])
+      let nextItems = Array.isArray(data.items) ? data.items : []
+      if (mode === 'single') {
+        nextItems = nextItems.filter((item: any) => item?.source === 'usda')
+        if (nextItems.length === 0) {
+          const fallback = buildSingleFoodFallback(query)
+          if (fallback) {
+            const retry = await fetchItems(fallback)
+            if (retry.res.ok) {
+              data = await retry.res.json()
+              nextItems = Array.isArray(data.items) ? data.items : []
+              nextItems = nextItems.filter((item: any) => item?.source === 'usda')
+            }
+          }
+        }
+      }
+
+      setOfficialResults(nextItems)
       setOfficialResultsSource(data?.source || 'auto')
       setOfficialLastRequest((prev) =>
         prev
@@ -4957,7 +5036,7 @@ export default function FoodDiary() {
               ...prev,
               status: res.status,
               source: data?.source || 'auto',
-              itemCount: Array.isArray(data.items) ? data.items.length : 0,
+              itemCount: nextItems.length,
             }
           : prev,
       )
@@ -13653,12 +13732,13 @@ Please add nutritional information manually if needed.`);
 	                </div>
 	              </div>
 	              <div className="p-4">
+                  {/* PROTECTED: ADD_INGREDIENT_MODAL_SEARCH START */}
 	                <div className="space-y-2">
 	                  <label className="block text-sm font-medium text-gray-900">
-	                    Search foods (USDA + FatSecret + OpenFoodFacts)
+	                    Search foods (USDA for single foods, FatSecret + OpenFoodFacts for packaged)
 	                  </label>
                   <div className="flex flex-col gap-2">
-                    <div className="flex gap-2">
+                    <div className="relative">
                       <input
                         type="text"
                         value={officialSearchQuery}
@@ -13687,15 +13767,23 @@ Please add nutritional information manually if needed.`);
                           }
                         }}
                         placeholder={'e.g., pizza'}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                        className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                       />
                       <button
                         type="button"
+                        aria-label="Search"
                         disabled={officialLoading || officialSearchQuery.trim().length === 0}
                         onClick={() => handleOfficialSearch(officialSource)}
-                        className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold disabled:opacity-60"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
                       >
-                        {officialLoading ? 'Searching…' : 'Search'}
+                        {officialLoading ? (
+                          <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="11" cy="11" r="7" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 20l-3.5-3.5" />
+                          </svg>
+                        )}
                       </button>
                     </div>
 
@@ -13733,22 +13821,24 @@ Please add nutritional information manually if needed.`);
                     </div>
                   </div>
 	                  <p className="text-xs text-gray-500">
-	                    We search multiple databases and show the best matches. Use the toggles to focus on packaged products or generic single foods.
+	                    Single food searches use USDA. Packaged searches use FatSecret + OpenFoodFacts. Plurals are OK — we auto-try the single word.
 	                  </p>
 	                </div>
                 {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
 	                {officialLoading && <div className="mt-3 text-xs text-gray-500">Searching…</div>}
                 {!officialLoading && !officialError && officialResults.length > 0 && (
                   <div className="mt-3 max-h-80 overflow-y-auto space-y-2">
-                    {officialResults.map((r, idx) => (
+                    {officialResults.map((r, idx) => {
+                      const display = buildOfficialSearchDisplay(r, officialSearchQuery)
+                      return (
                       <div
                         key={`${r.source}-${r.id}-${idx}`}
                         className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
                       >
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-gray-900 truncate">
-                            {r.name}
-                            {r.brand ? ` – ${r.brand}` : ''}
+                            {display.title}
+                            {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                           </div>
                           <div className="mt-0.5 text-xs text-gray-600">
                             {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
@@ -13782,7 +13872,7 @@ Please add nutritional information manually if needed.`);
                           Add
                         </button>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
                 {!officialLoading && !officialError && officialResults.length === 0 && officialSearchQuery.trim() && (
@@ -13799,7 +13889,7 @@ Please add nutritional information manually if needed.`);
                       const err = hasLast && last?.errorText ? ` (${String(last.errorText).slice(0, 140)})` : ''
                       return (
                         <div className="space-y-1">
-                          <div>No results yet.</div>
+                          <div>No results yet. Plurals are OK — we auto-try the single word.</div>
                           {hint && <div className="text-[11px] text-gray-400">{hint}{err}</div>}
                           <div>Can't find your food? You can use AI photo analysis instead.</div>
                         </div>
@@ -13807,6 +13897,7 @@ Please add nutritional information manually if needed.`);
                     })()}
                   </div>
                 )}
+                  {/* PROTECTED: ADD_INGREDIENT_MODAL_SEARCH END */}
                 <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
                   <div className="text-sm font-medium text-gray-900">
                     Or use AI photo analysis
@@ -16401,14 +16492,14 @@ Please add nutritional information manually if needed.`);
                       </div>
 
                       <div className="pt-2 border-t border-gray-200">
-                        <div className="text-sm font-medium text-gray-900">
-                          Find a better match (USDA + FatSecret + OpenFoodFacts)
+                      <div className="text-sm font-medium text-gray-900">
+                          Find a better match (USDA for single foods, FatSecret + OpenFoodFacts for packaged)
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
                           Selecting a result replaces the item name, serving size, and macros.
                         </p>
                         <div className="mt-3 flex flex-col gap-2">
-                          <div className="flex gap-2">
+                          <div className="relative">
                             <input
                               type="text"
                               value={officialSearchQuery}
@@ -16437,15 +16528,23 @@ Please add nutritional information manually if needed.`);
                                 }
                               }}
                               placeholder="e.g., Christmas pudding"
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                              className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                             />
                             <button
                               type="button"
+                              aria-label="Search"
                               disabled={officialLoading || officialSearchQuery.trim().length === 0}
                               onClick={() => handleOfficialSearch(officialSource)}
-                              className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold disabled:opacity-60"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
                             >
-                              {officialLoading ? 'Searching…' : 'Search'}
+                              {officialLoading ? (
+                                <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <circle cx="11" cy="11" r="7" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 20l-3.5-3.5" />
+                                </svg>
+                              )}
                             </button>
                           </div>
 
@@ -16486,49 +16585,52 @@ Please add nutritional information manually if needed.`);
                         {officialLoading && <div className="mt-3 text-xs text-gray-500">Searching…</div>}
                         {!officialLoading && !officialError && officialResults.length > 0 && (
                           <div className="mt-3 max-h-64 overflow-y-auto space-y-2">
-                            {officialResults.map((r, idx) => (
-                              <div
-                                key={`${r.source}-${r.id}-${idx}`}
-                                className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
-                              >
-                                <div className="min-w-0">
-                                  <div className="text-sm font-semibold text-gray-900 truncate">
-                                    {r.name}
-                                    {r.brand ? ` – ${r.brand}` : ''}
-                                  </div>
-                                  <div className="mt-0.5 text-xs text-gray-600">
-                                    {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
-                                    {r.calories != null && !Number.isNaN(Number(r.calories)) && (
-                                      <span>{Math.round(Number(r.calories))} kcal</span>
-                                    )}
-                                    {r.protein_g != null && (
-                                      <span className="ml-2">{`${r.protein_g} g protein`}</span>
-                                    )}
-                                    {r.carbs_g != null && (
-                                      <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
-                                    )}
-                                    {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
-                                  </div>
-                                  <div className="mt-1 text-[11px] text-gray-400">
-                                    Source:{' '}
-                                    {r.source === 'usda'
-                                      ? 'USDA FoodData Central'
-                                      : r.source === 'fatsecret'
-                                      ? 'FatSecret'
-                                      : r.source === 'openfoodfacts'
-                                      ? 'OpenFoodFacts'
-                                      : officialResultsSource || 'Unknown'}
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => replaceIngredientFromOfficial(r, editingItemIndex)}
-                                  className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
+                            {officialResults.map((r, idx) => {
+                              const display = buildOfficialSearchDisplay(r, officialSearchQuery)
+                              return (
+                                <div
+                                  key={`${r.source}-${r.id}-${idx}`}
+                                  className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
                                 >
-                                  Use match
-                                </button>
-                              </div>
-                            ))}
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-semibold text-gray-900 truncate">
+                                      {display.title}
+                                      {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
+                                    </div>
+                                    <div className="mt-0.5 text-xs text-gray-600">
+                                      {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
+                                      {r.calories != null && !Number.isNaN(Number(r.calories)) && (
+                                        <span>{Math.round(Number(r.calories))} kcal</span>
+                                      )}
+                                      {r.protein_g != null && (
+                                        <span className="ml-2">{`${r.protein_g} g protein`}</span>
+                                      )}
+                                      {r.carbs_g != null && (
+                                        <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
+                                      )}
+                                      {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
+                                    </div>
+                                    <div className="mt-1 text-[11px] text-gray-400">
+                                      Source:{' '}
+                                      {r.source === 'usda'
+                                        ? 'USDA FoodData Central'
+                                        : r.source === 'fatsecret'
+                                        ? 'FatSecret'
+                                        : r.source === 'openfoodfacts'
+                                        ? 'OpenFoodFacts'
+                                        : officialResultsSource || 'Unknown'}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => replaceIngredientFromOfficial(r, editingItemIndex)}
+                                    className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
+                                  >
+                                    Use match
+                                  </button>
+                                </div>
+                              )
+                            })}
                           </div>
                         )}
                         {!officialLoading && !officialError && officialResults.length === 0 && officialSearchQuery.trim() && (

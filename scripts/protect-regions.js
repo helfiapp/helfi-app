@@ -11,6 +11,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 function fail(msg) {
   console.error('\n❌ Guard Rails: ' + msg + '\n');
@@ -125,8 +126,63 @@ function checkIngredientsCard() {
   }
 }
 
+function hashRegion(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+
+function checkProtectedRegion(opts) {
+  const {
+    filePath,
+    startMarker,
+    endMarker,
+    expectedHash,
+    allowEnvVar,
+    description,
+  } = opts;
+  const allow = String(process.env[allowEnvVar] || '').toLowerCase() === 'true';
+  const content = fs.readFileSync(filePath, 'utf8');
+
+  const startIdx = content.indexOf(startMarker);
+  const endIdx = content.indexOf(endMarker);
+  if (startIdx === -1 || endIdx === -1) {
+    fail(`${description} markers are missing in ${filePath}. Do not remove protection markers.`);
+  }
+
+  const innerStart = content.indexOf('\n', startIdx) + 1;
+  const innerEnd = content.lastIndexOf('\n', endIdx);
+  const currentRegion = content.slice(innerStart, innerEnd).replace(/\r\n/g, '\n');
+  const currentHash = hashRegion(currentRegion);
+
+  if (currentHash !== expectedHash) {
+    if (!allow) {
+      fail(
+        `${description} was modified.\n` +
+        `If this change is intentional, redeploy with ${allowEnvVar}=true and then update the hash in scripts/protect-regions.js.`
+      );
+    } else {
+      console.warn(`⚠️ Guard Rails: ${description} changed (override enabled). Remember to update scripts/protect-regions.js hash.`);
+    }
+  }
+}
+
 function main() {
   checkIngredientsCard();
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'add-ingredient', 'AddIngredientClient.tsx'),
+    startMarker: 'PROTECTED: ADD_INGREDIENT_SEARCH START',
+    endMarker: 'PROTECTED: ADD_INGREDIENT_SEARCH END',
+    expectedHash: '980691072e3f4a07a0878016483332cc3591b3994429bc6d56b8a80d00245919',
+    allowEnvVar: 'ALLOW_ADD_INGREDIENT_SEARCH_EDIT',
+    description: 'Add Ingredient standalone search UI',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: ADD_INGREDIENT_MODAL_SEARCH START',
+    endMarker: 'PROTECTED: ADD_INGREDIENT_MODAL_SEARCH END',
+    expectedHash: '95111975dfcce8c2cd34cd6ba59d8c6625e96ef729e8acfb7ef060850d98bae7',
+    allowEnvVar: 'ALLOW_ADD_INGREDIENT_MODAL_SEARCH_EDIT',
+    description: 'Add Ingredient modal search UI',
+  });
   console.log('✅ Guard Rails: Protected regions verified.');
 }
 
