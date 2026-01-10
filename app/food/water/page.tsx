@@ -28,6 +28,9 @@ const DRINK_TYPES = [
   { id: 'Coffee', icon: 'coffee' },
   { id: 'Tea', icon: 'emoji_food_beverage' },
   { id: 'Juice', icon: 'local_bar' },
+  { id: 'Hot Chocolate', icon: 'local_cafe' },
+  { id: 'Soft Drink', icon: 'local_drink' },
+  { id: 'Alcohol', icon: 'wine_bar' },
 ] as const
 
 const QUICK_PRESETS = [
@@ -94,8 +97,8 @@ function normalizeLabel(value: string | null | undefined) {
 
 export default function WaterIntakePage() {
   const router = useRouter()
-  const { data: session } = useSession()
-  const { profileImage } = useUserData()
+  const { data: session, status } = useSession()
+  const { profileImage, userData } = useUserData()
 
   const [selectedDate, setSelectedDate] = useState(todayLocalDate())
   const [entries, setEntries] = useState<WaterEntry[]>([])
@@ -125,7 +128,8 @@ export default function WaterIntakePage() {
     [entries]
   )
   const entryCount = entries.length
-  const progressPercent = goalTargetMl ? Math.min(100, Math.round((totalMl / goalTargetMl) * 100)) : 0
+  const effectiveGoalMl = goalTargetMl ?? goalRecommendedMl ?? null
+  const progressPercent = effectiveGoalMl ? Math.min(100, Math.round((totalMl / effectiveGoalMl) * 100)) : 0
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -140,7 +144,14 @@ export default function WaterIntakePage() {
     setLoading(true)
     setBanner(null)
     try {
-      const res = await fetch(`/api/water-log?localDate=${encodeURIComponent(localDate)}`, { cache: 'no-store' as any })
+      const res = await fetch(`/api/water-log?localDate=${encodeURIComponent(localDate)}`, {
+        cache: 'no-store' as any,
+        credentials: 'include',
+      })
+      if (res.status === 401) {
+        setEntries([])
+        return
+      }
       if (!res.ok) throw new Error('load failed')
       const data = await res.json()
       setEntries(Array.isArray(data?.entries) ? data.entries : [])
@@ -155,28 +166,44 @@ export default function WaterIntakePage() {
   const loadGoal = async () => {
     setGoalLoading(true)
     try {
-      const res = await fetch('/api/hydration-goal', { cache: 'no-store' as any })
+      const res = await fetch('/api/hydration-goal', { cache: 'no-store' as any, credentials: 'include' })
       if (!res.ok) throw new Error('goal failed')
       const data = (await res.json()) as GoalResponse
       setGoalTargetMl(typeof data?.targetMl === 'number' ? data.targetMl : null)
       setGoalRecommendedMl(typeof data?.recommendedMl === 'number' ? data.recommendedMl : null)
       setGoalSource(data?.source === 'custom' ? 'custom' : 'auto')
     } catch {
-      setGoalTargetMl(null)
-      setGoalRecommendedMl(null)
-      setGoalSource('auto')
+      // Keep any goal already loaded from cached user data.
     } finally {
       setGoalLoading(false)
     }
   }
 
   useEffect(() => {
+    if (status !== 'authenticated') return
     loadEntries(selectedDate)
-  }, [selectedDate])
+  }, [selectedDate, status])
 
   useEffect(() => {
+    if (status !== 'authenticated') return
     loadGoal()
-  }, [])
+  }, [status])
+
+  useEffect(() => {
+    const hydrated = userData?.hydrationGoal
+    if (!hydrated) return
+    const target = Number(hydrated?.targetMl)
+    const recommended = Number(hydrated?.recommendedMl ?? hydrated?.targetMl)
+    if (!goalTargetMl && Number.isFinite(target)) {
+      setGoalTargetMl(target)
+    }
+    if (!goalRecommendedMl && Number.isFinite(recommended)) {
+      setGoalRecommendedMl(recommended)
+    }
+    if (hydrated?.source === 'custom') {
+      setGoalSource('custom')
+    }
+  }, [userData, goalRecommendedMl, goalTargetMl])
 
   const addEntry = async (amount: number, unit: string) => {
     setSaving(true)
@@ -186,6 +213,7 @@ export default function WaterIntakePage() {
       const res = await fetch('/api/water-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           amount,
           unit,
@@ -213,7 +241,7 @@ export default function WaterIntakePage() {
     setDeletingId(id)
     setBanner(null)
     try {
-      const res = await fetch(`/api/water-log/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      const res = await fetch(`/api/water-log/${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'include' })
       if (!res.ok) throw new Error('delete failed')
       setEntries((prev) => prev.filter((entry) => entry.id !== id))
       setBanner({ type: 'success', message: 'Entry removed.' })
@@ -246,8 +274,8 @@ export default function WaterIntakePage() {
   }
 
   const openGoalEditor = () => {
-    if (goalTargetMl) {
-      const next = goalToInput(goalTargetMl)
+    if (effectiveGoalMl) {
+      const next = goalToInput(effectiveGoalMl)
       setGoalAmountInput(next.amount)
       setGoalUnit(next.unit)
     }
@@ -372,11 +400,6 @@ export default function WaterIntakePage() {
 
         <div className="p-4">
           <div className="flex flex-col items-stretch justify-start rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] bg-white dark:bg-gray-900 overflow-hidden border border-gray-100 dark:border-gray-800">
-            <div className="w-full h-32 bg-gradient-to-br from-[#62b763]/40 to-[#62b763]/10 relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <MaterialSymbol name="water_drop" className="text-[#62b763] text-6xl opacity-30" />
-              </div>
-            </div>
             <div className="flex w-full flex-col items-stretch justify-center gap-1 py-4 px-4">
               <p className="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Daily Hydration Summary</p>
               <div className="flex items-baseline gap-2">
@@ -384,13 +407,13 @@ export default function WaterIntakePage() {
                   {formatMl(totalMl)}
                 </p>
                 <p className="text-gray-400 text-lg font-medium">
-                  {goalTargetMl ? `/ ${formatMl(goalTargetMl)}` : ''}
+                  {effectiveGoalMl ? `/ ${formatMl(effectiveGoalMl)}` : ''}
                 </p>
               </div>
               <div className="flex flex-col gap-2 mt-4">
                 <div className="flex gap-6 justify-between items-center">
                   <p className="text-[#111711] dark:text-white text-sm font-medium leading-normal">
-                    {goalTargetMl ? `${progressPercent}% of daily goal` : 'Set a daily goal'}
+                    {effectiveGoalMl ? `${progressPercent}% of daily goal` : 'Set a daily goal'}
                   </p>
                   <button
                     type="button"
@@ -447,7 +470,7 @@ export default function WaterIntakePage() {
                 </select>
               </div>
               <div className="mt-2 text-xs text-gray-500">
-                Recommended: {formatMl(goalRecommendedMl || 0)}
+                Recommended: {formatMl(goalRecommendedMl ?? goalTargetMl ?? 0)}
               </div>
               <div className="mt-4 flex items-center gap-2">
                 <button
@@ -535,7 +558,8 @@ export default function WaterIntakePage() {
               <select
                 value={customUnit}
                 onChange={(e) => setCustomUnit(e.target.value as 'ml' | 'l' | 'oz')}
-                className="absolute right-2 top-2 h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-500"
+                className="absolute right-2 top-2 h-8 rounded-md border border-transparent bg-transparent px-2 text-xs text-gray-500 appearance-none focus:outline-none"
+                style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
               >
                 <option value="ml">ml</option>
                 <option value="l">L</option>
