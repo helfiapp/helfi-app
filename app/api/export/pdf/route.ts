@@ -191,9 +191,13 @@ export async function GET(request: NextRequest) {
       goalIntensity: primaryGoal.goalIntensity,
       birthdate,
     })
+    const customHydration = readGoalCategory('__HYDRATION_GOAL__')
+    const customTarget = Number(customHydration?.targetMl)
+    const hydrationTarget =
+      Number.isFinite(customTarget) && customTarget > 0 ? Math.round(customTarget) : hydrationGoal.targetMl
 
     h2('Hydration')
-    drawText(`Daily hydration target: ${formatMl(hydrationGoal.targetMl)}`)
+    drawText(`Daily hydration target: ${formatMl(hydrationTarget)}`)
     const waterLogs = (user as any).waterLogs || []
     if (!waterLogs.length) {
       drawText('No water entries logged in this period.')

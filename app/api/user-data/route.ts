@@ -434,6 +434,24 @@ export async function GET(request: NextRequest) {
       goalIntensity: primaryGoalData.goalIntensity || '',
       birthdate: profileInfoData.dateOfBirth || '',
     })
+    let customHydrationTarget: number | null = null
+    let hydrationUpdatedAt: string | null = null
+    try {
+      const storedHydrationGoal = user.healthGoals.find((goal: any) => goal.name === '__HYDRATION_GOAL__')
+      if (storedHydrationGoal?.category) {
+        const parsed = JSON.parse(storedHydrationGoal.category)
+        const target = Number(parsed?.targetMl)
+        if (Number.isFinite(target) && target > 0) {
+          customHydrationTarget = Math.round(target)
+          hydrationUpdatedAt = typeof parsed?.updatedAt === 'string' ? parsed.updatedAt : null
+        }
+      }
+    } catch {
+      customHydrationTarget = null
+      hydrationUpdatedAt = null
+    }
+    const hydrationTarget = customHydrationTarget ?? hydrationGoal.targetMl
+    const hydrationSource = customHydrationTarget ? 'custom' : 'auto'
 
     const onboardingData = {
       gender: user.gender?.toLowerCase() || '',
@@ -489,9 +507,12 @@ export async function GET(request: NextRequest) {
       dietTypes,
       healthCheckSettings,
       hydrationGoal: {
-        targetMl: hydrationGoal.targetMl,
-        targetL: Math.round((hydrationGoal.targetMl / 1000) * 100) / 100,
-        source: 'auto',
+        targetMl: hydrationTarget,
+        targetL: Math.round((hydrationTarget / 1000) * 100) / 100,
+        recommendedMl: hydrationGoal.targetMl,
+        recommendedL: Math.round((hydrationGoal.targetMl / 1000) * 100) / 100,
+        source: hydrationSource,
+        updatedAt: hydrationUpdatedAt,
       },
     }
 

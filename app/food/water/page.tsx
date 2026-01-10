@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import PageHeader from '@/components/PageHeader'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { useUserData } from '@/components/providers/UserDataProvider'
+import MaterialSymbol from '@/components/MaterialSymbol'
 
 type WaterEntry = {
   id: string
@@ -14,22 +16,34 @@ type WaterEntry = {
   createdAt: string
 }
 
-const DRINK_TYPES = ['Water', 'Tea', 'Coffee', 'Juice', 'Smoothie', 'Other'] as const
+type GoalResponse = {
+  targetMl: number
+  recommendedMl: number
+  source: 'auto' | 'custom'
+  updatedAt?: string | null
+}
+
+const DRINK_TYPES = [
+  { id: 'Water', icon: 'water_full' },
+  { id: 'Coffee', icon: 'coffee' },
+  { id: 'Tea', icon: 'emoji_food_beverage' },
+  { id: 'Juice', icon: 'local_bar' },
+] as const
 
 const QUICK_PRESETS = [
-  { label: 'Cup', amount: 250, unit: 'ml' },
-  { label: 'Glass', amount: 300, unit: 'ml' },
-  { label: 'Mug', amount: 350, unit: 'ml' },
-  { label: 'Bottle', amount: 500, unit: 'ml' },
-  { label: 'Large bottle', amount: 750, unit: 'ml' },
-  { label: '1 L bottle', amount: 1, unit: 'l' },
-  { label: '1.5 L bottle', amount: 1.5, unit: 'l' },
-  { label: '2 L bottle', amount: 2, unit: 'l' },
-  { label: '3 L bottle', amount: 3, unit: 'l' },
-]
+  { amount: 250, unit: 'ml' },
+  { amount: 330, unit: 'ml' },
+  { amount: 500, unit: 'ml' },
+  { amount: 1, unit: 'l' },
+] as const
 
 function todayLocalDate() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function isValidDate(value: string | null | undefined) {
+  if (!value) return false
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
 function formatNumber(value: number) {
@@ -42,13 +56,20 @@ function formatAmount(entry: WaterEntry) {
   return `${formatNumber(entry.amount)} ${unit}`
 }
 
-function formatMl(ml: number) {
-  if (!Number.isFinite(ml)) return '0 ml'
-  if (ml >= 1000) {
-    const liters = ml / 1000
-    return `${formatNumber(Math.round(liters * 100) / 100)} L`
+function formatMl(ml: number | null | undefined) {
+  const value = Number(ml ?? 0)
+  if (!Number.isFinite(value) || value <= 0) return '0 ml'
+  if (value >= 1000) {
+    const liters = Math.round((value / 1000) * 100) / 100
+    return `${formatNumber(liters)} L`
   }
-  return `${Math.round(ml)} ml`
+  return `${Math.round(value)} ml`
+}
+
+function formatTime(value: string) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
 function formatDateLabel(value: string) {
@@ -59,33 +80,61 @@ function formatDateLabel(value: string) {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-function formatTime(value: string) {
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+function goalToInput(targetMl: number) {
+  if (targetMl >= 1000) {
+    return { amount: formatNumber(Math.round((targetMl / 1000) * 100) / 100), unit: 'l' as const }
+  }
+  return { amount: formatNumber(Math.round(targetMl)), unit: 'ml' as const }
+}
+
+function normalizeLabel(value: string | null | undefined) {
+  const cleaned = String(value || '').trim()
+  return cleaned || 'Water'
 }
 
 export default function WaterIntakePage() {
-  const [selectedDate, setSelectedDate] = useState(todayLocalDate)
+  const router = useRouter()
+  const { data: session } = useSession()
+  const { profileImage } = useUserData()
+
+  const [selectedDate, setSelectedDate] = useState(todayLocalDate())
   const [entries, setEntries] = useState<WaterEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const [selectedType, setSelectedType] = useState<(typeof DRINK_TYPES)[number]>('Water')
-  const [customAmount, setCustomAmount] = useState('')
-  const [customUnit, setCustomUnit] = useState<'ml' | 'l' | 'oz'>('ml')
-  const [customLabel, setCustomLabel] = useState('')
-  const [goalMl, setGoalMl] = useState<number | null>(null)
+  const [activeDrink, setActiveDrink] = useState<(typeof DRINK_TYPES)[number]['id']>('Water')
+  const [lastPresetKey, setLastPresetKey] = useState<string | null>(null)
+
   const [goalLoading, setGoalLoading] = useState(false)
+  const [goalTargetMl, setGoalTargetMl] = useState<number | null>(null)
+  const [goalRecommendedMl, setGoalRecommendedMl] = useState<number | null>(null)
+  const [goalSource, setGoalSource] = useState<'auto' | 'custom'>('auto')
+  const [showGoalEditor, setShowGoalEditor] = useState(false)
+  const [goalAmountInput, setGoalAmountInput] = useState('')
+  const [goalUnit, setGoalUnit] = useState<'ml' | 'l' | 'oz'>('ml')
+  const [goalSaving, setGoalSaving] = useState(false)
+  const [customAmountInput, setCustomAmountInput] = useState('')
+  const [customUnit, setCustomUnit] = useState<'ml' | 'l' | 'oz'>('ml')
+
+  const userImage = (profileImage || session?.user?.image || '') as string
+  const hasProfileImage = !!userImage
 
   const totalMl = useMemo(
     () => entries.reduce((sum, entry) => sum + (Number(entry.amountMl) || 0), 0),
     [entries]
   )
-
   const entryCount = entries.length
-  const goalProgress = goalMl ? Math.min(100, Math.round((totalMl / goalMl) * 100)) : null
+  const progressPercent = goalTargetMl ? Math.min(100, Math.round((totalMl / goalTargetMl) * 100)) : 0
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const fromQuery = params.get('date')
+    if (isValidDate(fromQuery)) {
+      setSelectedDate(String(fromQuery))
+    }
+  }, [])
 
   const loadEntries = async (localDate: string) => {
     setLoading(true)
@@ -103,43 +152,44 @@ export default function WaterIntakePage() {
     }
   }
 
+  const loadGoal = async () => {
+    setGoalLoading(true)
+    try {
+      const res = await fetch('/api/hydration-goal', { cache: 'no-store' as any })
+      if (!res.ok) throw new Error('goal failed')
+      const data = (await res.json()) as GoalResponse
+      setGoalTargetMl(typeof data?.targetMl === 'number' ? data.targetMl : null)
+      setGoalRecommendedMl(typeof data?.recommendedMl === 'number' ? data.recommendedMl : null)
+      setGoalSource(data?.source === 'custom' ? 'custom' : 'auto')
+    } catch {
+      setGoalTargetMl(null)
+      setGoalRecommendedMl(null)
+      setGoalSource('auto')
+    } finally {
+      setGoalLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadEntries(selectedDate)
   }, [selectedDate])
 
   useEffect(() => {
-    let ignore = false
-    const loadGoal = async () => {
-      setGoalLoading(true)
-      try {
-        const res = await fetch('/api/user-data', { cache: 'no-store' as any })
-        if (!res.ok) return
-        const data = await res.json()
-        const target = data?.data?.hydrationGoal?.targetMl
-        if (!ignore) {
-          setGoalMl(typeof target === 'number' ? target : null)
-        }
-      } catch {
-        if (!ignore) setGoalMl(null)
-      } finally {
-        if (!ignore) setGoalLoading(false)
-      }
-    }
     loadGoal()
-    return () => { ignore = true }
   }, [])
 
-  const addEntry = async (amount: number, unit: string, label: string | null) => {
+  const addEntry = async (amount: number, unit: string) => {
     setSaving(true)
     setBanner(null)
     try {
+      const label = activeDrink
       const res = await fetch('/api/water-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount,
           unit,
-          label: label || undefined,
+          label,
           localDate: selectedDate,
         }),
       })
@@ -175,20 +225,18 @@ export default function WaterIntakePage() {
   }
 
   const handleQuickAdd = (amount: number, unit: string) => {
-    const label = selectedType === 'Other' ? null : selectedType
-    addEntry(amount, unit, label)
+    setLastPresetKey(`${amount}-${unit}`)
+    addEntry(amount, unit)
   }
 
   const handleCustomAdd = () => {
-    const amount = Number(customAmount)
+    const amount = Number(customAmountInput)
     if (!Number.isFinite(amount) || amount <= 0) {
       setBanner({ type: 'error', message: 'Enter a valid amount first.' })
       return
     }
-    const label = customLabel.trim() || (selectedType === 'Other' ? '' : selectedType)
-    addEntry(amount, customUnit, label || null)
-    setCustomAmount('')
-    setCustomLabel('')
+    addEntry(amount, customUnit)
+    setCustomAmountInput('')
   }
 
   const shiftDate = (delta: number) => {
@@ -197,237 +245,369 @@ export default function WaterIntakePage() {
     setSelectedDate(d.toISOString().slice(0, 10))
   }
 
-  return (
-    <div className="min-h-screen bg-[#f6f8fb] pb-24">
-      <PageHeader title="Water Intake" backHref="/food" />
+  const openGoalEditor = () => {
+    if (goalTargetMl) {
+      const next = goalToInput(goalTargetMl)
+      setGoalAmountInput(next.amount)
+      setGoalUnit(next.unit)
+    }
+    setShowGoalEditor(true)
+  }
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
-        {banner && (
-          <div
-            className={[
-              'mb-4 rounded-xl border px-4 py-3 text-sm',
-              banner.type === 'success'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : 'bg-red-50 border-red-200 text-red-700',
-            ].join(' ')}
+  const saveGoal = async () => {
+    const amount = Number(goalAmountInput)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setBanner({ type: 'error', message: 'Enter a valid goal amount.' })
+      return
+    }
+    setGoalSaving(true)
+    try {
+      const res = await fetch('/api/hydration-goal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, unit: goalUnit }),
+      })
+      if (!res.ok) throw new Error('goal save failed')
+      await loadGoal()
+      setShowGoalEditor(false)
+    } catch {
+      setBanner({ type: 'error', message: 'Could not update goal.' })
+    } finally {
+      setGoalSaving(false)
+    }
+  }
+
+  const resetGoal = async () => {
+    setGoalSaving(true)
+    try {
+      const res = await fetch('/api/hydration-goal', { method: 'DELETE' })
+      if (!res.ok) throw new Error('goal reset failed')
+      await loadGoal()
+      setShowGoalEditor(false)
+    } catch {
+      setBanner({ type: 'error', message: 'Could not reset goal.' })
+    } finally {
+      setGoalSaving(false)
+    }
+  }
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
+    }
+    router.push('/food')
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f6f7f6] dark:bg-[#151d15]">
+      <div className="max-w-md mx-auto min-h-screen flex flex-col shadow-xl bg-[#f6f7f6] dark:bg-[#151d15]">
+        <div className="flex items-center p-4 pb-2 justify-between sticky top-0 z-10 bg-[#f6f7f6] dark:bg-[#151d15]">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="text-[#111711] dark:text-white flex size-12 shrink-0 items-center"
+            aria-label="Go back"
           >
-            {banner.message}
+            <MaterialSymbol name="arrow_back_ios" className="text-2xl" />
+          </button>
+          <h2 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
+            Water Intake
+          </h2>
+          <div className="size-12 flex items-center justify-end">
+            <div className="w-8 h-8 rounded-full bg-[#62b763]/20 flex items-center justify-center overflow-hidden border border-[#62b763]/30">
+              {hasProfileImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt="User profile avatar" src={userImage} className="w-full h-full object-cover" />
+              ) : (
+                <MaterialSymbol name="person" className="text-[#62b763]" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {banner && (
+          <div className="px-4">
+            <div
+              className={[
+                'mb-2 rounded-xl border px-4 py-3 text-sm',
+                banner.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-red-50 border-red-200 text-red-700',
+              ].join(' ')}
+            >
+              {banner.message}
+            </div>
           </div>
         )}
 
-        <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">Daily hydration log</h2>
-              <p className="text-sm text-gray-500 mt-1">Add water, tea, coffee, or any drink as many times as you want.</p>
-            </div>
-            <Link
-              href="/food"
-              className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              Back to Food Diary
-            </Link>
-          </div>
-
-          <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+        <div className="flex px-4 py-3">
+          <div className="flex h-10 flex-1 items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-800 p-1">
             <button
               type="button"
               onClick={() => shiftDate(-1)}
-              className="px-3 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200"
+              className="flex h-full grow items-center justify-center overflow-hidden rounded-lg px-2 text-gray-500 text-sm font-medium leading-normal hover:text-[#111711] dark:hover:text-white"
             >
               Previous
             </button>
-            <div className="relative">
+            <label className="relative flex h-full grow cursor-pointer items-center justify-center overflow-hidden rounded-lg px-2 text-sm font-medium leading-normal bg-white dark:bg-gray-700 shadow-[0_0_4px_rgba(0,0,0,0.1)] text-[#111711] dark:text-white">
+              <span className="truncate">{formatDateLabel(selectedDate)}</span>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 text-transparent caret-transparent"
+                className="absolute inset-0 opacity-0 cursor-pointer"
                 aria-label="Select date"
               />
-              <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-semibold text-gray-700">
-                {formatDateLabel(selectedDate)}
-              </span>
-            </div>
+            </label>
             <button
               type="button"
               onClick={() => shiftDate(1)}
-              className="px-3 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200"
+              className="flex h-full grow items-center justify-center overflow-hidden rounded-lg px-2 text-gray-500 text-sm font-medium leading-normal hover:text-[#111711] dark:hover:text-white"
             >
-              Next &gt;
+              Next
             </button>
-            <button
-              type="button"
-              onClick={() => setSelectedDate(todayLocalDate())}
-              className="px-3 py-2 rounded-xl border border-sky-200 text-sky-700 text-sm font-semibold hover:bg-sky-50"
-            >
-              Today
-            </button>
-          </div>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-[1.2fr_1fr]">
-            <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">Total for {formatDateLabel(selectedDate)}</div>
-              <div className="mt-2 text-3xl font-bold text-slate-900">{formatMl(totalMl)}</div>
-              <div className="mt-1 text-sm text-slate-500">
-                {entryCount} {entryCount === 1 ? 'entry' : 'entries'}
-                {loading ? ' - updating...' : ''}
-              </div>
-              {goalMl && (
-                <div className="mt-3 text-sm text-slate-700">
-                  Goal: {formatMl(goalMl)} daily
-                  {goalProgress != null ? ` (${goalProgress}%)` : ''}
-                </div>
-              )}
-              {goalLoading && !goalMl && (
-                <div className="mt-3 text-sm text-slate-500">Loading hydration goal...</div>
-              )}
-              {goalMl && (
-                <div className="mt-3 h-2 w-full rounded-full bg-white">
-                  <div
-                    className="h-full rounded-full bg-sky-400"
-                    style={{ width: `${goalProgress ?? 0}%` }}
-                  ></div>
-                </div>
-              )}
-            </div>
-            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Quick context</div>
-              <div className="mt-3 text-sm text-gray-700">
-                Pick a drink type and tap a size to log instantly. Use custom below for bottle sizes like 1 L, 2 L, or 3 L.
-              </div>
-            </div>
           </div>
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900">Quick add</h3>
-            <p className="text-sm text-gray-500 mt-1">Choose a drink type, then tap a size.</p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {DRINK_TYPES.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setSelectedType(type)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors ${
-                    selectedType === type
-                      ? 'bg-sky-600 text-white border-sky-600'
-                      : 'bg-white text-gray-700 border-gray-200 hover:border-sky-300'
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
+        <div className="p-4">
+          <div className="flex flex-col items-stretch justify-start rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] bg-white dark:bg-gray-900 overflow-hidden border border-gray-100 dark:border-gray-800">
+            <div className="w-full h-32 bg-gradient-to-br from-[#62b763]/40 to-[#62b763]/10 relative">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <MaterialSymbol name="water_drop" className="text-[#62b763] text-6xl opacity-30" />
+              </div>
             </div>
+            <div className="flex w-full flex-col items-stretch justify-center gap-1 py-4 px-4">
+              <p className="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Daily Hydration Summary</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-[#111711] dark:text-white text-4xl font-bold leading-tight tracking-[-0.015em]">
+                  {formatMl(totalMl)}
+                </p>
+                <p className="text-gray-400 text-lg font-medium">
+                  {goalTargetMl ? `/ ${formatMl(goalTargetMl)}` : ''}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 mt-4">
+                <div className="flex gap-6 justify-between items-center">
+                  <p className="text-[#111711] dark:text-white text-sm font-medium leading-normal">
+                    {goalTargetMl ? `${progressPercent}% of daily goal` : 'Set a daily goal'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openGoalEditor}
+                    className="text-[#62b763] text-sm font-semibold hover:underline"
+                  >
+                    Edit Goal
+                  </button>
+                </div>
+                <div className="rounded-full bg-gray-200 dark:bg-gray-800 h-2.5 overflow-hidden">
+                  <div className="h-full rounded-full bg-[#62b763]" style={{ width: `${progressPercent}%` }}></div>
+                </div>
+              </div>
+              <p className="text-gray-500 dark:text-gray-400 text-xs mt-3">
+                {entryCount} {entryCount === 1 ? 'entry' : 'entries'} logged today
+                {goalLoading ? ' - loading goal' : ''}
+              </p>
+              {goalSource === 'custom' && (
+                <p className="text-xs text-[#62b763] mt-1">Custom goal active</p>
+              )}
+            </div>
+          </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {QUICK_PRESETS.map((preset) => (
+          {showGoalEditor && (
+            <div className="mt-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-[#111711] dark:text-white">Edit hydration goal</div>
                 <button
-                  key={`${preset.label}-${preset.amount}-${preset.unit}`}
+                  type="button"
+                  onClick={() => setShowGoalEditor(false)}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={goalAmountInput}
+                  onChange={(e) => setGoalAmountInput(e.target.value)}
+                  className="h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-sm focus:border-[#62b763] focus:outline-none dark:text-white"
+                  placeholder="0"
+                />
+                <select
+                  value={goalUnit}
+                  onChange={(e) => setGoalUnit(e.target.value as 'ml' | 'l' | 'oz')}
+                  className="h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-sm focus:border-[#62b763] focus:outline-none dark:text-white"
+                >
+                  <option value="ml">ml</option>
+                  <option value="l">L</option>
+                  <option value="oz">oz</option>
+                </select>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                Recommended: {formatMl(goalRecommendedMl || 0)}
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={saveGoal}
+                  disabled={goalSaving}
+                  className="h-10 px-4 rounded-lg bg-[#62b763] text-white text-sm font-semibold disabled:opacity-60"
+                >
+                  {goalSaving ? 'Saving...' : 'Save goal'}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetGoal}
+                  disabled={goalSaving}
+                  className="h-10 px-4 rounded-lg border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300 text-sm font-semibold disabled:opacity-60"
+                >
+                  Reset to recommended
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-4 pt-2">
+          <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-3">Quick Add</h3>
+          <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
+            {DRINK_TYPES.map((drink) => (
+              <button
+                key={drink.id}
+                type="button"
+                onClick={() => setActiveDrink(drink.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
+                  activeDrink === drink.id
+                    ? 'bg-[#62b763] text-white'
+                    : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                }`}
+              >
+                <MaterialSymbol name={drink.icon} className="text-sm" />
+                {drink.id}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-4 gap-3">
+            {QUICK_PRESETS.map((preset) => {
+              const key = `${preset.amount}-${preset.unit}`
+              const isActive = lastPresetKey === key
+              return (
+                <button
+                  key={key}
                   type="button"
                   onClick={() => handleQuickAdd(preset.amount, preset.unit)}
                   disabled={saving}
-                  className="rounded-2xl border border-sky-100 bg-sky-50 px-3 py-4 text-left shadow-sm transition hover:bg-sky-100 disabled:opacity-60"
+                  className={`flex flex-col items-center justify-center p-3 rounded-xl border ${
+                    isActive
+                      ? 'border-[#62b763] bg-[#62b763]/5'
+                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-[#62b763]/50'
+                  }`}
                 >
-                  <div className="text-sm font-semibold text-gray-900">{preset.label}</div>
-                  <div className="text-xs text-gray-500 mt-1">{formatNumber(preset.amount)} {preset.unit === 'l' ? 'L' : preset.unit}</div>
+                  <span className={`text-sm font-bold ${isActive ? 'text-[#62b763]' : 'text-[#111711] dark:text-white'}`}>
+                    {formatNumber(preset.amount)}
+                  </span>
+                  <span className={`text-[10px] ${isActive ? 'text-[#62b763]' : 'text-gray-500'}`}>
+                    {preset.unit === 'l' ? 'L' : preset.unit}
+                  </span>
                 </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900">Custom entry</h3>
-            <p className="text-sm text-gray-500 mt-1">Use this for specific bottle sizes or drinks.</p>
-
-            <div className="mt-4 grid gap-4">
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Amount</label>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={customAmount}
-                    onChange={(e) => setCustomAmount(e.target.value)}
-                    className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none"
-                    placeholder="e.g. 1.5"
-                  />
-                  <select
-                    value={customUnit}
-                    onChange={(e) => setCustomUnit(e.target.value as 'ml' | 'l' | 'oz')}
-                    className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none"
-                  >
-                    <option value="ml">ml</option>
-                    <option value="l">L</option>
-                    <option value="oz">oz</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Drink label (optional)</label>
-                <input
-                  type="text"
-                  value={customLabel}
-                  onChange={(e) => setCustomLabel(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none"
-                  placeholder="e.g. Herbal tea, Sparkling water"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCustomAdd}
-                disabled={saving}
-                className="w-full rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : 'Add entry'}
-              </button>
-            </div>
+              )
+            })}
           </div>
         </div>
 
-        <div className="mt-6 rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Entries for {formatDateLabel(selectedDate)}</h3>
-            <div className="text-sm text-gray-500">{entryCount} {entryCount === 1 ? 'entry' : 'entries'}</div>
+        <div className="px-4 pt-8">
+          <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-3">Custom Entry</h3>
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <input
+                className="w-full h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-4 text-sm focus:ring-[#62b763] focus:border-[#62b763] dark:text-white"
+                placeholder="0"
+                type="number"
+                min="0"
+                step="0.1"
+                value={customAmountInput}
+                onChange={(e) => setCustomAmountInput(e.target.value)}
+              />
+              <select
+                value={customUnit}
+                onChange={(e) => setCustomUnit(e.target.value as 'ml' | 'l' | 'oz')}
+                className="absolute right-2 top-2 h-8 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 text-xs text-gray-500"
+              >
+                <option value="ml">ml</option>
+                <option value="l">L</option>
+                <option value="oz">oz</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={handleCustomAdd}
+              disabled={saving}
+              className="h-12 px-6 bg-[#62b763] text-white font-bold rounded-lg text-sm flex items-center justify-center disabled:opacity-60"
+            >
+              Add Entry
+            </button>
           </div>
+        </div>
 
-          <div className="mt-4 space-y-3">
+        <div className="px-4 pt-8 pb-10">
+          <div className="flex justify-between items-end pb-3">
+            <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">Recent Logs</h3>
+            <span className="text-xs text-gray-500 font-medium">History</span>
+          </div>
+          <div className="space-y-3">
             {loading && (
-              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-500">
+              <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-sm text-gray-500">
                 Loading entries...
               </div>
             )}
             {!loading && entries.length === 0 && (
-              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-500">
+              <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-sm text-gray-500">
                 No water entries yet. Add your first drink above.
               </div>
             )}
-            {!loading && entries.map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">{entry.label || 'Drink'}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {formatAmount(entry)} - {formatTime(entry.createdAt)}
+            {!loading && entries.map((entry) => {
+              const label = normalizeLabel(entry.label)
+              const drinkConfig = DRINK_TYPES.find((drink) => drink.id.toLowerCase() === label.toLowerCase())
+              const icon = drinkConfig?.icon || 'water_full'
+              const accent =
+                label.toLowerCase() === 'coffee'
+                  ? 'bg-orange-50 text-orange-500 dark:bg-orange-900/20'
+                  : 'bg-blue-50 text-blue-500 dark:bg-blue-900/20'
+              return (
+                <div key={entry.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${accent}`}>
+                      <MaterialSymbol name={icon} className="text-lg" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#111711] dark:text-white">{label}</p>
+                      <p className="text-xs text-gray-500">{formatTime(entry.createdAt)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <p className="text-sm font-bold text-[#111711] dark:text-white">{formatAmount(entry)}</p>
+                    <button
+                      type="button"
+                      onClick={() => deleteEntry(entry.id)}
+                      disabled={deletingId === entry.id}
+                      className="text-gray-300 hover:text-red-500 disabled:opacity-60"
+                      aria-label="Delete entry"
+                    >
+                      <MaterialSymbol name="delete" className="text-xl" />
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => deleteEntry(entry.id)}
-                  disabled={deletingId === entry.id}
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-60"
-                >
-                  {deletingId === entry.id ? 'Removing...' : 'Remove'}
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
-      </main>
+
+        <div className="h-20 bg-[#f6f7f6] dark:bg-[#151d15]"></div>
+      </div>
     </div>
   )
 }
