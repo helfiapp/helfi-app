@@ -55,12 +55,12 @@ const NUTRIENT_CARD_META: Record<typeof NUTRIENT_DISPLAY_ORDER[number], { label:
 }
 
 const ITEM_NUTRIENT_META = [
-  { key: 'calories', field: 'calories', label: 'Cal', unit: '', accent: 'text-orange-600' },
-  { key: 'protein', field: 'protein_g', label: 'Protein', unit: 'g', accent: 'text-blue-600' },
-  { key: 'carbs', field: 'carbs_g', label: 'Carbs', unit: 'g', accent: 'text-green-600' },
-  { key: 'fat', field: 'fat_g', label: 'Fat', unit: 'g', accent: 'text-purple-600' },
-  { key: 'fiber', field: 'fiber_g', label: 'Fiber', unit: 'g', accent: 'text-amber-600' },
-  { key: 'sugar', field: 'sugar_g', label: 'Sugar', unit: 'g', accent: 'text-pink-600' },
+  { key: 'calories', field: 'calories', label: 'Calories', unit: '', accent: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+  { key: 'protein', field: 'protein_g', label: 'Protein', unit: 'g', accent: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+  { key: 'carbs', field: 'carbs_g', label: 'Carbs', unit: 'g', accent: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
+  { key: 'fat', field: 'fat_g', label: 'Fat', unit: 'g', accent: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+  { key: 'fiber', field: 'fiber_g', label: 'Fiber', unit: 'g', accent: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+  { key: 'sugar', field: 'sugar_g', label: 'Sugar', unit: 'g', accent: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' },
 ] as const
 
 type NutritionTotals = {
@@ -15830,7 +15830,7 @@ Please add nutritional information manually if needed.`);
                           + Add ingredient
                         </button>
                       </div>
-                      <div className="mt-3">
+                      <div className="mt-3 space-y-4 px-4 sm:px-6">
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
                         const macroMultiplier = macroMultiplierForItem(item)
@@ -15958,13 +15958,13 @@ Please add nutritional information manually if needed.`);
                         }
                         
                         const cardPaddingClass =
-                          isCollapsed ? 'py-2 px-5' : 'p-4'
+                          isCollapsed ? 'py-3 px-4' : 'p-5'
 
                         return (
                           <div
                             key={index}
                             data-analysis-ingredient-card="1"
-                            className={`bg-white border-gray-200 ${cardPaddingClass} border-b ${index === 0 ? 'border-t' : ''} rounded-none ${isCollapsed ? 'cursor-pointer' : ''} overflow-hidden min-w-0`}
+                            className={`bg-white border border-slate-100 shadow-sm ${cardPaddingClass} rounded-2xl ${isCollapsed ? 'cursor-pointer hover:shadow-md transition-shadow' : ''} overflow-hidden min-w-0`}
                             role={isCollapsed ? 'button' : undefined}
                             tabIndex={isCollapsed ? 0 : undefined}
                             onClick={isCollapsed ? toggleExpand : undefined}
@@ -15982,14 +15982,14 @@ Please add nutritional information manually if needed.`);
                             {/* Header row with actions, title, and description */}
                             {isCollapsed ? (
                               <div className="flex items-center justify-between gap-2">
-                                <div className="font-semibold text-gray-900 text-base leading-tight break-words">
+                                <div className="font-semibold text-slate-900 text-base leading-tight break-words">
                                   {displayName}
                                 </div>
                                 <button
                                   onClick={() => {
                                     toggleExpand()
                                   }}
-                                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                  className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                   title="Expand"
                                 >
                                   <svg
@@ -16003,16 +16003,16 @@ Please add nutritional information manually if needed.`);
                                 </button>
                               </div>
                             ) : (
-                              <div className="flex flex-col mb-2">
-                                <div className="flex items-center justify-end gap-1">
-                                  <div className="flex items-center gap-1">
+                              <div className="flex flex-col mb-3">
+                                <div className="flex items-center justify-end">
+                                  <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 shadow-sm">
                                     <button
                                       type="button"
                                       onClick={() => handleItemThumb(index, 'up')}
-                                      className={`p-1 rounded-md transition-colors ${
+                                      className={`p-1.5 rounded-full transition-colors ${
                                         analysisFeedbackItems[index] === 'up'
                                           ? 'bg-emerald-600 text-white'
-                                          : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
+                                          : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
                                       }`}
                                       title="Thumbs up"
                                     >
@@ -16021,10 +16021,10 @@ Please add nutritional information manually if needed.`);
                                     <button
                                       type="button"
                                       onClick={() => handleItemThumb(index, 'down')}
-                                      className={`p-1 rounded-md transition-colors ${
+                                      className={`p-1.5 rounded-full transition-colors ${
                                         analysisFeedbackItems[index] === 'down'
                                           ? 'bg-red-600 text-white'
-                                          : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                                          : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
                                       }`}
                                       title="Thumbs down"
                                     >
@@ -16036,7 +16036,7 @@ Please add nutritional information manually if needed.`);
                                       setEditingItemIndex(index);
                                       setShowItemEditModal(true);
                                     }}
-                                    className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
                                     title="Adjust details"
                                   >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -16045,7 +16045,7 @@ Please add nutritional information manually if needed.`);
                                   </button>
                                   <button
                                     onClick={() => handleDeleteItem(index)}
-                                    className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
                                     title="Delete ingredient"
                                   >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -16057,7 +16057,7 @@ Please add nutritional information manually if needed.`);
                                       onClick={() => {
                                         toggleExpand()
                                       }}
-                                      className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                      className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors"
                                       title={isExpanded ? 'Collapse' : 'Expand'}
                                     >
                                       <svg
@@ -16071,14 +16071,16 @@ Please add nutritional information manually if needed.`);
                                     </button>
                                   )}
                                 </div>
-                                <div className="font-semibold text-gray-900 text-base mt-1 break-words">
+                                <div className="font-semibold text-slate-900 text-lg mt-2 break-words">
                                   {displayName}
                                 </div>
                                 {item.brand && (
-                                  <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
+                                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">
+                                    {item.brand}
+                                  </div>
                                 )}
                                 <div 
-                                  className="text-sm text-gray-500 mt-1 md:cursor-default cursor-pointer active:opacity-70 break-words"
+                                  className="text-sm text-slate-500 mt-1 md:cursor-default cursor-pointer active:opacity-70 break-words"
                                   onClick={() => {
                                     // On mobile, clicking serving size focuses weight input
                                     if (window.innerWidth < 768) {
@@ -16090,13 +16092,13 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 {servingOptions.length > 0 && (
                                   <div className="mt-2">
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">
                                       Serving size
                                     </label>
                                     <select
                                       value={selectedServingId || servingOptions[0]?.id || ''}
                                       onChange={(e) => handleServingOptionSelect(index, e.target.value)}
-                                      className="w-full max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      className="w-full max-w-xs px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-slate-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                     >
                                       {servingOptions.map((option: any) => (
                                         <option key={option.id} value={option.id}>
@@ -16105,7 +16107,7 @@ Please add nutritional information manually if needed.`);
                                       ))}
                                     </select>
                                     {item?.dbSource && (
-                                      <div className="mt-1 text-[11px] text-gray-400">
+                                      <div className="mt-1 text-[11px] text-slate-400">
                                         Data source: {item.dbSource === 'usda' ? 'USDA' : item.dbSource === 'fatsecret' ? 'FatSecret' : 'Database'}
                                       </div>
                                     )}
@@ -16123,7 +16125,7 @@ Please add nutritional information manually if needed.`);
                                       })
                                       setShowBarcodeLabelPrompt(true)
                                     }}
-                                    className="mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline"
+                                    className="mt-3 text-xs font-semibold uppercase tracking-wider text-emerald-700 hover:text-emerald-800"
                                   >
                                     Report incorrect nutrition
                                   </button>
@@ -16133,10 +16135,10 @@ Please add nutritional information manually if needed.`);
                             
                             {/* Portion controls: servings + optional weight editor (keeps servings/pieces/weight in sync). */}
                             {isExpanded && (
-                              <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-100">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-sm text-gray-600">Servings:</span>
-                                  <div className="flex items-center gap-2">
+                              <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-slate-100">
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Servings</span>
+                                  <div className="flex items-center bg-slate-100 p-1 rounded-xl">
                                     <button
                                       onClick={() => {
                                         const current = analyzedItems[index]?.servings || 1
@@ -16149,7 +16151,7 @@ Please add nutritional information manually if needed.`);
                                         const next = snapToStep(current - step)
                                         updateItemField(index, 'servings', next)
                                       }}
-                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                      className="w-10 h-10 flex items-center justify-center rounded-lg bg-white shadow-sm active:scale-95 transition-transform text-emerald-600"
                                     >
                                       -
                                     </button>
@@ -16184,7 +16186,7 @@ Please add nutritional information manually if needed.`);
                                           return next
                                         })
                                       }}
-                                      className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none p-0"
                                     />
                                     <button
                                       onClick={() => {
@@ -16198,19 +16200,19 @@ Please add nutritional information manually if needed.`);
                                         const next = snapToStep(current + step)
                                         updateItemField(index, 'servings', next)
                                       }}
-                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                      className="w-10 h-10 flex items-center justify-center rounded-lg bg-white shadow-sm active:scale-95 transition-transform text-emerald-600"
                                     >
                                       +
                                     </button>
                                   </div>
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-slate-400">
                                   {servingSizeDisplayLabel ? `1 serving = ${servingSizeDisplayLabel}` : 'Serving size not specified'}
                                 </div>
                                 {/* Pieces control for discrete items */}
                                 {piecesPerServing && piecesPerServing > 0 && (
-                                  <div className="flex items-center gap-3 mt-2">
-                                    <span className="text-sm text-gray-600">
+                                  <div className="flex items-center justify-between gap-3 mt-2">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                                       {(() => {
                                         const labelSource = String(servingSizeDisplayLabel || item?.serving_size || item?.name || '')
                                         const meta = parseServingUnitMetadata(labelSource)
@@ -16221,7 +16223,7 @@ Please add nutritional information manually if needed.`);
                                         return 'Pieces:'
                                       })()}
                                     </span>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center bg-slate-100 p-1 rounded-xl">
                                     <button
                                       onClick={() => {
                                         const current = analyzedItems[index]?.servings || 1
@@ -16230,7 +16232,7 @@ Please add nutritional information manually if needed.`);
                                         const newServings = newPieces / piecesPerServing
                                         updateItemField(index, 'servings', newServings)
                                       }}
-                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                      className="w-10 h-10 flex items-center justify-center rounded-lg bg-white shadow-sm active:scale-95 transition-transform text-emerald-600"
                                     >
                                       -
                                     </button>
@@ -16269,7 +16271,7 @@ Please add nutritional information manually if needed.`);
                                             return next
                                           })
                                         }}
-                                        className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                        className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none p-0"
                                       />
                                       <button
                                         onClick={() => {
@@ -16279,7 +16281,7 @@ Please add nutritional information manually if needed.`);
                                           const newServings = newPieces / piecesPerServing
                                           updateItemField(index, 'servings', newServings)
                                         }}
-                                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-white shadow-sm active:scale-95 transition-transform text-emerald-600"
                                     >
                                         +
                                       </button>
@@ -16287,9 +16289,9 @@ Please add nutritional information manually if needed.`);
                                   </div>
                                 )}
                                 {/* Weight editor: changing weight back-calculates servings (and pieces) when possible */}
-                                <div className="flex items-center gap-3 mt-2">
-                                  <span className="text-sm text-gray-600">Weight:</span>
-                                  <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-between gap-3 mt-2">
+                                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Weight</span>
+                                  <div className="flex items-center bg-slate-100 rounded-xl px-4 py-2 border border-transparent focus-within:border-emerald-200 transition-all">
                                     <input
                                       type="number"
                                       inputMode="decimal"
@@ -16334,12 +16336,13 @@ Please add nutritional information manually if needed.`);
                                             )
                                           : 'e.g., 250'
                                       }
-                                      className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      className="w-14 bg-transparent border-none font-bold text-lg text-slate-900 text-right focus:ring-0 focus:outline-none p-0"
                                     />
+                                    <div className="w-px h-6 bg-slate-300 mx-3" />
                                     <select
                                       value={item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'}
                                       onChange={(e) => updateItemField(index, 'weightUnit', e.target.value)}
-                                      className="pl-2 pr-8 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      className="bg-transparent border-none text-sm font-semibold text-slate-700 focus:ring-0 cursor-pointer pr-4"
                                     >
                                       <option value="g">g</option>
                                       <option value="ml">ml</option>
@@ -16348,7 +16351,7 @@ Please add nutritional information manually if needed.`);
                                   </div>
                                 </div>
                                 {baseWeightPerServing && (
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-slate-400">
                                     Total amount ≈{' '}
                                     {(() => {
                                       const unit =
@@ -16364,11 +16367,14 @@ Please add nutritional information manually if needed.`);
                             
                             {/* Macro totals for this ingredient – updates as servings change */}
                             {isExpanded && (
-                            <div className="space-y-2">
-                              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                Totals for {totalsLabel}
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                  Nutritional breakdown
+                                </div>
+                                <div className="text-xs text-slate-400">Total for {totalsLabel}</div>
                               </div>
-                              <div className="flex flex-wrap gap-2">
+                              <div className="grid grid-cols-3 gap-3">
                                 {ITEM_NUTRIENT_META.map((meta) => {
                                   const totalValue = totalsByField[meta.field as keyof typeof totalsByField]
                                   const displayValue =
@@ -16384,10 +16390,10 @@ Please add nutritional information manually if needed.`);
                                   return (
                                     <div
                                       key={`${meta.field}-${index}`}
-                                      className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700 flex items-center gap-1"
+                                      className={`p-3 rounded-2xl border ${meta.bg} ${meta.border} flex flex-col items-start gap-1`}
                                     >
-                                      <span className={`font-semibold ${meta.accent}`}>{displayValue}</span>
-                                      <span className="uppercase text-gray-500">{labelText}</span>
+                                      <span className={`text-lg font-bold ${meta.accent}`}>{displayValue}</span>
+                                      <span className={`text-[10px] font-bold uppercase ${meta.accent}`}>{labelText}</span>
                                     </div>
                                   )
                                 })}
