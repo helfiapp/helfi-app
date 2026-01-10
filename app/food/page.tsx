@@ -16201,7 +16201,7 @@ Please add nutritional information manually if needed.`);
                                           return next
                                         })
                                       }}
-                                      className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none p-0"
+                                      className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 focus:outline-none p-0"
                                     />
                                     <button
                                       onClick={() => {
@@ -16286,7 +16286,7 @@ Please add nutritional information manually if needed.`);
                                             return next
                                           })
                                         }}
-                                        className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none p-0"
+                                        className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 focus:outline-none p-0"
                                       />
                                       <button
                                         onClick={() => {
@@ -16306,7 +16306,7 @@ Please add nutritional information manually if needed.`);
                                 {/* Weight editor: changing weight back-calculates servings (and pieces) when possible */}
                                 <div className="flex items-center justify-between gap-3 mt-2">
                                   <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Weight</span>
-                                  <div className="flex items-center bg-slate-100 rounded-xl px-4 py-2 border border-transparent focus-within:border-emerald-200 transition-all">
+                                  <div className="flex items-center bg-slate-100 rounded-xl px-4 py-2 border border-transparent">
                                     <input
                                       type="number"
                                       inputMode="decimal"
@@ -16351,13 +16351,13 @@ Please add nutritional information manually if needed.`);
                                             )
                                           : 'e.g., 250'
                                       }
-                                      className="w-14 bg-transparent border-none font-bold text-lg text-slate-900 text-right focus:ring-0 focus:outline-none p-0"
+                                      className="w-14 bg-transparent border-none font-bold text-lg text-slate-900 text-right focus:outline-none p-0"
                                     />
                                     <div className="w-px h-6 bg-slate-300 mx-3" />
                                     <select
                                       value={item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'}
                                       onChange={(e) => updateItemField(index, 'weightUnit', e.target.value)}
-                                      className="bg-transparent border-none text-sm font-semibold text-slate-700 focus:ring-0 cursor-pointer pr-4"
+                                      className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none"
                                     >
                                       <option value="g">g</option>
                                       <option value="ml">ml</option>
