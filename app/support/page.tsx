@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { getCurrentSupportAgent, getSupportAgentForTimestamp } from '@/lib/support-agents'
 
@@ -19,6 +20,7 @@ const URL_REGEX = /https?:\/\/[^\s]+/g
 
 export default function SupportPage() {
   const { data: session } = useSession()
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [activeTicket, setActiveTicket] = useState<any | null>(null)
@@ -597,6 +599,23 @@ export default function SupportPage() {
     : []
   const combinedConversationItems = [...conversationItems, ...optimisticMessages]
 
+  const handleBack = () => {
+    triggerHaptic()
+    if (showChatPanel) {
+      setShowChatView(false)
+      setShowChatComposer(false)
+      setShowPostSubmitChoice(false)
+      return
+    }
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+    } else if (session) {
+      router.push('/dashboard')
+    } else {
+      router.push('/')
+    }
+  }
+
   const openTicket = async (ticketId: string) => {
     triggerHaptic()
     setIsLoadingTicket(true)
@@ -663,21 +682,13 @@ export default function SupportPage() {
       {/* Page Title */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {showChatPanel ? (
-            <button
-              type="button"
-              onClick={() => {
-                triggerHaptic()
-                setShowChatView(false)
-                setShowChatComposer(false)
-              }}
-              className="text-sm font-semibold text-helfi-green"
-            >
-              ← Back
-            </button>
-          ) : (
-            <span className="w-14" aria-hidden="true" />
-          )}
+          <button
+            type="button"
+            onClick={handleBack}
+            className="text-sm font-semibold text-helfi-green"
+          >
+            ← Back
+          </button>
           <div className="flex-1 text-center">
             <h1 className="text-lg md:text-xl font-semibold text-gray-900">Get Support</h1>
             <p className="text-sm text-gray-500 hidden sm:block">We're here to help you with any questions or issues</p>
