@@ -29,6 +29,26 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   const hasBanner = !!page.bannerImage
   const hasCarousel = !!page.carouselImages && page.carouselImages.length > 0
   const bannerLayout = page.bannerLayout ?? 'carousel'
+  const ctaPlacement = page.ctaPlacement ?? 'text'
+  const overviewPaddingClass = page.overviewSpacing === 'spacious' ? 'pt-16 md:pt-20' : 'pt-10'
+  const ctaButtonsClass = ctaPlacement === 'image' ? 'mt-6 flex flex-wrap gap-3' : 'flex flex-wrap gap-3 mt-8'
+
+  const ctaButtons = (
+    <div className={ctaButtonsClass}>
+      <Link
+        href={page.primaryCta.href}
+        className="px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+      >
+        {page.primaryCta.label}
+      </Link>
+      <Link
+        href={page.secondaryCta.href}
+        className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
+      >
+        {page.secondaryCta.label}
+      </Link>
+    </div>
+  )
 
   const overviewContent = (
     <div className="max-w-3xl">
@@ -49,20 +69,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
           <p key={paragraph}>{paragraph}</p>
         ))}
       </div>
-      <div className="flex flex-wrap gap-3 mt-8">
-        <Link
-          href={page.primaryCta.href}
-          className="px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-        >
-          {page.primaryCta.label}
-        </Link>
-        <Link
-          href={page.secondaryCta.href}
-          className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
-        >
-          {page.secondaryCta.label}
-        </Link>
-      </div>
+      {ctaPlacement === 'text' && ctaButtons}
     </div>
   )
 
@@ -99,33 +106,36 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
             </div>
           </section>
         )}
-        <section id="overview" className="px-6 pt-10 pb-12">
+        <section id="overview" className={`px-6 ${overviewPaddingClass} pb-12`}>
           <div className="max-w-6xl mx-auto">
             {isExpandedOverview ? (
               <>
                 <div className={`grid gap-10 lg:grid-cols-[1.1fr_0.9fr] ${overviewAlignClass}`}>
                   {overviewContent}
                   {showHeroImage && (
-                    <div
-                      className={
-                        heroIsPhoto
-                          ? 'rounded-3xl overflow-hidden shadow-lg'
-                          : 'rounded-3xl p-4 bg-transparent shadow-none border border-transparent'
-                      }
-                    >
-                      <Image
-                        src={page.heroImage.src}
-                        alt={page.heroImage.alt}
-                        width={page.heroImage.width ?? 1450}
-                        height={page.heroImage.height ?? 2936}
-                        sizes="(min-width: 1024px) 40vw, 90vw"
+                    <div>
+                      <div
                         className={
                           heroIsPhoto
-                            ? 'w-full h-auto object-cover'
-                            : 'w-full h-auto max-h-[520px] object-contain rounded-2xl'
+                            ? 'rounded-3xl overflow-hidden shadow-lg'
+                            : 'rounded-3xl p-4 bg-transparent shadow-none border border-transparent'
                         }
-                        priority
-                      />
+                      >
+                        <Image
+                          src={page.heroImage.src}
+                          alt={page.heroImage.alt}
+                          width={page.heroImage.width ?? 1450}
+                          height={page.heroImage.height ?? 2936}
+                          sizes="(min-width: 1024px) 40vw, 90vw"
+                          className={
+                            heroIsPhoto
+                              ? 'w-full h-auto object-cover'
+                              : 'w-full h-auto max-h-[520px] object-contain rounded-2xl'
+                          }
+                          priority
+                        />
+                      </div>
+                      {ctaPlacement === 'image' && ctaButtons}
                     </div>
                   )}
                 </div>
@@ -165,16 +175,19 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                 {overviewContent}
                 <div className="space-y-6">
                   {showHeroImage && (
-                    <div className="rounded-3xl p-4 bg-transparent shadow-none border border-transparent">
-                      <Image
-                        src={page.heroImage.src}
-                        alt={page.heroImage.alt}
-                        width={page.heroImage.width ?? 1450}
-                        height={page.heroImage.height ?? 2936}
-                        sizes="(min-width: 1024px) 35vw, 90vw"
-                        className="w-full h-auto max-h-[520px] object-contain rounded-2xl"
-                        priority
-                      />
+                    <div>
+                      <div className="rounded-3xl p-4 bg-transparent shadow-none border border-transparent">
+                        <Image
+                          src={page.heroImage.src}
+                          alt={page.heroImage.alt}
+                          width={page.heroImage.width ?? 1450}
+                          height={page.heroImage.height ?? 2936}
+                          sizes="(min-width: 1024px) 35vw, 90vw"
+                          className="w-full h-auto max-h-[520px] object-contain rounded-2xl"
+                          priority
+                        />
+                      </div>
+                      {ctaPlacement === 'image' && ctaButtons}
                     </div>
                   )}
                   <aside className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-8">

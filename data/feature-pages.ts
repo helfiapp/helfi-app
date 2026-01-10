@@ -46,6 +46,8 @@ export type FeaturePageContent = {
   showSegmentImages?: boolean
   overviewLayout?: 'default' | 'expanded'
   overviewAlign?: 'center' | 'start'
+  overviewSpacing?: 'default' | 'spacious'
+  ctaPlacement?: 'text' | 'image'
   primaryCta: FeaturePageCta
   secondaryCta: FeaturePageCta
   capabilities: FeaturePageCapability[]
@@ -108,7 +110,7 @@ export const featurePages: FeaturePageContent[] = [
     intro:
       'Helfi combines daily check-ins, manual logs, and wearable data so you can track progress without juggling tools.',
     overview: [
-      'You can capture the basics each day and see them alongside activity, sleep, and wellness metrics pulled from supported devices.',
+      'You can capture the basics each day and see them alongside activity and wellness metrics pulled from supported devices, including sleep when a wearable is connected.',
       'Fitbit and Garmin Connect are supported today, and you can share interest in other integrations as the device roster expands.',
       'As a health tracking app, Helfi keeps wearable health data and daily check-ins connected in a single timeline.',
       'Because the data lives in one place, you can move from daily tracking to weekly review without digging through multiple apps.',
@@ -124,6 +126,8 @@ export const featurePages: FeaturePageContent[] = [
     showHeroImage: true,
     overviewLayout: 'expanded',
     overviewAlign: 'start',
+    overviewSpacing: 'spacious',
+    ctaPlacement: 'image',
     bannerImage: healthTrackingPhoto(
       '/WEBSITE IMAGES/HEALTH TRACKING/HEALTH TRACKING BANNER.jpg',
       'Health tracking banner'
@@ -153,7 +157,7 @@ export const featurePages: FeaturePageContent[] = [
       {
         title: 'Unified daily dashboard',
         description:
-          'A single daily view for activity, sleep, and check-in trends with quick access to recent entries.',
+          'A single daily view for activity, check-ins, and sleep data when a wearable is connected, with quick access to recent entries.',
       },
       {
         title: 'Wearable syncs',
@@ -163,7 +167,7 @@ export const featurePages: FeaturePageContent[] = [
       {
         title: 'Trend comparisons',
         description:
-          'Weekly and 30-day views help you spot changes as routines shift or new habits begin.',
+          'The 7-day health report helps you spot changes as routines shift or new habits begin.',
       },
     ],
     useCases: [
@@ -184,9 +188,9 @@ export const featurePages: FeaturePageContent[] = [
       },
     ],
     outcomes: [
-      'Know what changed over the last 7 and 30 days without manual spreadsheets.',
+      'Know what changed over the last 7 days without manual spreadsheets.',
       'Bring clearer context into weekly reports and provider conversations.',
-      'Spot gaps in sleep, activity, or check-ins before they become patterns.',
+      'Spot gaps in activity, check-ins, or wearable sleep tracking before they become patterns.',
       'Keep device and manual tracking in one place, ready for review.',
       'Reduce tracking fatigue with a single, consistent workflow.',
       'Build a long-term record that supports proactive decisions.',
@@ -197,13 +201,13 @@ export const featurePages: FeaturePageContent[] = [
         description:
           'Start each day with a focused snapshot of the metrics that matter most.',
         details: [
-          'The dashboard highlights the latest activity and sleep signals alongside your most recent check-in.',
+          'The dashboard highlights the latest activity signals alongside your most recent check-in, with sleep shown when a wearable is connected.',
           'This keeps your daily routine visible before you dive into deeper analysis or reports.',
           'Over time, the dashboard becomes a quick reference point for how habits are trending.',
         ],
         bullets: [
-          'Daily snapshot for activity and sleep',
-          'Weekly rollups at a glance',
+          'Daily snapshot for activity and connected sleep data',
+          '7-day report highlights at a glance',
           'Quick links to check-ins and trends',
           'Supports manual metrics you care about',
           'Designed for fast mobile review',
@@ -239,7 +243,7 @@ export const featurePages: FeaturePageContent[] = [
         description:
           'Sync supported wearables to add context to your daily log.',
         details: [
-          'Fitbit and Garmin Connect data can be pulled into Helfi so your activity and sleep metrics stay aligned.',
+          'Fitbit and Garmin Connect data can be pulled into Helfi so your activity and sleep metrics from your devices stay aligned.',
           'You can see summaries, charts, and correlations without leaving the platform.',
           'Device syncing keeps the data flow steady without manual imports.',
         ],
