@@ -15,6 +15,18 @@ export default function MockupGallery({ images, ariaLabel = 'Health tracking moc
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
   const ignoreClickRef = useRef(false)
+  const triggerHaptic = () => {
+    try {
+      if (typeof window === 'undefined') return
+      const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+      const pref = window.localStorage?.getItem('hapticsEnabled')
+      const enabled = pref === null ? true : pref === 'true'
+      if (!enabled || reduced) return
+      if ('vibrate' in navigator) {
+        navigator.vibrate(10)
+      }
+    } catch {}
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -107,9 +119,10 @@ export default function MockupGallery({ images, ariaLabel = 'Health tracking moc
               onPointerDown={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
+                triggerHaptic()
                 closeLightbox()
               }}
-              className="absolute top-6 right-6 z-[2010] h-11 w-11 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md flex items-center justify-center text-2xl leading-none"
+              className="absolute top-6 right-6 z-[2010] h-11 w-11 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md flex items-center justify-center text-2xl leading-none active:scale-95 transition-transform"
               aria-label="Close image preview"
             >
               <span aria-hidden="true">×</span>
@@ -118,12 +131,13 @@ export default function MockupGallery({ images, ariaLabel = 'Health tracking moc
               type="button"
               onPointerDown={(event) => {
                 event.stopPropagation()
+                triggerHaptic()
               }}
               onClick={(event) => {
                 event.stopPropagation()
                 setExpandedIndex((prev) => (prev === null ? prev : (prev - 1 + images.length) % images.length))
               }}
-              className="absolute left-8 top-1/2 -translate-y-1/2 z-[2010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white"
+              className="absolute left-8 top-1/2 -translate-y-1/2 z-[2010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white active:scale-95 transition-transform"
               aria-label="Previous image"
             >
               <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
@@ -152,12 +166,13 @@ export default function MockupGallery({ images, ariaLabel = 'Health tracking moc
               type="button"
               onPointerDown={(event) => {
                 event.stopPropagation()
+                triggerHaptic()
               }}
               onClick={(event) => {
                 event.stopPropagation()
                 setExpandedIndex((prev) => (prev === null ? prev : (prev + 1) % images.length))
               }}
-              className="absolute right-8 top-1/2 -translate-y-1/2 z-[2010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white"
+              className="absolute right-8 top-1/2 -translate-y-1/2 z-[2010] h-12 w-12 rounded-full bg-white/90 text-gray-700 hover:bg-white active:scale-95 transition-transform"
               aria-label="Next image"
             >
               <svg viewBox="0 0 20 20" className="h-5 w-5 mx-auto" fill="currentColor" aria-hidden="true">
