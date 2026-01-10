@@ -51,6 +51,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [renameValue, setRenameValue] = useState('')
   const [renameCleared, setRenameCleared] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deletePending, setDeletePending] = useState(false)
   const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
   const storageKey = useMemo(() => 'helfi:chat:talk', [])
   const archivedKey = useMemo(() => 'helfi:chat:talk:archived', [])
@@ -307,6 +308,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     setRenameOpen(false)
     setDeleteConfirmOpen(false)
     setRenameCleared(false)
+    setDeletePending(false)
     longPressTriggeredRef.current = true
   }
 
@@ -315,6 +317,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     setRenameOpen(false)
     setDeleteConfirmOpen(false)
     setRenameCleared(false)
+    setDeletePending(false)
     longPressTriggeredRef.current = false
   }
 
@@ -1154,7 +1157,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 <button
                   type="button"
                   onClick={() => setDeleteConfirmOpen(true)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 rounded-lg"
+                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 active:translate-y-[1px] active:scale-[0.99] transition rounded-lg"
                 >
                   Delete
                   <span className="material-symbols-outlined text-red-500" style={{ fontSize: 20 }}>delete</span>
@@ -1218,12 +1221,15 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                     type="button"
                     onClick={async () => {
                       if (!actionThreadId) return
+                      setDeletePending(true)
                       await handleDeleteThread(actionThreadId)
+                      setDeletePending(false)
                       closeThreadActions()
                     }}
-                    className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+                    disabled={deletePending}
+                    className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 active:bg-red-700 active:translate-y-[1px] active:scale-[0.99] transition disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Delete
+                    {deletePending ? 'Deleting…' : 'Delete'}
                   </button>
                 </div>
               </div>
