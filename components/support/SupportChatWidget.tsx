@@ -26,6 +26,7 @@ const STORAGE_KEYS = {
   guestToken: 'helfi:support:guest:token',
   guestName: 'helfi:support:guest:name',
   guestEmail: 'helfi:support:guest:email',
+  guestHistory: 'helfi:support:guest:history',
 }
 
 export default function SupportChatWidget() {
@@ -55,6 +56,13 @@ export default function SupportChatWidget() {
   const [guestEmail, setGuestEmail] = useState('')
   const [guestToken, setGuestToken] = useState('')
   const [guestTicketId, setGuestTicketId] = useState('')
+  const [guestHistory, setGuestHistory] = useState<Array<{
+    ticketId: string
+    token: string
+    subject: string
+    createdAt: string
+    updatedAt: string
+  }>>([])
   const [feedbackRating, setFeedbackRating] = useState(0)
   const [feedbackComment, setFeedbackComment] = useState('')
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
@@ -82,6 +90,17 @@ export default function SupportChatWidget() {
     setGuestToken(window.localStorage.getItem(STORAGE_KEYS.guestToken) || '')
     setGuestName(window.localStorage.getItem(STORAGE_KEYS.guestName) || '')
     setGuestEmail(window.localStorage.getItem(STORAGE_KEYS.guestEmail) || '')
+    try {
+      const rawHistory = window.localStorage.getItem(STORAGE_KEYS.guestHistory)
+      if (rawHistory) {
+        const parsed = JSON.parse(rawHistory)
+        if (Array.isArray(parsed)) {
+          setGuestHistory(parsed)
+        }
+      }
+    } catch {
+      setGuestHistory([])
+    }
   }, [])
 
   useEffect(() => {
@@ -155,6 +174,11 @@ export default function SupportChatWidget() {
       window.localStorage.setItem(STORAGE_KEYS.guestEmail, guestEmail)
     }
   }, [guestName, guestEmail])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(STORAGE_KEYS.guestHistory, JSON.stringify(guestHistory))
+  }, [guestHistory])
 
   const splitMessageAttachments = (messageText: string) => {
     const markerIndex = messageText.indexOf(ATTACHMENTS_MARKER)
@@ -358,6 +382,22 @@ export default function SupportChatWidget() {
         setTicket(result.ticket || null)
         setGuestToken(result.token || '')
         setGuestTicketId(result.ticket?.id || '')
+        if (result.ticket?.id && result.token) {
+          setGuestHistory((prev) => {
+            const existing = prev.find((item) => item.ticketId === result.ticket.id)
+            if (existing) return prev
+            return [
+              {
+                ticketId: result.ticket.id,
+                token: result.token,
+                subject: result.ticket.subject || 'Support chat',
+                createdAt: result.ticket.createdAt || new Date().toISOString(),
+                updatedAt: result.ticket.updatedAt || new Date().toISOString(),
+              },
+              ...prev,
+            ]
+          })
+        }
         setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
       }
       if (!response.ok) {
@@ -550,6 +590,48 @@ export default function SupportChatWidget() {
     }
   }
 
+  const openGuestTicket = async (ticketId: string, token: string) => {
+    triggerHaptic()
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/support/inquiry?ticketId=${ticketId}&token=${token}`)
+      if (response.ok) {
+        const result = await response.json()
+        setTicket(result.ticket || null)
+        setGuestTicketId(ticketId)
+        setGuestToken(token)
+      }
+    } catch (error) {
+      console.error('Error loading guest ticket:', error)
+    }
+    setIsLoading(false)
+  }
+
+  const deleteGuestTicket = async (ticketId: string, token: string) => {
+    const confirmed = typeof window !== 'undefined'
+      ? window.confirm('Delete this ticket permanently? This cannot be undone.')
+      : false
+    if (!confirmed) return
+    triggerHaptic()
+    try {
+      const response = await fetch('/api/support/inquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_ticket', ticketId, token }),
+      })
+      if (response.ok) {
+        setGuestHistory((prev) => prev.filter((item) => item.ticketId !== ticketId))
+        if (guestTicketId === ticketId) {
+          setTicket(null)
+          setGuestTicketId('')
+          setGuestToken('')
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting guest ticket:', error)
+    }
+  }
+
   if (shouldHideWidget) return null
   if (isLoggedIn) return null
   if (!hasReachedAnchor) return null
@@ -700,6 +782,41 @@ export default function SupportChatWidget() {
                     placeholder="Your email"
                     className="w-full bg-gray-100 border border-gray-200 rounded-full px-4 py-2 text-sm"
                   />
+                  {guestHistory.length > 0 && (
+                    <div className="pt-2">
+                      <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.18em] mb-2">
+                        Past tickets
+                      </div>
+                      <div className="space-y-2">
+                        {guestHistory.map((item) => (
+                          <div key={item.ticketId} className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold text-gray-800 truncate">{item.subject}</div>
+                              <div className="text-[10px] text-gray-400">
+                                {new Date(item.updatedAt || item.createdAt).toLocaleDateString()}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openGuestTicket(item.ticketId, item.token)}
+                                className="text-[11px] font-semibold text-emerald-600"
+                              >
+                                View
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteGuestTicket(item.ticketId, item.token)}
+                                className="text-[11px] font-semibold text-red-500"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

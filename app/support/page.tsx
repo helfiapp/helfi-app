@@ -37,6 +37,16 @@ export default function SupportPage() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [showChatComposer, setShowChatComposer] = useState(false)
   const [showChatView, setShowChatView] = useState(true)
+  const [ticketHistory, setTicketHistory] = useState<Array<{
+    id: string
+    subject: string
+    status: string
+    priority: string
+    category: string
+    createdAt: string
+    updatedAt: string
+  }>>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{
     id: string
     message: string
@@ -164,11 +174,27 @@ export default function SupportPage() {
     setIsLoadingTicket(false)
   }, [session?.user?.email])
 
+  const loadTicketHistory = useCallback(async () => {
+    if (!session?.user?.email) return
+    setIsLoadingHistory(true)
+    try {
+      const response = await fetch('/api/support/tickets?list=1&activeOnly=0')
+      if (response.ok) {
+        const result = await response.json()
+        setTicketHistory(Array.isArray(result.tickets) ? result.tickets : [])
+      }
+    } catch (error) {
+      console.error('Error loading support ticket history:', error)
+    }
+    setIsLoadingHistory(false)
+  }, [session?.user?.email])
+
   useEffect(() => {
     if (session?.user?.email) {
       loadActiveTicket()
+      loadTicketHistory()
     }
-  }, [session, loadActiveTicket])
+  }, [session, loadActiveTicket, loadTicketHistory])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -411,6 +437,7 @@ export default function SupportPage() {
           setShowChatComposer(true)
         }
         setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
+        loadTicketHistory()
       }
       if (!response.ok) {
         setOptimisticMessages((prev) => prev.filter((item) => item.id !== optimisticId))
@@ -448,6 +475,7 @@ export default function SupportPage() {
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('helfi:support:cleared-ticket')
     }
+    loadTicketHistory()
   }
 
   const clearChat = () => {
@@ -485,6 +513,7 @@ export default function SupportPage() {
       if (response.ok) {
         const result = await response.json()
         setActiveTicket(result.ticket || null)
+        loadTicketHistory()
       }
     } catch (error) {
       console.error('Error ending support chat:', error)
@@ -514,6 +543,7 @@ export default function SupportPage() {
         const result = await response.json()
         setActiveTicket(result.ticket || null)
         setFeedbackSubmitted(true)
+        loadTicketHistory()
       }
     } catch (error) {
       console.error('Error submitting feedback:', error)
@@ -556,6 +586,50 @@ export default function SupportPage() {
       ]
     : []
   const combinedConversationItems = [...conversationItems, ...optimisticMessages]
+
+  const openTicket = async (ticketId: string) => {
+    triggerHaptic()
+    setIsLoadingTicket(true)
+    try {
+      const response = await fetch(`/api/support/tickets?ticketId=${ticketId}&activeOnly=0`)
+      if (response.ok) {
+        const result = await response.json()
+        if (result.ticket) {
+          setActiveTicket(result.ticket)
+          setShowChatComposer(true)
+          setShowChatView(true)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading ticket:', error)
+    }
+    setIsLoadingTicket(false)
+  }
+
+  const deleteTicket = async (ticketId: string) => {
+    const confirmed = typeof window !== 'undefined'
+      ? window.confirm('Delete this ticket permanently? This cannot be undone.')
+      : false
+    if (!confirmed) return
+    triggerHaptic()
+    try {
+      const response = await fetch('/api/support/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_ticket', ticketId }),
+      })
+      if (response.ok) {
+        setTicketHistory((prev) => prev.filter((ticket) => ticket.id !== ticketId))
+        if (activeTicket?.id === ticketId) {
+          setActiveTicket(null)
+          setShowChatComposer(false)
+          setShowChatView(false)
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting ticket:', error)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -604,6 +678,56 @@ export default function SupportPage() {
             >
               Start support chat
             </button>
+          </div>
+        )}
+
+        {showSupportEntry && (
+          <div className="mb-10 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Past tickets</h3>
+                <p className="text-sm text-gray-500">View or delete previous support chats.</p>
+              </div>
+            </div>
+            {isLoadingHistory && (
+              <div className="mt-4 text-sm text-gray-500">Loading tickets...</div>
+            )}
+            {!isLoadingHistory && ticketHistory.length === 0 && (
+              <div className="mt-4 text-sm text-gray-500">No past tickets yet.</div>
+            )}
+            {!isLoadingHistory && ticketHistory.length > 0 && (
+              <div className="mt-4 space-y-3">
+                {ticketHistory.map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">{ticket.subject}</div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(ticket.updatedAt || ticket.createdAt).toLocaleString()} • {ticket.status}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openTicket(ticket.id)}
+                        className="text-xs font-semibold text-helfi-green border border-helfi-green/30 px-3 py-1.5 rounded-full hover:bg-helfi-green/10"
+                      >
+                        View chat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteTicket(ticket.id)}
+                        className="text-xs font-semibold text-red-600 border border-red-200 px-3 py-1.5 rounded-full hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

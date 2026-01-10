@@ -252,5 +252,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ticket: updatedTicket ? rehydrateSupportTicket(updatedTicket) : updatedTicket })
   }
 
+  if (action === 'delete_ticket') {
+    const ticketId = String(body?.ticketId || '').trim()
+    const token = String(body?.token || '').trim()
+    if (!ticketId || !token) {
+      return NextResponse.json({ error: 'ticketId and token are required' }, { status: 400 })
+    }
+
+    const ticket = await prisma.supportTicket.findFirst({
+      where: {
+        id: ticketId,
+        externalMessageId: guestTokenPrefix(token),
+      },
+    })
+    if (!ticket) {
+      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+    }
+
+    await prisma.supportTicket.delete({
+      where: { id: ticketId },
+    })
+
+    return NextResponse.json({ success: true })
+  }
+
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }

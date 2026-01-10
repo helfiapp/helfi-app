@@ -29,10 +29,39 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const activeOnly = searchParams.get('activeOnly') !== '0'
+  const listMode = searchParams.get('list') === '1'
+  const ticketIdParam = String(searchParams.get('ticketId') || '').trim()
 
   const whereClause: any = userId ? { userId } : { userEmail: email }
   if (activeOnly) {
     whereClause.status = { notIn: ['RESOLVED', 'CLOSED'] }
+  }
+
+  if (ticketIdParam) {
+    const ticket = await prisma.supportTicket.findFirst({
+      where: { ...whereClause, id: ticketIdParam },
+      include: {
+        responses: { orderBy: { createdAt: 'asc' } },
+      },
+    })
+    return NextResponse.json({ ticket: ticket ? rehydrateSupportTicket(ticket) : null })
+  }
+
+  if (listMode) {
+    const tickets = await prisma.supportTicket.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        subject: true,
+        status: true,
+        priority: true,
+        category: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+    return NextResponse.json({ tickets })
   }
 
   const ticket = await prisma.supportTicket.findFirst({
@@ -198,6 +227,29 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ ticket: updatedTicket ? rehydrateSupportTicket(updatedTicket) : updatedTicket })
+  }
+
+  if (action === 'delete_ticket') {
+    const ticketId = String(body?.ticketId || '').trim()
+    if (!ticketId) {
+      return NextResponse.json({ error: 'ticketId is required' }, { status: 400 })
+    }
+
+    const ticket = await prisma.supportTicket.findFirst({
+      where: {
+        id: ticketId,
+        ...(session?.user?.id ? { userId: session.user.id } : { userEmail: email }),
+      },
+    })
+    if (!ticket) {
+      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+    }
+
+    await prisma.supportTicket.delete({
+      where: { id: ticketId },
+    })
+
+    return NextResponse.json({ success: true })
   }
 
   if (action === 'submit_feedback') {

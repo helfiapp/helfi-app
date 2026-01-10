@@ -9,7 +9,8 @@ import { buildSupportCodeContext } from '@/lib/support-code-search'
 import { getSupportAgentForTimestamp } from '@/lib/support-agents'
 import supportKnowledgeBase from '@/data/support-kb.json'
 
-const SUPPORT_AI_MODEL = process.env.SUPPORT_AI_MODEL || 'gpt-4o-mini'
+const SUPPORT_AI_MODEL = process.env.SUPPORT_AI_MODEL || 'gpt-5.2'
+const SUPPORT_AI_FALLBACK_MODEL = process.env.SUPPORT_AI_FALLBACK_MODEL || 'gpt-4o-mini'
 const SUPPORT_COPY_EMAIL = 'support@helfi.ai'
 const SUPPORT_VERIFICATION_TTL_MINUTES = 15
 const SYSTEM_IDENTITY_MARKER = '[SYSTEM] Identity verified'
@@ -150,6 +151,7 @@ function buildSupportSystemPrompt(agentName: string, agentRole: string): string 
     '- If the user already provided steps or a link they clicked, do not ask for the same info again. Move to the next helpful step.',
     '- Use the product facts below when answering questions about trials, pricing, credits, or features.',
     '- If you are not sure about a detail, say you will confirm and loop in the team.',
+    '- If the answer is not in the Support Knowledge Base or product facts, do not guess. Respond that you are escalating and that support will email them, then set shouldEscalate true and needsMoreInfo false.',
     `- Sign off with "${agentName} from ${agentRole}".`,
     '',
     supportProductFacts(),
@@ -1159,30 +1161,75 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
       conversation,
     })
 
-    const completion = await runChatCompletionWithLogging(
-      openai,
-      {
-        model: SUPPORT_AI_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-        max_tokens: 500,
-      },
-      {
-        feature: 'support:ai',
-        userId: ticket.userId || ticket.user?.id || null,
-        userLabel: ticket.userEmail,
-      },
-      {
-        callDetail: input.source ? `source:${input.source}` : undefined,
+    let completion = null
+    let usedFallbackModel = false
+    try {
+      completion = await runChatCompletionWithLogging(
+        openai,
+        {
+          model: SUPPORT_AI_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.2,
+          response_format: { type: 'json_object' },
+          max_tokens: 500,
+        },
+        {
+          feature: 'support:ai',
+          userId: ticket.userId || ticket.user?.id || null,
+          userLabel: ticket.userEmail,
+        },
+        {
+          callDetail: input.source ? `source:${input.source}` : undefined,
+        }
+      )
+    } catch (error) {
+      if (SUPPORT_AI_FALLBACK_MODEL) {
+        try {
+          usedFallbackModel = true
+          completion = await runChatCompletionWithLogging(
+            openai,
+            {
+              model: SUPPORT_AI_FALLBACK_MODEL,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+              ],
+              temperature: 0.2,
+              response_format: { type: 'json_object' },
+              max_tokens: 500,
+            },
+            {
+              feature: 'support:ai',
+              userId: ticket.userId || ticket.user?.id || null,
+              userLabel: ticket.userEmail,
+            },
+            {
+              callDetail: input.source ? `source:${input.source}` : undefined,
+            }
+          )
+        } catch (fallbackError) {
+          console.error('🤖 [SUPPORT AI] Fallback model failed:', fallbackError)
+          completion = null
+        }
+      } else {
+        completion = null
       }
-    )
+    }
 
-    const rawText = completion?.choices?.[0]?.message?.content || ''
-    aiResult = safeParseSupportJson(rawText) || fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
+    if (!completion) {
+      aiResult = fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
+    } else {
+      const rawText = completion?.choices?.[0]?.message?.content || ''
+      aiResult = safeParseSupportJson(rawText) || fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
+    }
+
+    if (usedFallbackModel) {
+      const note = `Primary model failed, used fallback model (${SUPPORT_AI_FALLBACK_MODEL}).`
+      aiResult.internalNotes = aiResult.internalNotes ? `${aiResult.internalNotes}\n${note}` : note
+    }
   }
 
   if (chatBug?.isChatBug) {
@@ -1198,6 +1245,19 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
       aiResult.shouldEscalate = true
       aiResult.escalationReason = aiResult.escalationReason || 'User reported chat input UI bug.'
     }
+  }
+
+  const uncertaintyPattern = /(not sure|cannot confirm|can't confirm|need to check|check and confirm|confirm with the team|i will check|i'll check|i am checking)/i
+  if (aiResult.customerReply && uncertaintyPattern.test(aiResult.customerReply)) {
+    const escalationReply = [
+      'I have escalated this to a human so we can confirm it properly.',
+      'You will get an email update as soon as we have the answer.',
+    ].join('\n')
+    aiResult.customerReply = addAgentSignOff(escalationReply, agent)
+    aiResult.shouldEscalate = true
+    aiResult.needsMoreInfo = false
+    aiResult.requestedInfo = []
+    aiResult.escalationReason = aiResult.escalationReason || 'Unverified answer requires human confirmation.'
   }
 
   if (aiResult.needsIdentityCheck && !identityVerified) {
