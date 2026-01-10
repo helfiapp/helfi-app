@@ -1200,6 +1200,54 @@ resetting to defaults every time.
 1) Restore draft persistence for manual exercise entries.
 2) Keep edit-mode hydration (existing entry data overrides the draft).
 
+## 7.3 Support Chat & Tickets (Jan 2026 - Locked)
+
+This support system has been reworked and must not be changed without explicit
+owner approval.
+
+**Protected files:**
+- `app/support/page.tsx`
+- `components/support/SupportChatWidget.tsx`
+- `app/api/support/tickets/route.ts`
+- `app/api/support/inquiry/route.ts`
+- `lib/support-automation.ts`
+- `data/support-kb.json`
+- `lib/support-code-search.ts`
+- `data/support-code-index.json`
+- `scripts/build-support-code-index.js`
+
+**Must keep (source of truth):**
+- Support page has two states for logged‑in users:
+  - Ticket entry + Past tickets list.
+  - Live chat view.
+- Back button behavior:
+  - If in chat view → returns to ticket entry.
+  - If in ticket entry → returns to the page the user came from (not always dashboard).
+- Submitting the support form does **not** auto‑open chat.
+  - After submit, show a choice: “Start chat now” or “Just email me.”
+- Past tickets list (logged‑in) with **View** and **Delete**.
+  - Delete must permanently remove the ticket and its responses.
+- Homepage support widget is **guest‑only** (not visible for logged‑in users).
+  - Guest tickets stored in `localStorage` history with **View/Delete**.
+- Chat UI:
+  - Only the message list scrolls.
+  - Input field stays visible.
+  - Mobile chat view is full‑width with no horizontal overflow.
+- Support AI:
+  - Model locked to **gpt‑5.2**.
+  - No fallback models.
+  - Answers must be based on Support KB + product facts + code context only.
+  - If not verified, the bot must escalate and tell the user they will receive an email.
+- Support code index is rebuilt on deploy via `prebuild`.
+  - Do not remove or bypass `scripts/build-support-code-index.js`.
+
+**Backup reference (known good snapshot):**
+- Commit: `7db259ab2918433abef8e010786e224b0c600594`
+- If this area breaks, restore from that commit or compare:
+  - `git show 7db259ab:app/support/page.tsx`
+  - `git show 7db259ab:components/support/SupportChatWidget.tsx`
+  - `git show 7db259ab:lib/support-automation.ts`
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
