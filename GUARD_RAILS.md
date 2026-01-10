@@ -219,6 +219,41 @@ the user.
 **Why this is hard‑locked (do not ignore):**
 - This area broke recently and blocked all left‑menu clicks on desktop while in Health Setup. It was extremely difficult to restore.
 
+---
+
+## 3. Water Intake + Exercise Logging (Jan 2026 – Locked)
+
+**Primary scope:**
+- `app/food/water/page.tsx`
+- `app/api/hydration-goal/route.ts`
+- `lib/hydration-goal.ts`
+- `app/api/water-log/route.ts`
+- `app/api/water-log/[id]/route.ts`
+- `app/food/page.tsx` (exercise panel)
+- `app/api/exercise-entries/route.ts`
+- `app/api/exercise-entries/[id]/route.ts`
+
+### 3.1 Hydration goal rules (must not change without approval)
+- **Base goal uses profile only** (weight/height/gender/age/diet/goals).  
+- **Health Setup exercise frequency is NOT used** in hydration targets.  
+- Daily exercise only affects hydration via a **calorie‑based bonus** when exercise is logged.
+- Exercise bonus: **1 ml per kcal**, capped at **1500 ml/day**, then rounded to nearest 50 ml.  
+- Custom goal overrides recommended goal; show “Custom goal active” when applicable.
+- `GET /api/hydration-goal` supports `?date=YYYY-MM-DD` and returns:
+  - `targetMl`, `recommendedMl`, `source`, and `exerciseBonusMl`.
+
+### 3.2 Exercise → hydration linkage (must not double‑count)
+- **Only logged exercise entries** (manual diary or wearable sync) affect the daily bonus.  
+- If **no exercise entries exist for the date**, **no bonus** is applied.  
+- Do **not** add wearable bonus on top of manual logs (they share the same entries table).
+
+### 3.3 Exercise log UI consistency (Food diary)
+- After **save** or **delete** of manual exercise, the list must **force reload** from the server
+  to avoid stale session storage (`loadExerciseEntriesForDate(..., { force: true })`).
+- Deleting must update the list even if the server responds with “Not found” for stale entries.
+
+Agents must not modify these rules without explicit user approval.
+
 **Do NOT change or remove:**
 - The sidebar click override in `app/onboarding/page.tsx` that directly listens to left‑menu clicks while on `/onboarding` and forces navigation.
 - The `window.__helfiOnboardingSidebarOverride` flag that prevents `LayoutWrapper` from double‑handling sidebar clicks during Health Setup.
