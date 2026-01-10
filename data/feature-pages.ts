@@ -45,6 +45,7 @@ export type FeaturePageContent = {
   showHeroImage?: boolean
   showSegmentImages?: boolean
   overviewLayout?: 'default' | 'expanded'
+  overviewAlign?: 'center' | 'start'
   primaryCta: FeaturePageCta
   secondaryCta: FeaturePageCta
   capabilities: FeaturePageCapability[]
@@ -114,9 +115,15 @@ export const featurePages: FeaturePageContent[] = [
     ],
     summary: 'Daily dashboards and device syncs that keep trends visible.',
     heroImage: {
-      src: '/screenshots/hero/DASHBOARD.png',
-      alt: 'Helfi dashboard on a phone',
+      src: '/WEBSITE IMAGES/HEALTH TRACKING/MAN IN GYM.png',
+      alt: 'Man using the Helfi app at the gym',
+      width: 1200,
+      height: 896,
+      kind: 'photo',
     },
+    showHeroImage: true,
+    overviewLayout: 'expanded',
+    overviewAlign: 'start',
     bannerImage: healthTrackingPhoto(
       '/WEBSITE IMAGES/HEALTH TRACKING/HEALTH TRACKING BANNER.jpg',
       'Health tracking banner'

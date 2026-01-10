@@ -25,6 +25,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   const showSegmentImages = page.showSegmentImages === true
   const heroIsPhoto = page.heroImage.kind === 'photo'
   const isExpandedOverview = page.overviewLayout === 'expanded'
+  const overviewAlignClass = (page.overviewAlign ?? 'center') === 'start' ? 'items-start' : 'items-center'
   const hasBanner = !!page.bannerImage
   const hasCarousel = !!page.carouselImages && page.carouselImages.length > 0
   const bannerLayout = page.bannerLayout ?? 'carousel'
@@ -102,7 +103,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
           <div className="max-w-6xl mx-auto">
             {isExpandedOverview ? (
               <>
-                <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center">
+                <div className={`grid gap-10 lg:grid-cols-[1.1fr_0.9fr] ${overviewAlignClass}`}>
                   {overviewContent}
                   {showHeroImage && (
                     <div
