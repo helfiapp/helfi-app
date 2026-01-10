@@ -37,6 +37,8 @@ export default function SupportPage() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [showChatComposer, setShowChatComposer] = useState(false)
   const [showChatView, setShowChatView] = useState(true)
+  const [showPostSubmitChoice, setShowPostSubmitChoice] = useState(false)
+  const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null)
   const [ticketHistory, setTicketHistory] = useState<Array<{
     id: string
     subject: string
@@ -370,9 +372,15 @@ export default function SupportPage() {
       })
 
       if (response.ok) {
+        const result = await response.json().catch(() => ({}))
         setSubmitStatus('success')
         if (session) {
-          await loadActiveTicket()
+          setActiveTicket(result.ticket || null)
+          setSubmittedTicketId(result.ticket?.id || null)
+          setShowPostSubmitChoice(true)
+          setShowChatView(false)
+          setShowChatComposer(false)
+          await loadTicketHistory()
         }
         setFormAttachments([])
         // Reset form
@@ -461,6 +469,8 @@ export default function SupportPage() {
   const startNewTicket = () => {
     triggerHaptic()
     setShowChatView(true)
+    setShowPostSubmitChoice(false)
+    setSubmittedTicketId(null)
     setActiveTicket(null)
     setSubmitStatus('idle')
     setChatAttachments([])
@@ -598,12 +608,29 @@ export default function SupportPage() {
           setActiveTicket(result.ticket)
           setShowChatComposer(true)
           setShowChatView(true)
+          setShowPostSubmitChoice(false)
         }
       }
     } catch (error) {
       console.error('Error loading ticket:', error)
     }
     setIsLoadingTicket(false)
+  }
+
+  const startChatFromSubmit = () => {
+    if (submittedTicketId) {
+      openTicket(submittedTicketId)
+    } else {
+      setShowChatComposer(true)
+      setShowChatView(true)
+    }
+    setShowPostSubmitChoice(false)
+  }
+
+  const keepEmailOnly = () => {
+    setShowChatView(false)
+    setShowChatComposer(false)
+    setShowPostSubmitChoice(false)
   }
 
   const deleteTicket = async (ticketId: string) => {
@@ -779,16 +806,16 @@ export default function SupportPage() {
                     <div className="text-xs text-gray-400 text-center">Start your support chat below.</div>
                   )}
 
-                  {!isLoadingTicket && combinedConversationItems.map((item) => {
-                    const timeLabel = formatMessageTime(item.createdAt)
-                    const isAdmin = item.isAdminResponse
-                    const messageBubble = (
-                      <div
-                        className={`text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 break-words ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
-                      >
-                        {renderMessageWithLinks(item.message)}
-                      </div>
-                    )
+          {!isLoadingTicket && combinedConversationItems.map((item) => {
+            const timeLabel = formatMessageTime(item.createdAt)
+            const isAdmin = item.isAdminResponse
+            const messageBubble = (
+              <div
+                className={`text-base font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 break-words ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
+              >
+                {renderMessageWithLinks(item.message)}
+              </div>
+            )
 
                     return (
                       <div key={item.id} className={`flex items-end gap-2.5 ${isAdmin ? '' : 'justify-end'}`}>
@@ -880,7 +907,7 @@ export default function SupportPage() {
                       </div>
                       <div className="flex flex-1 flex-col gap-1 items-start">
                         <div className="text-[11px] text-gray-500 px-1">Typing...</div>
-                        <div className="text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl rounded-bl-none px-4 py-2.5 bg-gray-100 text-gray-800">
+                        <div className="text-base font-normal leading-relaxed max-w-[85%] rounded-2xl rounded-bl-none px-4 py-2.5 bg-gray-100 text-gray-800">
                           <span className="animate-pulse">...</span>
                         </div>
                       </div>
@@ -932,7 +959,7 @@ export default function SupportPage() {
                           onChange={(e) => setChatMessage(e.target.value)}
                           onPaste={(e) => handlePasteUpload(e, setChatAttachments, setIsUploadingChatAttachment)}
                           onKeyDown={handleChatKeyDown}
-                          className="w-full bg-gray-100 border-none rounded-full px-4 py-2.5 text-sm focus:ring-1 focus:ring-emerald-200 placeholder:text-gray-400"
+                          className="w-full bg-gray-100 border-none rounded-full px-4 py-2.5 text-base focus:ring-1 focus:ring-emerald-200 placeholder:text-gray-400"
                           placeholder="Type a message..."
                           disabled={isChatClosed}
                         />
@@ -1043,6 +1070,29 @@ export default function SupportPage() {
                   <h3 className="text-green-800 font-medium">Support ticket submitted successfully!</h3>
                   <p className="text-green-700 text-sm">You will receive a reply by email shortly.</p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {session && showPostSubmitChoice && (
+            <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+              <div className="text-sm font-semibold text-emerald-900">Would you like to chat with support now?</div>
+              <p className="text-sm text-emerald-700 mt-1">You can start a live chat or just submit the ticket by email.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={startChatFromSubmit}
+                  className="px-4 py-2 rounded-full bg-helfi-green text-white text-sm hover:bg-helfi-green/90"
+                >
+                  Start chat now
+                </button>
+                <button
+                  type="button"
+                  onClick={keepEmailOnly}
+                  className="px-4 py-2 rounded-full border border-emerald-300 text-emerald-800 text-sm hover:bg-emerald-100"
+                >
+                  Just email me
+                </button>
               </div>
             </div>
           )}

@@ -862,7 +862,7 @@ export default function SupportChatWidget() {
                         )}
                       </div>
                       <div
-                        className={`text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 break-words ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
+                        className={`text-base font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 break-words ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
                       >
                         {renderMessageWithLinks(item.message)}
                       </div>
@@ -926,7 +926,7 @@ export default function SupportChatWidget() {
                   </div>
                   <div className="flex flex-1 flex-col gap-1 items-start">
                     <div className="text-[11px] text-gray-500 px-1">Typing...</div>
-                    <div className="text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl rounded-bl-none px-4 py-2.5 bg-gray-100 text-gray-800">
+                    <div className="text-base font-normal leading-relaxed max-w-[85%] rounded-2xl rounded-bl-none px-4 py-2.5 bg-gray-100 text-gray-800">
                       <span className="animate-pulse">...</span>
                     </div>
                   </div>
@@ -1040,7 +1040,7 @@ export default function SupportChatWidget() {
                     onChange={(e) => setMessage(e.target.value)}
                     onPaste={handlePasteUpload}
                     onKeyDown={handleChatKeyDown}
-                    className="w-full bg-gray-100 border-none rounded-full px-4 py-2.5 text-sm focus:ring-1 focus:ring-emerald-200 placeholder:text-gray-400"
+                    className="w-full bg-gray-100 border-none rounded-full px-4 py-2.5 text-base focus:ring-1 focus:ring-emerald-200 placeholder:text-gray-400"
                     placeholder="Type a message..."
                   />
                 </div>
