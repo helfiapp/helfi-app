@@ -118,12 +118,14 @@ export default function WaterIntakePage() {
   const [showGoalEditor, setShowGoalEditor] = useState(false)
   const [goalAmountInput, setGoalAmountInput] = useState('')
   const [goalUnit, setGoalUnit] = useState<'ml' | 'l' | 'oz'>('ml')
+  const [goalAutoClear, setGoalAutoClear] = useState(false)
   const [goalSaving, setGoalSaving] = useState(false)
   const [customAmountInput, setCustomAmountInput] = useState('')
   const [customUnit, setCustomUnit] = useState<'ml' | 'l' | 'oz'>('ml')
   const [showCustomUnitPicker, setShowCustomUnitPicker] = useState(false)
 
   const customUnitRef = useRef<HTMLDivElement | null>(null)
+  const goalInputRef = useRef<HTMLInputElement | null>(null)
 
   const userImage = (profileImage || session?.user?.image || '') as string
   const hasProfileImage = !!userImage
@@ -325,6 +327,7 @@ export default function WaterIntakePage() {
       setGoalAmountInput(next.amount)
       setGoalUnit(next.unit)
     }
+    setGoalAutoClear(true)
     setShowGoalEditor(true)
   }
 
@@ -676,13 +679,24 @@ export default function WaterIntakePage() {
                   </p>
                   <div className="flex w-full items-center justify-center bg-white dark:bg-slate-800 rounded-2xl border-2 border-[#62b763]/20 focus-within:border-[#62b763] px-4 py-6 transition-colors">
                     <input
+                      ref={goalInputRef}
                       className="form-input text-center w-full bg-transparent border-none focus:ring-0 text-5xl font-bold text-slate-900 dark:text-white placeholder:text-slate-300"
                       placeholder="0"
                       type="number"
+                      inputMode="decimal"
+                      enterKeyHint="done"
                       min="0"
                       step="0.1"
                       value={goalAmountInput}
                       onChange={(e) => setGoalAmountInput(e.target.value)}
+                      onFocus={(e) => {
+                        if (goalAutoClear) {
+                          setGoalAmountInput('')
+                          setGoalAutoClear(false)
+                        } else {
+                          e.currentTarget.select()
+                        }
+                      }}
                     />
                   </div>
                 </label>
