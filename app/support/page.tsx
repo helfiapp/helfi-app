@@ -554,9 +554,9 @@ export default function SupportPage() {
   const combinedConversationItems = [...conversationItems, ...optimisticMessages]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Navigation Header */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
+      <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           {/* Logo on the left */}
           <div className="flex items-center">
@@ -602,7 +602,7 @@ export default function SupportPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-6 md:px-10 py-8">
+      <div className="max-w-6xl mx-auto px-0 md:px-10 py-8">
         {session && !activeTicket && !showChatComposer && (
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -624,7 +624,7 @@ export default function SupportPage() {
 
         {session && (activeTicket || showChatComposer) && (
           <div className="mb-10">
-            <div className="mx-auto w-full max-w-[430px] md:max-w-[900px] bg-white border border-gray-100 shadow-2xl md:rounded-3xl overflow-hidden flex flex-col min-h-[640px]">
+            <div className="mx-auto w-full md:max-w-[900px] bg-white border-0 md:border border-gray-100 shadow-none md:shadow-2xl rounded-none md:rounded-3xl overflow-hidden flex flex-col min-h-[480px] h-[calc(100dvh-240px)] md:h-[calc(100dvh-260px)]">
               <header className="sticky top-0 z-10 flex items-center justify-between bg-white/95 backdrop-blur-md px-4 py-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -654,7 +654,7 @@ export default function SupportPage() {
                 </button>
               </header>
 
-              <main className="flex-1 overflow-y-auto px-4 bg-white">
+              <main className="flex-1 min-h-0 overflow-y-auto px-4 bg-white">
                 <div className="py-6 flex flex-col gap-6">
                   <div className="text-center">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">
@@ -675,7 +675,7 @@ export default function SupportPage() {
                     const isAdmin = item.isAdminResponse
                     const messageBubble = (
                       <div
-                        className={`text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
+                        className={`text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 break-words ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
                       >
                         {renderMessageWithLinks(item.message)}
                       </div>

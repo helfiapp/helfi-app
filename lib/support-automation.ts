@@ -325,6 +325,27 @@ function buildDeterministicSupportReply(options: {
   const featuresTopic = findSupportTopic('features')
   const sleepTopic = findSupportTopic('sleep_tracking')
 
+  const affiliatePayoutMatch =
+    /affiliate|referral|partner program|refer/i.test(text) &&
+    /(payout|pay|paid|payment|commission|bank|stripe|transfer|threshold|monthly|net\s?-?\s?30)/i.test(text)
+  if (affiliatePayoutMatch) {
+    const signupUrl = affiliateTopic?.links?.signup || authTopic?.links?.signup || 'https://helfi.ai/auth/signin?mode=signup'
+    const applyUrl = affiliateTopic?.links?.apply || 'https://helfi.ai/affiliate/apply'
+    const termsUrl = affiliateTopic?.links?.terms || 'https://helfi.ai/affiliate/terms'
+    const lines = [
+      'Affiliate payouts run once per month.',
+      'Payouts are sent via Stripe Connect to your bank account after approval.',
+      'Minimum payout threshold is $50 USD.',
+      'Commissions become payable 30 days after the purchase (Net-30) and are voided if refunded or disputed within that window.',
+    ]
+    if (!options.userLoggedIn) {
+      lines.unshift(`To get started, create a Helfi account first: ${signupUrl}.`)
+    }
+    lines.push(`Apply here: ${applyUrl}.`)
+    lines.push(`Terms: ${termsUrl}.`)
+    return addAgentSignOff(lines.join('\n'), options.agent)
+  }
+
   const chatBug = analyzeChatBugMessage(text)
   if (chatBug.isChatBug) {
     const followups: string[] = []

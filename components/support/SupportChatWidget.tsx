@@ -554,6 +554,10 @@ export default function SupportChatWidget() {
   if (isLoggedIn) return null
   if (!hasReachedAnchor) return null
 
+  const containerClassName = isOpen
+    ? 'fixed inset-0 z-[60] md:inset-auto md:bottom-24 md:right-5'
+    : 'fixed bottom-5 right-4 md:bottom-24 md:right-5 z-[60] max-w-[calc(100vw-2rem)]'
+
   const handleHideWidget = () => {
     triggerHaptic()
     setIsOpen(false)
@@ -566,7 +570,7 @@ export default function SupportChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-5 right-5 md:bottom-24 z-[60]">
+    <div className={containerClassName}>
       {isWidgetHidden && (
         <button
           type="button"
@@ -618,7 +622,7 @@ export default function SupportChatWidget() {
           )}
 
           {isOpen && (
-            <div className="w-[360px] max-w-[92vw] h-[520px] max-h-[80vh] bg-white rounded-2xl shadow-[0_18px_60px_rgba(16,24,40,0.18)] border border-gray-100 flex flex-col min-h-0">
+            <div className="w-full h-full max-w-none max-h-none bg-white rounded-none shadow-none border-0 flex flex-col min-h-0 md:w-[360px] md:max-w-[92vw] md:h-[520px] md:max-h-[80vh] md:rounded-2xl md:shadow-[0_18px_60px_rgba(16,24,40,0.18)] md:border md:border-gray-100">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white/95 backdrop-blur-md rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -741,7 +745,7 @@ export default function SupportChatWidget() {
                         )}
                       </div>
                       <div
-                        className={`text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
+                        className={`text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 break-words ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
                       >
                         {renderMessageWithLinks(item.message)}
                       </div>
