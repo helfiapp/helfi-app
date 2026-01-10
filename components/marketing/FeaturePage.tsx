@@ -267,6 +267,9 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                 const hasImages = segmentImages.length > 0
                 const isPhotoGallery = segmentImages.some((image) => image.kind === 'photo')
                 const imageGridClass = segmentImages.length > 1 ? 'grid gap-4 md:grid-cols-2' : 'grid gap-4'
+                const imageStackClass = `${segmentImages.length > 1 ? 'grid gap-4 sm:grid-cols-2' : 'grid gap-4'}${
+                  segment.alignImageWithHeading ? ' mt-6' : ''
+                }`
 
                 const textBlock = (
                   <div>
@@ -330,7 +333,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                       <div className={hasImages ? 'grid gap-8 lg:grid-cols-[1.15fr_0.85fr] items-start' : ''}>
                         {textBlock}
                         {hasImages && (
-                          <div className={segmentImages.length > 1 ? 'grid gap-4 sm:grid-cols-2' : 'grid gap-4'}>
+                          <div className={imageStackClass}>
                             {segmentImages.map((image) => (
                               <div
                                 key={`${segment.title}-${image.src}`}

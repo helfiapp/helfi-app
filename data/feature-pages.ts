@@ -28,6 +28,7 @@ export type FeaturePageSegment = {
   bullets: string[]
   image: FeaturePageImage
   images?: FeaturePageImage[]
+  alignImageWithHeading?: boolean
 }
 
 export type FeaturePageContent = {
@@ -702,6 +703,7 @@ export const featurePages: FeaturePageContent[] = [
           width: 1200,
           height: 896,
         },
+        alignImageWithHeading: true,
       },
       {
         title: 'Food recommendations and context',
