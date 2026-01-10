@@ -793,7 +793,7 @@ export default function Dashboard() {
                         className="px-4 py-2 bg-helfi-green text-white text-xs font-bold rounded-full"
                         disabled={fitbitLoading}
                       >
-                        {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
+                        {fitbitLoading ? 'Connecting...' : 'Connect'}
                       </button>
                     )}
                   </div>
@@ -813,7 +813,7 @@ export default function Dashboard() {
                         }`}
                         disabled={!!savingInterest}
                       >
-                        {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
+                        {deviceInterest.garmin ? 'Interested ✓' : 'Connect'}
                       </button>
                     ) : garminConnected ? (
                       <Link href="/devices" className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-full">
@@ -821,7 +821,7 @@ export default function Dashboard() {
                       </Link>
                     ) : (
                       <Link href="/devices" className="px-4 py-2 bg-helfi-green text-white text-xs font-bold rounded-full">
-                        Connect Garmin Connect
+                        Connect
                       </Link>
                     )}
                   </div>
@@ -840,7 +840,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
+                      {deviceInterest.googleFit ? 'Interested ✓' : 'Connect'}
                     </button>
                   </div>
 
@@ -858,7 +858,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
+                      {deviceInterest.oura ? 'Interested ✓' : 'Connect'}
                     </button>
                   </div>
 
@@ -876,7 +876,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
+                      {deviceInterest.polar ? 'Interested ✓' : 'Connect'}
                     </button>
                   </div>
                 </div>
@@ -897,7 +897,7 @@ export default function Dashboard() {
                         className="w-full bg-helfi-green hover:bg-green-600 text-white py-3 rounded-xl font-bold transition-all"
                         disabled={fitbitLoading}
                       >
-                        {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
+                        {fitbitLoading ? 'Connecting...' : 'Connect'}
                       </button>
                     )}
                   </div>
@@ -915,7 +915,7 @@ export default function Dashboard() {
                         }`}
                         disabled={!!savingInterest}
                       >
-                        {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
+                        {deviceInterest.garmin ? 'Interested ✓' : 'Connect'}
                       </button>
                     ) : garminConnected ? (
                       <Link href="/devices" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">
@@ -923,7 +923,7 @@ export default function Dashboard() {
                       </Link>
                     ) : (
                       <Link href="/devices" className="w-full bg-helfi-green hover:bg-green-600 text-white py-3 rounded-xl font-bold">
-                        Connect Garmin Connect
+                        Connect
                       </Link>
                     )}
                   </div>
@@ -940,7 +940,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
+                      {deviceInterest.googleFit ? 'Interested ✓' : 'Connect'}
                     </button>
                   </div>
 
@@ -956,7 +956,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
+                      {deviceInterest.oura ? 'Interested ✓' : 'Connect'}
                     </button>
                   </div>
 
@@ -972,7 +972,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
+                      {deviceInterest.polar ? 'Interested ✓' : 'Connect'}
                     </button>
                   </div>
                 </div>
