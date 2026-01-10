@@ -6937,8 +6937,8 @@ const applyStructuredItems = (
       setIsDiaryRefreshing(false)
     }
   }
-  const PULL_REFRESH_THRESHOLD = 70
-  const PULL_REFRESH_MAX = 120
+  const PULL_REFRESH_THRESHOLD = 120
+  const PULL_REFRESH_MAX = 180
   const handlePullStart = (e: React.TouchEvent) => {
     if (typeof window === 'undefined') return
     if (window.scrollY > 0) return
