@@ -212,16 +212,6 @@ function DesktopSidebar({
               Today's Check-in
             </a>
           <a
-            href="/check-in/history"
-            onClick={(e) => onNavigate('/check-in/history', e)}
-            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
-          >
-              <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M5 19h14M7 11v8m10-8v8" />
-              </svg>
-              Rating History
-            </a>
-          <a
             href="/mood"
             onClick={(e) => onNavigate('/mood', e)}
             className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
@@ -232,17 +222,6 @@ function DesktopSidebar({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15c1 1 2.2 1.5 3 1.5s2-.5 3-1.5" />
               </svg>
               Mood Tracker
-            </a>
-          <a
-            href="/mood/quick"
-            onClick={(e) => onNavigate('/mood/quick', e)}
-            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
-          >
-              <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Quick Mood Check‑In
             </a>
           <a
             href="/profile"
