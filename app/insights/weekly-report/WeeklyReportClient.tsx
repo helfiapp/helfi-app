@@ -9,6 +9,7 @@ const SECTIONS = [
   { key: 'supplements', label: 'Supplements' },
   { key: 'medications', label: 'Medications' },
   { key: 'nutrition', label: 'Nutrition' },
+  { key: 'hydration', label: 'Hydration' },
   { key: 'exercise', label: 'Exercise' },
   { key: 'lifestyle', label: 'Lifestyle' },
   { key: 'labs', label: 'Labs' },
@@ -43,6 +44,16 @@ function SectionBucket({ title, items }: { title: string; items: Array<{ name?: 
       ))}
     </div>
   )
+}
+
+function formatMl(value: number | null | undefined) {
+  const ml = Number(value ?? 0)
+  if (!Number.isFinite(ml) || ml <= 0) return '0 ml'
+  if (ml >= 1000) {
+    const liters = Math.round((ml / 1000) * 100) / 100
+    return `${liters.toString().replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')} L`
+  }
+  return `${Math.round(ml)} ml`
 }
 
 export default function WeeklyReportClient({ report, reports, nextReportDueAt }: WeeklyReportClientProps) {
@@ -80,12 +91,22 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
         daysActive?: number
         totalEvents?: number
         foodCount?: number
+        waterCount?: number
         moodCount?: number
         checkinCount?: number
         symptomCount?: number
         exerciseCount?: number
         labCount?: number
         talkToAiCount?: number
+      }
+    | undefined
+  const hydrationSummary = (report?.dataSummary as any)?.hydrationSummary as
+    | {
+        entries?: number
+        totalMl?: number
+        dailyAverageMl?: number
+        daysWithLogs?: number
+        topDrinks?: Array<{ label?: string; count?: number }>
       }
     | undefined
   const pdfHref = useMemo(() => {
@@ -199,6 +220,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
 
   const coverageItems = [
     { label: 'Food logs', value: coverage?.foodCount ?? 0 },
+    { label: 'Water logs', value: coverage?.waterCount ?? 0 },
     { label: 'Check-ins', value: coverage?.checkinCount ?? 0 },
     { label: 'Mood entries', value: coverage?.moodCount ?? 0 },
     { label: 'Symptoms', value: coverage?.symptomCount ?? 0 },
@@ -209,6 +231,11 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
   const maxCoverage = Math.max(1, ...coverageItems.map((item) => item.value))
   const daysActive = Math.min(7, Math.max(0, coverage?.daysActive ?? 0))
   const activityPercent = Math.round((daysActive / 7) * 100)
+  const hydrationEntries = hydrationSummary?.entries ?? 0
+  const hydrationDays = hydrationSummary?.daysWithLogs ?? 0
+  const hydrationTotal = hydrationSummary?.totalMl ?? 0
+  const hydrationAverage = hydrationSummary?.dailyAverageMl ?? 0
+  const hydrationTop = Array.isArray(hydrationSummary?.topDrinks) ? hydrationSummary?.topDrinks : []
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -280,6 +307,31 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
               </div>
             ))}
           </div>
+          {hydrationEntries > 0 && (
+            <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm font-semibold text-sky-900">Hydration summary</div>
+                <div className="text-xs text-sky-700">
+                  {hydrationEntries} {hydrationEntries === 1 ? 'entry' : 'entries'} • {hydrationDays} days
+                </div>
+              </div>
+              <div className="mt-2 text-sm text-sky-800">
+                {formatMl(hydrationTotal)} total • {formatMl(hydrationAverage)} per day
+              </div>
+              {hydrationTop.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {hydrationTop.map((drink, idx) => (
+                    <span
+                      key={`${drink.label || 'drink'}-${idx}`}
+                      className="rounded-full border border-sky-100 bg-white px-3 py-1 text-xs text-sky-800"
+                    >
+                      {(drink.label || 'Drink').toString()} {drink.count ? `• ${drink.count}` : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">

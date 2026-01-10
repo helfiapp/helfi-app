@@ -14242,6 +14242,29 @@ Please add nutritional information manually if needed.`);
         </div>
         )}
 
+        {!isAnalysisRoute && !isEditingDescription && !editingEntry && (
+          <div className="mb-6">
+            <Link
+              href="/food/water"
+              className="group block rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-white px-5 py-4 shadow-sm transition hover:border-sky-200"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-sky-700">Water Intake</div>
+                  <div className="text-lg font-semibold text-gray-900">Log water, tea, coffee, and bottle sizes</div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Add as many drinks as you want throughout the day. Quick sizes and custom bottles included.
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2 text-sm font-semibold text-sky-600">
+                  Open hydration page
+                  <span className="text-lg transition-transform group-hover:translate-x-1">&gt;</span>
+                </div>
+              </div>
+            </Link>
+          </div>
+        )}
+
         {historySaveError && (
           <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 px-4 py-3 text-sm flex items-center justify-between gap-3">
             <span className="flex-1">{historySaveError}</span>

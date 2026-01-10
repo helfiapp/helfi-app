@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { precomputeIssueSectionsForUser, precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
+import { computeHydrationGoal } from '@/lib/hydration-goal'
 
 export async function GET(request: NextRequest) {
   try {
@@ -420,6 +421,20 @@ export async function GET(request: NextRequest) {
     }
     console.log('GET /api/user-data - Parsed __SELECTED_ISSUES__ snapshot:', { count: selectedGoals.length, goals: selectedGoals })
 
+    const hydrationGoal = computeHydrationGoal({
+      weightKg: typeof user.weight === 'number' ? user.weight : null,
+      heightCm: typeof user.height === 'number' ? user.height : null,
+      gender: (user as any)?.gender ?? null,
+      bodyType: (user as any)?.bodyType ?? null,
+      exerciseFrequency: exerciseData.exerciseFrequency || '',
+      exerciseTypes: exerciseData.exerciseTypes || [],
+      dietTypes,
+      diabetesType: allergyData.diabetesType,
+      goalChoice: primaryGoalData.goalChoice || '',
+      goalIntensity: primaryGoalData.goalIntensity || '',
+      birthdate: profileInfoData.dateOfBirth || '',
+    })
+
     const onboardingData = {
       gender: user.gender?.toLowerCase() || '',
       weight: user.weight?.toString() || '',
@@ -473,6 +488,11 @@ export async function GET(request: NextRequest) {
       diabetesType: allergyData.diabetesType,
       dietTypes,
       healthCheckSettings,
+      hydrationGoal: {
+        targetMl: hydrationGoal.targetMl,
+        targetL: Math.round((hydrationGoal.targetMl / 1000) * 100) / 100,
+        source: 'auto',
+      },
     }
 
     // Fallback: if primary goal still missing, use the first non-hidden health goal as a soft default

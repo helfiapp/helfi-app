@@ -539,6 +539,7 @@ export function summarizeCoverage(stats: {
   daysActive: number
   totalEvents: number
   foodCount: number
+  waterCount?: number
   moodCount: number
   checkinCount: number
   symptomCount: number

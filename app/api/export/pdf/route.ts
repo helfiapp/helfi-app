@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { computeHydrationGoal } from '@/lib/hydration-goal'
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
         medications: true,
         healthLogs: hasRange ? { where: { createdAt: dateFilter } } : true,
         foodLogs: hasRange ? { where: { createdAt: dateFilter } } : true,
+        waterLogs: hasRange ? { where: { createdAt: dateFilter } } : true,
         exerciseLogs: hasRange ? { where: { createdAt: dateFilter } } : true,
       },
     })
@@ -82,6 +84,61 @@ export async function GET(request: NextRequest) {
       return lines
     }
 
+    const formatMl = (value: number | null | undefined) => {
+      const ml = Number(value ?? 0)
+      if (!Number.isFinite(ml) || ml <= 0) return '0 ml'
+      if (ml >= 1000) {
+        const liters = Math.round((ml / 1000) * 100) / 100
+        const str = liters.toString().replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')
+        return `${str} L`
+      }
+      return `${Math.round(ml)} ml`
+    }
+
+    const formatAmount = (amount: number | null | undefined, unit: string | null | undefined) => {
+      const raw = Number(amount ?? 0)
+      if (!Number.isFinite(raw) || raw <= 0) return ''
+      const rounded = Math.round(raw * 100) / 100
+      const unitLabel = (unit || '').toLowerCase() === 'l' ? 'L' : (unit || '')
+      return `${rounded.toString().replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')} ${unitLabel}`
+    }
+
+    const readGoalCategory = (name: string) => {
+      const goal = (user.healthGoals || []).find((g: any) => g?.name === name)
+      if (!goal?.category) return null
+      try {
+        return JSON.parse(goal.category)
+      } catch {
+        return null
+      }
+    }
+
+    const parseDietTypes = () => {
+      const parsed = readGoalCategory('__DIET_PREFERENCE__')
+      const raw = Array.isArray(parsed?.dietTypes) ? parsed.dietTypes : parsed?.dietType
+      if (Array.isArray(raw)) return raw.filter((v: any) => typeof v === 'string' && v.trim())
+      if (typeof raw === 'string' && raw.trim()) return [raw.trim()]
+      return []
+    }
+
+    const parseDiabetesType = () => {
+      const parsed = readGoalCategory('__ALLERGIES_DATA__')
+      return typeof parsed?.diabetesType === 'string' ? parsed.diabetesType : ''
+    }
+
+    const parseBirthdate = () => {
+      const parsed = readGoalCategory('__PROFILE_INFO_DATA__')
+      return typeof parsed?.dateOfBirth === 'string' ? parsed.dateOfBirth : ''
+    }
+
+    const parsePrimaryGoal = () => {
+      const parsed = readGoalCategory('__PRIMARY_GOAL__')
+      return {
+        goalChoice: typeof parsed?.goalChoice === 'string' ? parsed.goalChoice : '',
+        goalIntensity: typeof parsed?.goalIntensity === 'string' ? parsed.goalIntensity : '',
+      }
+    }
+
     h1('Helfi — Your Health Summary')
     drawText(`Generated for ${user.email} • Range: ${dateRangeText}`, 10, false, rgb(0.45,0.47,0.50))
 
@@ -117,6 +174,42 @@ export async function GET(request: NextRequest) {
         drawText(`${fmt(f.createdAt)} — ${f.name || 'Food'}${Number.isFinite(cal)?` — ${cal} kcal`:''}`)
       })
 
+    const dietTypes = parseDietTypes()
+    const diabetesType = parseDiabetesType()
+    const birthdate = parseBirthdate()
+    const primaryGoal = parsePrimaryGoal()
+    const hydrationGoal = computeHydrationGoal({
+      weightKg: typeof user.weight === 'number' ? user.weight : null,
+      heightCm: typeof user.height === 'number' ? user.height : null,
+      gender: (user as any)?.gender ?? null,
+      bodyType: (user as any)?.bodyType ?? null,
+      exerciseFrequency: user.exerciseFrequency || '',
+      exerciseTypes: user.exerciseTypes || [],
+      dietTypes,
+      diabetesType,
+      goalChoice: primaryGoal.goalChoice,
+      goalIntensity: primaryGoal.goalIntensity,
+      birthdate,
+    })
+
+    h2('Hydration')
+    drawText(`Daily hydration target: ${formatMl(hydrationGoal.targetMl)}`)
+    const waterLogs = (user as any).waterLogs || []
+    if (!waterLogs.length) {
+      drawText('No water entries logged in this period.')
+    } else {
+      const totalWaterMl = waterLogs.reduce((sum: number, w: any) => sum + (Number(w?.amountMl ?? 0) || 0), 0)
+      drawText(`Total logged: ${formatMl(totalWaterMl)} (${waterLogs.length} entries)`)
+      waterLogs
+        .sort((a:any,b:any)=> new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
+        .slice(0, 15)
+        .forEach((w:any)=> {
+          const label = w?.label || 'Drink'
+          const amount = formatAmount(w?.amount, w?.unit)
+          drawText(`${fmt(w.createdAt)} — ${label}${amount ? ` — ${amount}` : ''}`)
+        })
+    }
+
     h2('Activity')
     const ex = (user.exerciseLogs || [])
       .sort((a:any,b:any)=> new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
@@ -141,4 +234,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Export failed' }, { status: 500 })
   }
 }
-

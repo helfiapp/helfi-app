@@ -24,6 +24,7 @@ const REPORT_SECTIONS = [
   'supplements',
   'medications',
   'nutrition',
+  'hydration',
   'exercise',
   'lifestyle',
   'labs',
@@ -39,6 +40,7 @@ const TALK_TO_AI_TOPICS: Array<{ topic: string; section: ReportSectionKey; keywo
   { topic: 'supplements', section: 'supplements', keywords: ['supplement', 'vitamin', 'mineral', 'magnesium', 'creatine', 'omega', 'probiotic'] },
   { topic: 'medications', section: 'medications', keywords: ['medication', 'meds', 'prescription', 'dosage', 'side effect', 'interaction'] },
   { topic: 'nutrition', section: 'nutrition', keywords: ['diet', 'nutrition', 'food', 'meal', 'protein', 'carb', 'calorie', 'fiber', 'sugar'] },
+  { topic: 'hydration', section: 'hydration', keywords: ['water', 'hydration', 'fluids', 'drink', 'dehydration'] },
   { topic: 'exercise', section: 'exercise', keywords: ['exercise', 'workout', 'training', 'cardio', 'strength', 'lifting', 'run', 'cycling', 'yoga'] },
   { topic: 'sleep & stress', section: 'lifestyle', keywords: ['sleep', 'insomnia', 'stress', 'cortisol', 'relax'] },
   { topic: 'mood & focus', section: 'mood', keywords: ['mood', 'focus', 'brain fog', 'motivation', 'depression', 'anxiety'] },
@@ -136,6 +138,44 @@ function buildNutritionSummary(foodLogs: Array<{ name: string | null; nutrients:
       sodium_mg: counted ? Math.round(totals.sodium_mg / 7) : 0,
     },
     topFoods,
+  }
+}
+
+function buildHydrationSummary(
+  waterLogs: Array<{ amountMl: number | null; label?: string | null; localDate?: string | null; createdAt: Date }>
+) {
+  let totalMl = 0
+  const daySet = new Set<string>()
+  const labelCounts = new Map<string, { label: string; count: number }>()
+
+  for (const log of waterLogs) {
+    const ml = Number(log?.amountMl ?? 0) || 0
+    totalMl += ml
+    const day = log?.localDate || (log?.createdAt ? log.createdAt.toISOString().slice(0, 10) : '')
+    if (day) daySet.add(day)
+    const rawLabel = String(log?.label || '').trim()
+    const key = rawLabel.toLowerCase()
+    if (key) {
+      const existing = labelCounts.get(key)
+      if (existing) {
+        existing.count += 1
+      } else {
+        labelCounts.set(key, { label: rawLabel, count: 1 })
+      }
+    }
+  }
+
+  const topDrinks = Array.from(labelCounts.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+
+  const roundedTotal = Math.round(totalMl * 10) / 10
+  return {
+    entries: waterLogs.length,
+    totalMl: roundedTotal,
+    dailyAverageMl: Math.round((roundedTotal / 7) * 10) / 10,
+    daysWithLogs: daySet.size,
+    topDrinks,
   }
 }
 
@@ -260,6 +300,26 @@ function buildFallbackReport(context: any) {
       reason: 'Add workouts to help us understand how activity affects your focus areas.',
     })
   }
+  if ((coverage.waterCount || 0) >= 4) {
+    wins.push({
+      name: 'Hydration tracked',
+      reason: 'Water entries were logged multiple times this week, which helps hydration trends.',
+    })
+  }
+  if ((coverage.waterCount || 0) === 0) {
+    gaps.push({
+      name: 'Hydration not logged',
+      reason: 'Add water, tea, or coffee entries so hydration patterns show up in your report.',
+    })
+  }
+
+  const hydrationSummary = context?.hydrationSummary
+  if (hydrationSummary?.entries) {
+    sections.hydration.working.push({
+      name: 'Hydration logged',
+      reason: `${hydrationSummary.entries} drink entries across ${hydrationSummary.daysWithLogs || 0} days.`,
+    })
+  }
 
   const talkToAi = context?.talkToAi
   if (talkToAi?.userMessageCount) {
@@ -355,6 +415,11 @@ export async function POST(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
         take: 75,
       },
+      waterLogs: {
+        where: { createdAt: { gte: periodStart } },
+        orderBy: { createdAt: 'desc' },
+        take: 120,
+      },
       healthLogs: {
         where: { createdAt: { gte: periodStart } },
         orderBy: { createdAt: 'desc' },
@@ -426,6 +491,7 @@ export async function POST(request: NextRequest) {
   }
 
   user.foodLogs?.forEach((f) => stamp(f.createdAt))
+  user.waterLogs?.forEach((w) => stamp(w.createdAt))
   user.healthLogs?.forEach((h) => stamp(h.createdAt))
   user.exerciseLogs?.forEach((e) => stamp(e.createdAt))
   user.exerciseEntries?.forEach((e) => stamp(e.createdAt))
@@ -438,6 +504,7 @@ export async function POST(request: NextRequest) {
     daysActive: dataDays.size,
     totalEvents:
       (user.foodLogs?.length || 0) +
+      (user.waterLogs?.length || 0) +
       (user.healthLogs?.length || 0) +
       (user.exerciseLogs?.length || 0) +
       (user.exerciseEntries?.length || 0) +
@@ -445,6 +512,7 @@ export async function POST(request: NextRequest) {
       (symptomAnalyses?.length || 0) +
       (talkToAiMessages?.length || 0),
     foodCount: user.foodLogs?.length || 0,
+    waterCount: user.waterLogs?.length || 0,
     moodCount: moodRows?.length || 0,
     checkinCount: user.healthLogs?.length || 0,
     symptomCount: symptomAnalyses?.length || 0,
@@ -459,6 +527,7 @@ export async function POST(request: NextRequest) {
     daysActive: coverage.daysActive,
     totalEvents: coverage.totalEvents,
     foodCount: coverage.foodCount,
+    waterCount: coverage.waterCount,
     moodCount: coverage.moodCount,
     checkinCount: coverage.checkinCount,
     symptomCount: coverage.symptomCount,
@@ -469,6 +538,15 @@ export async function POST(request: NextRequest) {
       name: f.name,
       nutrients: (f as any).nutrients || null,
       createdAt: f.createdAt,
+    }))
+  )
+
+  const hydrationSummary = buildHydrationSummary(
+    (user.waterLogs || []).map((w) => ({
+      amountMl: (w as any).amountMl ?? null,
+      label: (w as any).label ?? null,
+      localDate: (w as any).localDate ?? null,
+      createdAt: w.createdAt,
     }))
   )
 
@@ -518,10 +596,18 @@ export async function POST(request: NextRequest) {
       timing: m.timing,
     })),
     nutritionSummary,
+    hydrationSummary,
     recentFoods: (user.foodLogs || []).slice(0, 20).map((f) => ({
       name: f.name,
       createdAt: f.createdAt,
       nutrients: (f as any).nutrients || null,
+    })),
+    recentWaterLogs: (user.waterLogs || []).slice(0, 20).map((w) => ({
+      label: (w as any).label ?? null,
+      amountMl: (w as any).amountMl ?? null,
+      amount: (w as any).amount ?? null,
+      unit: (w as any).unit ?? null,
+      createdAt: w.createdAt,
     })),
     checkins: goalRatings,
     moodSummary: {
@@ -565,6 +651,7 @@ Generate a 7-day health report in plain language with this exact JSON shape:
     "supplements": { "working": [], "suggested": [], "avoid": [] },
     "medications": { "working": [], "suggested": [], "avoid": [] },
     "nutrition": { "working": [], "suggested": [], "avoid": [] },
+    "hydration": { "working": [], "suggested": [], "avoid": [] },
     "exercise": { "working": [], "suggested": [], "avoid": [] },
     "lifestyle": { "working": [], "suggested": [], "avoid": [] },
     "labs": { "working": [], "suggested": [], "avoid": [] },
@@ -637,6 +724,7 @@ ${JSON.stringify(reportContext)}
         coverage,
         dataWarning,
         talkToAiSummary,
+        hydrationSummary,
         lockedReason: 'insufficient_credits',
       },
       report: null,
@@ -654,6 +742,7 @@ ${JSON.stringify(reportContext)}
       coverage,
       dataWarning,
       talkToAiSummary,
+      hydrationSummary,
     },
     report: reportPayload,
     model,

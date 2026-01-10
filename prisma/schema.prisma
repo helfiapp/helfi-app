@@ -70,6 +70,7 @@ model User {
   medications         Medication[]
   healthLogs          HealthLog[]
   foodLogs            FoodLog[]
+  waterLogs           WaterLog[]
   exerciseLogs        ExerciseLog[]
   exerciseEntries     ExerciseEntry[]
   subscription        Subscription?
@@ -209,6 +210,21 @@ model FoodLog {
 
   // File relationships (PHASE 2 addition)
   images File[] @relation("FoodLogImages")
+}
+
+model WaterLog {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Float
+  unit      String
+  amountMl  Float
+  label     String?
+  localDate String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, localDate])
+  @@index([userId, createdAt])
 }
 
 model BarcodeProduct {
