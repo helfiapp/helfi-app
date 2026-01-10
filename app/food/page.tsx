@@ -2813,10 +2813,10 @@ export default function FoodDiary() {
     setGarminConnected(Boolean(snapshot.garminConnected))
   }, [userCacheKey])
 
-  const loadExerciseEntriesForDate = async (dateKey: string, options?: { silent?: boolean }) => {
+  const loadExerciseEntriesForDate = async (dateKey: string, options?: { silent?: boolean; force?: boolean }) => {
     if (!dateKey) return
     const cached = readExerciseSnapshot(dateKey)
-    const shouldRefresh = shouldRefreshOnResume('exercise')
+    const shouldRefresh = options?.force ? true : shouldRefreshOnResume('exercise')
     if (cached && Array.isArray(cached.entries)) {
       setExerciseEntries(cached.entries)
       setExerciseCaloriesKcal(Number(cached.caloriesKcal) || 0)
@@ -2845,6 +2845,7 @@ export default function FoodDiary() {
       setExerciseEntries(entries)
       setExerciseCaloriesKcal(calories)
       writeExerciseSnapshot(dateKey, entries, calories)
+      setExerciseError(null)
       if (shouldRefresh) {
         markResumeHandled('exercise')
       }
@@ -2921,15 +2922,20 @@ export default function FoodDiary() {
 
   const deleteExerciseEntry = async (entryId: string) => {
     if (!entryId) return
+    let shouldReload = true
     try {
+      setExerciseError(null)
       const res = await fetch(`/api/exercise-entries/${encodeURIComponent(entryId)}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to delete exercise')
       }
-      await loadExerciseEntriesForDate(selectedDate, { silent: true })
     } catch (err: any) {
       setExerciseError(err?.message || 'Failed to delete exercise')
+    } finally {
+      if (shouldReload) {
+        await loadExerciseEntriesForDate(selectedDate, { silent: true, force: true })
+      }
     }
   }
 
@@ -3337,7 +3343,7 @@ export default function FoodDiary() {
       }
       setShowAddExerciseModal(false)
       setEditingExerciseEntry(null)
-      await loadExerciseEntriesForDate(selectedDate, { silent: true })
+      await loadExerciseEntriesForDate(selectedDate, { silent: true, force: true })
     } catch (err: any) {
       setExerciseSaveError(err?.message || 'Failed to save exercise')
     }
