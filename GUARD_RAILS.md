@@ -515,7 +515,22 @@ Rules that must stay locked:
 
 - The grey swipe bar must not appear when scrolling left to right in the energy summary.
 
-#### 3.4.10 Add Ingredient Search UI (Jan 2026 - Locked)
+#### 3.4.10 Ingredient Card Input UX (Jan 2026 - Locked)
+
+**Protected file:**
+- `app/food/page.tsx` (Detected Foods ingredient cards)
+
+**Last stable deploy (for this section):**
+- Commit: `efab11b21d2f92727640012d8b662533d5e1dd05`
+- Date: 2026-01-11
+
+Rules that must stay locked:
+- Servings and weight inputs show **no** focus outline, ring, or blue/green border on tap.
+- Weight input clears on focus so the field is blank.
+- Weight changes only save when the user presses **Done/Enter**; tapping elsewhere must discard.
+- The weight unit dropdown shows **no** expand/chevron icon; users tap the unit text (g/ml/oz) to change it.
+
+#### 3.4.11 Add Ingredient Search UI (Jan 2026 - Locked)
 
 **Protected files:**
 - `app/food/page.tsx` (Add Ingredient modal search UI)
