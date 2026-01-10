@@ -21,6 +21,7 @@ const URL_REGEX = /https?:\/\/[^\s]+/g
 export default function SupportPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const RETURN_KEY = 'helfi:support:returnTo'
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [activeTicket, setActiveTicket] = useState<any | null>(null)
@@ -199,6 +200,21 @@ export default function SupportPage() {
       loadTicketHistory()
     }
   }, [session, loadActiveTicket, loadTicketHistory])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const referrer = document.referrer
+    if (!referrer) return
+    try {
+      const url = new URL(referrer)
+      if (url.origin === window.location.origin && url.pathname !== '/support') {
+        const target = `${url.pathname}${url.search}${url.hash}`
+        window.sessionStorage.setItem(RETURN_KEY, target)
+      }
+    } catch {
+      return
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -607,13 +623,22 @@ export default function SupportPage() {
       setShowPostSubmitChoice(false)
       return
     }
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back()
-    } else if (session) {
-      router.push('/dashboard')
-    } else {
-      router.push('/')
+    if (typeof window !== 'undefined') {
+      const stored = window.sessionStorage.getItem(RETURN_KEY)
+      if (stored) {
+        router.push(stored)
+        return
+      }
+      if (window.history.length > 1) {
+        router.back()
+        return
+      }
     }
+    if (session) {
+      router.push('/dashboard')
+      return
+    }
+    router.push('/')
   }
 
   const openTicket = async (ticketId: string) => {
