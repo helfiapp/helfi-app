@@ -59,6 +59,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   const [renameValue, setRenameValue] = useState('')
   const [renameCleared, setRenameCleared] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deletePending, setDeletePending] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -252,6 +253,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     setActionThreadId(targetThreadId)
     setRenameOpen(false)
     setDeleteConfirmOpen(false)
+    setDeletePending(false)
     longPressTriggeredRef.current = true
   }
 
@@ -259,6 +261,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     setActionThreadId(null)
     setRenameOpen(false)
     setDeleteConfirmOpen(false)
+    setDeletePending(false)
     longPressTriggeredRef.current = false
   }
 
@@ -989,7 +992,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
                 <button
                   type="button"
                   onClick={() => setDeleteConfirmOpen(true)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 rounded-lg"
+                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 active:translate-y-[1px] active:scale-[0.99] transition rounded-lg"
                 >
                   Delete
                   <span className="material-symbols-outlined text-red-500" style={{ fontSize: 20 }}>delete</span>
@@ -1051,14 +1054,17 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!actionThreadId) return
-                      handleDeleteThread(actionThreadId)
+                      setDeletePending(true)
+                      await handleDeleteThread(actionThreadId)
+                      setDeletePending(false)
                       closeThreadActions()
                     }}
-                    className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+                    disabled={deletePending}
+                    className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 active:bg-red-700 active:translate-y-[1px] active:scale-[0.99] transition disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Delete
+                    {deletePending ? 'Deleting…' : 'Delete'}
                   </button>
                 </div>
               </div>

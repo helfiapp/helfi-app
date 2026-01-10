@@ -40,6 +40,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [expanded, setExpanded] = useState(false)
   const [actionThreadId, setActionThreadId] = useState<string | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deletePending, setDeletePending] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const enabled = (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true').toLowerCase() === 'true' || (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || '') === '1'
@@ -282,6 +283,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     setActionThreadId(targetThreadId)
     setRenameOpen(false)
     setDeleteConfirmOpen(false)
+    setDeletePending(false)
     longPressTriggeredRef.current = true
   }
 
@@ -289,6 +291,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     setActionThreadId(null)
     setRenameOpen(false)
     setDeleteConfirmOpen(false)
+    setDeletePending(false)
     longPressTriggeredRef.current = false
   }
 
@@ -1085,7 +1088,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 <button
                   type="button"
                   onClick={() => setDeleteConfirmOpen(true)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 rounded-lg"
+                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 active:translate-y-[1px] active:scale-[0.99] transition rounded-lg"
                 >
                   Delete
                   <span className="material-symbols-outlined text-red-500" style={{ fontSize: 20 }}>delete</span>
@@ -1149,12 +1152,15 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                     type="button"
                     onClick={async () => {
                       if (!actionThreadId) return
+                      setDeletePending(true)
                       await handleDeleteThread(actionThreadId)
+                      setDeletePending(false)
                       closeThreadActions()
                     }}
-                    className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+                    disabled={deletePending}
+                    className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 active:bg-red-700 active:translate-y-[1px] active:scale-[0.99] transition disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Delete
+                    {deletePending ? 'Deleting…' : 'Delete'}
                   </button>
                 </div>
               </div>
