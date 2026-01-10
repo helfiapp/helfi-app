@@ -677,12 +677,12 @@ export default function Dashboard() {
               <h1 className="text-3xl md:text-5xl font-extrabold text-helfi-black dark:text-white tracking-tight">
                 Welcome to Your <span className="text-helfi-green">Health Dashboard</span>
               </h1>
-              <p className="text-gray-600 text-base md:text-lg max-w-2xl mx-auto">
+              <p className="text-gray-600 text-base md:text-lg max-w-2xl mx-auto mt-2 px-4 md:px-0">
                 Your personalized health intelligence platform is being built to help you optimize your well-being.
               </p>
             </div>
 
-            <div className="md:hidden flex items-center justify-between mb-4">
+            <div className="md:hidden flex items-center justify-between mb-4 px-2 py-1">
               <h3 className="font-bold text-lg text-helfi-black dark:text-white">Daily Tools</h3>
               <span className="text-[10px] font-bold text-helfi-green uppercase tracking-wider">Slide to view</span>
             </div>
