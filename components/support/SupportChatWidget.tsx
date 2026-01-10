@@ -618,22 +618,35 @@ export default function SupportChatWidget() {
           )}
 
           {isOpen && (
-            <div className="w-[360px] max-w-[92vw] h-[520px] max-h-[80vh] bg-white/95 rounded-2xl shadow-[0_18px_60px_rgba(16,24,40,0.18)] border border-emerald-100 flex flex-col min-h-0 backdrop-blur">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-white rounded-t-2xl">
+            <div className="w-[360px] max-w-[92vw] h-[520px] max-h-[80vh] bg-white rounded-2xl shadow-[0_18px_60px_rgba(16,24,40,0.18)] border border-gray-100 flex flex-col min-h-0">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white/95 backdrop-blur-md rounded-t-2xl">
                 <div className="flex items-center gap-3">
-                  <Image
-                    src={agent.avatar}
-                    alt={`${agent.name} avatar`}
-                    width={36}
-                    height={36}
-                    className="rounded-full object-cover ring-2 ring-white"
-                  />
-                  <div>
-                    <div className="text-sm font-semibold text-gray-900">{agent.name}</div>
-                    <div className="text-xs text-gray-500">{agent.role}</div>
+                  <div className="relative">
+                    <Image
+                      src={agent.avatar}
+                      alt={`${agent.name} avatar`}
+                      width={36}
+                      height={36}
+                      className="rounded-full object-cover border border-gray-100"
+                    />
+                    <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full border-2 border-white" />
+                  </div>
+                  <div className="flex flex-col">
+                    <div className="text-sm font-bold text-gray-900">{agent.name}</div>
+                    <div className={`text-[11px] font-semibold ${isChatClosed ? 'text-gray-400' : 'text-emerald-600'}`}>
+                      {isChatClosed ? 'Chat Closed' : 'Active Support'}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={startNewChat}
+                    className="flex items-center gap-1 text-emerald-600 text-[11px] font-bold bg-emerald-50 px-2.5 py-1.5 rounded-full transition-colors active:scale-95"
+                  >
+                    <span className="text-sm">+</span>
+                    Ticket
+                  </button>
                   <button
                     type="button"
                     onClick={handleHideWidget}
@@ -658,143 +671,179 @@ export default function SupportChatWidget() {
                 </div>
               </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 space-y-3">
-            {isLoading && !ticket && (
-              <div className="text-xs text-gray-500">Loading chat...</div>
-            )}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4">
+            <div className="space-y-5">
+              {isLoading && !ticket && (
+                <div className="text-xs text-gray-500 text-center">Loading chat...</div>
+              )}
 
-            {!ticket && !isLoggedIn && (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-700">
-                  Hi! I’m {agent.name}. Ask me anything about Helfi and I’ll help out.
-                </p>
-                <input
-                  type="text"
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  placeholder="Your name"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-                <input
-                  type="email"
-                  value={guestEmail}
-                  onChange={(e) => setGuestEmail(e.target.value)}
-                  placeholder="Your email"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-            )}
+              {!ticket && !isLoggedIn && (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-600">
+                    Hi! I am {agent.name}. Share your question to start the chat.
+                  </p>
+                  <input
+                    type="text"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full bg-gray-100 border border-gray-200 rounded-full px-4 py-2 text-sm"
+                  />
+                  <input
+                    type="email"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="Your email"
+                    className="w-full bg-gray-100 border border-gray-200 rounded-full px-4 py-2 text-sm"
+                  />
+                </div>
+              )}
 
-            {ticket && isChatClosed && (
-              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                This chat is closed. Start a new chat if you need more help.
-              </div>
-            )}
+              {ticket && isChatClosed && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                  This chat is closed. Start a new chat if you need more help.
+                </div>
+              )}
 
-            {conversationItems.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-lg p-3 ${item.isAdminResponse ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'bg-gray-50 border-l-4 border-gray-300'}`}
-              >
-                <div className="flex items-center justify-between mb-1 text-[11px] text-gray-500">
-                  <span className="flex items-center gap-2">
-                    {item.isAdminResponse ? (
-                      <>
+              {conversationItems.length === 0 && !isLoading && (
+                <div className="text-[11px] text-gray-400 text-center">No messages yet.</div>
+              )}
+
+              {conversationItems.map((item) => {
+                const timeLabel = item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
+                const isAdmin = item.isAdminResponse
+                const fileTag = (attType?: string) => (attType?.includes('pdf') ? 'PDF' : 'FILE')
+                return (
+                  <div key={item.id} className={`flex items-end gap-2.5 ${isAdmin ? '' : 'justify-end'}`}>
+                    {isAdmin && (
+                      <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-7 h-7 shrink-0 border border-gray-100 overflow-hidden">
                         <Image
                           src={agent.avatar}
                           alt={`${agent.name} avatar`}
-                          width={18}
-                          height={18}
-                          className="rounded-full object-cover"
+                          width={28}
+                          height={28}
+                          className="w-full h-full object-cover"
                         />
-                        {agent.name}
-                      </>
-                    ) : (
-                      'You'
+                      </div>
                     )}
-                  </span>
-                  <span>{item.createdAt ? new Date(item.createdAt).toLocaleTimeString() : ''}</span>
-                </div>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-                  {renderMessageWithLinks(item.message)}
-                </p>
-                {item.attachments?.length > 0 && (
-                  <div className="mt-3 grid grid-cols-1 gap-2">
-                    {item.attachments.map((att: SupportAttachment) => (
-                      <a
-                        key={`${item.id}-${att.url}`}
-                        href={att.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="border border-gray-200 rounded-lg p-2 bg-white hover:bg-gray-50 transition-colors"
-                      >
-                        {att.type?.startsWith('image/') ? (
-                          <div className="space-y-2">
-                            <div className="relative w-full h-32">
-                              <Image
-                                src={att.url}
-                                alt={att.name}
-                                fill
-                                className="object-cover rounded-md"
-                              />
-                            </div>
-                            <div className="text-xs text-gray-600 truncate">{att.name}</div>
-                          </div>
+                    <div className={`flex flex-1 flex-col gap-1 ${isAdmin ? 'items-start' : 'items-end'}`}>
+                      <div className="flex items-center gap-2 px-1">
+                        {isAdmin ? (
+                          <>
+                            <p className="text-gray-500 text-[11px] font-medium leading-none">{agent.name}</p>
+                            <p className="text-gray-300 text-[10px]">{timeLabel}</p>
+                          </>
                         ) : (
-                          <div className="text-xs text-gray-700">
-                            <div className="font-medium">{att.name}</div>
-                            <div className="text-[11px] text-gray-500">{att.type || 'Document'}</div>
-                          </div>
+                          <>
+                            <p className="text-gray-300 text-[10px]">{timeLabel}</p>
+                            <p className="text-gray-500 text-[11px] font-medium leading-none text-right">You</p>
+                          </>
                         )}
-                      </a>
-                    ))}
+                      </div>
+                      <div
+                        className={`text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
+                      >
+                        {renderMessageWithLinks(item.message)}
+                      </div>
+                      {item.attachments?.length > 0 && (
+                        <div className={`flex flex-col gap-2 w-full ${isAdmin ? 'items-start' : 'items-end'}`}>
+                          {item.attachments.map((att: SupportAttachment) => {
+                            const isImage = att.type?.startsWith('image/')
+                            return (
+                              <a
+                                key={`${item.id}-${att.url}`}
+                                href={att.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`max-w-[85%] w-full rounded-xl border border-gray-200 bg-gray-50 p-3 transition-colors hover:bg-gray-100 ${isAdmin ? '' : 'self-end'}`}
+                              >
+                                {isImage ? (
+                                  <div className="space-y-2">
+                                    <div className="relative w-full h-28">
+                                      <Image
+                                        src={att.url}
+                                        alt={att.name}
+                                        fill
+                                        className="object-cover rounded-lg"
+                                      />
+                                    </div>
+                                    <div className="text-xs text-gray-600 truncate">{att.name}</div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-emerald-100 flex items-center justify-center rounded-lg w-9 h-9 text-emerald-600 text-[11px] font-bold">
+                                      {fileTag(att.type)}
+                                    </div>
+                                    <div className="flex-1 overflow-hidden">
+                                      <p className="text-gray-900 text-xs font-semibold truncate">{att.name}</p>
+                                      <p className="text-gray-400 text-[10px] font-medium uppercase tracking-wider">
+                                        {att.type || 'Document'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
+                              </a>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
-            {isAwaitingReply && !isChatClosed && (
-              <div className="flex items-center gap-2">
-                <Image
-                  src={agent.avatar}
-                  alt={`${agent.name} avatar`}
-                  width={18}
-                  height={18}
-                  className="rounded-full object-cover"
-                />
-                <div className="px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-[11px] text-emerald-700">
-                  <span className="animate-pulse">Typing...</span>
+                )
+              })}
+
+              {isAwaitingReply && !isChatClosed && (
+                <div className="flex items-end gap-2.5">
+                  <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-7 h-7 shrink-0 border border-gray-100 overflow-hidden">
+                    <Image
+                      src={agent.avatar}
+                      alt={`${agent.name} avatar`}
+                      width={28}
+                      height={28}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1 items-start">
+                    <div className="text-[11px] text-gray-500 px-1">Typing...</div>
+                    <div className="text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl rounded-bl-none px-4 py-2.5 bg-gray-100 text-gray-800">
+                      <span className="animate-pulse">...</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+              )}
+              <div ref={messagesEndRef} />
+            </div>
           </div>
 
           {ticket && isChatClosed && (
-            <div className="px-4 pb-3">
-              <div className="flex gap-2 mb-3">
+            <div className="bg-gray-50 border-t border-gray-100 px-4 py-4 space-y-4">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={startNewChat}
-                  className="w-full text-xs border border-gray-300 text-gray-700 rounded-lg px-3 py-2 active:scale-[0.98] transition-transform"
+                  className="w-full text-[11px] border border-gray-300 text-gray-700 rounded-full px-3 py-2 active:scale-[0.98] transition-transform"
                 >
                   Start a new chat
                 </button>
                 <button
                   type="button"
                   onClick={clearChat}
-                  className="w-full text-xs border border-gray-300 text-gray-700 rounded-lg px-3 py-2 active:scale-[0.98] transition-transform"
+                  className="w-full text-[11px] border border-gray-300 text-gray-700 rounded-full px-3 py-2 active:scale-[0.98] transition-transform"
                 >
                   Clear chat
                 </button>
               </div>
+              <div className="text-center space-y-1">
+                <h3 className="text-gray-900 text-[13px] font-bold tracking-tight">How was your support experience?</h3>
+                <p className="text-gray-400 text-[11px] font-medium">Your feedback helps us improve.</p>
+              </div>
               {feedbackSubmitted ? (
-                <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2">
+                <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center">
                   Thanks for the feedback.
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <p className="text-xs text-gray-600">How was your support experience?</p>
-                  <div className="flex gap-2">
+                <div className="space-y-3">
+                  <div className="flex justify-between gap-2">
                     {[1, 2, 3, 4, 5].map((rating) => (
                       <button
                         key={rating}
@@ -803,9 +852,9 @@ export default function SupportChatWidget() {
                           triggerHaptic()
                           setFeedbackRating(rating)
                         }}
-                        className={`px-2 py-1 rounded border text-xs active:scale-[0.98] transition-transform ${feedbackRating === rating ? 'bg-emerald-500 text-white border-emerald-500' : 'border-gray-300 text-gray-700'}`}
+                        className={`flex-1 aspect-square rounded-xl border flex items-center justify-center transition-all ${feedbackRating === rating ? 'bg-helfi-green text-white border-helfi-green shadow-lg' : 'bg-white border-gray-200 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'}`}
                       >
-                        {rating}
+                        <span className="text-sm font-bold">{rating}</span>
                       </button>
                     ))}
                   </div>
@@ -813,14 +862,14 @@ export default function SupportChatWidget() {
                     rows={2}
                     value={feedbackComment}
                     onChange={(e) => setFeedbackComment(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-2 py-1 text-xs"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs"
                     placeholder="Optional comment..."
                   />
                   <button
                     type="button"
                     onClick={submitFeedback}
                     disabled={feedbackRating < 1 || isLoading}
-                    className="w-full bg-helfi-green text-white rounded-lg px-3 py-2 text-xs disabled:opacity-50 active:scale-[0.98] transition-transform"
+                    className="w-full bg-helfi-green text-white rounded-full px-3 py-2 text-xs disabled:opacity-50 active:scale-[0.98] transition-transform"
                   >
                     {isLoading ? 'Submitting...' : 'Submit feedback'}
                   </button>
@@ -830,10 +879,10 @@ export default function SupportChatWidget() {
           )}
 
           {!isChatClosed && (
-            <div className="border-t border-gray-200 px-4 py-3 space-y-2">
-              {attachmentError && <p className="text-xs text-red-600">{attachmentError}</p>}
+            <div className="border-t border-gray-100 px-4 py-3">
+              {attachmentError && <p className="mb-2 text-xs text-red-600">{attachmentError}</p>}
               {attachments.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="mb-2 flex flex-wrap gap-2">
                   {attachments.map((att) => (
                     <div key={att.url} className="flex items-center gap-2 bg-gray-100 px-2 py-1 rounded-full text-[11px]">
                       <span className="truncate max-w-[140px]">{att.name}</span>
@@ -852,18 +901,9 @@ export default function SupportChatWidget() {
                   ))}
                 </div>
               )}
-              <textarea
-                rows={2}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onPaste={handlePasteUpload}
-                onKeyDown={handleChatKeyDown}
-                className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm"
-                placeholder="Type your message..."
-              />
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-gray-600 cursor-pointer border border-gray-300 rounded-lg px-2 py-1">
-                  Attach
+              <div className="flex items-center gap-2">
+                <label className="p-2 text-gray-400 hover:text-emerald-600 transition-colors cursor-pointer">
+                  <span className="text-lg">+</span>
                   <input
                     type="file"
                     multiple
@@ -872,37 +912,48 @@ export default function SupportChatWidget() {
                     onChange={(e) => handleUploadFiles(Array.from(e.target.files || []))}
                   />
                 </label>
-                <div className="flex items-center gap-2">
-                  {ticket && (
-                    <button
-                      type="button"
-                      onClick={endChat}
-                      className="text-xs border border-emerald-500 text-emerald-700 rounded-lg px-2 py-1 active:scale-[0.98] transition-transform"
-                    >
-                      End chat
-                    </button>
+                <div className="flex-1">
+                  <textarea
+                    rows={1}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onPaste={handlePasteUpload}
+                    onKeyDown={handleChatKeyDown}
+                    className="w-full bg-gray-100 border-none rounded-full px-4 py-2.5 text-sm focus:ring-1 focus:ring-emerald-200 placeholder:text-gray-400"
+                    placeholder="Type a message..."
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={sendMessage}
+                  disabled={isUploading || isLoading || (!message.trim() && attachments.length === 0) || (!isLoggedIn && !guestEmail.trim())}
+                  className="inline-flex items-center justify-center w-10 h-10 bg-helfi-green text-white rounded-full shadow-md disabled:opacity-50 active:scale-95 transition-transform"
+                  aria-label="Send message"
+                  title="Send"
+                >
+                  {isLoading || isUploading ? (
+                    <span className="text-[10px]">...</span>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
                   )}
+                </button>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+                {ticket && (
                   <button
                     type="button"
-                    onClick={sendMessage}
-                    disabled={isUploading || isLoading || (!message.trim() && attachments.length === 0) || (!isLoggedIn && !guestEmail.trim())}
-                    className="inline-flex items-center justify-center w-9 h-9 bg-helfi-green text-white rounded-full disabled:opacity-50 active:scale-95 transition-transform"
-                    aria-label="Send message"
-                    title="Send"
+                    onClick={endChat}
+                    className="text-emerald-600 hover:text-emerald-700"
                   >
-                    {isLoading || isUploading ? (
-                      <span className="text-[10px]">...</span>
-                    ) : (
-                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
-                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                      </svg>
-                    )}
+                    End chat
                   </button>
-                </div>
+                )}
+                {!isLoggedIn && !guestEmail.trim() && (
+                  <span>Add your email to start the chat.</span>
+                )}
               </div>
-              {!isLoggedIn && !guestEmail.trim() && (
-                <p className="text-[11px] text-gray-500">Add your email to start the chat.</p>
-              )}
             </div>
           )}
             </div>

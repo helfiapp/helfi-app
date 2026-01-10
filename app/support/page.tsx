@@ -94,6 +94,32 @@ export default function SupportPage() {
     }
     return nodes
   }
+
+  const formatMessageTime = (value?: string) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  }
+
+  const getConversationDayLabel = (items: Array<{ createdAt: string }>) => {
+    if (!items.length) return 'Today'
+    const last = items[items.length - 1]
+    if (!last?.createdAt) return 'Today'
+    const date = new Date(last.createdAt)
+    if (Number.isNaN(date.getTime())) return 'Today'
+    const today = new Date()
+    const isSameDay = date.toDateString() === today.toDateString()
+    return isSameDay ? 'Today' : date.toLocaleDateString()
+  }
+
+  const formatFileSize = (size?: number) => {
+    if (!size || size <= 0) return ''
+    if (size < 1024) return `${size} B`
+    const kb = size / 1024
+    if (kb < 1024) return `${kb.toFixed(1)} KB`
+    return `${(kb / 1024).toFixed(1)} MB`
+  }
   
   const [formData, setFormData] = useState({
     name: '',
@@ -598,253 +624,293 @@ export default function SupportPage() {
 
         {session && (activeTicket || showChatComposer) && (
           <div className="mb-10">
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Support Chat</h2>
-              <p className="text-gray-600">Chat with our support assistant. Replies appear here right away.</p>
-              <div className="mt-4 flex items-center justify-center gap-3 text-sm text-gray-600">
-                <Image
-                  src={agent.avatar}
-                  alt={`${agent.name} avatar`}
-                  width={36}
-                  height={36}
-                  className="rounded-full object-cover"
-                />
-                <span>{agent.name} from {agent.role}</span>
-              </div>
-            </div>
-
-            {isLoadingTicket && (
-              <div className="text-center text-sm text-gray-500">Loading your conversation...</div>
-            )}
-
-            {!isLoadingTicket && (
-              <div className="space-y-4 max-h-[55vh] md:max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
-                {isChatClosed && (
-                  <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    This chat is closed. If you need more help, start a new ticket below.
-                  </div>
-                )}
-                {combinedConversationItems.length === 0 && (
-                  <div className="text-sm text-gray-500 text-center">No messages yet.</div>
-                )}
-                {combinedConversationItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`rounded-lg p-4 ${item.isAdminResponse ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'bg-gray-50 border-l-4 border-gray-300'}`}
-                  >
-                    <div className="flex items-center justify-between mb-2 text-xs text-gray-500">
-                      <span className="flex items-center gap-2">
-                        {item.isAdminResponse ? (
-                          <>
-                            <Image
-                              src={agent.avatar}
-                              alt={`${agent.name} avatar`}
-                              width={20}
-                              height={20}
-                              className="rounded-full object-cover"
-                            />
-                            {agent.name}
-                          </>
-                        ) : (
-                          'You'
-                        )}
-                      </span>
-                      <span>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</span>
-                    </div>
-                    <p className="text-gray-700 whitespace-pre-wrap break-words">
-                      {renderMessageWithLinks(item.message)}
-                    </p>
-                    {item.attachments?.length > 0 && (
-                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {item.attachments.map((att: SupportAttachment) => (
-                          <a
-                            key={`${item.id}-${att.url}`}
-                            href={att.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="border border-gray-200 rounded-lg p-2 bg-white hover:bg-gray-50 transition-colors"
-                          >
-                            {att.type?.startsWith('image/') ? (
-                              <div className="space-y-2">
-                                <div className="relative w-full h-32">
-                                  <Image
-                                    src={att.url}
-                                    alt={att.name}
-                                    fill
-                                    className="object-cover rounded-md"
-                                  />
-                                </div>
-                                <div className="text-xs text-gray-600 truncate">{att.name}</div>
-                              </div>
-                            ) : (
-                              <div className="text-sm text-gray-700">
-                                <div className="font-medium">{att.name}</div>
-                                <div className="text-xs text-gray-500">{att.type || 'Document'}</div>
-                              </div>
-                            )}
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {isAwaitingReply && !isChatClosed && (
-                  <div className="rounded-lg p-4 bg-emerald-50 border-l-4 border-emerald-500">
-                    <div className="flex items-center gap-2 text-xs text-emerald-700">
-                      <Image
-                        src={agent.avatar}
-                        alt={`${agent.name} avatar`}
-                        width={20}
-                        height={20}
-                        className="rounded-full object-cover"
-                      />
-                      <span className="animate-pulse">Typing...</span>
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-            )}
-
-            <div className="mt-6">
-              <label htmlFor="chatMessage" className="block text-sm font-medium text-gray-700 mb-2">
-                Send a message
-              </label>
-              <textarea
-                id="chatMessage"
-                name="chatMessage"
-                rows={4}
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                onPaste={(e) => handlePasteUpload(e, setChatAttachments, setIsUploadingChatAttachment)}
-                onKeyDown={handleChatKeyDown}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-helfi-green focus:border-helfi-green"
-                placeholder="Describe the issue or add more details..."
-                disabled={isChatClosed}
-              />
-              {attachmentError && (
-                <p className="mt-2 text-sm text-red-600">{attachmentError}</p>
-              )}
-              {chatAttachments.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {chatAttachments.map((att) => (
-                    <div key={att.url} className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-xs">
-                      <span className="truncate max-w-[160px]">{att.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setChatAttachments((prev) => prev.filter((item) => item.url !== att.url))}
-                        className="text-gray-500 hover:text-gray-700"
-                        aria-label={`Remove ${att.name}`}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex items-center justify-between mt-4">
-                <div className="flex items-center gap-2">
-                  <label className={`px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${isChatClosed ? 'opacity-50 pointer-events-none' : ''}`}>
-                    Attach files
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      className="hidden"
-                      onChange={(e) => handleUploadFiles(Array.from(e.target.files || []), setChatAttachments, setIsUploadingChatAttachment)}
-                      disabled={isChatClosed}
+            <div className="mx-auto w-full max-w-[430px] md:max-w-[900px] bg-white border border-gray-100 shadow-2xl md:rounded-3xl overflow-hidden flex flex-col min-h-[640px]">
+              <header className="sticky top-0 z-10 flex items-center justify-between bg-white/95 backdrop-blur-md px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Image
+                      src={agent.avatar}
+                      alt={`${agent.name} avatar`}
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover border border-gray-100"
                     />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={startNewTicket}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Start a new ticket
-                  </button>
-                  <button
-                    type="button"
-                    onClick={endChat}
-                    disabled={isChatClosed || isSendingChat}
-                    className="px-4 py-2 border border-emerald-500 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    End chat
-                  </button>
-                  {isChatClosed && (
-                    <button
-                      type="button"
-                      onClick={clearChat}
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      Clear chat
-                    </button>
-                  )}
+                    <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full border-2 border-white" />
+                  </div>
+                  <div className="flex flex-col">
+                    <h2 className="text-gray-900 text-sm font-bold leading-tight">{agent.name}</h2>
+                    <p className={`text-[11px] font-semibold ${isChatClosed ? 'text-gray-400' : 'text-emerald-600'}`}>
+                      {isChatClosed ? 'Chat Closed' : 'Active Support'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
-                  onClick={sendChatMessage}
-                  disabled={isChatClosed || isUploadingChatAttachment || (!chatMessage.trim() && chatAttachments.length === 0) || isSendingChat}
-                  className="inline-flex items-center justify-center w-11 h-11 bg-helfi-green text-white rounded-full hover:bg-helfi-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Send message"
-                  title="Send"
+                  onClick={startNewTicket}
+                  className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold bg-emerald-50 px-3 py-2 rounded-full transition-colors active:scale-95"
                 >
-                  {isSendingChat || isUploadingChatAttachment ? (
-                    <span className="text-xs">...</span>
-                  ) : (
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor" aria-hidden="true">
-                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                    </svg>
-                  )}
+                  <span className="text-sm">+</span>
+                  Ticket
                 </button>
-              </div>
-            </div>
+              </header>
 
-            {isChatClosed && (
-              <div className="mt-8 border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">How was your support experience?</h3>
-                <p className="text-sm text-gray-600 mb-4">A quick rating helps us improve.</p>
-                {hasFeedback ? (
-                  <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                    Thanks for the feedback — we really appreciate it.
+              <main className="flex-1 overflow-y-auto px-4 bg-white">
+                <div className="py-6 flex flex-col gap-6">
+                  <div className="text-center">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">
+                      {getConversationDayLabel(combinedConversationItems)}
+                    </span>
                   </div>
-                ) : (
-                  <>
-                    <div className="flex gap-2 mb-4">
-                      {[1, 2, 3, 4, 5].map((rating) => (
-                        <button
-                          key={rating}
-                          type="button"
-                          onClick={() => {
-                            triggerHaptic()
-                            setFeedbackRating(rating)
-                          }}
-                          className={`px-3 py-2 rounded-lg border text-sm ${feedbackRating === rating ? 'bg-emerald-500 text-white border-emerald-500' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-                        >
-                          {rating}
-                        </button>
-                      ))}
+
+                  {isLoadingTicket && (
+                    <div className="text-xs text-gray-500 text-center">Loading your conversation...</div>
+                  )}
+
+                  {!isLoadingTicket && combinedConversationItems.length === 0 && (
+                    <div className="text-xs text-gray-400 text-center">Start your support chat below.</div>
+                  )}
+
+                  {!isLoadingTicket && combinedConversationItems.map((item) => {
+                    const timeLabel = formatMessageTime(item.createdAt)
+                    const isAdmin = item.isAdminResponse
+                    const messageBubble = (
+                      <div
+                        className={`text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl px-4 py-2.5 ${isAdmin ? 'rounded-bl-none bg-gray-100 text-gray-800' : 'rounded-br-none bg-helfi-green text-white shadow-sm'}`}
+                      >
+                        {renderMessageWithLinks(item.message)}
+                      </div>
+                    )
+
+                    return (
+                      <div key={item.id} className={`flex items-end gap-2.5 ${isAdmin ? '' : 'justify-end'}`}>
+                        {isAdmin && (
+                          <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-7 h-7 shrink-0 border border-gray-100 overflow-hidden">
+                            <Image
+                              src={agent.avatar}
+                              alt={`${agent.name} avatar`}
+                              width={28}
+                              height={28}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className={`flex flex-1 flex-col gap-1 ${isAdmin ? 'items-start' : 'items-end'}`}>
+                          <div className="flex items-center gap-2 px-1">
+                            {isAdmin ? (
+                              <>
+                                <p className="text-gray-500 text-[11px] font-medium leading-none">{agent.name}</p>
+                                <p className="text-gray-300 text-[10px]">{timeLabel}</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-gray-300 text-[10px]">{timeLabel}</p>
+                                <p className="text-gray-500 text-[11px] font-medium leading-none text-right">You</p>
+                              </>
+                            )}
+                          </div>
+                          {messageBubble}
+                          {item.attachments?.length > 0 && (
+                            <div className={`flex flex-col gap-2 w-full ${isAdmin ? 'items-start' : 'items-end'}`}>
+                              {item.attachments.map((att: SupportAttachment) => {
+                                const isImage = att.type?.startsWith('image/')
+                                const sizeLabel = formatFileSize(att.size)
+                                const fileTag = att.type?.includes('pdf') ? 'PDF' : 'FILE'
+                                return (
+                                  <a
+                                    key={`${item.id}-${att.url}`}
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={`max-w-[85%] w-full rounded-xl border border-gray-200 bg-gray-50 p-3 transition-colors hover:bg-gray-100 ${isAdmin ? '' : 'self-end'}`}
+                                  >
+                                    {isImage ? (
+                                      <div className="space-y-2">
+                                        <div className="relative w-full h-36">
+                                          <Image
+                                            src={att.url}
+                                            alt={att.name}
+                                            fill
+                                            className="object-cover rounded-lg"
+                                          />
+                                        </div>
+                                        <div className="text-xs text-gray-600 truncate">{att.name}</div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-3">
+                                        <div className="bg-emerald-100 flex items-center justify-center rounded-lg w-10 h-10 text-emerald-600 text-sm font-bold">
+                                          {fileTag}
+                                        </div>
+                                        <div className="flex-1 overflow-hidden">
+                                          <p className="text-gray-900 text-xs font-semibold truncate">{att.name}</p>
+                                          <p className="text-gray-400 text-[10px] font-medium uppercase tracking-wider">
+                                            {att.type || 'Document'}{sizeLabel ? ` - ${sizeLabel}` : ''}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </a>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {isAwaitingReply && !isChatClosed && (
+                    <div className="flex items-end gap-2.5">
+                      <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-7 h-7 shrink-0 border border-gray-100 overflow-hidden">
+                        <Image
+                          src={agent.avatar}
+                          alt={`${agent.name} avatar`}
+                          width={28}
+                          height={28}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex flex-1 flex-col gap-1 items-start">
+                        <div className="text-[11px] text-gray-500 px-1">Typing...</div>
+                        <div className="text-sm font-normal leading-relaxed max-w-[85%] rounded-2xl rounded-bl-none px-4 py-2.5 bg-gray-100 text-gray-800">
+                          <span className="animate-pulse">...</span>
+                        </div>
+                      </div>
                     </div>
-                    <textarea
-                      rows={3}
-                      value={feedbackComment}
-                      onChange={(e) => setFeedbackComment(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-helfi-green focus:border-helfi-green"
-                      placeholder="Optional comment..."
-                    />
-                    <div className="flex justify-end mt-4">
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+              </main>
+
+              {!isChatClosed && (
+                <div className="shrink-0 flex flex-col bg-white border-t border-gray-100">
+                  <div className="bg-white p-4">
+                    {attachmentError && (
+                      <p className="mb-2 text-xs text-red-600">{attachmentError}</p>
+                    )}
+                    {chatAttachments.length > 0 && (
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {chatAttachments.map((att) => (
+                          <div key={att.url} className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-[11px]">
+                            <span className="truncate max-w-[160px]">{att.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setChatAttachments((prev) => prev.filter((item) => item.url !== att.url))}
+                              className="text-gray-500 hover:text-gray-700"
+                              aria-label={`Remove ${att.name}`}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <label className="p-2 text-gray-400 hover:text-emerald-600 transition-colors cursor-pointer">
+                        <span className="text-lg">+</span>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          className="hidden"
+                          onChange={(e) => handleUploadFiles(Array.from(e.target.files || []), setChatAttachments, setIsUploadingChatAttachment)}
+                          disabled={isChatClosed}
+                        />
+                      </label>
+                      <div className="flex-1 relative flex items-center">
+                        <textarea
+                          rows={1}
+                          value={chatMessage}
+                          onChange={(e) => setChatMessage(e.target.value)}
+                          onPaste={(e) => handlePasteUpload(e, setChatAttachments, setIsUploadingChatAttachment)}
+                          onKeyDown={handleChatKeyDown}
+                          className="w-full bg-gray-100 border-none rounded-full px-4 py-2.5 text-sm focus:ring-1 focus:ring-emerald-200 placeholder:text-gray-400"
+                          placeholder="Type a message..."
+                          disabled={isChatClosed}
+                        />
+                      </div>
                       <button
                         type="button"
-                        onClick={submitFeedback}
-                        disabled={feedbackRating < 1 || isSubmittingFeedback}
-                        className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={sendChatMessage}
+                        disabled={isChatClosed || isUploadingChatAttachment || (!chatMessage.trim() && chatAttachments.length === 0) || isSendingChat}
+                        className="w-10 h-10 bg-helfi-green text-white rounded-full flex items-center justify-center shadow-md active:scale-95 transition-transform disabled:opacity-50"
+                        aria-label="Send message"
+                        title="Send"
                       >
-                        {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
+                        {isSendingChat || isUploadingChatAttachment ? (
+                          <span className="text-[10px]">...</span>
+                        ) : (
+                          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                          </svg>
+                        )}
                       </button>
                     </div>
-                  </>
-                )}
-              </div>
-            )}
+                    {activeTicket && (
+                      <div className="mt-3 flex items-center justify-between text-[11px] text-gray-500">
+                        <button
+                          type="button"
+                          onClick={endChat}
+                          disabled={isChatClosed || isSendingChat}
+                          className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
+                        >
+                          End chat
+                        </button>
+                        {isSendingChat && <span>Sending...</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isChatClosed && (
+                <div className="bg-gray-50 border-t border-gray-100 p-5 pb-6 space-y-5">
+                  <div className="text-center space-y-1">
+                    <h3 className="text-gray-900 text-[15px] font-bold tracking-tight">How was your support experience?</h3>
+                    <p className="text-gray-400 text-[11px] font-medium">Your feedback helps us improve.</p>
+                  </div>
+                  {hasFeedback ? (
+                    <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center">
+                      Thanks for the feedback. We appreciate it.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between gap-2 max-w-[320px] mx-auto">
+                        {[1, 2, 3, 4, 5].map((rating) => (
+                          <button
+                            key={rating}
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic()
+                              setFeedbackRating(rating)
+                            }}
+                            className={`flex-1 aspect-square rounded-xl border flex items-center justify-center transition-all ${feedbackRating === rating ? 'bg-helfi-green text-white border-helfi-green shadow-lg' : 'bg-white border-gray-200 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'}`}
+                          >
+                            <span className="text-lg font-bold">{rating}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={feedbackComment}
+                        onChange={(e) => setFeedbackComment(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-helfi-green focus:border-helfi-green"
+                        placeholder="Optional comment..."
+                      />
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={submitFeedback}
+                          disabled={feedbackRating < 1 || isSubmittingFeedback}
+                          className="px-5 py-2 bg-helfi-green text-white rounded-full hover:bg-helfi-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSubmittingFeedback ? 'Submitting...' : 'Submit feedback'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
