@@ -235,7 +235,7 @@ export default function WaterIntakePage() {
               onClick={() => shiftDate(-1)}
               className="px-3 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200"
             >
-              < Previous
+              Previous
             </button>
             <div className="relative">
               <input
@@ -254,7 +254,7 @@ export default function WaterIntakePage() {
               onClick={() => shiftDate(1)}
               className="px-3 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200"
             >
-              Next >
+              Next &gt;
             </button>
             <button
               type="button"
