@@ -11,14 +11,20 @@ interface SectionChatProps {
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
-type ChatThread = { id: string; title: string | null; createdAt: string; updatedAt: string }
+type ChatThread = {
+  id: string
+  title: string | null
+  archivedAt?: string | null
+  lastChargedCost?: number | null
+  lastChargedAt?: string | null
+  lastChargeCovered?: boolean | null
+  createdAt: string
+  updatedAt: string
+}
 
 const COST_PREFIX = '__cost__'
 
 export default function SectionChat({ issueSlug, section, issueName }: SectionChatProps) {
-  const storageKey = useMemo(() => `helfi:insights:thread:${issueSlug}:${section}`, [issueSlug, section])
-  const archivedKey = useMemo(() => `helfi:insights:archived:${issueSlug}:${section}`, [issueSlug, section])
-  const costKey = useMemo(() => `helfi:insights:costs:${issueSlug}:${section}`, [issueSlug, section])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,7 +33,6 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [threadId, setThreadId] = useState<string | null>(null)
   const [threadsOpen, setThreadsOpen] = useState(false)
-  const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [renameCleared, setRenameCleared] = useState(false)
@@ -35,7 +40,6 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [expanded, setExpanded] = useState(false)
   const [actionThreadId, setActionThreadId] = useState<string | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [threadChargeMap, setThreadChargeMap] = useState<Record<string, { cost: number; covered: boolean; at: string }>>({})
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const enabled = (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true').toLowerCase() === 'true' || (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || '') === '1'
@@ -44,7 +48,6 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [isClient, setIsClient] = useState(false)
   const longPressTimerRef = useRef<number | null>(null)
   const longPressTriggeredRef = useRef(false)
-  const pendingCostRef = useRef<{ cost: number; covered: boolean } | null>(null)
 
   const currentThreadTitle = useMemo(() => {
     if (!threadId) return 'New chat'
@@ -53,16 +56,22 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
   const currentCharge = useMemo(() => {
     if (!threadId) return null
-    return threadChargeMap[threadId] || null
-  }, [threadChargeMap, threadId])
+    const thread = threads.find((item) => item.id === threadId)
+    if (!thread || typeof thread.lastChargedCost !== 'number') return null
+    return {
+      cost: thread.lastChargedCost,
+      covered: Boolean(thread.lastChargeCovered),
+      at: thread.lastChargedAt || '',
+    }
+  }, [threadId, threads])
 
   const actionThread = actionThreadId ? threads.find((thread) => thread.id === actionThreadId) : null
-  const actionThreadArchived = actionThreadId ? archivedThreadIds.includes(actionThreadId) : false
+  const actionThreadArchived = actionThreadId ? Boolean(actionThread?.archivedAt) : false
 
   const threadGroups = useMemo(() => {
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
-    const visibleThreads = threads.filter((thread) => !archivedThreadIds.includes(thread.id))
+    const visibleThreads = threads.filter((thread) => !thread.archivedAt)
     const groups = {
       today: [] as ChatThread[],
       yesterday: [] as ChatThread[],
@@ -89,12 +98,12 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       { label: 'Previous 7 days', items: groups.week },
       { label: 'Older', items: groups.older },
     ]
-  }, [threads, archivedThreadIds])
+  }, [threads])
 
   const hasThreads = threadGroups.some((group) => group.items.length > 0)
   const archivedThreads = useMemo(
-    () => threads.filter((thread) => archivedThreadIds.includes(thread.id)),
-    [threads, archivedThreadIds]
+    () => threads.filter((thread) => thread.archivedAt),
+    [threads]
   )
   // Smooth single-frame resize to prevent jitter when text grows/shrinks quickly
   const resizeTextarea = useCallback(() => {
@@ -186,64 +195,6 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     setIsClient(true)
   }, [])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const raw = localStorage.getItem(archivedKey)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) {
-          setArchivedThreadIds(parsed.filter((id) => typeof id === 'string'))
-        }
-      }
-    } catch {}
-  }, [archivedKey])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const raw = localStorage.getItem(costKey)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed && typeof parsed === 'object') {
-          setThreadChargeMap(parsed)
-        }
-      }
-    } catch {}
-  }, [costKey])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      localStorage.setItem(archivedKey, JSON.stringify(archivedThreadIds))
-    } catch {}
-  }, [archivedKey, archivedThreadIds])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      localStorage.setItem(costKey, JSON.stringify(threadChargeMap))
-    } catch {}
-  }, [costKey, threadChargeMap])
-
-  useEffect(() => {
-    if (!threads.length) return
-    setArchivedThreadIds((prev) => prev.filter((id) => threads.some((thread) => thread.id === id)))
-  }, [threads])
-
-  useEffect(() => {
-    if (!threads.length) return
-    setThreadChargeMap((prev) => {
-      const next = { ...prev }
-      Object.keys(next).forEach((id) => {
-        if (!threads.some((thread) => thread.id === id)) {
-          delete next[id]
-        }
-      })
-      return next
-    })
-  }, [threads])
-
   // Auto-resize textarea pre-paint to reduce flicker
   useLayoutEffect(() => {
     resizeTextarea()
@@ -280,10 +231,9 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
             setThreads(threadsData.threads)
             hasThreads = threadsData.threads.length > 0
             if (threadsData.threads.length > 0 && !threadId) {
-              // Load most recent thread
-              const latestThreadId = threadsData.threads[0].id
-              setThreadId(latestThreadId)
-              loadThreadMessages(latestThreadId)
+              const latestThread = threadsData.threads.find((thread: ChatThread) => !thread.archivedAt) || threadsData.threads[0]
+              setThreadId(latestThread.id)
+              loadThreadMessages(latestThread.id)
             }
           }
         }
@@ -302,18 +252,6 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           }
         }
       } catch {}
-      // Also hydrate from localStorage if server has nothing yet
-      if (!cancelled && messages.length === 0) {
-        try {
-          const saved = localStorage.getItem(storageKey)
-          if (saved) {
-            const parsed = JSON.parse(saved)
-            if (Array.isArray(parsed)) {
-              setMessages(parsed.filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')).slice(-24))
-            }
-          }
-        } catch {}
-      }
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -395,22 +333,41 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     }
   }
 
-  function handleArchiveThread(targetThreadId: string) {
-    const isArchived = archivedThreadIds.includes(targetThreadId)
-    const nextArchived = isArchived
-      ? archivedThreadIds.filter((id) => id !== targetThreadId)
-      : [...archivedThreadIds, targetThreadId]
-    setArchivedThreadIds(nextArchived)
-
-    if (!isArchived && threadId === targetThreadId) {
-      const nextThread = threads.find((thread) => !nextArchived.includes(thread.id) && thread.id !== targetThreadId)
-      if (nextThread) {
-        setThreadId(nextThread.id)
-        loadThreadMessages(nextThread.id)
-      } else {
-        handleNewChat()
-      }
+  async function handleArchiveThread(targetThreadId: string) {
+    const targetThread = threads.find((thread) => thread.id === targetThreadId)
+    if (!targetThread) return
+    const nextArchived = !targetThread.archivedAt
+    let nextThreadId = threadId
+    if (nextArchived && threadId === targetThreadId) {
+      const fallback = threads.find((thread) => thread.id !== targetThreadId && !thread.archivedAt)
+      nextThreadId = fallback ? fallback.id : null
     }
+    try {
+      const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: targetThreadId, archived: nextArchived }),
+      })
+      if (res.ok) {
+        const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
+        if (threadsRes.ok) {
+          const threadsData = await threadsRes.json()
+          if (threadsData.threads) {
+            setThreads(threadsData.threads)
+            if (nextThreadId) {
+              setThreadId(nextThreadId)
+              loadThreadMessages(nextThreadId)
+            } else {
+              setThreadId(null)
+              setMessages([])
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to archive thread:', err)
+    }
+    closeThreadActions()
   }
 
   async function handleRenameThread(threadIdToRename: string, title: string) {
@@ -447,34 +404,21 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           if (threadsData.threads) {
             setThreads(threadsData.threads)
             if (threadsData.threads.length > 0) {
-              const newThreadId = threadsData.threads[0].id
-              setThreadId(newThreadId)
-              loadThreadMessages(newThreadId)
+              const nextThread = threadsData.threads.find((thread: ChatThread) => !thread.archivedAt) || threadsData.threads[0]
+              setThreadId(nextThread.id)
+              loadThreadMessages(nextThread.id)
             } else {
               setThreadId(null)
               setMessages([])
             }
           }
         }
-        setArchivedThreadIds((prev) => prev.filter((id) => id !== threadIdToDelete))
-        setThreadChargeMap((prev) => {
-          const next = { ...prev }
-          delete next[threadIdToDelete]
-          return next
-        })
         setThreadsOpen(false)
       }
     } catch (err) {
       console.error('Failed to delete thread:', err)
     }
   }
-
-  // Persist a lightweight copy locally for UX continuity
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(messages))
-    } catch {}
-  }, [messages, storageKey])
 
   useEffect(() => {
     const container = containerRef.current
@@ -547,20 +491,20 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 try {
                   const payload = JSON.parse(trimmed.slice(COST_PREFIX.length))
                   if (payload && typeof payload.costCents === 'number') {
-                    if (!threadId) {
-                      pendingCostRef.current = {
-                        cost: payload.costCents,
-                        covered: Boolean(payload.covered),
-                      }
-                    } else {
-                      setThreadChargeMap((prev) => ({
-                        ...prev,
-                        [threadId]: {
-                          cost: payload.costCents,
-                          covered: Boolean(payload.covered),
-                          at: new Date().toISOString(),
-                        },
-                      }))
+                    if (threadId) {
+                      const costNow = new Date().toISOString()
+                      setThreads((prev) =>
+                        prev.map((thread) =>
+                          thread.id === threadId
+                            ? {
+                                ...thread,
+                                lastChargedCost: payload.costCents,
+                                lastChargedAt: costNow,
+                                lastChargeCovered: Boolean(payload.covered),
+                              }
+                            : thread
+                        )
+                      )
                     }
                   }
                 } catch {}
@@ -599,19 +543,8 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                   setThreads(threadsData.threads)
                   // Update threadId if we created a new thread
                   if (!threadId && threadsData.threads.length > 0) {
-                    const nextId = threadsData.threads[0].id
-                    setThreadId(nextId)
-                    if (pendingCostRef.current) {
-                      setThreadChargeMap((prev) => ({
-                        ...prev,
-                        [nextId]: {
-                          cost: pendingCostRef.current!.cost,
-                          covered: pendingCostRef.current!.covered,
-                          at: new Date().toISOString(),
-                        },
-                      }))
-                      pendingCostRef.current = null
-                    }
+                    const nextThread = threadsData.threads.find((thread: ChatThread) => !thread.archivedAt) || threadsData.threads[0]
+                    setThreadId(nextThread.id)
                   }
                 }
               }
@@ -638,16 +571,19 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         if (typeof data?.costCents === 'number') {
           const targetId = data?.threadId || threadId
           if (targetId) {
-            setThreadChargeMap((prev) => ({
-              ...prev,
-              [targetId]: {
-                cost: data.costCents,
-                covered: Boolean(data.covered),
-                at: new Date().toISOString(),
-              },
-            }))
-          } else {
-            pendingCostRef.current = { cost: data.costCents, covered: Boolean(data.covered) }
+            const costNow = new Date().toISOString()
+            setThreads((prev) =>
+              prev.map((thread) =>
+                thread.id === targetId
+                  ? {
+                      ...thread,
+                      lastChargedCost: data.costCents,
+                      lastChargedAt: costNow,
+                      lastChargeCovered: Boolean(data.covered),
+                    }
+                  : thread
+              )
+            )
           }
         }
       }

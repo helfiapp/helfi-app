@@ -9,12 +9,12 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string }
 type ChatThread = {
   id: string
   title: string | null
-  messages: ChatMessage[]
+  archivedAt?: string | null
   createdAt: string
   updatedAt: string
   lastChargedCost?: number | null
   lastChargedAt?: string | null
-  lastChargeCovered?: boolean
+  lastChargeCovered?: boolean | null
 }
 
 type MedicalAnalysisResult = {
@@ -50,12 +50,10 @@ function normaliseMedicalChatContent(raw: string): string {
 }
 
 export default function MedicalImageChat({ analysisResult }: MedicalImageChatProps) {
-  const threadsKey = useMemo(() => 'helfi:medical:chat:threads', [])
-  const archivedKey = useMemo(() => 'helfi:medical:chat:archived', [])
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [threadsOpen, setThreadsOpen] = useState(false)
-  const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
   const [actionThreadId, setActionThreadId] = useState<string | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -77,7 +75,6 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     () => threads.find((thread) => thread.id === currentThreadId) || null,
     [threads, currentThreadId]
   )
-  const messages = currentThread?.messages || []
 
   const currentThreadTitle = useMemo(() => {
     if (!currentThreadId) return 'New chat'
@@ -85,12 +82,12 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   }, [currentThreadId, threads])
 
   const actionThread = actionThreadId ? threads.find((thread) => thread.id === actionThreadId) : null
-  const actionThreadArchived = actionThreadId ? archivedThreadIds.includes(actionThreadId) : false
+  const actionThreadArchived = actionThreadId ? Boolean(actionThread?.archivedAt) : false
 
   const threadGroups = useMemo(() => {
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
-    const visibleThreads = threads.filter((thread) => !archivedThreadIds.includes(thread.id))
+    const visibleThreads = threads.filter((thread) => !thread.archivedAt)
     const sortedThreads = [...visibleThreads].sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     )
@@ -120,31 +117,13 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       { label: 'Previous 7 days', items: groups.week },
       { label: 'Older', items: groups.older },
     ]
-  }, [threads, archivedThreadIds])
+  }, [threads])
 
   const hasVisibleThreads = threadGroups.some((group) => group.items.length > 0)
   const archivedThreads = useMemo(
-    () => threads.filter((thread) => archivedThreadIds.includes(thread.id)),
-    [threads, archivedThreadIds]
+    () => threads.filter((thread) => thread.archivedAt),
+    [threads]
   )
-
-  const createThread = useCallback((initialMessages: ChatMessage[] = []): ChatThread => {
-    const now = new Date().toISOString()
-    const id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`
-    return {
-      id,
-      title: null,
-      messages: initialMessages,
-      createdAt: now,
-      updatedAt: now,
-      lastChargedCost: null,
-      lastChargedAt: null,
-      lastChargeCovered: false,
-    }
-  }, [])
 
   const buildTitle = useCallback((text: string) => {
     const trimmed = text.trim()
@@ -180,72 +159,63 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     setIsClient(true)
   }, [])
 
-  // Load threads and archived list from localStorage on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    let nextThreads: ChatThread[] = []
-    let nextArchived: string[] = []
-
+  const loadThreadMessages = useCallback(async (threadId: string) => {
     try {
-      const rawArchived = localStorage.getItem(archivedKey)
-      if (rawArchived) {
-        const parsed = JSON.parse(rawArchived)
-        if (Array.isArray(parsed)) {
-          nextArchived = parsed.filter((id) => typeof id === 'string')
-        }
-      }
-    } catch {}
-
-    try {
-      const rawThreads = localStorage.getItem(threadsKey)
-      if (rawThreads) {
-        const parsed = JSON.parse(rawThreads)
-        if (Array.isArray(parsed)) {
-          nextThreads = parsed
-            .filter((thread) => thread && typeof thread.id === 'string' && Array.isArray(thread.messages))
-            .map((thread) => ({
-              id: thread.id,
-              title: typeof thread.title === 'string' ? thread.title : null,
-              messages: Array.isArray(thread.messages)
-                ? thread.messages.filter(
-                    (m: any) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')
-                  )
-                : [],
-              createdAt: typeof thread.createdAt === 'string' ? thread.createdAt : new Date().toISOString(),
-              updatedAt: typeof thread.updatedAt === 'string' ? thread.updatedAt : new Date().toISOString(),
-              lastChargedCost: typeof thread.lastChargedCost === 'number' ? thread.lastChargedCost : null,
-              lastChargedAt: typeof thread.lastChargedAt === 'string' ? thread.lastChargedAt : null,
-              lastChargeCovered: Boolean(thread.lastChargeCovered),
+      const res = await fetch(`/api/medical-images/chat?threadId=${threadId}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.messages && Array.isArray(data.messages)) {
+          setMessages(
+            data.messages.map((m: any) => ({
+              role: m.role === 'assistant' ? 'assistant' : 'user',
+              content: typeof m.content === 'string' ? m.content : '',
             }))
+          )
+        } else {
+          setMessages([])
         }
       }
-    } catch {}
-
-    if (!nextThreads.length) {
-      nextThreads = [createThread()]
+    } catch {
+      setMessages([])
     }
+  }, [])
 
-    const validArchived = nextArchived.filter((id) => nextThreads.some((thread) => thread.id === id))
-    setArchivedThreadIds(validArchived)
-    setThreads(nextThreads)
-    const initialThread = nextThreads.find((thread) => !validArchived.includes(thread.id)) || nextThreads[0]
-    setCurrentThreadId(initialThread ? initialThread.id : null)
-  }, [archivedKey, threadsKey, createThread])
+  const loadThreads = useCallback(
+    async (preferredThreadId?: string | null) => {
+      try {
+        const res = await fetch('/api/medical-images/threads')
+        if (res.ok) {
+          const data = await res.json()
+          const nextThreads = Array.isArray(data?.threads) ? data.threads : []
+          setThreads(nextThreads)
+          const selectedId = preferredThreadId || currentThreadId
+          if (selectedId && nextThreads.some((thread: ChatThread) => thread.id === selectedId)) {
+            setCurrentThreadId(selectedId)
+            return
+          }
+          const fallback =
+            nextThreads.find((thread: ChatThread) => !thread.archivedAt) || nextThreads[0] || null
+          setCurrentThreadId(fallback ? fallback.id : null)
+        }
+      } catch {
+        setThreads([])
+        setCurrentThreadId(null)
+      }
+    },
+    [currentThreadId]
+  )
 
-  // Persist threads locally
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      localStorage.setItem(threadsKey, JSON.stringify(threads))
-    } catch {}
-  }, [threads, threadsKey])
+    loadThreads()
+  }, [loadThreads])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      localStorage.setItem(archivedKey, JSON.stringify(archivedThreadIds))
-    } catch {}
-  }, [archivedKey, archivedThreadIds])
+    if (!currentThreadId) {
+      setMessages([])
+      return
+    }
+    loadThreadMessages(currentThreadId)
+  }, [currentThreadId, loadThreadMessages])
 
   // Scroll to bottom inside chat container
   useEffect(() => {
@@ -313,50 +283,90 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     setThreadsOpen(false)
   }
 
-  function handleNewChat() {
-    const newThread = createThread()
-    setThreads((prev) => [newThread, ...prev])
-    setCurrentThreadId(newThread.id)
-    setThreadsOpen(false)
-  }
-
-  function handleArchiveThread(threadId: string) {
-    const isArchived = archivedThreadIds.includes(threadId)
-    const nextArchived = isArchived
-      ? archivedThreadIds.filter((id) => id !== threadId)
-      : [...archivedThreadIds, threadId]
-    setArchivedThreadIds(nextArchived)
-
-    if (!isArchived && currentThreadId === threadId) {
-      const nextThread = threads.find((thread) => !nextArchived.includes(thread.id) && thread.id !== threadId)
-      if (nextThread) {
-        setCurrentThreadId(nextThread.id)
-      } else {
-        const newThread = createThread()
-        setThreads((prev) => [newThread, ...prev])
-        setCurrentThreadId(newThread.id)
+  async function handleNewChat() {
+    try {
+      const res = await fetch('/api/medical-images/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          context: { analysisResult },
+        }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const newThreadId = data?.threadId
+      if (newThreadId) {
+        setCurrentThreadId(newThreadId)
+        setMessages([])
+        setThreadsOpen(false)
+        await loadThreads(newThreadId)
       }
+    } catch {
+      setError('Unable to start a new chat right now.')
     }
   }
 
-  function handleRenameThread(threadId: string, nextTitle: string) {
-    const title = nextTitle.trim() || 'New chat'
-    setThreads((prev) => prev.map((thread) => (thread.id === threadId ? { ...thread, title } : thread)))
+  async function handleArchiveThread(threadId: string) {
+    const targetThread = threads.find((thread) => thread.id === threadId)
+    if (!targetThread) return
+    const nextArchived = !targetThread.archivedAt
+    let nextThreadId = currentThreadId
+    if (nextArchived && currentThreadId === threadId) {
+      const fallback = threads.find((thread) => thread.id !== threadId && !thread.archivedAt)
+      nextThreadId = fallback ? fallback.id : null
+    }
+    try {
+      const res = await fetch('/api/medical-images/threads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId, archived: nextArchived }),
+      })
+      if (res.ok) {
+        await loadThreads(nextThreadId)
+        if (!nextThreadId) {
+          setMessages([])
+        }
+      }
+    } catch {
+      setError('Unable to update this chat right now.')
+    }
+    closeThreadActions()
   }
 
-  function handleDeleteThread(threadId: string) {
-    setThreads((prev) => prev.filter((thread) => thread.id !== threadId))
-    setArchivedThreadIds((prev) => prev.filter((id) => id !== threadId))
-    if (currentThreadId === threadId) {
-      const remaining = threads.filter((thread) => thread.id !== threadId)
-      const nextThread = remaining.find((thread) => !archivedThreadIds.includes(thread.id)) || remaining[0]
-      if (nextThread) {
-        setCurrentThreadId(nextThread.id)
-      } else {
-        const newThread = createThread()
-        setThreads([newThread])
-        setCurrentThreadId(newThread.id)
+  async function handleRenameThread(threadId: string, nextTitle: string) {
+    const title = nextTitle.trim()
+    if (!title) return
+    try {
+      const res = await fetch('/api/medical-images/threads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId, title }),
+      })
+      if (res.ok) {
+        await loadThreads(threadId)
       }
+    } catch {
+      setError('Unable to rename this chat right now.')
+    }
+  }
+
+  async function handleDeleteThread(threadId: string) {
+    try {
+      const res = await fetch('/api/medical-images/threads', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId }),
+      })
+      if (!res.ok) return
+      const remaining = threads.filter((thread) => thread.id !== threadId)
+      const fallback =
+        remaining.find((thread) => !thread.archivedAt) || remaining[0] || null
+      await loadThreads(fallback ? fallback.id : null)
+      if (!fallback) {
+        setMessages([])
+      }
+    } catch {
+      setError('Unable to delete this chat right now.')
     }
   }
 
@@ -373,36 +383,65 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       setError(null)
 
       let activeThreadId = currentThreadId
-      let baseMessages = messages
       if (!activeThreadId) {
-        const newThread = createThread()
-        activeThreadId = newThread.id
-        baseMessages = []
-        setThreads((prev) => [newThread, ...prev])
-        setCurrentThreadId(newThread.id)
+        const createRes = await fetch('/api/medical-images/threads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            context: { analysisResult },
+          }),
+        })
+        if (createRes.ok) {
+          const data = await createRes.json()
+          activeThreadId = data?.threadId || null
+          if (activeThreadId) {
+            setCurrentThreadId(activeThreadId)
+            setMessages([])
+            await loadThreads(activeThreadId)
+          }
+        }
+      }
+
+      if (!activeThreadId) {
+        throw new Error('Unable to start a chat right now.')
       }
 
       const now = new Date().toISOString()
-      const nextMessages: ChatMessage[] = [...baseMessages, { role: 'user', content: text }]
-      const nextTitle = currentThread?.title || buildTitle(text)
-      setThreads((prev) =>
-        prev.map((thread) =>
+      setMessages((prev) => [...prev, { role: 'user', content: text }])
+      setThreads((prev) => {
+        const hasThread = prev.some((thread) => thread.id === activeThreadId)
+        if (!hasThread) {
+          return [
+            {
+              id: activeThreadId,
+              title: buildTitle(text),
+              archivedAt: null,
+              createdAt: now,
+              updatedAt: now,
+              lastChargedCost: null,
+              lastChargedAt: null,
+              lastChargeCovered: null,
+            },
+            ...prev,
+          ]
+        }
+        return prev.map((thread) =>
           thread.id === activeThreadId
             ? {
                 ...thread,
-                messages: nextMessages,
                 updatedAt: now,
-                title: thread.title || nextTitle,
+                title: thread.title || buildTitle(text),
               }
             : thread
         )
-      )
+      })
       setInput('')
 
       const res = await fetch('/api/medical-images/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
         body: JSON.stringify({
+          threadId: activeThreadId,
           message: text,
           analysisResult,
         }),
@@ -444,30 +483,20 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
                 continue
               }
               if (!hasAssistant) {
-                setThreads((prev) =>
-                  prev.map((thread) =>
-                    thread.id === activeThreadId
-                      ? {
-                          ...thread,
-                          messages: [...thread.messages, { role: 'assistant', content: token }],
-                          updatedAt: new Date().toISOString(),
-                        }
-                      : thread
-                  )
-                )
+                setMessages((prev) => [...prev, { role: 'assistant', content: token }])
                 hasAssistant = true
               } else {
-                setThreads((prev) =>
-                  prev.map((thread) => {
-                    if (thread.id !== activeThreadId) return thread
-                    const copy = thread.messages.slice()
+                setMessages((prev) => {
+                  const copy = prev.slice()
+                  const last = copy[copy.length - 1]
+                  if (last && last.role === 'assistant') {
                     copy[copy.length - 1] = {
                       role: 'assistant',
-                      content: (copy[copy.length - 1] as any).content + token,
+                      content: last.content + token,
                     }
-                    return { ...thread, messages: copy, updatedAt: new Date().toISOString() }
-                  })
-                )
+                  }
+                  return copy
+                })
               }
             }
           }
@@ -476,17 +505,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         const data = await res.json().catch(() => null)
         const textOut = data?.assistant as string | undefined
         if (textOut) {
-          setThreads((prev) =>
-            prev.map((thread) =>
-              thread.id === activeThreadId
-                ? {
-                    ...thread,
-                    messages: [...thread.messages, { role: 'assistant', content: textOut }],
-                    updatedAt: new Date().toISOString(),
-                  }
-                : thread
-            )
-          )
+          setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
         }
         if (typeof data?.costCents === 'number') {
           setThreads((prev) =>
@@ -503,6 +522,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
           )
         }
       }
+      await loadThreads(activeThreadId)
     } catch (err) {
       setError((err as Error).message)
     } finally {

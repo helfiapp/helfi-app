@@ -9,22 +9,61 @@ import { logAIUsage } from '@/lib/ai-usage-logger'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import {
+  getThread,
+  createThread,
+  listMessages,
+  appendMessage,
+  updateThreadTitle,
+  updateThreadContext,
+  updateThreadCost,
+} from '@/lib/symptom-chat-store'
 
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 }
 
+function buildTitle(text: string): string {
+  const trimmed = text.trim()
+  if (!trimmed) return 'New chat'
+  return trimmed.length > 50 ? `${trimmed.slice(0, 47)}...` : trimmed
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const url = new URL(req.url)
+    const threadId = url.searchParams.get('threadId')
+    if (!threadId) {
+      return NextResponse.json({ error: 'threadId required' }, { status: 400 })
+    }
+    const thread = await getThread(session.user.id, threadId)
+    if (!thread) {
+      return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
+    }
+    const messages = await listMessages(threadId, 60)
+    return NextResponse.json({ threadId, messages }, { status: 200 })
+  } catch (error) {
+    console.error('[symptom-chat.GET] error', error)
+    return NextResponse.json({ error: 'server_error' }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const contentType = req.headers.get('content-type') || ''
     let body: {
       message?: string
+      threadId?: string
       symptoms?: string[]
       duration?: string
       notes?: string
@@ -41,13 +80,59 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Message required' }, { status: 400 })
     }
 
-    const { symptoms = [], duration, notes, analysisResult = {} } = body
+    const safeSymptoms = Array.isArray(body?.symptoms)
+      ? body.symptoms.filter((item) => typeof item === 'string')
+      : []
+    const safeDuration = typeof body?.duration === 'string' ? body.duration : null
+    const safeNotes = typeof body?.notes === 'string' ? body.notes : null
+    const safeAnalysisResult =
+      body?.analysisResult && typeof body.analysisResult === 'object' ? body.analysisResult : {}
+    const contextPayload = {
+      symptoms: safeSymptoms,
+      duration: safeDuration,
+      notes: safeNotes,
+      analysisResult: safeAnalysisResult,
+    }
+    const hasContext =
+      safeSymptoms.length > 0 ||
+      Boolean(safeDuration) ||
+      Boolean(safeNotes) ||
+      Object.keys(safeAnalysisResult || {}).length > 0
+
+    const requestedThreadId = typeof body?.threadId === 'string' ? body.threadId.trim() : ''
+    let threadId = requestedThreadId
+    let thread = threadId ? await getThread(session.user.id, threadId) : null
+
+    if (!thread) {
+      const title = buildTitle(question)
+      const created = await createThread(session.user.id, hasContext ? contextPayload : undefined, title)
+      threadId = created.id
+      thread = { id: created.id, title, context: hasContext ? contextPayload : null }
+    } else {
+      if (hasContext) {
+        await updateThreadContext(session.user.id, threadId, contextPayload)
+      }
+      if (!thread.title) {
+        await updateThreadTitle(session.user.id, threadId, buildTitle(question))
+      }
+    }
+
+    const threadContext = hasContext ? contextPayload : thread?.context || {}
+    const symptoms = Array.isArray(threadContext?.symptoms)
+      ? threadContext.symptoms.filter((item: unknown) => typeof item === 'string')
+      : []
+    const duration = typeof threadContext?.duration === 'string' ? threadContext.duration : null
+    const notes = typeof threadContext?.notes === 'string' ? threadContext.notes : null
+    const analysisResult =
+      threadContext?.analysisResult && typeof threadContext.analysisResult === 'object'
+        ? threadContext.analysisResult
+        : {}
 
     const openai = getOpenAIClient()
     if (!openai) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
     }
-    const user = await prisma.user.findUnique({ where: { email: session.user.email }, include: { subscription: true, creditTopUps: true } })
+    const user = await prisma.user.findUnique({ where: { id: session.user.id }, include: { subscription: true, creditTopUps: true } })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
@@ -108,14 +193,18 @@ export async function POST(req: NextRequest) {
     const accept = (req.headers.get('accept') || '').toLowerCase()
     const wantsStream = accept.includes('text/event-stream')
 
+    const history = await listMessages(threadId, 30)
     const chatMessages = [
       { role: 'system' as const, content: systemPrompt },
+      ...history.map((m) => ({ role: m.role, content: m.content })),
       { role: 'user' as const, content: question },
     ]
 
+    await appendMessage(threadId, 'user', question)
+
     if (wantsStream) {
       const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
-      const promptText = `${systemPrompt}\n${question}`
+      const promptText = [systemPrompt, ...history.map((m) => m.content), question].join('\n')
       let maxTokens = 800
       if (!allowViaFreeUse) {
         const cm = new CreditManager(user.id)
@@ -157,6 +246,8 @@ export async function POST(req: NextRequest) {
       }
 
       const text = wrapped.completion.choices?.[0]?.message?.content || ''
+      await appendMessage(threadId, 'assistant', text)
+      await updateThreadCost(session.user.id, threadId, wrapped.costCents, allowViaFreeUse)
       const enc = new TextEncoder()
       const chunks = text.match(/[\s\S]{1,200}/g) || ['']
       const costPayload = JSON.stringify({ costCents: wrapped.costCents, covered: allowViaFreeUse })
@@ -183,7 +274,7 @@ export async function POST(req: NextRequest) {
         const wallet = await cm.getWalletStatus()
         const cappedMaxTokens = capMaxTokensToBudget(
           model,
-          `${systemPrompt}\n${question}`,
+          [systemPrompt, ...history.map((m) => m.content), question].join('\n'),
           maxTokens,
           wallet.totalAvailableCents
         )
@@ -222,7 +313,9 @@ export async function POST(req: NextRequest) {
       }
 
       const text = wrapped.completion.choices?.[0]?.message?.content || ''
-      return NextResponse.json({ assistant: text, costCents: wrapped.costCents, covered: allowViaFreeUse })
+      await appendMessage(threadId, 'assistant', text)
+      await updateThreadCost(session.user.id, threadId, wrapped.costCents, allowViaFreeUse)
+      return NextResponse.json({ assistant: text, costCents: wrapped.costCents, covered: allowViaFreeUse, threadId })
     }
   } catch (error) {
     console.error('[symptom-chat.POST] error', error)

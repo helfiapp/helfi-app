@@ -2,36 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import {
-  ensureChatTables,
   listThreads,
   createThread,
   updateThreadTitle,
   updateThreadArchived,
   deleteThread,
-} from '@/lib/insights/chat-store'
+} from '@/lib/medical-chat-store'
 
-export async function GET(
-  _request: Request,
-  context: { params: { slug: string; section: string } }
-) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    await ensureChatTables()
-    const threads = await listThreads(session.user.id, context.params.slug, context.params.section)
+    const threads = await listThreads(session.user.id)
     return NextResponse.json({ threads }, { status: 200 })
   } catch (error) {
-    console.error('[threads.GET] error', error)
+    console.error('[medical-threads.GET] error', error)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  context: { params: { slug: string; section: string } }
-) {
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -39,19 +31,16 @@ export async function POST(
     }
     const body = await request.json().catch(() => ({}))
     const title = String(body?.title || '').trim() || null
-    await ensureChatTables()
-    const thread = await createThread(session.user.id, context.params.slug, context.params.section, title || undefined)
+    const context = body?.context && typeof body.context === 'object' ? body.context : null
+    const thread = await createThread(session.user.id, context || undefined, title || undefined)
     return NextResponse.json({ threadId: thread.id }, { status: 200 })
   } catch (error) {
-    console.error('[threads.POST] error', error)
+    console.error('[medical-threads.POST] error', error)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  context: { params: { slug: string; section: string } }
-) {
+export async function PATCH(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -64,7 +53,6 @@ export async function PATCH(
     if (!threadId) {
       return NextResponse.json({ error: 'threadId required' }, { status: 400 })
     }
-    await ensureChatTables()
     if (title) {
       await updateThreadTitle(session.user.id, threadId, title)
     }
@@ -73,15 +61,12 @@ export async function PATCH(
     }
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
-    console.error('[threads.PATCH] error', error)
+    console.error('[medical-threads.PATCH] error', error)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  context: { params: { slug: string; section: string } }
-) {
+export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -92,11 +77,10 @@ export async function DELETE(
     if (!threadId) {
       return NextResponse.json({ error: 'threadId required' }, { status: 400 })
     }
-    await ensureChatTables()
     await deleteThread(session.user.id, threadId)
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
-    console.error('[threads.DELETE] error', error)
+    console.error('[medical-threads.DELETE] error', error)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }

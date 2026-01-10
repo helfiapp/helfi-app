@@ -11,6 +11,7 @@ import {
   listThreads,
   createThread,
   updateThreadTitle,
+  updateThreadCost,
 } from '@/lib/insights/chat-store'
 import type { IssueSectionKey } from '@/lib/insights/issue-engine'
 import { prisma } from '@/lib/prisma'
@@ -121,7 +122,7 @@ export async function POST(
       const currentThread = threads.find(t => t.id === thread.id)
       if (currentThread && !currentThread.title) {
         const title = question.length > 50 ? question.substring(0, 47) + '...' : question
-        await updateThreadTitle(thread.id, title)
+        await updateThreadTitle(session.user.id, thread.id, title)
       }
     }
 
@@ -227,6 +228,7 @@ export async function POST(
 
       const text = wrapped.completion.choices?.[0]?.message?.content || ''
       await appendMessage(thread.id, 'assistant', text)
+      await updateThreadCost(session.user.id, thread.id, wrapped.costCents, allowViaFreeUse)
 
       const enc = new TextEncoder()
       const chunks = text.match(/[\s\S]{1,200}/g) || ['']
@@ -293,6 +295,7 @@ export async function POST(
 
     const text = wrapped.completion.choices?.[0]?.message?.content || ''
     await appendMessage(thread.id, 'assistant', text)
+    await updateThreadCost(session.user.id, thread.id, wrapped.costCents, allowViaFreeUse)
     return NextResponse.json({
       assistant: text,
       threadId: thread.id,
