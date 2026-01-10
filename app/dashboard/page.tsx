@@ -675,16 +675,21 @@ export default function Dashboard() {
           <div className="bg-transparent md:bg-white rounded-none md:rounded-lg shadow-none md:shadow-sm p-0 md:p-8">
             <div className="text-center mb-8 space-y-3 py-4">
               <h1 className="text-3xl md:text-5xl font-extrabold text-helfi-black dark:text-white tracking-tight">
-                Welcome to Your Health Dashboard
+                Welcome to Your <span className="text-helfi-green">Health Dashboard</span>
               </h1>
               <p className="text-gray-600 text-base md:text-lg max-w-2xl mx-auto">
                 Your personalized health intelligence platform is being built to help you optimize your well-being.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <Link href="/check-in" className="group block">
-                <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
+            <div className="md:hidden flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg text-helfi-black dark:text-white">Daily Tools</h3>
+              <span className="text-[10px] font-bold text-helfi-green uppercase tracking-wider">Slide to view</span>
+            </div>
+
+            <div className="flex overflow-x-auto gap-4 pb-2 snap-x mb-8 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0">
+              <Link href="/check-in" className="group block min-w-[260px] snap-center md:min-w-0">
+                <div className="p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
                   <div className="flex items-center space-x-3 mb-4">
                     <span className="material-symbols-outlined text-emerald-500">check_circle</span>
                     <h3 className="font-bold text-lg text-helfi-black dark:text-white">Daily Check-In</h3>
@@ -698,8 +703,8 @@ export default function Dashboard() {
                 </div>
               </Link>
 
-              <Link href="/mood" className="group block">
-                <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
+              <Link href="/mood" className="group block min-w-[260px] snap-center md:min-w-0">
+                <div className="p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
                   <div className="flex items-center space-x-3 mb-4">
                     <span className="material-symbols-outlined text-amber-500">mood</span>
                     <h3 className="font-bold text-lg text-helfi-black dark:text-white">Mood Tracker</h3>
@@ -713,8 +718,8 @@ export default function Dashboard() {
                 </div>
               </Link>
 
-              <Link href="/health-tracking" className="group block">
-                <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
+              <Link href="/health-tracking" className="group block min-w-[260px] snap-center md:min-w-0">
+                <div className="p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
                   <div className="flex items-center space-x-3 mb-4">
                     <span className="material-symbols-outlined text-rose-500">track_changes</span>
                     <h3 className="font-bold text-lg text-helfi-black dark:text-white">Health Tracking</h3>
@@ -728,8 +733,8 @@ export default function Dashboard() {
                 </div>
               </Link>
 
-              <Link href="/insights" className="group block">
-                <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
+              <Link href="/insights" className="group block min-w-[260px] snap-center md:min-w-0">
+                <div className="p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
                   <div className="flex items-center space-x-3 mb-4">
                     <span className="material-symbols-outlined text-indigo-500">auto_awesome</span>
                     <h3 className="font-bold text-lg text-helfi-black dark:text-white">AI Insights</h3>
@@ -770,16 +775,116 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="md:hidden space-y-3">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-xl shadow-sm">
+                        <img src="/brands/fitbit.png" alt="Fitbit" className="h-6 w-auto" />
+                      </div>
+                      <span className="font-semibold text-sm">Fitbit</span>
+                    </div>
+                    {fitbitConnected ? (
+                      <Link href="/devices" className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-full">
+                        Connected ✓
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={handleConnectFitbit}
+                        className="px-4 py-2 bg-helfi-green text-white text-xs font-bold rounded-full"
+                        disabled={fitbitLoading}
+                      >
+                        {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-xl shadow-sm">
+                        <img src="/brands/garmin-connect.jpg" alt="Garmin Connect" className="h-6 w-auto" />
+                      </div>
+                      <span className="font-semibold text-sm">Garmin Connect</span>
+                    </div>
+                    {!garminConnectEnabled ? (
+                      <button
+                        onClick={() => toggleInterest('garmin')}
+                        className={`px-4 py-2 text-xs font-bold rounded-full ${
+                          deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                        }`}
+                        disabled={!!savingInterest}
+                      >
+                        {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
+                      </button>
+                    ) : garminConnected ? (
+                      <Link href="/devices" className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-full">
+                        Connected ✓
+                      </Link>
+                    ) : (
+                      <Link href="/devices" className="px-4 py-2 bg-helfi-green text-white text-xs font-bold rounded-full">
+                        Connect Garmin Connect
+                      </Link>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-xl shadow-sm">
+                        <img src="/brands/google-fit.png" alt="Google Fit" className="h-6 w-auto" />
+                      </div>
+                      <span className="font-semibold text-sm">Google Fit</span>
+                    </div>
+                    <button
+                      onClick={() => toggleInterest('googleFit')}
+                      className={`px-4 py-2 text-xs font-bold rounded-full ${
+                        deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                      }`}
+                      disabled={!!savingInterest}
+                    >
+                      {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-xl shadow-sm">
+                        <img src="/brands/oura-ring.png" alt="Oura Ring" className="h-6 w-auto" />
+                      </div>
+                      <span className="font-semibold text-sm">Oura Ring</span>
+                    </div>
+                    <button
+                      onClick={() => toggleInterest('oura')}
+                      className={`px-4 py-2 text-xs font-bold rounded-full ${
+                        deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                      }`}
+                      disabled={!!savingInterest}
+                    >
+                      {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-xl shadow-sm">
+                        <img src="/brands/polar.png" alt="Polar" className="h-6 w-auto" />
+                      </div>
+                      <span className="font-semibold text-sm">Polar</span>
+                    </div>
+                    <button
+                      onClick={() => toggleInterest('polar')}
+                      className={`px-4 py-2 text-xs font-bold rounded-full ${
+                        deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                      }`}
+                      disabled={!!savingInterest}
+                    >
+                      {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <Image
-                        src="/brands/fitbit.png"
-                        alt="Fitbit"
-                        width={40}
-                        height={40}
-                        className="h-8 w-auto object-contain"
-                      />
+                      <img src="/brands/fitbit.png" alt="Fitbit" className="h-8 w-auto object-contain" />
                     </div>
                     <span className="text-sm font-semibold mb-6">Fitbit</span>
                     {fitbitConnected ? (
@@ -799,7 +904,7 @@ export default function Dashboard() {
 
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={32} height={32} className="h-8 w-auto object-contain rounded-md" />
+                      <img src="/brands/garmin-connect.jpg" alt="Garmin Connect" className="h-8 w-auto object-contain rounded-md" />
                     </div>
                     <span className="text-sm font-semibold mb-6">Garmin Connect</span>
                     {!garminConnectEnabled ? (
@@ -818,20 +923,14 @@ export default function Dashboard() {
                       </Link>
                     ) : (
                       <Link href="/devices" className="w-full bg-helfi-green hover:bg-green-600 text-white py-3 rounded-xl font-bold">
-                        Connect Garmin
+                        Connect Garmin Connect
                       </Link>
                     )}
                   </div>
 
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <Image
-                        src="/brands/google-fit.png"
-                        alt="Google Fit"
-                        width={40}
-                        height={40}
-                        className="h-8 w-auto object-contain"
-                      />
+                      <img src="/brands/google-fit.png" alt="Google Fit" className="h-8 w-auto object-contain" />
                     </div>
                     <span className="text-sm font-semibold mb-6">Google Fit</span>
                     <button
@@ -847,13 +946,7 @@ export default function Dashboard() {
 
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <Image
-                        src="/brands/oura-ring.png"
-                        alt="Oura Ring"
-                        width={40}
-                        height={40}
-                        className="h-8 w-auto object-contain"
-                      />
+                      <img src="/brands/oura-ring.png" alt="Oura Ring" className="h-8 w-auto object-contain" />
                     </div>
                     <span className="text-sm font-semibold mb-6">Oura Ring</span>
                     <button
@@ -869,13 +962,7 @@ export default function Dashboard() {
 
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <Image
-                        src="/brands/polar.png"
-                        alt="Polar"
-                        width={40}
-                        height={40}
-                        className="h-8 w-auto object-contain"
-                      />
+                      <img src="/brands/polar.png" alt="Polar" className="h-8 w-auto object-contain" />
                     </div>
                     <span className="text-sm font-semibold mb-6">Polar</span>
                     <button
