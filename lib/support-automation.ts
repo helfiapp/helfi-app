@@ -9,8 +9,7 @@ import { buildSupportCodeContext } from '@/lib/support-code-search'
 import { getSupportAgentForTimestamp } from '@/lib/support-agents'
 import supportKnowledgeBase from '@/data/support-kb.json'
 
-const SUPPORT_AI_MODEL = process.env.SUPPORT_AI_MODEL || 'gpt-5.2'
-const SUPPORT_AI_FALLBACK_MODEL = process.env.SUPPORT_AI_FALLBACK_MODEL || 'gpt-4o-mini'
+const SUPPORT_AI_MODEL = 'gpt-5.2'
 const SUPPORT_COPY_EMAIL = 'support@helfi.ai'
 const SUPPORT_VERIFICATION_TTL_MINUTES = 15
 const SYSTEM_IDENTITY_MARKER = '[SYSTEM] Identity verified'
@@ -152,6 +151,7 @@ function buildSupportSystemPrompt(agentName: string, agentRole: string): string 
     '- Use the product facts below when answering questions about trials, pricing, credits, or features.',
     '- If you are not sure about a detail, say you will confirm and loop in the team.',
     '- If the answer is not in the Support Knowledge Base or product facts, do not guess. Respond that you are escalating and that support will email them, then set shouldEscalate true and needsMoreInfo false.',
+    '- Only answer using the Support Knowledge Base, product facts, or the provided code context. If it is not in those sources, escalate.',
     `- Sign off with "${agentName} from ${agentRole}".`,
     '',
     supportProductFacts(),
@@ -244,6 +244,32 @@ function supportKnowledgeBaseFacts(): string {
   return lines.join('\n')
 }
 
+function isGreetingOrThanks(message: string): boolean {
+  return /(^(hi|hello|hey|thanks|thank you|ok|okay|cool|great)\b)/i.test(message.trim())
+}
+
+function matchesSupportKnowledgeBase(message: string): boolean {
+  const text = message.toLowerCase()
+  const keywords = [
+    'affiliate',
+    'referral',
+    'signup',
+    'sign up',
+    'sign in',
+    'login',
+    'password',
+    'support',
+    'help',
+    'faq',
+    'features',
+    'sleep',
+    'devices',
+    'fitbit',
+    'garmin',
+  ]
+  return keywords.some((keyword) => text.includes(keyword))
+}
+
 type ChatBugAnalysis = {
   isChatBug: boolean
   isFrustrated: boolean
@@ -326,6 +352,14 @@ function buildDeterministicSupportReply(options: {
   const supportTopic = findSupportTopic('support_and_help')
   const featuresTopic = findSupportTopic('features')
   const sleepTopic = findSupportTopic('sleep_tracking')
+
+  if (isGreetingOrThanks(text)) {
+    const reply = [
+      `Hi! I’m ${options.agent?.name || 'Helfi Support'}.`,
+      'Tell me what you need help with, and I’ll take care of it.',
+    ].join('\n')
+    return addAgentSignOff(reply, options.agent)
+  }
 
   const affiliatePayoutMatch =
     /affiliate|referral|partner program|refer/i.test(text) &&
@@ -1142,93 +1176,77 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
       suggestedCategory: '',
       suggestedPriority: '',
     }
-  } else if (!openai) {
-    aiResult = fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
   } else {
-    const systemPrompt = buildSupportSystemPrompt(agent.name, agent.role)
     const codeContext = buildSupportCodeContext([ticket.subject, latestMessage].filter(Boolean).join(' '))
-    const userPrompt = buildSupportUserPrompt({
-      ticket,
-      latestMessage,
-      latestAttachments: parsedLatest.attachments,
-      identityVerified,
-      verificationPending,
-      verificationJustCompleted,
-      hasPriorSupportReply,
-      userLoggedIn,
-      source: input.source,
-      codeContext,
-      conversation,
-    })
+    const kbMatch = latestMessage ? matchesSupportKnowledgeBase(latestMessage) : false
+    const canUseAi = Boolean(openai && (codeContext || kbMatch))
 
-    let completion = null
-    let usedFallbackModel = false
-    try {
-      completion = await runChatCompletionWithLogging(
-        openai,
-        {
-          model: SUPPORT_AI_MODEL,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: 0.2,
-          response_format: { type: 'json_object' },
-          max_tokens: 500,
-        },
-        {
-          feature: 'support:ai',
-          userId: ticket.userId || ticket.user?.id || null,
-          userLabel: ticket.userEmail,
-        },
-        {
-          callDetail: input.source ? `source:${input.source}` : undefined,
-        }
-      )
-    } catch (error) {
-      if (SUPPORT_AI_FALLBACK_MODEL) {
-        try {
-          usedFallbackModel = true
-          completion = await runChatCompletionWithLogging(
-            openai,
-            {
-              model: SUPPORT_AI_FALLBACK_MODEL,
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-              ],
-              temperature: 0.2,
-              response_format: { type: 'json_object' },
-              max_tokens: 500,
-            },
-            {
-              feature: 'support:ai',
-              userId: ticket.userId || ticket.user?.id || null,
-              userLabel: ticket.userEmail,
-            },
-            {
-              callDetail: input.source ? `source:${input.source}` : undefined,
-            }
-          )
-        } catch (fallbackError) {
-          console.error('🤖 [SUPPORT AI] Fallback model failed:', fallbackError)
-          completion = null
-        }
-      } else {
+    if (!canUseAi) {
+      const escalationReply = [
+        'I have escalated this to a human so we can confirm it properly.',
+        'You will get an email update as soon as we have the answer.',
+      ].join('\n')
+      aiResult = {
+        customerReply: addAgentSignOff(escalationReply, agent),
+        shouldEscalate: true,
+        escalationReason: 'No verified code or knowledge base source for this request.',
+        needsIdentityCheck: false,
+        needsMoreInfo: false,
+        requestedInfo: [],
+        internalNotes: 'Escalated: no code context or KB match.',
+        suggestedCategory: 'GENERAL',
+        suggestedPriority: 'MEDIUM',
+      }
+    } else {
+      const systemPrompt = buildSupportSystemPrompt(agent.name, agent.role)
+      const userPrompt = buildSupportUserPrompt({
+        ticket,
+        latestMessage,
+        latestAttachments: parsedLatest.attachments,
+        identityVerified,
+        verificationPending,
+        verificationJustCompleted,
+        hasPriorSupportReply,
+        userLoggedIn,
+        source: input.source,
+        codeContext,
+        conversation,
+      })
+
+      let completion = null
+      try {
+        completion = await runChatCompletionWithLogging(
+          openai,
+          {
+            model: SUPPORT_AI_MODEL,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.2,
+            response_format: { type: 'json_object' },
+            max_tokens: 500,
+          },
+          {
+            feature: 'support:ai',
+            userId: ticket.userId || ticket.user?.id || null,
+            userLabel: ticket.userEmail,
+          },
+          {
+            callDetail: input.source ? `source:${input.source}` : undefined,
+          }
+        )
+      } catch (error) {
+        console.error('🤖 [SUPPORT AI] Model failed:', error)
         completion = null
       }
-    }
 
-    if (!completion) {
-      aiResult = fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
-    } else {
-      const rawText = completion?.choices?.[0]?.message?.content || ''
-      aiResult = safeParseSupportJson(rawText) || fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
-    }
-
-    if (usedFallbackModel) {
-      const note = `Primary model failed, used fallback model (${SUPPORT_AI_FALLBACK_MODEL}).`
-      aiResult.internalNotes = aiResult.internalNotes ? `${aiResult.internalNotes}\n${note}` : note
+      if (!completion) {
+        aiResult = fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
+      } else {
+        const rawText = completion?.choices?.[0]?.message?.content || ''
+        aiResult = safeParseSupportJson(rawText) || fallbackSupportReply({ message: latestMessage, userLoggedIn, agent })
+      }
     }
   }
 
