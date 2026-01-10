@@ -201,7 +201,7 @@ export const featurePages: FeaturePageContent[] = [
         description:
           'Start each day with a focused snapshot of the metrics that matter most.',
         details: [
-          'The dashboard highlights the latest activity signals alongside your most recent check-in, with sleep shown when a wearable is connected.',
+          'The dashboard highlights the latest activity signals alongside your most recent check-in. Sleep is shown when a wearable is connected.',
           'This keeps your daily routine visible before you dive into deeper analysis or reports.',
           'Over time, the dashboard becomes a quick reference point for how habits are trending.',
         ],
