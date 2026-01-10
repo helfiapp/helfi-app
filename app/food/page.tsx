@@ -15846,7 +15846,7 @@ Please add nutritional information manually if needed.`);
                           + Add ingredient
                         </button>
                       </div>
-                      <div className="mt-3 space-y-4 px-4 sm:px-6">
+                      <div className="mt-3">
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
                         const macroMultiplier = macroMultiplierForItem(item)
@@ -15974,13 +15974,17 @@ Please add nutritional information manually if needed.`);
                         }
                         
                         const cardPaddingClass =
-                          isCollapsed ? 'py-3 px-4' : 'p-5'
+                          isCollapsed ? 'py-2 px-5' : 'p-5'
 
                         return (
                           <div
                             key={index}
                             data-analysis-ingredient-card="1"
-                            className={`bg-white border border-slate-100 shadow-sm ${cardPaddingClass} rounded-2xl ${isCollapsed ? 'cursor-pointer hover:shadow-md transition-shadow' : ''} overflow-hidden min-w-0`}
+                            className={`${
+                              isCollapsed
+                                ? `bg-white border-gray-200 ${cardPaddingClass} border-b ${index === 0 ? 'border-t' : ''} rounded-none cursor-pointer`
+                                : `bg-white border border-slate-100 shadow-sm ${cardPaddingClass} rounded-2xl`
+                            } overflow-hidden min-w-0`}
                             role={isCollapsed ? 'button' : undefined}
                             tabIndex={isCollapsed ? 0 : undefined}
                             onClick={isCollapsed ? toggleExpand : undefined}
