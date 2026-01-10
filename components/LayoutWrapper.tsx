@@ -304,6 +304,12 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const sidebarNavLockRef = useRef(0)
   const [sidebarPortal, setSidebarPortal] = useState<HTMLElement | null>(null)
   const goalSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const pullStartYRef = useRef<number | null>(null)
+  const pullResetTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const pullRefreshingRef = useRef(false)
+  const [pullOffset, setPullOffset] = useState(0)
+  const [pullRefreshing, setPullRefreshing] = useState(false)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = [
@@ -326,6 +332,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const isFeaturePath = pathname.startsWith('/features')
   const isPublicPage = publicPages.includes(pathname) || isFeaturePath
   const isChatPage = pathname === '/chat'
+  const isFoodDiaryPage = pathname === '/food'
   
   // Admin panel paths should never show user sidebar
   const isAdminPanelPath =
@@ -555,6 +562,96 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     !isAdminPanelPath &&
     (!isPublicPage || isOnboardingPath)
 
+  const pullRefreshEnabled = shouldShowSidebar && !isChatPage && !isFoodDiaryPage
+  const PULL_REFRESH_THRESHOLD = 70
+  const PULL_REFRESH_MAX = 120
+
+  const isEditableElement = (target: EventTarget | null) => {
+    if (typeof document === 'undefined') return false
+    if (!(target instanceof Element)) return false
+    if (target.closest('[data-pull-refresh-disabled="true"]')) return true
+    return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+  }
+
+  const getScrollTop = () => {
+    if (contentRef.current) return contentRef.current.scrollTop
+    if (typeof window !== 'undefined') return window.scrollY
+    return 0
+  }
+
+  const clearPullState = () => {
+    pullStartYRef.current = null
+    setPullOffset(0)
+  }
+
+  const triggerPullRefresh = () => {
+    if (typeof window === 'undefined') return
+    pullRefreshingRef.current = true
+    setPullRefreshing(true)
+    if (pullResetTimeoutRef.current) {
+      clearTimeout(pullResetTimeoutRef.current)
+    }
+    pullResetTimeoutRef.current = setTimeout(() => {
+      pullRefreshingRef.current = false
+      setPullRefreshing(false)
+    }, 2000)
+    window.location.reload()
+  }
+
+  const handlePullStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!pullRefreshEnabled) return
+    if (pullRefreshingRef.current) return
+    if (event.touches.length !== 1) return
+    if (getScrollTop() > 0) return
+    if (isEditableElement(event.target) || isEditableElement(document.activeElement)) return
+    pullStartYRef.current = event.touches[0]?.clientY ?? null
+  }
+
+  const handlePullMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!pullRefreshEnabled) return
+    if (pullStartYRef.current === null) return
+    if (getScrollTop() > 0) {
+      clearPullState()
+      return
+    }
+    const currentY = event.touches[0]?.clientY ?? 0
+    const delta = currentY - (pullStartYRef.current || 0)
+    if (delta <= 0) {
+      setPullOffset(0)
+      return
+    }
+    setPullOffset(Math.min(PULL_REFRESH_MAX, delta))
+  }
+
+  const handlePullEnd = () => {
+    if (!pullRefreshEnabled) {
+      clearPullState()
+      return
+    }
+    if (pullStartYRef.current === null) return
+    const shouldRefresh = pullOffset >= PULL_REFRESH_THRESHOLD
+    clearPullState()
+    if (shouldRefresh) {
+      triggerPullRefresh()
+    }
+  }
+
+  useEffect(() => {
+    if (!pullRefreshEnabled) {
+      clearPullState()
+      if (pullRefreshingRef.current) {
+        pullRefreshingRef.current = false
+        setPullRefreshing(false)
+      }
+    }
+    return () => {
+      if (pullResetTimeoutRef.current) {
+        clearTimeout(pullResetTimeoutRef.current)
+        pullResetTimeoutRef.current = null
+      }
+    }
+  }, [pullRefreshEnabled, pathname])
+
   const handleSidebarNavigate = useCallback(
     (href: string, e: SidebarNavigateEvent) => {
       try {
@@ -719,6 +816,11 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         
         {/* Main Content */}
         <div
+          ref={contentRef}
+          onTouchStart={handlePullStart}
+          onTouchMove={handlePullMove}
+          onTouchEnd={handlePullEnd}
+          onTouchCancel={handlePullEnd}
           className={`md:pl-64 flex flex-col flex-1 relative ${
             isChatPage ? 'overflow-hidden h-[100dvh]' : 'overflow-y-auto'
           }`}
@@ -729,6 +831,20 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
                 <div className="text-sm font-semibold text-gray-900">Goal updated</div>
                 <div className="text-xs text-gray-600 mt-1">{goalSyncNotice}</div>
               </div>
+            </div>
+          )}
+          {pullRefreshEnabled && (pullRefreshing || pullOffset > 0) && (
+            <div
+              className="flex items-center justify-center text-[11px] text-gray-500"
+              style={{ height: pullRefreshing ? 44 : Math.min(pullOffset, 80) }}
+            >
+              <span>
+                {pullRefreshing
+                  ? 'Refreshing...'
+                  : pullOffset >= PULL_REFRESH_THRESHOLD
+                  ? 'Release to refresh'
+                  : 'Pull to refresh'}
+              </span>
             </div>
           )}
           {showHealthSetupReminder && (
