@@ -563,8 +563,8 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     (!isPublicPage || isOnboardingPath)
 
   const pullRefreshEnabled = shouldShowSidebar && !isChatPage && !isFoodDiaryPage
-  const PULL_REFRESH_THRESHOLD = 70
-  const PULL_REFRESH_MAX = 120
+  const PULL_REFRESH_THRESHOLD = 95
+  const PULL_REFRESH_MAX = 140
 
   const isEditableElement = (target: EventTarget | null) => {
     if (typeof document === 'undefined') return false
