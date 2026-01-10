@@ -233,21 +233,33 @@ the user.
 - `app/api/exercise-entries/route.ts`
 - `app/api/exercise-entries/[id]/route.ts`
 
+**Last verified deployment (water intake):**
+- Deployment ID: `dpl_CpRgtRZZEoenPqMMBqafFudPZhYV`
+- Commit: `5c824b086339fbd7f1616db7e96bd076e259b4b9`
+
 ### 3.1 Hydration goal rules (must not change without approval)
-- **Base goal uses profile only** (weight/height/gender/age/diet/goals).  
+- **Base goal uses profile only** (weight/height/gender/age/diet/primary goal).  
 - **Health Setup exercise frequency is NOT used** in hydration targets.  
 - Daily exercise only affects hydration via a **calorie‑based bonus** when exercise is logged.
 - Exercise bonus: **1 ml per kcal**, capped at **1500 ml/day**, then rounded to nearest 50 ml.  
 - Custom goal overrides recommended goal; show “Custom goal active” when applicable.
-- `GET /api/hydration-goal` supports `?date=YYYY-MM-DD` and returns:
-  - `targetMl`, `recommendedMl`, `source`, and `exerciseBonusMl`.
+- `GET /api/hydration-goal?date=YYYY-MM-DD` returns:
+  - `targetMl`, `recommendedMl`, `source`, `exerciseBonusMl`.
 
 ### 3.2 Exercise → hydration linkage (must not double‑count)
 - **Only logged exercise entries** (manual diary or wearable sync) affect the daily bonus.  
 - If **no exercise entries exist for the date**, **no bonus** is applied.  
 - Do **not** add wearable bonus on top of manual logs (they share the same entries table).
 
-### 3.3 Exercise log UI consistency (Food diary)
+### 3.3 Water logging UI behaviors
+- Users can log unlimited entries per day.
+- Custom Entry input must:
+  - Clear on focus.
+  - Use numeric keypad (`type=number`, `inputMode=decimal`).
+  - Use `ml` (lowercase), `L`, `oz` for units.
+
+### 3.4 Exercise log UI consistency (Food diary)
+- Manual exercise entries are created via `POST /api/exercise-entries`.
 - After **save** or **delete** of manual exercise, the list must **force reload** from the server
   to avoid stale session storage (`loadExerciseEntriesForDate(..., { force: true })`).
 - Deleting must update the list even if the server responds with “Not found” for stale entries.
@@ -275,6 +287,9 @@ Agents must not modify these rules without explicit user approval.
 - `app/api/reports/weekly/status/route.ts`
 - `app/api/reports/weekly/dispatch/route.ts`
 - `components/WeeklyReportReadyModal.tsx`
+- `app/insights/page.tsx`
+- `app/insights/InsightLandingClient.tsx`
+- `app/insights/weekly-report/WeeklyReportClient.tsx`
 
 **Guard rails:**
 - Reports are generated **in the background** and should not run on every page visit or whenever the app is opened.
@@ -284,6 +299,10 @@ Agents must not modify these rules without explicit user approval.
 - If the report is locked (no credits), the popup CTA must send users to **Billing**, not to the report page.
 - Email + push are sent **only once per report** and are triggered by QStash; do not re‑introduce repeated sends.
 - The **PDF export lives on the 7‑day report page** (button uses `/api/export/pdf` with the report date range). Do not re‑introduce the old JSON export on the Account page without user approval.
+
+**Last stable deployment (owner‑approved):**
+- Commit `16ed1f02` on 2026‑01‑09 (weekly report data summary + wins/gaps).
+  - Baseline for Health Insights pages and weekly report. No changes without written approval.
 
 ### 2.8 Notification Inbox + Profile Badge (Jan 2026 – Locked)
 
