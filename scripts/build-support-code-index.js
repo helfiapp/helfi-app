@@ -3,13 +3,12 @@ const path = require('path')
 
 const ROOT = process.cwd()
 const OUTPUT_PATH = path.join(ROOT, 'data', 'support-code-index.json')
-const INCLUDE_DIRS = ['app', 'lib', 'components', 'data', 'prisma']
+const INCLUDE_DIRS = ['app', 'lib', 'components', 'data', 'prisma', 'public', 'scripts', 'types']
 const INCLUDE_FILES = ['middleware.ts', 'next.config.js', 'package.json']
 const EXCLUDE_DIRS = new Set([
   'node_modules',
   '.next',
   '.git',
-  'public',
   'testsprite_tests',
   'database-backup',
   'openai-usage',
