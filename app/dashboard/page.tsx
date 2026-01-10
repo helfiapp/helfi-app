@@ -773,9 +773,13 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <div className="h-10 w-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                        F
-                      </div>
+                      <Image
+                        src="/WEBSITE IMAGES/DEVICES LOGOS/FITBIT.png"
+                        alt="Fitbit"
+                        width={40}
+                        height={40}
+                        className="h-8 w-auto object-contain"
+                      />
                     </div>
                     <span className="text-sm font-semibold mb-6">Fitbit</span>
                     {fitbitConnected ? (
@@ -821,9 +825,13 @@ export default function Dashboard() {
 
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
-                        G
-                      </div>
+                      <Image
+                        src="/WEBSITE IMAGES/DEVICES LOGOS/GOOGLE FIT.png"
+                        alt="Google Fit"
+                        width={40}
+                        height={40}
+                        className="h-8 w-auto object-contain"
+                      />
                     </div>
                     <span className="text-sm font-semibold mb-6">Google Fit</span>
                     <button
@@ -839,9 +847,13 @@ export default function Dashboard() {
 
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <div className="h-10 w-10 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold">
-                        O
-                      </div>
+                      <Image
+                        src="/WEBSITE IMAGES/DEVICES LOGOS/OURA RING.png"
+                        alt="Oura Ring"
+                        width={40}
+                        height={40}
+                        className="h-8 w-auto object-contain"
+                      />
                     </div>
                     <span className="text-sm font-semibold mb-6">Oura Ring</span>
                     <button
@@ -857,9 +869,13 @@ export default function Dashboard() {
 
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <div className="h-10 w-10 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
-                        P
-                      </div>
+                      <Image
+                        src="/WEBSITE IMAGES/DEVICES LOGOS/POLAR.png"
+                        alt="Polar"
+                        width={40}
+                        height={40}
+                        className="h-8 w-auto object-contain"
+                      />
                     </div>
                     <span className="text-sm font-semibold mb-6">Polar</span>
                     <button
