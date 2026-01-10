@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -51,6 +52,25 @@ function toMl(amount: number, unit: string): number {
   return Math.round(amount * factor * 10) / 10
 }
 
+async function ensureWaterLogTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "WaterLog" (
+      "id" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "amount" DOUBLE PRECISION NOT NULL,
+      "unit" TEXT NOT NULL,
+      "amountMl" DOUBLE PRECISION NOT NULL,
+      "label" TEXT,
+      "localDate" TEXT NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "WaterLog_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "WaterLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS "WaterLog_userId_localDate_idx" ON "WaterLog"("userId", "localDate");
+    CREATE INDEX IF NOT EXISTS "WaterLog_userId_createdAt_idx" ON "WaterLog"("userId", "createdAt");
+  `)
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -80,6 +100,18 @@ export async function GET(req: NextRequest) {
     })
     return NextResponse.json({ entries })
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') {
+      try {
+        await ensureWaterLogTable()
+        const entries = await prisma.waterLog.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+        })
+        return NextResponse.json({ entries })
+      } catch (retryError) {
+        console.error('[water-log] GET failed after ensure', retryError)
+      }
+    }
     console.error('[water-log] GET failed', error)
     return NextResponse.json({ error: 'Failed to load water logs' }, { status: 500 })
   }
@@ -115,6 +147,24 @@ export async function POST(req: NextRequest) {
     })
     return NextResponse.json({ entry })
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') {
+      try {
+        await ensureWaterLogTable()
+        const entry = await prisma.waterLog.create({
+          data: {
+            userId: user.id,
+            amount,
+            unit,
+            amountMl,
+            label,
+            localDate,
+          },
+        })
+        return NextResponse.json({ entry })
+      } catch (retryError) {
+        console.error('[water-log] POST failed after ensure', retryError)
+      }
+    }
     console.error('[water-log] POST failed', error)
     return NextResponse.json({ error: 'Failed to save water log' }, { status: 500 })
   }

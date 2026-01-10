@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MaterialSymbol from '@/components/MaterialSymbol'
+import { computeHydrationGoal } from '@/lib/hydration-goal'
 
 type WaterEntry = {
   id: string
@@ -98,7 +99,7 @@ function normalizeLabel(value: string | null | undefined) {
 export default function WaterIntakePage() {
   const router = useRouter()
   const { data: session, status } = useSession()
-  const { profileImage, userData } = useUserData()
+  const { profileImage, userData, refreshData } = useUserData()
 
   const [selectedDate, setSelectedDate] = useState(todayLocalDate())
   const [entries, setEntries] = useState<WaterEntry[]>([])
@@ -119,6 +120,9 @@ export default function WaterIntakePage() {
   const [goalSaving, setGoalSaving] = useState(false)
   const [customAmountInput, setCustomAmountInput] = useState('')
   const [customUnit, setCustomUnit] = useState<'ml' | 'l' | 'oz'>('ml')
+  const [showCustomUnitPicker, setShowCustomUnitPicker] = useState(false)
+
+  const customUnitRef = useRef<HTMLDivElement | null>(null)
 
   const userImage = (profileImage || session?.user?.image || '') as string
   const hasProfileImage = !!userImage
@@ -139,6 +143,11 @@ export default function WaterIntakePage() {
       setSelectedDate(String(fromQuery))
     }
   }, [])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    refreshData().catch(() => {})
+  }, [refreshData, status])
 
   const loadEntries = async (localDate: string) => {
     setLoading(true)
@@ -204,6 +213,41 @@ export default function WaterIntakePage() {
       setGoalSource('custom')
     }
   }, [userData, goalRecommendedMl, goalTargetMl])
+
+  useEffect(() => {
+    if (!userData) return
+    if (goalTargetMl || goalRecommendedMl) return
+    const weightKg = Number(userData.weight)
+    const heightCm = Number(userData.height)
+    const result = computeHydrationGoal({
+      weightKg: Number.isFinite(weightKg) ? weightKg : null,
+      heightCm: Number.isFinite(heightCm) ? heightCm : null,
+      gender: userData.gender || null,
+      bodyType: userData.bodyType || null,
+      exerciseFrequency: userData.exerciseFrequency || '',
+      exerciseTypes: Array.isArray(userData.exerciseTypes) ? userData.exerciseTypes : [],
+      dietTypes: Array.isArray(userData.dietTypes) ? userData.dietTypes : [],
+      diabetesType: userData.diabetesType || '',
+      goalChoice: userData.goalChoice || '',
+      goalIntensity: userData.goalIntensity || '',
+      birthdate: userData.birthdate || userData?.profileInfo?.dateOfBirth || '',
+    })
+    setGoalTargetMl(result.targetMl)
+    setGoalRecommendedMl(result.targetMl)
+    setGoalSource('auto')
+  }, [goalRecommendedMl, goalTargetMl, userData])
+
+  useEffect(() => {
+    if (!showCustomUnitPicker) return
+    const handlePointer = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (customUnitRef.current && !customUnitRef.current.contains(target)) {
+        setShowCustomUnitPicker(false)
+      }
+    }
+    window.addEventListener('pointerdown', handlePointer)
+    return () => window.removeEventListener('pointerdown', handlePointer)
+  }, [showCustomUnitPicker])
 
   const addEntry = async (amount: number, unit: string) => {
     setSaving(true)
@@ -555,16 +599,34 @@ export default function WaterIntakePage() {
                 value={customAmountInput}
                 onChange={(e) => setCustomAmountInput(e.target.value)}
               />
-              <select
-                value={customUnit}
-                onChange={(e) => setCustomUnit(e.target.value as 'ml' | 'l' | 'oz')}
-                className="absolute right-2 top-2 h-8 rounded-md border border-transparent bg-transparent px-2 text-xs text-gray-500 appearance-none focus:outline-none"
-                style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
-              >
-                <option value="ml">ml</option>
-                <option value="l">L</option>
-                <option value="oz">oz</option>
-              </select>
+              <div ref={customUnitRef} className="absolute right-2 top-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomUnitPicker((prev) => !prev)}
+                  className="h-8 px-2 rounded-md text-xs text-gray-500 hover:text-gray-700 focus:outline-none"
+                  aria-expanded={showCustomUnitPicker}
+                  aria-haspopup="listbox"
+                >
+                  {customUnit.toUpperCase()}
+                </button>
+                {showCustomUnitPicker && (
+                  <div className="absolute right-0 mt-1 w-16 rounded-md border border-gray-200 bg-white shadow-lg text-xs text-gray-600 z-10">
+                    {(['ml', 'l', 'oz'] as const).map((unit) => (
+                      <button
+                        key={unit}
+                        type="button"
+                        onClick={() => {
+                          setCustomUnit(unit)
+                          setShowCustomUnitPicker(false)
+                        }}
+                        className="block w-full px-2 py-1 text-left hover:bg-gray-50"
+                      >
+                        {unit.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <button
               type="button"
