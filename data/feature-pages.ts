@@ -40,6 +40,7 @@ export type FeaturePageContent = {
   heroImage: FeaturePageImage
   bannerImage?: FeaturePageImage
   carouselImages?: FeaturePageImage[]
+  bannerLayout?: 'carousel' | 'grid'
   showHeroImage?: boolean
   showSegmentImages?: boolean
   overviewLayout?: 'default' | 'expanded'
@@ -81,6 +82,22 @@ const foodDiaryPhoto = (src: string, alt: string): FeaturePageImage => ({
   kind: 'photo',
 })
 
+const healthTrackingPhone = (src: string, alt: string): FeaturePageImage => ({
+  src,
+  alt,
+  width: 1419,
+  height: 2796,
+  kind: 'phone',
+})
+
+const healthTrackingPhoto = (src: string, alt: string): FeaturePageImage => ({
+  src,
+  alt,
+  width: 2048,
+  height: 768,
+  kind: 'photo',
+})
+
 export const featurePages: FeaturePageContent[] = [
   {
     slug: 'health-tracking',
@@ -99,6 +116,29 @@ export const featurePages: FeaturePageContent[] = [
       src: '/screenshots/hero/DASHBOARD.png',
       alt: 'Helfi dashboard on a phone',
     },
+    bannerImage: healthTrackingPhoto(
+      '/WEBSITE IMAGES/HEALTH TRACKING/HEALTH TRACKING BANNER.jpg',
+      'Health tracking banner'
+    ),
+    carouselImages: [
+      healthTrackingPhone(
+        '/MOBILE MOCKUPS/HEALTH TRACKING/MOBILE MOCKUPS/DEVICES-portrait.png',
+        'Device connections'
+      ),
+      healthTrackingPhone(
+        '/MOBILE MOCKUPS/HEALTH TRACKING/MOBILE MOCKUPS/7 DAY HEALTH REPORT-portrait.png',
+        'Weekly health report preview'
+      ),
+      healthTrackingPhone(
+        '/MOBILE MOCKUPS/HEALTH TRACKING/MOBILE MOCKUPS/BOWEL MOVEMENTS-portrait.png',
+        'Health focus area tracking'
+      ),
+      healthTrackingPhone(
+        '/MOBILE MOCKUPS/HEALTH TRACKING/MOBILE MOCKUPS/SUPPLEMENTS-portrait.png',
+        'Supplement insights on mobile'
+      ),
+    ],
+    bannerLayout: 'grid',
     primaryCta,
     secondaryCta,
     capabilities: [

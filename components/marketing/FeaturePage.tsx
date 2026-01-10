@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { FeaturePageContent } from '@/data/feature-pages'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import MockupCarousel from '@/components/marketing/MockupCarousel'
+import MockupGallery from '@/components/marketing/MockupGallery'
 
 type FeaturePageProps = {
   page: FeaturePageContent
@@ -26,6 +27,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   const isExpandedOverview = page.overviewLayout === 'expanded'
   const hasBanner = !!page.bannerImage
   const hasCarousel = !!page.carouselImages && page.carouselImages.length > 0
+  const bannerLayout = page.bannerLayout ?? 'carousel'
 
   const overviewContent = (
     <div className="max-w-3xl">
@@ -84,7 +86,11 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
             <div className="relative z-10 px-6 py-12 md:py-16">
               <div className="max-w-6xl mx-auto">
                 {hasCarousel && page.carouselImages ? (
-                  <MockupCarousel images={page.carouselImages} />
+                  bannerLayout === 'grid' ? (
+                    <MockupGallery images={page.carouselImages} />
+                  ) : (
+                    <MockupCarousel images={page.carouselImages} />
+                  )
                 ) : (
                   <div className="h-36 md:h-44" />
                 )}
