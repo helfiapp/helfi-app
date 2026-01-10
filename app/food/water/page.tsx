@@ -105,6 +105,7 @@ export default function WaterIntakePage() {
   const [entries, setEntries] = useState<WaterEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [activeDrink, setActiveDrink] = useState<(typeof DRINK_TYPES)[number]['id']>('Water')
@@ -164,9 +165,10 @@ export default function WaterIntakePage() {
       if (!res.ok) throw new Error('load failed')
       const data = await res.json()
       setEntries(Array.isArray(data?.entries) ? data.entries : [])
+      setLoadError(false)
     } catch {
-      setBanner({ type: 'error', message: 'Could not load water entries. Please try again.' })
       setEntries([])
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -481,61 +483,6 @@ export default function WaterIntakePage() {
             </div>
           </div>
 
-          {showGoalEditor && (
-            <div className="mt-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-[#111711] dark:text-white">Edit hydration goal</div>
-                <button
-                  type="button"
-                  onClick={() => setShowGoalEditor(false)}
-                  className="text-xs text-gray-400 hover:text-gray-600"
-                >
-                  Close
-                </button>
-              </div>
-              <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={goalAmountInput}
-                  onChange={(e) => setGoalAmountInput(e.target.value)}
-                  className="h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-sm focus:border-[#62b763] focus:outline-none dark:text-white"
-                  placeholder="0"
-                />
-                <select
-                  value={goalUnit}
-                  onChange={(e) => setGoalUnit(e.target.value as 'ml' | 'l' | 'oz')}
-                  className="h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-sm focus:border-[#62b763] focus:outline-none dark:text-white"
-                >
-                  <option value="ml">ml</option>
-                  <option value="l">L</option>
-                  <option value="oz">oz</option>
-                </select>
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                Recommended: {formatMl(goalRecommendedMl ?? goalTargetMl ?? 0)}
-              </div>
-              <div className="mt-4 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={saveGoal}
-                  disabled={goalSaving}
-                  className="h-10 px-4 rounded-lg bg-[#62b763] text-white text-sm font-semibold disabled:opacity-60"
-                >
-                  {goalSaving ? 'Saving...' : 'Save goal'}
-                </button>
-                <button
-                  type="button"
-                  onClick={resetGoal}
-                  disabled={goalSaving}
-                  className="h-10 px-4 rounded-lg border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300 text-sm font-semibold disabled:opacity-60"
-                >
-                  Reset to recommended
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="px-4 pt-2">
@@ -650,6 +597,15 @@ export default function WaterIntakePage() {
                 Loading entries...
               </div>
             )}
+            {!loading && loadError && (
+              <button
+                type="button"
+                onClick={() => loadEntries(selectedDate)}
+                className="w-full p-4 bg-white dark:bg-gray-900 rounded-xl border border-red-100 dark:border-red-900 text-sm text-red-600 text-left"
+              >
+                Could not load water entries. Tap to retry.
+              </button>
+            )}
             {!loading && entries.length === 0 && (
               <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-sm text-gray-500">
                 No water entries yet. Add your first drink above.
@@ -694,6 +650,91 @@ export default function WaterIntakePage() {
 
         <div className="h-20 bg-[#f6f7f6] dark:bg-[#151d15]"></div>
       </div>
+      {showGoalEditor && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
+          <div className="w-full max-w-md bg-[#f6f7f6] dark:bg-[#151d15] rounded-t-[32px] shadow-2xl">
+            <div className="flex flex-col items-center pt-3 pb-2">
+              <div className="h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-700"></div>
+            </div>
+            <div className="relative flex items-center justify-between px-6 py-2">
+              <button
+                type="button"
+                onClick={() => setShowGoalEditor(false)}
+                className="text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                aria-label="Close goal editor"
+              >
+                <MaterialSymbol name="close" className="text-2xl" />
+              </button>
+              <h4 className="text-slate-900 dark:text-white text-lg font-semibold leading-normal">Edit Daily Goal</h4>
+              <div className="w-6"></div>
+            </div>
+            <div className="px-6 py-4 flex flex-col gap-6">
+              <div className="flex flex-col items-center gap-2">
+                <label className="w-full">
+                  <p className="text-slate-600 dark:text-slate-400 text-sm font-medium leading-normal pb-3 text-center">
+                    Set your daily intake goal
+                  </p>
+                  <div className="flex w-full items-center justify-center bg-white dark:bg-slate-800 rounded-2xl border-2 border-[#62b763]/20 focus-within:border-[#62b763] px-4 py-6 transition-colors">
+                    <input
+                      className="form-input text-center w-full bg-transparent border-none focus:ring-0 text-5xl font-bold text-slate-900 dark:text-white placeholder:text-slate-300"
+                      placeholder="0"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={goalAmountInput}
+                      onChange={(e) => setGoalAmountInput(e.target.value)}
+                    />
+                  </div>
+                </label>
+              </div>
+              <div className="flex">
+                <div className="flex h-12 flex-1 items-center justify-center rounded-xl bg-slate-200/50 dark:bg-slate-800 p-1.5">
+                  {(['ml', 'l', 'oz'] as const).map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      onClick={() => setGoalUnit(unit)}
+                      className={`flex h-full grow items-center justify-center overflow-hidden rounded-lg px-2 text-sm font-semibold transition-all ${
+                        goalUnit === unit
+                          ? 'bg-white dark:bg-slate-700 shadow-sm text-[#62b763]'
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      {unit === 'l' ? 'L' : unit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <p className="text-slate-500 dark:text-slate-400 text-sm font-normal leading-relaxed text-center max-w-[280px]">
+                  Auto-calculated from your profile. You can adjust any time.
+                </p>
+                <button type="button" onClick={resetGoal} className="text-[#62b763] text-sm font-semibold mt-2 hover:underline">
+                  Reset to recommended
+                </button>
+              </div>
+              <div className="flex flex-col gap-3 mt-4 mb-8">
+                <button
+                  type="button"
+                  onClick={saveGoal}
+                  disabled={goalSaving}
+                  className="w-full bg-[#62b763] hover:bg-[#62b763]/90 text-white font-bold py-4 rounded-2xl shadow-lg shadow-[#62b763]/20 transition-all active:scale-[0.98] disabled:opacity-60"
+                >
+                  {goalSaving ? 'Saving...' : 'Save Goal'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowGoalEditor(false)}
+                  className="w-full bg-transparent text-slate-500 dark:text-slate-400 font-semibold py-2 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+            <div className="h-8 w-full"></div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
