@@ -696,10 +696,12 @@ export const featurePages: FeaturePageContent[] = [
           'Edit portions and serving sizes',
           'Keeps entries aligned with weekly insights',
         ],
-        image: foodDiaryPhoto(
-          '/WEBSITE IMAGES/FOOD DIARY/BREAD SCAN.png',
-          'Scanning a packaged bread barcode with the app'
-        ),
+        image: {
+          src: '/WEBSITE IMAGES/FOOD DIARY/BREAD SCAN.png',
+          alt: 'Scanning a packaged bread barcode with the app',
+          width: 1200,
+          height: 896,
+        },
       },
       {
         title: 'Food recommendations and context',
