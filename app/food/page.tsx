@@ -2285,6 +2285,8 @@ export default function FoodDiary() {
   const [showItemEditModal, setShowItemEditModal] = useState<boolean>(false) // Show edit modal for item
   // Numeric input drafts (so tapping clears the box without mutating values until the user types)
   const [numericInputDrafts, setNumericInputDrafts] = useState<Record<string, string>>({})
+  const weightBlurCancelRef = useRef<Record<string, boolean>>({})
+  const weightPointerHandlersRef = useRef<Record<string, (event: PointerEvent) => void>>({})
   const [healthWarning, setHealthWarning] = useState<string | null>(null)
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
   const [dietWarning, setDietWarning] = useState<string | null>(null)
@@ -16201,7 +16203,7 @@ Please add nutritional information manually if needed.`);
                                           return next
                                         })
                                       }}
-                                      className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 focus:outline-none p-0"
+                                      className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
                                     />
                                     <button
                                       onClick={() => {
@@ -16286,7 +16288,7 @@ Please add nutritional information manually if needed.`);
                                             return next
                                           })
                                         }}
-                                        className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 focus:outline-none p-0"
+                                        className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
                                       />
                                       <button
                                         onClick={() => {
@@ -16324,18 +16326,52 @@ Please add nutritional information manually if needed.`);
                                       })()}
                                       onFocus={() => {
                                         const key = `ai:card:${index}:weightAmount`
+                                        weightBlurCancelRef.current[key] = false
+                                        const handler = (event: PointerEvent) => {
+                                          const target = event.target as Element | null
+                                          if (!target) return
+                                          if (!target.closest(`[data-weight-input-id="weight-input-${index}"]`)) {
+                                            weightBlurCancelRef.current[key] = true
+                                          }
+                                        }
+                                        weightPointerHandlersRef.current[key] = handler
+                                        document.addEventListener('pointerdown', handler)
                                         setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
                                       }}
                                       onChange={(e) => {
                                         const key = `ai:card:${index}:weightAmount`
                                         const v = e.target.value
                                         setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                        if (String(v).trim() !== '') {
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key !== 'Enter') return
+                                        const key = `ai:card:${index}:weightAmount`
+                                        const v = numericInputDrafts[key]
+                                        if (String(v || '').trim() !== '') {
                                           updateItemField(index, 'weightAmount', v)
                                         }
+                                        setNumericInputDrafts((prev) => {
+                                          const next = { ...prev }
+                                          delete next[key]
+                                          return next
+                                        })
+                                        ;(e.currentTarget as HTMLInputElement).blur()
                                       }}
                                       onBlur={() => {
                                         const key = `ai:card:${index}:weightAmount`
+                                        const handler = weightPointerHandlersRef.current[key]
+                                        if (handler) {
+                                          document.removeEventListener('pointerdown', handler)
+                                          delete weightPointerHandlersRef.current[key]
+                                        }
+                                        const cancel = weightBlurCancelRef.current[key]
+                                        delete weightBlurCancelRef.current[key]
+                                        if (!cancel) {
+                                          const v = numericInputDrafts[key]
+                                          if (String(v || '').trim() !== '') {
+                                            updateItemField(index, 'weightAmount', v)
+                                          }
+                                        }
                                         setNumericInputDrafts((prev) => {
                                           const next = { ...prev }
                                           delete next[key]
@@ -16351,7 +16387,7 @@ Please add nutritional information manually if needed.`);
                                             )
                                           : 'e.g., 250'
                                       }
-                                      className="w-14 bg-transparent border-none font-bold text-lg text-slate-900 text-right focus:outline-none p-0"
+                                      className="w-14 bg-transparent border-none font-bold text-lg text-slate-900 text-right outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
                                     />
                                     <div className="w-px h-6 bg-slate-300 mx-3" />
                                     <select
