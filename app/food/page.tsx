@@ -16403,7 +16403,7 @@ Please add nutritional information manually if needed.`);
                                       className={`p-3 rounded-2xl border ${meta.bg} ${meta.border} flex flex-col items-start gap-1`}
                                     >
                                       <div className="flex items-center gap-2">
-                                        <span className={`material-icons-round text-xl ${meta.iconClass}`}>
+                                        <span className={`material-symbols-outlined text-xl ${meta.iconClass}`}>
                                           {meta.icon}
                                         </span>
                                         <span className={`text-lg font-bold ${meta.valueClass}`}>{displayValue}</span>
