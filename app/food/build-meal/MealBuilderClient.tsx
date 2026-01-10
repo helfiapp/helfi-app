@@ -1679,7 +1679,7 @@ export default function MealBuilderClient() {
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
           <div className="text-sm font-semibold text-gray-900">Search ingredients</div>
-          <div className="flex gap-2">
+          <div className="relative">
             <input
               value={query}
               onFocus={() => {
@@ -1700,15 +1700,23 @@ export default function MealBuilderClient() {
                 queryEditedRef.current = false
               }}
               placeholder="e.g. chicken breast"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             />
             <button
               type="button"
-              disabled={busy}
+              aria-label="Search"
+              disabled={busy || query.trim().length === 0}
               onClick={runSearch}
-              className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold disabled:opacity-60"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
             >
-              Search
+              {busy ? (
+                <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 20l-3.5-3.5" />
+                </svg>
+              )}
             </button>
           </div>
           <div className="flex gap-2">
