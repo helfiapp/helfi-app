@@ -7,6 +7,7 @@ import { computeHydrationGoal } from '@/lib/hydration-goal'
 export const dynamic = 'force-dynamic'
 
 const GOAL_NAME = '__HYDRATION_GOAL__'
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 const UNIT_TO_ML: Record<string, number> = {
   ml: 1,
@@ -26,6 +27,12 @@ function normalizeAmount(value: unknown): number | null {
   const n = Number(value)
   if (!Number.isFinite(n) || n <= 0) return null
   return Math.round(n * 100) / 100
+}
+
+function normalizeLocalDate(input: string | null) {
+  const trimmed = (input || '').trim()
+  if (!DATE_RE.test(trimmed)) return null
+  return trimmed
 }
 
 function toMl(amount: number, unit: string): number {
@@ -79,6 +86,26 @@ function getCustomGoal(user: any): { targetMl: number; updatedAt?: string | null
   }
 }
 
+async function getExerciseOverrideFrequency(userId: string, localDate: string | null) {
+  if (!localDate) return null
+  const entries = await prisma.exerciseEntry.findMany({
+    where: { userId, localDate },
+    select: { durationMinutes: true, calories: true },
+  })
+  if (entries.length === 0) return null
+
+  const totalMinutes = entries.reduce((sum, entry) => sum + (Number(entry.durationMinutes) || 0), 0)
+  const totalCalories = entries.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0)
+
+  if (totalMinutes >= 45) return '5'
+  if (totalMinutes >= 20) return '3'
+  if (totalMinutes > 0) return '1'
+  if (totalCalories >= 600) return '5'
+  if (totalCalories >= 300) return '3'
+  if (totalCalories > 0) return '1'
+  return null
+}
+
 export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -93,12 +120,14 @@ export async function GET(_req: NextRequest) {
   const diabetesType = parseDiabetesType(user)
   const birthdate = parseBirthdate(user)
   const primaryGoal = parsePrimaryGoal(user)
+  const localDate = normalizeLocalDate(_req.nextUrl.searchParams.get('date'))
+  const exerciseOverride = await getExerciseOverrideFrequency(user.id, localDate)
   const recommended = computeHydrationGoal({
     weightKg: typeof user.weight === 'number' ? user.weight : null,
     heightCm: typeof user.height === 'number' ? user.height : null,
     gender: (user as any)?.gender ?? null,
     bodyType: (user as any)?.bodyType ?? null,
-    exerciseFrequency: user.exerciseFrequency || '',
+    exerciseFrequency: exerciseOverride ?? user.exerciseFrequency || '',
     exerciseTypes: user.exerciseTypes || [],
     dietTypes,
     diabetesType,

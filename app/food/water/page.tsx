@@ -176,10 +176,11 @@ export default function WaterIntakePage() {
     }
   }
 
-  const loadGoal = async () => {
+  const loadGoal = async (localDate?: string) => {
     setGoalLoading(true)
     try {
-      const res = await fetch('/api/hydration-goal', { cache: 'no-store' as any, credentials: 'include' })
+      const qs = localDate ? `?date=${encodeURIComponent(localDate)}` : ''
+      const res = await fetch(`/api/hydration-goal${qs}`, { cache: 'no-store' as any, credentials: 'include' })
       if (!res.ok) throw new Error('goal failed')
       const data = (await res.json()) as GoalResponse
       setGoalTargetMl(typeof data?.targetMl === 'number' ? data.targetMl : null)
@@ -199,8 +200,8 @@ export default function WaterIntakePage() {
 
   useEffect(() => {
     if (status !== 'authenticated') return
-    loadGoal()
-  }, [status])
+    loadGoal(selectedDate)
+  }, [selectedDate, status])
 
   useEffect(() => {
     const hydrated = userData?.hydrationGoal
@@ -345,7 +346,7 @@ export default function WaterIntakePage() {
         body: JSON.stringify({ amount, unit: goalUnit }),
       })
       if (!res.ok) throw new Error('goal save failed')
-      await loadGoal()
+      await loadGoal(selectedDate)
       setShowGoalEditor(false)
     } catch {
       setBanner({ type: 'error', message: 'Could not update goal.' })
@@ -359,7 +360,7 @@ export default function WaterIntakePage() {
     try {
       const res = await fetch('/api/hydration-goal', { method: 'DELETE' })
       if (!res.ok) throw new Error('goal reset failed')
-      await loadGoal()
+      await loadGoal(selectedDate)
       setShowGoalEditor(false)
     } catch {
       setBanner({ type: 'error', message: 'Could not reset goal.' })
