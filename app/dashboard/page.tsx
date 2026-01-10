@@ -673,56 +673,75 @@ export default function Dashboard() {
       <main className="flex-1 pb-24 md:pb-8">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 md:py-8">
           <div className="bg-transparent md:bg-white rounded-none md:rounded-lg shadow-none md:shadow-sm p-0 md:p-8">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-helfi-black dark:text-white mb-4">
+            <div className="text-center mb-8 space-y-3 py-4">
+              <h1 className="text-3xl md:text-5xl font-extrabold text-helfi-black dark:text-white tracking-tight">
                 Welcome to Your Health Dashboard
               </h1>
-              <p className="text-gray-600">
-                Your personalized health intelligence platform is being built!
+              <p className="text-gray-600 text-base md:text-lg max-w-2xl mx-auto">
+                Your personalized health intelligence platform is being built to help you optimize your well-being.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-              <Link href="/check-in" className="block">
-              <div className="bg-transparent md:bg-emerald-50 p-5 md:p-6 rounded-2xl border border-gray-200 md:border-2 md:border-emerald-200 hover:md:border-emerald-300 shadow-none transition-colors">
-                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">✅ Daily Check-In</h3>
-                <p className="text-[13px] text-gray-600">Rate your health issues for today</p>
-                <div className="mt-3">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">Active</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <Link href="/check-in" className="group block">
+                <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <span className="material-symbols-outlined text-emerald-500">check_circle</span>
+                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">Daily Check-In</h3>
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                    Rate your health issues and track symptoms for today.
+                  </p>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50">
+                    Active
+                  </span>
                 </div>
-              </div>
               </Link>
 
-              <Link href="/mood" className="block">
-              <div className="bg-transparent md:bg-amber-50 p-5 md:p-6 rounded-2xl border border-gray-200 md:border-2 md:border-amber-200 hover:md:border-amber-300 shadow-none transition-colors">
-                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">😊 Mood Tracker</h3>
-                <p className="text-[13px] text-gray-600">Track your mood and patterns</p>
-                <div className="mt-3">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">Active</span>
+              <Link href="/mood" className="group block">
+                <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <span className="material-symbols-outlined text-amber-500">mood</span>
+                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">Mood Tracker</h3>
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                    Track your daily mood patterns and emotional health.
+                  </p>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50">
+                    Active
+                  </span>
                 </div>
-              </div>
               </Link>
 
-              <Link href="/health-tracking" className="block">
-              <div className="bg-transparent md:bg-helfi-green/5 p-5 md:p-6 rounded-2xl border border-gray-200 md:border-2 md:border-helfi-green/20 hover:md:border-helfi-green/40 shadow-none transition-colors">
-                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">🎯 Health Tracking</h3>
-                <p className="text-[13px] text-gray-600">Track your daily metrics and progress</p>
-                <div className="mt-3">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">Active</span>
+              <Link href="/health-tracking" className="group block">
+                <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <span className="material-symbols-outlined text-rose-500">track_changes</span>
+                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">Health Tracking</h3>
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                    Monitor daily biometric metrics and fitness progress.
+                  </p>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-100 dark:border-rose-900/50">
+                    Active
+                  </span>
                 </div>
-              </div>
               </Link>
 
-              <Link href="/insights" className="block">
-              <div className="bg-transparent md:bg-blue-50 p-5 md:p-6 rounded-2xl border border-gray-200 md:border-2 md:border-blue-200 hover:md:border-blue-300 shadow-none transition-colors">
-                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">🤖 AI Insights</h3>
-                <p className="text-[13px] text-gray-600">Personalized health recommendations</p>
-                <div className="mt-3">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">Active</span>
+              <Link href="/insights" className="group block">
+                <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <span className="material-symbols-outlined text-indigo-500">auto_awesome</span>
+                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">AI Insights</h3>
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                    Personalized, data-driven health recommendations.
+                  </p>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50">
+                    Active
+                  </span>
                 </div>
-              </div>
               </Link>
-
             </div>
 
             {/* Fitbit Mini Summary */}
@@ -734,317 +753,210 @@ export default function Dashboard() {
 
             {/* Device Integration Section */}
             {onboardingData && (
-              <div className="mb-8 rounded-lg md:rounded-2xl p-0 md:p-6 bg-transparent md:bg-gradient-to-r md:from-blue-50 md:to-green-50 dark:bg-none dark:bg-gray-800 border-0 md:border md:border-blue-200 dark:border-gray-700">
-                <div className="mb-3 md:mb-4">
-                  {/* Mobile: centered heading and badge */}
-                  <div className="md:hidden text-center">
-                    <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white">📱 Connect Your Devices</h3>
-                    <div className="text-[12px] text-green-600 font-medium mt-1">Enhanced Analytics</div>
+              <section className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 md:p-8 border border-slate-200 dark:border-slate-700 shadow-sm mb-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-3 md:space-y-0">
+                  <div>
+                    <div className="flex items-center space-x-3">
+                      <span className="material-symbols-outlined text-slate-400">devices</span>
+                      <h2 className="text-2xl font-bold tracking-tight text-helfi-black dark:text-white">Connect Your Devices</h2>
+                    </div>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">
+                      Sync activity and sleep data from your favorite wearables.
+                    </p>
                   </div>
-                  {/* Desktop: left title, right badge */}
-                  <div className="hidden md:flex items-center justify-between">
-                    <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white">📱 Connect Your Devices</h3>
-                    <span className="text-[12px] md:text-sm text-green-600 font-medium whitespace-nowrap">Enhanced Analytics</span>
+                  <div className="flex items-center space-x-2 text-emerald-600 dark:text-emerald-500 font-semibold text-sm">
+                    <span className="material-symbols-outlined text-lg">auto_graph</span>
+                    <span>Enhanced Analytics Available</span>
                   </div>
-                  <p className="text-[13px] text-gray-600 text-center mt-2">Connect Fitbit or Garmin to sync activity and sleep data.</p>
                 </div>
-                
-                {/* Mobile grouped list */}
-                <div className="md:hidden mb-4">
-                  <div className="bg-transparent rounded-none border-0 shadow-none divide-y divide-gray-200">
-                    {/* Fitbit - First since it's the only working integration */}
-                    <div className="px-2 sm:px-3 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">🏃</div>
-                        <div className="flex-1">
-                          <div className="text-[15px] font-medium text-gray-900">Fitbit</div>
-                          <div className="text-[12px] text-gray-500">Activity & sleep</div>
-                        </div>
-                        {fitbitConnected && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        )}
-                      </div>
-                      {fitbitConnected ? (
-                        <Link href="/devices" className="mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-emerald-600 text-white block">Connected ✓</Link>
-                      ) : (
-                        <button onClick={handleConnectFitbit} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-helfi-green text-white hover:bg-green-600 transition-colors`} disabled={fitbitLoading}>
-                          {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
-                        </button>
-                      )}
-                    </div>
-                  {/* Garmin */}
-                  <div className="px-2 sm:px-3 py-3">
-                    <div className="flex items-center gap-3">
-                      <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={24} height={24} className="rounded-md" />
-                      <div>
-                        <div className="text-[15px] font-medium text-gray-900">Garmin Connect</div>
-                        <div className="text-[12px] text-gray-500">Training metrics</div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
+                    <div className="h-12 w-full flex items-center justify-center mb-6">
+                      <div className="h-10 w-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                        F
                       </div>
                     </div>
+                    <span className="text-sm font-semibold mb-6">Fitbit</span>
+                    {fitbitConnected ? (
+                      <Link href="/devices" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">
+                        Connected ✓
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={handleConnectFitbit}
+                        className="w-full bg-helfi-green hover:bg-green-600 text-white py-3 rounded-xl font-bold transition-all"
+                        disabled={fitbitLoading}
+                      >
+                        {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
+                    <div className="h-12 w-full flex items-center justify-center mb-6">
+                      <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={32} height={32} className="h-8 w-auto object-contain rounded-md" />
+                    </div>
+                    <span className="text-sm font-semibold mb-6">Garmin Connect</span>
                     {!garminConnectEnabled ? (
                       <button
                         onClick={() => toggleInterest('garmin')}
-                        className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${
-                          deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        className={`w-full py-3 rounded-xl font-bold transition-all ${
+                          deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                         }`}
                         disabled={!!savingInterest}
                       >
                         {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
                       </button>
                     ) : garminConnected ? (
-                      <Link href="/devices" className="mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-emerald-600 text-white block">
+                      <Link href="/devices" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">
                         Connected ✓
                       </Link>
                     ) : (
-                      <Link href="/devices" className="mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-helfi-green text-white block hover:bg-green-600 transition-colors">
-                        Connect Garmin Connect
+                      <Link href="/devices" className="w-full bg-helfi-green hover:bg-green-600 text-white py-3 rounded-xl font-bold">
+                        Connect Garmin
                       </Link>
-                      )}
-                    </div>
-                    {/* Google Fit */}
-                    <div className="px-2 sm:px-3 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">🤖</div>
-                        <div>
-                          <div className="text-[15px] font-medium text-gray-900">Google Fit</div>
-                          <div className="text-[12px] text-gray-500">Android fitness</div>
-                        </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
+                    <div className="h-12 w-full flex items-center justify-center mb-6">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                        G
                       </div>
-                      <button onClick={() => toggleInterest('googleFit')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
-                    {/* Oura Ring */}
-                    <div className="px-2 sm:px-3 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">💍</div>
-                        <div>
-                          <div className="text-[15px] font-medium text-gray-900">Oura Ring</div>
-                          <div className="text-[12px] text-gray-500">Recovery & sleep</div>
-                        </div>
+                    <span className="text-sm font-semibold mb-6">Google Fit</span>
+                    <button
+                      onClick={() => toggleInterest('googleFit')}
+                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                        deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                      disabled={!!savingInterest}
+                    >
+                      {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
+                    <div className="h-12 w-full flex items-center justify-center mb-6">
+                      <div className="h-10 w-10 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold">
+                        O
                       </div>
-                      <button onClick={() => toggleInterest('oura')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.oura ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
-                    {/* Polar */}
-                    <div className="px-2 sm:px-3 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">🧭</div>
-                        <div>
-                          <div className="text-[15px] font-medium text-gray-900">Polar</div>
-                          <div className="text-[12px] text-gray-500">Heart rate & sport</div>
-                        </div>
+                    <span className="text-sm font-semibold mb-6">Oura Ring</span>
+                    <button
+                      onClick={() => toggleInterest('oura')}
+                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                        deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                      disabled={!!savingInterest}
+                    >
+                      {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
+                    <div className="h-12 w-full flex items-center justify-center mb-6">
+                      <div className="h-10 w-10 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                        P
                       </div>
-                      <button onClick={() => toggleInterest('polar')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.polar ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
+                    <span className="text-sm font-semibold mb-6">Polar</span>
+                    <button
+                      onClick={() => toggleInterest('polar')}
+                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                        deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                      disabled={!!savingInterest}
+                    >
+                      {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
+                    </button>
                   </div>
                 </div>
-
-                {/* Desktop grid */}
-                <div className="hidden md:grid grid-cols-4 gap-4 mb-4">
-                  {/* Fitbit - First since it's the only working integration */}
-                  <div className={`bg-transparent p-4 rounded-2xl border ${fitbitConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">🏃</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2 flex items-center justify-center gap-1">
-                        Fitbit
-                        {fitbitConnected && <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>}
-                      </div>
-                      {fitbitConnected ? (
-                        <Link
-                          href="/devices"
-                          className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-emerald-600 text-white"
-                        >
-                          Connected ✓
-                        </Link>
-                      ) : (
-                        <button
-                          onClick={handleConnectFitbit}
-                          className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-helfi-green text-white hover:bg-green-600 transition-colors"
-                          disabled={fitbitLoading}
-                        >
-                          {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Garmin */}
-                  <div className={`bg-transparent p-4 rounded-2xl border ${garminConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
-                    <div className="text-center">
-                      <div className="flex justify-center mb-2">
-                        <Image src="/brands/garmin-connect.jpg" alt="Garmin Connect" width={28} height={28} className="rounded-md" />
-                      </div>
-                      <div className="text-xs font-medium text-gray-700 mb-2 flex items-center justify-center gap-1">
-                        Garmin Connect
-                        {garminConnected && <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>}
-                      </div>
-                      {!garminConnectEnabled ? (
-                        <button
-                          onClick={() => toggleInterest('garmin')}
-                          className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
-                            deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                          disabled={!!savingInterest}
-                        >
-                          {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
-                        </button>
-                      ) : garminConnected ? (
-                        <Link
-                          href="/devices"
-                          className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-emerald-600 text-white"
-                        >
-                          Connected ✓
-                        </Link>
-                      ) : (
-                        <Link
-                          href="/devices"
-                          className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-helfi-green text-white hover:bg-green-600 transition-colors"
-                        >
-                          Connect Garmin Connect
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Google Fit */}
-                  <div className={`bg-transparent p-4 rounded-2xl border ${deviceInterest.googleFit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">🤖</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">Google Fit</div>
-                      <button
-                        onClick={() => toggleInterest('googleFit')}
-                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
-                          deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                        disabled={!!savingInterest}
-                      >
-                        {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Oura Ring */}
-                  <div className={`bg-transparent p-4 rounded-2xl border ${deviceInterest.oura ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">💍</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">Oura Ring</div>
-                      <button
-                        onClick={() => toggleInterest('oura')}
-                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
-                          deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                        disabled={!!savingInterest}
-                      >
-                        {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Polar */}
-                  <div className={`bg-transparent p-4 rounded-2xl border ${deviceInterest.polar ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} shadow-none transition-colors`}>
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">🧭</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">Polar</div>
-                      <button
-                        onClick={() => toggleInterest('polar')}
-                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
-                          deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                        disabled={!!savingInterest}
-                      >
-                        {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="text-xs text-gray-500 text-center">
-                  Fitbit and Garmin are available now. Other integrations are under review.
-                </div>
-              </div>
+                <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-8">
+                  Selected integrations are available now. Other integrations are under review for security compliance.
+                </p>
+              </section>
             )}
 
             {/* Data Status Section */}
             <div className="mb-8">
               {onboardingData?.onboardingComplete ? (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-green-900 mb-2">✅ Onboarding Complete</h3>
-                      <p className="text-green-700 mb-4">
-                        Your health profile has been created and synced across all devices
-                      </p>
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {onboardingData.personalInfo && (
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                            Personal Info ✓
-                          </span>
-                        )}
-                        {onboardingData.physicalMetrics && (
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                            Physical Metrics ✓
-                          </span>
-                        )}
-                        {onboardingData.healthGoals && (
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                            Health Goals ✓
-                          </span>
-                        )}
-                        {onboardingData.medications && onboardingData.medications.length > 0 && (
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                            Medications ✓
-                          </span>
-                        )}
-                        {onboardingData.supplements && onboardingData.supplements.length > 0 && (
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                            Supplements ✓
-                          </span>
-                        )}
+                <section className="bg-[#ECFDF5] dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-[2rem] p-6 md:p-8 shadow-sm">
+                  <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
+                    <div className="flex flex-col md:flex-row items-center md:items-start gap-8 text-center md:text-left">
+                      <div className="h-20 w-20 bg-helfi-green rounded-full flex items-center justify-center text-white shadow-xl shadow-emerald-300/40 flex-shrink-0">
+                        <span className="material-symbols-outlined text-4xl">verified</span>
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Onboarding Complete</h2>
+                        <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-xl leading-relaxed">
+                          Your health profile has been successfully created and synced across all your connected devices.
+                        </p>
+                        <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                          {onboardingData.personalInfo && (
+                            <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 shadow-sm">
+                              Personal Info <span className="material-symbols-outlined text-[14px] ml-1.5">check</span>
+                            </span>
+                          )}
+                          {onboardingData.physicalMetrics && (
+                            <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 shadow-sm">
+                              Physical Metrics <span className="material-symbols-outlined text-[14px] ml-1.5">check</span>
+                            </span>
+                          )}
+                          {onboardingData.healthGoals && (
+                            <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 shadow-sm">
+                              Health Goals <span className="material-symbols-outlined text-[14px] ml-1.5">check</span>
+                            </span>
+                          )}
+                          {onboardingData.medications && onboardingData.medications.length > 0 && (
+                            <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 shadow-sm">
+                              Medications <span className="material-symbols-outlined text-[14px] ml-1.5">check</span>
+                            </span>
+                          )}
+                          {onboardingData.supplements && onboardingData.supplements.length > 0 && (
+                            <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 shadow-sm">
+                              Supplements <span className="material-symbols-outlined text-[14px] ml-1.5">check</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-green-600">
-                      <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                      </svg>
+                    <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+                      <button
+                        onClick={handleEditOnboarding}
+                        className="bg-helfi-green hover:bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg shadow-emerald-300/30 flex items-center justify-center space-x-2 whitespace-nowrap"
+                      >
+                        <span className="material-symbols-outlined text-xl">edit</span>
+                        <span>Edit Health Info</span>
+                      </button>
+                      <button
+                        onClick={() => setShowResetConfirm(true)}
+                        className="bg-[#334155] dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white px-8 py-4 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 shadow-lg shadow-slate-900/10 whitespace-nowrap"
+                      >
+                        <span className="material-symbols-outlined text-xl">refresh</span>
+                        <span>Reset All Data</span>
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="flex flex-wrap gap-3 mt-4">
-                    <button 
-                      onClick={handleEditOnboarding}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                    >
-                      Edit Health Information
-                    </button>
-                    <button 
-                      onClick={() => setShowResetConfirm(true)}
-                      className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      Reset All Data
-                    </button>
-                  </div>
-                </div>
+                </section>
               ) : (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-                  <div className="flex items-center justify-between">
+                <section className="bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-[2rem] p-6 md:p-8 shadow-sm">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div>
-                      <h3 className="text-lg font-semibold text-blue-900 mb-2">🚀 Complete your Health Setup</h3>
-                      <p className="text-blue-700 mb-4">
-                        Finish your health profile to unlock personalized insights and tracking
+                      <h3 className="text-xl font-semibold text-blue-900 dark:text-white mb-2">Complete your Health Setup</h3>
+                      <p className="text-blue-700 dark:text-slate-300 mb-4">
+                        Finish your health profile to unlock personalized insights and tracking.
                       </p>
                     </div>
-                    <div className="text-blue-600">
-                      <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>
-                      </svg>
-                    </div>
+                    <Link
+                      href="/onboarding"
+                      className="inline-flex items-center justify-center bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold whitespace-nowrap"
+                    >
+                      {onboardingData ? 'Continue Health Setup' : 'Start Health Profile Setup'}
+                    </Link>
                   </div>
-                  
-                  <Link 
-                    href="/onboarding"
-                    className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    {onboardingData ? 'Continue Health Setup' : 'Start Health Profile Setup'}
-                  </Link>
-                </div>
+                </section>
               )}
             </div>
 
