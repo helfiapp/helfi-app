@@ -1432,6 +1432,85 @@ const isVolumeBasedUnitLabel = (label: string) => {
   return volumeKeywords.some((u) => l.includes(u))
 }
 
+const isLikelyLiquidFood = (nameRaw: string, servingSizeRaw: string | null | undefined) => {
+  const name = String(nameRaw || '').toLowerCase()
+  const serving = String(servingSizeRaw || '').toLowerCase()
+  const label = `${name} ${serving}`.trim()
+  if (!label) return false
+
+  if (label.includes('milk chocolate')) return false
+  const chocolateLiquid = /\bchocolate\s+(milk|shake|drink|smoothie|syrup)\b/.test(label)
+  if (label.includes('chocolate') && !chocolateLiquid) return false
+
+  const solidHints = [
+    'bread',
+    'cookie',
+    'biscuit',
+    'cracker',
+    'granola',
+    'cereal',
+    'chips',
+    'crisps',
+    'popcorn',
+    'trail mix',
+    'candy',
+    'brownie',
+    'cake',
+    'powder',
+    'mix',
+    'protein bar',
+    'energy bar',
+    'candy bar',
+    'chocolate bar',
+    'granola bar',
+  ]
+  if (solidHints.some((hint) => label.includes(hint))) return false
+
+  const liquidKeywords = [
+    'oil',
+    'vinegar',
+    'milk',
+    'juice',
+    'water',
+    'soda',
+    'soft drink',
+    'drink',
+    'beverage',
+    'tea',
+    'coffee',
+    'kombucha',
+    'broth',
+    'stock',
+    'soup',
+    'wine',
+    'beer',
+    'spirit',
+    'liqueur',
+    'smoothie',
+    'shake',
+    'milkshake',
+    'syrup',
+  ]
+  return liquidKeywords.some((keyword) => label.includes(keyword))
+}
+
+const normalizeServingSizeForLiquid = (
+  servingSizeRaw: string | null | undefined,
+  liquidItem: boolean,
+) => {
+  const raw = String(servingSizeRaw || '')
+  if (!raw || liquidItem) return raw
+  if (/\b\d+(?:\.\d+)?\s*g\b/i.test(raw)) return raw
+  if (/\bml\b/i.test(raw) || /\bmilliliters?\b/i.test(raw) || /\bmillilitres?\b/i.test(raw)) {
+    let next = raw
+    next = next.replace(/\bmilliliters?\b/gi, 'g')
+    next = next.replace(/\bmillilitres?\b/gi, 'g')
+    next = next.replace(/\bml\b/gi, 'g')
+    return next
+  }
+  return raw
+}
+
 // Align servings for discrete items (eggs, bacon slices) when the label clearly
 // states multiple pieces but macros look like a single piece.
 const DISCRETE_SERVING_RULES = [
@@ -4806,9 +4885,15 @@ export default function FoodDiary() {
   const finalizeIngredientItem = (input: any) => {
     let next = normalizeDiscreteItem({ ...input })
 
+    const liquidItem = isLikelyLiquidFood(next?.name, next?.serving_size)
+    const normalizedServingSize = normalizeServingSizeForLiquid(next?.serving_size, liquidItem)
+    if (normalizedServingSize && normalizedServingSize !== next.serving_size) {
+      next.serving_size = normalizedServingSize
+    }
+
     const { gramsPerServing, mlPerServing, ozPerServing } = quickParseServingSize(next?.serving_size)
     if (!next.weightUnit) {
-      if (mlPerServing && mlPerServing > 0) next.weightUnit = 'ml'
+      if (mlPerServing && mlPerServing > 0 && liquidItem) next.weightUnit = 'ml'
       else if (ozPerServing && ozPerServing > 0) next.weightUnit = 'oz'
       else next.weightUnit = 'g'
     }
@@ -5387,6 +5472,11 @@ const applyStructuredItems = (
   })()
   const itemsToUse = itemsToUseRaw.map((it: any) => {
     const next = normalizeDiscreteItem(it)
+    const liquidItem = isLikelyLiquidFood(next?.name, next?.serving_size)
+    const normalizedServingSize = normalizeServingSizeForLiquid(next?.serving_size, liquidItem)
+    if (normalizedServingSize && normalizedServingSize !== next.serving_size) {
+      next.serving_size = normalizedServingSize
+    }
     const itemLabel = `${String(next?.name || '')} ${String(next?.serving_size || '')}`.toLowerCase()
     const isDiscrete = isDiscreteUnitLabel(itemLabel)
     const inferredPieces = inferPiecesFromAnalysisForItem(analysisText, next)
@@ -5435,7 +5525,7 @@ const applyStructuredItems = (
         targetUnit = 'oz'
         initialWeight = ozPerServing * servings
       } else if (mlPerServing && mlPerServing > 0) {
-        targetUnit = 'ml'
+        targetUnit = liquidItem ? 'ml' : 'g'
         initialWeight = mlPerServing * servings
       } else if (gramsPerServing && gramsPerServing > 0) {
         targetUnit = 'g'
@@ -10506,33 +10596,6 @@ Please add nutritional information manually if needed.`);
   }
 
   const buildBarcodeIngredientItem = (food: any, code?: string) => {
-    const isLikelyLiquid = (nameRaw: string, servingSizeRaw: string | null | undefined) => {
-      const name = String(nameRaw || '').toLowerCase()
-      const serving = String(servingSizeRaw || '').toLowerCase()
-      if (serving.includes('ml') || serving.includes('l ')) return true
-      const liquidKeywords = [
-        'oil',
-        'vinegar',
-        'milk',
-        'juice',
-        'water',
-        'soda',
-        'soft drink',
-        'drink',
-        'beverage',
-        'tea',
-        'coffee',
-        'kombucha',
-        'broth',
-        'stock',
-        'soup',
-        'wine',
-        'beer',
-        'spirit',
-        'liqueur',
-      ]
-      return liquidKeywords.some((k) => name.includes(k))
-    }
     const toNumber = (value: any) => {
       const num = Number(value)
       return Number.isFinite(num) ? num : null
@@ -10555,9 +10618,13 @@ Please add nutritional information manually if needed.`);
       food?.serving_size ||
       (Number.isFinite(Number(food?.quantity_g)) && Number(food?.quantity_g) > 0 ? `${Number(food.quantity_g)} g` : null)
     let serving_size = servingSizeRaw || '1 serving'
-    const liquidItem = isLikelyLiquid(String(food?.name || ''), serving_size)
+    const liquidItem = isLikelyLiquidFood(String(food?.name || ''), serving_size)
     if (liquidItem && /\b(\d+(?:\.\d+)?)\s*g\b/i.test(serving_size) && !/\bml\b/i.test(serving_size)) {
       serving_size = serving_size.replace(/\b(\d+(?:\.\d+)?)\s*g\b/i, '$1 ml')
+    }
+    if (!liquidItem) {
+      const normalizedServing = normalizeServingSizeForLiquid(serving_size, liquidItem)
+      if (normalizedServing) serving_size = normalizedServing
     }
     const servingInfo = parseServingSizeInfo({ serving_size })
     const quantityG =
@@ -10570,11 +10637,13 @@ Please add nutritional information manually if needed.`);
       !quantityG && servingInfo?.mlPerServing && servingInfo.mlPerServing > 0
         ? Number(servingInfo.mlPerServing)
         : null
-    const liquidQuantity = liquidItem && !quantityMl && quantityG ? quantityG : quantityMl
-    const customGramsPerServing = liquidQuantity ? null : quantityG ? quantityG : null
-    const customMlPerServing = liquidQuantity ? liquidQuantity : null
-    const weightUnit = liquidQuantity ? 'ml' : 'g'
-    const weightAmount = liquidQuantity ?? quantityG ?? null
+    const useMl = liquidItem && ((quantityMl && quantityMl > 0) || (quantityG && quantityG > 0))
+    const mlValue = useMl ? (quantityMl && quantityMl > 0 ? quantityMl : quantityG) : null
+    const gramValue = useMl ? null : (quantityG && quantityG > 0 ? quantityG : quantityMl)
+    const customGramsPerServing = gramValue ? gramValue : null
+    const customMlPerServing = mlValue ? mlValue : null
+    const weightUnit = useMl ? 'ml' : 'g'
+    const weightAmount = useMl ? mlValue : gramValue
     return {
       name: food?.name || 'Scanned food',
       brand: food?.brand || null,
