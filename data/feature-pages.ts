@@ -696,20 +696,10 @@ export const featurePages: FeaturePageContent[] = [
           'Edit portions and serving sizes',
           'Keeps entries aligned with weekly insights',
         ],
-        image: foodDiaryPhone(
-          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON MEAL-portrait.png',
-          'Packaged food scan summary on a phone'
+        image: foodDiaryPhoto(
+          '/WEBSITE IMAGES/FOOD DIARY/BREAD SCAN.png',
+          'Scanning a packaged bread barcode with the app'
         ),
-        images: [
-          foodDiaryPhone(
-            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON MEAL-portrait.png',
-            'Packaged food scan summary on a phone'
-          ),
-          foodDiaryPhone(
-            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD SCAN SALMON 2-portrait.png',
-            'Barcode scan results for a packaged meal'
-          ),
-        ],
       },
       {
         title: 'Food recommendations and context',
