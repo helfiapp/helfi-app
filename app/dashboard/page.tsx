@@ -774,7 +774,7 @@ export default function Dashboard() {
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
                       <Image
-                        src="/WEBSITE IMAGES/DEVICES LOGOS/FITBIT.png"
+                        src="/WEBSITE%20IMAGES/DEVICES%20LOGOS/FITBIT.png"
                         alt="Fitbit"
                         width={40}
                         height={40}
@@ -826,7 +826,7 @@ export default function Dashboard() {
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
                       <Image
-                        src="/WEBSITE IMAGES/DEVICES LOGOS/GOOGLE FIT.png"
+                        src="/WEBSITE%20IMAGES/DEVICES%20LOGOS/GOOGLE%20FIT.png"
                         alt="Google Fit"
                         width={40}
                         height={40}
@@ -848,7 +848,7 @@ export default function Dashboard() {
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
                       <Image
-                        src="/WEBSITE IMAGES/DEVICES LOGOS/OURA RING.png"
+                        src="/WEBSITE%20IMAGES/DEVICES%20LOGOS/OURA%20RING.png"
                         alt="Oura Ring"
                         width={40}
                         height={40}
@@ -870,7 +870,7 @@ export default function Dashboard() {
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
                       <Image
-                        src="/WEBSITE IMAGES/DEVICES LOGOS/POLAR.png"
+                        src="/WEBSITE%20IMAGES/DEVICES%20LOGOS/POLAR.png"
                         alt="Polar"
                         width={40}
                         height={40}
