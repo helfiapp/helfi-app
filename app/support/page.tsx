@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { getCurrentSupportAgent, getSupportAgentForTimestamp } from '@/lib/support-agents'
 
 type SupportAttachment = {
@@ -37,6 +36,7 @@ export default function SupportPage() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [showChatComposer, setShowChatComposer] = useState(false)
+  const [showChatView, setShowChatView] = useState(true)
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{
     id: string
     message: string
@@ -433,6 +433,7 @@ export default function SupportPage() {
 
   const startNewTicket = () => {
     triggerHaptic()
+    setShowChatView(true)
     setActiveTicket(null)
     setSubmitStatus('idle')
     setChatAttachments([])
@@ -454,6 +455,7 @@ export default function SupportPage() {
       window.localStorage.setItem('helfi:support:cleared-ticket', activeTicket.id)
     }
     triggerHaptic()
+    setShowChatView(false)
     setActiveTicket(null)
     setChatMessage('')
     setChatAttachments([])
@@ -522,6 +524,8 @@ export default function SupportPage() {
   const shouldShowRegisteredEmail = formData.inquiryType === 'account' && !session
   const isChatClosed = activeTicket && ['RESOLVED', 'CLOSED'].includes(activeTicket.status)
   const hasFeedback = feedbackSubmitted || Boolean(activeTicket?.responses?.some((res: any) => String(res.message || '').startsWith('[FEEDBACK]')))
+  const showChatPanel = Boolean(session && showChatView && (activeTicket || showChatComposer))
+  const showSupportEntry = Boolean(session && !showChatPanel)
   const conversationItems = activeTicket
     ? [
         (() => {
@@ -555,55 +559,35 @@ export default function SupportPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
-      {/* Navigation Header */}
-      <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          {/* Logo on the left */}
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="/mobile-assets/LOGOS/helfi-01-01.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-          </div>
-          
-          {/* Navigation Links */}
-          <div className="flex items-center space-x-4">
-            {session ? (
-              <Link 
-                href="/dashboard" 
-                className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
-              >
-                Back to Dashboard
-              </Link>
-            ) : (
-              <Link 
-                href="/" 
-                className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
-              >
-                Back to Home
-              </Link>
-            )}
-          </div>
-        </div>
-      </nav>
-
       {/* Page Title */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Get Support</h1>
-          <p className="text-sm text-gray-500 hidden sm:block">We're here to help you with any questions or issues</p>
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          {showChatPanel ? (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic()
+                setShowChatView(false)
+                setShowChatComposer(false)
+              }}
+              className="text-sm font-semibold text-helfi-green"
+            >
+              ← Back
+            </button>
+          ) : (
+            <span className="w-14" aria-hidden="true" />
+          )}
+          <div className="flex-1 text-center">
+            <h1 className="text-lg md:text-xl font-semibold text-gray-900">Get Support</h1>
+            <p className="text-sm text-gray-500 hidden sm:block">We're here to help you with any questions or issues</p>
+          </div>
+          <span className="w-14" aria-hidden="true" />
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-0 md:px-10 py-8">
-        {session && !activeTicket && !showChatComposer && (
+      <div className="max-w-6xl mx-auto px-4 md:px-10 py-8">
+        {showSupportEntry && (
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">Need help right now?</h2>
@@ -614,6 +598,7 @@ export default function SupportPage() {
               onClick={() => {
                 triggerHaptic()
                 setShowChatComposer(true)
+                setShowChatView(true)
               }}
               className="inline-flex items-center justify-center px-5 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors"
             >
@@ -622,8 +607,8 @@ export default function SupportPage() {
           </div>
         )}
 
-        {session && (activeTicket || showChatComposer) && (
-          <div className="mb-10">
+        {showChatPanel && (
+          <div className="mb-10 -mx-4 md:mx-0">
             <div className="mx-auto w-full md:max-w-[900px] bg-white border-0 md:border border-gray-100 shadow-none md:shadow-2xl rounded-none md:rounded-3xl overflow-hidden flex flex-col min-h-[480px] h-[calc(100dvh-240px)] md:h-[calc(100dvh-260px)]">
               <header className="sticky top-0 z-10 flex items-center justify-between bg-white/95 backdrop-blur-md px-4 py-3 border-b border-gray-100">
                 <div className="flex items-center gap-3">
@@ -914,7 +899,7 @@ export default function SupportPage() {
           </div>
         )}
 
-        {(!session || (!activeTicket && !showChatComposer)) && (
+        {(!session || showSupportEntry) && (
           <div className="mt-6">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Contact Support</h2>
