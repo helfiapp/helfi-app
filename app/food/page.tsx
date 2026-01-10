@@ -2466,6 +2466,8 @@ export default function FoodDiary() {
   const foodLibraryRefreshRef = useRef<{ last: number; inFlight: boolean }>({ last: 0, inFlight: false })
   const renameSaveRef = useRef<((value: string) => void) | null>(null)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
+  const favoritesReplaceTargetRef = useRef<number | null>(null)
+  const favoritesActionRef = useRef<'analysis' | 'diary' | null>(null)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
@@ -2488,6 +2490,8 @@ export default function FoodDiary() {
   const [barcodeValue, setBarcodeValue] = useState('')
   const [barcodeStatus, setBarcodeStatus] = useState<'idle' | 'scanning' | 'loading'>('idle')
   const [barcodeStatusHint, setBarcodeStatusHint] = useState<string>('')
+  const barcodeReplaceTargetRef = useRef<number | null>(null)
+  const barcodeActionRef = useRef<'analysis' | 'diary' | null>(null)
   const [barcodeLabelFlow, setBarcodeLabelFlow] = useState<{
     barcode: string
     reason: 'missing' | 'report'
@@ -2508,6 +2512,10 @@ export default function FoodDiary() {
   const hybridBarcodeFrameRef = useRef<number | null>(null)
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back')
   const manualBarcodeInputRef = useRef<HTMLInputElement | null>(null)
+  const replacePhotoInputRef = useRef<HTMLInputElement | null>(null)
+  const photoReplaceTargetRef = useRef<number | null>(null)
+  const [replacePhotoLoading, setReplacePhotoLoading] = useState(false)
+  const [replacePhotoError, setReplacePhotoError] = useState<string | null>(null)
   const SWIPE_MENU_WIDTH = 88
   const SWIPE_DELETE_WIDTH = 96
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -4777,24 +4785,8 @@ export default function FoodDiary() {
     } catch {}
   }
 
-  const buildOfficialItem = (item: any, servingsOverride?: number | null) => {
-    const base = {
-      name: item.name || 'Unknown food',
-      brand: item.brand ?? null,
-      serving_size: item.serving_size || '',
-      servings:
-        Number.isFinite(Number(servingsOverride)) && Number(servingsOverride) > 0
-          ? Number(servingsOverride)
-          : 1,
-      calories: item.calories ?? null,
-      protein_g: item.protein_g ?? null,
-      carbs_g: item.carbs_g ?? null,
-      fat_g: item.fat_g ?? null,
-      fiber_g: item.fiber_g ?? null,
-      sugar_g: item.sugar_g ?? null,
-    }
-
-    let next = normalizeDiscreteItem(base)
+  const finalizeIngredientItem = (input: any) => {
+    let next = normalizeDiscreteItem({ ...input })
 
     const { gramsPerServing, mlPerServing, ozPerServing } = quickParseServingSize(next?.serving_size)
     if (!next.weightUnit) {
@@ -4822,6 +4814,176 @@ export default function FoodDiary() {
     }
 
     return next
+  }
+
+  const buildOfficialItem = (item: any, servingsOverride?: number | null) => {
+    const base = {
+      name: item.name || 'Unknown food',
+      brand: item.brand ?? null,
+      serving_size: item.serving_size || '',
+      servings:
+        Number.isFinite(Number(servingsOverride)) && Number(servingsOverride) > 0
+          ? Number(servingsOverride)
+          : 1,
+      calories: item.calories ?? null,
+      protein_g: item.protein_g ?? null,
+      carbs_g: item.carbs_g ?? null,
+      fat_g: item.fat_g ?? null,
+      fiber_g: item.fiber_g ?? null,
+      sugar_g: item.sugar_g ?? null,
+    }
+
+    return finalizeIngredientItem(base)
+  }
+
+  const getItemServings = (item: any) =>
+    Number.isFinite(Number(item?.servings)) && Number(item?.servings) > 0 ? Number(item.servings) : 1
+
+  const buildItemFromFavoriteSource = (source: any, servingsOverride?: number | null) => {
+    if (!source) return null
+    const rawItems = (() => {
+      if (Array.isArray(source?.items)) return source.items
+      if (typeof source?.items === 'string') {
+        try {
+          const parsed = JSON.parse(String(source.items))
+          return Array.isArray(parsed) ? parsed : null
+        } catch {
+          return null
+        }
+      }
+      return null
+    })()
+
+    const servings = Number.isFinite(Number(servingsOverride)) && Number(servingsOverride) > 0 ? Number(servingsOverride) : 1
+
+    if (Array.isArray(rawItems) && rawItems.length === 1) {
+      const cloned = JSON.parse(JSON.stringify(rawItems[0]))
+      const base = { ...cloned, servings }
+      return finalizeIngredientItem(base)
+    }
+
+    const totals = getEntryTotals(source)
+    const label =
+      favoriteDisplayLabel(source) ||
+      applyFoodNameOverride(source?.label || source?.description || source?.favorite?.label || 'Favorite', source) ||
+      'Favorite'
+    const base = {
+      name: label,
+      brand: null,
+      serving_size: '1 serving',
+      servings,
+      calories: totals?.calories ?? null,
+      protein_g: totals?.protein ?? null,
+      carbs_g: totals?.carbs ?? null,
+      fat_g: totals?.fat ?? null,
+      fiber_g: totals?.fiber ?? null,
+      sugar_g: totals?.sugar ?? null,
+    }
+    return finalizeIngredientItem(base)
+  }
+
+  const buildItemFromBarcodeFood = (food: any, code?: string, servingsOverride?: number | null) => {
+    if (!food) return null
+    const base = buildBarcodeIngredientItem(food, code)
+    const servings = Number.isFinite(Number(servingsOverride)) && Number(servingsOverride) > 0 ? Number(servingsOverride) : 1
+    return finalizeIngredientItem({ ...base, servings })
+  }
+
+  const replaceIngredientAtIndex = (index: number, nextItem: any, toastLabel?: string) => {
+    if (!nextItem || index === null || index === undefined) return
+    const itemsCopy = [...analyzedItems]
+    if (!itemsCopy[index]) return
+    itemsCopy[index] = nextItem
+    setAnalyzedItems(itemsCopy)
+    applyRecalculatedNutrition(itemsCopy)
+    if (editingEntry) {
+      try {
+        const updatedNutrition = recalculateNutritionFromItems(itemsCopy)
+        const updatedEntry = {
+          ...editingEntry,
+          items: itemsCopy,
+          nutrition: updatedNutrition,
+          total: convertTotalsForStorage(updatedNutrition),
+        }
+        setEditingEntry(updatedEntry)
+        setTodaysFoods((prev) => prev.map((food) => (food.id === editingEntry.id ? updatedEntry : food)))
+      } catch {}
+    }
+    if (toastLabel) showQuickToast(toastLabel)
+  }
+
+  const replaceIngredientFromFavoriteSource = (source: any, index: number) => {
+    if (!source || index === null || index === undefined) return
+    const currentServings = getItemServings(analyzedItems?.[index])
+    const nextItem = buildItemFromFavoriteSource(source, currentServings)
+    if (!nextItem) {
+      showQuickToast('Could not use that favorite')
+      return
+    }
+    nextItem.dbLocked = true
+    replaceIngredientAtIndex(index, nextItem, `Updated to ${nextItem.name}`)
+  }
+
+  const replaceIngredientFromBarcodeFood = (food: any, code: string, index: number) => {
+    if (!food || index === null || index === undefined) return
+    const currentServings = getItemServings(analyzedItems?.[index])
+    const nextItem = buildItemFromBarcodeFood(food, code, currentServings)
+    if (!nextItem) {
+      showQuickToast('Could not use that barcode')
+      return
+    }
+    nextItem.dbLocked = true
+    replaceIngredientAtIndex(index, nextItem, `Updated to ${nextItem.name}`)
+  }
+
+  const addFavoriteIngredientToAnalysis = (source: any) => {
+    if (!source) return
+    const nextItem = buildItemFromFavoriteSource(source, 1)
+    if (!nextItem) {
+      showQuickToast('Could not use that favorite')
+      return
+    }
+    const next = [...analyzedItems, nextItem]
+    setAnalyzedItems(next)
+    applyRecalculatedNutrition(next)
+    if (editingEntry) {
+      try {
+        const updatedNutrition = recalculateNutritionFromItems(next)
+        const updatedEntry = {
+          ...editingEntry,
+          items: next,
+          nutrition: updatedNutrition,
+          total: convertTotalsForStorage(updatedNutrition),
+        }
+        setEditingEntry(updatedEntry)
+        setTodaysFoods((prev) => prev.map((food) => (food.id === editingEntry.id ? updatedEntry : food)))
+      } catch {}
+    }
+  }
+
+  const addBarcodeIngredientToAnalysis = (food: any, code: string) => {
+    if (!food) return
+    const nextItem = buildItemFromBarcodeFood(food, code, 1)
+    if (!nextItem) {
+      showQuickToast('Could not use that barcode')
+      return
+    }
+    const next = [...analyzedItems, nextItem]
+    setAnalyzedItems(next)
+    applyRecalculatedNutrition(next)
+    if (editingEntry) {
+      try {
+        const updatedNutrition = recalculateNutritionFromItems(next)
+        const updatedEntry = {
+          ...editingEntry,
+          items: next,
+          nutrition: updatedNutrition,
+          total: convertTotalsForStorage(updatedNutrition),
+        }
+        setEditingEntry(updatedEntry)
+        setTodaysFoods((prev) => prev.map((food) => (food.id === editingEntry.id ? updatedEntry : food)))
+      } catch {}
+    }
   }
 
   const replaceIngredientFromOfficial = async (item: any, index: number) => {
@@ -7254,6 +7416,58 @@ const applyStructuredItems = (
     }
   }
 
+  const handleReplacePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    const targetIndex = photoReplaceTargetRef.current
+    if (!file || targetIndex === null || targetIndex === undefined) return
+    setReplacePhotoLoading(true)
+    setReplacePhotoError(null)
+    try {
+      const preserveLabelDetail = officialSource === 'packaged'
+      const compressedFile = preserveLabelDetail ? file : await compressImage(file, 1024, 0.85)
+      const formData = new FormData()
+      formData.append('image', compressedFile)
+      formData.append('analysisMode', preserveLabelDetail ? 'packaged' : 'meal')
+      formData.append('forceFresh', '1')
+      const response = await fetch('/api/analyze-food', {
+        method: 'POST',
+        body: formData,
+      })
+      if (response.status === 402) {
+        const errorData = await response.json().catch(() => null)
+        const msg = errorData?.message || errorData?.error || 'Not enough credits to analyze that photo.'
+        setReplacePhotoError(msg)
+        return
+      }
+      if (response.status === 401) {
+        setReplacePhotoError('Please sign in to analyze a photo.')
+        return
+      }
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        throw new Error(text || 'Photo analysis failed')
+      }
+      const result = await response.json()
+      const items = Array.isArray(result?.items) ? result.items : []
+      if (items.length === 0) {
+        setReplacePhotoError('No food detected in that photo. Try a clearer photo or use search.')
+        return
+      }
+      const currentServings = getItemServings(analyzedItems?.[targetIndex])
+      const base = { ...items[0], servings: currentServings }
+      const nextItem = finalizeIngredientItem(base)
+      nextItem.dbLocked = true
+      replaceIngredientAtIndex(targetIndex, nextItem, `Updated to ${nextItem.name}`)
+    } catch (err) {
+      console.error('Replace photo analysis failed', err)
+      setReplacePhotoError('Photo analysis failed. Please try again.')
+    } finally {
+      setReplacePhotoLoading(false)
+      photoReplaceTargetRef.current = null
+      if (replacePhotoInputRef.current) replacePhotoInputRef.current.value = ''
+    }
+  }
+
   const parseServingSizeInfo = (item: any) => {
     const raw = (item?.serving_size && String(item.serving_size)) || ''
     const parseRange = (pattern: RegExp, factor = 1) => {
@@ -8419,7 +8633,7 @@ Please add nutritional information manually if needed.`);
     setHealthAlternatives(null)
     setShowAiResult(true)
     setShowAddFood(true)
-    setShowFavoritesPicker(false)
+    closeFavoritesPicker()
     setEntryTime('')
 
     // Prompt the official search modal immediately so the user can start adding ingredients.
@@ -10234,6 +10448,8 @@ Please add nutritional information manually if needed.`);
     setBarcodeError(null)
     setBarcodeValue('')
     setShowManualBarcodeInput(false)
+    barcodeReplaceTargetRef.current = null
+    barcodeActionRef.current = null
     resetTorchState()
   }
 
@@ -10592,6 +10808,8 @@ Please add nutritional information manually if needed.`);
       return
     }
     if (barcodeLookupInFlightRef.current) return
+    const replaceIndex = barcodeReplaceTargetRef.current
+    const actionMode = barcodeActionRef.current
     barcodeLookupInFlightRef.current = true
     setBarcodeStatus('loading')
     setBarcodeError(null)
@@ -10601,14 +10819,20 @@ Please add nutritional information manually if needed.`);
         const data = await res.json().catch(() => null)
         setBarcodeStatus('idle')
         setBarcodeError(null)
-        setShowBarcodeScanner(false)
-        setBarcodeLabelFlow({
-          barcode: normalized,
-          reason: 'missing',
-          productName: data?.product?.name || null,
-          brand: data?.product?.brand || null,
-        })
-        setShowBarcodeLabelPrompt(true)
+        if (replaceIndex !== null && replaceIndex !== undefined) {
+          setBarcodeError('No food found for this barcode. Try again or use photo.')
+          setBarcodeStatus('scanning')
+          startBarcodeScanner()
+        } else {
+          setShowBarcodeScanner(false)
+          setBarcodeLabelFlow({
+            barcode: normalized,
+            reason: 'missing',
+            productName: data?.product?.name || null,
+            brand: data?.product?.brand || null,
+          })
+          setShowBarcodeLabelPrompt(true)
+        }
         return
       }
       if (res.status === 402) {
@@ -10625,14 +10849,20 @@ Please add nutritional information manually if needed.`);
         const data = await res.json().catch(() => null)
         setBarcodeStatus('idle')
         setBarcodeError(null)
-        setShowBarcodeScanner(false)
-        setBarcodeLabelFlow({
-          barcode: normalized,
-          reason: 'missing',
-          productName: data?.product?.name || null,
-          brand: data?.product?.brand || null,
-        })
-        setShowBarcodeLabelPrompt(true)
+        if (replaceIndex !== null && replaceIndex !== undefined) {
+          setBarcodeError('No food found for this barcode. Try again or use photo.')
+          setBarcodeStatus('scanning')
+          startBarcodeScanner()
+        } else {
+          setShowBarcodeScanner(false)
+          setBarcodeLabelFlow({
+            barcode: normalized,
+            reason: 'missing',
+            productName: data?.product?.name || null,
+            brand: data?.product?.brand || null,
+          })
+          setShowBarcodeLabelPrompt(true)
+        }
         return
       }
       if (res.status === 401) {
@@ -10651,10 +10881,18 @@ Please add nutritional information manually if needed.`);
         startBarcodeScanner()
         return
       }
-      await insertBarcodeFoodIntoDiary(data.food, normalized)
+      if (replaceIndex !== null && replaceIndex !== undefined) {
+        replaceIngredientFromBarcodeFood(data.food, normalized, replaceIndex)
+        barcodeReplaceTargetRef.current = null
+      } else if (actionMode === 'analysis') {
+        addBarcodeIngredientToAnalysis(data.food, normalized)
+      } else {
+        await insertBarcodeFoodIntoDiary(data.food, normalized)
+      }
       setShowBarcodeScanner(false)
       setBarcodeValue('')
       setShowManualBarcodeInput(false)
+      barcodeActionRef.current = null
     } catch (err) {
       console.error('Barcode lookup failed', err)
       setBarcodeError('Could not find a match. Please rescan or type the code.')
@@ -11235,7 +11473,7 @@ Please add nutritional information manually if needed.`);
       setPhotoOptionsAnchor(null)
       setShowAddFood(false)
       setShowPhotoOptions(false)
-      setShowFavoritesPicker(false)
+      closeFavoritesPicker()
       endDiaryMutation()
     }
   }
@@ -11315,6 +11553,12 @@ Please add nutritional information manually if needed.`);
       }
     } catch {}
     showQuickToast('Added to favorites')
+  }
+
+  const closeFavoritesPicker = () => {
+    setShowFavoritesPicker(false)
+    favoritesReplaceTargetRef.current = null
+    favoritesActionRef.current = null
   }
 
   const insertFavoriteIntoDiary = async (favorite: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
@@ -11400,7 +11644,7 @@ Please add nutritional information manually if needed.`);
     updateTodaysFoodsForDate(updatedFoods, selectedDate)
     triggerHaptic(10)
     queueScrollToDiaryEntry({ entryKey: pendingEntry.id, category })
-    setShowFavoritesPicker(false)
+    closeFavoritesPicker()
     setShowPhotoOptions(false)
     setShowAddFood(false)
     setQuickToast(`Adding to ${categoryLabel(category)}...`)
@@ -13819,6 +14063,46 @@ Please add nutritional information manually if needed.`);
                         Single food
                       </button>
                     </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddIngredientModal(false)
+                          barcodeReplaceTargetRef.current = null
+                          barcodeActionRef.current = addIngredientContextRef.current?.mode === 'analysis' ? 'analysis' : 'diary'
+                          setShowBarcodeScanner(true)
+                          setBarcodeError(null)
+                          setBarcodeValue('')
+                        }}
+                        className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                      >
+                        Scan barcode
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddIngredientModal(false)
+                          favoritesReplaceTargetRef.current = null
+                          favoritesActionRef.current = addIngredientContextRef.current?.mode === 'analysis' ? 'analysis' : 'diary'
+                          setShowFavoritesPicker(true)
+                        }}
+                        className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                      >
+                        Add from favorites
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddIngredientModal(false)
+                          try {
+                            selectPhotoInputRef.current?.click()
+                          } catch {}
+                        }}
+                        className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                      >
+                        Add by photo
+                      </button>
+                    </div>
                   </div>
 	                  <p className="text-xs text-gray-500">
 	                    Single food searches use USDA. Packaged searches use FatSecret + OpenFoodFacts. Plurals are OK — we auto-try the single word.
@@ -14403,6 +14687,8 @@ Please add nutritional information manually if needed.`);
 	                    onClick={() => {
 	                      setShowPhotoOptions(false);
                       setPhotoOptionsAnchor(null);
+                      favoritesReplaceTargetRef.current = null;
+                      favoritesActionRef.current = 'diary';
                       setShowFavoritesPicker(true);
                     }}
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -14426,6 +14712,8 @@ Please add nutritional information manually if needed.`);
                     onClick={() => {
                       setShowPhotoOptions(false);
                       setPhotoOptionsAnchor(null);
+                      barcodeReplaceTargetRef.current = null;
+                      barcodeActionRef.current = 'diary';
                       setShowBarcodeScanner(true);
                       setBarcodeError(null);
                       setBarcodeValue('');
@@ -14520,6 +14808,13 @@ Please add nutritional information manually if needed.`);
             handlePhotoUpload(e);
             setPendingPhotoPicker(false);
           }}
+        />
+        <input
+          ref={replacePhotoInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleReplacePhotoUpload}
         />
 
         {/* Mode chooser modal immediately after photo selection */}
@@ -16580,7 +16875,52 @@ Please add nutritional information manually if needed.`);
                               Single food
                             </button>
                           </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              disabled={replacePhotoLoading || editingItemIndex === null || editingItemIndex === undefined}
+                              onClick={() => {
+                                if (editingItemIndex === null || editingItemIndex === undefined) return
+                                setReplacePhotoError(null)
+                                photoReplaceTargetRef.current = editingItemIndex
+                                replacePhotoInputRef.current?.click()
+                              }}
+                              className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                            >
+                              {replacePhotoLoading ? 'Analyzing…' : 'Add by photo'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={editingItemIndex === null || editingItemIndex === undefined}
+                              onClick={() => {
+                                if (editingItemIndex === null || editingItemIndex === undefined) return
+                                barcodeReplaceTargetRef.current = editingItemIndex
+                                barcodeActionRef.current = null
+                                setShowBarcodeScanner(true)
+                                setBarcodeError(null)
+                                setBarcodeValue('')
+                              }}
+                              className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                            >
+                              Scan barcode
+                            </button>
+                            <button
+                              type="button"
+                              disabled={editingItemIndex === null || editingItemIndex === undefined}
+                              onClick={() => {
+                                if (editingItemIndex === null || editingItemIndex === undefined) return
+                                favoritesReplaceTargetRef.current = editingItemIndex
+                                favoritesActionRef.current = null
+                                setShowFavoritesPicker(true)
+                              }}
+                              className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                            >
+                              Add from favorites
+                            </button>
+                          </div>
                         </div>
+                        {replacePhotoError && <div className="mt-2 text-xs text-red-600">{replacePhotoError}</div>}
                         {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
                         {officialLoading && <div className="mt-3 text-xs text-gray-500">Searching…</div>}
                         {!officialLoading && !officialError && officialResults.length > 0 && (
@@ -18279,6 +18619,8 @@ Please add nutritional information manually if needed.`);
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
+                                          favoritesReplaceTargetRef.current = null;
+                                          favoritesActionRef.current = 'diary';
                                           setShowFavoritesPicker(true);
                                         }}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -18435,6 +18777,8 @@ Please add nutritional information manually if needed.`);
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
                                           setSelectedAddCategory(cat.key)
+                                          barcodeReplaceTargetRef.current = null;
+                                          barcodeActionRef.current = 'diary';
                                           setShowBarcodeScanner(true);
                                           setBarcodeError(null);
                                           setBarcodeValue('');
@@ -18613,6 +18957,8 @@ Please add nutritional information manually if needed.`);
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
+                                          favoritesReplaceTargetRef.current = null;
+                                          favoritesActionRef.current = 'diary';
                                           setShowFavoritesPicker(true);
                                         }}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -18769,6 +19115,8 @@ Please add nutritional information manually if needed.`);
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
                                           setSelectedAddCategory(cat.key);
+                                          barcodeReplaceTargetRef.current = null;
+                                          barcodeActionRef.current = 'diary';
                                           setShowBarcodeScanner(true);
                                           setBarcodeError(null);
                                           setBarcodeValue('');
@@ -18901,11 +19249,18 @@ Please add nutritional information manually if needed.`);
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
                 <div>
                   <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
-                  <div className="text-sm text-gray-600">Insert into {categoryLabel(selectedAddCategory)}</div>
+                  <div className="text-sm text-gray-600">
+                    {(() => {
+                      const replaceIndex = favoritesReplaceTargetRef.current
+                      if (replaceIndex !== null && replaceIndex !== undefined) return 'Replace this ingredient'
+                      if (favoritesActionRef.current === 'analysis') return 'Add to this meal'
+                      return `Insert into ${categoryLabel(selectedAddCategory)}`
+                    })()}
+                  </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowFavoritesPicker(false)}
+                  onClick={closeFavoritesPicker}
                   className="p-2 rounded-full hover:bg-gray-100"
                 >
                   <span aria-hidden>✕</span>
@@ -18938,7 +19293,15 @@ Please add nutritional information manually if needed.`);
                       <button
                         type="button"
                         onClick={() => {
-                          setShowFavoritesPicker(false)
+                          const replaceIndex = favoritesReplaceTargetRef.current
+                          if (replaceIndex !== null && replaceIndex !== undefined) {
+                            barcodeReplaceTargetRef.current = replaceIndex
+                            barcodeActionRef.current = null
+                          } else {
+                            barcodeReplaceTargetRef.current = null
+                            barcodeActionRef.current = 'diary'
+                          }
+                          closeFavoritesPicker()
                           setShowBarcodeScanner(true)
                           setBarcodeError(null)
                           setBarcodeValue('')
@@ -19021,6 +19384,18 @@ Please add nutritional information manually if needed.`);
                         const tag = item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom')
                         const serving = item?.serving || '1 serving'
                         const handleSelect = () => {
+                          const source = item.favorite || item.entry || item
+                          const replaceIndex = favoritesReplaceTargetRef.current
+                          if (replaceIndex !== null && replaceIndex !== undefined) {
+                            replaceIngredientFromFavoriteSource(source, replaceIndex)
+                            closeFavoritesPicker()
+                            return
+                          }
+                          if (favoritesActionRef.current === 'analysis') {
+                            addFavoriteIngredientToAnalysis(source)
+                            closeFavoritesPicker()
+                            return
+                          }
                           if (item.favorite) {
                             insertFavoriteIntoDiary(item.favorite, selectedAddCategory)
                           } else if (item.entry) {
@@ -19118,7 +19493,7 @@ Please add nutritional information manually if needed.`);
                                       if (isCustomMealFavorite(fav)) {
                                         const favCategory =
                                           (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
-                                        setShowFavoritesPicker(false)
+                                        closeFavoritesPicker()
                                         router.push(
                                           `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
                                             favCategory,
@@ -19142,7 +19517,7 @@ Please add nutritional information manually if needed.`);
                                         if (!newFavId) return
                                         const favCategory =
                                           normalizeCategory(entry?.meal || entry?.category || entry?.mealType || selectedAddCategory)
-                                        setShowFavoritesPicker(false)
+                                        closeFavoritesPicker()
                                         router.push(
                                           `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
                                             favCategory,
