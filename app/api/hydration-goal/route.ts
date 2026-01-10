@@ -127,7 +127,7 @@ export async function GET(_req: NextRequest) {
     heightCm: typeof user.height === 'number' ? user.height : null,
     gender: (user as any)?.gender ?? null,
     bodyType: (user as any)?.bodyType ?? null,
-    exerciseFrequency: exerciseOverride ?? user.exerciseFrequency || '',
+    exerciseFrequency: exerciseOverride ?? (user.exerciseFrequency || ''),
     exerciseTypes: user.exerciseTypes || [],
     dietTypes,
     diabetesType,
