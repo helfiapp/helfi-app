@@ -377,8 +377,8 @@ export default function WaterIntakePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f7f6] dark:bg-[#151d15]">
-      <div className="max-w-md mx-auto min-h-screen flex flex-col shadow-xl bg-[#f6f7f6] dark:bg-[#151d15]">
+    <div className="min-h-[100dvh] bg-[#f6f7f6] dark:bg-[#151d15] overflow-x-hidden">
+      <div className="max-w-md mx-auto min-h-[100dvh] flex flex-col shadow-xl bg-[#f6f7f6] dark:bg-[#151d15] overflow-x-hidden">
         <div className="flex items-center p-4 pb-2 justify-between sticky top-0 z-10 bg-[#f6f7f6] dark:bg-[#151d15]">
           <button
             type="button"
@@ -541,13 +541,19 @@ export default function WaterIntakePage() {
           <div className="flex gap-3">
             <div className="flex-1 relative">
               <input
-                className="w-full h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-4 text-sm focus:ring-[#62b763] focus:border-[#62b763] dark:text-white"
+                className="w-full h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-4 text-base focus:ring-[#62b763] focus:border-[#62b763] dark:text-white"
                 placeholder="0"
                 type="number"
+                inputMode="decimal"
+                enterKeyHint="done"
                 min="0"
                 step="0.1"
                 value={customAmountInput}
                 onChange={(e) => setCustomAmountInput(e.target.value)}
+                onFocus={(e) => {
+                  setCustomAmountInput('')
+                  e.currentTarget.select()
+                }}
               />
               <div ref={customUnitRef} className="absolute right-2 top-2">
                 <button
@@ -557,7 +563,7 @@ export default function WaterIntakePage() {
                   aria-expanded={showCustomUnitPicker}
                   aria-haspopup="listbox"
                 >
-                  {customUnit.toUpperCase()}
+                  {customUnit === 'ml' ? 'ml' : customUnit === 'l' ? 'L' : 'oz'}
                 </button>
                 {showCustomUnitPicker && (
                   <div className="absolute right-0 mt-1 w-16 rounded-md border border-gray-200 bg-white shadow-lg text-xs text-gray-600 z-10">
@@ -571,7 +577,7 @@ export default function WaterIntakePage() {
                         }}
                         className="block w-full px-2 py-1 text-left hover:bg-gray-50"
                       >
-                        {unit.toUpperCase()}
+                        {unit === 'l' ? 'L' : unit}
                       </button>
                     ))}
                   </div>
@@ -721,7 +727,7 @@ export default function WaterIntakePage() {
               </div>
               <div className="flex flex-col items-center gap-1">
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-normal leading-relaxed text-center max-w-[280px]">
-                  Auto-calculated from your profile. You can adjust any time.
+                  Based on your weight, activity, and goals. We add small adjustments for diet and exercise.
                 </p>
                 <button type="button" onClick={resetGoal} className="text-[#62b763] text-sm font-semibold mt-2 hover:underline">
                   Reset to recommended
