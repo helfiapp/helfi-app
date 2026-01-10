@@ -16008,20 +16008,13 @@ Please add nutritional information manually if needed.`);
                                   className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                   title="Expand"
                                 >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
+                                  <span className="material-symbols-outlined text-[20px]">expand_more</span>
                                 </button>
                               </div>
                             ) : (
                               <div className="flex flex-col mb-3">
                                 <div className="flex items-center justify-end">
-                                  <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 shadow-sm">
+                                  <div className="flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-sm">
                                     <button
                                       type="button"
                                       onClick={() => handleItemThumb(index, 'up')}
@@ -16032,7 +16025,7 @@ Please add nutritional information manually if needed.`);
                                       }`}
                                       title="Thumbs up"
                                     >
-                                      <HandThumbUpIcon className="w-5 h-5" />
+                                      <span className="material-symbols-outlined text-[20px]">thumb_up</span>
                                     </button>
                                     <button
                                       type="button"
@@ -16044,48 +16037,39 @@ Please add nutritional information manually if needed.`);
                                       }`}
                                       title="Thumbs down"
                                     >
-                                      <HandThumbDownIcon className="w-5 h-5" />
+                                      <span className="material-symbols-outlined text-[20px]">thumb_down</span>
                                     </button>
-                                  </div>
-                                  <button
-                                    onClick={() => {
-                                      setEditingItemIndex(index);
-                                      setShowItemEditModal(true);
-                                    }}
-                                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
-                                    title="Adjust details"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteItem(index)}
-                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                                    title="Delete ingredient"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-7 0l1 12a2 2 0 002 2h2a2 2 0 002-2l1-12" />
-                                    </svg>
-                                  </button>
-                                  {isMultiIngredient && (
+                                    <div className="w-px h-4 bg-slate-200 mx-1" />
                                     <button
                                       onClick={() => {
-                                        toggleExpand()
+                                        setEditingItemIndex(index);
+                                        setShowItemEditModal(true);
                                       }}
-                                      className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors"
-                                      title={isExpanded ? 'Collapse' : 'Expand'}
+                                      className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                                      title="Adjust details"
                                     >
-                                      <svg
-                                        className={`w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                      </svg>
+                                      <span className="material-symbols-outlined text-[20px]">edit</span>
                                     </button>
-                                  )}
+                                    <button
+                                      onClick={() => handleDeleteItem(index)}
+                                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                      title="Delete ingredient"
+                                    >
+                                      <span className="material-symbols-outlined text-[20px]">delete</span>
+                                    </button>
+                                    <div className="w-px h-4 bg-slate-200 mx-1" />
+                                    {isMultiIngredient && (
+                                      <button
+                                        onClick={() => {
+                                          toggleExpand()
+                                        }}
+                                        className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors"
+                                        title={isExpanded ? 'Collapse' : 'Expand'}
+                                      >
+                                        <span className="material-symbols-outlined text-[20px]">unfold_less</span>
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="font-semibold text-slate-900 text-lg mt-2 break-words">
                                   {displayName}
