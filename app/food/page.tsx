@@ -15846,7 +15846,13 @@ Please add nutritional information manually if needed.`);
                           + Add ingredient
                         </button>
                       </div>
-                      <div className="mt-3">
+                      <div
+                        className={`mt-3 ${
+                          analyzedItems.length > 1 && expandedItemIndex === null
+                            ? 'rounded-2xl border border-gray-200 bg-white overflow-hidden'
+                            : ''
+                        }`}
+                      >
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
                         const macroMultiplier = macroMultiplierForItem(item)
@@ -15975,6 +15981,7 @@ Please add nutritional information manually if needed.`);
                         
                         const cardPaddingClass =
                           isCollapsed ? 'py-2 px-5' : 'p-5'
+                        const isGroupedCollapsed = isCollapsed && analyzedItems.length > 1 && expandedItemIndex === null
 
                         return (
                           <div
@@ -15982,7 +15989,11 @@ Please add nutritional information manually if needed.`);
                             data-analysis-ingredient-card="1"
                             className={`${
                               isCollapsed
-                                ? `bg-white border-gray-200 ${cardPaddingClass} border-b ${index === 0 ? 'border-t' : ''} rounded-none cursor-pointer`
+                                ? isGroupedCollapsed
+                                  ? `bg-white ${cardPaddingClass} ${
+                                      index < analyzedItems.length - 1 ? 'border-b border-gray-200' : ''
+                                    } cursor-pointer`
+                                  : `bg-white border-gray-200 ${cardPaddingClass} border-b ${index === 0 ? 'border-t' : ''} rounded-none cursor-pointer`
                                 : `bg-white border border-slate-100 shadow-sm ${cardPaddingClass} rounded-2xl`
                             } overflow-hidden min-w-0`}
                             role={isCollapsed ? 'button' : undefined}
