@@ -27,6 +27,7 @@ Before pushing ANY code changes to GitHub, you MUST:
      - Change goal on device A → refresh device B → both must match before claiming success.
 6. ✅ **Guard Rails Update**:
    - If your change prevents a regression or defines a critical rule, add it to `GUARD_RAILS.md`.
+   - When locking a section, record the last stable deployment commit ID and date in `GUARD_RAILS.md`.
 
 ## Why This Matters
 

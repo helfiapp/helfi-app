@@ -293,6 +293,7 @@ Agents must not modify these rules without explicit user approval.
 
 **Guard rails:**
 - Reports are generated **in the background** and should not run on every page visit or whenever the app is opened.
+- Health Insights pages and the weekly report UI are **locked**. Do not change without written owner approval.
 - The **ready alert is scheduled for 12:00 pm in the user’s time zone**. Do not change this timing without explicit user approval.
 - Time zone is resolved in this order: Check‑in settings → Mood reminders → AI tips → fallback UTC. Do not reorder without approval.
 - The popup should appear **at most once per day** until the report is viewed or dismissed.
