@@ -682,11 +682,21 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
               <Link href="/check-in" className="block">
               <div className="bg-transparent md:bg-emerald-50 p-5 md:p-6 rounded-2xl border border-gray-200 md:border-2 md:border-emerald-200 hover:md:border-emerald-300 shadow-none transition-colors">
                 <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">✅ Daily Check-In</h3>
                 <p className="text-[13px] text-gray-600">Rate your health issues for today</p>
+                <div className="mt-3">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">Active</span>
+                </div>
+              </div>
+              </Link>
+
+              <Link href="/mood" className="block">
+              <div className="bg-transparent md:bg-amber-50 p-5 md:p-6 rounded-2xl border border-gray-200 md:border-2 md:border-amber-200 hover:md:border-amber-300 shadow-none transition-colors">
+                <h3 className="text-[17px] font-semibold text-helfi-black dark:text-white mb-1.5">😊 Mood Tracker</h3>
+                <p className="text-[13px] text-gray-600">Track your mood and patterns</p>
                 <div className="mt-3">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">Active</span>
                 </div>
