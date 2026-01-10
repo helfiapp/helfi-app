@@ -86,24 +86,22 @@ function getCustomGoal(user: any): { targetMl: number; updatedAt?: string | null
   }
 }
 
-async function getExerciseOverrideFrequency(userId: string, localDate: string | null) {
+async function getExerciseCaloriesForDate(userId: string, localDate: string | null) {
   if (!localDate) return null
   const entries = await prisma.exerciseEntry.findMany({
     where: { userId, localDate },
-    select: { durationMinutes: true, calories: true },
+    select: { calories: true },
   })
   if (entries.length === 0) return null
-
-  const totalMinutes = entries.reduce((sum, entry) => sum + (Number(entry.durationMinutes) || 0), 0)
   const totalCalories = entries.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0)
+  if (!Number.isFinite(totalCalories) || totalCalories <= 0) return null
+  return Math.round(totalCalories)
+}
 
-  if (totalMinutes >= 45) return '5'
-  if (totalMinutes >= 20) return '3'
-  if (totalMinutes > 0) return '1'
-  if (totalCalories >= 600) return '5'
-  if (totalCalories >= 300) return '3'
-  if (totalCalories > 0) return '1'
-  return null
+function exerciseCaloriesToBonusMl(calories: number | null) {
+  if (!Number.isFinite(calories || NaN) || (calories as number) <= 0) return 0
+  const raw = Math.round(calories as number)
+  return Math.min(raw, 1500)
 }
 
 export async function GET(_req: NextRequest) {
@@ -121,13 +119,14 @@ export async function GET(_req: NextRequest) {
   const birthdate = parseBirthdate(user)
   const primaryGoal = parsePrimaryGoal(user)
   const localDate = normalizeLocalDate(_req.nextUrl.searchParams.get('date'))
-  const exerciseOverride = await getExerciseOverrideFrequency(user.id, localDate)
+  const exerciseCalories = await getExerciseCaloriesForDate(user.id, localDate)
+  const exerciseBonusMl = exerciseCaloriesToBonusMl(exerciseCalories)
   const recommended = computeHydrationGoal({
     weightKg: typeof user.weight === 'number' ? user.weight : null,
     heightCm: typeof user.height === 'number' ? user.height : null,
     gender: (user as any)?.gender ?? null,
     bodyType: (user as any)?.bodyType ?? null,
-    exerciseFrequency: exerciseOverride ?? (user.exerciseFrequency || ''),
+    exerciseFrequency: '',
     exerciseTypes: user.exerciseTypes || [],
     dietTypes,
     diabetesType,
@@ -136,15 +135,19 @@ export async function GET(_req: NextRequest) {
     birthdate,
   })
 
+  const recommendedWithBonus = exerciseBonusMl
+    ? Math.round((recommended.targetMl + exerciseBonusMl) / 50) * 50
+    : recommended.targetMl
   const custom = getCustomGoal(user)
-  const targetMl = custom?.targetMl ?? recommended.targetMl
+  const targetMl = custom?.targetMl ?? recommendedWithBonus
   const source = custom ? 'custom' : 'auto'
 
   return NextResponse.json({
     targetMl,
-    recommendedMl: recommended.targetMl,
+    recommendedMl: recommendedWithBonus,
     source,
     updatedAt: custom?.updatedAt ?? null,
+    exerciseBonusMl,
   })
 }
 

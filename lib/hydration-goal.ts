@@ -43,18 +43,6 @@ function calculateAgeYears(birthdate?: string | null): number | null {
   return age
 }
 
-function parseExerciseDays(value?: string | null): number {
-  const raw = normalizeString(value).toLowerCase()
-  if (!raw) return 0
-  if (raw.includes('every')) return 7
-  const match = raw.match(/(\d+)/)
-  if (match) {
-    const n = Number(match[1])
-    if (Number.isFinite(n)) return clamp(n, 0, 7)
-  }
-  return 0
-}
-
 const DIET_GROUPS = {
   lowCarb: ['keto', 'keto-carnivore', 'low-carb', 'atkins', 'zero-carb', 'carnivore', 'lion'],
   highProtein: ['high-protein', 'bodybuilding', 'athlete', 'cutting-bulking'],
@@ -71,8 +59,6 @@ export function computeHydrationGoal(input: HydrationGoalInput): HydrationGoalRe
   const heightCm = Number.isFinite(input.heightCm || NaN) ? Number(input.heightCm) : null
   const gender = normalizeString(input.gender).toUpperCase()
   const bodyType = normalizeString(input.bodyType).toUpperCase()
-  const exerciseFrequency = normalizeString(input.exerciseFrequency)
-  const exerciseTypes = normalizeList(input.exerciseTypes).map((v) => v.toLowerCase())
   const dietTypes = normalizeList(input.dietTypes).map((v) => v.toLowerCase())
   const goalChoice = normalizeString(input.goalChoice).toLowerCase()
   const goalIntensity = normalizeString(input.goalIntensity).toLowerCase()
@@ -98,11 +84,6 @@ export function computeHydrationGoal(input: HydrationGoalInput): HydrationGoalRe
 
   if (gender === 'MALE') add('gender', 200)
 
-  const exerciseDays = parseExerciseDays(exerciseFrequency)
-  if (exerciseDays >= 5) add('exercise', 500)
-  if (exerciseDays >= 3 && exerciseDays < 5) add('exercise', 300)
-  if (exerciseDays >= 1 && exerciseDays < 3) add('exercise', 150)
-
   if (hasAnyDiet(dietSet, DIET_GROUPS.lowCarb)) add('dietLowCarb', 200)
   if (hasAnyDiet(dietSet, DIET_GROUPS.highProtein)) add('dietHighProtein', 150)
   if (hasAnyDiet(dietSet, DIET_GROUPS.plantBased)) add('dietPlantBased', 100)
@@ -126,8 +107,6 @@ export function computeHydrationGoal(input: HydrationGoalInput): HydrationGoalRe
     heightCm: heightCm ? Math.round(heightCm) : null,
     gender,
     bodyType,
-    exerciseFrequency: exerciseFrequency.toLowerCase(),
-    exerciseTypes: exerciseTypes.sort(),
     dietTypes: dietTypes.sort(),
     goalChoice,
     goalIntensity,

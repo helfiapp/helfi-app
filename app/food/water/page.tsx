@@ -21,6 +21,7 @@ type GoalResponse = {
   targetMl: number
   recommendedMl: number
   source: 'auto' | 'custom'
+  exerciseBonusMl?: number
   updatedAt?: string | null
 }
 
@@ -115,6 +116,7 @@ export default function WaterIntakePage() {
   const [goalTargetMl, setGoalTargetMl] = useState<number | null>(null)
   const [goalRecommendedMl, setGoalRecommendedMl] = useState<number | null>(null)
   const [goalSource, setGoalSource] = useState<'auto' | 'custom'>('auto')
+  const [goalExerciseBonusMl, setGoalExerciseBonusMl] = useState<number>(0)
   const [showGoalEditor, setShowGoalEditor] = useState(false)
   const [goalAmountInput, setGoalAmountInput] = useState('')
   const [goalUnit, setGoalUnit] = useState<'ml' | 'l' | 'oz'>('ml')
@@ -186,6 +188,7 @@ export default function WaterIntakePage() {
       setGoalTargetMl(typeof data?.targetMl === 'number' ? data.targetMl : null)
       setGoalRecommendedMl(typeof data?.recommendedMl === 'number' ? data.recommendedMl : null)
       setGoalSource(data?.source === 'custom' ? 'custom' : 'auto')
+      setGoalExerciseBonusMl(typeof data?.exerciseBonusMl === 'number' ? data.exerciseBonusMl : 0)
     } catch {
       // Keep any goal already loaded from cached user data.
     } finally {
@@ -477,6 +480,9 @@ export default function WaterIntakePage() {
                   <div className="h-full rounded-full bg-[#62b763]" style={{ width: `${progressPercent}%` }}></div>
                 </div>
               </div>
+              {goalExerciseBonusMl > 0 && goalSource === 'auto' && (
+                <p className="text-xs text-gray-500">Activity bonus: +{formatMl(goalExerciseBonusMl)} today</p>
+              )}
               <p className="text-gray-500 dark:text-gray-400 text-xs mt-3">
                 {entryCount} {entryCount === 1 ? 'entry' : 'entries'} logged today
                 {goalLoading ? ' - loading goal' : ''}
@@ -728,7 +734,7 @@ export default function WaterIntakePage() {
               </div>
               <div className="flex flex-col items-center gap-1">
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-normal leading-relaxed text-center max-w-[280px]">
-                  Based on your weight, activity, and goals. We add small adjustments for diet and exercise.
+                  Based on your profile. Exercise adds a daily bonus from logged calories.
                 </p>
                 <button type="button" onClick={resetGoal} className="text-[#62b763] text-sm font-semibold mt-2 hover:underline">
                   Reset to recommended
