@@ -285,6 +285,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                 const imageStackClass = `${segmentImages.length > 1 ? 'grid gap-4 sm:grid-cols-2' : 'grid gap-4'}${
                   segment.alignImageWithHeading ? ' mt-6' : ''
                 }`
+                const imageSizeClass = segment.imageSize === 'large' ? 'max-h-[560px]' : 'max-h-[520px]'
 
                 const textBlock = (
                   <div>
@@ -360,7 +361,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                                   width={image.width ?? 1450}
                                   height={image.height ?? 2936}
                                   sizes="(min-width: 1024px) 30vw, 90vw"
-                                  className="w-full h-auto max-h-[520px] object-contain"
+                                  className={`w-full h-auto ${imageSizeClass} object-contain`}
                                   loading="lazy"
                                 />
                               </div>

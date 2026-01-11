@@ -30,6 +30,7 @@ export type FeaturePageSegment = {
   images?: FeaturePageImage[]
   alignImageWithHeading?: boolean
   showImage?: boolean
+  imageSize?: 'default' | 'large'
 }
 
 export type FeaturePageContent = {
@@ -220,6 +221,7 @@ export const featurePages: FeaturePageContent[] = [
           height: 1742,
         },
         showImage: true,
+        imageSize: 'large',
       },
       {
         title: 'Check-ins and rating history',
