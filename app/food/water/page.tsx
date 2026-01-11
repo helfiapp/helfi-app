@@ -43,6 +43,16 @@ const QUICK_PRESETS = [
   { amount: 1, unit: 'l' },
 ] as const
 
+const SUGAR_UNITS = ['g', 'tsp', 'tbsp'] as const
+type SugarUnit = (typeof SUGAR_UNITS)[number]
+
+const sugarToGrams = (amount: number, unit: SugarUnit): number => {
+  if (!Number.isFinite(amount) || amount <= 0) return 0
+  if (unit === 'g') return amount
+  if (unit === 'tbsp') return amount * 12
+  return amount * 4
+}
+
 function todayLocalDate() {
   return formatLocalDate(new Date())
 }
@@ -118,6 +128,12 @@ export default function WaterIntakePage() {
   const [loadError, setLoadError] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [drinkDetail, setDrinkDetail] = useState<{ amount: number; unit: string } | null>(null)
+  const [drinkSugarChoice, setDrinkSugarChoice] = useState<'free' | 'sugar' | null>(null)
+  const [drinkSugarAmount, setDrinkSugarAmount] = useState('')
+  const [drinkSugarUnit, setDrinkSugarUnit] = useState<SugarUnit>('tsp')
+  const [drinkDetailError, setDrinkDetailError] = useState<string | null>(null)
+  const [drinkDetailSaving, setDrinkDetailSaving] = useState(false)
   const [activeDrink, setActiveDrink] = useState<(typeof DRINK_TYPES)[number]['id']>('Water')
   const [lastPresetKey, setLastPresetKey] = useState<string | null>(null)
 
@@ -270,11 +286,11 @@ export default function WaterIntakePage() {
     return () => window.removeEventListener('pointerdown', handlePointer)
   }, [showCustomUnitPicker])
 
-  const addEntry = async (amount: number, unit: string) => {
+  const addEntry = async (amount: number, unit: string, labelOverride?: string) => {
     setSaving(true)
     setBanner(null)
     try {
-      const label = activeDrink
+      const label = labelOverride || activeDrink
       const category =
         sourceCategory ||
         (() => {
@@ -325,9 +341,148 @@ export default function WaterIntakePage() {
     }
   }
 
+  const openDrinkDetail = (amount: number, unit: string) => {
+    setDrinkDetail({ amount, unit })
+    setDrinkSugarChoice(null)
+    setDrinkSugarAmount('')
+    setDrinkSugarUnit('tsp')
+    setDrinkDetailError(null)
+  }
+
+  const closeDrinkDetail = () => {
+    if (drinkDetailSaving) return
+    setDrinkDetail(null)
+    setDrinkSugarChoice(null)
+    setDrinkSugarAmount('')
+    setDrinkDetailError(null)
+  }
+
+  const addDrinkFoodLog = async (label: string, sugarGrams: number, displayAmount: number, displayUnit: SugarUnit) => {
+    const calories = Math.round(sugarGrams * 4)
+    const carbs = Math.round(sugarGrams * 10) / 10
+    const sugar = Math.round(sugarGrams * 10) / 10
+    const description = `${label} with sugar (${formatNumber(displayAmount)} ${displayUnit})`
+    const item = {
+      name: label,
+      brand: null,
+      serving_size: '1 serving',
+      servings: 1,
+      calories,
+      protein_g: 0,
+      carbs_g: carbs,
+      fat_g: 0,
+      fiber_g: 0,
+      sugar_g: sugar,
+    }
+    const category =
+      sourceCategory ||
+      (() => {
+        if (typeof window === 'undefined') return null
+        const params = new URLSearchParams(window.location.search)
+        return params.get('category')
+      })()
+    const res = await fetch('/api/food-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        description,
+        nutrition: { calories, protein: 0, carbs, fat: 0, fiber: 0, sugar },
+        items: [item],
+        localDate: selectedDate,
+        meal: category,
+        category,
+        allowDuplicate: true,
+      }),
+    })
+    if (!res.ok) throw new Error('food log failed')
+  }
+
+  const handleSugarFreeDrink = async () => {
+    if (!drinkDetail) return
+    setDrinkDetailSaving(true)
+    setDrinkDetailError(null)
+    try {
+      await addEntry(drinkDetail.amount, drinkDetail.unit)
+      closeDrinkDetail()
+    } catch {
+      setDrinkDetailError('Could not save this drink. Please try again.')
+    } finally {
+      setDrinkDetailSaving(false)
+    }
+  }
+
+  const handleSugarDrink = async () => {
+    if (!drinkDetail) return
+    const rawAmount = Number(drinkSugarAmount)
+    if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+      setDrinkDetailError('Enter a valid sugar amount.')
+      return
+    }
+    const sugarGrams = sugarToGrams(rawAmount, drinkSugarUnit)
+    if (sugarGrams <= 0) {
+      setDrinkDetailError('Enter a valid sugar amount.')
+      return
+    }
+    setDrinkDetailSaving(true)
+    setDrinkDetailError(null)
+    try {
+      const sugarLabel = `${activeDrink} (sugar ${formatNumber(rawAmount)} ${drinkSugarUnit})`
+      await addEntry(drinkDetail.amount, drinkDetail.unit, sugarLabel)
+      await addDrinkFoodLog(activeDrink, sugarGrams, rawAmount, drinkSugarUnit)
+      closeDrinkDetail()
+    } catch {
+      setDrinkDetailError('Could not save this drink. Please try again.')
+    } finally {
+      setDrinkDetailSaving(false)
+    }
+  }
+
+  const navigateDrinkNutrition = async (mode: 'barcode' | 'favorites' | 'photo' | 'search') => {
+    if (!drinkDetail) return
+    setDrinkDetailSaving(true)
+    setDrinkDetailError(null)
+    try {
+      await addEntry(drinkDetail.amount, drinkDetail.unit, activeDrink)
+      closeDrinkDetail()
+      const category = sourceCategory || 'uncategorized'
+      if (mode === 'photo') {
+        const qs = new URLSearchParams({
+          date: selectedDate,
+          category,
+        })
+        router.push(`/food/analysis?${qs.toString()}`)
+        return
+      }
+      if (mode === 'search') {
+        const qs = new URLSearchParams({
+          date: selectedDate,
+          category,
+          q: activeDrink.toLowerCase(),
+        })
+        router.push(`/food/add-ingredient?${qs.toString()}`)
+        return
+      }
+      const qs = new URLSearchParams({
+        open: mode,
+        date: selectedDate,
+        category,
+      })
+      router.push(`/food?${qs.toString()}`)
+    } catch {
+      setDrinkDetailError('Could not save this drink. Please try again.')
+    } finally {
+      setDrinkDetailSaving(false)
+    }
+  }
+
   const handleQuickAdd = (amount: number, unit: string) => {
     setLastPresetKey(`${amount}-${unit}`)
-    addEntry(amount, unit)
+    if (activeDrink === 'Water') {
+      addEntry(amount, unit)
+      return
+    }
+    openDrinkDetail(amount, unit)
   }
 
   const handleCustomAdd = () => {
@@ -336,7 +491,12 @@ export default function WaterIntakePage() {
       setBanner({ type: 'error', message: 'Enter a valid amount first.' })
       return
     }
-    addEntry(amount, customUnit)
+    if (activeDrink === 'Water') {
+      addEntry(amount, customUnit)
+      setCustomAmountInput('')
+      return
+    }
+    openDrinkDetail(amount, customUnit)
     setCustomAmountInput('')
   }
 
@@ -653,7 +813,8 @@ export default function WaterIntakePage() {
             )}
             {!loading && entries.map((entry) => {
               const label = normalizeLabel(entry.label)
-              const drinkConfig = DRINK_TYPES.find((drink) => drink.id.toLowerCase() === label.toLowerCase())
+              const baseLabel = label.replace(/\s*\(.*\)\s*$/, '').trim()
+              const drinkConfig = DRINK_TYPES.find((drink) => drink.id.toLowerCase() === baseLabel.toLowerCase())
               const icon = drinkConfig?.icon || '/mobile-assets/MOBILE%20ICONS/WATER.png'
               const accent =
                 label.toLowerCase() === 'coffee'
@@ -691,6 +852,147 @@ export default function WaterIntakePage() {
 
         <div className="h-20 bg-[#f6f7f6] dark:bg-[#151d15]"></div>
       </div>
+      {drinkDetail && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
+          <div className="w-full max-w-md bg-[#f6f7f6] dark:bg-[#151d15] rounded-t-[32px] shadow-2xl">
+            <div className="flex flex-col items-center pt-3 pb-2">
+              <div className="h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-700"></div>
+            </div>
+            <div className="px-6 pb-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-base font-semibold text-[#111711] dark:text-white">Drink details</div>
+                  <div className="text-xs text-gray-500">Tell us if this drink has sugar.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDrinkDetail}
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                  aria-label="Close"
+                >
+                  <MaterialSymbol name="close" />
+                </button>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-2">
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">{activeDrink}</div>
+                <div className="text-xs text-gray-500">
+                  Amount: {formatNumber(drinkDetail.amount)} {drinkDetail.unit === 'l' ? 'L' : drinkDetail.unit}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDrinkSugarChoice('free')}
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold border ${
+                    drinkSugarChoice === 'free'
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-white text-gray-700 border-gray-200'
+                  }`}
+                >
+                  Sugar-free
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDrinkSugarChoice('sugar')}
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold border ${
+                    drinkSugarChoice === 'sugar'
+                      ? 'bg-slate-800 text-white border-slate-800'
+                      : 'bg-white text-gray-700 border-gray-200'
+                  }`}
+                >
+                  Contains sugar
+                </button>
+              </div>
+
+              {drinkSugarChoice === 'sugar' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Sugar amount</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.1"
+                        value={drinkSugarAmount}
+                        onChange={(e) => setDrinkSugarAmount(e.target.value)}
+                        className="flex-1 h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-sm text-gray-900 dark:text-white"
+                        placeholder="0"
+                      />
+                      <select
+                        value={drinkSugarUnit}
+                        onChange={(e) => setDrinkSugarUnit(e.target.value as SugarUnit)}
+                        className="h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200"
+                      >
+                        {SUGAR_UNITS.map((unit) => (
+                          <option key={unit} value={unit}>
+                            {unit}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSugarDrink}
+                      disabled={drinkDetailSaving}
+                      className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      Add with sugar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateDrinkNutrition('search')}
+                      disabled={drinkDetailSaving}
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      Search food
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateDrinkNutrition('barcode')}
+                      disabled={drinkDetailSaving}
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      Scan barcode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateDrinkNutrition('photo')}
+                      disabled={drinkDetailSaving}
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      Add by photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateDrinkNutrition('favorites')}
+                      disabled={drinkDetailSaving}
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60 col-span-2"
+                    >
+                      Add from favorites
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {drinkSugarChoice === 'free' && (
+                <button
+                  type="button"
+                  onClick={handleSugarFreeDrink}
+                  disabled={drinkDetailSaving}
+                  className="w-full px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  Add drink
+                </button>
+              )}
+
+              {drinkDetailError && <div className="text-xs text-red-600">{drinkDetailError}</div>}
+            </div>
+          </div>
+        </div>
+      )}
       {showGoalEditor && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
           <div className="w-full max-w-md bg-[#f6f7f6] dark:bg-[#151d15] rounded-t-[32px] shadow-2xl">

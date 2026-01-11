@@ -28,7 +28,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, Component } f
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
@@ -2009,6 +2009,7 @@ export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const isAnalysisRoute = pathname === '/food/analysis'
   const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
   const { userData, profileImage, updateUserData } = useUserData()
@@ -2694,6 +2695,7 @@ export default function FoodDiary() {
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
+  const openMenuKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (!isAnalysisRoute) return
     if (typeof window !== 'undefined') {
@@ -2713,6 +2715,43 @@ export default function FoodDiary() {
     setPhotoOptionsAnchor(null)
     setShowAnalysisModeModal(false)
   }, [isAnalysisRoute])
+  useEffect(() => {
+    if (isAnalysisRoute) return
+    if (!searchParams) return
+    const open = searchParams.get('open')
+    if (!open) return
+    const routeDate = searchParams.get('date') || ''
+    const routeCategory = searchParams.get('category') || ''
+    const key = `${open}|${routeDate}|${routeCategory}`
+    if (openMenuKeyRef.current === key) return
+    openMenuKeyRef.current = key
+
+    if (routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate)) {
+      setSelectedDate(routeDate)
+    }
+    if (routeCategory) {
+      setSelectedAddCategory(normalizeCategory(routeCategory) as any)
+    }
+
+    setShowCategoryPicker(false)
+    setShowPhotoOptions(false)
+    setPhotoOptionsAnchor(null)
+    setPhotoOptionsPosition(null)
+    setPendingPhotoPicker(false)
+
+    if (open === 'barcode') {
+      barcodeReplaceTargetRef.current = null
+      barcodeActionRef.current = 'diary'
+      setShowBarcodeScanner(true)
+      setBarcodeError(null)
+      setBarcodeValue('')
+    }
+    if (open === 'favorites') {
+      favoritesReplaceTargetRef.current = null
+      favoritesActionRef.current = 'diary'
+      setShowFavoritesPicker(true)
+    }
+  }, [isAnalysisRoute, searchParams])
   const categoryRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const verifyMergeHoldRef = useRef<Record<string, number>>({})
   const verifyMergeTimerRef = useRef<Record<string, { id: number; fireAt: number }>>({})

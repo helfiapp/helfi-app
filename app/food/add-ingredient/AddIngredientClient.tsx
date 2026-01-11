@@ -112,6 +112,7 @@ export default function AddIngredientClient() {
 
   const selectedDate = searchParams.get('date') || buildTodayIso()
   const category = normalizeCategory(searchParams.get('category'))
+  const prefillQuery = searchParams.get('q') || ''
 
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<SearchKind>('packaged')
@@ -121,6 +122,7 @@ export default function AddIngredientClient() {
   const [results, setResults] = useState<NormalizedFoodItem[]>([])
   const [photoLoading, setPhotoLoading] = useState(false)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
+  const prefillAppliedRef = useRef(false)
 
   const abortRef = useRef<AbortController | null>(null)
   const servingCacheRef = useRef<Map<string, ServingOption>>(new Map())
@@ -187,6 +189,17 @@ export default function AddIngredientClient() {
       } catch {}
     }
   }, [photoPreviewUrl])
+
+  useEffect(() => {
+    if (prefillAppliedRef.current) return
+    const next = String(prefillQuery || '').trim()
+    if (!next) return
+    prefillAppliedRef.current = true
+    setQuery(next)
+    if (next.length >= 2) {
+      runSearch(next, kind)
+    }
+  }, [prefillQuery, kind])
 
   useEffect(() => {
     // Keep /food on the same date when the user returns.
