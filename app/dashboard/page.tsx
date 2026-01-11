@@ -677,8 +677,8 @@ export default function Dashboard() {
               <h1 className="text-3xl md:text-5xl font-extrabold text-helfi-black dark:text-white tracking-tight">
                 Welcome to Your <span className="text-helfi-green">Health Dashboard</span>
               </h1>
-              <p className="text-gray-600 text-base md:text-lg max-w-2xl mx-auto mt-2 px-4 md:px-0">
-                Your personalized health intelligence platform is being built to help you optimize your well-being.
+              <p className="text-gray-600 text-base md:text-lg max-w-2xl mx-auto mt-2 px-4 md:px-0 font-semibold">
+                Decisions Today Define Your Tomorrow
               </p>
             </div>
 
