@@ -35,7 +35,7 @@ ChartJS.register(
 
 export const dynamic = 'force-dynamic'
 
-type Row = { date: string; issueId: string; name: string; polarity: 'positive'|'negative'; value: number | null; note?: string }
+type Row = { date: string; timestamp?: string | null; issueId: string; name: string; polarity: 'positive'|'negative'; value: number | null; note?: string }
 type HistoryCache = { rows: Row[]; fetchedAt: number }
 
 export default function CheckinHistoryPage() {
@@ -47,7 +47,7 @@ export default function CheckinHistoryPage() {
   const [start, setStart] = useState<string>('')
   const [end, setEnd] = useState<string>('')
   const [timePeriod, setTimePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'all' | 'custom'>('all')
-  const [pageSize] = useState(10)
+  const pageSize = 10
   const [page, setPage] = useState(1)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<Row | null>(null)
@@ -187,9 +187,30 @@ export default function CheckinHistoryPage() {
     return filtered
   }, [rows, selectedIssues, allIssues.length, timePeriod])
 
+  const groupedRows = useMemo(() => {
+    const groups: { key: string; dateLabel: string; timeLabel: string; entries: Row[] }[] = []
+    const seen = new Map<string, number>()
+
+    filteredRows.forEach((row) => {
+      const key = row.timestamp || row.date
+      if (!key) return
+      const existingIndex = seen.get(key)
+      if (existingIndex === undefined) {
+        const timeLabel = row.timestamp ? format(new Date(row.timestamp), 'h:mm a') : ''
+        const dateLabel = row.date
+        groups.push({ key, dateLabel, timeLabel, entries: [row] })
+        seen.set(key, groups.length - 1)
+      } else {
+        groups[existingIndex].entries.push(row)
+      }
+    })
+
+    return groups
+  }, [filteredRows])
+
   useEffect(() => {
     setPage(1)
-  }, [filteredRows.length, pageSize])
+  }, [groupedRows.length])
 
   const handleDelete = async (date: string, issueId: string) => {
     if (!confirm('Delete this rating?')) return
@@ -445,10 +466,10 @@ export default function CheckinHistoryPage() {
       }
     }
   }, [timePeriod])
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
-  const pageStart = filteredRows.length === 0 ? 0 : (page - 1) * pageSize + 1
-  const pageEnd = Math.min(page * pageSize, filteredRows.length)
-  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  const totalPages = Math.max(1, Math.ceil(groupedRows.length / pageSize))
+  const pageStart = groupedRows.length === 0 ? 0 : (page - 1) * pageSize + 1
+  const pageEnd = Math.min(page * pageSize, groupedRows.length)
+  const pagedGroups = groupedRows.slice((page - 1) * pageSize, page * pageSize)
 
   return (
     <div className="min-h-screen min-h-[100svh] bg-gray-50 dark:bg-gray-900 pb-24 overscroll-y-none overflow-x-hidden">
@@ -609,24 +630,19 @@ export default function CheckinHistoryPage() {
 
           <section>
             <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Check-in History</h2>
-            {filteredRows.length === 0 ? (
+            {groupedRows.length === 0 ? (
               <div className="py-8 text-center text-gray-500 dark:text-gray-400">
                 {rows.length === 0 ? 'No ratings yet.' : 'No ratings match your filters.'}
               </div>
             ) : (
               <>
                 <div className="grid gap-3 md:grid-cols-2">
-                  {pagedRows.map((r, i) => {
-                    const label = getRatingLabel(r.value)
-                    const color = r.value === null || r.value === undefined ? 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400' :
-                      r.value <= 1 ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' :
-                      r.value <= 3 ? 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                      'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400'
-                    const rowKey = `${r.date}:${r.issueId}`
+                  {pagedGroups.map((group) => {
+                    const rowKey = group.key
                   
                     return (
                       <div
-                        key={i}
+                        key={rowKey}
                         className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"
                       >
                         <button
@@ -635,53 +651,70 @@ export default function CheckinHistoryPage() {
                           className="w-full text-left"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap">
-                                {r.date}
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                {group.dateLabel}
                               </span>
-                              <span className="text-base font-semibold text-gray-900 dark:text-white truncate">
-                                {r.name}
-                              </span>
+                              {group.timeLabel && (
+                                <span className="text-xs font-semibold text-slate-400 uppercase">
+                                  {group.timeLabel}
+                                </span>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${color}`}>
-                                {label}
-                                {r.value !== null && r.value !== undefined && (
-                                  <span className="ml-1 opacity-70">({r.value})</span>
-                                )}
-                              </span>
-                              <span
-                                className={`text-slate-400 transition-transform ${
-                                  expandedRow === rowKey ? 'rotate-180' : ''
-                                }`}
-                                aria-hidden="true"
-                              >
-                                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                                </svg>
-                              </span>
-                            </div>
+                            <span
+                              className={`text-slate-400 transition-transform ${
+                                expandedRow === rowKey ? 'rotate-180' : ''
+                              }`}
+                              aria-hidden="true"
+                            >
+                              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                              </svg>
+                            </span>
                           </div>
                         </button>
                         {expandedRow === rowKey && (
-                          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
-                            <div className="text-xs text-slate-500">
-                              {r.note ? `Note: ${r.note}` : 'No notes'}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleEdit(r)}
-                                className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(r.date, r.issueId)}
-                                className="px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                          <div className="mt-4 space-y-3">
+                            {group.entries.map((entry) => {
+                              const label = getRatingLabel(entry.value)
+                              const color = entry.value === null || entry.value === undefined ? 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400' :
+                                entry.value <= 1 ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' :
+                                entry.value <= 3 ? 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400'
+
+                              return (
+                                <div key={`${entry.issueId}-${entry.date}`} className="flex flex-wrap items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                      {entry.name}
+                                    </p>
+                                    {entry.note && (
+                                      <p className="text-xs text-slate-500 mt-1">Note: {entry.note}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${color}`}>
+                                      {label}
+                                      {entry.value !== null && entry.value !== undefined && (
+                                        <span className="ml-1 opacity-70">({entry.value})</span>
+                                      )}
+                                    </span>
+                                    <button
+                                      onClick={() => handleEdit(entry)}
+                                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(entry.date, entry.issueId)}
+                                      className="px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
                         )}
                       </div>
@@ -690,7 +723,7 @@ export default function CheckinHistoryPage() {
                 </div>
                 <div className="flex justify-between items-center mt-6">
                   <p className="text-xs text-slate-500 font-medium">
-                    Showing {pageStart}-{pageEnd} of {filteredRows.length}
+                    Showing {pageStart}-{pageEnd} of {groupedRows.length}
                   </p>
                   <div className="flex gap-2">
                     <button
