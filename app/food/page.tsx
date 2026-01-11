@@ -16138,8 +16138,9 @@ Please add nutritional information manually if needed.`);
                           piecesPerServing && piecesPerServing > 0
                             ? Math.max(0, Math.round(servingsCount * piecesPerServing * 1000) / 1000)
                             : null
+                        const showPiecesControl = Boolean(piecesPerServing && piecesPerServing > 1)
                         const pieceCountDisplay =
-                          pieceCount !== null ? formatPieceDisplay(pieceCount) : ''
+                          showPiecesControl && pieceCount !== null ? formatPieceDisplay(pieceCount) : ''
 
                         const cleanBaseName = (() => {
                           const raw = String(item.name || 'Unknown Food')
@@ -16158,7 +16159,7 @@ Please add nutritional information manually if needed.`);
                         })()
                         const displayName = (() => {
                           const base =
-                            piecesPerServing && piecesPerServing > 0 && pieceCountDisplay
+                            showPiecesControl && pieceCountDisplay
                               ? `${pieceCountDisplay} ${cleanBaseName}`.trim()
                               : cleanBaseName
                           if (!base) return base
@@ -16444,7 +16445,8 @@ Please add nutritional information manually if needed.`);
                                   {servingSizeDisplayLabel ? `1 serving = ${servingSizeDisplayLabel}` : 'Serving size not specified'}
                                 </div>
                                 {/* Pieces control for discrete items */}
-                                {piecesPerServing && piecesPerServing > 0 && (
+                                {/* Only show pieces when we have multiple items, not for a single slice/piece. */}
+                                {showPiecesControl && (
                                   <div className="flex items-center justify-between gap-3 mt-2">
                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                                       {(() => {
