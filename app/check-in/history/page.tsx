@@ -41,7 +41,7 @@ type HistoryCache = { rows: Row[]; fetchedAt: number }
 export default function CheckinHistoryPage() {
   const router = useRouter()
   const pathname = usePathname()
-  const chartRef = useRef<ChartJS<'line'> | null>(null)
+  const chartRef = useRef<any>(null)
   const lastTooltipKeyRef = useRef<string | null>(null)
   const [rows, setRows] = useState<Row[]>([])
   const [allIssues, setAllIssues] = useState<string[]>([])
