@@ -291,9 +291,15 @@ export const featurePages: FeaturePageContent[] = [
           'Built for long-term tracking',
         ],
         image: {
-          src: '/screenshots/hero/MORE MENU.png',
-          alt: 'Device preferences on a phone',
+          src: '/WEBSITE IMAGES/HEALTH TRACKING/ALL DEVICE LOGOS.jpg',
+          alt: 'Connected device logos',
+          width: 1024,
+          height: 768,
+          kind: 'photo',
         },
+        showImage: true,
+        imageLayout: 'side',
+        imagePlacement: 'right',
       },
     ],
     seo: {
