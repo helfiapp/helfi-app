@@ -24,12 +24,22 @@ interface VoiceChatProps {
   context?: VoiceChatContext
   onCostEstimate?: (cost: number) => void
   className?: string
+  onExit?: () => void
+  startExpanded?: boolean
+  hideExpandToggle?: boolean
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 type ChatThread = { id: string; title: string | null; chargedOnce: boolean; createdAt: string; updatedAt: string }
 
-export default function VoiceChat({ context, onCostEstimate, className = '' }: VoiceChatProps) {
+export default function VoiceChat({
+  context,
+  onCostEstimate,
+  className = '',
+  onExit,
+  startExpanded = false,
+  hideExpandToggle = false,
+}: VoiceChatProps) {
   const router = useRouter()
   const VOICE_CHAT_COST_CREDITS = 10
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -44,7 +54,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
   const [threadsOpen, setThreadsOpen] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(startExpanded)
   const [isClient, setIsClient] = useState(false)
   const [actionThreadId, setActionThreadId] = useState<string | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
@@ -130,13 +140,19 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     [threads, archivedThreadIds]
   )
 
+  const showExitButton = Boolean(onExit)
+
   const handleExit = useCallback(() => {
+    if (onExit) {
+      onExit()
+      return
+    }
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back()
       return
     }
     router.push('/dashboard')
-  }, [router])
+  }, [onExit, router])
   
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -857,7 +873,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
           <button
             type="button"
             onClick={handleExit}
-            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-gray-100 lg:hidden"
+            className={`flex h-10 w-10 items-center justify-center rounded-lg hover:bg-gray-100 ${
+              showExitButton ? '' : 'lg:hidden'
+            }`}
             aria-label="Exit chat"
           >
             <span className="material-symbols-outlined text-2xl text-gray-700">arrow_back</span>
@@ -887,16 +905,18 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
           >
             <span className="material-symbols-outlined text-2xl text-gray-700">edit_square</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setExpanded((value) => !value)}
-            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-gray-100"
-            aria-label={expanded ? 'Exit full screen' : 'Full screen'}
-          >
-            <span className="material-symbols-outlined text-2xl text-gray-700">
-              {expanded ? 'close_fullscreen' : 'open_in_full'}
-            </span>
-          </button>
+          {!hideExpandToggle && (
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-gray-100"
+              aria-label={expanded ? 'Exit full screen' : 'Full screen'}
+            >
+              <span className="material-symbols-outlined text-2xl text-gray-700">
+                {expanded ? 'close_fullscreen' : 'open_in_full'}
+              </span>
+            </button>
+          )}
         </div>
       </header>
 

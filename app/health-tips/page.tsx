@@ -36,36 +36,8 @@ type TipBlock =
   | { type: 'paragraph'; text: string }
   | { type: 'label'; label: string; text: string }
   | { type: 'list'; items: string[] }
-
-const TIP_CATEGORIES = {
-  food: {
-    label: 'Food tip',
-    iconText: 'F',
-    badge:
-      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-700',
-    icon: 'bg-emerald-600 text-white',
-  },
-  supplement: {
-    label: 'Supplement tip',
-    iconText: 'S',
-    badge:
-      'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-200 dark:border-sky-700',
-    icon: 'bg-sky-600 text-white',
-  },
-  lifestyle: {
-    label: 'Lifestyle tip',
-    iconText: 'L',
-    badge:
-      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700',
-    icon: 'bg-amber-600 text-white',
-  },
-} as const
-
-const getTipCategory = (category?: string) => {
-  if (category === 'supplement') return TIP_CATEGORIES.supplement
-  if (category === 'lifestyle') return TIP_CATEGORIES.lifestyle
-  return TIP_CATEGORIES.food
-}
+const TIPS_CACHE_KEY = 'helfi:health-tips:today'
+const CLEARED_TIPS_KEY = 'helfi:health-tips:cleared'
 
 const splitSentences = (value: string) => {
   const matches = value.match(/[^.!?]+[.!?]+|[^.!?]+$/g)
@@ -128,10 +100,12 @@ export default function HealthTipsPage() {
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
   const [timezoneQuery, setTimezoneQuery] = useState('')
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false)
-  const [expandedTipId, setExpandedTipId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [generatingTip, setGeneratingTip] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const [activeChatTip, setActiveChatTip] = useState<HealthTip | null>(null)
+  const [clearedTipIds, setClearedTipIds] = useState<Set<string>>(new Set())
+  const clearedTipIdsRef = useRef<Set<string>>(new Set())
   const settingsSnapshotRef = useRef<string>('')
   const settingsRef = useRef<HealthTipSettings>({
     enabled: false,
@@ -153,7 +127,15 @@ export default function HealthTipsPage() {
       const res = await fetch('/api/health-tips/today', { cache: 'no-store' as any })
       if (res.ok) {
         const data = await res.json()
-        setTips(Array.isArray(data?.tips) ? data.tips : [])
+        const nextTips = Array.isArray(data?.tips) ? data.tips : []
+        setTips(nextTips)
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem(TIPS_CACHE_KEY, JSON.stringify(nextTips))
+          } catch {
+            // ignore cache errors
+          }
+        }
       }
     } catch {
       // ignore – UI will show friendly message
@@ -165,8 +147,45 @@ export default function HealthTipsPage() {
   }, [])
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      loadTips()
+      return
+    }
+    let cached: HealthTip[] | null = null
+    try {
+      const raw = sessionStorage.getItem(TIPS_CACHE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          cached = parsed
+        }
+      }
+    } catch {
+      cached = null
+    }
+    if (cached && cached.length > 0) {
+      setTips(cached)
+      setLoadingTips(false)
+      return
+    }
     loadTips()
   }, [loadTips])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = localStorage.getItem(CLEARED_TIPS_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        const nextSet = new Set(parsed.filter((id) => typeof id === 'string' && id))
+        clearedTipIdsRef.current = nextSet
+        setClearedTipIds(new Set(nextSet))
+      }
+    } catch {
+      // ignore storage issues
+    }
+  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -294,6 +313,21 @@ export default function HealthTipsPage() {
     }
   }, [generatingTip, loadTips])
 
+  const handleClearTip = useCallback((tipId: string) => {
+    if (!tipId) return
+    const nextSet = new Set(clearedTipIdsRef.current)
+    nextSet.add(tipId)
+    clearedTipIdsRef.current = nextSet
+    setClearedTipIds(new Set(nextSet))
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(CLEARED_TIPS_KEY, JSON.stringify(Array.from(nextSet)))
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }, [])
+
   const handleSaveSettings = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: HealthTipSettings }) => {
     const payload = options?.payload ?? {
       enabled,
@@ -372,8 +406,12 @@ export default function HealthTipsPage() {
       return bTime - aTime
     })
   }, [tips])
-  const visibleTips = sortedTips.slice(0, 2)
-  const hasMoreTips = sortedTips.length > 2
+  const filteredTips = useMemo(
+    () => sortedTips.filter((tip) => !clearedTipIds.has(tip.id)),
+    [sortedTips, clearedTipIds]
+  )
+  const visibleTips = filteredTips.slice(0, 2)
+  const hasMoreTips = filteredTips.length > 2
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
@@ -435,40 +473,25 @@ export default function HealthTipsPage() {
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-helfi-green" />
             </div>
-          ) : tips.length === 0 ? (
+          ) : filteredTips.length === 0 ? (
             <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-4 text-sm text-gray-600 dark:text-gray-300">
-              No AI tips have been sent yet today. Once your schedule is set and you have credits,
-              Helfi will send you personalised health tips here.
+              {tips.length === 0
+                ? "No AI tips have been sent yet today. Once your schedule is set and you have credits, Helfi will send you personalised health tips here."
+                : "You cleared today’s tips. They’re still saved in your tip history."}
             </div>
           ) : (
             <div className="space-y-4">
               {visibleTips.map((tip) => {
-                const category = getTipCategory(tip.category)
                 const blocks = buildTipBlocks(tip.body || '')
-                const tipSummary = [tip.title, tip.body, tip.safetyNote]
-                  .filter((value) => value && value.trim().length > 0)
-                  .join(' ')
 
                 return (
                   <article
                     key={tip.id}
                     className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-gray-800/70"
                   >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                        {tip.title}
-                      </h2>
-                      <span
-                        className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${category.badge}`}
-                      >
-                        <span
-                          className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${category.icon}`}
-                        >
-                          {category.iconText}
-                        </span>
-                        <span>{category.label}</span>
-                      </span>
-                    </div>
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+                      {tip.title}
+                    </h2>
                     <div className="space-y-2 text-sm text-gray-800 dark:text-gray-100 leading-relaxed">
                       {blocks.length > 0 ? (
                         blocks.map((block, index) => {
@@ -507,29 +530,23 @@ export default function HealthTipsPage() {
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         Do you have any questions about this tip?
                       </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExpandedTipId((current) => (current === tip.id ? null : tip.id))
-                        }
-                        className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold bg-helfi-green text-white shadow-sm hover:bg-helfi-green/90 transition-colors"
-                      >
-                        Ask AI
-                      </button>
-                    </div>
-                    {expandedTipId === tip.id && (
-                      <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900/60 overflow-hidden">
-                        <VoiceChat
-                          className="h-80"
-                          context={{
-                            healthTipSummary: tipSummary,
-                            healthTipTitle: tip.title,
-                            healthTipCategory: tip.category,
-                            healthTipSuggestedQuestions: tip.suggestedQuestions,
-                          }}
-                        />
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <button
+                          type="button"
+                          onClick={() => setActiveChatTip(tip)}
+                          className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold bg-helfi-green text-white shadow-sm hover:bg-helfi-green/90 transition-colors"
+                        >
+                          Ask AI
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleClearTip(tip.id)}
+                          className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        >
+                          Clear from today
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </article>
                 )
               })}
@@ -764,6 +781,23 @@ export default function HealthTipsPage() {
           )}
         </section>
       </main>
+
+      {activeChatTip && (
+        <VoiceChat
+          className="flex-1"
+          startExpanded={true}
+          hideExpandToggle={true}
+          onExit={() => setActiveChatTip(null)}
+          context={{
+            healthTipSummary: [activeChatTip.title, activeChatTip.body, activeChatTip.safetyNote]
+              .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+              .join(' '),
+            healthTipTitle: activeChatTip.title,
+            healthTipCategory: activeChatTip.category,
+            healthTipSuggestedQuestions: activeChatTip.suggestedQuestions,
+          }}
+        />
+      )}
     </div>
   )
 }

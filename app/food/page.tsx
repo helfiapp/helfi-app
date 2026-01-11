@@ -7037,16 +7037,19 @@ const applyStructuredItems = (
       setIsDiaryRefreshing(false)
     }
   }
-  const PULL_REFRESH_ACTIVATE = 20
-  const PULL_REFRESH_THRESHOLD = 160
-  const PULL_REFRESH_MAX = 240
+  const PULL_REFRESH_ACTIVATE = 40
+  const PULL_REFRESH_THRESHOLD = 220
+  const PULL_REFRESH_MAX = 320
+  const PULL_REFRESH_START_ZONE = 80
   const handlePullStart = (e: React.TouchEvent) => {
     if (typeof window === 'undefined') return
     if (window.scrollY > 0) return
     if (syncPausedRef.current || diaryRefreshingRef.current) return
     pullOffsetRef.current = 0
     setPullOffset(0)
-    pullStartYRef.current = e.touches[0]?.clientY ?? null
+    const startY = e.touches[0]?.clientY ?? null
+    if (startY === null || startY > PULL_REFRESH_START_ZONE) return
+    pullStartYRef.current = startY
   }
   const handlePullMove = (e: React.TouchEvent) => {
     if (pullStartYRef.current === null) return
