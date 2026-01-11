@@ -29,6 +29,7 @@ export type FeaturePageSegment = {
   image: FeaturePageImage
   images?: FeaturePageImage[]
   alignImageWithHeading?: boolean
+  showImage?: boolean
 }
 
 export type FeaturePageContent = {
@@ -213,9 +214,12 @@ export const featurePages: FeaturePageContent[] = [
           'Designed for fast mobile review',
         ],
         image: {
-          src: '/screenshots/hero/DASHBOARD.png',
+          src: '/WEBSITE IMAGES/HEALTH TRACKING/DASHBOARD PAGE.jpg',
           alt: 'Daily health dashboard view',
+          width: 2490,
+          height: 1742,
         },
+        showImage: true,
       },
       {
         title: 'Check-ins and rating history',

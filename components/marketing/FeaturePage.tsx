@@ -275,7 +275,8 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
             </h2>
             <div className="space-y-8">
               {page.segments.map((segment, index) => {
-                const segmentImages = showSegmentImages
+                const shouldShowImages = showSegmentImages || segment.showImage === true
+                const segmentImages = shouldShowImages
                   ? (segment.images && segment.images.length > 0 ? segment.images : [segment.image])
                   : []
                 const hasImages = segmentImages.length > 0
