@@ -414,7 +414,7 @@ export default function CheckinHistoryPage() {
   const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
 
   return (
-    <div className="min-h-screen min-h-[100svh] bg-gray-50 dark:bg-gray-900 pb-24 overscroll-y-none">
+    <div className="min-h-screen min-h-[100svh] bg-gray-50 dark:bg-gray-900 pb-24 overscroll-y-none overflow-x-hidden">
       <PageHeader title="Today's Check-In" backHref="/more" />
       
       {/* Tabs */}
@@ -574,7 +574,7 @@ export default function CheckinHistoryPage() {
           )}
 
           {/* Table */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-hidden">
             {filteredRows.length > 0 && (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <div className="text-sm text-gray-600 dark:text-gray-300">
@@ -610,13 +610,13 @@ export default function CheckinHistoryPage() {
                 </div>
               </div>
             )}
-            <table className="min-w-full text-sm">
+            <table className="w-full text-sm table-fixed">
               <thead>
                 <tr className="text-left border-b border-gray-200 dark:border-gray-700">
-                  <th className="py-3 pr-4 font-semibold text-gray-900 dark:text-white">Date</th>
-                  <th className="py-3 pr-4 font-semibold text-gray-900 dark:text-white">Issue</th>
-                  <th className="py-3 pr-4 font-semibold text-gray-900 dark:text-white">Rating</th>
-                  <th className="py-3 pr-4 font-semibold text-gray-900 dark:text-white">Actions</th>
+                  <th className="py-3 pr-3 font-semibold text-gray-900 dark:text-white w-[90px]">Date</th>
+                  <th className="py-3 pr-3 font-semibold text-gray-900 dark:text-white">Issue</th>
+                  <th className="py-3 pr-3 font-semibold text-gray-900 dark:text-white w-[120px]">Rating</th>
+                  <th className="py-3 pr-3 font-semibold text-gray-900 dark:text-white w-[70px]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -629,9 +629,9 @@ export default function CheckinHistoryPage() {
                   
                   return (
                     <tr key={i} className="border-b border-gray-100 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="py-3 pr-4 whitespace-nowrap text-gray-900 dark:text-gray-100">{r.date}</td>
-                      <td className="py-3 pr-4 text-gray-900 dark:text-gray-100">{r.name}</td>
-                      <td className="py-3 pr-4">
+                      <td className="py-3 pr-3 text-gray-900 dark:text-gray-100">{r.date}</td>
+                      <td className="py-3 pr-3 text-gray-900 dark:text-gray-100 break-words">{r.name}</td>
+                      <td className="py-3 pr-3">
                         <span className={`inline-flex items-center gap-2 px-2 py-1 rounded-lg text-xs border ${color}`}>
                           <span>{label}</span>
                           {r.value !== null && r.value !== undefined && (
@@ -639,7 +639,7 @@ export default function CheckinHistoryPage() {
                           )}
                         </span>
                       </td>
-                      <td className="py-3 pr-4">
+                      <td className="py-3 pr-3">
                         <Menu as="div" className="relative inline-block text-left">
                           <div>
                             <Menu.Button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
