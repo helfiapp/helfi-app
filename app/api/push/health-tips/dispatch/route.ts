@@ -278,8 +278,6 @@ export async function POST(req: NextRequest) {
 
     const safeTip = String(parsed.tip).trim()
     const safetyNote = String(parsed.safetyNote || '').trim()
-    const fullBody =
-      safetyNote && safetyNote.length > 0 ? `${safeTip} ${safetyNote}` : safeTip
 
     // costCents already includes the global markup (default 2x OpenAI cost).
     // Charge the user exactly that amount—do not double again.
@@ -311,14 +309,15 @@ export async function POST(req: NextRequest) {
       userId,
       localDateString,
       parsed.title.substring(0, 140),
-      fullBody,
+      safeTip,
       category,
-      JSON.stringify({ rawContent, suggestedQuestions }).slice(0, 10000),
+      JSON.stringify({ rawContent, suggestedQuestions, safetyNote }).slice(0, 10000),
       costCents,
       chargeCents
     )
 
-    const notificationBody = safeTip.length > 120 ? `${safeTip.slice(0, 117)}…` : safeTip
+    const compactTip = safeTip.replace(/\s*\n+\s*/g, ' ').trim()
+    const notificationBody = compactTip.length > 120 ? `${compactTip.slice(0, 117)}…` : compactTip
 
     const payload = JSON.stringify({
       title: parsed.title.substring(0, 80),

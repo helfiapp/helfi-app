@@ -142,7 +142,6 @@ export async function POST() {
 
   const safeTip = String(parsed.tip).trim()
   const safetyNote = String(parsed.safetyNote || '').trim()
-  const fullBody = safetyNote && safetyNote.length > 0 ? `${safeTip} ${safetyNote}` : safeTip
 
   const costCents = wrapped.costCents
   const chargeCents = costCents
@@ -168,9 +167,9 @@ export async function POST() {
     user.id,
     localDateString,
     String(parsed.title || '').substring(0, 140),
-    fullBody,
+    safeTip,
     category,
-    JSON.stringify({ rawContent, suggestedQuestions }).slice(0, 10000),
+    JSON.stringify({ rawContent, suggestedQuestions, safetyNote }).slice(0, 10000),
     costCents,
     chargeCents
   )
@@ -194,8 +193,9 @@ export async function POST() {
       tipDate: localDateString,
       sentAt: now.toISOString(),
       title: String(parsed.title || '').substring(0, 140),
-      body: fullBody,
+      body: safeTip,
       category,
+      safetyNote,
       suggestedQuestions,
     },
   })
