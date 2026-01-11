@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
@@ -41,6 +41,8 @@ type HistoryCache = { rows: Row[]; fetchedAt: number }
 export default function CheckinHistoryPage() {
   const router = useRouter()
   const pathname = usePathname()
+  const chartRef = useRef<ChartJS<'line'> | null>(null)
+  const lastTooltipKeyRef = useRef<string | null>(null)
   const [rows, setRows] = useState<Row[]>([])
   const [allIssues, setAllIssues] = useState<string[]>([])
   const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set())
@@ -218,6 +220,34 @@ export default function CheckinHistoryPage() {
   useEffect(() => {
     setPage(1)
   }, [groupedRows.length])
+
+  const handleChartClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const chart = chartRef.current
+    if (!chart) return
+    const nativeEvent = (event.nativeEvent ?? event) as unknown as Event
+    const elements = chart.getElementsAtEventForMode(nativeEvent, 'nearest', { intersect: true }, true)
+
+    if (!elements.length) {
+      lastTooltipKeyRef.current = null
+      chart.tooltip.setActiveElements([], { x: 0, y: 0 })
+      chart.update()
+      return
+    }
+
+    const { datasetIndex, index } = elements[0]
+    const key = `${datasetIndex}:${index}`
+    if (lastTooltipKeyRef.current === key) {
+      lastTooltipKeyRef.current = null
+      chart.tooltip.setActiveElements([], { x: 0, y: 0 })
+      chart.update()
+      return
+    }
+
+    lastTooltipKeyRef.current = key
+    const point = chart.getDatasetMeta(datasetIndex).data[index] as { x: number; y: number }
+    chart.tooltip.setActiveElements([{ datasetIndex, index }], { x: point.x, y: point.y })
+    chart.update()
+  }
 
   const handleDelete = async (date: string, issueId: string) => {
     if (!confirm('Delete this rating?')) return
@@ -618,7 +648,7 @@ export default function CheckinHistoryPage() {
               </p>
 
               <div className="h-56 md:h-72">
-                <Line data={chartData} options={chartOptions} />
+                <Line ref={chartRef} data={chartData} options={chartOptions} onClick={handleChartClick} />
               </div>
               <div className="flex flex-wrap gap-4 mt-4 justify-center">
                 {chartData.datasets.map((dataset) => (
