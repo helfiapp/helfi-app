@@ -288,6 +288,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const pullOffsetRef = useRef(0)
   const pullResetTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pullRefreshingRef = useRef(false)
+  const pullScrollParentRef = useRef<HTMLElement | null>(null)
   const [pullOffset, setPullOffset] = useState(0)
   const [pullRefreshing, setPullRefreshing] = useState(false)
   
@@ -543,9 +544,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     (!isPublicPage || isOnboardingPath)
 
   const pullRefreshEnabled = shouldShowSidebar && !isChatPage && !isFoodDiaryPage
-  const PULL_REFRESH_ACTIVATE = 40
-  const PULL_REFRESH_THRESHOLD = 220
-  const PULL_REFRESH_MAX = 320
+  const PULL_REFRESH_ACTIVATE = 60
+  const PULL_REFRESH_THRESHOLD = 280
+  const PULL_REFRESH_MAX = 360
+  const PULL_REFRESH_START_ZONE = 140
 
   const isEditableElement = (target: EventTarget | null) => {
     if (typeof document === 'undefined') return false
@@ -560,9 +562,25 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     return 0
   }
 
+  const getScrollParent = (target: EventTarget | null) => {
+    if (typeof window === 'undefined') return null
+    if (!(target instanceof Element)) return null
+    let el: Element | null = target
+    while (el && el !== contentRef.current) {
+      const style = window.getComputedStyle(el)
+      const overflowY = style?.overflowY
+      if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+        return el as HTMLElement
+      }
+      el = el.parentElement
+    }
+    return null
+  }
+
   const clearPullState = () => {
     pullStartYRef.current = null
     pullOffsetRef.current = 0
+    pullScrollParentRef.current = null
     setPullOffset(0)
   }
 
@@ -586,14 +604,23 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (event.touches.length !== 1) return
     if (getScrollTop() > 0) return
     if (isEditableElement(event.target) || isEditableElement(document.activeElement)) return
+    const scrollParent = getScrollParent(event.target)
+    if (scrollParent && scrollParent.scrollTop > 0) return
     pullOffsetRef.current = 0
     setPullOffset(0)
-    pullStartYRef.current = event.touches[0]?.clientY ?? null
+    const startY = event.touches[0]?.clientY ?? null
+    if (startY === null || startY > PULL_REFRESH_START_ZONE) return
+    pullScrollParentRef.current = scrollParent
+    pullStartYRef.current = startY
   }
 
   const handlePullMove = (event: React.TouchEvent<HTMLDivElement>) => {
     if (!pullRefreshEnabled) return
     if (pullStartYRef.current === null) return
+    if (pullScrollParentRef.current && pullScrollParentRef.current.scrollTop > 0) {
+      clearPullState()
+      return
+    }
     if (getScrollTop() > 0) {
       clearPullState()
       return

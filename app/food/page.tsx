@@ -2793,6 +2793,7 @@ export default function FoodDiary() {
   const [pullOffset, setPullOffset] = useState<number>(0)
   const pullStartYRef = useRef<number | null>(null)
   const pullOffsetRef = useRef<number>(0)
+  const pullScrollParentRef = useRef<HTMLElement | null>(null)
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
@@ -7083,28 +7084,56 @@ const applyStructuredItems = (
       setIsDiaryRefreshing(false)
     }
   }
-  const PULL_REFRESH_ACTIVATE = 40
-  const PULL_REFRESH_THRESHOLD = 220
-  const PULL_REFRESH_MAX = 320
+  const PULL_REFRESH_ACTIVATE = 60
+  const PULL_REFRESH_THRESHOLD = 280
+  const PULL_REFRESH_MAX = 360
+  const PULL_REFRESH_START_ZONE = 140
   const getScrollTop = () => {
     if (typeof window === 'undefined') return 0
     const scroller = document.scrollingElement
     if (scroller && Number.isFinite(scroller.scrollTop)) return scroller.scrollTop
     return window.scrollY || 0
   }
+  const getScrollParent = (target: EventTarget | null) => {
+    if (typeof window === 'undefined') return null
+    if (!(target instanceof Element)) return null
+    let el: Element | null = target
+    while (el && el !== document.body) {
+      const style = window.getComputedStyle(el)
+      const overflowY = style?.overflowY
+      if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+        return el as HTMLElement
+      }
+      el = el.parentElement
+    }
+    return null
+  }
   const handlePullStart = (e: React.TouchEvent) => {
     if (typeof window === 'undefined') return
     if (getScrollTop() > 0) return
     if (syncPausedRef.current || diaryRefreshingRef.current) return
+    const scrollParent = getScrollParent(e.target)
+    if (scrollParent && scrollParent.scrollTop > 0) return
     pullOffsetRef.current = 0
     setPullOffset(0)
-    pullStartYRef.current = e.touches[0]?.clientY ?? null
+    const startY = e.touches[0]?.clientY ?? null
+    if (startY === null || startY > PULL_REFRESH_START_ZONE) return
+    pullScrollParentRef.current = scrollParent
+    pullStartYRef.current = startY
   }
   const handlePullMove = (e: React.TouchEvent) => {
     if (pullStartYRef.current === null) return
+    if (pullScrollParentRef.current && pullScrollParentRef.current.scrollTop > 0) {
+      pullStartYRef.current = null
+      pullOffsetRef.current = 0
+      pullScrollParentRef.current = null
+      setPullOffset(0)
+      return
+    }
     if (typeof window !== 'undefined' && getScrollTop() > 0) {
       pullStartYRef.current = null
       pullOffsetRef.current = 0
+      pullScrollParentRef.current = null
       setPullOffset(0)
       return
     }
@@ -7124,6 +7153,7 @@ const applyStructuredItems = (
     const shouldRefresh = pullOffsetRef.current >= PULL_REFRESH_THRESHOLD
     pullStartYRef.current = null
     pullOffsetRef.current = 0
+    pullScrollParentRef.current = null
     setPullOffset(0)
     if (shouldRefresh) {
       await refreshDiaryNow()
