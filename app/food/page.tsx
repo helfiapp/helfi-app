@@ -824,7 +824,7 @@ function TargetRing({ label, valueLabel, percent, tone, color }: RingProps) {
         </svg>
         {/* Center value */}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-xl font-bold text-gray-900 leading-[1.15] pb-0.5">{mainValue}</div>
+          <div className="text-xl font-bold text-gray-900 leading-snug">{mainValue}</div>
           {unitPart && (
             <div className="text-xs text-gray-500 mt-0.5">
               {unitPart}
@@ -3014,6 +3014,12 @@ export default function FoodDiary() {
     window.addEventListener('resize', updateIsMobile)
     return () => window.removeEventListener('resize', updateIsMobile)
   }, [])
+
+  useEffect(() => {
+    setSummarySlideIndex(0)
+    if (!summaryCarouselRef.current) return
+    summaryCarouselRef.current.scrollTo({ left: 0, behavior: 'auto' })
+  }, [selectedDate, isMobile])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -18007,7 +18013,10 @@ Please add nutritional information manually if needed.`);
 	          {!editingEntry && (
 	            <div className="mb-4">
 	              {(() => {
-	                const source = dedupeEntries(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), { fallbackDate: selectedDate })
+	                const baseEntries = isViewingToday
+                    ? todaysFoodsForSelectedDate
+                    : filterEntriesForDate(historyFoods, selectedDate)
+                  const source = dedupeEntries(baseEntries, { fallbackDate: selectedDate })
 
                 const safeNumber = (value: any) => {
                   const num = Number(value)
@@ -18163,7 +18172,7 @@ Please add nutritional information manually if needed.`);
                 return (
                   <div className="space-y-4">
                     {/* Daily rings header */}
-                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-2">
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-2" key={selectedDate}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="text-sm font-semibold text-gray-800">
                           {isViewingToday ? 'Today\u2019s energy summary' : 'Energy summary'}
