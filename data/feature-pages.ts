@@ -262,9 +262,13 @@ export const featurePages: FeaturePageContent[] = [
           'Ready for weekly reporting',
         ],
         image: {
-          src: '/screenshots/hero/INSIGHTS ENERGY.png',
-          alt: 'Device data trends',
+          src: '/WEBSITE IMAGES/HEALTH TRACKING/GARMIN WOMAN.png',
+          alt: 'Checking Garmin wearable data',
+          width: 1200,
+          height: 896,
+          kind: 'photo',
         },
+        showImage: true,
       },
       {
         title: 'Device roadmap visibility',
