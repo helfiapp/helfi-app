@@ -264,6 +264,16 @@ the user.
   to avoid stale session storage (`loadExerciseEntriesForDate(..., { force: true })`).
 - Deleting must update the list even if the server responds with “Not found” for stale entries.
 
+### 3.5 Water Intake Enhancements (Jan 2026 – Locked)
+- Quick Add drink row must hide the horizontal scrollbar/grey line while still allowing swipe.
+- Non‑water drinks must open the Drink Details modal:
+  - Choices: **Sugar‑free** or **Contains sugar**.
+  - Sugar amount supports `g`, `tsp`, `tbsp`, clears on focus, uses numeric keypad, and must not overflow on iPhone.
+  - “Add with sugar” logs **both** a water entry (label includes sugar amount) and a Food Diary entry with calories/carbs/sugar derived from sugar grams.
+  - “Search food / Scan barcode / Add by photo / Add from favorites” should log the drink and then open the corresponding Food Diary flow.
+- Drink icons must show on the Food Diary entries using the matching icon from `public/mobile-assets/MOBILE ICONS/`.
+- Water entries must appear under the **category they were logged in**, not default to Other.
+
 Agents must not modify these rules without explicit user approval.
 
 **Do NOT change or remove:**
@@ -403,6 +413,29 @@ On January 19th, 2025, food diary entries disappeared because entries were being
    - Refresh should only happen when the user manually pulls to refresh or taps the refresh control.
    - Do not re‑enable background refresh without explicit user approval.
    - Exception (user‑approved): if the last page was `/food` and the local calendar day has changed since the last visit, the Food Diary should open on **today** by default (no background refresh beyond the normal load).
+
+### 3.4 Food Diary UX Safeguards (Jan 2026 – Locked)
+- Energy summary rings must render full, un-clipped numbers after any date switch (especially Today → previous day).
+  - The summary should remount on date change to avoid iOS rendering glitches.
+  - Past-day energy summaries should use the cached per‑date snapshot immediately while the server load runs.
+- Opening the **last** category (Other / `uncategorized`) should auto‑scroll to the **last** entry in that category so it’s visible without manual scrolling.
+- Do not remove or bypass these UI safeguards without explicit owner approval.
+
+### 3.6 Food Search Consistency (Jan 2026 – Locked)
+- Single‑food searches must use USDA; packaged searches use FatSecret + OpenFoodFacts.
+- Plural searches should automatically fall back to the singular form (e.g., “fried eggs” → “fried egg”) to prevent empty/irrelevant results.
+- If the query begins with a brand (e.g., KFC, Starbucks, McDonalds), top results should preserve the brand‑first wording.
+- Search UX must stay consistent across:
+  - Add Ingredient
+  - Build a Meal
+  - Adjust Food Details (edit a card)
+  - Add Ingredient after photo analysis
+  - Drink Details “Search food” flow (prefills the query)
+- The search input should keep the embedded search icon and avoid the separate wide button layout regression.
+
+### 3.7 Weight Unit Defaults (Jan 2026 – Locked)
+- Default weight unit must be **ml** only for liquids (milk, oils, drinks).
+- Solid foods must default to **grams**; do not auto‑select ml for solids like chocolate, nuts, etc.
 
 **Backend (`app/api/food-log/route.ts`):**
 
