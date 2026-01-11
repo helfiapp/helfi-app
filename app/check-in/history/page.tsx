@@ -434,7 +434,7 @@ export default function CheckinHistoryPage() {
       </div>
       
       <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-white dark:bg-gray-800 rounded-b-2xl shadow-sm p-6">
+        <div className="bg-transparent p-0">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Check-in History</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
@@ -474,7 +474,7 @@ export default function CheckinHistoryPage() {
 
           {/* Filtering Section */}
           {allIssues.length > 0 && (
-            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className="mb-6 p-0">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Filter by Health Issue</h3>
                 <button
@@ -524,7 +524,7 @@ export default function CheckinHistoryPage() {
 
           {/* Chart */}
           {filteredRows.length > 0 && chartData.datasets.length > 0 && (
-            <div className="mb-6 p-6 bg-gradient-to-br from-white via-helfi-green/5 to-white dark:from-gray-800 dark:via-helfi-green/10 dark:to-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+            <div className="mb-6 p-0">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Trends Over Time</h3>
