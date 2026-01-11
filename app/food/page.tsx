@@ -1410,6 +1410,7 @@ const normalizeDiscreteItem = (item: any) => {
 const defaultGramsForItem = (item: any): number | null => {
   const name = String(item?.name || '').toLowerCase()
   if (!name) return null
+  if (/\bcheese\s*-?\s*cake\b/.test(name) || name.includes('cheesecake')) return null
   const curated: Array<{ keywords: string[]; grams: number }> = [
     { keywords: ['egg', 'eggs'], grams: 50 },
     { keywords: ['bacon', 'rasher', 'rashers', 'strip', 'strips'], grams: 15 },
@@ -1433,7 +1434,7 @@ const defaultGramsForItem = (item: any): number | null => {
   }
   if (name.includes('patty')) return 115 // ~4 oz patty
   if (name.includes('bacon')) return 15 // one slice cooked
-  if (name.includes('cheese')) return 25 // one slice
+  if (/\bcheese\b/.test(name)) return 25 // one slice
   if (name.includes('tomato')) return 50 // a couple slices
   if (name.includes('lettuce')) return 10
   if (name.includes('bun')) return 75
