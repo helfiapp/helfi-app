@@ -2582,6 +2582,7 @@ export default function FoodDiary() {
   const [manualMealBuildMode, setManualMealBuildMode] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
+  const [summaryRenderNonce, setSummaryRenderNonce] = useState(0)
   const [resumeTick, setResumeTick] = useState(0)
   
   // Manual food entry states
@@ -3017,6 +3018,7 @@ export default function FoodDiary() {
 
   useEffect(() => {
     setSummarySlideIndex(0)
+    setSummaryRenderNonce((prev) => prev + 1)
     if (!summaryCarouselRef.current) return
     summaryCarouselRef.current.scrollTo({ left: 0, behavior: 'auto' })
   }, [selectedDate, isMobile])
@@ -6780,6 +6782,13 @@ const applyStructuredItems = (
       }
       try {
         console.log(`🔍 Loading history for date: ${selectedDate}, isViewingToday: ${isViewingToday}`);
+        const snapshot = readPersistentDiarySnapshot()
+        const cached = snapshot?.byDate?.[selectedDate]?.entries
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+          const normalizedCached = dedupeEntries(normalizeDiaryList(cached, selectedDate), { fallbackDate: selectedDate })
+          setHistoryFoods(normalizedCached)
+          setFoodDiaryLoaded(true)
+        }
         setIsLoadingHistory(true);
         const hasCachedHistory = Array.isArray(historyFoods) && historyFoods.length > 0
         setFoodDiaryLoaded(hasCachedHistory); // Show cached state instantly when available
@@ -18224,6 +18233,7 @@ Please add nutritional information manually if needed.`);
                             <div className="flex flex-col items-center order-1 md:order-2 w-full">
                               <div className="grid grid-cols-2 gap-4 sm:gap-6 w-full items-stretch">
                                 <TargetRing
+                                  key={`remaining-${selectedDate}-${summaryRenderNonce}`}
                                   label="Remaining"
                                   valueLabel={
                                     remainingInUnit !== null
@@ -18235,6 +18245,7 @@ Please add nutritional information manually if needed.`);
                                   color="#22c55e"
                                 />
                                 <TargetRing
+                                  key={`used-${selectedDate}-${summaryRenderNonce}`}
                                   label="Used"
                                   valueLabel={
                                     consumedInUnit !== null
