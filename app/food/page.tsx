@@ -183,6 +183,21 @@ const formatWaterEntryAmount = (entry: { amount?: number; unit?: string; amountM
   return formatWaterMl(Number(entry?.amountMl ?? 0))
 }
 
+const WATER_ICON_BY_LABEL: Record<string, string> = {
+  water: '/mobile-assets/MOBILE%20ICONS/WATER.png',
+  coffee: '/mobile-assets/MOBILE%20ICONS/COFFEE.png',
+  tea: '/mobile-assets/MOBILE%20ICONS/TEA.png',
+  juice: '/mobile-assets/MOBILE%20ICONS/JUICE.png',
+  'hot chocolate': '/mobile-assets/MOBILE%20ICONS/HOT%20CHOCOLATE.png',
+  'soft drink': '/mobile-assets/MOBILE%20ICONS/SOFT%20DRINK.png',
+  alcohol: '/mobile-assets/MOBILE%20ICONS/ALCOHOL.png',
+}
+
+const getWaterIconSrc = (label?: string | null) => {
+  const key = String(label || '').trim().toLowerCase()
+  return WATER_ICON_BY_LABEL[key] ?? WATER_ICON_BY_LABEL.water
+}
+
 const isInlineImageSrc = (src: string | null | undefined) =>
   typeof src === 'string' && (src.startsWith('data:') || src.startsWith('blob:'))
 
@@ -18344,6 +18359,8 @@ Please add nutritional information manually if needed.`);
                       const isWaterEntry = Boolean(food?.__water)
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
                       const entryCalories = !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Math.round(Number(entryTotals?.calories)) : null
+                      const waterLabel = isWaterEntry ? String(food?.label || 'Water') : null
+                      const waterIconSrc = isWaterEntry ? getWaterIconSrc(waterLabel) : null
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
@@ -18634,8 +18651,8 @@ Please add nutritional information manually if needed.`);
                               <div className="flex items-center gap-3">
                                 <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
                                   <Image
-                                    src={isWaterEntry ? "/mobile-assets/MOBILE%20ICONS/WATER.png" : "/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"}
-                                    alt={isWaterEntry ? "Water log" : "Food item"}
+                                    src={isWaterEntry ? (waterIconSrc || "/mobile-assets/MOBILE%20ICONS/WATER.png") : "/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"}
+                                    alt={isWaterEntry ? `${waterLabel || 'Water'} log` : "Food item"}
                                     width={32}
                                     height={32}
                                     className="w-8 h-8"
@@ -18645,7 +18662,7 @@ Please add nutritional information manually if needed.`);
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm sm:text-base text-gray-900 truncate">
                                     {isWaterEntry
-                                      ? String(food?.label || 'Water')
+                                      ? waterLabel || 'Water'
                                       : sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
                                   </p>
                                   {isWaterEntry && (

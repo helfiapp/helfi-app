@@ -528,14 +528,12 @@ export default function WaterIntakePage() {
                 key={drink.id}
                 type="button"
                 onClick={() => setActiveDrink(drink.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
+                className={`flex items-center px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
                   activeDrink === drink.id
                     ? 'bg-[#62b763] text-white'
                     : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                 }`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={drink.icon} alt={`${drink.id} icon`} className="h-4 w-4" />
                 {drink.id}
               </button>
             ))}
