@@ -300,6 +300,7 @@ export const featurePages: FeaturePageContent[] = [
         showImage: true,
         imageLayout: 'side',
         imagePlacement: 'right',
+        alignImageWithHeading: true,
       },
     ],
     seo: {
