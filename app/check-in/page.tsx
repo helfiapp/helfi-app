@@ -16,6 +16,13 @@ const LABELS = [
 ] as const
 
 type UserIssue = { id: string; name: string; polarity: 'positive' | 'negative' }
+type TodayCache = {
+  issues: UserIssue[]
+  ratings: Record<string, number | null>
+  notes: Record<string, string>
+  na: Record<string, boolean>
+  fetchedAt: number
+}
 
 export default function CheckInPage() {
   const [ratings, setRatings] = useState<Record<string, number | null>>({})
@@ -25,11 +32,48 @@ export default function CheckInPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const CACHE_KEY = 'checkins:today:cache'
+    const CACHE_TTL_MS = 5 * 60_000
+
+    const readCache = (): TodayCache | null => {
+      if (typeof window === 'undefined') return null
+      try {
+        const raw = window.sessionStorage.getItem(CACHE_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw) as TodayCache
+        if (!parsed?.fetchedAt) return null
+        return parsed
+      } catch {
+        return null
+      }
+    }
+
+    const writeCache = (data: TodayCache) => {
+      if (typeof window === 'undefined') return
+      try {
+        window.sessionStorage.setItem(CACHE_KEY, JSON.stringify(data))
+      } catch {
+        // ignore
+      }
+    }
+
+    const cached = readCache()
+    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+      setIssues(cached.issues || [])
+      setRatings(cached.ratings || {})
+      setNotes(cached.notes || {})
+      setNa(cached.na || {})
+      setLoading(false)
+      return
+    }
+
     // Load actual issues if API is available
     setLoading(true)
     fetch('/api/checkins/today', { cache: 'no-store' as any })
       .then(r => r.json())
       .then((data) => {
+        let nextIssues: UserIssue[] = []
+        let nextRatings: Record<string, number | null> = {}
         if (Array.isArray(data?.issues)) {
           const seen = new Set<string>()
           const unique = [] as UserIssue[]
@@ -37,13 +81,24 @@ export default function CheckInPage() {
             const key = (it.name || '').toLowerCase().trim()
             if (!seen.has(key)) { seen.add(key); unique.push(it) }
           }
-          if (unique.length > 0) setIssues(unique)
+          if (unique.length > 0) {
+            nextIssues = unique
+            setIssues(unique)
+          }
         }
         if (Array.isArray(data?.ratings)) {
-          const map: Record<string, number> = {}
+          const map: Record<string, number | null> = {}
           for (const r of data.ratings) map[r.issueId] = r.value
+          nextRatings = map
           setRatings(map)
         }
+        writeCache({
+          issues: nextIssues,
+          ratings: nextRatings,
+          notes: {},
+          na: {},
+          fetchedAt: Date.now(),
+        })
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -79,6 +134,21 @@ export default function CheckInPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.detail || data?.error || 'Failed to save')
       }
+      try {
+        const CACHE_KEY = 'checkins:today:cache'
+        const payloadRatings: Record<string, number | null> = {}
+        for (const item of payload) payloadRatings[item.issueId] = item.value
+        sessionStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({
+            issues,
+            ratings: payloadRatings,
+            notes,
+            na,
+            fetchedAt: Date.now(),
+          }),
+        )
+      } catch {}
       if (pendingId) {
         try {
           sessionStorage.removeItem('helfi:pending-notification-id')
