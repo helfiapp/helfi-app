@@ -192,12 +192,19 @@ export default function CheckinHistoryPage() {
     const seen = new Map<string, number>()
 
     filteredRows.forEach((row) => {
-      const key = row.timestamp || row.date
-      if (!key) return
+      let key = row.date
+      let dateLabel = row.date
+      let timeLabel = ''
+      if (row.timestamp) {
+        const parsed = new Date(row.timestamp)
+        if (!Number.isNaN(parsed.getTime())) {
+          key = format(parsed, 'yyyy-MM-dd HH:mm')
+          dateLabel = format(parsed, 'yyyy-MM-dd')
+          timeLabel = format(parsed, 'h:mm a')
+        }
+      }
       const existingIndex = seen.get(key)
       if (existingIndex === undefined) {
-        const timeLabel = row.timestamp ? format(new Date(row.timestamp), 'h:mm a') : ''
-        const dateLabel = row.date
         groups.push({ key, dateLabel, timeLabel, entries: [row] })
         seen.set(key, groups.length - 1)
       } else {
@@ -643,7 +650,7 @@ export default function CheckinHistoryPage() {
                     return (
                       <div
                         key={rowKey}
-                        className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"
+                        className="bg-white dark:bg-slate-800 p-4 pr-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"
                       >
                         <button
                           type="button"
