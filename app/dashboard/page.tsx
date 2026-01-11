@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null)
   const [profileImage, setProfileImage] = useState<string | null>(null)
-  const [deviceInterest, setDeviceInterest] = useState<{ appleWatch?: boolean; fitbit?: boolean; garmin?: boolean; samsung?: boolean; googleFit?: boolean; oura?: boolean; polar?: boolean }>({})
+  const [deviceInterest, setDeviceInterest] = useState<{ fitbit?: boolean; garmin?: boolean; googleFit?: boolean; oura?: boolean; polar?: boolean; huawei?: boolean }>({})
   const [savingInterest, setSavingInterest] = useState(false)
   const [fitbitConnected, setFitbitConnected] = useState(false)
   const [fitbitLoading, setFitbitLoading] = useState(false)
@@ -428,7 +428,7 @@ export default function Dashboard() {
     }
   }, [])
 
-  const toggleInterest = (key: 'appleWatch' | 'fitbit' | 'garmin' | 'samsung' | 'googleFit' | 'oura' | 'polar') => {
+  const toggleInterest = (key: 'fitbit' | 'garmin' | 'googleFit' | 'oura' | 'polar' | 'huawei') => {
     // Don't toggle Fitbit interest if it's already connected
     if (key === 'fitbit' && fitbitConnected) {
       return
@@ -863,7 +863,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.googleFit ? 'Interested ✓' : 'Connect'}
+                      {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
                     </button>
                   </div>
 
@@ -881,7 +881,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.oura ? 'Interested ✓' : 'Connect'}
+                      {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
                     </button>
                   </div>
 
@@ -899,12 +899,30 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.polar ? 'Interested ✓' : 'Connect'}
+                      {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-xl shadow-sm">
+                        <img src="/brands/huawei-health.png" alt="Huawei Health" className="h-6 w-auto" />
+                      </div>
+                      <span className="font-semibold text-sm">Huawei Health</span>
+                    </div>
+                    <button
+                      onClick={() => toggleInterest('huawei')}
+                      className={`px-4 py-2 text-xs font-bold rounded-full ${
+                        deviceInterest.huawei ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                      }`}
+                      disabled={!!savingInterest}
+                    >
+                      {deviceInterest.huawei ? 'Interested ✓' : "I'm interested"}
                     </button>
                   </div>
                 </div>
 
-                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
                       <img src="/brands/fitbit.png" alt="Fitbit" className="h-8 w-auto object-contain" />
@@ -963,7 +981,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.googleFit ? 'Interested ✓' : 'Connect'}
+                      {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
                     </button>
                   </div>
 
@@ -979,7 +997,7 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.oura ? 'Interested ✓' : 'Connect'}
+                      {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
                     </button>
                   </div>
 
@@ -995,7 +1013,23 @@ export default function Dashboard() {
                       }`}
                       disabled={!!savingInterest}
                     >
-                      {deviceInterest.polar ? 'Interested ✓' : 'Connect'}
+                      {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
+                    <div className="h-12 w-full flex items-center justify-center mb-6">
+                      <img src="/brands/huawei-health.png" alt="Huawei Health" className="h-8 w-auto object-contain" />
+                    </div>
+                    <span className="text-sm font-semibold mb-6">Huawei Health</span>
+                    <button
+                      onClick={() => toggleInterest('huawei')}
+                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                        deviceInterest.huawei ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                      disabled={!!savingInterest}
+                    >
+                      {deviceInterest.huawei ? 'Interested ✓' : "I'm interested"}
                     </button>
                   </div>
                 </div>
