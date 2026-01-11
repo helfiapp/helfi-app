@@ -402,6 +402,7 @@ On January 19th, 2025, food diary entries disappeared because entries were being
    - Food diary must **not auto-refresh** on day changes, focus events, or navigation.
    - Refresh should only happen when the user manually pulls to refresh or taps the refresh control.
    - Do not re‑enable background refresh without explicit user approval.
+   - Exception (user‑approved): if the last page was `/food` and the local calendar day has changed since the last visit, the Food Diary should open on **today** by default (no background refresh beyond the normal load).
 
 **Backend (`app/api/food-log/route.ts`):**
 

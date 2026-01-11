@@ -390,6 +390,7 @@ type FavoritesAllSnapshotStore = Record<string, FavoritesAllSnapshot>
 const FAVORITES_ALL_SNAPSHOT_TTL_MS = 5 * 60 * 1000
 const FAVORITES_ALL_SNAPSHOT_KEY = 'foodDiary:favoritesAllSnapshot'
 const FOOD_RESUME_LAST_PREFIX = 'food:resume:last:'
+const FOOD_DIARY_LAST_VISIT_KEY = 'food:diary:lastVisitDate'
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
@@ -2020,10 +2021,24 @@ export default function FoodDiary() {
     setPersistentDiarySnapshotVersion((prev) => prev + 1)
   }, [])
   const persistentDiarySnapshot = useMemo(() => readPersistentDiarySnapshot(), [persistentDiarySnapshotVersion])
-  const initialSelectedDate =
-    warmDiaryState?.selectedDate && warmDiaryState.selectedDate.length >= 8
-      ? warmDiaryState.selectedDate
-      : buildTodayIso()
+  const initialSelectedDate = (() => {
+    const today = buildTodayIso()
+    const warmSelected =
+      warmDiaryState?.selectedDate && warmDiaryState.selectedDate.length >= 8
+        ? warmDiaryState.selectedDate
+        : today
+    if (typeof window === 'undefined') return warmSelected
+    try {
+      const lastPath = localStorage.getItem('helfi:lastPath') || ''
+      const lastPathBase = lastPath.split('?')[0]
+      const lastVisitDate = localStorage.getItem(FOOD_DIARY_LAST_VISIT_KEY) || ''
+      const lastWasFoodDiary = lastPathBase === '/food'
+      if (lastWasFoodDiary && lastVisitDate && lastVisitDate !== today) {
+        return today
+      }
+    } catch {}
+    return warmSelected
+  })()
   const formatDateFromMs = (ms: number) => {
     const d = new Date(ms)
     const y = d.getFullYear()
@@ -2998,6 +3013,13 @@ export default function FoodDiary() {
     updateIsMobile()
     window.addEventListener('resize', updateIsMobile)
     return () => window.removeEventListener('resize', updateIsMobile)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(FOOD_DIARY_LAST_VISIT_KEY, buildTodayIso())
+    } catch {}
   }, [])
 
   useEffect(() => {
