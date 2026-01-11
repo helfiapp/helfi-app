@@ -268,6 +268,13 @@ export default function WaterIntakePage() {
     setBanner(null)
     try {
       const label = activeDrink
+      const category =
+        sourceCategory ||
+        (() => {
+          if (typeof window === 'undefined') return null
+          const params = new URLSearchParams(window.location.search)
+          return params.get('category')
+        })()
       const res = await fetch('/api/water-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -276,7 +283,7 @@ export default function WaterIntakePage() {
           amount,
           unit,
           label,
-          category: sourceCategory,
+          category,
           localDate: selectedDate,
         }),
       })

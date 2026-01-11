@@ -2400,7 +2400,6 @@ export default function FoodDiary() {
   const [showItemEditModal, setShowItemEditModal] = useState<boolean>(false) // Show edit modal for item
   // Numeric input drafts (so tapping clears the box without mutating values until the user types)
   const [numericInputDrafts, setNumericInputDrafts] = useState<Record<string, string>>({})
-  const weightCommitRef = useRef<Record<string, boolean>>({})
   const [healthWarning, setHealthWarning] = useState<string | null>(null)
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
   const [dietWarning, setDietWarning] = useState<string | null>(null)
@@ -16527,7 +16526,6 @@ Please add nutritional information manually if needed.`);
                                       })()}
                                       onFocus={() => {
                                         const key = `ai:card:${index}:weightAmount`
-                                        weightCommitRef.current[key] = false
                                         setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
                                       }}
                                       onChange={(e) => {
@@ -16538,7 +16536,6 @@ Please add nutritional information manually if needed.`);
                                       onKeyDown={(e) => {
                                         if (e.key !== 'Enter') return
                                         const key = `ai:card:${index}:weightAmount`
-                                        weightCommitRef.current[key] = true
                                         const v = numericInputDrafts[key]
                                         if (String(v || '').trim() !== '') {
                                           updateItemField(index, 'weightAmount', v)
@@ -16552,13 +16549,9 @@ Please add nutritional information manually if needed.`);
                                       }}
                                       onBlur={() => {
                                         const key = `ai:card:${index}:weightAmount`
-                                        const shouldCommit = weightCommitRef.current[key]
-                                        delete weightCommitRef.current[key]
-                                        if (shouldCommit) {
-                                          const v = numericInputDrafts[key]
-                                          if (String(v || '').trim() !== '') {
-                                            updateItemField(index, 'weightAmount', v)
-                                          }
+                                        const v = numericInputDrafts[key]
+                                        if (String(v || '').trim() !== '') {
+                                          updateItemField(index, 'weightAmount', v)
                                         }
                                         setNumericInputDrafts((prev) => {
                                           const next = { ...prev }
