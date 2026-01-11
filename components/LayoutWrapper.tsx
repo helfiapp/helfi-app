@@ -577,6 +577,30 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     return null
   }
 
+  const hasVisibleEditableFields = () => {
+    if (typeof document === 'undefined') return false
+    const root = contentRef.current || document.body
+    const fields = root.querySelectorAll('input, textarea, select, [contenteditable="true"]')
+    if (!fields.length) return false
+    return Array.from(fields).some((field) => {
+      if (field instanceof HTMLInputElement) {
+        if (field.type === 'hidden' || field.disabled || field.readOnly) return false
+      }
+      if (field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+        if (field.disabled) return false
+      }
+      if (field instanceof HTMLElement) {
+        const style = window.getComputedStyle(field)
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+          return false
+        }
+        const rect = field.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) return false
+      }
+      return true
+    })
+  }
+
   const clearPullState = () => {
     pullStartYRef.current = null
     pullOffsetRef.current = 0
@@ -604,6 +628,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (event.touches.length !== 1) return
     if (getScrollTop() > 0) return
     if (isEditableElement(event.target) || isEditableElement(document.activeElement)) return
+    if (hasVisibleEditableFields()) return
     const scrollParent = getScrollParent(event.target)
     if (scrollParent && scrollParent.scrollTop > 0) return
     pullOffsetRef.current = 0
@@ -617,6 +642,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const handlePullMove = (event: React.TouchEvent<HTMLDivElement>) => {
     if (!pullRefreshEnabled) return
     if (pullStartYRef.current === null) return
+    if (hasVisibleEditableFields()) {
+      clearPullState()
+      return
+    }
     if (pullScrollParentRef.current && pullScrollParentRef.current.scrollTop > 0) {
       clearPullState()
       return
