@@ -48,7 +48,7 @@ export default function CheckinHistoryPage() {
   const [start, setStart] = useState<string>('')
   const [end, setEnd] = useState<string>('')
   const [timePeriod, setTimePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'all' | 'custom'>('all')
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize] = useState(10)
   const [page, setPage] = useState(1)
   const [editingEntry, setEditingEntry] = useState<Row | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
@@ -418,38 +418,36 @@ export default function CheckinHistoryPage() {
       <PageHeader title="Today's Check-In" backHref="/more" />
       
       {/* Tabs */}
-      <div className="max-w-7xl mx-auto px-4 pt-4">
-        <div className="bg-white dark:bg-gray-800 rounded-t-xl border-b border-gray-200 dark:border-gray-700">
-          <div className="flex">
-            <Link
-              href="/check-in"
-              className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
-                pathname !== '/check-in/history'
-                  ? 'text-helfi-green border-b-2 border-helfi-green'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              Today's Check-in
-            </Link>
-            <Link
-              href="/check-in/history"
-              className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
-                pathname === '/check-in/history'
-                  ? 'text-helfi-green border-b-2 border-helfi-green'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              Rating History
-            </Link>
-          </div>
+      <div className="max-w-5xl mx-auto px-4 pt-4">
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+          <Link
+            href="/check-in"
+            className={`flex-1 py-2 text-sm font-medium rounded-lg text-center transition-colors ${
+              pathname !== '/check-in/history'
+                ? 'bg-white dark:bg-slate-700 shadow-sm text-helfi-green'
+                : 'text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            Today's Check-in
+          </Link>
+          <Link
+            href="/check-in/history"
+            className={`flex-1 py-2 text-sm font-medium rounded-lg text-center transition-colors ${
+              pathname === '/check-in/history'
+                ? 'bg-white dark:bg-slate-700 shadow-sm text-helfi-green'
+                : 'text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            Rating History
+          </Link>
         </div>
       </div>
       
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-transparent p-0">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Check-in History</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+      <main className="max-w-5xl mx-auto px-4 pb-24">
+        <div className="space-y-8 pt-6">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">Check-in History</h1>
+            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-4">
               Scale: 0 Really bad · 1 Bad · 2 Below average · 3 Average · 4 Above average · 5 Good · 6 Excellent
             </p>
           </div>
@@ -486,25 +484,27 @@ export default function CheckinHistoryPage() {
 
           {/* Filtering Section */}
           {allIssues.length > 0 && (
-            <div className="mb-6 p-0">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Filter by Health Issue</h3>
+            <section>
+              <div className="flex items-end justify-between mb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Filter by Health Issue
+                </h3>
                 <button
                   onClick={toggleSelectAll}
-                  className="text-sm text-helfi-green hover:underline"
+                  className="text-helfi-green text-xs font-semibold"
                 >
                   {selectedIssues.size === allIssues.length ? 'Deselect All' : 'Select All'}
                 </button>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2">
                 {allIssues.map(issue => (
                   <button
                     key={issue}
                     onClick={() => toggleIssue(issue)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium shadow-sm transition-transform active:scale-95 ${
                       selectedIssues.has(issue)
                         ? 'bg-helfi-green text-white'
-                        : 'bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-500'
+                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                     }`}
                   >
                     {issue}
@@ -514,207 +514,189 @@ export default function CheckinHistoryPage() {
               {selectedIssues.size > 0 && selectedIssues.size < allIssues.length && (
                 <button
                   onClick={handleDeleteSelected}
-                  className="mt-3 text-sm text-red-600 hover:underline"
+                  className="mt-3 text-xs text-red-600 hover:underline"
                 >
                   Delete Selected ({selectedIssues.size})
                 </button>
               )}
-            </div>
+            </section>
           )}
 
 
           {/* Chart */}
           {filteredRows.length > 0 && chartData.datasets.length > 0 && (
-            <div className="mb-6 p-0">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Trends Over Time</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Ratings are scored 0 (Really bad) to 6 (Excellent). Hover the chart to see exact values.
-                  </p>
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Trends Over Time</h2>
+                <div className="relative">
+                  <select
+                    value={timePeriod}
+                    onChange={(e) => setTimePeriod(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all' | 'custom')}
+                    className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-helfi-green focus:border-transparent cursor-pointer"
+                  >
+                    <option value="daily">30 Days</option>
+                    <option value="weekly">12 Weeks</option>
+                    <option value="monthly">12 Months</option>
+                    <option value="yearly">5 Years</option>
+                    <option value="all">All Time</option>
+                    <option value="custom">Custom Date</option>
+                  </select>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                    </svg>
+                  </span>
                 </div>
               </div>
-              
-              {/* Time Period Filter */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Time Period</label>
-                <select
-                  value={timePeriod}
-                  onChange={(e) => setTimePeriod(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all' | 'custom')}
-                  className="w-full sm:w-auto min-w-[180px] border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 dark:bg-gray-700 dark:text-white bg-white text-gray-900 focus:ring-2 focus:ring-helfi-green focus:border-transparent cursor-pointer"
-                >
-                  <option value="daily">30 Days</option>
-                  <option value="weekly">12 Weeks</option>
-                  <option value="monthly">12 Months</option>
-                  <option value="yearly">5 Years</option>
-                  <option value="all">All Time</option>
-                  <option value="custom">Custom Date</option>
-                </select>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Ratings are scored 0 (Really bad) to 6 (Excellent). Hover the chart to see exact values.
+              </p>
+
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
+                <div className="h-56 md:h-72">
+                  <Line data={chartData} options={chartOptions} />
+                </div>
+                <div className="flex flex-wrap gap-4 mt-4 justify-center">
+                  {chartData.datasets.map((dataset) => (
+                    <div key={dataset.label} className="flex items-center gap-1.5">
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: dataset.borderColor as string }}
+                        aria-hidden="true"
+                      />
+                      <span className="text-[10px] text-slate-500 font-medium">{dataset.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              
-              <div className="h-72">
-                <Line data={chartData} options={chartOptions} />
-              </div>
-              <div className="flex flex-wrap gap-2 mt-4">
-                {chartData.datasets.map((dataset) => (
-                  <div
-                    key={dataset.label}
-                    className="inline-flex items-center gap-2 rounded-full bg-white/80 dark:bg-gray-700/70 px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 shadow-sm border border-gray-200 dark:border-gray-600"
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: dataset.borderColor as string }}
-                      aria-hidden="true"
-                    />
-                    <span>{dataset.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            </section>
           )}
 
-          {/* Table */}
-          <div className="overflow-x-hidden">
-            {filteredRows.length > 0 && (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-                <div className="text-sm text-gray-600 dark:text-gray-300">
-                  Showing {pageStart}-{pageEnd} of {filteredRows.length}
+          <section>
+            <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Check-in History</h2>
+            {filteredRows.length === 0 ? (
+              <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+                {rows.length === 0 ? 'No ratings yet.' : 'No ratings match your filters.'}
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {pagedRows.map((r, i) => {
+                    const label = getRatingLabel(r.value)
+                    const color = r.value === null || r.value === undefined ? 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400' :
+                      r.value <= 1 ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' :
+                      r.value <= 3 ? 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                      'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400'
+
+                    return (
+                      <div
+                        key={i}
+                        className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                      >
+                        <div>
+                          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase">{r.date}</p>
+                          <p className="text-base font-semibold text-gray-900 dark:text-white">{r.name}</p>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-3">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${color}`}>
+                            {label}
+                            {r.value !== null && r.value !== undefined && (
+                              <span className="ml-1 opacity-70">({r.value})</span>
+                            )}
+                          </span>
+                          <Menu as="div" className="relative inline-block text-left">
+                            <div>
+                              <Menu.Button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+                                <EllipsisVerticalIcon className="w-5 h-5 text-slate-400" />
+                              </Menu.Button>
+                            </div>
+
+                            <Transition
+                              as={Fragment}
+                              enter="transition ease-out duration-100"
+                              enterFrom="transform opacity-0 scale-95"
+                              enterTo="transform opacity-100 scale-100"
+                              leave="transition ease-in duration-75"
+                              leaveFrom="transform opacity-100 scale-100"
+                              leaveTo="transform opacity-0 scale-95"
+                            >
+                              <Menu.Items className="absolute right-0 z-20 mt-2 w-36 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 focus:outline-none border border-gray-200 dark:border-gray-700">
+                                <div className="py-1">
+                                  <Menu.Item>
+                                    {({ active }) => (
+                                      <button
+                                        onClick={() => handleEdit(r)}
+                                        className={classNames(
+                                          active && 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100',
+                                          !active && 'text-gray-700 dark:text-gray-200',
+                                          'block w-full px-4 py-2 text-left text-sm'
+                                        )}
+                                      >
+                                        Edit
+                                      </button>
+                                    )}
+                                  </Menu.Item>
+                                  <Menu.Item>
+                                    {({ active }) => (
+                                      <button
+                                        onClick={() => handleDelete(r.date, r.issueId)}
+                                        className={classNames(
+                                          active && 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+                                          !active && 'text-red-600 dark:text-red-400',
+                                          'block w-full px-4 py-2 text-left text-sm'
+                                        )}
+                                      >
+                                        Delete
+                                      </button>
+                                    )}
+                                  </Menu.Item>
+                                </div>
+                              </Menu.Items>
+                            </Transition>
+                          </Menu>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-sm text-gray-600 dark:text-gray-300">Rows</label>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="min-w-[90px] border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white bg-white text-gray-900 focus:ring-2 focus:ring-helfi-green focus:border-transparent cursor-pointer text-sm"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                  </select>
-                  <div className="flex items-center gap-2">
+                <div className="flex justify-between items-center mt-6">
+                  <p className="text-xs text-slate-500 font-medium">
+                    Showing {pageStart}-{pageEnd} of {filteredRows.length}
+                  </p>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page <= 1}
-                      className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                      className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold disabled:opacity-50"
                     >
                       Previous
                     </button>
                     <button
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={page >= totalPages}
-                      className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                      className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold disabled:opacity-50"
                     >
                       Next
                     </button>
                   </div>
                 </div>
-              </div>
+              </>
             )}
-            <table className="w-full text-sm table-fixed">
-              <thead>
-                <tr className="text-left border-b border-gray-200 dark:border-gray-700">
-                  <th className="py-3 pr-3 font-semibold text-gray-900 dark:text-white w-[90px]">Date</th>
-                  <th className="py-3 pr-3 font-semibold text-gray-900 dark:text-white">Issue</th>
-                  <th className="py-3 pr-3 font-semibold text-gray-900 dark:text-white w-[120px]">Rating</th>
-                  <th className="py-3 pr-3 font-semibold text-gray-900 dark:text-white w-[70px]">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedRows.map((r, i) => {
-                  const label = getRatingLabel(r.value)
-                  const color = r.value === null || r.value === undefined ? 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400' :
-                    r.value <= 1 ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' :
-                    r.value <= 3 ? 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                    'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400'
-                  
-                  return (
-                    <tr key={i} className="border-b border-gray-100 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="py-3 pr-3 text-gray-900 dark:text-gray-100">{r.date}</td>
-                      <td className="py-3 pr-3 text-gray-900 dark:text-gray-100 break-words">{r.name}</td>
-                      <td className="py-3 pr-3">
-                        <span className={`inline-flex items-center gap-2 px-2 py-1 rounded-lg text-xs border ${color}`}>
-                          <span>{label}</span>
-                          {r.value !== null && r.value !== undefined && (
-                            <span className="text-[10px] opacity-70">({r.value})</span>
-                          )}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-3">
-                        <Menu as="div" className="relative inline-block text-left">
-                          <div>
-                            <Menu.Button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
-                              <EllipsisVerticalIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                            </Menu.Button>
-                          </div>
-
-                          <Transition
-                            as={Fragment}
-                            enter="transition ease-out duration-100"
-                            enterFrom="transform opacity-0 scale-95"
-                            enterTo="transform opacity-100 scale-100"
-                            leave="transition ease-in duration-75"
-                            leaveFrom="transform opacity-100 scale-100"
-                            leaveTo="transform opacity-0 scale-95"
-                          >
-                            <Menu.Items className="absolute right-0 z-20 mt-2 w-36 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 focus:outline-none border border-gray-200 dark:border-gray-700">
-                              <div className="py-1">
-                                <Menu.Item>
-                                  {({ active }) => (
-                                    <button
-                                      onClick={() => handleEdit(r)}
-                                      className={classNames(
-                                        active && 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100',
-                                        !active && 'text-gray-700 dark:text-gray-200',
-                                        'block w-full px-4 py-2 text-left text-sm'
-                                      )}
-                                    >
-                                      Edit
-                                    </button>
-                                  )}
-                                </Menu.Item>
-                                <Menu.Item>
-                                  {({ active }) => (
-                                    <button
-                                      onClick={() => handleDelete(r.date, r.issueId)}
-                                      className={classNames(
-                                        active && 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-                                        !active && 'text-red-600 dark:text-red-400',
-                                        'block w-full px-4 py-2 text-left text-sm'
-                                      )}
-                                    >
-                                      Delete
-                                    </button>
-                                  )}
-                                </Menu.Item>
-                              </div>
-                            </Menu.Items>
-                          </Transition>
-                        </Menu>
-                      </td>
-                    </tr>
-                  )
-                })}
-                {filteredRows.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-gray-500 dark:text-gray-400">
-                      {rows.length === 0 ? 'No ratings yet.' : 'No ratings match your filters.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          </section>
 
           {/* Reset Button */}
           {rows.length > 0 && (
-            <div className="mt-8 flex justify-center sm:justify-end">
+            <footer className="mt-10 text-center">
               <button
                 onClick={handleResetAll}
-                className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 border border-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                className="w-full py-4 border-2 border-dashed border-red-200 dark:border-red-900/30 text-red-500 dark:text-red-400 font-bold rounded-2xl hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
               >
                 Reset All Data
               </button>
-            </div>
+              <p className="mt-4 text-[10px] text-slate-400 leading-relaxed max-w-xs mx-auto">
+                Resetting your data will permanently delete your check-in history. This action cannot be undone.
+              </p>
+            </footer>
           )}
         </div>
       </main>
