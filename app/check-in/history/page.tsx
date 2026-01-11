@@ -47,7 +47,7 @@ export default function CheckinHistoryPage() {
   const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set())
   const [start, setStart] = useState<string>('')
   const [end, setEnd] = useState<string>('')
-  const [timePeriod, setTimePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'all'>('all')
+  const [timePeriod, setTimePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'all' | 'custom'>('all')
   const [editingEntry, setEditingEntry] = useState<Row | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string>('')
@@ -77,12 +77,14 @@ export default function CheckinHistoryPage() {
       ? color.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`)
       : color
 
-  const load = async () => {
+  const load = async (overrides?: { start?: string; end?: string }) => {
     setLoading(true)
     try {
+      const startValue = overrides?.start ?? start
+      const endValue = overrides?.end ?? end
       const params = new URLSearchParams()
-      if (start) params.set('start', start)
-      if (end) params.set('end', end)
+      if (startValue) params.set('start', startValue)
+      if (endValue) params.set('end', endValue)
       const res = await fetch(`/api/checkins/history?${params.toString()}`)
       const data = await res.json()
       const history = Array.isArray(data?.history) ? data.history : []
@@ -102,6 +104,13 @@ export default function CheckinHistoryPage() {
   }
 
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (timePeriod !== 'custom' && (start || end)) {
+      setStart('')
+      setEnd('')
+      load({ start: '', end: '' })
+    }
+  }, [timePeriod])
 
   // Filter rows by selected issues and time period
   const filteredRows = useMemo(() => {
@@ -113,7 +122,7 @@ export default function CheckinHistoryPage() {
     }
     
     // Filter by time period
-    if (timePeriod !== 'all' && filtered.length > 0) {
+    if (timePeriod !== 'all' && timePeriod !== 'custom' && filtered.length > 0) {
       const now = new Date()
       const cutoffDate = new Date()
       
@@ -433,8 +442,8 @@ export default function CheckinHistoryPage() {
             </p>
           </div>
 
-          {/* Date Picker - Vertical Layout */}
-          <div className="space-y-3 mb-6">
+          {timePeriod === 'custom' && (
+            <div className="space-y-3 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
               <input
@@ -461,6 +470,7 @@ export default function CheckinHistoryPage() {
               {loading ? 'Loading...' : 'Apply Filter'}
             </button>
           </div>
+          )}
 
           {/* Filtering Section */}
           {allIssues.length > 0 && (
@@ -529,7 +539,7 @@ export default function CheckinHistoryPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Time Period</label>
                 <select
                   value={timePeriod}
-                  onChange={(e) => setTimePeriod(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all')}
+                  onChange={(e) => setTimePeriod(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all' | 'custom')}
                   className="w-full sm:w-auto min-w-[180px] border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 dark:bg-gray-700 dark:text-white bg-white text-gray-900 focus:ring-2 focus:ring-helfi-green focus:border-transparent cursor-pointer"
                 >
                   <option value="daily">30 Days</option>
@@ -537,6 +547,7 @@ export default function CheckinHistoryPage() {
                   <option value="monthly">12 Months</option>
                   <option value="yearly">5 Years</option>
                   <option value="all">All Time</option>
+                  <option value="custom">Custom Date</option>
                 </select>
               </div>
               
