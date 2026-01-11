@@ -682,7 +682,7 @@ export default function WaterIntakePage() {
 
         <div className="px-4 pt-2">
           <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-3">Quick Add</h3>
-          <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
+          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
             {DRINK_TYPES.map((drink) => (
               <button
                 key={drink.id}

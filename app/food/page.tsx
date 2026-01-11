@@ -6215,6 +6215,30 @@ const applyStructuredItems = (
   const normalizeDiaryList = (list: any[], fallbackDate: string) =>
     Array.isArray(list) ? list.map((entry) => normalizeDiaryEntry(entry, fallbackDate)) : []
 
+  const updatePersistentDiarySnapshotForDate = (
+    entriesForDate: any[],
+    targetDate: string,
+    expandedOverride?: Record<string, boolean>,
+  ) => {
+    if (typeof window === 'undefined') return
+    if (!targetDate) return
+    try {
+      const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
+      const filtered = filterEntriesForDate(entriesForDate, targetDate)
+      const normalized = dedupeEntries(normalizeDiaryList(filtered, targetDate), { fallbackDate: targetDate })
+      const existing = snapshot.byDate[targetDate] || {}
+      snapshot.byDate[targetDate] = {
+        entries: normalized,
+        expandedCategories: expandedOverride || existing.expandedCategories,
+        normalized: true,
+      }
+      writePersistentDiarySnapshot(snapshot)
+      refreshPersistentDiarySnapshot()
+    } catch (err) {
+      console.warn('Could not persist diary snapshot for date', err)
+    }
+  }
+
   const sourceEntries = useMemo(
     () =>
       dedupeEntries(
@@ -12152,10 +12176,12 @@ Please add nutritional information manually if needed.`);
       )
       updatedTodaysFoods = dedupeList([pendingEntry, ...baseForDate])
       updateTodaysFoodsForDate(updatedTodaysFoods, dedupeTargetDate)
+      updatePersistentDiarySnapshotForDate(updatedTodaysFoods, dedupeTargetDate)
       foodsForSave = updatedTodaysFoods
     } else if (isTargetSelected && !isViewingToday) {
       updatedHistoryFoods = dedupeList([pendingEntry, ...normalizedHistory])
       setHistoryFoods(updatedHistoryFoods)
+      updatePersistentDiarySnapshotForDate(updatedHistoryFoods, dedupeTargetDate)
       foodsForSave = updatedHistoryFoods
     } else {
       const baseForDate = dedupeEntries(
@@ -12164,6 +12190,7 @@ Please add nutritional information manually if needed.`);
       )
       updatedTodaysFoods = dedupeList([pendingEntry, ...baseForDate])
       updateTodaysFoodsForDate(updatedTodaysFoods, dedupeTargetDate)
+      updatePersistentDiarySnapshotForDate(updatedTodaysFoods, dedupeTargetDate)
       foodsForSave = updatedTodaysFoods
     }
     holdVerifyMergeForDate(dedupeTargetDate)
@@ -12256,6 +12283,7 @@ Please add nutritional information manually if needed.`);
     )
     const deduped = dedupeEntries([...clones, ...baseForDate], { fallbackDate: targetDate })
     updateTodaysFoodsForDate(deduped, targetDate)
+    updatePersistentDiarySnapshotForDate(deduped, targetDate)
     clones.forEach((clone) => enqueuePendingFoodLogSave(clone, targetDate))
     holdVerifyMergeForDate(targetDate)
     setExpandedCategories((prev) => ({ ...prev, [categoryKey]: true }))
