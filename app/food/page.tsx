@@ -1408,9 +1408,36 @@ const normalizeDiscreteItem = (item: any) => {
 
 // Fallback estimated grams per single serving when no weight info exists
 const defaultGramsForItem = (item: any): number | null => {
-  const name = String(item?.name || '').toLowerCase()
+  const nameRaw = String(item?.name || '')
+  const servingRaw = String(item?.serving_size || '')
+  const name = nameRaw.toLowerCase()
   if (!name) return null
+  const dessertLabel = `${nameRaw} ${servingRaw}`.toLowerCase()
+  const dessertHints = [
+    'fruitcake',
+    'christmas pudding',
+    'pudding',
+    'cake',
+    'brownie',
+    'cheesecake',
+    'banana bread',
+    'carrot cake',
+    'mud cake',
+    'fudge',
+    'tart',
+    'pie',
+  ]
+  const portionHints = ['slice', 'piece', 'portion', 'wedge', 'square', 'bar']
+  if (
+    dessertHints.some((term) => dessertLabel.includes(term)) &&
+    (portionHints.some((term) => dessertLabel.includes(term)) || /(\d+)\s*\/\s*(\d+)/.test(dessertLabel))
+  ) {
+    return null
+  }
   if (/\bcheese\s*-?\s*cake\b/.test(name) || name.includes('cheesecake')) return null
+  const normalizedName = name.replace(/[^a-z0-9]+/g, ' ').trim()
+  const hasWord = (word: string) => new RegExp(`\\b${escapeRegex(word)}\\b`).test(normalizedName)
+  const hasPhrase = (phrase: string) => normalizedName.includes(phrase)
   const curated: Array<{ keywords: string[]; grams: number }> = [
     { keywords: ['egg', 'eggs'], grams: 50 },
     { keywords: ['bacon', 'rasher', 'rashers', 'strip', 'strips'], grams: 15 },
@@ -1430,14 +1457,18 @@ const defaultGramsForItem = (item: any): number | null => {
     { keywords: ['meatball', 'meatballs'], grams: 20 },
   ]
   for (const entry of curated) {
-    if (entry.keywords.some((k) => name.includes(k))) return entry.grams
+    if (
+      entry.keywords.some((k) => (k.includes(' ') ? hasPhrase(k) : hasWord(k)))
+    ) {
+      return entry.grams
+    }
   }
-  if (name.includes('patty')) return 115 // ~4 oz patty
-  if (name.includes('bacon')) return 15 // one slice cooked
-  if (/\bcheese\b/.test(name)) return 25 // one slice
-  if (name.includes('tomato')) return 50 // a couple slices
-  if (name.includes('lettuce')) return 10
-  if (name.includes('bun')) return 75
+  if (hasWord('patty')) return 115 // ~4 oz patty
+  if (hasWord('bacon')) return 15 // one slice cooked
+  if (hasWord('cheese') && /\bslice\b|\bslices\b|\bpiece\b/.test(dessertLabel)) return 25 // one slice
+  if (hasWord('tomato')) return 50 // a couple slices
+  if (hasWord('lettuce')) return 10
+  if (hasWord('bun')) return 75
   return null
 }
 
