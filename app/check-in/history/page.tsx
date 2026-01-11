@@ -229,7 +229,7 @@ export default function CheckinHistoryPage() {
 
     if (!elements.length) {
       lastTooltipKeyRef.current = null
-      chart.tooltip.setActiveElements([], { x: 0, y: 0 })
+      chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
       chart.update()
       return
     }
@@ -238,14 +238,14 @@ export default function CheckinHistoryPage() {
     const key = `${datasetIndex}:${index}`
     if (lastTooltipKeyRef.current === key) {
       lastTooltipKeyRef.current = null
-      chart.tooltip.setActiveElements([], { x: 0, y: 0 })
+      chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
       chart.update()
       return
     }
 
     lastTooltipKeyRef.current = key
     const point = chart.getDatasetMeta(datasetIndex).data[index] as { x: number; y: number }
-    chart.tooltip.setActiveElements([{ datasetIndex, index }], { x: point.x, y: point.y })
+    chart.tooltip?.setActiveElements([{ datasetIndex, index }], { x: point.x, y: point.y })
     chart.update()
   }
 
