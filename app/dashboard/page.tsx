@@ -929,13 +929,13 @@ export default function Dashboard() {
                     </div>
                     <span className="text-sm font-semibold mb-6">Fitbit</span>
                     {fitbitConnected ? (
-                      <Link href="/devices" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">
+                      <Link href="/devices" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-xs leading-tight">
                         Connected ✓
                       </Link>
                     ) : (
                       <button
                         onClick={handleConnectFitbit}
-                        className="w-full bg-helfi-green hover:bg-green-600 text-white py-3 rounded-xl font-bold transition-all"
+                        className="w-full bg-helfi-green hover:bg-green-600 text-white py-3 rounded-xl font-bold transition-all text-xs leading-tight"
                         disabled={fitbitLoading}
                       >
                         {fitbitLoading ? 'Connecting...' : 'Connect'}
@@ -951,7 +951,7 @@ export default function Dashboard() {
                     {!garminConnectEnabled ? (
                       <button
                         onClick={() => toggleInterest('garmin')}
-                        className={`w-full py-3 rounded-xl font-bold transition-all ${
+                        className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
                           deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                         }`}
                         disabled={!!savingInterest}
@@ -959,11 +959,11 @@ export default function Dashboard() {
                         {deviceInterest.garmin ? 'Interested ✓' : 'Connect'}
                       </button>
                     ) : garminConnected ? (
-                      <Link href="/devices" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">
+                      <Link href="/devices" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-xs leading-tight">
                         Connected ✓
                       </Link>
                     ) : (
-                      <Link href="/devices" className="w-full bg-helfi-green hover:bg-green-600 text-white py-3 rounded-xl font-bold">
+                      <Link href="/devices" className="w-full bg-helfi-green hover:bg-green-600 text-white py-3 rounded-xl font-bold text-xs leading-tight">
                         Connect
                       </Link>
                     )}
@@ -976,7 +976,7 @@ export default function Dashboard() {
                     <span className="text-sm font-semibold mb-6">Google Fit</span>
                     <button
                       onClick={() => toggleInterest('googleFit')}
-                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                      className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
                         deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                       }`}
                       disabled={!!savingInterest}
@@ -992,7 +992,7 @@ export default function Dashboard() {
                     <span className="text-sm font-semibold mb-6">Oura Ring</span>
                     <button
                       onClick={() => toggleInterest('oura')}
-                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                      className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
                         deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                       }`}
                       disabled={!!savingInterest}
@@ -1008,7 +1008,7 @@ export default function Dashboard() {
                     <span className="text-sm font-semibold mb-6">Polar</span>
                     <button
                       onClick={() => toggleInterest('polar')}
-                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                      className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
                         deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                       }`}
                       disabled={!!savingInterest}
@@ -1024,7 +1024,7 @@ export default function Dashboard() {
                     <span className="text-sm font-semibold mb-6">Huawei Health</span>
                     <button
                       onClick={() => toggleInterest('huawei')}
-                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                      className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
                         deviceInterest.huawei ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                       }`}
                       disabled={!!savingInterest}
