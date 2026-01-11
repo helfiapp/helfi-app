@@ -184,13 +184,13 @@ const formatWaterEntryAmount = (entry: { amount?: number; unit?: string; amountM
 }
 
 const WATER_ICON_BY_LABEL: Record<string, string> = {
-  water: '/mobile-assets/MOBILE%20ICONS/WATER.png',
-  coffee: '/mobile-assets/MOBILE%20ICONS/COFFEE.png',
-  tea: '/mobile-assets/MOBILE%20ICONS/TEA.png',
-  juice: '/mobile-assets/MOBILE%20ICONS/JUICE.png',
-  'hot chocolate': '/mobile-assets/MOBILE%20ICONS/HOT%20CHOCOLATE.png',
-  'soft drink': '/mobile-assets/MOBILE%20ICONS/SOFT%20DRINK.png',
-  alcohol: '/mobile-assets/MOBILE%20ICONS/ALCOHOL.png',
+  water: '/mobile-assets/MOBILE ICONS/WATER.png',
+  coffee: '/mobile-assets/MOBILE ICONS/COFFEE.png',
+  tea: '/mobile-assets/MOBILE ICONS/TEA.png',
+  juice: '/mobile-assets/MOBILE ICONS/JUICE.png',
+  'hot chocolate': '/mobile-assets/MOBILE ICONS/HOT CHOCOLATE.png',
+  'soft drink': '/mobile-assets/MOBILE ICONS/SOFT DRINK.png',
+  alcohol: '/mobile-assets/MOBILE ICONS/ALCOHOL.png',
 }
 
 const getWaterIconSrc = (label?: string | null) => {
@@ -7054,10 +7054,16 @@ const applyStructuredItems = (
   const PULL_REFRESH_ACTIVATE = 40
   const PULL_REFRESH_THRESHOLD = 220
   const PULL_REFRESH_MAX = 320
-  const PULL_REFRESH_START_ZONE = 80
+  const PULL_REFRESH_START_ZONE = 180
+  const getScrollTop = () => {
+    if (typeof window === 'undefined') return 0
+    const scroller = document.scrollingElement
+    if (scroller && Number.isFinite(scroller.scrollTop)) return scroller.scrollTop
+    return window.scrollY || 0
+  }
   const handlePullStart = (e: React.TouchEvent) => {
     if (typeof window === 'undefined') return
-    if (window.scrollY > 0) return
+    if (getScrollTop() > 0) return
     if (syncPausedRef.current || diaryRefreshingRef.current) return
     pullOffsetRef.current = 0
     setPullOffset(0)
@@ -7067,7 +7073,7 @@ const applyStructuredItems = (
   }
   const handlePullMove = (e: React.TouchEvent) => {
     if (pullStartYRef.current === null) return
-    if (typeof window !== 'undefined' && window.scrollY > 0) {
+    if (typeof window !== 'undefined' && getScrollTop() > 0) {
       pullStartYRef.current = null
       pullOffsetRef.current = 0
       setPullOffset(0)
@@ -18651,7 +18657,7 @@ Please add nutritional information manually if needed.`);
                               <div className="flex items-center gap-3">
                                 <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
                                   <Image
-                                    src={isWaterEntry ? (waterIconSrc || "/mobile-assets/MOBILE%20ICONS/WATER.png") : "/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"}
+                                    src={isWaterEntry ? (waterIconSrc || "/mobile-assets/MOBILE ICONS/WATER.png") : "/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"}
                                     alt={isWaterEntry ? `${waterLabel || 'Water'} log` : "Food item"}
                                     width={32}
                                     height={32}
