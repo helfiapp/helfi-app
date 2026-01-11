@@ -920,13 +920,13 @@ export default function WaterIntakePage() {
                           setDrinkSugarAmount('')
                           e.currentTarget.select()
                         }}
-                        className="flex-1 h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-sm text-gray-900 dark:text-white"
-                        placeholder="0"
+                        className="flex-1 min-w-0 h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-[16px] text-gray-900 dark:text-white"
+                        placeholder="Enter amount"
                       />
                       <select
                         value={drinkSugarUnit}
                         onChange={(e) => setDrinkSugarUnit(e.target.value as SugarUnit)}
-                        className="h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-sm text-gray-700 dark:text-gray-200"
+                        className="h-11 min-w-[84px] rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-[16px] text-gray-700 dark:text-gray-200"
                       >
                         {SUGAR_UNITS.map((unit) => (
                           <option key={unit} value={unit}>
