@@ -38,6 +38,7 @@ ChartJS.register(
 export const dynamic = 'force-dynamic'
 
 type Row = { date: string; issueId: string; name: string; polarity: 'positive'|'negative'; value: number | null; note?: string }
+type HistoryCache = { rows: Row[]; fetchedAt: number }
 
 export default function CheckinHistoryPage() {
   const router = useRouter()
@@ -66,6 +67,30 @@ export default function CheckinHistoryPage() {
     'rgb(14, 165, 233)',
   ]
 
+  const HISTORY_CACHE_TTL_MS = 5 * 60_000
+  const buildHistoryCacheKey = (startValue: string, endValue: string) =>
+    `checkin-history:${startValue || 'all'}:${endValue || 'all'}`
+  const readHistoryCache = (key: string): HistoryCache | null => {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = window.sessionStorage.getItem(key)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (!parsed?.rows || !Array.isArray(parsed.rows)) return null
+      return parsed
+    } catch {
+      return null
+    }
+  }
+  const writeHistoryCache = (key: string, history: Row[]) => {
+    if (typeof window === 'undefined') return
+    try {
+      window.sessionStorage.setItem(key, JSON.stringify({ rows: history, fetchedAt: Date.now() }))
+    } catch {
+      // ignore cache write errors
+    }
+  }
+
   const getRatingLabel = (value: number | null) => {
     if (value === null || value === undefined) return 'N/A'
     const clamped = Math.max(0, Math.min(6, value))
@@ -79,11 +104,25 @@ export default function CheckinHistoryPage() {
       ? color.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`)
       : color
 
-  const load = async (overrides?: { start?: string; end?: string }) => {
+  const load = async (overrides?: { start?: string; end?: string }, options?: { force?: boolean }) => {
     setLoading(true)
     try {
       const startValue = overrides?.start ?? start
       const endValue = overrides?.end ?? end
+      const cacheKey = buildHistoryCacheKey(startValue, endValue)
+      if (!options?.force) {
+        const cached = readHistoryCache(cacheKey)
+        if (cached && Date.now() - cached.fetchedAt < HISTORY_CACHE_TTL_MS) {
+          const history = cached.rows
+          setRows(history)
+          const issues = Array.from(new Set(history.map((r: Row) => r.name))).sort() as string[]
+          setAllIssues(issues)
+          if (selectedIssues.size === 0) {
+            setSelectedIssues(new Set(issues))
+          }
+          return
+        }
+      }
       const params = new URLSearchParams()
       if (startValue) params.set('start', startValue)
       if (endValue) params.set('end', endValue)
@@ -98,6 +137,7 @@ export default function CheckinHistoryPage() {
       if (selectedIssues.size === 0) {
         setSelectedIssues(new Set(issues))
       }
+      writeHistoryCache(cacheKey, history)
     } catch (e) {
       console.error('Failed to load history', e)
     } finally {
@@ -159,7 +199,7 @@ export default function CheckinHistoryPage() {
     try {
       const res = await fetch(`/api/checkins/ratings?date=${date}&issueId=${issueId}`, { method: 'DELETE' })
       if (res.ok) {
-        await load()
+        await load(undefined, { force: true })
         // setShowDeleteMenu(null) // This state was removed
       } else {
         alert('Failed to delete rating')
@@ -190,7 +230,7 @@ export default function CheckinHistoryPage() {
         })
       })
       if (res.ok) {
-        await load()
+        await load(undefined, { force: true })
         setEditingEntry(null)
       } else {
         alert('Failed to update rating')
@@ -216,7 +256,7 @@ export default function CheckinHistoryPage() {
         body: JSON.stringify({ action: 'delete-by-issues', issueIds })
       })
       if (res.ok) {
-        await load()
+        await load(undefined, { force: true })
         setSelectedIssues(new Set())
       } else {
         alert('Failed to delete ratings')
@@ -235,7 +275,7 @@ export default function CheckinHistoryPage() {
         body: JSON.stringify({ action: 'delete-all' })
       })
       if (res.ok) {
-        await load()
+        await load(undefined, { force: true })
         setSelectedIssues(new Set())
       } else {
         alert('Failed to reset data')
@@ -473,7 +513,7 @@ export default function CheckinHistoryPage() {
               />
             </div>
             <button
-              onClick={() => load()}
+              onClick={() => load(undefined, { force: true })}
               disabled={loading}
               className="w-full bg-helfi-green text-white px-4 py-2.5 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 font-medium transition-colors"
             >
@@ -552,22 +592,20 @@ export default function CheckinHistoryPage() {
                 Ratings are scored 0 (Really bad) to 6 (Excellent). Hover the chart to see exact values.
               </p>
 
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
-                <div className="h-56 md:h-72">
-                  <Line data={chartData} options={chartOptions} />
-                </div>
-                <div className="flex flex-wrap gap-4 mt-4 justify-center">
-                  {chartData.datasets.map((dataset) => (
-                    <div key={dataset.label} className="flex items-center gap-1.5">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: dataset.borderColor as string }}
-                        aria-hidden="true"
-                      />
-                      <span className="text-[10px] text-slate-500 font-medium">{dataset.label}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="h-56 md:h-72">
+                <Line data={chartData} options={chartOptions} />
+              </div>
+              <div className="flex flex-wrap gap-4 mt-4 justify-center">
+                {chartData.datasets.map((dataset) => (
+                  <div key={dataset.label} className="flex items-center gap-1.5">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: dataset.borderColor as string }}
+                      aria-hidden="true"
+                    />
+                    <span className="text-[10px] text-slate-500 font-medium">{dataset.label}</span>
+                  </div>
+                ))}
               </div>
             </section>
           )}
@@ -591,13 +629,17 @@ export default function CheckinHistoryPage() {
                     return (
                       <div
                         key={i}
-                        className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                        className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3"
                       >
-                        <div>
-                          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase">{r.date}</p>
-                          <p className="text-base font-semibold text-gray-900 dark:text-white">{r.name}</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap">
+                            {r.date}
+                          </span>
+                          <span className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                            {r.name}
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between sm:justify-end gap-3">
+                        <div className="flex items-center gap-3">
                           <span className={`px-3 py-1 rounded-full text-xs font-bold border ${color}`}>
                             {label}
                             {r.value !== null && r.value !== undefined && (
