@@ -16138,7 +16138,9 @@ Please add nutritional information manually if needed.`);
                           piecesPerServing && piecesPerServing > 0
                             ? Math.max(0, Math.round(servingsCount * piecesPerServing * 1000) / 1000)
                             : null
-                        const showPiecesControl = Boolean(piecesPerServing && piecesPerServing > 1)
+                        const piecesPerServingValue =
+                          piecesPerServing && piecesPerServing > 1 ? piecesPerServing : null
+                        const showPiecesControl = Boolean(piecesPerServingValue)
                         const pieceCountDisplay =
                           showPiecesControl && pieceCount !== null ? formatPieceDisplay(pieceCount) : ''
 
@@ -16446,7 +16448,7 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 {/* Pieces control for discrete items */}
                                 {/* Only show pieces when we have multiple items, not for a single slice/piece. */}
-                                {showPiecesControl && (
+                                {showPiecesControl && piecesPerServingValue && (
                                   <div className="flex items-center justify-between gap-3 mt-2">
                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                                       {(() => {
@@ -16463,9 +16465,9 @@ Please add nutritional information manually if needed.`);
                                     <button
                                       onClick={() => {
                                         const current = analyzedItems[index]?.servings || 1
-                                        const currentPieces = pieceCount ?? current * piecesPerServing
+                                        const currentPieces = pieceCount ?? current * piecesPerServingValue
                                         const newPieces = Math.max(0, currentPieces - 1)
-                                        const newServings = newPieces / piecesPerServing
+                                        const newServings = newPieces / piecesPerServingValue
                                         updateItemField(index, 'servings', newServings)
                                       }}
                                       className="w-10 h-10 flex items-center justify-center rounded-lg bg-white shadow-sm active:scale-95 transition-transform text-emerald-600"
@@ -16491,14 +16493,14 @@ Please add nutritional information manually if needed.`);
                                           const key = `ai:card:${index}:pieces`
                                           const v = e.target.value
                                           setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                          if (String(v).trim() !== '') {
-                                            const parsed = Number(v)
-                                            if (Number.isFinite(parsed)) {
-                                              const newServings = parsed / piecesPerServing
+                                        if (String(v).trim() !== '') {
+                                          const parsed = Number(v)
+                                          if (Number.isFinite(parsed)) {
+                                              const newServings = parsed / piecesPerServingValue
                                               updateItemField(index, 'servings', newServings)
-                                            }
                                           }
-                                        }}
+                                        }
+                                      }}
                                         onBlur={() => {
                                           const key = `ai:card:${index}:pieces`
                                           setNumericInputDrafts((prev) => {
@@ -16513,9 +16515,9 @@ Please add nutritional information manually if needed.`);
                                       <button
                                         onClick={() => {
                                           const current = analyzedItems[index]?.servings || 1
-                                          const currentPieces = pieceCount ?? current * piecesPerServing
+                                          const currentPieces = pieceCount ?? current * piecesPerServingValue
                                           const newPieces = currentPieces + 1
-                                          const newServings = newPieces / piecesPerServing
+                                          const newServings = newPieces / piecesPerServingValue
                                           updateItemField(index, 'servings', newServings)
                                         }}
                                         className="w-10 h-10 flex items-center justify-center rounded-lg bg-white shadow-sm active:scale-95 transition-transform text-emerald-600"
