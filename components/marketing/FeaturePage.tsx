@@ -281,6 +281,8 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                   : []
                 const hasImages = segmentImages.length > 0
                 const isPhotoGallery = segmentImages.some((image) => image.kind === 'photo')
+                const shouldUseSideLayout = hasImages && (segment.imageLayout === 'side' || !isPhotoGallery)
+                const imageFirst = segment.imagePlacement === 'left'
                 const imageGridClass = segmentImages.length > 1 ? 'grid gap-4 md:grid-cols-2' : 'grid gap-4'
                 const imageStackClass = `${segmentImages.length > 1 ? 'grid gap-4 sm:grid-cols-2' : 'grid gap-4'}${
                   segment.alignImageWithHeading ? ' mt-6' : ''
@@ -321,7 +323,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                     key={segment.title}
                     className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 shadow-sm"
                   >
-                    {isPhotoGallery ? (
+                    {!shouldUseSideLayout && isPhotoGallery ? (
                       <div>
                         {textBlock}
                         {hasImages && (
@@ -338,6 +340,50 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                                   height={image.height ?? 896}
                                   sizes="(min-width: 768px) 45vw, 100vw"
                                   className="w-full h-auto object-cover"
+                                  loading="lazy"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : shouldUseSideLayout ? (
+                      <div className={hasImages ? 'grid gap-8 lg:grid-cols-[1.15fr_0.85fr] items-start' : ''}>
+                        {imageFirst && hasImages && (
+                          <div className={imageStackClass}>
+                            {segmentImages.map((image) => (
+                              <div
+                                key={`${segment.title}-${image.src}`}
+                                className="rounded-2xl bg-transparent shadow-none overflow-hidden"
+                              >
+                                <Image
+                                  src={image.src}
+                                  alt={image.alt}
+                                  width={image.width ?? 1450}
+                                  height={image.height ?? 2936}
+                                  sizes="(min-width: 1024px) 30vw, 90vw"
+                                  className={`w-full h-auto ${imageSizeClass} object-contain`}
+                                  loading="lazy"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {textBlock}
+                        {!imageFirst && hasImages && (
+                          <div className={imageStackClass}>
+                            {segmentImages.map((image) => (
+                              <div
+                                key={`${segment.title}-${image.src}`}
+                                className="rounded-2xl bg-transparent shadow-none overflow-hidden"
+                              >
+                                <Image
+                                  src={image.src}
+                                  alt={image.alt}
+                                  width={image.width ?? 1450}
+                                  height={image.height ?? 2936}
+                                  sizes="(min-width: 1024px) 30vw, 90vw"
+                                  className={`w-full h-auto ${imageSizeClass} object-contain`}
                                   loading="lazy"
                                 />
                               </div>

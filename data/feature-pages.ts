@@ -31,6 +31,8 @@ export type FeaturePageSegment = {
   alignImageWithHeading?: boolean
   showImage?: boolean
   imageSize?: 'default' | 'large'
+  imageLayout?: 'stacked' | 'side'
+  imagePlacement?: 'left' | 'right'
 }
 
 export type FeaturePageContent = {
@@ -269,6 +271,8 @@ export const featurePages: FeaturePageContent[] = [
           kind: 'photo',
         },
         showImage: true,
+        imageLayout: 'side',
+        imagePlacement: 'left',
       },
       {
         title: 'Device roadmap visibility',
