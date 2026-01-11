@@ -19015,11 +19015,24 @@ Please add nutritional information manually if needed.`);
                         summaryText = summaryParts.length > 0 ? summaryParts.join(', ') : 'No entries yet'
                       }
 
-                      const toggleCategory = () =>
+                      const toggleCategory = () => {
+                        const isOpening = !expandedCategories[cat.key]
                         setExpandedCategories((prev) => ({
                           ...prev,
                           [cat.key]: !prev[cat.key],
                         }))
+                        if (!isOpening) return
+                        const isLastCategory =
+                          cat.key === 'uncategorized' || cat.key === MEAL_CATEGORY_ORDER[MEAL_CATEGORY_ORDER.length - 1]
+                        if (!isLastCategory || visibleEntries.length === 0) return
+                        const sorted = visibleEntries
+                          .slice()
+                          .sort((a: any, b: any) => (extractEntryTimestampMs(b) || 0) - (extractEntryTimestampMs(a) || 0))
+                        const lastEntry = sorted[sorted.length - 1] || sorted[0]
+                        if (lastEntry?.id !== undefined && lastEntry?.id !== null) {
+                          queueScrollToDiaryEntry({ entryKey: lastEntry.id, category: cat.key })
+                        }
+                      }
 
                       return (
                         <div
