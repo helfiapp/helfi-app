@@ -27,13 +27,13 @@ type GoalResponse = {
 }
 
 const DRINK_TYPES = [
-  { id: 'Water', icon: 'water_full' },
-  { id: 'Coffee', icon: 'coffee' },
-  { id: 'Tea', icon: 'emoji_food_beverage' },
-  { id: 'Juice', icon: 'local_bar' },
-  { id: 'Hot Chocolate', icon: 'local_cafe' },
-  { id: 'Soft Drink', icon: 'local_drink' },
-  { id: 'Alcohol', icon: 'wine_bar' },
+  { id: 'Water', icon: '/mobile-assets/MOBILE%20ICONS/WATER.png' },
+  { id: 'Coffee', icon: '/mobile-assets/MOBILE%20ICONS/COFFEE.png' },
+  { id: 'Tea', icon: '/mobile-assets/MOBILE%20ICONS/TEA.png' },
+  { id: 'Juice', icon: '/mobile-assets/MOBILE%20ICONS/JUICE.png' },
+  { id: 'Hot Chocolate', icon: '/mobile-assets/MOBILE%20ICONS/HOT%20CHOCOLATE.png' },
+  { id: 'Soft Drink', icon: '/mobile-assets/MOBILE%20ICONS/SOFT%20DRINK.png' },
+  { id: 'Alcohol', icon: '/mobile-assets/MOBILE%20ICONS/ALCOHOL.png' },
 ] as const
 
 const QUICK_PRESETS = [
@@ -534,7 +534,8 @@ export default function WaterIntakePage() {
                     : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                 }`}
               >
-                <MaterialSymbol name={drink.icon} className="text-sm" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={drink.icon} alt={`${drink.id} icon`} className="h-4 w-4" />
                 {drink.id}
               </button>
             ))}
@@ -655,7 +656,7 @@ export default function WaterIntakePage() {
             {!loading && entries.map((entry) => {
               const label = normalizeLabel(entry.label)
               const drinkConfig = DRINK_TYPES.find((drink) => drink.id.toLowerCase() === label.toLowerCase())
-              const icon = drinkConfig?.icon || 'water_full'
+              const icon = drinkConfig?.icon || '/mobile-assets/MOBILE%20ICONS/WATER.png'
               const accent =
                 label.toLowerCase() === 'coffee'
                   ? 'bg-orange-50 text-orange-500 dark:bg-orange-900/20'
@@ -664,7 +665,8 @@ export default function WaterIntakePage() {
                 <div key={entry.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${accent}`}>
-                      <MaterialSymbol name={icon} className="text-lg" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={icon} alt={`${label} icon`} className="h-5 w-5" />
                     </div>
                     <div>
                       <p className="text-sm font-bold text-[#111711] dark:text-white">{label}</p>
