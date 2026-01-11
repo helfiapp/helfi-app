@@ -44,7 +44,14 @@ const QUICK_PRESETS = [
 ] as const
 
 function todayLocalDate() {
-  return new Date().toISOString().slice(0, 10)
+  return formatLocalDate(new Date())
+}
+
+function formatLocalDate(value: Date) {
+  const y = value.getFullYear()
+  const m = String(value.getMonth() + 1).padStart(2, '0')
+  const d = String(value.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function isValidDate(value: string | null | undefined) {
@@ -334,9 +341,13 @@ export default function WaterIntakePage() {
   }
 
   const shiftDate = (delta: number) => {
-    const d = new Date(`${selectedDate}T00:00:00`)
-    d.setDate(d.getDate() + delta)
-    setSelectedDate(d.toISOString().slice(0, 10))
+    const parts = String(selectedDate).split('-').map(Number)
+    const [yy, mm, dd] = parts
+    const base = Number.isFinite(yy) && Number.isFinite(mm) && Number.isFinite(dd)
+      ? new Date(yy, mm - 1, dd)
+      : new Date()
+    base.setDate(base.getDate() + delta)
+    setSelectedDate(formatLocalDate(base))
   }
 
   const openGoalEditor = () => {
