@@ -463,7 +463,7 @@ export default function CheckinHistoryPage() {
               />
             </div>
             <button
-              onClick={load}
+              onClick={() => load()}
               disabled={loading}
               className="w-full bg-helfi-green text-white px-4 py-2.5 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 font-medium transition-colors"
             >
