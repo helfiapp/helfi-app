@@ -54,6 +54,8 @@ export default function HealthTipsPage() {
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false)
   const [expandedTipId, setExpandedTipId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [generatingTip, setGeneratingTip] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
   const settingsSnapshotRef = useRef<string>('')
   const settingsRef = useRef<HealthTipSettings>({
     enabled: false,
@@ -67,21 +69,28 @@ export default function HealthTipsPage() {
     focusLifestyle: true,
   })
 
-  useEffect(() => {
-    ;(async () => {
-      try {
-        const res = await fetch('/api/health-tips/today', { cache: 'no-store' as any })
-        if (res.ok) {
-          const data = await res.json()
-          setTips(Array.isArray(data?.tips) ? data.tips : [])
-        }
-      } catch {
-        // ignore – UI will show friendly message
-      } finally {
+  const loadTips = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoadingTips(true)
+    }
+    try {
+      const res = await fetch('/api/health-tips/today', { cache: 'no-store' as any })
+      if (res.ok) {
+        const data = await res.json()
+        setTips(Array.isArray(data?.tips) ? data.tips : [])
+      }
+    } catch {
+      // ignore – UI will show friendly message
+    } finally {
+      if (!options?.silent) {
         setLoadingTips(false)
       }
-    })()
+    }
   }, [])
+
+  useEffect(() => {
+    loadTips()
+  }, [loadTips])
 
   useEffect(() => {
     ;(async () => {
@@ -185,6 +194,29 @@ export default function HealthTipsPage() {
       .filter((tz) => tz.toLowerCase().includes(query))
       .slice(0, 50)
   }, [timezoneOptions, timezoneQuery])
+
+  const handleGenerateTip = useCallback(async () => {
+    if (generatingTip) return
+    setGenerateError(null)
+    setGeneratingTip(true)
+    try {
+      const res = await fetch('/api/health-tips/generate', { method: 'POST' })
+      if (res.status === 402) {
+        setGenerateError('You do not have enough credits to generate a tip right now.')
+        return
+      }
+      if (!res.ok) {
+        setGenerateError('We could not generate a tip. Please try again.')
+        return
+      }
+      await res.json().catch(() => ({}))
+      await loadTips({ silent: true })
+    } catch {
+      setGenerateError('We could not generate a tip. Please try again.')
+    } finally {
+      setGeneratingTip(false)
+    }
+  }, [generatingTip, loadTips])
 
   const handleSaveSettings = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: HealthTipSettings }) => {
     const payload = options?.payload ?? {
@@ -309,6 +341,19 @@ export default function HealthTipsPage() {
             When you receive a notification and tap it, you&apos;ll land here to see the full tip,
             plus any others sent today.
           </p>
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={handleGenerateTip}
+              disabled={generatingTip}
+              className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
+            >
+              {generatingTip ? 'Generating…' : 'Generate Health Tip'}
+            </button>
+            {generateError && (
+              <p className="mt-2 text-xs text-red-600">{generateError}</p>
+            )}
+          </div>
 
           {loadingTips ? (
             <div className="flex items-center justify-center py-8">
@@ -386,13 +431,10 @@ export default function HealthTipsPage() {
 
         {/* Settings */}
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Health tip schedule
             </h2>
-            <Link href="/notifications/ai-insights" className="text-sm text-helfi-green hover:underline font-medium">
-              Set your notifications →
-            </Link>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Choose how many AI health tips you&apos;d like each day and when you&apos;d like to
