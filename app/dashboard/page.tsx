@@ -447,7 +447,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen min-h-[100svh] bg-gray-50 dark:bg-gray-900">
       {/* Navigation Header - Mobile: Logo + Profile Row, Desktop: Logo + Actions Row */}
       <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-3">
         <div className="max-w-7xl mx-auto">
