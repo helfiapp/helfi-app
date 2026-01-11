@@ -751,12 +751,12 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
               <Link href="/food" className="block">
-                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
+                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-[#FF803E] text-white hover:bg-[#E67237] transition-colors">
                   Track Calories
                 </div>
               </Link>
               <Link href="/food/water" className="block">
-                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-sky-600 text-white hover:bg-sky-700 transition-colors">
+                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-[#0099FF] text-white hover:bg-[#0086E6] transition-colors">
                   Log Water Intake
                 </div>
               </Link>
@@ -766,7 +766,7 @@ export default function Dashboard() {
                 </div>
               </Link>
               <Link href="/health-tips" className="block">
-                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-amber-600 text-white hover:bg-amber-700 transition-colors">
+                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-[#4DAF50] text-white hover:bg-[#439A45] transition-colors">
                   Health Tips
                 </div>
               </Link>
