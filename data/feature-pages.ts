@@ -239,10 +239,11 @@ export const featurePages: FeaturePageContent[] = [
           'Feeds weekly summaries automatically',
           'Supports reminders and notifications',
         ],
-        image: {
-          src: '/screenshots/hero/TODAYS CHECK IN.png',
-          alt: 'Daily check-in screen',
-        },
+        image: healthTrackingPhone(
+          '/MOBILE MOCKUPS/HEALTH TRACKING/MOBILE MOCKUPS/MOOD TRACKER-portrait.png',
+          'Mood tracker screen'
+        ),
+        showImage: true,
       },
       {
         title: 'Wearable integrations',
