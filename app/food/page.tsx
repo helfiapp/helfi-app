@@ -7054,7 +7054,6 @@ const applyStructuredItems = (
   const PULL_REFRESH_ACTIVATE = 40
   const PULL_REFRESH_THRESHOLD = 220
   const PULL_REFRESH_MAX = 320
-  const PULL_REFRESH_START_ZONE = 180
   const getScrollTop = () => {
     if (typeof window === 'undefined') return 0
     const scroller = document.scrollingElement
@@ -7067,9 +7066,7 @@ const applyStructuredItems = (
     if (syncPausedRef.current || diaryRefreshingRef.current) return
     pullOffsetRef.current = 0
     setPullOffset(0)
-    const startY = e.touches[0]?.clientY ?? null
-    if (startY === null || startY > PULL_REFRESH_START_ZONE) return
-    pullStartYRef.current = startY
+    pullStartYRef.current = e.touches[0]?.clientY ?? null
   }
   const handlePullMove = (e: React.TouchEvent) => {
     if (pullStartYRef.current === null) return

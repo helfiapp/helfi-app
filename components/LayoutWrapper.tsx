@@ -546,7 +546,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const PULL_REFRESH_ACTIVATE = 40
   const PULL_REFRESH_THRESHOLD = 220
   const PULL_REFRESH_MAX = 320
-  const PULL_REFRESH_START_ZONE = 80
 
   const isEditableElement = (target: EventTarget | null) => {
     if (typeof document === 'undefined') return false
@@ -589,9 +588,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (isEditableElement(event.target) || isEditableElement(document.activeElement)) return
     pullOffsetRef.current = 0
     setPullOffset(0)
-    const startY = event.touches[0]?.clientY ?? null
-    if (startY === null || startY > PULL_REFRESH_START_ZONE) return
-    pullStartYRef.current = startY
+    pullStartYRef.current = event.touches[0]?.clientY ?? null
   }
 
   const handlePullMove = (event: React.TouchEvent<HTMLDivElement>) => {
