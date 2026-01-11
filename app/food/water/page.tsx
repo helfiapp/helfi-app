@@ -13,6 +13,7 @@ type WaterEntry = {
   unit: string
   amountMl: number
   label?: string | null
+  category?: string | null
   localDate: string
   createdAt: string
 }
@@ -104,6 +105,7 @@ export default function WaterIntakePage() {
 
   const [selectedDate, setSelectedDate] = useState(todayLocalDate())
   const [entries, setEntries] = useState<WaterEntry[]>([])
+  const [sourceCategory, setSourceCategory] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState(false)
@@ -144,8 +146,12 @@ export default function WaterIntakePage() {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const fromQuery = params.get('date')
+    const category = params.get('category')
     if (isValidDate(fromQuery)) {
       setSelectedDate(String(fromQuery))
+    }
+    if (category) {
+      setSourceCategory(String(category))
     }
   }, [])
 
@@ -270,6 +276,7 @@ export default function WaterIntakePage() {
           amount,
           unit,
           label,
+          category: sourceCategory,
           localDate: selectedDate,
         }),
       })

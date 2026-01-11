@@ -47,10 +47,22 @@ function normalizeLabel(value: unknown): string | null {
   return trimmed || null
 }
 
+function normalizeCategory(value: unknown): string | null {
+  const raw = String(value ?? '').trim().toLowerCase()
+  if (!raw) return null
+  if (raw === 'snack') return 'snacks'
+  if (raw === 'snacks') return 'snacks'
+  if (raw === 'uncategorized') return 'uncategorized'
+  if (raw === 'breakfast' || raw === 'lunch' || raw === 'dinner' || raw === 'other') return raw
+  return null
+}
+
 function toMl(amount: number, unit: string): number {
   const factor = UNIT_TO_ML[unit] || 1
   return Math.round(amount * factor * 10) / 10
 }
+
+let waterLogColumnsReady = false
 
 async function ensureWaterLogTable() {
   await prisma.$executeRawUnsafe(`
@@ -61,6 +73,7 @@ async function ensureWaterLogTable() {
       "unit" TEXT NOT NULL,
       "amountMl" DOUBLE PRECISION NOT NULL,
       "label" TEXT,
+      "category" TEXT,
       "localDate" TEXT NOT NULL,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "WaterLog_pkey" PRIMARY KEY ("id"),
@@ -73,6 +86,21 @@ async function ensureWaterLogTable() {
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "WaterLog_userId_createdAt_idx" ON "WaterLog"("userId", "createdAt")
   `)
+}
+
+async function ensureWaterLogColumns() {
+  if (waterLogColumnsReady) return
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "WaterLog" ADD COLUMN IF NOT EXISTS "category" TEXT`)
+    waterLogColumnsReady = true
+  } catch (error) {
+    try {
+      await ensureWaterLogTable()
+      waterLogColumnsReady = true
+    } catch (retryError) {
+      console.error('[water-log] Column ensure failed', retryError)
+    }
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -98,6 +126,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    await ensureWaterLogColumns()
     const entries = await prisma.waterLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -136,9 +165,11 @@ export async function POST(req: NextRequest) {
 
   const localDate = asLocalDate(body?.localDate) ?? todayLocalDate()
   const label = normalizeLabel(body?.label)
+  const category = normalizeCategory(body?.category)
   const amountMl = toMl(amount, unit)
 
   try {
+    await ensureWaterLogColumns()
     const entry = await prisma.waterLog.create({
       data: {
         userId: user.id,
@@ -146,6 +177,7 @@ export async function POST(req: NextRequest) {
         unit,
         amountMl,
         label,
+        category,
         localDate,
       },
     })

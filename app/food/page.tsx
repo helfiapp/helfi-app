@@ -87,6 +87,17 @@ type HealthCheckResult = {
   alternative: string | null
 }
 
+type WaterLogEntry = {
+  id: string
+  amount: number
+  unit: string
+  amountMl: number
+  label?: string | null
+  category?: string | null
+  localDate: string
+  createdAt: string
+}
+
 const HEALTH_CHECK_THRESHOLDS = { sugar: 30, carbs: 90, fat: 35 } as const
 const HEALTH_CHECK_COST_CREDITS = 2
 const HEALTH_CHECK_PROMPT_STORAGE_KEY = 'food:healthCheckPrompted'
@@ -145,6 +156,31 @@ const formatServingsDisplay = (value: number | null | undefined) => {
   const rounded = Math.round(normalized * 100) / 100
   if (Number.isInteger(rounded)) return String(rounded)
   return rounded.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')
+}
+
+const formatWaterNumber = (value: number) => {
+  if (Number.isInteger(value)) return String(value)
+  return value.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')
+}
+
+const formatWaterMl = (ml: number | null | undefined) => {
+  const value = Number(ml ?? 0)
+  if (!Number.isFinite(value) || value <= 0) return '0 ml'
+  if (value >= 1000) {
+    const liters = Math.round((value / 1000) * 100) / 100
+    return `${formatWaterNumber(liters)} L`
+  }
+  return `${Math.round(value)} ml`
+}
+
+const formatWaterEntryAmount = (entry: { amount?: number; unit?: string; amountMl?: number }) => {
+  const amount = Number(entry?.amount ?? 0)
+  const unitRaw = String(entry?.unit || '').trim().toLowerCase()
+  if (Number.isFinite(amount) && amount > 0 && unitRaw) {
+    const unit = unitRaw === 'l' ? 'L' : unitRaw
+    return `${formatWaterNumber(amount)} ${unit}`
+  }
+  return formatWaterMl(Number(entry?.amountMl ?? 0))
 }
 
 const isInlineImageSrc = (src: string | null | undefined) =>
@@ -2685,6 +2721,9 @@ export default function FoodDiary() {
     if (persisted?.entries && Array.isArray(persisted.entries)) return persisted.entries
     return null
   })
+  const [waterEntries, setWaterEntries] = useState<WaterLogEntry[]>([])
+  const [waterLoading, setWaterLoading] = useState(false)
+  const [waterDeletingId, setWaterDeletingId] = useState<string | null>(null)
   useEffect(() => {
     latestTodaysFoodsRef.current = Array.isArray(todaysFoods) ? todaysFoods : []
   }, [todaysFoods])
@@ -6107,6 +6146,36 @@ const applyStructuredItems = (
     })
     return grouped
   }, [sourceEntries])
+  const waterEntriesByCategory = useMemo(() => {
+    const grouped: Record<string, any[]> = {}
+    if (!Array.isArray(waterEntries) || waterEntries.length === 0) return grouped
+    waterEntries.forEach((entry) => {
+      const cat = normalizeCategory(entry?.category || 'uncategorized')
+      const createdAtMs = entry?.createdAt ? new Date(entry.createdAt).getTime() : NaN
+      const createdAtIso = Number.isFinite(createdAtMs) ? new Date(createdAtMs).toISOString() : new Date().toISOString()
+      const time = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const localDate = entry?.localDate || selectedDate
+      const normalized = {
+        id: `water:${entry.id}`,
+        waterId: entry.id,
+        amount: entry.amount,
+        unit: entry.unit,
+        amountMl: entry.amountMl,
+        label: entry.label ?? 'Water',
+        description: entry.label ?? 'Water',
+        meal: cat,
+        category: cat,
+        persistedCategory: cat,
+        localDate,
+        createdAt: createdAtIso,
+        time,
+        __water: true,
+      }
+      grouped[cat] = grouped[cat] || []
+      grouped[cat].push(normalized)
+    })
+    return grouped
+  }, [selectedDate, waterEntries])
 
   const multiCopyEntries = useMemo(() => {
     if (!multiCopyCategory) return []
@@ -6620,6 +6689,36 @@ const applyStructuredItems = (
     };
     loadHistory();
   }, [selectedDate, isViewingToday, resumeTick]);
+
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setWaterEntries([])
+      return
+    }
+    let cancelled = false
+    const loadWater = async () => {
+      setWaterLoading(true)
+      try {
+        const res = await fetch(`/api/water-log?localDate=${encodeURIComponent(selectedDate)}`, {
+          cache: 'no-store' as any,
+          credentials: 'include',
+        })
+        if (!res.ok) throw new Error('water load failed')
+        const data = await res.json()
+        if (!cancelled) {
+          setWaterEntries(Array.isArray(data?.entries) ? data.entries : [])
+        }
+      } catch {
+        if (!cancelled) setWaterEntries([])
+      } finally {
+        if (!cancelled) setWaterLoading(false)
+      }
+    }
+    loadWater()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedDate, session?.user?.email])
 
   const mapLogsToEntries = (
     logs: any[],
@@ -12640,51 +12739,71 @@ Please add nutritional information manually if needed.`);
       }
     }
 
-	    try {
-        // Single request: delete (with server sweep) + update server snapshot in one go
-        try {
-          const sweepDates = Array.from(new Set([targetDateKey || selectedDate].filter(Boolean)))
+    try {
+      // Single request: delete (with server sweep) + update server snapshot in one go
+      try {
+        const sweepDates = Array.from(new Set([targetDateKey || selectedDate].filter(Boolean)))
 
-          const snapshotFoods = limitSnapshotFoods(updatedFoods, selectedDate)
-          const createdAtForDelete = (() => {
-            if (entry?.createdAt) {
-              const dt = new Date(entry.createdAt)
-              if (!Number.isNaN(dt.getTime())) return dt.toISOString()
-            }
-            const ts = extractEntryTimestampMs(entry)
-            if (Number.isFinite(ts)) return new Date(ts).toISOString()
-            return null
-          })()
-          const payloadStr = JSON.stringify({
-            id: dbId || null,
-            description: (entry?.description || entry?.name || '').toString().trim().slice(0, 220),
-            category: entryCategory,
-            dates: sweepDates.slice(0, 1),
-            snapshotDate: selectedDate,
-            snapshotFoods,
-            clientId: getEntryClientId(entry) || undefined,
-            createdAt: createdAtForDelete || undefined,
-          })
-          const keepalive = payloadStr.length < 60_000
-          await fetch('/api/food-log/delete-atomic', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payloadStr,
-            keepalive,
-          }).catch((err) => console.warn('Atomic delete request failed (best-effort)', err))
-        } catch (err) {
-          console.warn('Atomic delete failed (best-effort)', err)
-        }
+        const snapshotFoods = limitSnapshotFoods(updatedFoods, selectedDate)
+        const createdAtForDelete = (() => {
+          if (entry?.createdAt) {
+            const dt = new Date(entry.createdAt)
+            if (!Number.isNaN(dt.getTime())) return dt.toISOString()
+          }
+          const ts = extractEntryTimestampMs(entry)
+          if (Number.isFinite(ts)) return new Date(ts).toISOString()
+          return null
+        })()
+        const payloadStr = JSON.stringify({
+          id: dbId || null,
+          description: (entry?.description || entry?.name || '').toString().trim().slice(0, 220),
+          category: entryCategory,
+          dates: sweepDates.slice(0, 1),
+          snapshotDate: selectedDate,
+          snapshotFoods,
+          clientId: getEntryClientId(entry) || undefined,
+          createdAt: createdAtForDelete || undefined,
+        })
+        const keepalive = payloadStr.length < 60_000
+        await fetch('/api/food-log/delete-atomic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr,
+          keepalive,
+        }).catch((err) => console.warn('Atomic delete request failed (best-effort)', err))
+      } catch (err) {
+        console.warn('Atomic delete failed (best-effort)', err)
+      }
 
-	      try {
-	        await syncSnapshotOnly(updatedFoods, selectedDate)
-	      } catch (err) {
-	        console.warn('Delete snapshot sync failed', err)
-	      }
-	    } finally {
-	      endDiaryMutation()
-	    }
-	  };
+      try {
+        await syncSnapshotOnly(updatedFoods, selectedDate)
+      } catch (err) {
+        console.warn('Delete snapshot sync failed', err)
+      }
+    } finally {
+      endDiaryMutation()
+    }
+  }
+
+  const deleteWaterEntry = async (entry: any) => {
+    const waterId = entry?.waterId || entry?.id
+    if (!waterId) return
+    if (waterDeletingId === String(waterId)) return
+    setWaterDeletingId(String(waterId))
+    try {
+      const res = await fetch(`/api/water-log/${encodeURIComponent(String(waterId))}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error('delete failed')
+      setWaterEntries((prev) => prev.filter((item) => item.id !== waterId))
+      showQuickToast('Water entry removed.')
+    } catch {
+      showQuickToast('Could not remove water entry.')
+    } finally {
+      setWaterDeletingId(null)
+    }
+  }
 
 		  const deleteHistoryFood = async (dbId: string) => {
 		    beginDiaryMutation()
@@ -18210,7 +18329,7 @@ Please add nutritional information manually if needed.`);
 	                className="space-y-3 -mx-4 sm:-mx-6 overflow-visible"
 	                style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
 	              >
-                {sourceEntries.length === 0 && (
+                {sourceEntries.length === 0 && waterEntries.length === 0 && !waterLoading && (
                   <div className="text-sm text-gray-500 px-4 sm:px-6 pb-2">
                     No food entries yet {isViewingToday ? 'today' : 'for this date'}. Add a meal to get started.
                   </div>
@@ -18226,8 +18345,9 @@ Please add nutritional information manually if needed.`);
                       const entryRenderKey = entryIdentityKey(food) || entryKey
                       const swipeOffset = entrySwipeOffsets[entryKey] || 0
                       const isMenuOpen = swipeMenuEntry === entryKey
-                      const entryTotals = getEntryTotals(food)
-                      const entryCalories = Number.isFinite(Number(entryTotals?.calories)) ? Math.round(Number(entryTotals?.calories)) : null
+                      const isWaterEntry = Boolean(food?.__water)
+                      const entryTotals = isWaterEntry ? null : getEntryTotals(food)
+                      const entryCalories = !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Math.round(Number(entryTotals?.calories)) : null
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
@@ -18237,6 +18357,10 @@ Please add nutritional information manually if needed.`);
                       const handleDeleteAction = () => {
                         closeSwipeMenus()
                         setShowEntryOptions(null)
+                        if (isWaterEntry) {
+                          deleteWaterEntry(food)
+                          return
+                        }
                         if (isViewingToday) {
                           deleteFood(food)
                         } else if ((food as any)?.dbId) {
@@ -18247,6 +18371,7 @@ Please add nutritional information manually if needed.`);
                       }
 
                       const startEditEntry = () => {
+                        if (isWaterEntry) return
                         const runEdit = () => editFood(food)
                         if (isAddMenuOpen) {
                           closeAddMenus()
@@ -18260,35 +18385,43 @@ Please add nutritional information manually if needed.`);
                         runEdit()
                       }
 
-                      const actions = [
-                        ...(isEntryAlreadyFavorite(food)
-                          ? []
-                          : [{ label: 'Add to Favorites', onClick: () => handleAddToFavorites(food) }]),
-                        {
-                          label: 'Duplicate Meal',
-                          onClick: () =>
-                            setDuplicateModalContext({
-                              entry: food,
-                              targetDate: selectedDate,
-                              mode: 'duplicate',
-                            }),
-                        },
-                        {
-                          label: 'Copy to Today',
-                          onClick: () =>
-                            setDuplicateModalContext({
-                              entry: food,
-                              targetDate: todayIso,
-                              mode: 'copyToToday',
-                            }),
-                        },
-                        { label: 'Edit Entry', onClick: startEditEntry },
-                        {
-                          label: 'Delete',
-                          onClick: handleDeleteAction,
-                          destructive: true,
-                        },
-                      ]
+                      const actions = isWaterEntry
+                        ? [
+                            {
+                              label: 'Delete',
+                              onClick: handleDeleteAction,
+                              destructive: true,
+                            },
+                          ]
+                        : [
+                            ...(isEntryAlreadyFavorite(food)
+                              ? []
+                              : [{ label: 'Add to Favorites', onClick: () => handleAddToFavorites(food) }]),
+                            {
+                              label: 'Duplicate Meal',
+                              onClick: () =>
+                                setDuplicateModalContext({
+                                  entry: food,
+                                  targetDate: selectedDate,
+                                  mode: 'duplicate',
+                                }),
+                            },
+                            {
+                              label: 'Copy to Today',
+                              onClick: () =>
+                                setDuplicateModalContext({
+                                  entry: food,
+                                  targetDate: todayIso,
+                                  mode: 'copyToToday',
+                                }),
+                            },
+                            { label: 'Edit Entry', onClick: startEditEntry },
+                            {
+                              label: 'Delete',
+                              onClick: handleDeleteAction,
+                              destructive: true,
+                            },
+                          ]
 
                       const actionIcons: Record<string, JSX.Element> = {
                         'Add to Favorites': (
@@ -18410,6 +18543,13 @@ Please add nutritional information manually if needed.`);
                         if (isMobile && swipeClickBlockRef.current[entryKey]) return
                         closeSwipeMenus()
                         setShowEntryOptions(null)
+                        if (isWaterEntry) {
+                          const qs = new URLSearchParams()
+                          qs.set('date', food?.localDate || selectedDate)
+                          if (food?.category) qs.set('category', food.category)
+                          router.push(`/food/water?${qs.toString()}`)
+                          return
+                        }
                         setEnergyUnit('kcal')
                         editFood(food)
                       }
@@ -18498,8 +18638,8 @@ Please add nutritional information manually if needed.`);
                               <div className="flex items-center gap-3">
                                 <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
                                   <Image
-                                    src="/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"
-                                    alt="Food item"
+                                    src={isWaterEntry ? "/mobile-assets/MOBILE%20ICONS/WATER.png" : "/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"}
+                                    alt={isWaterEntry ? "Water log" : "Food item"}
                                     width={32}
                                     height={32}
                                     className="w-8 h-8"
@@ -18508,8 +18648,13 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm sm:text-base text-gray-900 truncate">
-                                    {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
+                                    {isWaterEntry
+                                      ? String(food?.label || 'Water')
+                                      : sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
                                   </p>
+                                  {isWaterEntry && (
+                                    <p className="text-xs text-gray-500 truncate">{formatWaterEntryAmount(food)}</p>
+                                  )}
                                 </div>
                                 <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
                                   {entryCalories !== null && <span className="font-semibold text-gray-900">{entryCalories} kcal</span>}
@@ -18625,12 +18770,15 @@ Please add nutritional information manually if needed.`);
 
                     return mealCategories.map((cat) => {
                       const entries = entriesByCategory[cat.key] || []
-                      const visibleEntries = Array.isArray(entries)
+                      const waterInCategory = waterEntriesByCategory[cat.key] || []
+                      const visibleFoodEntries = Array.isArray(entries)
                         ? entries.filter((entry) => !isEntryDeleted(entry))
                         : []
+                      const visibleWaterEntries = Array.isArray(waterInCategory) ? waterInCategory : []
+                      const visibleEntries = [...visibleFoodEntries, ...visibleWaterEntries]
                       let summaryText = 'No entries yet'
                       if (visibleEntries.length > 0) {
-                        const totals = visibleEntries.reduce(
+                        const totals = visibleFoodEntries.reduce(
                           (acc, entry) => {
                             const t = getEntryTotals(entry)
                             acc.calories += Number(t.calories || 0)
@@ -18641,11 +18789,16 @@ Please add nutritional information manually if needed.`);
                           },
                           { calories: 0, protein: 0, carbs: 0, fat: 0 },
                         )
+                        const waterTotalMl = visibleWaterEntries.reduce(
+                          (sum, entry) => sum + (Number(entry?.amountMl) || 0),
+                          0,
+                        )
                         const summaryParts: string[] = []
                         if (totals.calories > 0) summaryParts.push(`${Math.round(totals.calories)} kcal`)
                         if (totals.protein > 0) summaryParts.push(`${Math.round(totals.protein)}g Protein`)
                         if (totals.carbs > 0) summaryParts.push(`${Math.round(totals.carbs)}g Carbs`)
                         if (totals.fat > 0) summaryParts.push(`${Math.round(totals.fat)}g Fat`)
+                        if (waterTotalMl > 0) summaryParts.push(`Water ${formatWaterMl(waterTotalMl)}`)
                         summaryText = summaryParts.length > 0 ? summaryParts.join(', ') : 'No entries yet'
                       }
 
@@ -18982,6 +19135,7 @@ Please add nutritional information manually if needed.`);
                                           setPhotoOptionsAnchor(null)
                                           const qs = new URLSearchParams()
                                           qs.set('date', selectedDate)
+                                          qs.set('category', cat.key)
                                           router.push(`/food/water?${qs.toString()}`)
                                         }}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -19353,7 +19507,7 @@ Please add nutritional information manually if needed.`);
                               ) : (
                                 visibleEntries
                                   .slice()
-                                  .sort((a: any, b: any) => (b?.id || 0) - (a?.id || 0))
+                                  .sort((a: any, b: any) => (extractEntryTimestampMs(b) || 0) - (extractEntryTimestampMs(a) || 0))
                                   .map((food) => renderEntryCard(food))
                               )}
                             </div>
