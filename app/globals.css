@@ -118,6 +118,14 @@ input.goal-pace-slider::-webkit-slider-runnable-track {
   );
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 input.goal-pace-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;

@@ -687,7 +687,7 @@ export default function Dashboard() {
               <span className="text-[10px] font-bold text-helfi-green uppercase tracking-wider">Slide to view</span>
             </div>
 
-            <div className="flex overflow-x-auto gap-4 pb-2 snap-x mb-8 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0">
+            <div className="flex overflow-x-auto gap-4 pb-2 snap-x mb-8 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 scrollbar-none">
               <Link href="/check-in" className="group block min-w-[260px] snap-center md:min-w-0">
                 <div className="p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
                   <div className="flex items-center space-x-3 mb-4">
