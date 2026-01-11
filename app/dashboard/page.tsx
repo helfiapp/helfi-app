@@ -832,7 +832,7 @@ export default function Dashboard() {
                       <button
                         onClick={() => toggleInterest('garmin')}
                         className={`px-4 py-2 text-xs font-bold rounded-full ${
-                          deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                          deviceInterest.garmin ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600'
                         }`}
                         disabled={!!savingInterest}
                       >
@@ -859,7 +859,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => toggleInterest('googleFit')}
                       className={`px-4 py-2 text-xs font-bold rounded-full ${
-                        deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                        deviceInterest.googleFit ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600'
                       }`}
                       disabled={!!savingInterest}
                     >
@@ -877,7 +877,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => toggleInterest('oura')}
                       className={`px-4 py-2 text-xs font-bold rounded-full ${
-                        deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                        deviceInterest.oura ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600'
                       }`}
                       disabled={!!savingInterest}
                     >
@@ -895,7 +895,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => toggleInterest('polar')}
                       className={`px-4 py-2 text-xs font-bold rounded-full ${
-                        deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                        deviceInterest.polar ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600'
                       }`}
                       disabled={!!savingInterest}
                     >
@@ -913,7 +913,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => toggleInterest('huawei')}
                       className={`px-4 py-2 text-xs font-bold rounded-full ${
-                        deviceInterest.huawei ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                        deviceInterest.huawei ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600'
                       }`}
                       disabled={!!savingInterest}
                     >
@@ -952,7 +952,7 @@ export default function Dashboard() {
                       <button
                         onClick={() => toggleInterest('garmin')}
                         className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
-                          deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                          deviceInterest.garmin ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                         }`}
                         disabled={!!savingInterest}
                       >
@@ -977,7 +977,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => toggleInterest('googleFit')}
                       className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
-                        deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        deviceInterest.googleFit ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                       }`}
                       disabled={!!savingInterest}
                     >
@@ -993,7 +993,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => toggleInterest('oura')}
                       className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
-                        deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        deviceInterest.oura ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                       }`}
                       disabled={!!savingInterest}
                     >
@@ -1009,7 +1009,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => toggleInterest('polar')}
                       className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
-                        deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        deviceInterest.polar ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                       }`}
                       disabled={!!savingInterest}
                     >
@@ -1025,7 +1025,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => toggleInterest('huawei')}
                       className={`w-full py-3 rounded-xl font-bold transition-all text-xs leading-tight ${
-                        deviceInterest.huawei ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        deviceInterest.huawei ? 'bg-helfi-green text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                       }`}
                       disabled={!!savingInterest}
                     >

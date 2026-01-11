@@ -108,13 +108,12 @@ export async function GET(request: NextRequest) {
 
     // Device interest counts (from user.data JSON field category if present)
     // Count from hidden HealthGoal records storing device interest
-    const deviceApple = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"appleWatch":true' } } })
     const deviceFitbit = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"fitbit":true' } } })
     const deviceGarmin = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"garmin":true' } } })
-    const deviceSamsung = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"samsung":true' } } })
     const deviceGoogleFit = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"googleFit":true' } } })
     const deviceOura = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"oura":true' } } })
     const devicePolar = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"polar":true' } } })
+    const deviceHuawei = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"huawei":true' } } })
 
     const stats = {
       totalUsers,
@@ -128,13 +127,12 @@ export async function GET(request: NextRequest) {
       recentUsers,
       completionRate: totalUsers > 0 ? Math.round((usersWithProfiles / totalUsers) * 100) : 0,
       deviceInterest: {
-        appleWatch: deviceApple,
         fitbit: deviceFitbit,
         garmin: deviceGarmin,
-        samsung: deviceSamsung,
         googleFit: deviceGoogleFit,
         oura: deviceOura,
-        polar: devicePolar
+        polar: devicePolar,
+        huawei: deviceHuawei
       }
     }
 
