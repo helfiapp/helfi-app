@@ -1,6 +1,6 @@
 'use client'
 
-import React, { Fragment, useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
@@ -20,8 +20,6 @@ import {
 import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
 import 'chartjs-adapter-date-fns'
 import { format } from 'date-fns'
-import { Menu, Transition } from '@headlessui/react'
-import { EllipsisVerticalIcon } from '@heroicons/react/24/outline'
 
 ChartJS.register(
   CategoryScale,
@@ -51,6 +49,7 @@ export default function CheckinHistoryPage() {
   const [timePeriod, setTimePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'all' | 'custom'>('all')
   const [pageSize] = useState(10)
   const [page, setPage] = useState(1)
+  const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<Row | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string>('')
@@ -96,8 +95,6 @@ export default function CheckinHistoryPage() {
     const clamped = Math.max(0, Math.min(6, value))
     return LABELS[clamped]
   }
-
-  const classNames = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' ')
 
   const toRGBA = (color: string, alpha: number) =>
     color.startsWith('rgb(')
@@ -625,78 +622,68 @@ export default function CheckinHistoryPage() {
                       r.value <= 1 ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' :
                       r.value <= 3 ? 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400' :
                       'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400'
-
+                    const rowKey = `${r.date}:${r.issueId}`
+                  
                     return (
                       <div
                         key={i}
-                        className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3"
+                        className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap">
-                            {r.date}
-                          </span>
-                          <span className="text-base font-semibold text-gray-900 dark:text-white truncate">
-                            {r.name}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${color}`}>
-                            {label}
-                            {r.value !== null && r.value !== undefined && (
-                              <span className="ml-1 opacity-70">({r.value})</span>
-                            )}
-                          </span>
-                          <Menu as="div" className="relative inline-block text-left">
-                            <div>
-                              <Menu.Button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
-                                <EllipsisVerticalIcon className="w-5 h-5 text-slate-400" />
-                              </Menu.Button>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedRow((current) => (current === rowKey ? null : rowKey))}
+                          className="w-full text-left"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase whitespace-nowrap">
+                                {r.date}
+                              </span>
+                              <span className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                                {r.name}
+                              </span>
                             </div>
-
-                            <Transition
-                              as={Fragment}
-                              enter="transition ease-out duration-100"
-                              enterFrom="transform opacity-0 scale-95"
-                              enterTo="transform opacity-100 scale-100"
-                              leave="transition ease-in duration-75"
-                              leaveFrom="transform opacity-100 scale-100"
-                              leaveTo="transform opacity-0 scale-95"
-                            >
-                              <Menu.Items className="absolute right-0 z-20 mt-2 w-36 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 focus:outline-none border border-gray-200 dark:border-gray-700">
-                                <div className="py-1">
-                                  <Menu.Item>
-                                    {({ active }) => (
-                                      <button
-                                        onClick={() => handleEdit(r)}
-                                        className={classNames(
-                                          active && 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100',
-                                          !active && 'text-gray-700 dark:text-gray-200',
-                                          'block w-full px-4 py-2 text-left text-sm'
-                                        )}
-                                      >
-                                        Edit
-                                      </button>
-                                    )}
-                                  </Menu.Item>
-                                  <Menu.Item>
-                                    {({ active }) => (
-                                      <button
-                                        onClick={() => handleDelete(r.date, r.issueId)}
-                                        className={classNames(
-                                          active && 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-                                          !active && 'text-red-600 dark:text-red-400',
-                                          'block w-full px-4 py-2 text-left text-sm'
-                                        )}
-                                      >
-                                        Delete
-                                      </button>
-                                    )}
-                                  </Menu.Item>
-                                </div>
-                              </Menu.Items>
-                            </Transition>
-                          </Menu>
-                        </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${color}`}>
+                                {label}
+                                {r.value !== null && r.value !== undefined && (
+                                  <span className="ml-1 opacity-70">({r.value})</span>
+                                )}
+                              </span>
+                              <span
+                                className={`text-slate-400 transition-transform ${
+                                  expandedRow === rowKey ? 'rotate-180' : ''
+                                }`}
+                                aria-hidden="true"
+                              >
+                                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                                </svg>
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                        {expandedRow === rowKey && (
+                          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+                            <div className="text-xs text-slate-500">
+                              {r.note ? `Note: ${r.note}` : 'No notes'}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleEdit(r)}
+                                className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(r.date, r.issueId)}
+                                className="px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
