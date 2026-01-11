@@ -749,6 +749,29 @@ export default function Dashboard() {
               </Link>
             </div>
 
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
+              <Link href="/food" className="block">
+                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition-colors">
+                  Track Calories
+                </div>
+              </Link>
+              <Link href="/food/water" className="block">
+                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-sky-50 text-sky-700 border border-sky-100 hover:bg-sky-100 transition-colors">
+                  Log Water Intake
+                </div>
+              </Link>
+              <Link href="/chat" className="block">
+                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 transition-colors">
+                  Talk to AI
+                </div>
+              </Link>
+              <Link href="/health-tips" className="block">
+                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 transition-colors">
+                  Health Tips
+                </div>
+              </Link>
+            </div>
+
             {/* Fitbit Mini Summary */}
             {fitbitConnected && (
               <div className="mb-6">
