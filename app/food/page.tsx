@@ -7084,9 +7084,9 @@ const applyStructuredItems = (
       setIsDiaryRefreshing(false)
     }
   }
-  const PULL_REFRESH_ACTIVATE = 60
-  const PULL_REFRESH_THRESHOLD = 280
-  const PULL_REFRESH_MAX = 360
+  const PULL_REFRESH_ACTIVATE = 80
+  const PULL_REFRESH_THRESHOLD = 320
+  const PULL_REFRESH_MAX = 420
   const PULL_REFRESH_START_ZONE = 140
   const getScrollTop = () => {
     if (typeof window === 'undefined') return 0
@@ -7108,33 +7108,16 @@ const applyStructuredItems = (
     }
     return null
   }
-  const hasVisibleEditableFields = () => {
+  const isEditableElement = (target: EventTarget | null) => {
     if (typeof document === 'undefined') return false
-    const fields = document.querySelectorAll('input, textarea, select, [contenteditable="true"]')
-    if (!fields.length) return false
-    return Array.from(fields).some((field) => {
-      if (field instanceof HTMLInputElement) {
-        if (field.type === 'hidden' || field.disabled || field.readOnly) return false
-      }
-      if (field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
-        if (field.disabled) return false
-      }
-      if (field instanceof HTMLElement) {
-        const style = window.getComputedStyle(field)
-        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-          return false
-        }
-        const rect = field.getBoundingClientRect()
-        if (rect.width === 0 || rect.height === 0) return false
-      }
-      return true
-    })
+    if (!(target instanceof Element)) return false
+    return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
   }
   const handlePullStart = (e: React.TouchEvent) => {
     if (typeof window === 'undefined') return
     if (getScrollTop() > 0) return
     if (syncPausedRef.current || diaryRefreshingRef.current) return
-    if (hasVisibleEditableFields()) return
+    if (isEditableElement(e.target) || isEditableElement(document.activeElement)) return
     const scrollParent = getScrollParent(e.target)
     if (scrollParent && scrollParent.scrollTop > 0) return
     pullOffsetRef.current = 0
@@ -7146,7 +7129,7 @@ const applyStructuredItems = (
   }
   const handlePullMove = (e: React.TouchEvent) => {
     if (pullStartYRef.current === null) return
-    if (hasVisibleEditableFields()) {
+    if (isEditableElement(e.target) || isEditableElement(document.activeElement)) {
       pullStartYRef.current = null
       pullOffsetRef.current = 0
       pullScrollParentRef.current = null
