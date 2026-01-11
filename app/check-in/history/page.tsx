@@ -52,6 +52,7 @@ export default function CheckinHistoryPage() {
   const pageSize = 10
   const [page, setPage] = useState(1)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [tooltipActive, setTooltipActive] = useState(false)
   const [editingEntry, setEditingEntry] = useState<Row | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string>('')
@@ -228,9 +229,12 @@ export default function CheckinHistoryPage() {
     const elements = chart.getElementsAtEventForMode(nativeEvent, 'nearest', { intersect: true }, true)
 
     if (!elements.length) {
-      lastTooltipKeyRef.current = null
-      chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
-      chart.update()
+      if (tooltipActive) {
+        lastTooltipKeyRef.current = null
+        chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+        chart.update()
+        setTooltipActive(false)
+      }
       return
     }
 
@@ -240,6 +244,7 @@ export default function CheckinHistoryPage() {
       lastTooltipKeyRef.current = null
       chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
       chart.update()
+      setTooltipActive(false)
       return
     }
 
@@ -247,6 +252,16 @@ export default function CheckinHistoryPage() {
     const point = chart.getDatasetMeta(datasetIndex).data[index] as { x: number; y: number }
     chart.tooltip?.setActiveElements([{ datasetIndex, index }], { x: point.x, y: point.y })
     chart.update()
+    setTooltipActive(true)
+  }
+
+  const handleTooltipDismiss = () => {
+    const chart = chartRef.current
+    if (!chart) return
+    lastTooltipKeyRef.current = null
+    chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+    chart.update()
+    setTooltipActive(false)
   }
 
   const handleDelete = async (date: string, issueId: string) => {
@@ -647,8 +662,16 @@ export default function CheckinHistoryPage() {
                 Ratings are scored 0 (Really bad) to 6 (Excellent). Hover the chart to see exact values.
               </p>
 
-              <div className="h-56 md:h-72">
+              <div className="relative h-56 md:h-72">
                 <Line ref={chartRef} data={chartData} options={chartOptions} onClick={handleChartClick} />
+                {tooltipActive && (
+                  <button
+                    type="button"
+                    onClick={handleTooltipDismiss}
+                    className="absolute inset-0 z-10 cursor-pointer"
+                    aria-label="Hide chart tooltip"
+                  />
+                )}
               </div>
               <div className="flex flex-wrap gap-4 mt-4 justify-center">
                 {chartData.datasets.map((dataset) => (
