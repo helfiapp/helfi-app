@@ -1055,8 +1055,31 @@ If changes are requested, explain them to the user first, get explicit approval,
 
 ---
 
-## 10. PWA Home Screen / Entry Path (Locked)
+## 9.2 Device Interest Tracking (Dashboard + Admin) — Locked
 
+**Goal:** The “I’m interested” buttons must always record interest and show up in the admin panel counts. Do **not** break this flow.
+
+**Protected files:**
+- `app/dashboard/page.tsx` (Connect Your Devices buttons + labels)
+- `app/api/user-data/route.ts` (persists `deviceInterest` into `__DEVICE_INTEREST__`)
+- `app/api/admin/users/route.ts` (admin counts for device interest)
+- `app/devices/page.tsx` and `app/health-tracking/page.tsx` (interest toggles)
+
+**Rules (do not change without explicit user approval):**
+- “I’m interested” buttons must call the interest toggle and persist to `deviceInterest` (not a no‑op UI).
+- Admin counts must reflect the saved interest, including **Huawei Health**.
+- **Apple Watch** and **Samsung Health** are intentionally removed from admin counts.
+- Active “Interested ✓” should use the same green as “Connect” buttons (`bg-helfi-green`).
+- Huawei icon is stored at `public/brands/huawei-health.png` and must stay wired in the dashboard devices grid.
+
+If this ever breaks, restore by:
+1) Verify `toggleInterest(...)` updates `deviceInterest` and POSTs to `/api/user-data`.
+2) Ensure `/api/user-data/route.ts` persists `deviceInterest` to the `__DEVICE_INTEREST__` record.
+3) Ensure `/api/admin/users/route.ts` counts `googleFit`, `oura`, `polar`, and `huawei` (and not `appleWatch`/`samsung`).
+
+---
+
+## 10. PWA Home Screen / Entry Path (Locked)
 **Protected files:**
 - `public/manifest.json` → `start_url` must stay `/auth/signin`, `scope` `/`, icons point to local leaf assets.
 - `middleware.ts` → when a valid session exists and the path is `/auth/signin` **or `/`**, it must redirect server-side to `/pwa-entry` before rendering the login/marketing page.

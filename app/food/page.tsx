@@ -824,7 +824,7 @@ function TargetRing({ label, valueLabel, percent, tone, color }: RingProps) {
         </svg>
         {/* Center value */}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-xl font-bold text-gray-900 leading-snug">{mainValue}</div>
+          <div className="text-xl font-bold text-gray-900 leading-[1.35] pt-0.5 tabular-nums">{mainValue}</div>
           {unitPart && (
             <div className="text-xs text-gray-500 mt-0.5">
               {unitPart}
@@ -18013,9 +18013,18 @@ Please add nutritional information manually if needed.`);
 	          {!editingEntry && (
 	            <div className="mb-4">
 	              {(() => {
-	                const baseEntries = isViewingToday
-                    ? todaysFoodsForSelectedDate
+	                const historyFiltered = isViewingToday
+                    ? []
                     : filterEntriesForDate(historyFoods, selectedDate)
+                  const snapshotEntries =
+                    !isViewingToday && persistentDiarySnapshot?.byDate?.[selectedDate]?.entries
+                      ? persistentDiarySnapshot.byDate[selectedDate]?.entries
+                      : []
+                  const baseEntries = isViewingToday
+                    ? todaysFoodsForSelectedDate
+                    : historyFiltered.length > 0
+                    ? historyFiltered
+                    : snapshotEntries || []
                   const source = dedupeEntries(baseEntries, { fallbackDate: selectedDate })
 
                 const safeNumber = (value: any) => {
