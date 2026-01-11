@@ -854,11 +854,11 @@ export default function WaterIntakePage() {
       </div>
       {drinkDetail && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-          <div className="w-full max-w-md bg-[#f6f7f6] dark:bg-[#151d15] rounded-t-[32px] shadow-2xl">
+          <div className="w-full max-w-md bg-[#f6f7f6] dark:bg-[#151d15] rounded-t-[32px] shadow-2xl max-h-[85vh] overflow-hidden">
             <div className="flex flex-col items-center pt-3 pb-2">
               <div className="h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-700"></div>
             </div>
-            <div className="px-6 pb-6 space-y-4">
+            <div className="px-6 pb-[calc(env(safe-area-inset-bottom)+24px)] space-y-4 overflow-y-auto overscroll-contain">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-base font-semibold text-[#111711] dark:text-white">Drink details</div>
@@ -916,6 +916,10 @@ export default function WaterIntakePage() {
                         step="0.1"
                         value={drinkSugarAmount}
                         onChange={(e) => setDrinkSugarAmount(e.target.value)}
+                        onFocus={(e) => {
+                          setDrinkSugarAmount('')
+                          e.currentTarget.select()
+                        }}
                         className="flex-1 h-11 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 text-sm text-gray-900 dark:text-white"
                         placeholder="0"
                       />
