@@ -48,6 +48,8 @@ export default function CheckinHistoryPage() {
   const [start, setStart] = useState<string>('')
   const [end, setEnd] = useState<string>('')
   const [timePeriod, setTimePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'all' | 'custom'>('all')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
   const [editingEntry, setEditingEntry] = useState<Row | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string>('')
@@ -147,6 +149,10 @@ export default function CheckinHistoryPage() {
     
     return filtered
   }, [rows, selectedIssues, allIssues.length, timePeriod])
+
+  useEffect(() => {
+    setPage(1)
+  }, [filteredRows.length, pageSize])
 
   const handleDelete = async (date: string, issueId: string) => {
     if (!confirm('Delete this rating?')) return
@@ -350,6 +356,8 @@ export default function CheckinHistoryPage() {
     return {
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 150,
+      animation: false,
       plugins: {
         legend: {
           position: 'bottom',
@@ -400,9 +408,13 @@ export default function CheckinHistoryPage() {
       }
     }
   }, [timePeriod])
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
+  const pageStart = filteredRows.length === 0 ? 0 : (page - 1) * pageSize + 1
+  const pageEnd = Math.min(page * pageSize, filteredRows.length)
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+    <div className="min-h-screen min-h-[100svh] bg-gray-50 dark:bg-gray-900 pb-24 overscroll-y-none">
       <PageHeader title="Today's Check-In" backHref="/more" />
       
       {/* Tabs */}
@@ -510,17 +522,6 @@ export default function CheckinHistoryPage() {
             </div>
           )}
 
-          {/* Reset Button */}
-          {rows.length > 0 && (
-            <div className="mb-6 flex justify-end">
-              <button
-                onClick={handleResetAll}
-                className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 border border-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >
-                Reset All Data
-              </button>
-            </div>
-          )}
 
           {/* Chart */}
           {filteredRows.length > 0 && chartData.datasets.length > 0 && (
@@ -574,6 +575,41 @@ export default function CheckinHistoryPage() {
 
           {/* Table */}
           <div className="overflow-x-auto">
+            {filteredRows.length > 0 && (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                <div className="text-sm text-gray-600 dark:text-gray-300">
+                  Showing {pageStart}-{pageEnd} of {filteredRows.length}
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-sm text-gray-600 dark:text-gray-300">Rows</label>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="min-w-[90px] border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white bg-white text-gray-900 focus:ring-2 focus:ring-helfi-green focus:border-transparent cursor-pointer text-sm"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                      className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                      className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-left border-b border-gray-200 dark:border-gray-700">
@@ -584,7 +620,7 @@ export default function CheckinHistoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((r, i) => {
+                {pagedRows.map((r, i) => {
                   const label = getRatingLabel(r.value)
                   const color = r.value === null || r.value === undefined ? 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400' :
                     r.value <= 1 ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' :
@@ -668,6 +704,18 @@ export default function CheckinHistoryPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Reset Button */}
+          {rows.length > 0 && (
+            <div className="mt-8 flex justify-center sm:justify-end">
+              <button
+                onClick={handleResetAll}
+                className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 border border-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                Reset All Data
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
