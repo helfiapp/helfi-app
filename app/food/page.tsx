@@ -9030,6 +9030,12 @@ Please add nutritional information manually if needed.`);
       }
       return fallbackDescription || generatedSummary || ''
     })()
+    const previousLabel = normalizeMealLabel(baseDescription) || baseDescription
+    const nextLabel = normalizeMealLabel(finalDescription) || finalDescription
+    const nameChanged =
+      normalizeFoodName(previousLabel || '') && normalizeFoodName(nextLabel || '')
+        ? normalizeFoodName(previousLabel || '') !== normalizeFoodName(nextLabel || '')
+        : false
 
     // Calculate new createdAt from entryTime + selectedDate
     let newCreatedAt = editingEntry.createdAt;
@@ -9110,6 +9116,18 @@ Please add nutritional information manually if needed.`);
       items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : (editingEntry.items || null),
       total: mergedTotal || (editingEntry.total || null)
     };
+
+    if (nameChanged && nextLabel) {
+      const resolved = resolveFavoriteForEntry(editingEntry, baseDescription)
+      if (resolved.favoriteId) {
+        updateFavoriteLabelById(resolved.favoriteId, nextLabel, previousLabel)
+        renameEntriesWithFavoriteId(resolved.favoriteId, nextLabel)
+      }
+      try {
+        const overrideSource = resolved.favorite || editingEntry
+        saveFoodNameOverride(previousLabel || baseDescription, nextLabel, overrideSource)
+      } catch {}
+    }
 
     const sourceFoods = isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || [])
     const updatedFoods = sourceFoods.map(food => 
@@ -11995,6 +12013,110 @@ Please add nutritional information manually if needed.`);
     renamePersistentDiaryEntries(updateEntry)
   }
 
+  const getFavoriteIdForEntry = (entry: any) => {
+    try {
+      const id =
+        (entry?.favorite && entry.favorite.id && String(entry.favorite.id)) ||
+        (entry?.nutrition && (entry.nutrition as any).__favoriteId) ||
+        (entry?.total && (entry.total as any).__favoriteId) ||
+        ''
+      return String(id || '').trim()
+    } catch {
+      return ''
+    }
+  }
+
+  const getSourceIdForEntry = (entry: any) => {
+    try {
+      const id =
+        entry?.sourceId ||
+        entry?.dbId ||
+        (entry?.favorite && entry.favorite.sourceId) ||
+        (entry?.nutrition && (entry.nutrition as any).__sourceId) ||
+        (entry?.total && (entry.total as any).__sourceId) ||
+        ''
+      return String(id || '').trim()
+    } catch {
+      return ''
+    }
+  }
+
+  const resolveFavoriteForEntry = (entry: any, fallbackLabel?: string) => {
+    const list = Array.isArray(favorites) ? favorites : []
+    if (!entry || list.length === 0) return { favorite: null, favoriteId: '' }
+    const favoriteId = getFavoriteIdForEntry(entry)
+    if (favoriteId) {
+      const match = list.find((fav: any) => String(fav?.id || '') === favoriteId) || null
+      if (match) return { favorite: match, favoriteId }
+    }
+    const sourceId = getSourceIdForEntry(entry)
+    if (sourceId) {
+      const match = list.find((fav: any) => String(fav?.sourceId || '') === sourceId) || null
+      if (match) return { favorite: match, favoriteId: String(match?.id || '') }
+    }
+    const baseLabel = normalizeFoodName(normalizeMealLabel(fallbackLabel || entry?.description || entry?.label || ''))
+    if (!baseLabel) return { favorite: null, favoriteId: '' }
+    const match =
+      list.find((fav: any) => {
+        const labelKey = normalizeFoodName(normalizeMealLabel(fav?.label || fav?.description || ''))
+        if (labelKey && labelKey === baseLabel) return true
+        const aliases = Array.isArray((fav as any)?.aliases) ? (fav as any).aliases : []
+        return aliases.some((alias: any) => normalizeFoodName(normalizeMealLabel(alias || '')) === baseLabel)
+      }) || null
+    return { favorite: match, favoriteId: String(match?.id || '') }
+  }
+
+  const updateFavoriteLabelById = (favoriteId: string, nextLabel: string, previousLabel?: string) => {
+    const targetId = String(favoriteId || '').trim()
+    const cleaned = normalizeMealLabel(nextLabel || '') || (nextLabel || '').trim()
+    if (!targetId || !cleaned) return
+    setFavorites((prev) => {
+      const base = Array.isArray(prev) ? prev : []
+      let changed = false
+      const next = base.map((fav: any) => {
+        if (String(fav?.id || '') !== targetId) return fav
+        const existingLabel = favoriteDisplayLabel(fav) || ''
+        const aliases = Array.isArray((fav as any)?.aliases) ? ([...(fav as any).aliases] as string[]) : []
+        const normalizedExisting = normalizeMealLabel(existingLabel) || existingLabel
+        if (normalizedExisting && normalizedExisting !== cleaned && !aliases.includes(normalizedExisting)) {
+          aliases.push(normalizedExisting)
+        }
+        if (previousLabel) {
+          const normalizedPrev = normalizeMealLabel(previousLabel) || previousLabel
+          if (normalizedPrev && normalizedPrev !== cleaned && !aliases.includes(normalizedPrev)) {
+            aliases.push(normalizedPrev)
+          }
+        }
+        changed = true
+        return { ...fav, label: cleaned, description: cleaned, ...(aliases.length > 0 ? { aliases } : {}) }
+      })
+      if (changed) {
+        persistFavorites(next)
+        return next
+      }
+      return prev
+    })
+  }
+
+  const renameEntriesWithFavoriteId = (favoriteId: string, toLabel: string) => {
+    const favId = String(favoriteId || '').trim()
+    const cleaned = normalizeMealLabel(toLabel || '') || (toLabel || '').trim()
+    if (!favId || !cleaned) return
+    const updateEntry = (entry: any) => {
+      if (!entry) return entry
+      const entryFavId = getFavoriteIdForEntry(entry)
+      if (entryFavId && entryFavId === favId) {
+        return { ...entry, description: cleaned, label: cleaned }
+      }
+      return entry
+    }
+    setTodaysFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
+    setHistoryFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
+    setFavoritesAllServerEntries((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
+    setFoodLibrary((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
+    renamePersistentDiaryEntries(updateEntry)
+  }
+
   const saveFoodNameOverride = (fromLabel: any, toLabel: any, entry?: any) => {
     const from = normalizeMealLabel(fromLabel || '').trim()
     const to = normalizeMealLabel(toLabel || '').trim()
@@ -12493,6 +12615,7 @@ Please add nutritional information manually if needed.`);
         persistFavorites(next)
         return next
       })
+      renameEntriesWithFavoriteId(favId, cleaned)
       showQuickToast('Renamed')
     })
   }
