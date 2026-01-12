@@ -66,6 +66,9 @@ const sanitizeUserDataPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return payload;
   // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
   const { todaysFoods, favorites, ...rest } = payload as any;
+  if (rest.healthSetupUpdatedAt) {
+    return rest;
+  }
   if (shouldStampHealthSetup(rest)) {
     return { ...rest, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() }
   }
@@ -794,6 +797,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const goalIntensityTouchedRef = useRef(false);
   const goalChoiceHydratedRef = useRef(false);
   const goalIntensityHydratedRef = useRef(false);
+  const lastSyncVersionRef = useRef<number>(0);
   const [showGoalDetails, setShowGoalDetails] = useState(false);
   const [goalTargetWeightUnit, setGoalTargetWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [goalTargetWeightInput, setGoalTargetWeightInput] = useState('');
@@ -952,29 +956,38 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   // but avoid overwriting any values the user has already edited on this step.
   useEffect(() => {
     if (!initial) return;
+    const incomingVersion = Number((initial as any)?.healthSetupUpdatedAt || 0);
+    const forceHydrate = Number.isFinite(incomingVersion) && incomingVersion > lastSyncVersionRef.current;
+    if (forceHydrate) {
+      lastSyncVersionRef.current = incomingVersion;
+    }
     if (!initialSnapshotRef.current && Object.keys(initial || {}).length > 0) {
       initialSnapshotRef.current = initial;
     }
 
-    if (!birthdate && typeof initial.birthdate === 'string' && initial.birthdate.trim().length >= 8) {
+    if (
+      (forceHydrate || !birthdate) &&
+      typeof initial.birthdate === 'string' &&
+      initial.birthdate.trim().length >= 8
+    ) {
       setBirthdate(initial.birthdate);
     }
 
-    if (!weight && initial.weight) {
+    if ((forceHydrate || !weight) && initial.weight) {
       setWeight(initial.weight);
     }
-    if (!height && initial.height) {
+    if ((forceHydrate || !height) && initial.height) {
       setHeight(initial.height);
     }
-    if (!feet && initial.feet) {
+    if ((forceHydrate || !feet) && initial.feet) {
       setFeet(initial.feet);
     }
-    if (!inches && initial.inches) {
+    if ((forceHydrate || !inches) && initial.inches) {
       setInches(initial.inches);
     }
     // Body type is optional and user-toggleable; only hydrate it once from initial.
-    if (!bodyTypeHydratedRef.current) {
-      if (!bodyType && initial.bodyType) {
+    if (forceHydrate || !bodyTypeHydratedRef.current) {
+      if ((forceHydrate || !bodyType) && initial.bodyType) {
         setBodyType(initial.bodyType);
       }
       bodyTypeHydratedRef.current = true;
@@ -982,59 +995,59 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if (
       typeof initial.goalChoice === 'string' &&
       initial.goalChoice.trim().length > 0 &&
-      !goalChoiceTouchedRef.current &&
-      !goalChoiceHydratedRef.current &&
+      (!goalChoiceTouchedRef.current || forceHydrate) &&
+      (!goalChoiceHydratedRef.current || forceHydrate) &&
       initial.goalChoice !== goalChoice
     ) {
       setGoalChoice(initial.goalChoice);
     }
     if (
-      !goalChoiceHydratedRef.current &&
+      (!goalChoiceHydratedRef.current || forceHydrate) &&
       typeof initial.goalChoice === 'string' &&
       initial.goalChoice.trim().length > 0
     ) {
       goalChoiceHydratedRef.current = true;
     }
-    if (!allergiesHydratedRef.current && Array.isArray(initial.allergies)) {
+    if ((forceHydrate || !allergiesHydratedRef.current) && Array.isArray(initial.allergies)) {
       setAllergies(initial.allergies);
       allergiesHydratedRef.current = true;
     }
-    if (!dietHydratedRef.current) {
+    if (forceHydrate || !dietHydratedRef.current) {
       dietHydratedRef.current = true;
-      if (!dietTouchedRef.current) {
+      if (!dietTouchedRef.current || forceHydrate) {
         const incomingDietTypes = normalizeDietTypes((initial as any)?.dietTypes ?? (initial as any)?.dietType)
         if (incomingDietTypes.length && dietTypes.length === 0) {
           setDietTypes(incomingDietTypes)
         }
       }
     }
-    if (!healthCheckHydratedRef.current) {
+    if (forceHydrate || !healthCheckHydratedRef.current) {
       healthCheckHydratedRef.current = true;
-      if (!healthCheckTouchedRef.current) {
+      if (!healthCheckTouchedRef.current || forceHydrate) {
         setHealthCheckSettings(normalizeHealthCheckSettings((initial as any)?.healthCheckSettings));
       }
     }
-    if (!diabetesHydratedRef.current && initial.diabetesType) {
+    if ((forceHydrate || !diabetesHydratedRef.current) && initial.diabetesType) {
       setDiabetesType(initial.diabetesType);
       diabetesHydratedRef.current = true;
     }
     if (
       initial.goalIntensity &&
-      !goalIntensityTouchedRef.current &&
-      !goalIntensityHydratedRef.current &&
+      (!goalIntensityTouchedRef.current || forceHydrate) &&
+      (!goalIntensityHydratedRef.current || forceHydrate) &&
       initial.goalIntensity !== goalIntensity
     ) {
       setGoalIntensity(initial.goalIntensity);
     }
     if (
-      !goalIntensityHydratedRef.current &&
+      (!goalIntensityHydratedRef.current || forceHydrate) &&
       typeof initial.goalIntensity === 'string' &&
       initial.goalIntensity.trim().length > 0
     ) {
       goalIntensityHydratedRef.current = true;
     }
 
-    if (!goalDetailsHydratedRef.current) {
+    if (forceHydrate || !goalDetailsHydratedRef.current) {
       const rawGoalUnit =
         typeof (initial as any).goalTargetWeightUnit === 'string'
           ? (initial as any).goalTargetWeightUnit.toLowerCase()
@@ -1097,7 +1110,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       goalDetailsHydratedRef.current = true;
     }
 
-    if (!birthYear && !birthMonth && !birthDay && typeof initial.birthdate === 'string') {
+    if ((forceHydrate || (!birthYear && !birthMonth && !birthDay)) && typeof initial.birthdate === 'string') {
       const [y, m, d] = initial.birthdate.split('-');
       if (y && m && d) {
         setBirthYear(y);
@@ -8256,7 +8269,10 @@ export default function Onboarding() {
   const persistForm = useCallback(
     (partial: any) => {
       setForm((prev: any) => {
-        const next = { ...prev, ...partial };
+        let next = { ...prev, ...partial };
+        if (shouldStampHealthSetup(partial)) {
+          next = { ...next, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() };
+        }
         formRef.current = next; // Keep latest edits available for exit-save flows.
         if (allowAutosave && !SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) {
           debouncedSave(next);
