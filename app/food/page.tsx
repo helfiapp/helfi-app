@@ -183,6 +183,37 @@ const formatWaterEntryAmount = (entry: { amount?: number; unit?: string; amountM
   return formatWaterMl(Number(entry?.amountMl ?? 0))
 }
 
+type DrinkAmountOverride = {
+  amount: number
+  unit: 'ml' | 'l' | 'oz'
+  amountMl: number
+}
+
+const normalizeDrinkUnit = (value: string | null | undefined): DrinkAmountOverride['unit'] | null => {
+  const raw = String(value || '').trim().toLowerCase()
+  if (raw === 'ml' || raw === 'milliliter' || raw === 'millilitre') return 'ml'
+  if (raw === 'l' || raw === 'liter' || raw === 'litre') return 'l'
+  if (raw === 'oz' || raw === 'ounce' || raw === 'ounces' || raw === 'fl oz' || raw === 'floz') return 'oz'
+  return null
+}
+
+const parseDrinkOverrideFromParams = (params: URLSearchParams): DrinkAmountOverride | null => {
+  const rawAmount = params.get('drinkAmount')
+  const rawUnit = params.get('drinkUnit')
+  const amount = Number(rawAmount)
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  const unit = normalizeDrinkUnit(rawUnit)
+  if (!unit) return null
+  const amountMl = unit === 'l' ? amount * 1000 : unit === 'oz' ? amount * 29.5735 : amount
+  if (!Number.isFinite(amountMl) || amountMl <= 0) return null
+  return { amount, unit, amountMl }
+}
+
+const formatDrinkOverrideLabel = (override: DrinkAmountOverride) => {
+  const unitLabel = override.unit === 'l' ? 'L' : override.unit
+  return `${formatWaterNumber(override.amount)} ${unitLabel}`
+}
+
 const WATER_ICON_BY_LABEL: Record<string, string> = {
   water: '/mobile-assets/MOBILE ICONS/WATER.png',
   coffee: '/mobile-assets/MOBILE ICONS/COFFEE.png',
@@ -2668,6 +2699,7 @@ export default function FoodDiary() {
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const favoritesReplaceTargetRef = useRef<number | null>(null)
   const favoritesActionRef = useRef<'analysis' | 'diary' | null>(null)
+  const pendingDrinkOverrideRef = useRef<DrinkAmountOverride | null>(null)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
@@ -2729,11 +2761,15 @@ export default function FoodDiary() {
       const params = new URLSearchParams(window.location.search)
       const routeDate = params.get('date') || ''
       const routeCategory = params.get('category') || ''
+      const drinkOverride = parseDrinkOverrideFromParams(params)
       if (routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate)) {
         setSelectedDate(routeDate)
       }
       if (routeCategory) {
         setSelectedAddCategory(normalizeCategory(routeCategory) as any)
+      }
+      if (drinkOverride) {
+        pendingDrinkOverrideRef.current = drinkOverride
       }
     }
     setShowAddFood(true)
@@ -2750,6 +2786,7 @@ export default function FoodDiary() {
     if (!open) return
     const routeDate = params.get('date') || ''
     const routeCategory = params.get('category') || ''
+    const drinkOverride = parseDrinkOverrideFromParams(params)
     const key = `${open}|${routeDate}|${routeCategory}`
     if (openMenuKeyRef.current === key) return
     openMenuKeyRef.current = key
@@ -2759,6 +2796,9 @@ export default function FoodDiary() {
     }
     if (routeCategory) {
       setSelectedAddCategory(normalizeCategory(routeCategory) as any)
+    }
+    if (drinkOverride) {
+      pendingDrinkOverrideRef.current = drinkOverride
     }
 
     setShowCategoryPicker(false)
@@ -8136,6 +8176,79 @@ const applyStructuredItems = (
     }
   }
 
+  const applyDrinkOverrideToItems = (
+    items: any[] | null | undefined,
+    override: DrinkAmountOverride | null,
+  ): { items: any[] | null; totals: NutritionTotals | null; used: boolean } => {
+    if (!override || !Array.isArray(items) || items.length !== 1) {
+      return { items: Array.isArray(items) ? items : null, totals: null, used: false }
+    }
+    const baseItem = items[0]
+    if (!baseItem) return { items, totals: null, used: false }
+    const info = parseServingSizeInfo(baseItem)
+    const isLiquid = isLikelyLiquidFood(String(baseItem?.name || ''), String(baseItem?.serving_size || ''))
+    const customMl =
+      Number.isFinite(Number(baseItem?.customMlPerServing)) && Number(baseItem.customMlPerServing) > 0
+        ? Number(baseItem.customMlPerServing)
+        : null
+    const customGrams =
+      Number.isFinite(Number(baseItem?.customGramsPerServing)) && Number(baseItem.customGramsPerServing) > 0
+        ? Number(baseItem.customGramsPerServing)
+        : null
+    let baseMl =
+      customMl ||
+      info.mlPerServing ||
+      (info.ozPerServing ? info.ozPerServing * 29.5735 : null)
+    if (!baseMl && isLiquid) {
+      const grams = customGrams || info.gramsPerServing
+      if (grams && grams > 0) baseMl = grams
+    }
+    if (!baseMl || !Number.isFinite(baseMl) || baseMl <= 0) {
+      return { items, totals: null, used: false }
+    }
+    const factor = override.amountMl / baseMl
+    if (!Number.isFinite(factor) || factor <= 0) {
+      return { items, totals: null, used: false }
+    }
+
+    const scaleMacro = (value: any, decimals: number) => {
+      const numeric = Number(value)
+      if (!Number.isFinite(numeric)) return null
+      const scaled = numeric * factor
+      if (!Number.isFinite(scaled)) return null
+      const precision = Math.pow(10, decimals)
+      return Math.round(scaled * precision) / precision
+    }
+
+    const next = {
+      ...baseItem,
+      serving_size: formatDrinkOverrideLabel(override),
+      calories: scaleMacro(baseItem?.calories, 0),
+      protein_g: scaleMacro(baseItem?.protein_g, 1),
+      carbs_g: scaleMacro(baseItem?.carbs_g, 1),
+      fat_g: scaleMacro(baseItem?.fat_g, 1),
+      fiber_g: scaleMacro(baseItem?.fiber_g, 1),
+      sugar_g: scaleMacro(baseItem?.sugar_g, 1),
+      servings: 1,
+    }
+
+    if (override.unit === 'oz') {
+      next.weightUnit = 'oz'
+      next.weightAmount = Math.round(override.amount * 100) / 100
+      next.customMlPerServing = null
+      next.customGramsPerServing = null
+    } else {
+      next.weightUnit = 'ml'
+      next.weightAmount = Math.round(override.amountMl * 10) / 10
+      next.customMlPerServing = Math.round(override.amountMl * 10) / 10
+      next.customGramsPerServing = null
+    }
+
+    const updatedItems = [next]
+    const totals = recalculateNutritionFromItems(updatedItems)
+    return { items: updatedItems, totals, used: true }
+  }
+
 const convertTotalsForStorage = (totals: NutritionTotals | null | undefined) => {
   if (!totals) return null
   return {
@@ -8623,6 +8736,13 @@ Please add nutritional information manually if needed.`);
     const addedOrder = Date.now()
     const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const drinkOverride = pendingDrinkOverrideRef.current
+    const adjusted = applyDrinkOverrideToItems(analyzedItems, drinkOverride)
+    const finalItems = adjusted.items || (analyzedItems && analyzedItems.length > 0 ? analyzedItems : null)
+    const overrideTotals = adjusted.used ? adjusted.totals || null : null
+    if (adjusted.used) pendingDrinkOverrideRef.current = null
+    const finalNutrition = overrideTotals || nutrition || analyzedNutrition
+    const finalTotal = overrideTotals ? convertTotalsForStorage(overrideTotals) : analyzedTotal || null
     const newEntry = ensureEntryLoggedAt(
       applyEntryClientId(
         {
@@ -8635,9 +8755,9 @@ Please add nutritional information manually if needed.`);
           time: displayTime,
           method,
           photo: method === 'photo' ? photoPreview : null,
-          nutrition: nutrition || analyzedNutrition,
-          items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : null, // Store structured items
-          total: analyzedTotal || null, // Store total nutrition
+          nutrition: finalNutrition,
+          items: finalItems, // Store structured items
+          total: finalTotal, // Store total nutrition
           meal: category,
           category,
           persistedCategory: category,
@@ -10999,7 +11119,11 @@ Please add nutritional information manually if needed.`);
     const item = buildBarcodeIngredientItem(food, code)
     const normalizedItems = normalizeDiscreteServingsWithLabel([item])
     const items = normalizedItems.length > 0 ? normalizedItems : [item]
-    const recalculatedTotals = recalculateNutritionFromItems(items)
+    const drinkOverride = pendingDrinkOverrideRef.current
+    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
+    const finalItems = adjusted.items || items
+    if (adjusted.used) pendingDrinkOverrideRef.current = null
+    const recalculatedTotals = recalculateNutritionFromItems(finalItems)
     const totals =
       recalculatedTotals ||
       sanitizeNutritionTotals({
@@ -11012,7 +11136,7 @@ Please add nutritional information manually if needed.`);
       })
     const totalsForStorage = convertTotalsForStorage(totals)
     const description =
-      buildMealSummaryFromItems(items) ||
+      buildMealSummaryFromItems(finalItems) ||
       [food?.name, food?.brand].filter(Boolean).join(' – ') ||
       'Scanned food'
     const entry = ensureEntryLoggedAt(
@@ -11029,7 +11153,7 @@ Please add nutritional information manually if needed.`);
           photo: null,
           nutrition: totals,
           total: totalsForStorage,
-          items,
+          items: finalItems,
           meal: category,
           category,
           persistedCategory: category,
@@ -11818,6 +11942,11 @@ Please add nutritional information manually if needed.`);
       }
       return null
     })()
+    const drinkOverride = pendingDrinkOverrideRef.current
+    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
+    const finalItems = adjusted.items || items
+    const finalTotals = adjusted.used ? adjusted.totals || totals : totals
+    if (adjusted.used) pendingDrinkOverrideRef.current = null
     const newEntry = ensureEntryLoggedAt(
       applyEntryClientId(
         {
@@ -11830,9 +11959,9 @@ Please add nutritional information manually if needed.`);
           time: displayTime,
           method: source?.method || 'text',
           photo: source?.photo || source?.entry?.photo || null,
-          nutrition: totals,
-          total: totals,
-          items,
+          nutrition: finalTotals,
+          total: finalTotals,
+          items: finalItems,
           meal: category,
           category,
           persistedCategory: category,
@@ -11993,6 +12122,12 @@ Please add nutritional information manually if needed.`);
       if (origin) next.__origin = origin
       return next
     }
+    const drinkOverride = pendingDrinkOverrideRef.current
+    const adjusted = applyDrinkOverrideToItems(clonedItems, drinkOverride)
+    const finalItems = adjusted.items || clonedItems
+    const adjustedTotals = adjusted.used ? adjusted.totals || null : null
+    if (adjusted.used) pendingDrinkOverrideRef.current = null
+
     const entry = ensureEntryLoggedAt(
       applyEntryClientId(
         {
@@ -12005,9 +12140,9 @@ Please add nutritional information manually if needed.`);
           time: new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           method: favorite.method || 'text',
           photo: favorite.photo || null,
-          nutrition: attachMeta(favorite.nutrition || favorite.total || null),
-          items: Array.isArray(clonedItems)
-            ? clonedItems
+          nutrition: attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null),
+          items: Array.isArray(finalItems)
+            ? finalItems
             : typeof (favorite as any)?.items === 'string'
             ? (() => {
                 try {
@@ -12018,7 +12153,7 @@ Please add nutritional information manually if needed.`);
                 }
               })()
             : null,
-          total: favorite.total || favorite.nutrition || null,
+          total: adjustedTotals || favorite.total || favorite.nutrition || null,
           meal: category,
           category,
           persistedCategory: category,

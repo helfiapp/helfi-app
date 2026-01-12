@@ -446,10 +446,14 @@ export default function WaterIntakePage() {
       await addEntry(drinkDetail.amount, drinkDetail.unit, activeDrink)
       closeDrinkDetail()
       const category = sourceCategory || 'uncategorized'
+      const amountParam = String(drinkDetail.amount)
+      const unitParam = String(drinkDetail.unit || '')
       if (mode === 'photo') {
         const qs = new URLSearchParams({
           date: selectedDate,
           category,
+          drinkAmount: amountParam,
+          drinkUnit: unitParam,
         })
         router.push(`/food/analysis?${qs.toString()}`)
         return
@@ -459,6 +463,8 @@ export default function WaterIntakePage() {
           date: selectedDate,
           category,
           q: activeDrink.toLowerCase(),
+          drinkAmount: amountParam,
+          drinkUnit: unitParam,
         })
         router.push(`/food/add-ingredient?${qs.toString()}`)
         return
@@ -467,6 +473,8 @@ export default function WaterIntakePage() {
         open: mode,
         date: selectedDate,
         category,
+        drinkAmount: amountParam,
+        drinkUnit: unitParam,
       })
       router.push(`/food?${qs.toString()}`)
     } catch {

@@ -13,6 +13,7 @@ type NormalizedFoodItem = {
   name: string
   brand?: string | null
   serving_size?: string | null
+  servings?: number | null
   calories?: number | null
   protein_g?: number | null
   carbs_g?: number | null
@@ -64,12 +65,91 @@ const buildTodayIso = () => {
 
 const safeNumber = (n: any) => (typeof n === 'number' && Number.isFinite(n) ? n : null)
 const round3 = (n: number) => Math.round(n * 1000) / 1000
+const formatNumber = (value: number) => {
+  if (Number.isInteger(value)) return String(value)
+  return value.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')
+}
 const is100gServing = (label?: string | null) => /\b100\s*g\b/i.test(String(label || ''))
 const sameNumber = (a: any, b: any) => {
   if (a === null || a === undefined) return b === null || b === undefined
   if (b === null || b === undefined) return false
   return Number(a) === Number(b)
 }
+
+const normalizeDrinkUnit = (value: string | null | undefined) => {
+  const raw = String(value || '').trim().toLowerCase()
+  if (raw === 'ml' || raw === 'milliliter' || raw === 'millilitre') return 'ml'
+  if (raw === 'l' || raw === 'liter' || raw === 'litre') return 'l'
+  if (raw === 'oz' || raw === 'ounce' || raw === 'ounces' || raw === 'fl oz' || raw === 'floz') return 'oz'
+  return null
+}
+
+const parseDrinkOverride = (amountRaw: string | null, unitRaw: string | null) => {
+  const amount = Number(amountRaw)
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  const unit = normalizeDrinkUnit(unitRaw)
+  if (!unit) return null
+  const amountMl = unit === 'l' ? amount * 1000 : unit === 'oz' ? amount * 29.5735 : amount
+  if (!Number.isFinite(amountMl) || amountMl <= 0) return null
+  return { amount, unit, amountMl }
+}
+
+const formatDrinkAmountLabel = (amount: number, unit: 'ml' | 'l' | 'oz') => {
+  const unitLabel = unit === 'l' ? 'L' : unit
+  return `${formatNumber(amount)} ${unitLabel}`
+}
+
+const parseServingBaseMl = (servingSize: string | null | undefined) => {
+  const raw = String(servingSize || '').toLowerCase()
+  const matchMl = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/)
+  if (matchMl) return Number(matchMl[1])
+  const matchL = raw.match(/(\d+(?:\.\d+)?)\s*l\b/)
+  if (matchL) return Number(matchL[1]) * 1000
+  const matchOz = raw.match(/(\d+(?:\.\d+)?)\s*(?:fl\s*)?oz\b/)
+  if (matchOz) return Number(matchOz[1]) * 29.5735
+  const matchG = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
+  if (matchG) return Number(matchG[1])
+  return null
+}
+
+const scaleMacroValue = (value: any, factor: number, decimals: number) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return null
+  const scaled = numeric * factor
+  if (!Number.isFinite(scaled)) return null
+  const precision = Math.pow(10, decimals)
+  return Math.round(scaled * precision) / precision
+}
+
+const applyDrinkAmountOverrideToItem = (
+  item: NormalizedFoodItem,
+  override: { amount: number; unit: 'ml' | 'l' | 'oz'; amountMl: number },
+) => {
+  const baseMl = parseServingBaseMl(item?.serving_size)
+  if (!baseMl || !Number.isFinite(baseMl) || baseMl <= 0) return item
+  const factor = override.amountMl / baseMl
+  if (!Number.isFinite(factor) || factor <= 0) return item
+  return {
+    ...item,
+    serving_size: formatDrinkAmountLabel(override.amount, override.unit),
+    calories: scaleMacroValue(item.calories, factor, 0),
+    protein_g: scaleMacroValue(item.protein_g, factor, 1),
+    carbs_g: scaleMacroValue(item.carbs_g, factor, 1),
+    fat_g: scaleMacroValue(item.fat_g, factor, 1),
+    fiber_g: scaleMacroValue(item.fiber_g, factor, 1),
+    sugar_g: scaleMacroValue(item.sugar_g, factor, 1),
+    servings: 1,
+  }
+}
+
+const buildTotalsFromItem = (item: NormalizedFoodItem) => ({
+  calories: Number(item?.calories ?? 0),
+  protein: Number(item?.protein_g ?? 0),
+  carbs: Number(item?.carbs_g ?? 0),
+  fat: Number(item?.fat_g ?? 0),
+  fiber: Number(item?.fiber_g ?? 0),
+  sugar: Number(item?.sugar_g ?? 0),
+})
 
 const alignTimestampToLocalDate = (iso: string, localDate: string) => {
   try {
@@ -113,6 +193,10 @@ export default function AddIngredientClient() {
   const selectedDate = searchParams.get('date') || buildTodayIso()
   const category = normalizeCategory(searchParams.get('category'))
   const prefillQuery = searchParams.get('q') || ''
+  const drinkOverride = parseDrinkOverride(
+    searchParams.get('drinkAmount'),
+    searchParams.get('drinkUnit'),
+  )
 
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<SearchKind>('packaged')
@@ -408,7 +492,7 @@ export default function AddIngredientClient() {
     try {
       const upgraded = await loadServingOverride(r)
       const final = upgraded || r
-      const item = {
+      const baseItem = {
         name: String(final.name || 'Food'),
         brand: final.brand ?? null,
         serving_size: String(final.serving_size || '1 serving'),
@@ -421,6 +505,7 @@ export default function AddIngredientClient() {
         servings: 1,
       }
 
+      const item = drinkOverride ? applyDrinkAmountOverrideToItem(baseItem, drinkOverride) : baseItem
       const nutrition = {
         calories: Math.round(Number(item.calories || 0)),
         protein: round3(Number(item.protein_g || 0)),
@@ -499,23 +584,33 @@ export default function AddIngredientClient() {
         return
       }
 
+      let finalItems = items
+      let finalTotal = total
+      if (drinkOverride && items.length === 1) {
+        const scaled = applyDrinkAmountOverrideToItem(items[0], drinkOverride)
+        if (scaled !== items[0]) {
+          finalItems = [scaled]
+          finalTotal = buildTotalsFromItem(scaled)
+        }
+      }
+
       const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
-      const title = buildDefaultMealName(items.map((it: any) => it?.name || it?.food || 'Food'))
+      const title = buildDefaultMealName(finalItems.map((it: any) => it?.name || it?.food || 'Food'))
 
       const nutrition = {
-        calories: Math.round(Number(total?.calories || 0)),
-        protein: round3(Number(total?.protein ?? total?.protein_g ?? 0)),
-        carbs: round3(Number(total?.carbs ?? total?.carbs_g ?? 0)),
-        fat: round3(Number(total?.fat ?? total?.fat_g ?? 0)),
-        fiber: round3(Number(total?.fiber ?? total?.fiber_g ?? 0)),
-        sugar: round3(Number(total?.sugar ?? total?.sugar_g ?? 0)),
+        calories: Math.round(Number(finalTotal?.calories || 0)),
+        protein: round3(Number(finalTotal?.protein ?? finalTotal?.protein_g ?? 0)),
+        carbs: round3(Number(finalTotal?.carbs ?? finalTotal?.carbs_g ?? 0)),
+        fat: round3(Number(finalTotal?.fat ?? finalTotal?.fat_g ?? 0)),
+        fiber: round3(Number(finalTotal?.fiber ?? finalTotal?.fiber_g ?? 0)),
+        sugar: round3(Number(finalTotal?.sugar ?? finalTotal?.sugar_g ?? 0)),
       }
 
       const payload = {
         description: title,
         nutrition,
         imageUrl: null,
-        items,
+        items: finalItems,
         localDate: selectedDate,
         meal: category,
         category,

@@ -273,6 +273,7 @@ the user.
   - “Search food / Scan barcode / Add by photo / Add from favorites” should log the drink and then open the corresponding Food Diary flow.
 - Drink icons must show on the Food Diary entries using the matching icon from `public/mobile-assets/MOBILE ICONS/`.
 - Icon lookup must normalize labels (remove sugar notes like “with sugar”, “sugar‑free”, and parenthetical sugar amounts) so sweetened drinks still show the correct drink icon.
+- When a drink is added via Sugar‑free + search/barcode/photo/favorites, the Food Diary entry must **auto‑scale macros** to the drink amount (e.g., 100 ml) instead of the product’s default serving.
 - Water entries must appear under the **category they were logged in**, not default to Other.
 
 Agents must not modify these rules without explicit user approval.
