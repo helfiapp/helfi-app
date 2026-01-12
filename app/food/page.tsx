@@ -9003,10 +9003,33 @@ Please add nutritional information manually if needed.`);
     }
 
     // Never override a user-provided title with an auto-generated ingredient summary.
-    const manualDescription = (editedDescription?.trim?.() || '').trim()
+    const baseDescription = extractBaseMealDescription(originalEditingEntry?.description || editingEntry?.description || '')
+    const rawManualDescription = (editedDescription?.trim?.() || '').trim()
+    const manualDescription =
+      rawManualDescription && normalizedDescription(rawManualDescription) !== normalizedDescription(baseDescription)
+        ? rawManualDescription
+        : ''
     const fallbackDescription = (manualDescription || aiDescription || editingEntry.description || '').trim()
     const generatedSummary = buildMealSummaryFromItems(analyzedItems)
-    const finalDescription = fallbackDescription || generatedSummary || ''
+    const singleItemName = (() => {
+      const list =
+        Array.isArray(analyzedItems) && analyzedItems.length > 0
+          ? analyzedItems
+          : Array.isArray(editingEntry.items)
+          ? editingEntry.items
+          : null
+      if (!list || list.length !== 1) return ''
+      const item = list[0]
+      return String(item?.name || item?.label || '').trim()
+    })()
+    const finalDescription = (() => {
+      if (!manualDescription && singleItemName) {
+        const base = normalizedDescription(fallbackDescription || '')
+        const next = normalizedDescription(singleItemName)
+        if (next && next !== base) return singleItemName
+      }
+      return fallbackDescription || generatedSummary || ''
+    })()
 
     // Calculate new createdAt from entryTime + selectedDate
     let newCreatedAt = editingEntry.createdAt;
@@ -9100,6 +9123,7 @@ Please add nutritional information manually if needed.`);
       } else {
         setHistoryFoods(updatedFoods);
       }
+      updateUserSnapshotForDate(updatedFoods, selectedDate)
 
       // Persist edit to FoodLog when we have a database id
       const dbId = resolvedDbId || editingEntry.dbId || editingEntry.id
