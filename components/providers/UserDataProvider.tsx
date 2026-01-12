@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { clearClientCache, isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
 import { markAppHidden } from '@/lib/app-visibility'
@@ -32,6 +32,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
   const [userData, setUserData] = useState<UserData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const lastLocalUpdateRef = useRef(0)
 
   // Profile image is either the saved Cloudinary image or the auth provider image.
   // We intentionally do NOT provide a graphic default here so UI components can
@@ -44,6 +45,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   // Load data once and cache it
   const loadData = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
     if (!session) return
+    const requestStartedAt = Date.now()
 
     const cached = cacheKey ? readClientCache<UserData>(cacheKey) : null
     const hadCached = !!cached?.data
@@ -77,9 +79,20 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
             } catch {
               // Ignore sync notice errors
             }
-            setUserData(result.data)
-            if (cacheKey) {
-              writeClientCache(cacheKey, result.data)
+            const localUpdatedAfterRequest = lastLocalUpdateRef.current > requestStartedAt
+            if (localUpdatedAfterRequest) {
+              setUserData(prev => {
+                const next = prev ? { ...result.data, ...prev } : result.data
+                if (cacheKey) {
+                  writeClientCache(cacheKey, next)
+                }
+                return next
+              })
+            } else {
+              setUserData(result.data)
+              if (cacheKey) {
+                writeClientCache(cacheKey, result.data)
+              }
             }
           }
         }
@@ -113,6 +126,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   // Update user data
   const updateUserData = (newData: Partial<UserData>) => {
+    lastLocalUpdateRef.current = Date.now()
     setUserData(prev => {
       const next = prev ? { ...prev, ...newData } : (newData as UserData)
       if (cacheKey) {
@@ -124,6 +138,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   // Update profile image specifically
   const updateProfileImage = (image: string) => {
+    lastLocalUpdateRef.current = Date.now()
     setUserData(prev => {
       const next = prev ? { ...prev, profileImage: image } : ({ profileImage: image } as UserData)
       if (cacheKey) {
