@@ -453,6 +453,20 @@ export async function GET(request: NextRequest) {
     const hydrationTarget = customHydrationTarget ?? hydrationGoal.targetMl
     const hydrationSource = customHydrationTarget ? 'custom' : 'auto'
 
+    let healthSetupUpdatedAt: number | null = null
+    try {
+      const storedMeta = user.healthGoals.find((goal: any) => goal.name === '__HEALTH_SETUP_META__')
+      if (storedMeta?.category) {
+        const parsed = JSON.parse(storedMeta.category)
+        const parsedUpdatedAt = Number(parsed?.updatedAt)
+        if (Number.isFinite(parsedUpdatedAt) && parsedUpdatedAt > 0) {
+          healthSetupUpdatedAt = parsedUpdatedAt
+        }
+      }
+    } catch {
+      healthSetupUpdatedAt = null
+    }
+
     const onboardingData = {
       gender: user.gender?.toLowerCase() || '',
       weight: user.weight?.toString() || '',
@@ -506,6 +520,7 @@ export async function GET(request: NextRequest) {
       diabetesType: allergyData.diabetesType,
       dietTypes,
       healthCheckSettings,
+      healthSetupUpdatedAt,
       hydrationGoal: {
         targetMl: hydrationTarget,
         targetL: Math.round((hydrationTarget / 1000) * 100) / 100,
@@ -597,6 +612,40 @@ export async function POST(request: NextRequest) {
     const incomingHealthSetupUpdatedAt = Number(incomingHealthSetupUpdatedAtRaw)
     const hasIncomingHealthSetupUpdatedAt =
       Number.isFinite(incomingHealthSetupUpdatedAt) && incomingHealthSetupUpdatedAt > 0
+    const healthSetupKeys = new Set([
+      'gender',
+      'termsAccepted',
+      'weight',
+      'height',
+      'birthdate',
+      'bodyType',
+      'exerciseFrequency',
+      'exerciseTypes',
+      'exerciseDurations',
+      'goals',
+      'goalChoice',
+      'goalIntensity',
+      'goalTargetWeightKg',
+      'goalTargetWeightUnit',
+      'goalPaceKgPerWeek',
+      'goalCalorieTarget',
+      'goalMacroSplit',
+      'goalMacroMode',
+      'goalFiberTarget',
+      'goalSugarMax',
+      'dietTypes',
+      'dietType',
+      'allergies',
+      'diabetesType',
+      'healthCheckSettings',
+      'healthSituations',
+      'bloodResults',
+      'supplements',
+      'medications',
+    ])
+    const touchesHealthSetup =
+      data && typeof data === 'object' && Object.keys(data as any).some((key) => healthSetupKeys.has(key))
+    let storedHealthSetupUpdatedAt = 0
 
     // #region agent log
 	    try {
@@ -649,16 +698,27 @@ export async function POST(request: NextRequest) {
     console.timeEnd('⏱️ User Lookup/Creation')
 
     // Guard against older health setup saves overwriting newer changes.
-    if (hasIncomingHealthSetupUpdatedAt) {
+    if (touchesHealthSetup) {
       try {
         const storedMeta = await prisma.healthGoal.findFirst({
           where: { userId: user.id, name: '__HEALTH_SETUP_META__' },
         })
-        const storedUpdatedAt = storedMeta?.category ? Number(JSON.parse(storedMeta.category)?.updatedAt) : 0
-        if (Number.isFinite(storedUpdatedAt) && storedUpdatedAt > 0 && incomingHealthSetupUpdatedAt < storedUpdatedAt) {
+        storedHealthSetupUpdatedAt = storedMeta?.category ? Number(JSON.parse(storedMeta.category)?.updatedAt) : 0
+        if (!hasIncomingHealthSetupUpdatedAt && storedHealthSetupUpdatedAt > 0) {
+          console.log('Skipping un-stamped health setup update', {
+            storedHealthSetupUpdatedAt,
+          })
+          return NextResponse.json({ success: true, ignored: true, reason: 'missing-health-setup-stamp' })
+        }
+        if (
+          hasIncomingHealthSetupUpdatedAt &&
+          Number.isFinite(storedHealthSetupUpdatedAt) &&
+          storedHealthSetupUpdatedAt > 0 &&
+          incomingHealthSetupUpdatedAt < storedHealthSetupUpdatedAt
+        ) {
           console.log('Skipping stale health setup update', {
             incomingHealthSetupUpdatedAt,
-            storedUpdatedAt,
+            storedUpdatedAt: storedHealthSetupUpdatedAt,
           })
           return NextResponse.json({ success: true, ignored: true, reason: 'stale-health-setup' })
         }
@@ -1860,7 +1920,9 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
     
-    if (hasIncomingHealthSetupUpdatedAt) {
+    const shouldStoreHealthSetupMeta = touchesHealthSetup && (hasIncomingHealthSetupUpdatedAt || storedHealthSetupUpdatedAt === 0)
+    const metaUpdatedAt = hasIncomingHealthSetupUpdatedAt ? incomingHealthSetupUpdatedAt : Date.now()
+    if (shouldStoreHealthSetupMeta) {
       try {
         await prisma.healthGoal.deleteMany({
           where: { userId: user.id, name: '__HEALTH_SETUP_META__' },
@@ -1869,7 +1931,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             name: '__HEALTH_SETUP_META__',
-            category: JSON.stringify({ updatedAt: incomingHealthSetupUpdatedAt }),
+            category: JSON.stringify({ updatedAt: metaUpdatedAt }),
             currentRating: 0,
           },
         })

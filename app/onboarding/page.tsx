@@ -1875,7 +1875,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goalChoice: choice, goalIntensity: nextIntensity }),
+        body: JSON.stringify(sanitizeUserDataPayload({ goalChoice: choice, goalIntensity: nextIntensity })),
         keepalive: true,
       }).catch(() => {});
     },
