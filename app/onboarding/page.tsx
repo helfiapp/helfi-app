@@ -764,7 +764,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [activeDietCategoryId, setActiveDietCategoryId] = useState<string>(DIET_CATEGORIES[0]?.id || 'plant-based');
   const [showDietSavedNotice, setShowDietSavedNotice] = useState(false);
   const dietSavedNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const partialSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dietHydratedRef = useRef(false);
   const dietTouchedRef = useRef(false);
   const [healthCheckSettings, setHealthCheckSettings] = useState(() =>
@@ -1175,10 +1174,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       if (dietSavedNoticeTimeoutRef.current) {
         clearTimeout(dietSavedNoticeTimeoutRef.current);
         dietSavedNoticeTimeoutRef.current = null;
-      }
-      if (partialSaveTimeoutRef.current) {
-        clearTimeout(partialSaveTimeoutRef.current);
-        partialSaveTimeoutRef.current = null;
       }
     };
   }, []);
@@ -1962,12 +1957,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const schedulePartialSave = useCallback(
     (payload: any) => {
       if (!onPartialSave) return;
-      if (partialSaveTimeoutRef.current) {
-        clearTimeout(partialSaveTimeoutRef.current);
-      }
-      partialSaveTimeoutRef.current = setTimeout(() => {
-        onPartialSave(payload);
-      }, 250);
+      onPartialSave(payload);
     },
     [onPartialSave],
   );
@@ -7735,7 +7725,8 @@ export default function Onboarding() {
   const [isLoading, setIsLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [profileImage, setProfileImage] = useState<string>('');
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveInFlightRef = useRef(false);
+  const pendingSaveRef = useRef<any | null>(null);
   const formRef = useRef<any>({});
   const [allowAutosave, setAllowAutosave] = useState(false);
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
@@ -8170,22 +8161,21 @@ export default function Onboarding() {
     } catch {}
   }, [status, form, showFirstTimeModal, dataLoaded, firstTimeModalDismissed]);
 
-  // Optimized debounced save function
   const debouncedSave = useCallback(async (data: any) => {
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    pendingSaveRef.current = data;
+    if (saveInFlightRef.current) return;
 
-    // Set new timeout for debounced save
-    saveTimeoutRef.current = setTimeout(async () => {
+    saveInFlightRef.current = true;
+    while (pendingSaveRef.current) {
+      const nextPayload = pendingSaveRef.current;
+      pendingSaveRef.current = null;
       try {
         const response = await fetch('/api/user-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sanitizeUserDataPayload(data))
+          body: JSON.stringify(sanitizeUserDataPayload(nextPayload)),
         });
-        
+
         if (response.ok) {
           console.log('Progress auto-saved to database');
         } else {
@@ -8194,7 +8184,8 @@ export default function Onboarding() {
       } catch (error) {
         console.warn('Error auto-saving progress:', error);
       }
-    }, 1000); // Save after 1 second of inactivity
+    }
+    saveInFlightRef.current = false;
   }, []);
 
   const persistForm = useCallback(
