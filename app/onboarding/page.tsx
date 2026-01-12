@@ -7785,7 +7785,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
 
 export default function Onboarding() {
   const { data: session, status } = useSession();
-  const { profileImage: providerProfileImage, updateUserData, refreshData } = useUserData();
+  const { profileImage: providerProfileImage, updateUserData } = useUserData();
   const router = useRouter();
   
   // ⚠️ HEALTH SETUP GUARD RAIL
@@ -8150,11 +8150,18 @@ export default function Onboarding() {
   }, [status]);
 
   // Optimized: Consolidated data loading - no separate profile image API call
-  const loadUserData = async (options?: { preserveUnsaved?: boolean }) => {
+  const loadUserData = async (options?: { preserveUnsaved?: boolean; timeoutMs?: number }) => {
     let mergedForBaseline: any = null;
     let serverData: any = null;
+    const controller = options?.timeoutMs ? new AbortController() : null;
+    const timeoutId = options?.timeoutMs
+      ? window.setTimeout(() => controller?.abort(), options.timeoutMs)
+      : null;
     try {
-      const response = await fetch('/api/user-data', { cache: 'no-store' as any });
+      const response = await fetch('/api/user-data', {
+        cache: 'no-store' as any,
+        signal: controller?.signal,
+      });
       if (response.ok) {
         const userData = await response.json();
         console.log('Loaded user data from database:', userData);
@@ -8172,6 +8179,9 @@ export default function Onboarding() {
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
       setAllowAutosave(true);
       if (!options?.preserveUnsaved) {
         // Establish a clean baseline after the initial load so navigation guard only triggers on new edits
@@ -8186,24 +8196,33 @@ export default function Onboarding() {
     if (isSyncing) return;
     setIsSyncing(true);
     try {
-      if (hasGlobalUnsavedChangesRef.current) {
+      const hadUnsaved = hasGlobalUnsavedChangesRef.current;
+      if (hadUnsaved) {
         const payload = sanitizeUserDataPayload(formRef.current || form, { forceStamp: true });
-        const response = await fetch('/api/user-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          throw new Error(`Sync save failed: ${response.status}`);
+        const syncController = new AbortController();
+        const syncTimer = window.setTimeout(() => syncController.abort(), 12000);
+        let response: Response | null = null;
+        try {
+          response = await fetch('/api/user-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...payload, manualSync: true }),
+            signal: syncController.signal,
+          });
+        } finally {
+          window.clearTimeout(syncTimer);
+        }
+        if (!response || !response.ok) {
+          throw new Error(`Sync save failed: ${response?.status || 'no response'}`);
         }
         updateUserData(payload);
       }
 
-      const serverData = await loadUserData({ preserveUnsaved: true });
+      const serverData = await loadUserData({ preserveUnsaved: hadUnsaved, timeoutMs: 12000 });
       if (serverData && Object.keys(serverData).length > 0) {
         updateUserData(serverData, { trackLocal: false });
       } else {
-        await refreshData();
+        throw new Error('No fresh data returned from server');
       }
     } catch (error) {
       console.error('Manual sync failed:', error);

@@ -608,6 +608,7 @@ export async function POST(request: NextRequest) {
     console.time('⏱️ Parse Request Data')
     const data = await request.json()
     console.timeEnd('⏱️ Parse Request Data')
+    const manualSync = (data as any)?.manualSync === true || (data as any)?.syncOverride === true
     const incomingHealthSetupUpdatedAtRaw = (data as any)?.healthSetupUpdatedAt
     const incomingHealthSetupUpdatedAt = Number(incomingHealthSetupUpdatedAtRaw)
     const hasIncomingHealthSetupUpdatedAt =
@@ -698,7 +699,7 @@ export async function POST(request: NextRequest) {
     console.timeEnd('⏱️ User Lookup/Creation')
 
     // Guard against older health setup saves overwriting newer changes.
-    if (touchesHealthSetup) {
+    if (touchesHealthSetup && !manualSync) {
       try {
         const storedMeta = await prisma.healthGoal.findFirst({
           where: { userId: user.id, name: '__HEALTH_SETUP_META__' },
@@ -1920,8 +1921,13 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
     
-    const shouldStoreHealthSetupMeta = touchesHealthSetup && (hasIncomingHealthSetupUpdatedAt || storedHealthSetupUpdatedAt === 0)
-    const metaUpdatedAt = hasIncomingHealthSetupUpdatedAt ? incomingHealthSetupUpdatedAt : Date.now()
+    const shouldStoreHealthSetupMeta =
+      touchesHealthSetup && (manualSync || hasIncomingHealthSetupUpdatedAt || storedHealthSetupUpdatedAt === 0)
+    const metaUpdatedAt = manualSync
+      ? Date.now()
+      : hasIncomingHealthSetupUpdatedAt
+      ? incomingHealthSetupUpdatedAt
+      : Date.now()
     if (shouldStoreHealthSetupMeta) {
       try {
         await prisma.healthGoal.deleteMany({
