@@ -272,6 +272,7 @@ the user.
   - “Add with sugar” logs **both** a water entry (label includes sugar amount) and a Food Diary entry with calories/carbs/sugar derived from sugar grams.
   - “Search food / Scan barcode / Add by photo / Add from favorites” should log the drink and then open the corresponding Food Diary flow.
 - Drink icons must show on the Food Diary entries using the matching icon from `public/mobile-assets/MOBILE ICONS/`.
+- Icon lookup must normalize labels (remove sugar notes like “with sugar”, “sugar‑free”, and parenthetical sugar amounts) so sweetened drinks still show the correct drink icon.
 - Water entries must appear under the **category they were logged in**, not default to Other.
 
 Agents must not modify these rules without explicit user approval.
@@ -935,6 +936,9 @@ for a change.
 - **Analysis speed and cost control (Apr 2026 - locked):**
   - Stop after one good follow-up. If valid items exist, do not chain extra AI calls.
   - Avoid multi-step follow-ups that increase time or credits unless the user explicitly asks.
+- **Health warning alternatives (Mar 2026 - locked):**
+  - When a health warning is triggered, show 2–3 plain‑language alternative meal ideas with short recipes in the Food Analyzer UI.
+  - Alternatives must avoid the ingredients/issues named in the warning and should use the low‑cost model to keep usage minimal.
 - **Food photo model defaults + component-bound follow-up (Dec 25, 2025 – locked):**
   - Food photo analysis defaults to `gpt-4o` for speed and accuracy. Do not revert image analysis to `gpt-5.2` by default.
   - Packaged/label OCR keeps `gpt-5.2` for per‑serve accuracy; do not downgrade label scans.
