@@ -78,7 +78,7 @@ getting user approval.
 
 ### 2.1.1 Health Setup autosave + AI context (Jan 2026 – Locked)
 
-- Health Setup changes must save when leaving Health Setup (no per‑keystroke saves), and there is still no manual save button (including the “Health situations” step).
+- Health Setup changes must save immediately as the user edits each field (no exit‑only saves), and there is still no manual save button (including the “Health situations” step).
 - If a user previously tapped “Skip for now,” typing into any Health situations field must **clear the skip** and keep auto‑save active.
 - Insights generation must include Health situations notes (e.g., DHT sensitivity) and treat them as constraints when generating supplement guidance.
 
@@ -270,6 +270,7 @@ the user.
   - Choices: **Sugar‑free** or **Contains sugar**.
   - Sugar amount supports `g`, `tsp`, `tbsp`, clears on focus, uses numeric keypad, and must not overflow on iPhone.
   - “Add with sugar” logs **both** a water entry (label includes sugar amount) and a Food Diary entry with calories/carbs/sugar derived from sugar grams.
+  - Food Diary must show **one single drink entry** (product name + drink icon + amount). The linked water log **stays only in Water Intake** and is **hidden from Food Diary lists**.
   - “Search food / Scan barcode / Add by photo / Add from favorites” should log the drink and then open the corresponding Food Diary flow.
 - Drink icons must show on the Food Diary entries using the matching icon from `public/mobile-assets/MOBILE ICONS/`.
 - Icon lookup must normalize labels (remove sugar notes like “with sugar”, “sugar‑free”, and parenthetical sugar amounts) so sweetened drinks still show the correct drink icon.

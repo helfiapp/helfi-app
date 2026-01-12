@@ -28,7 +28,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, Component } f
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
@@ -209,9 +209,113 @@ const parseDrinkOverrideFromParams = (params: URLSearchParams): DrinkAmountOverr
   return { amount, unit, amountMl }
 }
 
+const parseDrinkTypeFromParams = (params: URLSearchParams): string | null => {
+  const raw = params.get('drinkType')
+  if (!raw) return null
+  const trimmed = raw.trim()
+  return trimmed ? trimmed : null
+}
+
+const parseDrinkWaterLogIdFromParams = (params: URLSearchParams): string | null => {
+  const raw = params.get('waterLogId')
+  if (!raw) return null
+  const trimmed = raw.trim()
+  return trimmed ? trimmed : null
+}
+
 const formatDrinkOverrideLabel = (override: DrinkAmountOverride) => {
   const unitLabel = override.unit === 'l' ? 'L' : override.unit
   return `${formatWaterNumber(override.amount)} ${unitLabel}`
+}
+
+type DrinkEntryMeta = {
+  type: string
+  amount: number
+  unit: DrinkAmountOverride['unit']
+  amountMl: number
+  waterLogId?: string | null
+}
+
+const buildDrinkEntryMeta = (
+  override: DrinkAmountOverride | null,
+  drinkType: string | null,
+  waterLogId?: string | null,
+): DrinkEntryMeta | null => {
+  if (!override || !drinkType) return null
+  const type = drinkType.trim()
+  if (!type) return null
+  const amount = Number(override.amount)
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  const unit = override.unit
+  const amountMl = Number.isFinite(override.amountMl)
+    ? override.amountMl
+    : unit === 'l'
+    ? amount * 1000
+    : unit === 'oz'
+    ? amount * 29.5735
+    : amount
+  return {
+    type,
+    amount,
+    unit,
+    amountMl,
+    waterLogId: waterLogId ? String(waterLogId) : null,
+  }
+}
+
+const applyDrinkMetaToTotals = (totals: any, meta: DrinkEntryMeta | null) => {
+  if (!meta) return totals
+  const base = totals && typeof totals === 'object' ? { ...totals } : {}
+  return {
+    ...base,
+    __drinkType: meta.type,
+    __drinkAmount: meta.amount,
+    __drinkUnit: meta.unit,
+    __drinkAmountMl: Number.isFinite(meta.amountMl) ? meta.amountMl : undefined,
+    ...(meta.waterLogId ? { __waterLogId: meta.waterLogId } : {}),
+  }
+}
+
+const getDrinkMetaFromEntry = (entry: any): DrinkEntryMeta | null => {
+  const source =
+    entry?.nutrition && typeof entry.nutrition === 'object'
+      ? entry.nutrition
+      : entry?.total && typeof entry.total === 'object'
+      ? entry.total
+      : null
+  if (!source) return null
+  const type = typeof source.__drinkType === 'string' ? source.__drinkType.trim() : ''
+  if (!type) return null
+  const unit = normalizeDrinkUnit(source.__drinkUnit) || 'ml'
+  const amount = Number(source.__drinkAmount)
+  const amountMlRaw = Number(source.__drinkAmountMl)
+  const amountMl = Number.isFinite(amountMlRaw)
+    ? amountMlRaw
+    : Number.isFinite(amount) && amount > 0
+    ? unit === 'l'
+      ? amount * 1000
+      : unit === 'oz'
+      ? amount * 29.5735
+      : amount
+    : NaN
+  const waterLogId = source.__waterLogId ? String(source.__waterLogId) : null
+  return {
+    type,
+    amount,
+    unit,
+    amountMl,
+    waterLogId,
+  }
+}
+
+const formatDrinkEntryAmount = (meta: DrinkEntryMeta | null) => {
+  if (!meta) return ''
+  if (Number.isFinite(meta.amount) && meta.amount > 0) {
+    const unitLabel = meta.unit === 'l' ? 'L' : meta.unit
+    return `${formatWaterNumber(meta.amount)} ${unitLabel}`
+  }
+  if (Number.isFinite(meta.amountMl) && meta.amountMl > 0) return formatWaterMl(meta.amountMl)
+  return ''
 }
 
 const WATER_ICON_BY_LABEL: Record<string, string> = {
@@ -2053,6 +2157,8 @@ export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const searchKey = searchParams?.toString() || ''
   const isAnalysisRoute = pathname === '/food/analysis'
   const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
   const { userData, profileImage, updateUserData } = useUserData()
@@ -2700,6 +2806,8 @@ export default function FoodDiary() {
   const favoritesReplaceTargetRef = useRef<number | null>(null)
   const favoritesActionRef = useRef<'analysis' | 'diary' | null>(null)
   const pendingDrinkOverrideRef = useRef<DrinkAmountOverride | null>(null)
+  const pendingDrinkTypeRef = useRef<string | null>(null)
+  const pendingDrinkWaterLogIdRef = useRef<string | null>(null)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
@@ -2755,6 +2863,19 @@ export default function FoodDiary() {
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
   const openMenuKeyRef = useRef<string | null>(null)
+  const consumePendingDrinkMeta = (override: DrinkAmountOverride | null) => {
+    const drinkType = pendingDrinkTypeRef.current
+    if (!drinkType) return null
+    if (!override) {
+      pendingDrinkTypeRef.current = null
+      pendingDrinkWaterLogIdRef.current = null
+      return null
+    }
+    const meta = buildDrinkEntryMeta(override, drinkType, pendingDrinkWaterLogIdRef.current)
+    pendingDrinkTypeRef.current = null
+    pendingDrinkWaterLogIdRef.current = null
+    return meta
+  }
   useEffect(() => {
     if (!isAnalysisRoute) return
     if (typeof window !== 'undefined') {
@@ -2762,6 +2883,8 @@ export default function FoodDiary() {
       const routeDate = params.get('date') || ''
       const routeCategory = params.get('category') || ''
       const drinkOverride = parseDrinkOverrideFromParams(params)
+      const drinkType = parseDrinkTypeFromParams(params)
+      const waterLogId = parseDrinkWaterLogIdFromParams(params)
       if (routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate)) {
         setSelectedDate(routeDate)
       }
@@ -2771,22 +2894,31 @@ export default function FoodDiary() {
       if (drinkOverride) {
         pendingDrinkOverrideRef.current = drinkOverride
       }
+      pendingDrinkTypeRef.current = drinkType
+      pendingDrinkWaterLogIdRef.current = waterLogId
     }
     setShowAddFood(true)
     setShowCategoryPicker(false)
     setShowPhotoOptions(false)
     setPhotoOptionsAnchor(null)
     setShowAnalysisModeModal(false)
-  }, [isAnalysisRoute])
+  }, [isAnalysisRoute, searchKey])
   useEffect(() => {
     if (isAnalysisRoute) return
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const open = params.get('open')
-    if (!open) return
+    if (!open) {
+      pendingDrinkOverrideRef.current = null
+      pendingDrinkTypeRef.current = null
+      pendingDrinkWaterLogIdRef.current = null
+      return
+    }
     const routeDate = params.get('date') || ''
     const routeCategory = params.get('category') || ''
     const drinkOverride = parseDrinkOverrideFromParams(params)
+    const drinkType = parseDrinkTypeFromParams(params)
+    const waterLogId = parseDrinkWaterLogIdFromParams(params)
     const key = `${open}|${routeDate}|${routeCategory}`
     if (openMenuKeyRef.current === key) return
     openMenuKeyRef.current = key
@@ -2800,6 +2932,8 @@ export default function FoodDiary() {
     if (drinkOverride) {
       pendingDrinkOverrideRef.current = drinkOverride
     }
+    pendingDrinkTypeRef.current = drinkType
+    pendingDrinkWaterLogIdRef.current = waterLogId
 
     setShowCategoryPicker(false)
     setShowPhotoOptions(false)
@@ -2819,7 +2953,7 @@ export default function FoodDiary() {
       favoritesActionRef.current = 'diary'
       setShowFavoritesPicker(true)
     }
-  }, [isAnalysisRoute, pathname])
+  }, [isAnalysisRoute, pathname, searchKey])
   const categoryRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const verifyMergeHoldRef = useRef<Record<string, number>>({})
   const verifyMergeTimerRef = useRef<Record<string, { id: number; fireAt: number }>>({})
@@ -6338,10 +6472,20 @@ const applyStructuredItems = (
     })
     return grouped
   }, [sourceEntries])
+  const linkedWaterLogIds = useMemo(() => {
+    const set = new Set<string>()
+    sourceEntries.forEach((entry) => {
+      if (isEntryDeleted(entry)) return
+      const meta = getDrinkMetaFromEntry(entry)
+      if (meta?.waterLogId) set.add(String(meta.waterLogId))
+    })
+    return set
+  }, [sourceEntries])
   const waterEntriesByCategory = useMemo(() => {
     const grouped: Record<string, any[]> = {}
     if (!Array.isArray(waterEntries) || waterEntries.length === 0) return grouped
     waterEntries.forEach((entry) => {
+      if (linkedWaterLogIds.has(String(entry?.id ?? ''))) return
       const cat = normalizeCategory(entry?.category || 'uncategorized')
       const createdAtMs = entry?.createdAt ? new Date(entry.createdAt).getTime() : NaN
       const createdAtIso = Number.isFinite(createdAtMs) ? new Date(createdAtMs).toISOString() : new Date().toISOString()
@@ -6367,7 +6511,7 @@ const applyStructuredItems = (
       grouped[cat].push(normalized)
     })
     return grouped
-  }, [selectedDate, waterEntries])
+  }, [linkedWaterLogIds, selectedDate, waterEntries])
 
   const multiCopyEntries = useMemo(() => {
     if (!multiCopyCategory) return []
@@ -8741,8 +8885,11 @@ Please add nutritional information manually if needed.`);
     const finalItems = adjusted.items || (analyzedItems && analyzedItems.length > 0 ? analyzedItems : null)
     const overrideTotals = adjusted.used ? adjusted.totals || null : null
     if (adjusted.used) pendingDrinkOverrideRef.current = null
-    const finalNutrition = overrideTotals || nutrition || analyzedNutrition
-    const finalTotal = overrideTotals ? convertTotalsForStorage(overrideTotals) : analyzedTotal || null
+    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+    const finalNutritionBase = overrideTotals || nutrition || analyzedNutrition
+    const finalTotalBase = overrideTotals ? convertTotalsForStorage(overrideTotals) : analyzedTotal || null
+    const finalNutrition = applyDrinkMetaToTotals(finalNutritionBase, drinkMeta)
+    const finalTotal = applyDrinkMetaToTotals(finalTotalBase, drinkMeta)
     const newEntry = ensureEntryLoggedAt(
       applyEntryClientId(
         {
@@ -8875,10 +9022,25 @@ Please add nutritional information manually if needed.`);
     const meta = (() => {
       const n = editingEntry?.nutrition
       const clientId = getEntryClientId(editingEntry)
-      if (!n || typeof n !== 'object') return { favoriteId: '', origin: '', clientId }
+      if (!n || typeof n !== 'object') return { favoriteId: '', origin: '', clientId, drinkMeta: null }
       const favoriteId = typeof (n as any).__favoriteId === 'string' ? String((n as any).__favoriteId).trim() : ''
       const origin = typeof (n as any).__origin === 'string' ? String((n as any).__origin).trim() : ''
-      return { favoriteId, origin, clientId }
+      const drinkType = typeof (n as any).__drinkType === 'string' ? String((n as any).__drinkType).trim() : ''
+      const drinkUnit = normalizeDrinkUnit((n as any).__drinkUnit) || null
+      const drinkAmount = Number((n as any).__drinkAmount)
+      const drinkAmountMl = Number((n as any).__drinkAmountMl)
+      const waterLogId = (n as any).__waterLogId ? String((n as any).__waterLogId).trim() : ''
+      const drinkMeta =
+        drinkType && drinkUnit && Number.isFinite(drinkAmount) && drinkAmount > 0
+          ? {
+              __drinkType: drinkType,
+              __drinkUnit: drinkUnit,
+              __drinkAmount: drinkAmount,
+              __drinkAmountMl: Number.isFinite(drinkAmountMl) ? drinkAmountMl : undefined,
+              ...(waterLogId ? { __waterLogId: waterLogId } : {}),
+            }
+          : null
+      return { favoriteId, origin, clientId, drinkMeta }
     })()
 
     const mergedNutrition = (() => {
@@ -8888,6 +9050,9 @@ Please add nutritional information manually if needed.`);
       if (meta.favoriteId) next.__favoriteId = meta.favoriteId
       if (meta.origin) next.__origin = meta.origin
       if (meta.clientId) next.__clientId = meta.clientId
+      if (meta.drinkMeta) {
+        Object.assign(next, meta.drinkMeta)
+      }
       return next
     })()
 
@@ -11120,6 +11285,7 @@ Please add nutritional information manually if needed.`);
     const normalizedItems = normalizeDiscreteServingsWithLabel([item])
     const items = normalizedItems.length > 0 ? normalizedItems : [item]
     const drinkOverride = pendingDrinkOverrideRef.current
+    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
     const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
     const finalItems = adjusted.items || items
     if (adjusted.used) pendingDrinkOverrideRef.current = null
@@ -11134,7 +11300,8 @@ Please add nutritional information manually if needed.`);
         fiber: food?.fiber_g,
         sugar: food?.sugar_g,
       })
-    const totalsForStorage = convertTotalsForStorage(totals)
+    const totalsWithMeta = applyDrinkMetaToTotals(totals, drinkMeta)
+    const totalsForStorage = applyDrinkMetaToTotals(convertTotalsForStorage(totalsWithMeta || totals), drinkMeta)
     const description =
       buildMealSummaryFromItems(finalItems) ||
       [food?.name, food?.brand].filter(Boolean).join(' – ') ||
@@ -11151,7 +11318,7 @@ Please add nutritional information manually if needed.`);
           time: displayTime,
           method: 'text',
           photo: null,
-          nutrition: totals,
+          nutrition: totalsWithMeta,
           total: totalsForStorage,
           items: finalItems,
           meal: category,
@@ -11947,6 +12114,8 @@ Please add nutritional information manually if needed.`);
     const finalItems = adjusted.items || items
     const finalTotals = adjusted.used ? adjusted.totals || totals : totals
     if (adjusted.used) pendingDrinkOverrideRef.current = null
+    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+    const totalsWithMeta = applyDrinkMetaToTotals(finalTotals, drinkMeta)
     const newEntry = ensureEntryLoggedAt(
       applyEntryClientId(
         {
@@ -11959,8 +12128,8 @@ Please add nutritional information manually if needed.`);
           time: displayTime,
           method: source?.method || 'text',
           photo: source?.photo || source?.entry?.photo || null,
-          nutrition: finalTotals,
-          total: finalTotals,
+          nutrition: totalsWithMeta,
+          total: totalsWithMeta,
           items: finalItems,
           meal: category,
           category,
@@ -12127,6 +12296,10 @@ Please add nutritional information manually if needed.`);
     const finalItems = adjusted.items || clonedItems
     const adjustedTotals = adjusted.used ? adjusted.totals || null : null
     if (adjusted.used) pendingDrinkOverrideRef.current = null
+    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+    const baseTotals = attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null)
+    const totalsWithMeta = applyDrinkMetaToTotals(baseTotals, drinkMeta)
+    const totalWithMeta = applyDrinkMetaToTotals(adjustedTotals || favorite.total || favorite.nutrition || null, drinkMeta)
 
     const entry = ensureEntryLoggedAt(
       applyEntryClientId(
@@ -12140,7 +12313,7 @@ Please add nutritional information manually if needed.`);
           time: new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           method: favorite.method || 'text',
           photo: favorite.photo || null,
-          nutrition: attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null),
+          nutrition: totalsWithMeta,
           items: Array.isArray(finalItems)
             ? finalItems
             : typeof (favorite as any)?.items === 'string'
@@ -12153,7 +12326,7 @@ Please add nutritional information manually if needed.`);
                 }
               })()
             : null,
-          total: adjustedTotals || favorite.total || favorite.nutrition || null,
+          total: totalWithMeta,
           meal: category,
           category,
           persistedCategory: category,
@@ -18704,10 +18877,14 @@ Please add nutritional information manually if needed.`);
                       const swipeOffset = entrySwipeOffsets[entryKey] || 0
                       const isMenuOpen = swipeMenuEntry === entryKey
                       const isWaterEntry = Boolean(food?.__water)
+                      const drinkMeta = !isWaterEntry ? getDrinkMetaFromEntry(food) : null
+                      const isDrinkEntry = !isWaterEntry && Boolean(drinkMeta?.type)
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
                       const entryCalories = !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Math.round(Number(entryTotals?.calories)) : null
                       const waterLabel = isWaterEntry ? String(food?.label || 'Water') : null
                       const waterIconSrc = isWaterEntry ? getWaterIconSrc(waterLabel) : null
+                      const drinkIconSrc = isDrinkEntry ? getWaterIconSrc(drinkMeta?.type) : null
+                      const drinkAmountLabel = isDrinkEntry ? formatDrinkEntryAmount(drinkMeta) : ''
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
@@ -18720,6 +18897,9 @@ Please add nutritional information manually if needed.`);
                         if (isWaterEntry) {
                           deleteWaterEntry(food)
                           return
+                        }
+                        if (drinkMeta?.waterLogId) {
+                          deleteWaterEntry({ id: drinkMeta.waterLogId })
                         }
                         if (isViewingToday) {
                           deleteFood(food)
@@ -18998,8 +19178,14 @@ Please add nutritional information manually if needed.`);
                               <div className="flex items-center gap-3">
                                 <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
                                   <Image
-                                    src={isWaterEntry ? (waterIconSrc || "/mobile-assets/MOBILE ICONS/WATER.png") : "/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"}
-                                    alt={isWaterEntry ? `${waterLabel || 'Water'} log` : "Food item"}
+                                    src={
+                                      isWaterEntry
+                                        ? (waterIconSrc || "/mobile-assets/MOBILE ICONS/WATER.png")
+                                        : isDrinkEntry
+                                        ? (drinkIconSrc || "/mobile-assets/MOBILE ICONS/WATER.png")
+                                        : "/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"
+                                    }
+                                    alt={isWaterEntry ? `${waterLabel || 'Water'} log` : isDrinkEntry ? `${drinkMeta?.type || 'Drink'} log` : "Food item"}
                                     width={32}
                                     height={32}
                                     className="w-8 h-8"
@@ -19012,9 +19198,15 @@ Please add nutritional information manually if needed.`);
                                       ? waterLabel || 'Water'
                                       : sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
                                   </p>
-                                  {isWaterEntry && (
-                                    <p className="text-xs text-gray-500 truncate">{formatWaterEntryAmount(food)}</p>
-                                  )}
+                                  {(() => {
+                                    const amountLabel = isWaterEntry
+                                      ? formatWaterEntryAmount(food)
+                                      : isDrinkEntry
+                                      ? drinkAmountLabel
+                                      : ''
+                                    if (!amountLabel) return null
+                                    return <p className="text-xs text-gray-500 truncate">{amountLabel}</p>
+                                  })()}
                                 </div>
                                 <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
                                   {entryCalories !== null && <span className="font-semibold text-gray-900">{entryCalories} kcal</span>}
@@ -19149,10 +19341,16 @@ Please add nutritional information manually if needed.`);
                           },
                           { calories: 0, protein: 0, carbs: 0, fat: 0 },
                         )
+                        const drinkTotalMl = visibleFoodEntries.reduce((sum, entry) => {
+                          const meta = getDrinkMetaFromEntry(entry)
+                          if (!meta?.type) return sum
+                          const ml = Number(meta.amountMl)
+                          return sum + (Number.isFinite(ml) ? ml : 0)
+                        }, 0)
                         const waterTotalMl = visibleWaterEntries.reduce(
                           (sum, entry) => sum + (Number(entry?.amountMl) || 0),
                           0,
-                        )
+                        ) + drinkTotalMl
                         const summaryParts: string[] = []
                         if (totals.calories > 0) summaryParts.push(`${Math.round(totals.calories)} kcal`)
                         if (totals.protein > 0) summaryParts.push(`${Math.round(totals.protein)}g Protein`)

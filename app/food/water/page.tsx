@@ -319,8 +319,10 @@ export default function WaterIntakePage() {
         await loadEntries(selectedDate)
       }
       setBanner({ type: 'success', message: 'Water entry saved.' })
+      return entry || null
     } catch {
       setBanner({ type: 'error', message: 'Could not save. Please try again.' })
+      return null
     } finally {
       setSaving(false)
     }
@@ -357,7 +359,17 @@ export default function WaterIntakePage() {
     setDrinkDetailError(null)
   }
 
-  const addDrinkFoodLog = async (label: string, sugarGrams: number, displayAmount: number, displayUnit: SugarUnit) => {
+  const addDrinkFoodLog = async (
+    label: string,
+    sugarGrams: number,
+    displayAmount: number,
+    displayUnit: SugarUnit,
+    drinkAmount: number,
+    drinkUnit: string,
+    waterLogId?: string | null,
+  ) => {
+    const drinkAmountMl =
+      drinkUnit === 'l' ? drinkAmount * 1000 : drinkUnit === 'oz' ? drinkAmount * 29.5735 : drinkAmount
     const calories = Math.round(sugarGrams * 4)
     const carbs = Math.round(sugarGrams * 10) / 10
     const sugar = Math.round(sugarGrams * 10) / 10
@@ -381,13 +393,26 @@ export default function WaterIntakePage() {
         const params = new URLSearchParams(window.location.search)
         return params.get('category')
       })()
+    const nutrition = {
+      calories,
+      protein: 0,
+      carbs,
+      fat: 0,
+      fiber: 0,
+      sugar,
+      __drinkType: activeDrink,
+      __drinkAmount: drinkAmount,
+      __drinkUnit: drinkUnit,
+      __drinkAmountMl: Number.isFinite(drinkAmountMl) ? drinkAmountMl : undefined,
+      ...(waterLogId ? { __waterLogId: waterLogId } : {}),
+    }
     const res = await fetch('/api/food-log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
         description,
-        nutrition: { calories, protein: 0, carbs, fat: 0, fiber: 0, sugar },
+        nutrition,
         items: [item],
         localDate: selectedDate,
         meal: category,
@@ -428,8 +453,16 @@ export default function WaterIntakePage() {
     setDrinkDetailError(null)
     try {
       const sugarLabel = `${activeDrink} (sugar ${formatNumber(rawAmount)} ${drinkSugarUnit})`
-      await addEntry(drinkDetail.amount, drinkDetail.unit, sugarLabel)
-      await addDrinkFoodLog(activeDrink, sugarGrams, rawAmount, drinkSugarUnit)
+      const waterEntry = await addEntry(drinkDetail.amount, drinkDetail.unit, sugarLabel)
+      await addDrinkFoodLog(
+        activeDrink,
+        sugarGrams,
+        rawAmount,
+        drinkSugarUnit,
+        drinkDetail.amount,
+        drinkDetail.unit,
+        waterEntry?.id,
+      )
       closeDrinkDetail()
     } catch {
       setDrinkDetailError('Could not save this drink. Please try again.')
@@ -443,17 +476,21 @@ export default function WaterIntakePage() {
     setDrinkDetailSaving(true)
     setDrinkDetailError(null)
     try {
-      await addEntry(drinkDetail.amount, drinkDetail.unit, activeDrink)
+      const waterEntry = await addEntry(drinkDetail.amount, drinkDetail.unit, activeDrink)
       closeDrinkDetail()
       const category = sourceCategory || 'uncategorized'
       const amountParam = String(drinkDetail.amount)
       const unitParam = String(drinkDetail.unit || '')
+      const drinkTypeParam = activeDrink
+      const waterLogIdParam = waterEntry?.id ? String(waterEntry.id) : ''
       if (mode === 'photo') {
         const qs = new URLSearchParams({
           date: selectedDate,
           category,
           drinkAmount: amountParam,
           drinkUnit: unitParam,
+          drinkType: drinkTypeParam,
+          ...(waterLogIdParam ? { waterLogId: waterLogIdParam } : {}),
         })
         router.push(`/food/analysis?${qs.toString()}`)
         return
@@ -465,6 +502,8 @@ export default function WaterIntakePage() {
           q: activeDrink.toLowerCase(),
           drinkAmount: amountParam,
           drinkUnit: unitParam,
+          drinkType: drinkTypeParam,
+          ...(waterLogIdParam ? { waterLogId: waterLogIdParam } : {}),
         })
         router.push(`/food/add-ingredient?${qs.toString()}`)
         return
@@ -475,6 +514,8 @@ export default function WaterIntakePage() {
         category,
         drinkAmount: amountParam,
         drinkUnit: unitParam,
+        drinkType: drinkTypeParam,
+        ...(waterLogIdParam ? { waterLogId: waterLogIdParam } : {}),
       })
       router.push(`/food?${qs.toString()}`)
     } catch {

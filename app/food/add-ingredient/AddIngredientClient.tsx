@@ -205,6 +205,18 @@ export default function AddIngredientClient() {
     searchParams.get('drinkAmount'),
     searchParams.get('drinkUnit'),
   )
+  const drinkType = (searchParams.get('drinkType') || '').trim()
+  const waterLogId = (searchParams.get('waterLogId') || '').trim()
+  const drinkMeta =
+    drinkType && drinkOverride
+      ? {
+          __drinkType: drinkType,
+          __drinkAmount: drinkOverride.amount,
+          __drinkUnit: drinkOverride.unit,
+          __drinkAmountMl: drinkOverride.amountMl,
+          ...(waterLogId ? { __waterLogId: waterLogId } : {}),
+        }
+      : null
 
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<SearchKind>('packaged')
@@ -521,6 +533,7 @@ export default function AddIngredientClient() {
         fat: round3(Number(item.fat_g || 0)),
         fiber: round3(Number(item.fiber_g || 0)),
         sugar: round3(Number(item.sugar_g || 0)),
+        ...(drinkMeta ? drinkMeta : {}),
       }
 
       const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
@@ -612,6 +625,7 @@ export default function AddIngredientClient() {
         fat: round3(Number(finalTotal?.fat ?? finalTotal?.fat_g ?? 0)),
         fiber: round3(Number(finalTotal?.fiber ?? finalTotal?.fiber_g ?? 0)),
         sugar: round3(Number(finalTotal?.sugar ?? finalTotal?.sugar_g ?? 0)),
+        ...(drinkMeta ? drinkMeta : {}),
       }
 
       const payload = {
