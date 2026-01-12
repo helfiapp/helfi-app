@@ -745,6 +745,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   );
   const goalChoiceTouchedRef = useRef(false);
   const goalIntensityTouchedRef = useRef(false);
+  const goalChoiceHydratedRef = useRef(false);
+  const goalIntensityHydratedRef = useRef(false);
   const [showGoalDetails, setShowGoalDetails] = useState(false);
   const [goalTargetWeightUnit, setGoalTargetWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [goalTargetWeightInput, setGoalTargetWeightInput] = useState('');
@@ -934,9 +936,17 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       typeof initial.goalChoice === 'string' &&
       initial.goalChoice.trim().length > 0 &&
       !goalChoiceTouchedRef.current &&
+      !goalChoiceHydratedRef.current &&
       initial.goalChoice !== goalChoice
     ) {
       setGoalChoice(initial.goalChoice);
+    }
+    if (
+      !goalChoiceHydratedRef.current &&
+      typeof initial.goalChoice === 'string' &&
+      initial.goalChoice.trim().length > 0
+    ) {
+      goalChoiceHydratedRef.current = true;
     }
     if (!allergiesHydratedRef.current && Array.isArray(initial.allergies)) {
       setAllergies(initial.allergies);
@@ -964,9 +974,17 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if (
       initial.goalIntensity &&
       !goalIntensityTouchedRef.current &&
+      !goalIntensityHydratedRef.current &&
       initial.goalIntensity !== goalIntensity
     ) {
       setGoalIntensity(initial.goalIntensity);
+    }
+    if (
+      !goalIntensityHydratedRef.current &&
+      typeof initial.goalIntensity === 'string' &&
+      initial.goalIntensity.trim().length > 0
+    ) {
+      goalIntensityHydratedRef.current = true;
     }
 
     if (!goalDetailsHydratedRef.current) {
