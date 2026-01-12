@@ -22,6 +22,11 @@ type NormalizedFoodItem = {
   sugar_g?: number | null
 }
 
+type DrinkOverrideItem = Omit<NormalizedFoodItem, 'source' | 'id'> & {
+  source?: NormalizedFoodItem['source'] | string
+  id?: string
+}
+
 type ServingOption = {
   id: string
   serving_size: string
@@ -84,7 +89,10 @@ const normalizeDrinkUnit = (value: string | null | undefined) => {
   return null
 }
 
-const parseDrinkOverride = (amountRaw: string | null, unitRaw: string | null) => {
+const parseDrinkOverride = (
+  amountRaw: string | null,
+  unitRaw: string | null,
+): { amount: number; unit: 'ml' | 'l' | 'oz'; amountMl: number } | null => {
   const amount = Number(amountRaw)
   if (!Number.isFinite(amount) || amount <= 0) return null
   const unit = normalizeDrinkUnit(unitRaw)
@@ -122,7 +130,7 @@ const scaleMacroValue = (value: any, factor: number, decimals: number) => {
 }
 
 const applyDrinkAmountOverrideToItem = (
-  item: NormalizedFoodItem,
+  item: DrinkOverrideItem,
   override: { amount: number; unit: 'ml' | 'l' | 'oz'; amountMl: number },
 ) => {
   const baseMl = parseServingBaseMl(item?.serving_size)
@@ -142,7 +150,7 @@ const applyDrinkAmountOverrideToItem = (
   }
 }
 
-const buildTotalsFromItem = (item: NormalizedFoodItem) => ({
+const buildTotalsFromItem = (item: DrinkOverrideItem) => ({
   calories: Number(item?.calories ?? 0),
   protein: Number(item?.protein_g ?? 0),
   carbs: Number(item?.carbs_g ?? 0),
