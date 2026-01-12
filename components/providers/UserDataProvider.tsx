@@ -19,7 +19,7 @@ interface UserDataContextType {
   userData: UserData | null
   profileImage: string | null
   isLoading: boolean
-  updateUserData: (newData: Partial<UserData>) => void
+  updateUserData: (newData: Partial<UserData>, options?: { trackLocal?: boolean }) => void
   updateProfileImage: (image: string) => void
   refreshData: () => Promise<void>
 }
@@ -28,6 +28,7 @@ const UserDataContext = createContext<UserDataContextType | undefined>(undefined
 
 const USER_DATA_CACHE_TTL_MS = 5 * 60_000
 const HEALTH_SETUP_GRACE_MS = 2 * 60_000
+const LOCAL_OVERRIDE_GRACE_MS = 30 * 1000
 const HEALTH_SETUP_KEYS = new Set([
   'goalChoice',
   'goalIntensity',
@@ -64,11 +65,18 @@ const valuesMatch = (a: any, b: any) => {
   return false
 }
 
+const getHealthSetupVersion = (data: any) => {
+  const raw = Number(data?.healthSetupUpdatedAt || 0)
+  return Number.isFinite(raw) && raw > 0 ? raw : 0
+}
+
+const hasOwnKey = (value: any, key: string) =>
+  value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key)
+
 export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
   const [userData, setUserData] = useState<UserData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const lastLocalUpdateRef = useRef(0)
   const userDataRef = useRef<UserData | null>(null)
   const pendingLocalUpdatesRef = useRef<Record<string, number>>({})
 
@@ -86,8 +94,6 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   // Load data once and cache it
   const loadData = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
     if (!session) return
-    const requestStartedAt = Date.now()
-
     const cached = cacheKey ? readClientCache<UserData>(cacheKey) : null
     const hadCached = !!cached?.data
     if (cached?.data) {
@@ -120,17 +126,31 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
             } catch {
               // Ignore sync notice errors
             }
-            const localUpdatedAfterRequest = lastLocalUpdateRef.current > requestStartedAt
             const localSnapshot = userDataRef.current
-            const now = Date.now()
             let merged = result.data
-            let hasOverride = false
             if (localSnapshot) {
               const overrides: Record<string, any> = {}
-              Object.keys(localSnapshot).forEach((key) => {
-                if (!HEALTH_SETUP_KEYS.has(key)) return
-                const touchedAt = pendingLocalUpdatesRef.current[key]
-                if (!touchedAt || now - touchedAt > HEALTH_SETUP_GRACE_MS) return
+              const now = Date.now()
+              const localHealthVersion = getHealthSetupVersion(localSnapshot)
+              const serverHealthVersion = getHealthSetupVersion(merged)
+              const preferLocalHealth =
+                localHealthVersion > 0 && (serverHealthVersion === 0 || localHealthVersion > serverHealthVersion)
+
+              if (preferLocalHealth) {
+                HEALTH_SETUP_KEYS.forEach((key) => {
+                  if (!hasOwnKey(localSnapshot, key)) return
+                  if (valuesMatch(localSnapshot[key], merged[key])) return
+                  overrides[key] = localSnapshot[key]
+                })
+              }
+
+              Object.entries(pendingLocalUpdatesRef.current).forEach(([key, touchedAt]) => {
+                const grace = HEALTH_SETUP_KEYS.has(key) ? HEALTH_SETUP_GRACE_MS : LOCAL_OVERRIDE_GRACE_MS
+                if (!touchedAt || now - touchedAt > grace) {
+                  delete pendingLocalUpdatesRef.current[key]
+                  return
+                }
+                if (!hasOwnKey(localSnapshot, key)) return
                 if (valuesMatch(localSnapshot[key], merged[key])) {
                   delete pendingLocalUpdatesRef.current[key]
                   return
@@ -139,22 +159,11 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
               })
               if (Object.keys(overrides).length > 0) {
                 merged = { ...merged, ...overrides }
-                hasOverride = true
               }
             }
-            if (localUpdatedAfterRequest || hasOverride) {
-              setUserData(prev => {
-                const next = prev ? { ...merged, ...prev } : merged
-                if (cacheKey) {
-                  writeClientCache(cacheKey, next)
-                }
-                return next
-              })
-            } else {
-              setUserData(merged)
-              if (cacheKey) {
-                writeClientCache(cacheKey, merged)
-              }
+            setUserData(merged)
+            if (cacheKey) {
+              writeClientCache(cacheKey, merged)
             }
           }
         }
@@ -187,14 +196,14 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   }, [loadData])
 
   // Update user data
-  const updateUserData = (newData: Partial<UserData>) => {
+  const updateUserData = (newData: Partial<UserData>, options?: { trackLocal?: boolean }) => {
+    const trackLocal = options?.trackLocal !== false
     const now = Date.now()
-    lastLocalUpdateRef.current = now
-    Object.keys(newData || {}).forEach((key) => {
-      if (HEALTH_SETUP_KEYS.has(key)) {
+    if (trackLocal) {
+      Object.keys(newData || {}).forEach((key) => {
         pendingLocalUpdatesRef.current[key] = now
-      }
-    })
+      })
+    }
     setUserData(prev => {
       const next = prev ? { ...prev, ...newData } : (newData as UserData)
       if (cacheKey) {
@@ -206,7 +215,8 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   // Update profile image specifically
   const updateProfileImage = (image: string) => {
-    lastLocalUpdateRef.current = Date.now()
+    const now = Date.now()
+    pendingLocalUpdatesRef.current.profileImage = now
     setUserData(prev => {
       const next = prev ? { ...prev, profileImage: image } : ({ profileImage: image } as UserData)
       if (cacheKey) {

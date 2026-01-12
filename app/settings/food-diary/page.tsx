@@ -114,8 +114,9 @@ export default function FoodDiarySettingsPage() {
 
   const scheduleSave = useCallback(
     (next: HealthCheckSettings) => {
+      const stampedPayload = { healthCheckSettings: next, healthSetupUpdatedAt: Date.now() }
       setSettings(next)
-      updateUserData({ healthCheckSettings: next })
+      updateUserData(stampedPayload)
       if (!settingsLoaded) return
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
@@ -126,7 +127,7 @@ export default function FoodDiarySettingsPage() {
           const response = await fetch('/api/user-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ healthCheckSettings: next }),
+            body: JSON.stringify(stampedPayload),
           })
           if (!response.ok) throw new Error('save failed')
           setSaveStatus('saved')

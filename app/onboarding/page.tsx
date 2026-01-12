@@ -7782,7 +7782,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
 
 export default function Onboarding() {
   const { data: session, status } = useSession();
-  const { profileImage: providerProfileImage, updateUserData } = useUserData();
+  const { profileImage: providerProfileImage, updateUserData, refreshData } = useUserData();
   const router = useRouter();
   
   // ⚠️ HEALTH SETUP GUARD RAIL
@@ -7798,7 +7798,7 @@ export default function Onboarding() {
   const [form, setForm] = useState<any>({});
   // Removed forced remount to avoid infinite loops
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -8147,14 +8147,16 @@ export default function Onboarding() {
   }, [status]);
 
   // Optimized: Consolidated data loading - no separate profile image API call
-  const loadUserData = async () => {
+  const loadUserData = async (options?: { preserveUnsaved?: boolean }) => {
     let mergedForBaseline: any = null;
+    let serverData: any = null;
     try {
       const response = await fetch('/api/user-data', { cache: 'no-store' as any });
       if (response.ok) {
         const userData = await response.json();
         console.log('Loaded user data from database:', userData);
         if (userData && userData.data && Object.keys(userData.data).length > 0) {
+          serverData = userData.data;
           mergedForBaseline = { ...(formRef.current || {}), ...userData.data };
           formRef.current = mergedForBaseline;
           setForm(mergedForBaseline);
@@ -8168,9 +8170,43 @@ export default function Onboarding() {
       console.error('Error loading user data:', error);
     } finally {
       setAllowAutosave(true);
-      // Establish a clean baseline after the initial load so navigation guard only triggers on new edits
-      syncFormBaseline(mergedForBaseline ?? formRef.current ?? form);
-      setHasGlobalUnsavedChanges(false);
+      if (!options?.preserveUnsaved) {
+        // Establish a clean baseline after the initial load so navigation guard only triggers on new edits
+        syncFormBaseline(mergedForBaseline ?? formRef.current ?? form);
+        setHasGlobalUnsavedChanges(false);
+      }
+    }
+    return serverData;
+  };
+
+  const handleManualSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      if (hasGlobalUnsavedChangesRef.current) {
+        const payload = sanitizeUserDataPayload(formRef.current || form);
+        const response = await fetch('/api/user-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          throw new Error(`Sync save failed: ${response.status}`);
+        }
+        updateUserData(payload);
+      }
+
+      const serverData = await loadUserData({ preserveUnsaved: true });
+      if (serverData && Object.keys(serverData).length > 0) {
+        updateUserData(serverData, { trackLocal: false });
+      } else {
+        await refreshData();
+      }
+    } catch (error) {
+      console.error('Manual sync failed:', error);
+      alert('Sync failed. Please try again.');
+    } finally {
+      setIsSyncing(false);
     }
   };
   // Keep a ref of the latest form for partial saves
@@ -8533,17 +8569,25 @@ export default function Onboarding() {
               Edit Health Info
             </h1>
             
-            {/* Reset Button & Profile Dropdown */}
+            {/* Sync Button & Profile Dropdown */}
             <div className="flex items-center space-x-2">
-              {/* Reset Button */}
+              {/* Sync Button */}
               <button
-                onClick={() => setShowResetConfirm(true)}
-                className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800"
-                title="Reset page"
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-2 rounded-full border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-60"
+                title="Sync now"
+                aria-label="Sync now"
               >
-                <svg className="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className={`w-4 h-4 text-gray-600 dark:text-gray-300 ${isSyncing ? 'animate-spin' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
+                <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync now'}</span>
               </button>
               
               {/* Profile Avatar & Dropdown */}
@@ -8927,35 +8971,6 @@ export default function Onboarding() {
           </div>
         </nav>
 
-        {/* Reset Confirmation Popup */}
-        {showResetConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Reset Page Data</h3>
-              <p className="text-gray-600 mb-6">
-                Are you sure you want to reset all data on this page? This will clear all your current progress and cannot be undone.
-              </p>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowResetConfirm(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    window.location.reload();
-                    setShowResetConfirm(false);
-                  }}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                >
-                  Reset Page
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        
         {/* Background Regen Status Indicator */}
         {backgroundRegenStatus.isRegenerating && (
           <div className="fixed bottom-20 md:bottom-4 left-1/2 transform -translate-x-1/2 z-50 animate-in fade-in duration-300 pointer-events-none">
