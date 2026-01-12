@@ -287,7 +287,7 @@ function analyzeChatBugMessage(message: string): ChatBugAnalysis {
     /(bug|buggy|broken|not working|doesn.t work|does not work|issue|problem|glitch|jump|jumping|move|moving|disappear|off the screen|off-screen|weird)/i.test(text)
   const hasMobile = /(iphone|ipad|ios|android|mobile)/i.test(text)
   const hasDesktop = /(mac|windows|desktop|laptop|browser)/i.test(text)
-  const hasChatArea = /(symptom|medical image|image analyzer|insight|talk to ai|voice|support chat)/i.test(text)
+  const hasChatArea = /(symptom|medical image|image analyzer|insight|talk to ai|talk to helfi|voice|support chat)/i.test(text)
   const isFrustrated = /(repeating|already told|stop asking|check your code|check the code|loop|looping)/i.test(text)
   const areas: string[] = []
   if (/support chat|support widget|support/i.test(text)) {
@@ -302,8 +302,8 @@ function analyzeChatBugMessage(message: string): ChatBugAnalysis {
   if (/insight/i.test(text)) {
     areas.push('Insights chat')
   }
-  if (/talk to ai|voice/i.test(text)) {
-    areas.push('Talk to AI chat')
+  if (/talk to ai|talk to helfi|voice/i.test(text)) {
+    areas.push('Talk to Helfi chat')
   }
   const devices: string[] = []
   if (/iphone|ipad|ios/i.test(text)) devices.push('iOS')
@@ -386,7 +386,7 @@ function buildDeterministicSupportReply(options: {
   if (chatBug.isChatBug) {
     const followups: string[] = []
     if (!chatBug.hasChatArea) {
-      followups.push('Which chat is it in? (Talk to AI, Symptoms, Medical Image, or Insights)')
+      followups.push('Which chat is it in? (Talk to Helfi, Symptoms, Medical Image, or Insights)')
     }
     if (!chatBug.hasMobile && !chatBug.hasDesktop) {
       followups.push('Does it happen on mobile, desktop, or both?')
@@ -424,7 +424,7 @@ function buildDeterministicSupportReply(options: {
       'Lab report upload and analysis (PDF or photos).',
       'Mood tracking and quick mood check-in.',
       'Daily check-ins and rating history.',
-      'Talk to AI (voice chat).',
+      'Talk to Helfi (chat).',
       'Health tips.',
       'Device connections (Fitbit available; Garmin evaluation in progress).',
     ]

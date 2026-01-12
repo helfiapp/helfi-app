@@ -1699,12 +1699,12 @@ export const featurePages: FeaturePageContent[] = [
     title: 'Talk to Helfi',
     subtitle: 'Chat with your health data and get clear answers.',
     intro:
-      'Talk to Helfi is your personal chat assistant. Ask questions about your health data or leave notes without typing.',
+      'Talk to Helfi is your personal chat assistant. Ask questions about your health data and keep a long-term conversation history.',
     overview: [
       'It uses your profile, goals, and logged data to give personal answers.',
-      'Your chats are saved unless you delete them, so you can return to old conversations.',
-      'If you ask about something from months ago, Helfi can pull it back up.',
-      'Weekly reports include a short summary of your last 7 days of chat topics.',
+      'Your chats are saved unless you delete them.',
+      'You can return to a conversation months later without losing context.',
+      'Ask about past entries without digging through charts.',
     ],
     summary: 'A personal health chat that remembers your conversations.',
     heroImage: {
@@ -1737,7 +1737,7 @@ export const featurePages: FeaturePageContent[] = [
           'Ask about something from months ago without starting from scratch.',
       },
       {
-        title: 'Quick check-ins',
+        title: 'Quick clarifications',
         description:
           'Get clear answers without digging through charts.',
       },
@@ -1751,7 +1751,7 @@ export const featurePages: FeaturePageContent[] = [
       'Answers that use your profile and logged data.',
       'Past conversations stay available unless you delete them.',
       'Faster follow-ups about older topics.',
-      'Weekly reports summarize the last 7 days of chat topics.',
+      'Long-term chat history you can reference later.',
       'Clearer next steps without scrolling through charts.',
       'Less friction when you want a quick answer.',
     ],

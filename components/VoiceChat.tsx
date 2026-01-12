@@ -965,7 +965,7 @@ export default function VoiceChat({
                           <li>Each chat costs 10 credits once (not per response).</li>
                           <li>We show the estimate before sending and confirm the charge after the first response.</li>
                           <li>Your chats are saved unless you delete them, so you can revisit past conversations.</li>
-                          <li>Your last 7 days of chat topics appear in your weekly report.</li>
+                          <li>Helfi can reference older chats when it helps answer a new question.</li>
                         </ul>
                       </div>
                       <div className="mt-8 w-full max-w-sm">
