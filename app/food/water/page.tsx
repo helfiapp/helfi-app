@@ -982,14 +982,50 @@ export default function WaterIntakePage() {
               )}
 
               {drinkSugarChoice === 'free' && (
-                <button
-                  type="button"
-                  onClick={handleSugarFreeDrink}
-                  disabled={drinkDetailSaving}
-                  className="w-full px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  Add drink
-                </button>
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={handleSugarFreeDrink}
+                    disabled={drinkDetailSaving}
+                    className="w-full px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    Add drink
+                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigateDrinkNutrition('search')}
+                      disabled={drinkDetailSaving}
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      Search food
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateDrinkNutrition('barcode')}
+                      disabled={drinkDetailSaving}
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      Scan barcode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateDrinkNutrition('photo')}
+                      disabled={drinkDetailSaving}
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      Add by photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateDrinkNutrition('favorites')}
+                      disabled={drinkDetailSaving}
+                      className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60 col-span-2"
+                    >
+                      Add from favorites
+                    </button>
+                  </div>
+                </div>
               )}
 
               {drinkDetailError && <div className="text-xs text-red-600">{drinkDetailError}</div>}
