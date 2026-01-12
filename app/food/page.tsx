@@ -193,8 +193,20 @@ const WATER_ICON_BY_LABEL: Record<string, string> = {
   alcohol: '/mobile-assets/MOBILE ICONS/ALCOHOL.png',
 }
 
+const normalizeWaterLabel = (label?: string | null) => {
+  const raw = String(label || '').toLowerCase()
+  const withoutParens = raw.replace(/\([^)]*\)/g, '')
+  const withoutSugarHints = withoutParens
+    .replace(/\bwith\s+sugar\b/g, '')
+    .replace(/\bcontains\s+sugar\b/g, '')
+    .replace(/\bsugar[-\s]?free\b/g, '')
+    .replace(/\bno\s+sugar\b/g, '')
+    .replace(/\bwith\s+no\s+sugar\b/g, '')
+  return withoutSugarHints.replace(/\s+/g, ' ').trim()
+}
+
 const getWaterIconSrc = (label?: string | null) => {
-  const key = String(label || '').trim().toLowerCase()
+  const key = normalizeWaterLabel(label)
   return WATER_ICON_BY_LABEL[key] ?? WATER_ICON_BY_LABEL.water
 }
 

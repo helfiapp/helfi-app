@@ -4465,7 +4465,57 @@ CRITICAL REQUIREMENTS:
       }
 
       resp.healthWarning = warnings.length ? `⚠️ Health warning:\n- ${warnings.join('\n- ')}` : null;
-      resp.alternatives = null;
+
+      if (warnings.length > 0) {
+        try {
+          const itemList = Array.isArray(resp.items)
+            ? resp.items
+                .map((it: any) => `${it?.name || ''}`.trim())
+                .filter(Boolean)
+                .slice(0, 6)
+            : [];
+          const totalParts: string[] = [];
+          const calories = Number((resp.total as any)?.calories);
+          const carbs = Number((resp.total as any)?.carbs_g);
+          const fat = Number((resp.total as any)?.fat_g);
+          const sugar = Number((resp.total as any)?.sugar_g);
+          if (Number.isFinite(calories)) totalParts.push(`Calories ${Math.round(calories)}`);
+          if (Number.isFinite(carbs)) totalParts.push(`Carbs ${Math.round(carbs)}g`);
+          if (Number.isFinite(fat)) totalParts.push(`Fat ${Math.round(fat)}g`);
+          if (Number.isFinite(sugar)) totalParts.push(`Sugar ${Math.round(sugar)}g`);
+
+          const alternativesPrompt =
+            'You are a nutrition assistant. The user received a health warning for this meal.\n' +
+            'Suggest 2-3 safer alternatives. Each option must include:\n' +
+            '- a short option name\n' +
+            '- a simple 2-3 step recipe\n' +
+            '- one short reason why it is a better fit\n' +
+            'Avoid ingredients or issues mentioned in the warning. Keep the language plain and short.\n\n' +
+            `Meal items: ${itemList.length > 0 ? itemList.join(', ') : 'Unknown'}\n` +
+            `Totals: ${totalParts.length > 0 ? totalParts.join(', ') : 'Unknown'}\n` +
+            `Warning: ${warnings.join(' | ')}\n\n` +
+            'Return plain text only in this format:\n' +
+            '- Option: ...\n' +
+            '  Recipe: step 1; step 2; step 3.\n' +
+            '  Why: ...';
+
+          const alternatives = await chatCompletionWithCost(openai, {
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: alternativesPrompt }],
+            max_tokens: 220,
+            temperature: 0.2,
+          } as any);
+
+          totalCostCents += alternatives.costCents;
+          const text = alternatives.completion?.choices?.[0]?.message?.content?.trim() || '';
+          resp.alternatives = text.replace(/```/g, '').trim() || null;
+        } catch (alternativesError) {
+          console.warn('Health alternatives generation failed (non-fatal):', alternativesError);
+          resp.alternatives = null;
+        }
+      } else {
+        resp.alternatives = null;
+      }
     } catch (healthError) {
       console.warn('⚠️ Health compatibility section skipped due to error:', healthError);
     }
