@@ -74,7 +74,9 @@ async function loadChatMemorySnippets(userId: string, question: string, threadId
       params.push(threadId)
     }
     query += ` ORDER BY m."createdAt" DESC LIMIT ${MEMORY_MATCH_LIMIT}`
-    rows = await prisma.$queryRawUnsafe(query, ...params).catch(() => [])
+    rows = await prisma
+      .$queryRawUnsafe<Array<{ content: string; createdAt: Date }>>(query, ...params)
+      .catch(() => [])
   }
 
   if (!rows.length) {
@@ -89,7 +91,9 @@ async function loadChatMemorySnippets(userId: string, question: string, threadId
       params.push(threadId)
     }
     query += ` ORDER BY m."createdAt" DESC LIMIT ${MEMORY_FALLBACK_LIMIT}`
-    rows = await prisma.$queryRawUnsafe(query, ...params).catch(() => [])
+    rows = await prisma
+      .$queryRawUnsafe<Array<{ content: string; createdAt: Date }>>(query, ...params)
+      .catch(() => [])
   }
 
   return rows
