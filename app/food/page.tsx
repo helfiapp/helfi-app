@@ -2806,6 +2806,7 @@ export default function FoodDiary() {
   const pendingDrinkOverrideRef = useRef<DrinkAmountOverride | null>(null)
   const pendingDrinkTypeRef = useRef<string | null>(null)
   const pendingDrinkWaterLogIdRef = useRef<string | null>(null)
+  const editingDrinkMetaRef = useRef<DrinkEntryMeta | null>(null)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
@@ -9041,6 +9042,8 @@ Please add nutritional information manually if needed.`);
       return { favoriteId, origin, clientId, drinkMeta }
     })()
 
+    const drinkMeta = editingDrinkMetaRef.current || getDrinkMetaFromEntry(editingEntry)
+
     const mergedNutrition = (() => {
       const base = (analyzedNutrition || editingEntry.nutrition) as any
       if (!base || typeof base !== 'object') return base
@@ -9051,18 +9054,38 @@ Please add nutritional information manually if needed.`);
       if (meta.drinkMeta) {
         Object.assign(next, meta.drinkMeta)
       }
+      if (drinkMeta) {
+        Object.assign(next, applyDrinkMetaToTotals({}, drinkMeta))
+      }
       return next
     })()
+    const mergedTotal = applyDrinkMetaToTotals(analyzedTotal || (editingEntry.total || null), drinkMeta)
+
+    const resolveDbId = () => {
+      if (editingEntry.dbId) return editingEntry.dbId
+      const clientId = getEntryClientId(editingEntry)
+      if (!clientId) return null
+      const match = (entry: any) => Boolean(entry?.dbId) && getEntryClientId(entry) === clientId
+      const sources = [
+        ...(Array.isArray(todaysFoodsForSelectedDate) ? todaysFoodsForSelectedDate : []),
+        ...(Array.isArray(historyFoods) ? historyFoods : []),
+        ...(Array.isArray((userData as any)?.todaysFoods) ? ((userData as any).todaysFoods as any[]) : []),
+      ]
+      const found = sources.find(match)
+      return found?.dbId || null
+    }
+    const resolvedDbId = resolveDbId()
 
     const updatedEntry = {
       ...editingEntry,
+      ...(resolvedDbId ? { dbId: resolvedDbId } : {}),
       localDate: editingEntry.localDate || selectedDate,
       createdAt: newCreatedAt,
       description: finalDescription,
       photo: photoPreview || editingEntry.photo,
       nutrition: mergedNutrition,
       items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : (editingEntry.items || null),
-      total: analyzedTotal || (editingEntry.total || null)
+      total: mergedTotal || (editingEntry.total || null)
     };
 
     const sourceFoods = isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || [])
@@ -9079,8 +9102,9 @@ Please add nutritional information manually if needed.`);
       }
 
       // Persist edit to FoodLog when we have a database id
-      const dbId = editingEntry.dbId || editingEntry.id
-      if (dbId) {
+      const dbId = resolvedDbId || editingEntry.dbId || editingEntry.id
+      let serverUpdated = false
+      if (resolvedDbId || editingEntry.dbId) {
         const res = await fetch('/api/food-log', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -9100,6 +9124,8 @@ Please add nutritional information manually if needed.`);
           const text = await res.text()
           console.error('❌ Failed to update FoodLog entry', { status: res.status, text })
           setHistorySaveError('Updating your entry failed. Please retry.')
+        } else {
+          serverUpdated = true
         }
       } else {
         console.warn('⚠️ Editing entry without dbId; skipping FoodLog update')
@@ -9130,7 +9156,9 @@ Please add nutritional information manually if needed.`);
 
       // Keep local snapshot in sync (but do not create a new history row)
       await saveFoodEntries(updatedFoods, { appendHistory: false });
-      await refreshEntriesFromServer();
+      if (serverUpdated) {
+        await refreshEntriesFromServer();
+      }
       await saveBarcodeLabelIfNeeded(updatedEntry.items)
       
       // Reset all form states
@@ -9140,6 +9168,7 @@ Please add nutritional information manually if needed.`);
         router.push('/food')
       }
     } finally {
+      editingDrinkMetaRef.current = null
       setIsSavingEntry(false)
     }
   };
@@ -12842,6 +12871,7 @@ Please add nutritional information manually if needed.`);
         nutrition: mergedNutrition,
         total: mergedNutrition || null,
       }
+      editingDrinkMetaRef.current = getDrinkMetaFromEntry(food)
 
       // Custom meals should be edited in the Build-a-meal editor (not the analyzer-style editor).
       try {
