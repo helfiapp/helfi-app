@@ -62,10 +62,13 @@ const shouldStampHealthSetup = (payload: any) => {
   return Object.keys(payload).some((key) => HEALTH_SETUP_STAMP_KEYS.has(key))
 }
 
-const sanitizeUserDataPayload = (payload: any) => {
+const sanitizeUserDataPayload = (payload: any, options?: { forceStamp?: boolean }) => {
   if (!payload || typeof payload !== 'object') return payload;
   // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
   const { todaysFoods, favorites, ...rest } = payload as any;
+  if (options?.forceStamp && shouldStampHealthSetup(rest)) {
+    return { ...rest, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() }
+  }
   if (rest.healthSetupUpdatedAt) {
     return rest;
   }
@@ -8184,7 +8187,7 @@ export default function Onboarding() {
     setIsSyncing(true);
     try {
       if (hasGlobalUnsavedChangesRef.current) {
-        const payload = sanitizeUserDataPayload(formRef.current || form);
+        const payload = sanitizeUserDataPayload(formRef.current || form, { forceStamp: true });
         const response = await fetch('/api/user-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

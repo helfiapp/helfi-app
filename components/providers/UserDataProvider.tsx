@@ -65,11 +65,6 @@ const valuesMatch = (a: any, b: any) => {
   return false
 }
 
-const getHealthSetupVersion = (data: any) => {
-  const raw = Number(data?.healthSetupUpdatedAt || 0)
-  return Number.isFinite(raw) && raw > 0 ? raw : 0
-}
-
 const hasOwnKey = (value: any, key: string) =>
   value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key)
 
@@ -131,19 +126,6 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
             if (localSnapshot) {
               const overrides: Record<string, any> = {}
               const now = Date.now()
-              const localHealthVersion = getHealthSetupVersion(localSnapshot)
-              const serverHealthVersion = getHealthSetupVersion(merged)
-              const preferLocalHealth =
-                localHealthVersion > 0 && (serverHealthVersion === 0 || localHealthVersion > serverHealthVersion)
-
-              if (preferLocalHealth) {
-                HEALTH_SETUP_KEYS.forEach((key) => {
-                  if (!hasOwnKey(localSnapshot, key)) return
-                  if (valuesMatch(localSnapshot[key], merged[key])) return
-                  overrides[key] = localSnapshot[key]
-                })
-              }
-
               Object.entries(pendingLocalUpdatesRef.current).forEach(([key, touchedAt]) => {
                 const grace = HEALTH_SETUP_KEYS.has(key) ? HEALTH_SETUP_GRACE_MS : LOCAL_OVERRIDE_GRACE_MS
                 if (!touchedAt || now - touchedAt > grace) {
