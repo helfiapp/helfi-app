@@ -20,10 +20,79 @@ import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 const VOICE_CHAT_COST_CENTS = 10
+const MEMORY_MATCH_LIMIT = 12
+const MEMORY_FALLBACK_LIMIT = 8
+const MEMORY_SNIPPET_MAX = 200
+const MEMORY_STOP_WORDS = new Set([
+  'a', 'about', 'after', 'again', 'all', 'also', 'an', 'and', 'any', 'are', 'as', 'at', 'be',
+  'because', 'been', 'before', 'but', 'by', 'can', 'could', 'did', 'do', 'does', 'doing', 'done',
+  'for', 'from', 'get', 'got', 'had', 'has', 'have', 'having', 'help', 'her', 'here', 'hers',
+  'him', 'his', 'how', 'i', 'if', 'in', 'into', 'is', 'it', 'its', 'just', 'like', 'me', 'my',
+  'myself', 'not', 'of', 'on', 'one', 'or', 'our', 'ours', 'ourselves', 'out', 'over', 'please',
+  'said', 'same', 'she', 'should', 'so', 'some', 'something', 'that', 'the', 'their', 'them',
+  'then', 'there', 'these', 'they', 'this', 'to', 'too', 'up', 'us', 'very', 'was', 'we', 'were',
+  'what', 'when', 'where', 'which', 'who', 'why', 'will', 'with', 'you', 'your', 'yours',
+])
 
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+}
+
+function clipMemoryText(value: string, max = MEMORY_SNIPPET_MAX) {
+  const compact = String(value || '').replace(/\s+/g, ' ').trim()
+  if (compact.length <= max) return compact
+  return `${compact.slice(0, Math.max(0, max - 3)).trim()}...`
+}
+
+function extractKeywords(text: string) {
+  const words = String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length >= 4 && !MEMORY_STOP_WORDS.has(word))
+  const unique = Array.from(new Set(words))
+  return unique.slice(0, 8)
+}
+
+async function loadChatMemorySnippets(userId: string, question: string, threadId?: string) {
+  await ensureTalkToAITables()
+
+  const keywords = extractKeywords(question)
+  let rows: Array<{ content: string; createdAt: Date }> = []
+
+  if (keywords.length) {
+    const patterns = keywords.map((word) => `%${word}%`)
+    const params: Array<string | string[]> = [userId, patterns]
+    let query =
+      `SELECT m."content", m."createdAt"
+       FROM "TalkToAIChatMessage" m
+       JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
+       WHERE t."userId" = $1 AND m."role" = 'user' AND m."content" ILIKE ANY($2)`
+    if (threadId) {
+      query += ' AND m."threadId" <> $3'
+      params.push(threadId)
+    }
+    query += ` ORDER BY m."createdAt" DESC LIMIT ${MEMORY_MATCH_LIMIT}`
+    rows = await prisma.$queryRawUnsafe(query, ...params).catch(() => [])
+  }
+
+  if (!rows.length) {
+    const params: Array<string> = [userId]
+    let query =
+      `SELECT m."content", m."createdAt"
+       FROM "TalkToAIChatMessage" m
+       JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
+       WHERE t."userId" = $1 AND m."role" = 'user'`
+    if (threadId) {
+      query += ' AND m."threadId" <> $2'
+      params.push(threadId)
+    }
+    query += ` ORDER BY m."createdAt" DESC LIMIT ${MEMORY_FALLBACK_LIMIT}`
+    rows = await prisma.$queryRawUnsafe(query, ...params).catch(() => [])
+  }
+
+  return rows
 }
 
 async function loadFullUserContext(userId: string) {
@@ -348,6 +417,7 @@ export async function POST(req: NextRequest) {
     // Load message history for context
     const history = await listMessages(threadId, 30)
     const historyMessages = history.map((m) => ({ role: m.role, content: m.content }))
+    const memorySnippets = await loadChatMemorySnippets(session.user.id, question, threadId)
 
     // Load full user context
     const context = await loadFullUserContext(session.user.id)
@@ -358,6 +428,13 @@ export async function POST(req: NextRequest) {
       typeof body?.healthTipSummary === 'string' ? body.healthTipSummary.trim() : ''
     if (healthTipSummary) {
       systemPrompt += `\n\nCURRENT HEALTH TIP CONTEXT (IMPORTANT):\n${healthTipSummary}\n\nWhen the user asks questions in this chat, assume they are asking follow-up questions about this specific tip unless they clearly change the subject.`
+    }
+
+    if (memorySnippets.length) {
+      const memoryLines = memorySnippets
+        .slice(0, 10)
+        .map((item) => `- ${item.createdAt.toISOString().slice(0, 10)}: ${clipMemoryText(item.content)}`)
+      systemPrompt += `\n\nPAST CHAT MEMORY (saved conversations):\n${memoryLines.join('\n')}\n\nIf any memory looks unclear or outdated, ask the user to confirm before relying on it.`
     }
 
     const accept = (req.headers.get('accept') || '').toLowerCase()

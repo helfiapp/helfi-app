@@ -762,7 +762,7 @@ export default function Dashboard() {
               </Link>
               <Link href="/chat" className="block">
                 <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
-                  Talk to AI
+                  Talk to Helfi
                 </div>
               </Link>
               <Link href="/health-tips" className="block">

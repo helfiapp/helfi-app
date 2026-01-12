@@ -1696,155 +1696,134 @@ export const featurePages: FeaturePageContent[] = [
   },
   {
     slug: 'voice-ai',
-    title: 'Voice AI Assistant',
-    subtitle: 'Log updates and ask questions hands-free.',
+    title: 'Talk to Helfi',
+    subtitle: 'Chat with your health data and get clear answers.',
     intro:
-      'Talk to Helfi to record notes or ask questions about your data without typing.',
+      'Talk to Helfi is your personal chat assistant. Ask questions about your health data or leave notes without typing.',
     overview: [
-      'Voice AI keeps your tracking consistent when you are on the move or short on time.',
-      'You can review what gets saved so your data stays accurate and intentional.',
-      'Voice conversations can be used alongside traditional logging for flexibility.',
-      'Think of it as a voice health assistant that fits into your daily routine.',
+      'It uses your profile, goals, and logged data to give personal answers.',
+      'Your chats are saved unless you delete them, so you can return to old conversations.',
+      'If you ask about something from months ago, Helfi can pull it back up.',
+      'Weekly reports include a short summary of your last 7 days of chat topics.',
     ],
-    summary: 'Hands-free logging and voice-based questions for your health data.',
+    summary: 'A personal health chat that remembers your conversations.',
     heroImage: {
       src: '/screenshots/hero/ASK AI.png',
-      alt: 'Voice AI assistant on a phone',
+      alt: 'Talk to Helfi chat on a phone',
     },
     primaryCta,
     secondaryCta,
     capabilities: [
       {
-        title: 'Voice capture',
+        title: 'Chat about your health data',
         description:
-          'Record updates, supplements, or symptoms without typing.',
+          'Ask about meals, check-ins, supplements, workouts, symptoms, and trends.',
       },
       {
-        title: 'Contextual questions',
+        title: 'Long-term chat memory',
         description:
-          'Ask about trends or weekly patterns and get focused responses.',
+          'Past conversations are saved and can be referenced later.',
       },
       {
-        title: 'Review and control',
+        title: 'Privacy controls',
         description:
-          'You decide what gets saved and can edit any entries.',
+          'Delete chats any time and keep things in your control.',
       },
     ],
     useCases: [
       {
-        title: 'On-the-go logging',
+        title: 'Follow-up questions',
         description:
-          'Capture updates while commuting or between meetings without opening a keyboard.',
+          'Ask about something from months ago without starting from scratch.',
       },
       {
-        title: 'Quick weekly check-ins',
+        title: 'Quick check-ins',
         description:
-          'Ask about weekly patterns or next steps without scrolling through charts.',
+          'Get clear answers without digging through charts.',
       },
       {
-        title: 'Hands-free journaling',
+        title: 'Notes you can revisit',
         description:
-          'Record context when it is fresh and review it later in your log.',
+          'Capture context and come back to it later.',
       },
     ],
     outcomes: [
-      'Less friction when logging daily updates.',
-      'Faster questions and answers about your weekly trends.',
-      'Better context captured while it is fresh.',
-      'Full control over what gets stored.',
-      'A flexible workflow that adapts to your day.',
-      'Reduced skipped entries due to time pressure.',
+      'Answers that use your profile and logged data.',
+      'Past conversations stay available unless you delete them.',
+      'Faster follow-ups about older topics.',
+      'Weekly reports summarize the last 7 days of chat topics.',
+      'Clearer next steps without scrolling through charts.',
+      'Less friction when you want a quick answer.',
     ],
     segments: [
       {
-        title: 'Voice-first logging',
+        title: 'Chat with your data',
         description:
-          'Capture meals, symptoms, or supplements without typing.',
+          'Ask questions about your health data in plain language.',
         details: [
-          'Voice capture keeps tracking consistent when you are busy or away from a keyboard.',
-          'You can review and edit entries before they become part of your log.',
-          'This makes it easier to maintain high-quality data without extra effort.',
+          'Helfi uses your profile, goals, and logs to answer in context.',
+          'You can type or use voice input when it is faster.',
+          'Conversations stay connected to your Helfi account.',
         ],
         bullets: [
-          'Hands-free entries',
-          'Fast on mobile',
-          'Review and adjust after saving',
-          'Works alongside manual logging',
-          'Keeps tracking consistent',
+          'Personalized answers',
+          'Voice or typing',
+          'Works across your data',
+          'Clear, concise responses',
+          'Built for daily use',
         ],
         image: {
           src: '/screenshots/hero/ASK AI.png',
-          alt: 'Voice AI logging on a phone',
+          alt: 'Talk to Helfi chat on a phone',
         },
       },
       {
-        title: 'Ask about your patterns',
+        title: 'Remember past conversations',
         description:
-          'Ask questions about trends in your data and weekly reports.',
+          'Helfi can refer back to your previous chats.',
         details: [
-          'Voice AI helps you explore what happened this week without digging through charts.',
-          'Use it to summarize patterns or identify what to focus on next.',
-          'It is designed to keep conversations concise and actionable.',
+          'Your chats are saved unless you delete them.',
+          'If you ask about something from months ago, Helfi can pull it back up.',
+          'This keeps long-term context available.',
         ],
         bullets: [
-          'Context-aware responses',
-          'Weekly report alignment',
-          'Clear summaries',
-          'Designed for fast answers',
-          'Supports follow-up questions',
+          'Long-term chat history',
+          'Follow-ups across months',
+          'Saved unless deleted',
+          'Relevant past notes',
+          'Made for continuity',
         ],
         image: {
           src: '/screenshots/hero/INSIGHTS.png',
-          alt: 'Voice AI responses on a phone',
+          alt: 'Talk to Helfi history context',
         },
       },
       {
-        title: 'Review and edit',
+        title: 'Private and in your control',
         description:
-          'Control what is saved to your log.',
+          'You choose what stays and what gets deleted.',
         details: [
-          'You decide what entries become part of your data and can edit anything later.',
-          'This keeps your record accurate and aligned with your goals.',
-          'Your log stays clean even when you speak quickly.',
+          'Delete any chat thread at any time.',
+          'Your data stays inside your Helfi account.',
+          'You decide how much to share in each conversation.',
         ],
         bullets: [
-          'Review before saving',
-          'Edit any entry later',
-          'Delete data any time',
-          'Privacy-first controls',
-          'Keeps logs accurate',
+          'Delete threads any time',
+          'Account-based access',
+          'You control the details',
+          'Safe by design',
+          'Built for health privacy',
         ],
         image: {
           src: '/screenshots/hero/MORE MENU.png',
-          alt: 'Voice AI settings on a phone',
-        },
-      },
-      {
-        title: 'Private and controlled',
-        description:
-          'Keep conversations focused on your health data without oversharing.',
-        details: [
-          'Voice interactions are designed to stay within your Helfi account and tracking context.',
-          'You can keep conversations light or detailed depending on the moment.',
-          'The control stays with you at all times.',
-        ],
-        bullets: [
-          'Account-based access',
-          'No shared data',
-          'Flexible conversation depth',
-          'Aligned with your settings',
-          'Designed for daily use',
-        ],
-        image: {
-          src: '/screenshots/hero/DASHBOARD.png',
-          alt: 'Voice AI privacy overview',
+          alt: 'Talk to Helfi privacy controls',
         },
       },
     ],
     seo: {
-      title: 'Voice AI Assistant',
+      title: 'Talk to Helfi',
       description:
-        'Log health updates and ask questions hands-free with Helfi voice AI.',
+        'Chat with your health data and keep a lasting conversation history with Talk to Helfi.',
     },
   },
 ]

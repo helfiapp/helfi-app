@@ -148,9 +148,9 @@ export default function PublicHeader() {
       title: 'Assist',
       items: [
         {
-          label: 'Voice AI',
+          label: 'Talk to Helfi',
           href: '/features/voice-ai',
-          description: 'Hands-free, guided conversations.',
+          description: 'Chat with your health data.',
           icon: (
             <svg className={iconClassName} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
               <rect x="9" y="3" width="6" height="12" rx="3" />

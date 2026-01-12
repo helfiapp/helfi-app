@@ -890,7 +890,7 @@ export default function VoiceChat({
           </button>
         </div>
         <div className="flex-1 text-center">
-          <div className="text-sm font-semibold text-gray-900">Talk to AI</div>
+          <div className="text-sm font-semibold text-gray-900">Talk to Helfi</div>
           <div className="text-[11px] text-gray-400 hidden md:block truncate">{currentThreadTitle}</div>
         </div>
         <div className="flex items-center gap-2">
@@ -960,12 +960,12 @@ export default function VoiceChat({
                       </div>
                       <h1 className="mt-6 text-2xl font-bold tracking-tight text-gray-900">How can I help you today?</h1>
                       <div className="mt-4 w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-4 text-left text-sm text-gray-600 shadow-sm">
-                        <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">How Talk to AI works</div>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">How Talk to Helfi works</div>
                         <ul className="mt-3 space-y-2 text-[13px] text-gray-600">
                           <li>Each chat costs 10 credits once (not per response).</li>
                           <li>We show the estimate before sending and confirm the charge after the first response.</li>
-                          <li>Your chat topics and key questions are summarized into your 7‑day report.</li>
-                          <li>We connect those topics to your food, exercise, symptoms, mood, and check-ins.</li>
+                          <li>Your chats are saved unless you delete them, so you can revisit past conversations.</li>
+                          <li>Your last 7 days of chat topics appear in your weekly report.</li>
                         </ul>
                       </div>
                       <div className="mt-8 w-full max-w-sm">
@@ -1077,7 +1077,7 @@ export default function VoiceChat({
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={onComposerKeyDown}
-                  placeholder="Message AI Assistant..."
+                  placeholder="Message Talk to Helfi..."
                   rows={1}
                   className="max-h-[200px] min-h-[60px] w-full resize-none bg-transparent px-4 py-[18px] text-[16px] text-black placeholder-gray-400 focus:outline-none border-none focus:ring-0"
                 />

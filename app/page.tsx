@@ -396,9 +396,9 @@ export default function SplashPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Voice AI Assistant</h3>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Talk to Helfi</h3>
               <p className="text-gray-600 leading-relaxed">
-                Log updates and ask questions hands-free.
+                Chat with your health data and get clear answers.
               </p>
             </Link>
           </div>
@@ -588,29 +588,27 @@ export default function SplashPage() {
         </div>
       </section>
 
-      {/* Voice AI Section */}
+      {/* Talk to Helfi Section */}
       <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-r from-purple-50 to-blue-50">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-4xl font-bold text-helfi-black mb-6">
-                Meet Your AI Health Assistant
-              </h2>
+              <h2 className="text-4xl font-bold text-helfi-black mb-6">Talk to Helfi</h2>
               <p className="text-xl text-gray-600 mb-8">
-                Log updates by voice and ask questions about your week. Helfi helps you capture context without typing.
+                Ask questions about your health data by text or voice. Helfi uses your profile and logs to answer clearly.
               </p>
               
               <div className="space-y-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-purple-100">
-                  <div className="flex items-start space-x-4">
-                    <div className="bg-purple-100 rounded-full p-2 mt-1">
-                      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-purple-100">
+                    <div className="flex items-start space-x-4">
+                      <div className="bg-purple-100 rounded-full p-2 mt-1">
+                        <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Natural Voice Commands</h4>
-                      <p className="text-gray-600 text-sm">"Hey Helfi, I just went for a 5km run and feeling great!"</p>
+                      <h4 className="font-semibold text-gray-900 mb-2">Natural questions</h4>
+                      <p className="text-gray-600 text-sm">"How did my week look for energy and sleep?"</p>
                     </div>
                   </div>
                 </div>
@@ -623,8 +621,8 @@ export default function SplashPage() {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Contextual Questions</h4>
-                      <p className="text-gray-600 text-sm">"I'm feeling tired after lunch. What should I watch this week?"</p>
+                      <h4 className="font-semibold text-gray-900 mb-2">Past conversations stay with you</h4>
+                      <p className="text-gray-600 text-sm">"Can you remind me what we discussed last month?"</p>
                     </div>
                   </div>
                 </div>
@@ -637,8 +635,8 @@ export default function SplashPage() {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Guided Suggestions</h4>
-                      <p className="text-gray-600 text-sm">"Based on your week, try taking magnesium 2 hours before sleep."</p>
+                      <h4 className="font-semibold text-gray-900 mb-2">Clear, short answers</h4>
+                      <p className="text-gray-600 text-sm">"Here is what stands out from your recent logs."</p>
                     </div>
                   </div>
                 </div>
@@ -649,7 +647,7 @@ export default function SplashPage() {
               <div className="w-full max-w-lg h-96 bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl shadow-2xl overflow-hidden">
                 <img 
                   src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg"
-                  alt="Woman speaking into phone using voice AI"
+                  alt="Person using Talk to Helfi"
                   className="w-full h-full object-cover object-center"
                   style={{objectPosition: 'center 20%'}}
                 />

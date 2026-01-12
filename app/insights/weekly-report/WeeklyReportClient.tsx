@@ -341,7 +341,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
 
         {talkToAiSummary?.userMessageCount ? (
           <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-blue-900">Talk to AI highlights</h2>
+            <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
             <p className="text-sm text-blue-800 mt-2">
               {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
               {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}.

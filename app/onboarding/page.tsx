@@ -63,7 +63,7 @@ function UpdateInsightsPopup({
         
         <div className="mb-6">
           <p className="text-sm text-gray-600 mb-4">
-            You've changed your health information. Would you like to update your insights now? This will regenerate AI insights, update Talk to AI, and refresh all AI-powered sections with your latest data.
+            You've changed your health information. Would you like to update your insights now? This will regenerate AI insights, update Talk to Helfi, and refresh all AI-powered sections with your latest data.
           </p>
           <p className="text-xs text-gray-500 mb-3">
             Credits will be charged after generation based on actual AI usage.
