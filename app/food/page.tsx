@@ -12821,14 +12821,26 @@ Please add nutritional information manually if needed.`);
         return null
       })()
       const safePhoto = typeof food.photo === 'string' ? food.photo : null
-      const safeNutrition = sanitizeNutritionTotals(food.nutrition || food.total || null) || EMPTY_TOTALS
+      const rawTotals = food.nutrition || food.total || null
+      const safeNutrition = sanitizeNutritionTotals(rawTotals) || EMPTY_TOTALS
+      const mergedNutrition = (() => {
+        const base: any = { ...(safeNutrition as any) }
+        if (rawTotals && typeof rawTotals === 'object') {
+          Object.keys(rawTotals).forEach((key) => {
+            if (key.startsWith('__')) {
+              base[key] = (rawTotals as any)[key]
+            }
+          })
+        }
+        return base
+      })()
       const safeFood = {
         ...food,
         description: safeDescription,
         items: safeItems,
         photo: safePhoto,
-        nutrition: safeNutrition,
-        total: safeNutrition || null,
+        nutrition: mergedNutrition,
+        total: mergedNutrition || null,
       }
 
       // Custom meals should be edited in the Build-a-meal editor (not the analyzer-style editor).

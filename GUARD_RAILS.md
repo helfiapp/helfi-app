@@ -276,6 +276,7 @@ the user.
 - Icon lookup must normalize labels (remove sugar notes like “with sugar”, “sugar‑free”, and parenthetical sugar amounts) so sweetened drinks still show the correct drink icon.
 - When a drink is added via Sugar‑free + search/barcode/photo/favorites, the Food Diary entry must **auto‑scale macros** to the drink amount (e.g., 100 ml) instead of the product’s default serving.
 - Water entries must appear under the **category they were logged in**, not default to Other.
+- Editing/renaming a drink entry must **preserve** `__drinkType` and `__waterLogId` so the linked water log stays hidden in Food Diary.
 
 Agents must not modify these rules without explicit user approval.
 
