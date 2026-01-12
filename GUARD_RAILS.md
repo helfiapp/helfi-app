@@ -280,6 +280,36 @@ the user.
 
 Agents must not modify these rules without explicit user approval.
 
+### 3.5.1 Favorites + Diary Rename Sync (Jan 2026 – Locked)
+Goal: renaming a food/drink **anywhere** updates **everywhere**.
+- Renaming inside a **Food Diary entry** must update:
+  - The diary list label
+  - Favorites list label
+  - “All” list label
+- Renaming inside **Favorites** must update:
+  - Favorites list label
+  - Diary entries linked to that favorite
+  - “All” list label
+
+Implementation notes (do not remove):
+- Food Diary rename flow is handled in `app/food/page.tsx` → `updateFoodEntry`:
+  - Detects a real name change (not just the same text)
+  - Resolves linked favorite by `__favoriteId` / `sourceId` / label
+  - Updates the favorite label and renames all linked diary entries
+- Favorites rename flow is handled in `app/food/page.tsx` → `handleRenameFavorite`:
+  - Updates the favorite label
+  - Calls `renameEntriesWithFavoriteId(...)` to update diary entries
+- Helper functions that must stay wired:
+  - `resolveFavoriteForEntry`, `updateFavoriteLabelById`, `renameEntriesWithFavoriteId`
+  - `saveFoodNameOverride` (keeps aliases for older labels)
+
+If this breaks again, restore in this order:
+1) In `updateFoodEntry`, ensure name changes call:
+   - `resolveFavoriteForEntry` → `updateFavoriteLabelById` → `renameEntriesWithFavoriteId`
+2) In `handleRenameFavorite`, ensure it calls:
+   - `renameEntriesWithFavoriteId`
+3) Confirm Favorites, All, and Food Diary labels match after rename.
+
 **Do NOT change or remove:**
 - The sidebar click override in `app/onboarding/page.tsx` that directly listens to left‑menu clicks while on `/onboarding` and forces navigation.
 - The `window.__helfiOnboardingSidebarOverride` flag that prevents `LayoutWrapper` from double‑handling sidebar clicks during Health Setup.
