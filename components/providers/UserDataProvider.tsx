@@ -50,6 +50,7 @@ const HEALTH_SETUP_KEYS = new Set([
   'diabetesType',
   'allergies',
   'healthCheckSettings',
+  'healthSetupUpdatedAt',
 ])
 
 const valuesMatch = (a: any, b: any) => {

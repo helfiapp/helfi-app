@@ -18,10 +18,57 @@ import { DIET_CATEGORIES, DIET_OPTIONS, getDietOption, normalizeDietTypes } from
 import { applyDietMacroRules, calculateDailyTargets } from '@/lib/daily-targets';
 import { normalizeHealthCheckSettings } from '@/lib/food-health-check-settings';
 
+const HEALTH_SETUP_STAMP_KEYS = new Set([
+  'gender',
+  'termsAccepted',
+  'weight',
+  'height',
+  'birthdate',
+  'bodyType',
+  'exerciseFrequency',
+  'exerciseTypes',
+  'exerciseDurations',
+  'goals',
+  'goalChoice',
+  'goalIntensity',
+  'goalTargetWeightKg',
+  'goalTargetWeightUnit',
+  'goalPaceKgPerWeek',
+  'goalCalorieTarget',
+  'goalMacroSplit',
+  'goalMacroMode',
+  'goalFiberTarget',
+  'goalSugarMax',
+  'dietTypes',
+  'dietType',
+  'allergies',
+  'diabetesType',
+  'healthCheckSettings',
+  'healthSituations',
+  'bloodResults',
+  'supplements',
+  'medications',
+])
+
+let healthSetupUpdateStamp = 0
+const nextHealthSetupUpdateStamp = () => {
+  const now = Date.now()
+  healthSetupUpdateStamp = Math.max(healthSetupUpdateStamp + 1, now)
+  return healthSetupUpdateStamp
+}
+
+const shouldStampHealthSetup = (payload: any) => {
+  if (!payload || typeof payload !== 'object') return false
+  return Object.keys(payload).some((key) => HEALTH_SETUP_STAMP_KEYS.has(key))
+}
+
 const sanitizeUserDataPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return payload;
   // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
   const { todaysFoods, favorites, ...rest } = payload as any;
+  if (shouldStampHealthSetup(rest)) {
+    return { ...rest, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() }
+  }
   return rest;
 };
 

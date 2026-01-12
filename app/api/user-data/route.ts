@@ -593,6 +593,10 @@ export async function POST(request: NextRequest) {
     console.time('⏱️ Parse Request Data')
     const data = await request.json()
     console.timeEnd('⏱️ Parse Request Data')
+    const incomingHealthSetupUpdatedAtRaw = (data as any)?.healthSetupUpdatedAt
+    const incomingHealthSetupUpdatedAt = Number(incomingHealthSetupUpdatedAtRaw)
+    const hasIncomingHealthSetupUpdatedAt =
+      Number.isFinite(incomingHealthSetupUpdatedAt) && incomingHealthSetupUpdatedAt > 0
 
     // #region agent log
 	    try {
@@ -643,6 +647,25 @@ export async function POST(request: NextRequest) {
     }
     
     console.timeEnd('⏱️ User Lookup/Creation')
+
+    // Guard against older health setup saves overwriting newer changes.
+    if (hasIncomingHealthSetupUpdatedAt) {
+      try {
+        const storedMeta = await prisma.healthGoal.findFirst({
+          where: { userId: user.id, name: '__HEALTH_SETUP_META__' },
+        })
+        const storedUpdatedAt = storedMeta?.category ? Number(JSON.parse(storedMeta.category)?.updatedAt) : 0
+        if (Number.isFinite(storedUpdatedAt) && storedUpdatedAt > 0 && incomingHealthSetupUpdatedAt < storedUpdatedAt) {
+          console.log('Skipping stale health setup update', {
+            incomingHealthSetupUpdatedAt,
+            storedUpdatedAt,
+          })
+          return NextResponse.json({ success: true, ignored: true, reason: 'stale-health-setup' })
+        }
+      } catch (metaError) {
+        console.warn('Failed to read __HEALTH_SETUP_META__', metaError)
+      }
+    }
 
     // Load existing profile info record for merging purposes (date of birth, etc.)
     let existingProfileInfoData: Record<string, any> | null = null
@@ -1837,6 +1860,24 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
     
+    if (hasIncomingHealthSetupUpdatedAt) {
+      try {
+        await prisma.healthGoal.deleteMany({
+          where: { userId: user.id, name: '__HEALTH_SETUP_META__' },
+        })
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__HEALTH_SETUP_META__',
+            category: JSON.stringify({ updatedAt: incomingHealthSetupUpdatedAt }),
+            currentRating: 0,
+          },
+        })
+      } catch (metaError) {
+        console.warn('Failed to store __HEALTH_SETUP_META__', metaError)
+      }
+    }
+
     return NextResponse.json({ 
       success: true, 
       message: 'Data saved successfully',
