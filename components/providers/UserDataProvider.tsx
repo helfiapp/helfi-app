@@ -27,12 +27,49 @@ interface UserDataContextType {
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined)
 
 const USER_DATA_CACHE_TTL_MS = 5 * 60_000
+const HEALTH_SETUP_GRACE_MS = 2 * 60_000
+const HEALTH_SETUP_KEYS = new Set([
+  'goalChoice',
+  'goalIntensity',
+  'goalTargetWeightKg',
+  'goalTargetWeightUnit',
+  'goalPaceKgPerWeek',
+  'goalCalorieTarget',
+  'goalMacroSplit',
+  'goalMacroMode',
+  'goalFiberTarget',
+  'goalSugarMax',
+  'dietTypes',
+  'dietType',
+  'weight',
+  'height',
+  'birthdate',
+  'bodyType',
+  'exerciseFrequency',
+  'exerciseTypes',
+  'diabetesType',
+  'allergies',
+  'healthCheckSettings',
+])
+
+const valuesMatch = (a: any, b: any) => {
+  if (a === b) return true
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return JSON.stringify(a) === JSON.stringify(b)
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    return JSON.stringify(a) === JSON.stringify(b)
+  }
+  return false
+}
 
 export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
   const [userData, setUserData] = useState<UserData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const lastLocalUpdateRef = useRef(0)
+  const userDataRef = useRef<UserData | null>(null)
+  const pendingLocalUpdatesRef = useRef<Record<string, number>>({})
 
   // Profile image is either the saved Cloudinary image or the auth provider image.
   // We intentionally do NOT provide a graphic default here so UI components can
@@ -41,6 +78,9 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   const userEmail = session?.user?.email || ''
   const cacheKey = useMemo(() => (userEmail ? `user-data:${userEmail}` : ''), [userEmail])
+  useEffect(() => {
+    userDataRef.current = userData
+  }, [userData])
 
   // Load data once and cache it
   const loadData = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
@@ -80,18 +120,39 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
               // Ignore sync notice errors
             }
             const localUpdatedAfterRequest = lastLocalUpdateRef.current > requestStartedAt
-            if (localUpdatedAfterRequest) {
+            const localSnapshot = userDataRef.current
+            const now = Date.now()
+            let merged = result.data
+            let hasOverride = false
+            if (localSnapshot) {
+              const overrides: Record<string, any> = {}
+              Object.keys(localSnapshot).forEach((key) => {
+                if (!HEALTH_SETUP_KEYS.has(key)) return
+                const touchedAt = pendingLocalUpdatesRef.current[key]
+                if (!touchedAt || now - touchedAt > HEALTH_SETUP_GRACE_MS) return
+                if (valuesMatch(localSnapshot[key], merged[key])) {
+                  delete pendingLocalUpdatesRef.current[key]
+                  return
+                }
+                overrides[key] = localSnapshot[key]
+              })
+              if (Object.keys(overrides).length > 0) {
+                merged = { ...merged, ...overrides }
+                hasOverride = true
+              }
+            }
+            if (localUpdatedAfterRequest || hasOverride) {
               setUserData(prev => {
-                const next = prev ? { ...result.data, ...prev } : result.data
+                const next = prev ? { ...merged, ...prev } : merged
                 if (cacheKey) {
                   writeClientCache(cacheKey, next)
                 }
                 return next
               })
             } else {
-              setUserData(result.data)
+              setUserData(merged)
               if (cacheKey) {
-                writeClientCache(cacheKey, result.data)
+                writeClientCache(cacheKey, merged)
               }
             }
           }
@@ -126,7 +187,13 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   // Update user data
   const updateUserData = (newData: Partial<UserData>) => {
-    lastLocalUpdateRef.current = Date.now()
+    const now = Date.now()
+    lastLocalUpdateRef.current = now
+    Object.keys(newData || {}).forEach((key) => {
+      if (HEALTH_SETUP_KEYS.has(key)) {
+        pendingLocalUpdatesRef.current[key] = now
+      }
+    })
     setUserData(prev => {
       const next = prev ? { ...prev, ...newData } : (newData as UserData)
       if (cacheKey) {
