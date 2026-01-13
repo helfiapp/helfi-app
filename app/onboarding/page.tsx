@@ -7851,7 +7851,7 @@ export default function Onboarding() {
     (options?: { preserveUnsaved?: boolean; timeoutMs?: number }) => Promise<any>
   >(async () => null);
   const healthSetupMetaInFlightRef = useRef(false);
-  const lastHealthSetupUpdatedAtRef = useRef(0);
+  const lastServerHealthSetupUpdatedAtRef = useRef(0);
 
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
   useEffect(() => {
@@ -8196,8 +8196,8 @@ export default function Onboarding() {
           serverData = userData.data;
           const incomingHealthSetupUpdatedAt = Number(userData.data?.healthSetupUpdatedAt || 0);
           if (Number.isFinite(incomingHealthSetupUpdatedAt) && incomingHealthSetupUpdatedAt > 0) {
-            lastHealthSetupUpdatedAtRef.current = Math.max(
-              lastHealthSetupUpdatedAtRef.current,
+            lastServerHealthSetupUpdatedAtRef.current = Math.max(
+              lastServerHealthSetupUpdatedAtRef.current,
               incomingHealthSetupUpdatedAt,
             );
           }
@@ -8245,17 +8245,15 @@ export default function Onboarding() {
       const payload = await response.json();
       const serverUpdatedAt = Number(payload?.healthSetupUpdatedAt || 0);
       if (!Number.isFinite(serverUpdatedAt) || serverUpdatedAt <= 0) return;
-      const serverTime = Number(payload?.serverTime || 0);
-      const now = Date.now();
-      const skew = Number.isFinite(serverTime) && serverTime > 0 ? now - serverTime : 0;
-      const adjustedServerUpdatedAt = serverUpdatedAt + skew;
-      lastHealthSetupUpdatedAtRef.current = Math.max(
-        lastHealthSetupUpdatedAtRef.current,
-        serverUpdatedAt,
-      );
-      const localUpdatedAt = Number(formRef.current?.healthSetupUpdatedAt || 0);
-      if (adjustedServerUpdatedAt > localUpdatedAt) {
-        await loadUserDataRef.current({ preserveUnsaved: true, timeoutMs: 8000 });
+      const lastServerUpdatedAt = lastServerHealthSetupUpdatedAtRef.current || 0;
+      if (serverUpdatedAt <= lastServerUpdatedAt) return;
+      const freshData = await loadUserDataRef.current({ preserveUnsaved: true, timeoutMs: 8000 });
+      const refreshedAt = Number(freshData?.healthSetupUpdatedAt || 0);
+      if (Number.isFinite(refreshedAt) && refreshedAt > 0) {
+        lastServerHealthSetupUpdatedAtRef.current = Math.max(
+          lastServerHealthSetupUpdatedAtRef.current,
+          refreshedAt,
+        );
       }
     } catch (error) {
       console.warn('Health setup auto-sync check failed', error);
