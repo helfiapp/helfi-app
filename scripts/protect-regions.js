@@ -171,7 +171,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'food', 'add-ingredient', 'AddIngredientClient.tsx'),
     startMarker: 'PROTECTED: ADD_INGREDIENT_SEARCH START',
     endMarker: 'PROTECTED: ADD_INGREDIENT_SEARCH END',
-    expectedHash: '980691072e3f4a07a0878016483332cc3591b3994429bc6d56b8a80d00245919',
+    expectedHash: '4dfe3786fd1b394b13f522e81aefd36bd4b9d9e6220c850bdc27357eaed75a1f',
     allowEnvVar: 'ALLOW_ADD_INGREDIENT_SEARCH_EDIT',
     description: 'Add Ingredient standalone search UI',
   });
