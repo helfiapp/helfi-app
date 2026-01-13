@@ -788,7 +788,6 @@ const PhysicalStep = memo(function PhysicalStep({
   onPartialSave,
   onUnsavedChange,
   onInsightsSaved,
-  manualSyncKey,
   serverHydrationKey,
 }: {
   onNext: (data: any) => void
@@ -797,7 +796,6 @@ const PhysicalStep = memo(function PhysicalStep({
   onPartialSave?: (data: any) => void
   onUnsavedChange?: () => void
   onInsightsSaved?: () => void
-  manualSyncKey?: number
   serverHydrationKey?: number
 }) {
   const initialSnapshotRef = useRef<any>(null);
@@ -819,7 +817,6 @@ const PhysicalStep = memo(function PhysicalStep({
   const goalChoiceHydratedRef = useRef(false);
   const goalIntensityHydratedRef = useRef(false);
   const lastSyncVersionRef = useRef<number>(0);
-  const manualSyncHydratedRef = useRef<number>(0);
   const serverHydratedRef = useRef<number>(0);
   const [showGoalDetails, setShowGoalDetails] = useState(false);
   const [goalTargetWeightUnit, setGoalTargetWeightUnit] = useState<'kg' | 'lb'>('kg');
@@ -984,10 +981,6 @@ const PhysicalStep = memo(function PhysicalStep({
       lastSyncVersionRef.current = incomingVersion;
     }
     let forceHydrate = false;
-    if (typeof manualSyncKey === 'number' && manualSyncKey > manualSyncHydratedRef.current) {
-      manualSyncHydratedRef.current = manualSyncKey;
-      forceHydrate = true;
-    }
     if (typeof serverHydrationKey === 'number' && serverHydrationKey > serverHydratedRef.current) {
       serverHydratedRef.current = serverHydrationKey;
       forceHydrate = true;
@@ -1266,7 +1259,7 @@ const PhysicalStep = memo(function PhysicalStep({
     if ((changed && hasAny) && onUnsavedChange) {
       onUnsavedChange();
     }
-  }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, healthCheckSettings, initial, unit, manualSyncKey, serverHydrationKey]);
+  }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, healthCheckSettings, initial, unit, serverHydrationKey]);
 
   const triggerDietSavedNotice = useCallback(() => {
     setShowDietSavedNotice(true);
@@ -7829,7 +7822,6 @@ export default function Onboarding() {
   const [form, setForm] = useState<any>({});
   // Removed forced remount to avoid infinite loops
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [affiliateMenu, setAffiliateMenu] = useState<{ label: string; href: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -7843,7 +7835,6 @@ export default function Onboarding() {
   const hasGlobalUnsavedChangesRef = useRef(false);
   const [showGlobalUpdatePopup, setShowGlobalUpdatePopup] = useState(false);
   const [isGlobalGenerating, setIsGlobalGenerating] = useState(false);
-  const [manualSyncKey, setManualSyncKey] = useState(0);
   const [serverHydrationKey, setServerHydrationKey] = useState(0);
   // Track if the user has dismissed the first-time modal during this visit,
   // so they can actually complete the intake instead of being stuck.
@@ -8197,9 +8188,10 @@ export default function Onboarding() {
         console.log('Loaded user data from database:', userData);
         if (userData && userData.data && Object.keys(userData.data).length > 0) {
           serverData = userData.data;
-          mergedForBaseline = { ...(formRef.current || {}), ...userData.data };
-          formRef.current = mergedForBaseline;
-          setForm(mergedForBaseline);
+          const nextForm = { ...(userData.data || {}) };
+          mergedForBaseline = nextForm;
+          formRef.current = nextForm;
+          setForm(nextForm);
           setServerHydrationKey(Date.now());
           // Load profile image from the same API response
           if (userData.data.profileImage) {
@@ -8223,84 +8215,6 @@ export default function Onboarding() {
     return serverData;
   };
 
-  const buildManualSyncPayload = (source: any) => {
-    if (!source || typeof source !== 'object') return {};
-    const safeKeys = [
-      'gender',
-      'termsAccepted',
-      'weight',
-      'height',
-      'birthdate',
-      'bodyType',
-      'exerciseFrequency',
-      'exerciseTypes',
-      'exerciseDurations',
-      'goals',
-      'goalChoice',
-      'goalIntensity',
-      'goalTargetWeightKg',
-      'goalTargetWeightUnit',
-      'goalPaceKgPerWeek',
-      'goalCalorieTarget',
-      'goalMacroSplit',
-      'goalMacroMode',
-      'goalFiberTarget',
-      'goalSugarMax',
-      'dietTypes',
-      'dietType',
-      'allergies',
-      'diabetesType',
-      'healthCheckSettings',
-    ];
-    const payload: Record<string, any> = {};
-    safeKeys.forEach((key) => {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        payload[key] = source[key];
-      }
-    });
-    return payload;
-  };
-
-  const handleManualSync = async () => {
-    if (isSyncing) return;
-    setIsSyncing(true);
-    try {
-      const hadUnsaved = hasGlobalUnsavedChangesRef.current;
-      if (hadUnsaved) {
-        const payload = sanitizeUserDataPayload(buildManualSyncPayload(formRef.current || form), { forceStamp: true });
-        const syncController = new AbortController();
-        const syncTimer = window.setTimeout(() => syncController.abort(), 12000);
-        let response: Response | null = null;
-        try {
-          response = await fetch('/api/user-data', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...payload, manualSync: true }),
-            signal: syncController.signal,
-          });
-        } finally {
-          window.clearTimeout(syncTimer);
-        }
-        if (!response || !response.ok) {
-          throw new Error(`Sync save failed: ${response?.status || 'no response'}`);
-        }
-        updateUserData(payload);
-      }
-
-      const serverData = await loadUserData({ preserveUnsaved: false, timeoutMs: 12000 });
-      if (serverData && Object.keys(serverData).length > 0) {
-        updateUserData(serverData, { trackLocal: false });
-        setManualSyncKey(Date.now());
-      } else {
-        throw new Error('No fresh data returned from server');
-      }
-    } catch (error) {
-      console.error('Manual sync failed:', error);
-      alert('Sync failed. Please try again.');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
   // Keep a ref of the latest form for partial saves
   useEffect(() => {
     formRef.current = form;
@@ -8313,39 +8227,14 @@ export default function Onboarding() {
     if (hasMeaningfulData) syncFormBaseline(form);
   }, [form, syncFormBaseline]);
 
-  // Warm cache: load last known form instantly on mount
+  // Health Setup must always reflect the latest server state on refresh.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const raw = sessionStorage.getItem('onboarding:warmForm');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          setForm((prev: any) => ({ ...parsed, ...prev }));
-        }
-      }
-      const durableRaw = localStorage.getItem('onboarding:durableForm');
-      if (durableRaw) {
-        const parsed = JSON.parse(durableRaw);
-        if (parsed && typeof parsed === 'object') {
-          setForm((prev: any) => ({ ...parsed, ...prev }));
-        }
-      }
-    } catch (e) {
-      console.warn('Warm form cache read failed', e);
-    }
+      sessionStorage.removeItem('onboarding:warmForm');
+      localStorage.removeItem('onboarding:durableForm');
+    } catch {}
   }, []);
-
-  // Persist warm cache on every form change for instant reloads
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      sessionStorage.setItem('onboarding:warmForm', JSON.stringify(form));
-      localStorage.setItem('onboarding:durableForm', JSON.stringify(form));
-    } catch (e) {
-      console.warn('Warm form cache write failed', e);
-    }
-  }, [form]);
 
   // If user is clearly new or incomplete, show the health-setup modal whenever
   // they arrive on this page, but allow them to dismiss it for the current visit
@@ -8661,25 +8550,24 @@ export default function Onboarding() {
               Edit Health Info
             </h1>
             
-            {/* Sync Button & Profile Dropdown */}
+            {/* Refresh Button & Profile Dropdown */}
             <div className="flex items-center space-x-2">
-              {/* Sync Button */}
+              {/* Refresh Button */}
               <button
-                onClick={handleManualSync}
-                disabled={isSyncing}
-                className="inline-flex items-center gap-2 rounded-full border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-60"
-                title="Sync now"
-                aria-label="Sync now"
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center gap-2 rounded-full border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+                title="Refresh"
+                aria-label="Refresh"
               >
                 <svg
-                  className={`w-4 h-4 text-gray-600 dark:text-gray-300 ${isSyncing ? 'animate-spin' : ''}`}
+                  className="w-4 h-4 text-gray-600 dark:text-gray-300"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync now'}</span>
+                <span className="hidden sm:inline">Refresh</span>
               </button>
               
               {/* Profile Avatar & Dropdown */}
@@ -8884,7 +8772,7 @@ export default function Onboarding() {
         {/* Content */}
         <div className="flex-1 px-4 py-2 pb-20">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} onPartialSave={persistForm} />}
-          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} manualSyncKey={manualSyncKey} serverHydrationKey={serverHydrationKey} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} serverHydrationKey={serverHydrationKey} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
