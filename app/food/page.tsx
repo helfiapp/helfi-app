@@ -10997,6 +10997,57 @@ Please add nutritional information manually if needed.`);
     const usedFavoriteIds = new Set<string>()
     const usedLabels = new Set<string>()
 
+    const pickPreferredAllItem = (existing: any, candidate: any) => {
+      if (!existing) return candidate
+      if (!candidate) return existing
+      const existingCreated = Number(existing?.createdAt) || 0
+      const candidateCreated = Number(candidate?.createdAt) || 0
+      if (candidateCreated !== existingCreated) return candidateCreated > existingCreated ? candidate : existing
+      const existingHasFavorite = Boolean(existing?.favorite)
+      const candidateHasFavorite = Boolean(candidate?.favorite)
+      if (existingHasFavorite !== candidateHasFavorite) return candidateHasFavorite ? candidate : existing
+      const existingHasItems = Array.isArray(existing?.entry?.items) && existing.entry.items.length > 0
+      const candidateHasItems = Array.isArray(candidate?.entry?.items) && candidate.entry.items.length > 0
+      if (existingHasItems !== candidateHasItems) return candidateHasItems ? candidate : existing
+      return existing
+    }
+
+    const mergeAllItems = (base: any, other: any) => {
+      if (!base) return other
+      if (!other) return base
+      const merged = { ...base }
+      if (!merged.favorite && other.favorite) merged.favorite = other.favorite
+      if (!merged.entry && other.entry) merged.entry = other.entry
+      const baseCreated = Number(base?.createdAt) || 0
+      const otherCreated = Number(other?.createdAt) || 0
+      merged.createdAt = Math.max(baseCreated, otherCreated)
+      if (merged.calories == null && other.calories != null) merged.calories = other.calories
+      if ((!merged.serving || merged.serving === '') && other.serving) merged.serving = other.serving
+      return merged
+    }
+
+    const dedupeAllMealsByLabel = (items: any[]) => {
+      if (!Array.isArray(items)) return []
+      const byLabel = new Map<string, any>()
+      const unkeyed: any[] = []
+      items.forEach((item) => {
+        const key = normalizeFoodName(String(item?.label || '').trim())
+        if (!key) {
+          unkeyed.push(item)
+          return
+        }
+        const existing = byLabel.get(key)
+        if (!existing) {
+          byLabel.set(key, item)
+          return
+        }
+        const preferred = pickPreferredAllItem(existing, item)
+        const other = preferred === existing ? item : existing
+        byLabel.set(key, mergeAllItems(preferred, other))
+      })
+      return [...byLabel.values(), ...unkeyed]
+    }
+
     const allMealsRaw = history.map((entry, idx) => {
       const label = (() => {
         const linkedId = linkedFavoriteIdForEntry(entry)
@@ -11040,10 +11091,6 @@ Please add nutritional information manually if needed.`);
               return favoritesByKey.get(normalizeKey(entry?.description || entry?.label || '', entry)) || null
             })()
 
-      if (favorite?.id) usedFavoriteIds.add(String(favorite.id))
-      const labelKey = normalizeFoodName(String(label || '').trim())
-      if (labelKey) usedLabels.add(labelKey)
-
       const createdAtValue = resolveEntryCreatedAtMs(entry)
 
       return {
@@ -11059,7 +11106,12 @@ Please add nutritional information manually if needed.`);
       }
     })
 
-    const allMealsUnique = allMealsRaw
+    const allMealsUnique = dedupeAllMealsByLabel(allMealsRaw)
+    allMealsUnique.forEach((item: any) => {
+      if (item?.favorite?.id) usedFavoriteIds.add(String(item.favorite.id))
+      const labelKey = normalizeFoodName(String(item?.label || '').trim())
+      if (labelKey) usedLabels.add(labelKey)
+    })
 
     // "All" should show every meal, including favorites that aren't in history yet.
     const allMealsWithFavorites = [...allMealsUnique]

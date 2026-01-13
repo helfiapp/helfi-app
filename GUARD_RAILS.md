@@ -1316,6 +1316,8 @@ days after midnight).
 - The list sort always prefers `__addedOrder` over any date/time fields.
 - `__addedOrder` is saved on the entry and copied into `nutrition`/`total` so it
   survives merges and rehydration.
+- Favorites -> All must collapse duplicate items by normalized name so each item
+  appears only once (keep the most recent entry and preserve favorite links).
 
 **If this breaks again, fix checklist (only in `app/food/page.tsx`):**
 1) Ensure every entry creation path sets `addedOrder = Date.now()` and passes it
