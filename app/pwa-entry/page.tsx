@@ -65,9 +65,11 @@ export default async function PwaEntryPage({
   }
 
   const notificationOpenParam = searchParams?.notificationOpen
+  const notificationOpenCookie = cookies().get('helfi-notification-open')?.value
   const notificationOpen =
     notificationOpenParam === '1' ||
-    (Array.isArray(notificationOpenParam) && notificationOpenParam.includes('1'))
+    (Array.isArray(notificationOpenParam) && notificationOpenParam.includes('1')) ||
+    notificationOpenCookie === '1'
 
   if (notificationOpen) {
     const pending = await consumePendingNotificationOpen(user.id, {

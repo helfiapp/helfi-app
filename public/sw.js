@@ -44,6 +44,11 @@ self.addEventListener('notificationclick', (event) => {
     target.searchParams.set('notificationOpen', '1');
   }
   const targetUrl = target.href;
+  const notifyOpen = () =>
+    fetch('/api/notifications/notification-open', {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(() => {});
   const sameUrl = (a, b) => {
     try {
       return new URL(a).href === new URL(b).href;
@@ -52,53 +57,52 @@ self.addEventListener('notificationclick', (event) => {
     }
   };
 
-  event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then(async (clientsArr) => {
-        const alreadyAtTarget = clientsArr.find((client) => client && client.url && sameUrl(client.url, targetUrl));
-        if (alreadyAtTarget) {
-          if ('focus' in alreadyAtTarget) {
-            await alreadyAtTarget.focus();
-          }
-          return undefined;
-        }
+  const handleClick = async () => {
+    const clientsArr = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const alreadyAtTarget = clientsArr.find((client) => client && client.url && sameUrl(client.url, targetUrl));
+    if (alreadyAtTarget) {
+      if ('focus' in alreadyAtTarget) {
+        await alreadyAtTarget.focus();
+      }
+      return undefined;
+    }
 
-        const preferred =
-          clientsArr.find((client) => client && client.focused) ||
-          clientsArr.find((client) => client && client.visibilityState === 'visible') ||
-          clientsArr[0];
+    const preferred =
+      clientsArr.find((client) => client && client.focused) ||
+      clientsArr.find((client) => client && client.visibilityState === 'visible') ||
+      clientsArr[0];
 
-        if (preferred) {
-          try {
-            if ('navigate' in preferred) {
-              await preferred.navigate(targetUrl);
-            }
-          } catch (e) {
-            // Ignore navigation failures
-          }
-          try {
-            preferred.postMessage({ type: 'navigate', url: targetUrl });
-          } catch (e) {
-            // Ignore message failures
-          }
-          try {
-            if ('focus' in preferred) {
-              await preferred.focus();
-            }
-          } catch (e) {
-            // Ignore focus failures
-          }
-          return undefined;
+    if (preferred) {
+      try {
+        if ('navigate' in preferred) {
+          await preferred.navigate(targetUrl);
         }
+      } catch (e) {
+        // Ignore navigation failures
+      }
+      try {
+        preferred.postMessage({ type: 'navigate', url: targetUrl });
+      } catch (e) {
+        // Ignore message failures
+      }
+      try {
+        if ('focus' in preferred) {
+          await preferred.focus();
+        }
+      } catch (e) {
+        // Ignore focus failures
+      }
+      return undefined;
+    }
 
-        if (self.clients.openWindow) {
-          const opened = await self.clients.openWindow(targetUrl);
-          if (opened && 'focus' in opened) {
-            await opened.focus();
-          }
-        }
-        return undefined;
-      }),
-  );
+    if (self.clients.openWindow) {
+      const opened = await self.clients.openWindow(targetUrl);
+      if (opened && 'focus' in opened) {
+        await opened.focus();
+      }
+    }
+    return undefined;
+  };
+
+  event.waitUntil(Promise.all([notifyOpen(), handleClick()]));
 });
