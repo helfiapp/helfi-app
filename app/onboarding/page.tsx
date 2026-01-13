@@ -8227,14 +8227,51 @@ export default function Onboarding() {
     if (hasMeaningfulData) syncFormBaseline(form);
   }, [form, syncFormBaseline]);
 
-  // Health Setup must always reflect the latest server state on refresh.
+  const hasMeaningfulCacheData = useCallback((value: any) => {
+    if (!value || typeof value !== 'object') return false;
+    return Object.keys(value).some((key) => {
+      const v = (value as any)[key];
+      if (Array.isArray(v)) return v.length > 0;
+      if (v === null || v === undefined) return false;
+      if (typeof v === 'string') return v.trim().length > 0;
+      if (typeof v === 'object') return Object.keys(v).length > 0;
+      return true;
+    });
+  }, []);
+
+  // Warm + durable cache keeps Health Setup fields visible on refresh.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      sessionStorage.removeItem('onboarding:warmForm');
-      localStorage.removeItem('onboarding:durableForm');
-    } catch {}
+      const warmRaw = sessionStorage.getItem('onboarding:warmForm');
+      if (warmRaw) {
+        const parsed = JSON.parse(warmRaw);
+        if (parsed && typeof parsed === 'object') {
+          setForm((prev: any) => ({ ...prev, ...parsed }));
+        }
+      }
+      const durableRaw = localStorage.getItem('onboarding:durableForm');
+      if (durableRaw) {
+        const parsed = JSON.parse(durableRaw);
+        if (parsed && typeof parsed === 'object') {
+          setForm((prev: any) => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch (e) {
+      console.warn('Warm form cache read failed', e);
+    }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!hasMeaningfulCacheData(form)) return;
+    try {
+      sessionStorage.setItem('onboarding:warmForm', JSON.stringify(form));
+      localStorage.setItem('onboarding:durableForm', JSON.stringify(form));
+    } catch (e) {
+      console.warn('Warm form cache write failed', e);
+    }
+  }, [form, hasMeaningfulCacheData]);
 
   // If user is clearly new or incomplete, show the health-setup modal whenever
   // they arrive on this page, but allow them to dismiss it for the current visit
