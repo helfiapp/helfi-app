@@ -781,7 +781,23 @@ function GenderStep({ onNext, initial, initialAgreed, onPartialSave }: { onNext:
   );
 }
 
-const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange, onInsightsSaved }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void, onUnsavedChange?: () => void, onInsightsSaved?: () => void }) {
+const PhysicalStep = memo(function PhysicalStep({
+  onNext,
+  onBack,
+  initial,
+  onPartialSave,
+  onUnsavedChange,
+  onInsightsSaved,
+  manualSyncKey,
+}: {
+  onNext: (data: any) => void
+  onBack: () => void
+  initial?: any
+  onPartialSave?: (data: any) => void
+  onUnsavedChange?: () => void
+  onInsightsSaved?: () => void
+  manualSyncKey?: number
+}) {
   const initialSnapshotRef = useRef<any>(null);
   const [weight, setWeight] = useState(initial?.weight || '');
   const [birthdate, setBirthdate] = useState(initial?.birthdate || '');
@@ -801,6 +817,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const goalChoiceHydratedRef = useRef(false);
   const goalIntensityHydratedRef = useRef(false);
   const lastSyncVersionRef = useRef<number>(0);
+  const manualSyncHydratedRef = useRef<number>(0);
   const [showGoalDetails, setShowGoalDetails] = useState(false);
   const [goalTargetWeightUnit, setGoalTargetWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [goalTargetWeightInput, setGoalTargetWeightInput] = useState('');
@@ -960,9 +977,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   useEffect(() => {
     if (!initial) return;
     const incomingVersion = Number((initial as any)?.healthSetupUpdatedAt || 0);
-    const forceHydrate = Number.isFinite(incomingVersion) && incomingVersion > lastSyncVersionRef.current;
+    let forceHydrate = Number.isFinite(incomingVersion) && incomingVersion > lastSyncVersionRef.current;
     if (forceHydrate) {
       lastSyncVersionRef.current = incomingVersion;
+    }
+    if (typeof manualSyncKey === 'number' && manualSyncKey > manualSyncHydratedRef.current) {
+      manualSyncHydratedRef.current = manualSyncKey;
+      forceHydrate = true;
     }
     if (!initialSnapshotRef.current && Object.keys(initial || {}).length > 0) {
       initialSnapshotRef.current = initial;
@@ -1238,7 +1259,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if ((changed && hasAny) && onUnsavedChange) {
       onUnsavedChange();
     }
-  }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, healthCheckSettings, initial, unit]);
+  }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, healthCheckSettings, initial, unit, manualSyncKey]);
 
   const triggerDietSavedNotice = useCallback(() => {
     setShowDietSavedNotice(true);
@@ -7815,6 +7836,7 @@ export default function Onboarding() {
   const hasGlobalUnsavedChangesRef = useRef(false);
   const [showGlobalUpdatePopup, setShowGlobalUpdatePopup] = useState(false);
   const [isGlobalGenerating, setIsGlobalGenerating] = useState(false);
+  const [manualSyncKey, setManualSyncKey] = useState(0);
   // Track if the user has dismissed the first-time modal during this visit,
   // so they can actually complete the intake instead of being stuck.
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
@@ -8218,9 +8240,10 @@ export default function Onboarding() {
         updateUserData(payload);
       }
 
-      const serverData = await loadUserData({ preserveUnsaved: hadUnsaved, timeoutMs: 12000 });
+      const serverData = await loadUserData({ preserveUnsaved: false, timeoutMs: 12000 });
       if (serverData && Object.keys(serverData).length > 0) {
         updateUserData(serverData, { trackLocal: false });
+        setManualSyncKey(Date.now());
       } else {
         throw new Error('No fresh data returned from server');
       }
@@ -8814,7 +8837,7 @@ export default function Onboarding() {
         {/* Content */}
         <div className="flex-1 px-4 py-2 pb-20">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} onPartialSave={persistForm} />}
-          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} manualSyncKey={manualSyncKey} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
