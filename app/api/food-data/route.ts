@@ -241,6 +241,11 @@ export async function GET(request: NextRequest) {
 
         items = Array.from(byNameBrand.values()).slice(0, limit)
         actualSource = 'auto'
+
+        if (items.length === 0) {
+          // Fallback: if packaged sources return nothing, try USDA so users still get results.
+          items = await searchUsdaFoods(query, { pageSize: limit, dataType: 'all' })
+        }
       }
     } else if (source === 'openfoodfacts') {
       items = await searchOpenFoodFactsByQuery(query, { pageSize: limit })
