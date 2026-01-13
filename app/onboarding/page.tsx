@@ -838,6 +838,7 @@ const PhysicalStep = memo(function PhysicalStep({
   const [activeDietCategoryId, setActiveDietCategoryId] = useState<string>(DIET_CATEGORIES[0]?.id || 'plant-based');
   const [showDietSavedNotice, setShowDietSavedNotice] = useState(false);
   const dietSavedNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAutoSaveSnapshotRef = useRef('');
   const dietHydratedRef = useRef(false);
   const dietTouchedRef = useRef(false);
   const [healthCheckSettings, setHealthCheckSettings] = useState(() =>
@@ -987,6 +988,9 @@ const PhysicalStep = memo(function PhysicalStep({
       forceHydrate = true;
     }
     if (!initialSnapshotRef.current && Object.keys(initial || {}).length > 0) {
+      initialSnapshotRef.current = initial;
+    }
+    if (forceHydrate && !hasUnsavedChanges) {
       initialSnapshotRef.current = initial;
     }
 
@@ -2098,6 +2102,7 @@ const PhysicalStep = memo(function PhysicalStep({
   // Persist physical info as the user fills it out so moving between steps keeps data
   useEffect(() => {
     if (!onPartialSave) return;
+    if (!hasUnsavedChanges) return;
     const weightKgRounded = getCurrentWeightKgRounded();
     const heightCmRounded = getCurrentHeightCmRounded();
     const includeDietTypes = dietHydratedRef.current || dietTouchedRef.current;
@@ -2135,6 +2140,9 @@ const PhysicalStep = memo(function PhysicalStep({
       healthCheckSettings,
       ...(includeDietTypes ? { dietTypes: Array.from(new Set(dietTypes)).sort() } : {}),
     };
+    const snapshot = onboardingGuardSnapshotJson(payload);
+    if (snapshot === lastAutoSaveSnapshotRef.current) return;
+    lastAutoSaveSnapshotRef.current = snapshot;
     schedulePartialSave(payload);
   }, [
     weight,
@@ -2160,6 +2168,7 @@ const PhysicalStep = memo(function PhysicalStep({
     allergies,
     diabetesType,
     healthCheckSettings,
+    hasUnsavedChanges,
     onPartialSave,
     schedulePartialSave,
   ]);
@@ -2937,7 +2946,11 @@ const PhysicalStep = memo(function PhysicalStep({
                 } transition-colors text-sm font-semibold`}
                 onClick={() => {
                   goalIntensityTouchedRef.current = true;
-                  setGoalIntensity(option.key as any);
+                  const nextIntensity = option.key as any;
+                  setGoalIntensity(nextIntensity);
+                  if (onPartialSave) {
+                    onPartialSave({ goalChoice, goalIntensity: nextIntensity });
+                  }
                 }}
                 type="button"
               >
