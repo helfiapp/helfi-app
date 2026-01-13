@@ -279,6 +279,39 @@ If this breaks again, restore these rules exactly.
 - Commit: `5e2720b2` (poll full health setup while onboarding is open)
 - Commit: `aa00b3e1` (prevent sync overwrite during edits)
 - Date: 2026‑01‑13
+
+**Copy‑Paste Restore Checklist (no guesswork):**
+1) Open `app/onboarding/page.tsx`.
+2) Confirm these constants exist:
+   - `HEALTH_SETUP_SYNC_POLL_MS = 12 * 1000`
+   - `HEALTH_SETUP_SYNC_EDIT_GRACE_MS = 20 * 1000`
+3) Confirm these refs exist near the top of the onboarding component:
+   - `lastLocalEditAtRef`
+   - `lastServerHealthSetupUpdatedAtRef`
+4) In `persistForm(...)` confirm:
+   - `healthSetupUpdatedAt` is stamped for any health setup edit.
+   - `lastLocalEditAtRef.current = Date.now()` is set when stamping.
+5) In `checkForHealthSetupUpdates(...)` confirm:
+   - it returns early when `Date.now() - lastLocalEditAtRef.current < HEALTH_SETUP_SYNC_EDIT_GRACE_MS`
+   - it **always** calls `loadUserDataRef.current({ preserveUnsaved: true, timeoutMs: 8000 })`
+   - it does **not** block on meta‑only timestamp comparisons
+6) Confirm the polling useEffect:
+   - uses `setInterval(..., HEALTH_SETUP_SYNC_POLL_MS)`
+   - calls on `focus` and `visibilitychange`
+   - only runs when `document.visibilityState === 'visible'`
+7) In the “How intense?” buttons, confirm it:
+   - updates local state **and**
+   - immediately POSTs `/api/user-data` with `goalChoice + goalIntensity`
+8) Open `components/providers/UserDataProvider.tsx`:
+   - confirm there is **no** health setup polling there.
+9) Open `app/api/user-data/route.ts`:
+   - confirm single‑record storage for `__PRIMARY_GOAL__`, `__SELECTED_ISSUES__`, `__HEALTH_SETUP_META__`
+   - confirm `healthGoals` are ordered by `updatedAt DESC` on reads
+10) Test:
+   - Change “Tone up → Mild” on device A
+   - Keep device B on page 2
+   - Wait 12–15 seconds
+   - Device B updates without leaving the page
 - **HARD LOCK (do not touch without explicit owner approval):** The desktop left menu must remain clickable *inside* Health Setup at all times. Any change that interferes with this is forbidden.
 
 **Protected files (extra locked):**
