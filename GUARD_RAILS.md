@@ -269,6 +269,12 @@ If this breaks again, restore these rules exactly.
 - `components/providers/UserDataProvider.tsx`
 - `app/api/user-data/route.ts`
 
+**Important (do NOT reset the whole repo):**
+- The “last stable commit” is a **reference** only.
+- Do **not** `git reset` or roll back the whole codebase to that commit.
+- Instead, copy/reapply the specific logic described above, or cherry‑pick only the
+  relevant changes from those commits. Leave all other newer work intact.
+
 **Last stable deployment:**
 - Commit: `5e2720b2` (poll full health setup while onboarding is open)
 - Commit: `aa00b3e1` (prevent sync overwrite during edits)
