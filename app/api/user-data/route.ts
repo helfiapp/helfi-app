@@ -614,10 +614,6 @@ export async function POST(request: NextRequest) {
     const data = await request.json()
     console.timeEnd('⏱️ Parse Request Data')
     const manualSync = (data as any)?.manualSync === true || (data as any)?.syncOverride === true
-    const incomingHealthSetupUpdatedAtRaw = (data as any)?.healthSetupUpdatedAt
-    const incomingHealthSetupUpdatedAt = Number(incomingHealthSetupUpdatedAtRaw)
-    const hasIncomingHealthSetupUpdatedAt =
-      Number.isFinite(incomingHealthSetupUpdatedAt) && incomingHealthSetupUpdatedAt > 0
     const healthSetupKeys = new Set([
       'gender',
       'termsAccepted',
@@ -703,31 +699,13 @@ export async function POST(request: NextRequest) {
     
     console.timeEnd('⏱️ User Lookup/Creation')
 
-    // Guard against older health setup saves overwriting newer changes.
-    if (touchesHealthSetup && !manualSync) {
+    // Health setup saves always win; we store a server-side timestamp for sync.
+    if (touchesHealthSetup) {
       try {
         const storedMeta = await prisma.healthGoal.findFirst({
           where: { userId: user.id, name: '__HEALTH_SETUP_META__' },
         })
         storedHealthSetupUpdatedAt = storedMeta?.category ? Number(JSON.parse(storedMeta.category)?.updatedAt) : 0
-        if (!hasIncomingHealthSetupUpdatedAt && storedHealthSetupUpdatedAt > 0) {
-          console.log('Skipping un-stamped health setup update', {
-            storedHealthSetupUpdatedAt,
-          })
-          return NextResponse.json({ success: true, ignored: true, reason: 'missing-health-setup-stamp' })
-        }
-        if (
-          hasIncomingHealthSetupUpdatedAt &&
-          Number.isFinite(storedHealthSetupUpdatedAt) &&
-          storedHealthSetupUpdatedAt > 0 &&
-          incomingHealthSetupUpdatedAt < storedHealthSetupUpdatedAt
-        ) {
-          console.log('Skipping stale health setup update', {
-            incomingHealthSetupUpdatedAt,
-            storedUpdatedAt: storedHealthSetupUpdatedAt,
-          })
-          return NextResponse.json({ success: true, ignored: true, reason: 'stale-health-setup' })
-        }
       } catch (metaError) {
         console.warn('Failed to read __HEALTH_SETUP_META__', metaError)
       }
@@ -1926,13 +1904,8 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
     
-    const shouldStoreHealthSetupMeta =
-      touchesHealthSetup && (manualSync || hasIncomingHealthSetupUpdatedAt || storedHealthSetupUpdatedAt === 0)
-    const metaUpdatedAt = manualSync
-      ? Date.now()
-      : hasIncomingHealthSetupUpdatedAt
-      ? incomingHealthSetupUpdatedAt
-      : Date.now()
+    const shouldStoreHealthSetupMeta = touchesHealthSetup
+    const metaUpdatedAt = Date.now()
     if (shouldStoreHealthSetupMeta) {
       try {
         await prisma.healthGoal.deleteMany({

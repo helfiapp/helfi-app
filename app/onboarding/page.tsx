@@ -8223,13 +8223,51 @@ export default function Onboarding() {
     return serverData;
   };
 
+  const buildManualSyncPayload = (source: any) => {
+    if (!source || typeof source !== 'object') return {};
+    const safeKeys = [
+      'gender',
+      'termsAccepted',
+      'weight',
+      'height',
+      'birthdate',
+      'bodyType',
+      'exerciseFrequency',
+      'exerciseTypes',
+      'exerciseDurations',
+      'goals',
+      'goalChoice',
+      'goalIntensity',
+      'goalTargetWeightKg',
+      'goalTargetWeightUnit',
+      'goalPaceKgPerWeek',
+      'goalCalorieTarget',
+      'goalMacroSplit',
+      'goalMacroMode',
+      'goalFiberTarget',
+      'goalSugarMax',
+      'dietTypes',
+      'dietType',
+      'allergies',
+      'diabetesType',
+      'healthCheckSettings',
+    ];
+    const payload: Record<string, any> = {};
+    safeKeys.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        payload[key] = source[key];
+      }
+    });
+    return payload;
+  };
+
   const handleManualSync = async () => {
     if (isSyncing) return;
     setIsSyncing(true);
     try {
       const hadUnsaved = hasGlobalUnsavedChangesRef.current;
       if (hadUnsaved) {
-        const payload = sanitizeUserDataPayload(formRef.current || form, { forceStamp: true });
+        const payload = sanitizeUserDataPayload(buildManualSyncPayload(formRef.current || form), { forceStamp: true });
         const syncController = new AbortController();
         const syncTimer = window.setTimeout(() => syncController.abort(), 12000);
         let response: Response | null = null;
