@@ -242,8 +242,8 @@ the user.
 - `app/api/exercise-entries/[id]/route.ts`
 
 **Last verified deployment (water intake):**
-- Deployment ID: `dpl_CpRgtRZZEoenPqMMBqafFudPZhYV`
-- Commit: `5c824b086339fbd7f1616db7e96bd076e259b4b9`
+- Deployment ID: `dpl_H9uLV53WbgihAc75EyJANKuEnWcu`
+- Commit: `18cd98a50f911a3587e410fa39e5a2b0f29b0e37`
 
 ### 3.1 Hydration goal rules (must not change without approval)
 - **Base goal uses profile only** (weight/height/gender/age/diet/primary goal).  
@@ -271,6 +271,26 @@ the user.
 - After **save** or **delete** of manual exercise, the list must **force reload** from the server
   to avoid stale session storage (`loadExerciseEntriesForDate(..., { force: true })`).
 - Deleting must update the list even if the server responds with “Not found” for stale entries.
+
+### 3.5 Favorite label must stay consistent in edit view (Food diary)
+- When a user logs a **favorite** item (e.g., “Hot chocolate”), the **edit view must show the favorite label**,
+  not a raw ingredient name (e.g., “Drinking Chocolate”).
+- This regression happens when the edit UI renders **raw analyzed item names** or **AI description text** instead
+  of the favorite/override label.
+
+**Restore steps if it breaks again:**
+1. File: `app/food/page.tsx`.
+2. In the **Food Description** block, ensure the description text uses the favorite override when
+   `editingEntry` has exactly **one** analyzed item:
+   - Use `applyFoodNameOverride(editingEntry?.description || editingEntry?.label || '', editingEntry)`
+   - Short‑circuit `foodDescriptionText` to this value before the AI description fallback.
+3. In the **Detected Foods / ingredient card title** section, ensure the displayed name uses the same override
+   for single‑item entries:
+   - Create `entryLabelOverride` when `editingEntry && analyzedItems.length === 1`
+   - Use `entryLabelOverride` in the title in place of `cleanBaseName`
+4. Confirm the “Food Description” line and the ingredient title both show the favorite label.
+5. If “Drinking Chocolate” reappears, search for `cleanBaseName` and `foodDescriptionText`
+   and re‑apply the override logic described above.
 
 ### 3.5 Water Intake Enhancements (Jan 2026 – Locked)
 - Quick Add drink row must hide the horizontal scrollbar/grey line while still allowing swipe.
