@@ -104,5 +104,14 @@ self.addEventListener('notificationclick', (event) => {
     return undefined;
   };
 
-  event.waitUntil(Promise.all([notifyOpen(), handleClick()]));
+  event.waitUntil(
+    (async () => {
+      try {
+        await notifyOpen();
+      } catch (e) {
+        // Ignore notify failures
+      }
+      await handleClick();
+    })(),
+  );
 });
