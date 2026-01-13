@@ -25,7 +25,7 @@ export async function GET() {
         medications: true,
         foodLogs: { orderBy: { createdAt: 'desc' }, take: 30 },
         healthLogs: { orderBy: { createdAt: 'desc' }, take: 30 },
-        healthGoals: true,
+        healthGoals: { orderBy: { updatedAt: 'desc' } },
       },
     })
 
@@ -139,5 +139,4 @@ export async function GET() {
     return NextResponse.json({ items: [] }, { status: 200 })
   }
 }
-
 

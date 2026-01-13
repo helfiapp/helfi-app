@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       profile = await prisma.user.findUnique({
         where: { id: session.user.id },
         include: {
-          healthGoals: true,
+          healthGoals: { orderBy: { updatedAt: 'desc' } },
           supplements: true,
           medications: true,
           foodLogs: {

@@ -226,7 +226,7 @@ export async function buildSystemPrompt(userId: string, slug: string, section: I
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        healthGoals: true,
+        healthGoals: { orderBy: { updatedAt: 'desc' } },
         supplements: true,
         medications: true,
         healthLogs: { orderBy: { createdAt: 'desc' }, take: 14 },

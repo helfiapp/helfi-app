@@ -23,7 +23,7 @@ async function isOnboardingComplete(userId: string): Promise<boolean> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        healthGoals: true,
+        healthGoals: { orderBy: { updatedAt: 'desc' } },
         supplements: true,
         medications: true,
       }

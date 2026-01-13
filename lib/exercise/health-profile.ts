@@ -49,7 +49,7 @@ function mapBodyType(v: any): HealthProfile['bodyType'] {
 export async function getHealthProfileForUser(userId: string): Promise<HealthProfile> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { healthGoals: true },
+    include: { healthGoals: { orderBy: { updatedAt: 'desc' } } },
   })
 
   if (!user) {
@@ -92,4 +92,3 @@ export async function getHealthProfileForUser(userId: string): Promise<HealthPro
     bodyType: mapBodyType(user.bodyType),
   }
 }
-

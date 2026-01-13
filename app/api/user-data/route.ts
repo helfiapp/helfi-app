@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       user = await prisma.user.findUnique({
       where: { email: userEmail },
         include: {
-          healthGoals: true,
+          healthGoals: { orderBy: { updatedAt: 'desc' } },
           supplements: true,
           medications: true,
         }

@@ -17,7 +17,11 @@ export async function GET(request: Request) {
     // Collect minimal context
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      include: { supplements: true, medications: true, healthGoals: true }
+      include: {
+        supplements: true,
+        medications: true,
+        healthGoals: { orderBy: { updatedAt: 'desc' } },
+      },
     })
 
     // Build a lightweight recommendation object now (stub without OpenAI)
@@ -49,5 +53,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
-
 

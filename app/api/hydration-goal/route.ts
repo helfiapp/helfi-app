@@ -110,7 +110,7 @@ export async function GET(_req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
-    include: { healthGoals: true },
+    include: { healthGoals: { orderBy: { updatedAt: 'desc' } } },
   })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
-    include: { healthGoals: true },
+    include: { healthGoals: { orderBy: { updatedAt: 'desc' } } },
   })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 

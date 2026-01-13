@@ -203,7 +203,7 @@ async function markSectionsStale(userId: string, sections: IssueSectionKey[]): P
     // Get all issues for this user
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { healthGoals: true },
+      include: { healthGoals: { orderBy: { updatedAt: 'desc' } } },
     })
 
     if (!user) return
@@ -321,7 +321,7 @@ export async function triggerBackgroundRegeneration(event: DataChangeEvent): Pro
         await ensureMetadataTable()
         const user = await prisma.user.findUnique({
           where: { id: userId },
-          include: { healthGoals: true },
+          include: { healthGoals: { orderBy: { updatedAt: 'desc' } } },
         })
 
         if (!user) return
@@ -395,7 +395,7 @@ export async function triggerManualSectionRegeneration(
       await ensureMetadataTable()
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { healthGoals: true },
+        include: { healthGoals: { orderBy: { updatedAt: 'desc' } } },
       })
 
       if (!user) return

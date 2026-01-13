@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        healthGoals: true,
+        healthGoals: { orderBy: { updatedAt: 'desc' } },
         supplements: true,
         medications: true,
         healthLogs: { orderBy: { createdAt: 'desc' }, take: 14 },
