@@ -198,6 +198,14 @@ Layout behaviour (`components/LayoutWrapper.tsx`):
   - Sets `sessionStorage.helfiHealthSetupReminderShownThisSession = '1'` so the banner
     appears only once per browser session.
 
+### 2.6 Health Setup data source (Jan 2026 – Locked)
+
+- When reading Health Setup from `HealthGoal` records, always use the **latest** record per name.
+- Always order `healthGoals` by `updatedAt` descending (or equivalent) before reading
+  `__PRIMARY_GOAL__`, `__HEALTH_SETUP_META__`, and other hidden records.
+- Do not rely on unsorted `healthGoals` arrays because duplicates can exist after
+  concurrent saves, which causes cross‑device mismatches.
+
 This reminder is meant to be a **gentle nudge**, not a gate. Agents must not convert
 it into a hard block or significantly change the timing/behaviour without consulting
 the user.
