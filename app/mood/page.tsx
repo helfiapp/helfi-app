@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import MoodPicker from '@/components/mood/MoodPicker'
 import IntensitySlider from '@/components/mood/IntensitySlider'
@@ -45,8 +44,11 @@ export default function MoodCheckInPage() {
   const [saving, setSaving] = useState(false)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [intensityPercent, setIntensityPercent] = useState<number>(35)
-  const pendingIdRef = useRef<string | null>(null)
-  const searchParams = useSearchParams()
+  const pendingIdRef = useRef<string | null>(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('notificationId')?.trim() || null
+      : null
+  )
 
   const [context, setContext] = useState<ContextResponse | null>(null)
   const [energyLevel, setEnergyLevel] = useState<number | null>(null)
@@ -58,14 +60,11 @@ export default function MoodCheckInPage() {
   const localDate = useMemo(() => localDateToday(), [])
 
   useEffect(() => {
-    if (pendingIdRef.current) return
-    const fromUrl = searchParams.get('notificationId')?.trim()
-    if (!fromUrl) return
-    pendingIdRef.current = fromUrl
+    if (!pendingIdRef.current) return
     try {
-      sessionStorage.setItem('helfi:pending-notification-id', fromUrl)
+      sessionStorage.setItem('helfi:pending-notification-id', pendingIdRef.current)
     } catch {}
-  }, [searchParams])
+  }, [])
 
   useEffect(() => {
     try {

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
 
@@ -30,8 +30,11 @@ export default function CheckInPage() {
   const [na, setNa] = useState<Record<string, boolean>>({})
   const [issues, setIssues] = useState<UserIssue[]>([])
   const [loading, setLoading] = useState(true)
-  const pendingIdRef = useRef<string | null>(null)
-  const searchParams = useSearchParams()
+  const pendingIdRef = useRef<string | null>(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('notificationId')?.trim() || null
+      : null
+  )
 
   useEffect(() => {
     const CACHE_KEY = 'checkins:today:cache'
@@ -107,14 +110,11 @@ export default function CheckInPage() {
   }, [])
 
   useEffect(() => {
-    if (pendingIdRef.current) return
-    const fromUrl = searchParams.get('notificationId')?.trim()
-    if (!fromUrl) return
-    pendingIdRef.current = fromUrl
+    if (!pendingIdRef.current) return
     try {
-      sessionStorage.setItem('helfi:pending-notification-id', fromUrl)
+      sessionStorage.setItem('helfi:pending-notification-id', pendingIdRef.current)
     } catch {}
-  }, [searchParams])
+  }, [])
 
   const setRating = (issueId: string, value: number) => {
     setRatings((r) => {

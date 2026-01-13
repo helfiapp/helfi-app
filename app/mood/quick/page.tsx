@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import MoodPicker from '@/components/mood/MoodPicker'
 import InfluenceChips from '@/components/mood/InfluenceChips'
@@ -22,20 +21,20 @@ export default function QuickMoodCheckInPage() {
   const [feelings, setFeelings] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const pendingIdRef = useRef<string | null>(null)
-  const searchParams = useSearchParams()
+  const pendingIdRef = useRef<string | null>(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('notificationId')?.trim() || null
+      : null
+  )
 
   const localDate = useMemo(() => localDateToday(), [])
 
   useEffect(() => {
-    if (pendingIdRef.current) return
-    const fromUrl = searchParams.get('notificationId')?.trim()
-    if (!fromUrl) return
-    pendingIdRef.current = fromUrl
+    if (!pendingIdRef.current) return
     try {
-      sessionStorage.setItem('helfi:pending-notification-id', fromUrl)
+      sessionStorage.setItem('helfi:pending-notification-id', pendingIdRef.current)
     } catch {}
-  }, [searchParams])
+  }, [])
 
   const save = async () => {
     if (mood == null) return
