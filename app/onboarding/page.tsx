@@ -8261,16 +8261,6 @@ export default function Onboarding() {
     if (healthSetupMetaInFlightRef.current) return;
     healthSetupMetaInFlightRef.current = true;
     try {
-      const response = await fetch('/api/health-setup-meta', {
-        cache: 'no-store' as any,
-        headers: { 'Cache-Control': 'no-cache' },
-      });
-      if (!response.ok) return;
-      const payload = await response.json();
-      const serverUpdatedAt = Number(payload?.healthSetupUpdatedAt || 0);
-      if (!Number.isFinite(serverUpdatedAt) || serverUpdatedAt <= 0) return;
-      const lastServerUpdatedAt = lastServerHealthSetupUpdatedAtRef.current || 0;
-      if (serverUpdatedAt <= lastServerUpdatedAt) return;
       const freshData = await loadUserDataRef.current({ preserveUnsaved: true, timeoutMs: 8000 });
       const refreshedAt = Number(freshData?.healthSetupUpdatedAt || 0);
       if (Number.isFinite(refreshedAt) && refreshedAt > 0) {
