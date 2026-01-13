@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
     console.log('=== GET /api/user-data DEBUG START ===')
     console.log('Request URL:', request.url)
     console.log('Request headers:', Object.fromEntries(request.headers.entries()))
+    const scope = new URL(request.url).searchParams.get('scope')
+    const includeFoodData = scope !== 'health-setup'
     
     // Get NextAuth session - with JWT fallback (same pattern as /api/analyze-food)
     let session = await getServerSession(authOptions)
@@ -201,117 +203,120 @@ export async function GET(request: NextRequest) {
     }
 
     // Get today's food entries
-    const normalizeCategory = (raw: any) => {
-      const value = typeof raw === 'string' ? raw.toLowerCase() : ''
-      if (/breakfast/.test(value)) return 'breakfast'
-      if (/lunch/.test(value)) return 'lunch'
-      if (/dinner/.test(value)) return 'dinner'
-      if (/snack/.test(value)) return 'snacks'
-      if (/other/.test(value) || /uncat/.test(value)) return 'uncategorized'
-      return value && value.trim().length > 0 ? value.trim() : 'uncategorized'
-    }
-    const buildTodayIso = () => {
-      const d = new Date()
-      const y = d.getFullYear()
-      const m = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      return `${y}-${m}-${day}`
-    }
-    let todaysFoods: any[] = [];
-    try {
-      const storedFoods = user.healthGoals.find((goal: any) => goal.name === '__TODAYS_FOODS_DATA__');
-      if (storedFoods && storedFoods.category) {
-        const parsed = JSON.parse(storedFoods.category);
-        todaysFoods = parsed.foods || [];
+    let normalizedTodaysFoods: any[] = []
+    let favorites: any[] = []
+    let foodNameOverrides: any[] = []
+    let foodLibrary: any[] = []
+    if (includeFoodData) {
+      const normalizeCategory = (raw: any) => {
+        const value = typeof raw === 'string' ? raw.toLowerCase() : ''
+        if (/breakfast/.test(value)) return 'breakfast'
+        if (/lunch/.test(value)) return 'lunch'
+        if (/dinner/.test(value)) return 'dinner'
+        if (/snack/.test(value)) return 'snacks'
+        if (/other/.test(value) || /uncat/.test(value)) return 'uncategorized'
+        return value && value.trim().length > 0 ? value.trim() : 'uncategorized'
       }
-    } catch (e) {
-      console.log('No todays foods data found in storage');
-    }
-    const deriveLocalDateFromEntry = (entry: any) => {
+      const buildTodayIso = () => {
+        const d = new Date()
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        return `${y}-${m}-${day}`
+      }
+      let todaysFoods: any[] = []
       try {
-        const ts = typeof entry?.id === 'number' ? entry.id : Number(entry?.id)
-        if (Number.isFinite(ts)) {
-          const d = new Date(ts)
-          if (!Number.isNaN(d.getTime())) {
-            const y = d.getFullYear()
-            const m = String(d.getMonth() + 1).padStart(2, '0')
-            const day = String(d.getDate()).padStart(2, '0')
-            return `${y}-${m}-${day}`
+        const storedFoods = user.healthGoals.find((goal: any) => goal.name === '__TODAYS_FOODS_DATA__');
+        if (storedFoods && storedFoods.category) {
+          const parsed = JSON.parse(storedFoods.category);
+          todaysFoods = parsed.foods || [];
+        }
+      } catch (e) {
+        console.log('No todays foods data found in storage');
+      }
+      const deriveLocalDateFromEntry = (entry: any) => {
+        try {
+          const ts = typeof entry?.id === 'number' ? entry.id : Number(entry?.id)
+          if (Number.isFinite(ts)) {
+            const d = new Date(ts)
+            if (!Number.isNaN(d.getTime())) {
+              const y = d.getFullYear()
+              const m = String(d.getMonth() + 1).padStart(2, '0')
+              const day = String(d.getDate()).padStart(2, '0')
+              return `${y}-${m}-${day}`
+            }
+          }
+        } catch {}
+        return ''
+      }
+      normalizedTodaysFoods = Array.isArray(todaysFoods)
+        ? todaysFoods
+            .map((entry: any) => {
+              const category = normalizeCategory(entry?.meal ?? entry?.category ?? entry?.mealType ?? entry?.persistedCategory)
+              const explicitLocalDate =
+                typeof entry?.localDate === 'string' && entry.localDate.length >= 8
+                  ? entry.localDate
+                  : ''
+              const derivedLocalDate = deriveLocalDateFromEntry(entry)
+              const localDate = explicitLocalDate || derivedLocalDate
+              if (!localDate) return null
+              return {
+                ...entry,
+                meal: category,
+                category,
+                persistedCategory: entry?.persistedCategory ?? category,
+                localDate,
+              }
+            })
+            .filter(Boolean)
+        : []
+
+      // Get saved favorites
+      try {
+        const storedFavorites = user.healthGoals.find((goal: any) => goal.name === '__FOOD_FAVORITES__');
+        if (storedFavorites && storedFavorites.category) {
+          const parsed = JSON.parse(storedFavorites.category);
+          if (Array.isArray(parsed?.favorites)) {
+            favorites = parsed.favorites;
+          } else if (Array.isArray(parsed)) {
+            favorites = parsed;
           }
         }
-      } catch {}
-      return ''
-    }
-    const normalizedTodaysFoods = Array.isArray(todaysFoods)
-      ? todaysFoods
-          .map((entry: any) => {
-            const category = normalizeCategory(entry?.meal ?? entry?.category ?? entry?.mealType ?? entry?.persistedCategory)
-            const explicitLocalDate =
-              typeof entry?.localDate === 'string' && entry.localDate.length >= 8
-                ? entry.localDate
-                : ''
-            const derivedLocalDate = deriveLocalDateFromEntry(entry)
-            const localDate = explicitLocalDate || derivedLocalDate
-            if (!localDate) return null
-            return {
-              ...entry,
-              meal: category,
-              category,
-              persistedCategory: entry?.persistedCategory ?? category,
-              localDate,
-            }
-          })
-          .filter(Boolean)
-      : []
-
-    // Get saved favorites
-    let favorites: any[] = [];
-    try {
-      const storedFavorites = user.healthGoals.find((goal: any) => goal.name === '__FOOD_FAVORITES__');
-      if (storedFavorites && storedFavorites.category) {
-        const parsed = JSON.parse(storedFavorites.category);
-        if (Array.isArray(parsed?.favorites)) {
-          favorites = parsed.favorites;
-        } else if (Array.isArray(parsed)) {
-          favorites = parsed;
-        }
+      } catch (e) {
+        console.log('No favorites data found in storage');
       }
-    } catch (e) {
-      console.log('No favorites data found in storage');
-    }
 
-    // Get saved food name overrides (used for user renames without forcing favorites)
-    let foodNameOverrides: any[] = []
-    try {
-      const storedOverrides = user.healthGoals.find((goal: any) => goal.name === '__FOOD_NAME_OVERRIDES__')
-      if (storedOverrides && storedOverrides.category) {
-        const parsed = JSON.parse(storedOverrides.category)
-        if (Array.isArray(parsed?.overrides)) {
-          foodNameOverrides = parsed.overrides
-        } else if (Array.isArray(parsed)) {
-          foodNameOverrides = parsed
+      // Get saved food name overrides (used for user renames without forcing favorites)
+      try {
+        const storedOverrides = user.healthGoals.find((goal: any) => goal.name === '__FOOD_NAME_OVERRIDES__')
+        if (storedOverrides && storedOverrides.category) {
+          const parsed = JSON.parse(storedOverrides.category)
+          if (Array.isArray(parsed?.overrides)) {
+            foodNameOverrides = parsed.overrides
+          } else if (Array.isArray(parsed)) {
+            foodNameOverrides = parsed
+          }
         }
+      } catch (e) {
+        console.log('No food name overrides data found in storage')
       }
-    } catch (e) {
-      console.log('No food name overrides data found in storage')
-    }
 
-    // Get food library (all-items list, independent from daily diary)
-    let foodLibrary: any[] = []
-    try {
-      const storedLibrary = user.healthGoals.find((goal: any) => goal.name === '__FOOD_LIBRARY__')
-      if (storedLibrary && storedLibrary.category) {
-        const parsed = JSON.parse(storedLibrary.category)
-        if (Array.isArray(parsed?.items)) {
-          foodLibrary = parsed.items
-        } else if (Array.isArray(parsed?.library)) {
-          foodLibrary = parsed.library
-        } else if (Array.isArray(parsed)) {
-          foodLibrary = parsed
+      // Get food library (all-items list, independent from daily diary)
+      try {
+        const storedLibrary = user.healthGoals.find((goal: any) => goal.name === '__FOOD_LIBRARY__')
+        if (storedLibrary && storedLibrary.category) {
+          const parsed = JSON.parse(storedLibrary.category)
+          if (Array.isArray(parsed?.items)) {
+            foodLibrary = parsed.items
+          } else if (Array.isArray(parsed?.library)) {
+            foodLibrary = parsed.library
+          } else if (Array.isArray(parsed)) {
+            foodLibrary = parsed
+          }
         }
+      } catch (e) {
+        console.log('No food library data found in storage')
       }
-    } catch (e) {
-      console.log('No food library data found in storage')
     }
 
     // Get device interest (stored in hidden goal record)

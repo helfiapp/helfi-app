@@ -789,6 +789,7 @@ const PhysicalStep = memo(function PhysicalStep({
   onUnsavedChange,
   onInsightsSaved,
   manualSyncKey,
+  serverHydrationKey,
 }: {
   onNext: (data: any) => void
   onBack: () => void
@@ -797,6 +798,7 @@ const PhysicalStep = memo(function PhysicalStep({
   onUnsavedChange?: () => void
   onInsightsSaved?: () => void
   manualSyncKey?: number
+  serverHydrationKey?: number
 }) {
   const initialSnapshotRef = useRef<any>(null);
   const [weight, setWeight] = useState(initial?.weight || '');
@@ -818,6 +820,7 @@ const PhysicalStep = memo(function PhysicalStep({
   const goalIntensityHydratedRef = useRef(false);
   const lastSyncVersionRef = useRef<number>(0);
   const manualSyncHydratedRef = useRef<number>(0);
+  const serverHydratedRef = useRef<number>(0);
   const [showGoalDetails, setShowGoalDetails] = useState(false);
   const [goalTargetWeightUnit, setGoalTargetWeightUnit] = useState<'kg' | 'lb'>('kg');
   const [goalTargetWeightInput, setGoalTargetWeightInput] = useState('');
@@ -977,12 +980,16 @@ const PhysicalStep = memo(function PhysicalStep({
   useEffect(() => {
     if (!initial) return;
     const incomingVersion = Number((initial as any)?.healthSetupUpdatedAt || 0);
-    let forceHydrate = Number.isFinite(incomingVersion) && incomingVersion > lastSyncVersionRef.current;
-    if (forceHydrate) {
+    if (Number.isFinite(incomingVersion) && incomingVersion > lastSyncVersionRef.current) {
       lastSyncVersionRef.current = incomingVersion;
     }
+    let forceHydrate = false;
     if (typeof manualSyncKey === 'number' && manualSyncKey > manualSyncHydratedRef.current) {
       manualSyncHydratedRef.current = manualSyncKey;
+      forceHydrate = true;
+    }
+    if (typeof serverHydrationKey === 'number' && serverHydrationKey > serverHydratedRef.current) {
+      serverHydratedRef.current = serverHydrationKey;
       forceHydrate = true;
     }
     if (!initialSnapshotRef.current && Object.keys(initial || {}).length > 0) {
@@ -1259,7 +1266,7 @@ const PhysicalStep = memo(function PhysicalStep({
     if ((changed && hasAny) && onUnsavedChange) {
       onUnsavedChange();
     }
-  }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, healthCheckSettings, initial, unit, manualSyncKey]);
+  }, [weight, height, feet, inches, bodyType, dietTypes, goalChoice, goalIntensity, birthdate, allergies, diabetesType, healthCheckSettings, initial, unit, manualSyncKey, serverHydrationKey]);
 
   const triggerDietSavedNotice = useCallback(() => {
     setShowDietSavedNotice(true);
@@ -7837,6 +7844,7 @@ export default function Onboarding() {
   const [showGlobalUpdatePopup, setShowGlobalUpdatePopup] = useState(false);
   const [isGlobalGenerating, setIsGlobalGenerating] = useState(false);
   const [manualSyncKey, setManualSyncKey] = useState(0);
+  const [serverHydrationKey, setServerHydrationKey] = useState(0);
   // Track if the user has dismissed the first-time modal during this visit,
   // so they can actually complete the intake instead of being stuck.
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
@@ -8180,7 +8188,7 @@ export default function Onboarding() {
       ? window.setTimeout(() => controller?.abort(), options.timeoutMs)
       : null;
     try {
-      const response = await fetch('/api/user-data', {
+      const response = await fetch('/api/user-data?scope=health-setup', {
         cache: 'no-store' as any,
         signal: controller?.signal,
       });
@@ -8192,6 +8200,7 @@ export default function Onboarding() {
           mergedForBaseline = { ...(formRef.current || {}), ...userData.data };
           formRef.current = mergedForBaseline;
           setForm(mergedForBaseline);
+          setServerHydrationKey(Date.now());
           // Load profile image from the same API response
           if (userData.data.profileImage) {
             setProfileImage(userData.data.profileImage);
@@ -8837,7 +8846,7 @@ export default function Onboarding() {
         {/* Content */}
         <div className="flex-1 px-4 py-2 pb-20">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} onPartialSave={persistForm} />}
-          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} manualSyncKey={manualSyncKey} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} manualSyncKey={manualSyncKey} serverHydrationKey={serverHydrationKey} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
