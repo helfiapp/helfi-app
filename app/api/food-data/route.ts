@@ -191,12 +191,12 @@ export async function GET(request: NextRequest) {
       score += scoredServing(it?.serving_size)
       if (isMealQuery) {
         const grams = parseServingGrams(it?.serving_size)
-        if (Number.isFinite(grams)) {
+        if (typeof grams === 'number' && Number.isFinite(grams)) {
           if (grams >= 150 && grams <= 600) score += 6
           if (grams >= 90 && grams < 150) score += 2
           if (grams > 0 && grams < 80) score -= 6
         }
-        if (it?.source === 'openfoodfacts' && grams && grams < 80) score -= 4
+        if (it?.source === 'openfoodfacts' && typeof grams === 'number' && grams < 80) score -= 4
       }
       return score
     }
