@@ -1288,6 +1288,29 @@ Anything marked ✅ in the audit is **locked**. Do not change, loosen, or bypass
 2) Get explicit written approval.  
 3) Re‑test reminder tap behavior and inbox logging on iPhone PWA before shipping.
 
+### Restore steps (if this breaks again)
+If reminder taps open the wrong page OR the inbox does not clear after a completed reminder, restore in this order:
+
+1) Reminder tap routing must return a URL that includes a `notificationId`.
+   - The pending‑open flow already returns `{ url, id }` and appends
+     `?notificationId=<id>` when it redirects (see `app/pwa-entry/page.tsx`).
+
+2) The reminder pages must capture that `notificationId` from the URL and save it
+   so the save action can clear the inbox item.
+   - Pages: `app/check-in/page.tsx`, `app/mood/page.tsx`, `app/mood/quick/page.tsx`
+   - On load, read `window.location.search` and extract `notificationId`.
+   - Save it to `sessionStorage` as `helfi:pending-notification-id`.
+   - Do NOT use `useSearchParams()` here; it causes build failures. Use
+     `new URLSearchParams(window.location.search)` inside the client component.
+
+3) The save endpoints must delete the inbox item using that `notificationId`.
+   - `/api/checkins/today` and `/api/mood/entries` already delete by ID.
+   - Do not remove that deletion, and only clear the inbox after a successful save.
+
+4) Re‑test on iPhone PWA:
+   - Tap a fresh reminder, complete it, then open inbox.
+   - The alert must be gone. If not, step 2 is broken.
+
 ### Medium and low priority fixes that must stay locked
 - Session lifetime must not be multi-year, and admin logout/revoke must remain available.
 - No fallback default secrets in production. Missing secrets must be flagged, not silently replaced.
