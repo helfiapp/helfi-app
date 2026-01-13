@@ -204,6 +204,23 @@ export async function GET(request: NextRequest) {
       if (resolvedKind === 'single') {
         items = await searchUsdaSingleFood(query)
         actualSource = 'usda'
+        if (items.length === 0) {
+          const perSource = Math.min(Math.max(Math.ceil(limit / 2), 10), 25)
+          const results = await Promise.allSettled([
+            searchFatSecretFoods(query, { pageSize: perSource }),
+            searchOpenFoodFactsByQuery(query, { pageSize: perSource }),
+          ])
+          const pooled: any[] = []
+          for (const res of results) {
+            if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+              pooled.push(...res.value)
+            }
+          }
+          if (pooled.length > 0) {
+            items = pooled.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+            actualSource = 'auto'
+          }
+        }
       } else {
         const perSource = Math.min(Math.max(Math.ceil(limit / 2), 10), 25)
 

@@ -6,6 +6,7 @@ import UsageMeter from '@/components/UsageMeter'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 type SearchKind = 'packaged' | 'single'
+type SearchSource = 'auto' | 'usda' | 'fatsecret' | 'openfoodfacts'
 
 type NormalizedFoodItem = {
   source: 'openfoodfacts' | 'usda' | 'fatsecret'
@@ -220,6 +221,7 @@ export default function AddIngredientClient() {
 
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<SearchKind>('packaged')
+  const [sourceChoice, setSourceChoice] = useState<SearchSource>('auto')
   const [loading, setLoading] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -388,9 +390,10 @@ export default function AddIngredientClient() {
     }
   }
 
-  const runSearch = async (qOverride?: string, kindOverride?: SearchKind) => {
+  const runSearch = async (qOverride?: string, kindOverride?: SearchKind, sourceOverride?: SearchSource) => {
     const q = String(qOverride ?? query).trim()
     const k = kindOverride ?? kind
+    const source = sourceOverride ?? sourceChoice
     if (!q) {
       setError('Please type a food name to search.')
       return
@@ -408,7 +411,7 @@ export default function AddIngredientClient() {
     const seq = ++seqRef.current
 
     try {
-      const sourceParam = k === 'single' ? 'usda' : 'auto'
+      const sourceParam = source === 'auto' ? 'auto' : source
       const fetchItems = async (searchQuery: string) => {
         const params = new URLSearchParams({
           source: sourceParam,
@@ -697,7 +700,7 @@ export default function AddIngredientClient() {
           {/* PROTECTED: ADD_INGREDIENT_SEARCH START */}
           <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
             <div className="text-sm font-semibold text-gray-900">
-              Search foods (USDA for single foods, FatSecret + OpenFoodFacts for packaged)
+              Search foods (use the source buttons below if results look off)
             </div>
 
             <div className="relative">
@@ -731,7 +734,7 @@ export default function AddIngredientClient() {
                 disabled={loading}
                 onClick={() => {
                   setKind('packaged')
-                  if (query.trim().length >= 2) runSearch(query, 'packaged')
+                  if (query.trim().length >= 2) runSearch(query, 'packaged', sourceChoice)
                 }}
                 className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
                   kind === 'packaged' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
@@ -744,7 +747,7 @@ export default function AddIngredientClient() {
                 disabled={loading}
                 onClick={() => {
                   setKind('single')
-                  if (query.trim().length >= 2) runSearch(query, 'single')
+                  if (query.trim().length >= 2) runSearch(query, 'single', sourceChoice)
                 }}
                 className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
                   kind === 'single' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-gray-700 border-gray-200'
@@ -754,11 +757,40 @@ export default function AddIngredientClient() {
               </button>
             </div>
 
+            <div className="space-y-1">
+              <div className="text-xs font-semibold text-gray-600">Source</div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {([
+                  { key: 'auto', label: 'Best match' },
+                  { key: 'usda', label: 'USDA' },
+                  { key: 'fatsecret', label: 'FatSecret' },
+                  { key: 'openfoodfacts', label: 'OpenFoodFacts' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setSourceChoice(opt.key)
+                      if (query.trim().length >= 2) runSearch(query, kind, opt.key)
+                    }}
+                    className={`px-3 py-2 rounded-lg border text-xs font-semibold ${
+                      sourceChoice === opt.key
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-gray-700 border-gray-200'
+                    } disabled:opacity-60`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {error && <div className="text-sm text-red-600">{error}</div>}
 
             {!loading && !error && results.length === 0 && query.trim() && (
               <div className="text-sm text-gray-500">
-                No results yet. Try a different search. Plurals are OK — we auto-try the single word.
+                No results yet. Try a different search or switch the source above.
               </div>
             )}
 
