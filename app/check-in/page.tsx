@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
 
@@ -30,6 +30,8 @@ export default function CheckInPage() {
   const [na, setNa] = useState<Record<string, boolean>>({})
   const [issues, setIssues] = useState<UserIssue[]>([])
   const [loading, setLoading] = useState(true)
+  const pendingIdRef = useRef<string | null>(null)
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     const CACHE_KEY = 'checkins:today:cache'
@@ -104,6 +106,16 @@ export default function CheckInPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    if (pendingIdRef.current) return
+    const fromUrl = searchParams.get('notificationId')?.trim()
+    if (!fromUrl) return
+    pendingIdRef.current = fromUrl
+    try {
+      sessionStorage.setItem('helfi:pending-notification-id', fromUrl)
+    } catch {}
+  }, [searchParams])
+
   const setRating = (issueId: string, value: number) => {
     setRatings((r) => {
       const updated = { ...r, [issueId]: value }
@@ -118,7 +130,8 @@ export default function CheckInPage() {
   const handleSave = async () => {
     try {
       const pendingId =
-        typeof window !== 'undefined' ? sessionStorage.getItem('helfi:pending-notification-id') : null
+        pendingIdRef.current ||
+        (typeof window !== 'undefined' ? sessionStorage.getItem('helfi:pending-notification-id') : null)
       const payload = issues.map((it) => ({
         issueId: it.id,
         value: na[it.id] ? null : (ratings[it.id] ?? null),
@@ -153,6 +166,7 @@ export default function CheckInPage() {
         try {
           sessionStorage.removeItem('helfi:pending-notification-id')
         } catch {}
+        pendingIdRef.current = null
       }
       // Navigate after save
       try {

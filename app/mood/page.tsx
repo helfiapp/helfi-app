@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import MoodPicker from '@/components/mood/MoodPicker'
 import IntensitySlider from '@/components/mood/IntensitySlider'
@@ -44,6 +45,8 @@ export default function MoodCheckInPage() {
   const [saving, setSaving] = useState(false)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [intensityPercent, setIntensityPercent] = useState<number>(35)
+  const pendingIdRef = useRef<string | null>(null)
+  const searchParams = useSearchParams()
 
   const [context, setContext] = useState<ContextResponse | null>(null)
   const [energyLevel, setEnergyLevel] = useState<number | null>(null)
@@ -53,6 +56,16 @@ export default function MoodCheckInPage() {
   const [physicalActivity, setPhysicalActivity] = useState<number | null>(null)
 
   const localDate = useMemo(() => localDateToday(), [])
+
+  useEffect(() => {
+    if (pendingIdRef.current) return
+    const fromUrl = searchParams.get('notificationId')?.trim()
+    if (!fromUrl) return
+    pendingIdRef.current = fromUrl
+    try {
+      sessionStorage.setItem('helfi:pending-notification-id', fromUrl)
+    } catch {}
+  }, [searchParams])
 
   useEffect(() => {
     try {
@@ -92,7 +105,8 @@ export default function MoodCheckInPage() {
     setSaving(true)
     setBanner(null)
     const pendingId =
-      typeof window !== 'undefined' ? sessionStorage.getItem('helfi:pending-notification-id') : null
+      pendingIdRef.current ||
+      (typeof window !== 'undefined' ? sessionStorage.getItem('helfi:pending-notification-id') : null)
     try {
       const res = await fetch('/api/mood/entries', {
         method: 'POST',
@@ -120,6 +134,7 @@ export default function MoodCheckInPage() {
         try {
           sessionStorage.removeItem('helfi:pending-notification-id')
         } catch {}
+        pendingIdRef.current = null
       }
       setBanner({ type: 'success', message: 'Saved.' })
       setMood(null)
