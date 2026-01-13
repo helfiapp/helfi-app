@@ -212,12 +212,67 @@ the user.
 
 ---
 
-### 2.6 Health Setup Desktop Sidebar (Dec 2025 – Locked)
+### 2.6.1 Health Setup Desktop Sidebar (Dec 2025 – Locked)
 
 - Health Setup (`/onboarding`) must show the standard desktop left menu so users can move around the app like other pages.
 - When auto‑update‑on‑exit is enabled, the left menu must still work immediately; the save/regeneration should run in the background as the user leaves.
 - If auto‑update‑on‑exit is disabled, leaving via the left menu must trigger the “Update Insights / Add more” prompt when there are unsaved changes.
 - Do NOT allow silent navigation away from Health Setup when auto‑update‑on‑exit is disabled.
+
+---
+
+### 2.7 Health Setup Live Sync (Jan 2026 – Locked)
+
+This is the **current working fix** for cross‑device sync on Health Setup (page 2+).
+If this breaks again, restore these rules exactly.
+
+**Goal:** When one device changes Health Setup, the other device updates **without manual refresh**, but **only** while the Health Setup page is open (no app‑wide polling).
+
+**Required behavior (do not change):**
+- Only poll while `/onboarding` is open and visible.  
+- Poll by reloading **full Health Setup data** (`/api/user-data?scope=health-setup`) every ~12 seconds.  
+- Do **not** run any Health Setup polling outside the onboarding page (no global polling).  
+- Do **not** overwrite a user’s fresh edit while they are actively editing.
+
+**Source of truth (must stay exactly as-is):**
+- `app/onboarding/page.tsx`
+  - Uses `HEALTH_SETUP_SYNC_POLL_MS = 12 * 1000`.
+  - Uses `HEALTH_SETUP_SYNC_EDIT_GRACE_MS = 20 * 1000` to avoid overwriting local edits.
+  - `checkForHealthSetupUpdates()` **always calls** `loadUserDataRef.current({ preserveUnsaved: true })` on each poll.
+  - The poll is attached to `setInterval`, `visibilitychange`, and `focus`, and it only runs when the page is visible.
+  - `persistForm(...)` stamps `healthSetupUpdatedAt` and sets `lastLocalEditAtRef.current = Date.now()`.
+  - **Do not** reintroduce the “meta‑only” poll or any comparison logic that blocks updates.
+- `components/providers/UserDataProvider.tsx`
+  - **Must NOT** poll health setup in the provider (no background checks elsewhere).
+  - Only refresh on focus/visibility for general data.
+- `app/api/user-data/route.ts`
+  - Must keep single‑record storage for `__PRIMARY_GOAL__`, `__SELECTED_ISSUES__`, and `__HEALTH_SETUP_META__`.
+  - Must order `healthGoals` by `updatedAt DESC` when reading.
+
+**Required immediate save (prevents snap‑back):**
+- `app/onboarding/page.tsx` → “How intense?” buttons **must** call `POST /api/user-data`
+  with `goalChoice + goalIntensity` immediately on click (not just local state).
+  This prevents the value snapping back to “standard.”
+
+**Autosave guard (prevents stale spam writes):**
+- `app/onboarding/page.tsx` → auto‑save only when `hasUnsavedChanges` is true.
+- `lastAutoSaveSnapshotRef` prevents repeat saves of identical payloads.
+
+**How to verify (two devices):**
+1. Open Health Setup page 2 on desktop + phone.  
+2. Change “Tone up → Mild” on device A.  
+3. Keep device B on the same page and wait 12–15 seconds.  
+4. **Expected:** device B updates without leaving the page, device A stays on Mild.
+
+**If broken again, restore the above rules in these exact files:**
+- `app/onboarding/page.tsx`
+- `components/providers/UserDataProvider.tsx`
+- `app/api/user-data/route.ts`
+
+**Last stable deployment:**
+- Commit: `5e2720b2` (poll full health setup while onboarding is open)
+- Commit: `aa00b3e1` (prevent sync overwrite during edits)
+- Date: 2026‑01‑13
 - **HARD LOCK (do not touch without explicit owner approval):** The desktop left menu must remain clickable *inside* Health Setup at all times. Any change that interferes with this is forbidden.
 
 **Protected files (extra locked):**
