@@ -879,18 +879,22 @@ export async function POST(request: NextRequest) {
       // Persist the canonical selected issue list only when a goals array is provided
       if (Array.isArray(data.goals)) {
         const safeGoals = data.goals.map((g: any) => String(g || '').trim()).filter(Boolean)
-        await prisma.healthGoal.deleteMany({
-          where: { userId: user.id, name: '__SELECTED_ISSUES__' },
-        })
-        await prisma.healthGoal.create({
-          data: {
-            userId: user.id,
-            name: '__SELECTED_ISSUES__',
-            category: JSON.stringify(safeGoals),
-            currentRating: 0,
-          },
-        })
-        console.log('📝 Saved __SELECTED_ISSUES__ snapshot:', { count: safeGoals.length, goals: safeGoals })
+        if (safeGoals.length > 0) {
+          await prisma.healthGoal.deleteMany({
+            where: { userId: user.id, name: '__SELECTED_ISSUES__' },
+          })
+          await prisma.healthGoal.create({
+            data: {
+              userId: user.id,
+              name: '__SELECTED_ISSUES__',
+              category: JSON.stringify(safeGoals),
+              currentRating: 0,
+            },
+          })
+          console.log('📝 Saved __SELECTED_ISSUES__ snapshot:', { count: safeGoals.length, goals: safeGoals })
+        } else {
+          console.log('🔒 Preserved existing __SELECTED_ISSUES__ (empty goals array received)')
+        }
       } else {
         console.log('🔒 Preserved existing __SELECTED_ISSUES__ (no goals array provided in this request)')
       }
