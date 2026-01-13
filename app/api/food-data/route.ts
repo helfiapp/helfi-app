@@ -152,17 +152,54 @@ export async function GET(request: NextRequest) {
         return 1
       }
 
-      const scoreItem = (it: any) => {
-        let score = 0
-        score += scoreItemName(it)
-        if (it?.source === 'usda') score += 4
-        if (it?.source === 'fatsecret') score += 2
-        if (it?.source === 'openfoodfacts') score += 1
-        if (it?.brand) score += 2
-        if (Number.isFinite(Number(it?.calories)) && Number(it.calories) > 0) score += 1
-        score += scoredServing(it?.serving_size)
-        return score
+    const parseServingGrams = (serving: any) => {
+      const raw = String(serving || '').toLowerCase()
+      const match = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
+      if (!match) return null
+      const grams = Number(match[1])
+      return Number.isFinite(grams) ? grams : null
+    }
+
+    const mealKeywords = [
+      'kebab',
+      'kebap',
+      'shawarma',
+      'doner',
+      'gyro',
+      'burger',
+      'wrap',
+      'burrito',
+      'taco',
+      'pizza',
+      'sandwich',
+      'roll',
+      'sub',
+      'pita',
+      'meal',
+      'combo',
+    ]
+    const isMealQuery = queryTokens.some((token) => mealKeywords.includes(token))
+
+    const scoreItem = (it: any) => {
+      let score = 0
+      score += scoreItemName(it)
+      if (it?.source === 'usda') score += 4
+      if (it?.source === 'fatsecret') score += isMealQuery ? 6 : 2
+      if (it?.source === 'openfoodfacts') score += 1
+      if (it?.brand) score += 2
+      if (Number.isFinite(Number(it?.calories)) && Number(it.calories) > 0) score += 1
+      score += scoredServing(it?.serving_size)
+      if (isMealQuery) {
+        const grams = parseServingGrams(it?.serving_size)
+        if (Number.isFinite(grams)) {
+          if (grams >= 150 && grams <= 600) score += 6
+          if (grams >= 90 && grams < 150) score += 2
+          if (grams > 0 && grams < 80) score -= 6
+        }
+        if (it?.source === 'openfoodfacts' && grams && grams < 80) score -= 4
       }
+      return score
+    }
 
       if (resolvedKind === 'single') {
         items = await searchUsdaSingleFood(query)
