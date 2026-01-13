@@ -880,16 +880,24 @@ export async function POST(request: NextRequest) {
       if (Array.isArray(data.goals)) {
         const safeGoals = data.goals.map((g: any) => String(g || '').trim()).filter(Boolean)
         if (safeGoals.length > 0) {
-          await prisma.healthGoal.deleteMany({
+          const existingSelected = await prisma.healthGoal.findFirst({
             where: { userId: user.id, name: '__SELECTED_ISSUES__' },
+            orderBy: { updatedAt: 'desc' },
           })
-          await prisma.healthGoal.create({
-            data: {
-              userId: user.id,
-              name: '__SELECTED_ISSUES__',
-              category: JSON.stringify(safeGoals),
-              currentRating: 0,
-            },
+          const selectedPayload = {
+            userId: user.id,
+            name: '__SELECTED_ISSUES__',
+            category: JSON.stringify(safeGoals),
+            currentRating: 0,
+          }
+          const selectedRecord = existingSelected
+            ? await prisma.healthGoal.update({
+                where: { id: existingSelected.id },
+                data: selectedPayload,
+              })
+            : await prisma.healthGoal.create({ data: selectedPayload })
+          await prisma.healthGoal.deleteMany({
+            where: { userId: user.id, name: '__SELECTED_ISSUES__', id: { not: selectedRecord.id } },
           })
           console.log('📝 Saved __SELECTED_ISSUES__ snapshot:', { count: safeGoals.length, goals: safeGoals })
         } else {
@@ -1176,35 +1184,45 @@ export async function POST(request: NextRequest) {
           ? incomingGoalSugarMax
           : (existingPrimaryGoalData.goalSugarMax ?? null)
 
-        await prisma.healthGoal.deleteMany({
-          where: {
-            userId: user.id,
-            name: '__PRIMARY_GOAL__'
-          }
+        const primaryGoalPayload = {
+          userId: user.id,
+          name: '__PRIMARY_GOAL__',
+          category: JSON.stringify({
+            goalChoice: incomingGoalChoice,
+            goalIntensity: incomingGoalIntensity || 'standard',
+            goalTargetWeightKg: nextGoalTargetWeightKg,
+            goalTargetWeightUnit: nextGoalTargetWeightUnit,
+            goalPaceKgPerWeek: nextGoalPaceKgPerWeek,
+            goalCalorieTarget: nextGoalCalorieTarget,
+            goalMacroSplit: nextGoalMacroSplit,
+            goalMacroMode: nextGoalMacroMode,
+            goalFiberTarget: nextGoalFiberTarget,
+            goalSugarMax: nextGoalSugarMax,
+          }),
+          currentRating: 0,
+        }
+
+        const existingPrimary = await prisma.healthGoal.findFirst({
+          where: { userId: user.id, name: '__PRIMARY_GOAL__' },
+          orderBy: { updatedAt: 'desc' },
         })
 
         console.log('POST /api/user-data - Persisting primary goal selection', {
           goalChoice: incomingGoalChoice,
           goalIntensity: incomingGoalIntensity || 'standard',
         })
-        await prisma.healthGoal.create({
-          data: {
+        const primaryRecord = existingPrimary
+          ? await prisma.healthGoal.update({
+              where: { id: existingPrimary.id },
+              data: primaryGoalPayload,
+            })
+          : await prisma.healthGoal.create({ data: primaryGoalPayload })
+        await prisma.healthGoal.deleteMany({
+          where: {
             userId: user.id,
             name: '__PRIMARY_GOAL__',
-            category: JSON.stringify({
-              goalChoice: incomingGoalChoice,
-              goalIntensity: incomingGoalIntensity || 'standard',
-              goalTargetWeightKg: nextGoalTargetWeightKg,
-              goalTargetWeightUnit: nextGoalTargetWeightUnit,
-              goalPaceKgPerWeek: nextGoalPaceKgPerWeek,
-              goalCalorieTarget: nextGoalCalorieTarget,
-              goalMacroSplit: nextGoalMacroSplit,
-              goalMacroMode: nextGoalMacroMode,
-              goalFiberTarget: nextGoalFiberTarget,
-              goalSugarMax: nextGoalSugarMax,
-            }),
-            currentRating: 0,
-          }
+            id: { not: primaryRecord.id },
+          },
         })
         console.log('Stored primary goal data successfully')
       }
@@ -1912,16 +1930,24 @@ export async function POST(request: NextRequest) {
     const metaUpdatedAt = Date.now()
     if (shouldStoreHealthSetupMeta) {
       try {
-        await prisma.healthGoal.deleteMany({
+        const existingMeta = await prisma.healthGoal.findFirst({
           where: { userId: user.id, name: '__HEALTH_SETUP_META__' },
+          orderBy: { updatedAt: 'desc' },
         })
-        await prisma.healthGoal.create({
-          data: {
-            userId: user.id,
-            name: '__HEALTH_SETUP_META__',
-            category: JSON.stringify({ updatedAt: metaUpdatedAt }),
-            currentRating: 0,
-          },
+        const metaPayload = {
+          userId: user.id,
+          name: '__HEALTH_SETUP_META__',
+          category: JSON.stringify({ updatedAt: metaUpdatedAt }),
+          currentRating: 0,
+        }
+        const metaRecord = existingMeta
+          ? await prisma.healthGoal.update({
+              where: { id: existingMeta.id },
+              data: metaPayload,
+            })
+          : await prisma.healthGoal.create({ data: metaPayload })
+        await prisma.healthGoal.deleteMany({
+          where: { userId: user.id, name: '__HEALTH_SETUP_META__', id: { not: metaRecord.id } },
         })
       } catch (metaError) {
         console.warn('Failed to store __HEALTH_SETUP_META__', metaError)

@@ -80,6 +80,7 @@ const sanitizeUserDataPayload = (payload: any, options?: { forceStamp?: boolean 
 
 const AUTO_UPDATE_INSIGHTS_ON_EXIT = true;
 const SAVE_HEALTH_SETUP_ON_LEAVE_ONLY = false;
+const HEALTH_SETUP_SYNC_POLL_MS = 12 * 1000;
 
 // Auth-enabled onboarding flow
 
@@ -7846,6 +7847,11 @@ export default function Onboarding() {
   const exitUpdateTriggeredRef = useRef(false);
   const triggerInsightsUpdateOnExitRef = useRef<(reason: string) => void>(() => {});
   const sidebarHandlersRef = useRef<Array<{ el: HTMLAnchorElement; handler: (event: Event) => void }> | null>(null);
+  const loadUserDataRef = useRef<
+    (options?: { preserveUnsaved?: boolean; timeoutMs?: number }) => Promise<any>
+  >(async () => null);
+  const healthSetupMetaInFlightRef = useRef(false);
+  const lastHealthSetupUpdatedAtRef = useRef(0);
 
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
   useEffect(() => {
@@ -8188,6 +8194,13 @@ export default function Onboarding() {
         console.log('Loaded user data from database:', userData);
         if (userData && userData.data && Object.keys(userData.data).length > 0) {
           serverData = userData.data;
+          const incomingHealthSetupUpdatedAt = Number(userData.data?.healthSetupUpdatedAt || 0);
+          if (Number.isFinite(incomingHealthSetupUpdatedAt) && incomingHealthSetupUpdatedAt > 0) {
+            lastHealthSetupUpdatedAtRef.current = Math.max(
+              lastHealthSetupUpdatedAtRef.current,
+              incomingHealthSetupUpdatedAt,
+            );
+          }
           const nextForm = { ...(userData.data || {}) };
           mergedForBaseline = nextForm;
           formRef.current = nextForm;
@@ -8214,6 +8227,63 @@ export default function Onboarding() {
     }
     return serverData;
   };
+
+  useEffect(() => {
+    loadUserDataRef.current = loadUserData;
+  }, [loadUserData]);
+
+  const checkForHealthSetupUpdates = useCallback(async () => {
+    if (status !== 'authenticated') return;
+    if (healthSetupMetaInFlightRef.current) return;
+    healthSetupMetaInFlightRef.current = true;
+    try {
+      const response = await fetch('/api/health-setup-meta', {
+        cache: 'no-store' as any,
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      const serverUpdatedAt = Number(payload?.healthSetupUpdatedAt || 0);
+      if (!Number.isFinite(serverUpdatedAt) || serverUpdatedAt <= 0) return;
+      const serverTime = Number(payload?.serverTime || 0);
+      const now = Date.now();
+      const skew = Number.isFinite(serverTime) && serverTime > 0 ? now - serverTime : 0;
+      const adjustedServerUpdatedAt = serverUpdatedAt + skew;
+      lastHealthSetupUpdatedAtRef.current = Math.max(
+        lastHealthSetupUpdatedAtRef.current,
+        serverUpdatedAt,
+      );
+      const localUpdatedAt = Number(formRef.current?.healthSetupUpdatedAt || 0);
+      if (adjustedServerUpdatedAt > localUpdatedAt) {
+        await loadUserDataRef.current({ preserveUnsaved: true, timeoutMs: 8000 });
+      }
+    } catch (error) {
+      console.warn('Health setup auto-sync check failed', error);
+    } finally {
+      healthSetupMetaInFlightRef.current = false;
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      checkForHealthSetupUpdates();
+    };
+    const intervalId = window.setInterval(tick, HEALTH_SETUP_SYNC_POLL_MS);
+    const handleFocus = () => tick();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [checkForHealthSetupUpdates, status]);
 
   // Keep a ref of the latest form for partial saves
   useEffect(() => {

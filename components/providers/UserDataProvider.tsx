@@ -27,6 +27,7 @@ interface UserDataContextType {
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined)
 
 const USER_DATA_CACHE_TTL_MS = 5 * 60_000
+const HEALTH_SETUP_POLL_MS = 15 * 1000
 const HEALTH_SETUP_GRACE_MS = 2 * 60_000
 const LOCAL_OVERRIDE_GRACE_MS = 30 * 1000
 const HEALTH_SETUP_KEYS = new Set([
@@ -74,6 +75,8 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const userDataRef = useRef<UserData | null>(null)
   const pendingLocalUpdatesRef = useRef<Record<string, number>>({})
+  const healthSetupMetaInFlightRef = useRef(false)
+  const lastHealthSetupUpdatedAtRef = useRef(0)
 
   // Profile image is either the saved Cloudinary image or the auth provider image.
   // We intentionally do NOT provide a graphic default here so UI components can
@@ -108,6 +111,13 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
           const result = await response.json()
 
           if (result.data) {
+            const incomingHealthSetupUpdatedAt = Number(result.data?.healthSetupUpdatedAt || 0)
+            if (Number.isFinite(incomingHealthSetupUpdatedAt) && incomingHealthSetupUpdatedAt > 0) {
+              lastHealthSetupUpdatedAtRef.current = Math.max(
+                lastHealthSetupUpdatedAtRef.current,
+                incomingHealthSetupUpdatedAt,
+              )
+            }
             try {
               const cachedGoal = String(cached?.data?.goalChoice || '').trim().toLowerCase()
               const freshGoal = String(result.data?.goalChoice || '').trim().toLowerCase()
@@ -176,6 +186,38 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const refreshData = useCallback(async () => {
     await loadData({ force: true })
   }, [loadData])
+
+  const checkHealthSetupMeta = useCallback(async () => {
+    if (!session) return
+    if (healthSetupMetaInFlightRef.current) return
+    healthSetupMetaInFlightRef.current = true
+    try {
+      const response = await fetch('/api/health-setup-meta', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      })
+      if (!response.ok) return
+      const payload = await response.json()
+      const serverUpdatedAt = Number(payload?.healthSetupUpdatedAt || 0)
+      if (!Number.isFinite(serverUpdatedAt) || serverUpdatedAt <= 0) return
+      const serverTime = Number(payload?.serverTime || 0)
+      const now = Date.now()
+      const skew = Number.isFinite(serverTime) && serverTime > 0 ? now - serverTime : 0
+      const adjustedServerUpdatedAt = serverUpdatedAt + skew
+      lastHealthSetupUpdatedAtRef.current = Math.max(
+        lastHealthSetupUpdatedAtRef.current,
+        serverUpdatedAt,
+      )
+      const localUpdatedAt = Number(userDataRef.current?.healthSetupUpdatedAt || 0)
+      if (adjustedServerUpdatedAt > localUpdatedAt) {
+        await loadData({ force: true })
+      }
+    } catch (error) {
+      console.error('UserDataProvider: Health setup meta check failed:', error)
+    } finally {
+      healthSetupMetaInFlightRef.current = false
+    }
+  }, [loadData, session])
 
   // Update user data
   const updateUserData = (newData: Partial<UserData>, options?: { trackLocal?: boolean }) => {
@@ -248,6 +290,16 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('pagehide', handlePageHide)
     }
   }, [session, refreshData])
+
+  useEffect(() => {
+    if (!session) return
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      checkHealthSetupMeta()
+    }, HEALTH_SETUP_POLL_MS)
+    return () => window.clearInterval(intervalId)
+  }, [session, checkHealthSetupMeta])
 
   // Allow other parts of the app to force a refresh (e.g., after insights updates)
   useEffect(() => {
