@@ -81,6 +81,7 @@ const sanitizeUserDataPayload = (payload: any, options?: { forceStamp?: boolean 
 const AUTO_UPDATE_INSIGHTS_ON_EXIT = true;
 const SAVE_HEALTH_SETUP_ON_LEAVE_ONLY = false;
 const HEALTH_SETUP_SYNC_POLL_MS = 12 * 1000;
+const HEALTH_SETUP_SYNC_EDIT_GRACE_MS = 20 * 1000;
 
 // Auth-enabled onboarding flow
 
@@ -2951,6 +2952,14 @@ const PhysicalStep = memo(function PhysicalStep({
                   if (onPartialSave) {
                     onPartialSave({ goalChoice, goalIntensity: nextIntensity });
                   }
+                  fetch('/api/user-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(
+                      sanitizeUserDataPayload({ goalChoice, goalIntensity: nextIntensity }),
+                    ),
+                    keepalive: true,
+                  }).catch(() => {});
                 }}
                 type="button"
               >
@@ -7865,6 +7874,7 @@ export default function Onboarding() {
   >(async () => null);
   const healthSetupMetaInFlightRef = useRef(false);
   const lastServerHealthSetupUpdatedAtRef = useRef(0);
+  const lastLocalEditAtRef = useRef(0);
 
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
   useEffect(() => {
@@ -8247,6 +8257,7 @@ export default function Onboarding() {
 
   const checkForHealthSetupUpdates = useCallback(async () => {
     if (status !== 'authenticated') return;
+    if (Date.now() - lastLocalEditAtRef.current < HEALTH_SETUP_SYNC_EDIT_GRACE_MS) return;
     if (healthSetupMetaInFlightRef.current) return;
     healthSetupMetaInFlightRef.current = true;
     try {
@@ -8407,6 +8418,7 @@ export default function Onboarding() {
         let next = { ...prev, ...partial };
         if (shouldStampHealthSetup(partial)) {
           next = { ...next, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() };
+          lastLocalEditAtRef.current = Date.now();
         }
         formRef.current = next; // Keep latest edits available for exit-save flows.
         if (allowAutosave && !SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) {
