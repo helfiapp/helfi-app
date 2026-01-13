@@ -14022,6 +14022,11 @@ Please add nutritional information manually if needed.`);
   }, [mealSummary, editingEntry, aiDescription]);
 
   const foodDescriptionText = useMemo(() => {
+    const singleItemOverride =
+      editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
+        ? applyFoodNameOverride(editingEntry?.description || editingEntry?.label || '', editingEntry)
+        : ''
+    if (singleItemOverride) return singleItemOverride
     if (aiDescription && aiDescription.trim()) {
       const trimmed = aiDescription.trim();
       // If this looks like a successful AI analysis (contains nutrition/structured markers),
@@ -14039,7 +14044,7 @@ Please add nutritional information manually if needed.`);
     }
     if (editingEntry?.description) return editingEntry.description;
     return '';
-  }, [aiDescription, editingEntry]);
+  }, [aiDescription, analyzedItems, applyFoodNameOverride, editingEntry]);
 
   const aiSavedMealMeta = useMemo(() => {
     const nutrition = editingEntry?.nutrition
@@ -16897,11 +16902,16 @@ Please add nutritional information manually if needed.`);
                           const trimmed = withoutGenericPrefixes.trim()
                           return trimmed || 'Unknown Food'
                         })()
+                        const entryLabelOverride =
+                          editingEntry && analyzedItems.length === 1
+                            ? applyFoodNameOverride(editingEntry?.description || editingEntry?.label || '', editingEntry)
+                            : ''
                         const displayName = (() => {
+                          const baseName = entryLabelOverride || cleanBaseName
                           const base =
                             showPiecesControl && pieceCountDisplay
-                              ? `${pieceCountDisplay} ${cleanBaseName}`.trim()
-                              : cleanBaseName
+                              ? `${pieceCountDisplay} ${baseName}`.trim()
+                              : baseName
                           if (!base) return base
                           for (let i = 0; i < base.length; i += 1) {
                             const ch = base[i]
