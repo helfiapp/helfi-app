@@ -78,6 +78,8 @@ export default function PractitionerPage() {
   const [boostRadiusTier, setBoostRadiusTier] = useState('R10')
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [galleryUploading, setGalleryUploading] = useState(false)
 
   const subcategories = useMemo(() => {
     const parent = categories.find((cat) => cat.id === form.categoryId)
@@ -276,6 +278,62 @@ export default function PractitionerPage() {
     }
   }
 
+  const uploadListingImage = async (file: File, kind: 'logo' | 'gallery') => {
+    const formData = new FormData()
+    formData.append('image', file)
+    formData.append('kind', kind)
+    const res = await fetch('/api/practitioner/uploads', {
+      method: 'POST',
+      body: formData,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data?.error || 'Upload failed')
+    return String(data?.url || '')
+  }
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setError(null)
+    setSuccess(null)
+    setLogoUploading(true)
+    try {
+      const url = await uploadListingImage(file, 'logo')
+      if (url) updateField('logoUrl', url)
+    } catch (err: any) {
+      setError(err?.message || 'Logo upload failed')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
+  const handleGalleryUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!files.length) return
+    setError(null)
+    setSuccess(null)
+    setGalleryUploading(true)
+    try {
+      const uploaded: string[] = []
+      for (const file of files) {
+        const url = await uploadListingImage(file, 'gallery')
+        if (url) uploaded.push(url)
+      }
+      if (uploaded.length) {
+        const existing = form.galleryUrls
+          ? form.galleryUrls.split(',').map((item) => item.trim()).filter(Boolean)
+          : []
+        updateField('galleryUrls', [...existing, ...uploaded].join(', '))
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Gallery upload failed')
+    } finally {
+      setGalleryUploading(false)
+    }
+  }
+
   const handleDeleteAccount = async () => {
     if (deleteConfirm !== 'DELETE') {
       setError('Please type DELETE to confirm account deletion.')
@@ -316,7 +374,6 @@ export default function PractitionerPage() {
     )
   }
 
-  const subscriptionActive = dashboard?.listing?.subscriptionStatus === 'ACTIVE'
   const hasStripeSubscription = Boolean(dashboard?.listing?.stripeSubscriptionId)
 
   if (status === 'loading') {
@@ -476,11 +533,9 @@ export default function PractitionerPage() {
                 <div className="text-sm text-gray-700">
                   Price: ${boostPriceMap[boostRadiusTier]}.00 USD for 7 days
                 </div>
-                {!subscriptionActive && (
-                  <div className="text-sm text-amber-700">
-                    Start your subscription to unlock boosts.
-                  </div>
-                )}
+                <div className="text-sm text-gray-600">
+                  Boosts are available once your listing is approved.
+                </div>
                 {(!form.lat || !form.lng) && (
                   <div className="text-sm text-amber-700">
                     Add your location to enable boosts.
@@ -488,7 +543,7 @@ export default function PractitionerPage() {
                 )}
                 <button
                   onClick={handleBoostPurchase}
-                  disabled={!form.lat || !form.lng || !subscriptionActive}
+                  disabled={!form.lat || !form.lng}
                   className="px-5 py-2.5 rounded-full bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
                 >
                   Purchase boost
@@ -716,21 +771,46 @@ export default function PractitionerPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Logo URL (optional)</label>
-                  <input
-                    value={form.logoUrl}
-                    onChange={(e) => updateField('logoUrl', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="https://"
-                  />
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <input
+                      value={form.logoUrl}
+                      onChange={(e) => updateField('logoUrl', e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      placeholder="https://"
+                    />
+                    <label className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 cursor-pointer hover:border-emerald-300 hover:text-emerald-700 text-center">
+                      {logoUploading ? 'Uploading…' : 'Upload logo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                        disabled={logoUploading}
+                      />
+                    </label>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Gallery image URLs (comma separated)</label>
-                  <input
-                    value={form.galleryUrls}
-                    onChange={(e) => updateField('galleryUrls', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="https://, https://"
-                  />
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <input
+                      value={form.galleryUrls}
+                      onChange={(e) => updateField('galleryUrls', e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      placeholder="https://, https://"
+                    />
+                    <label className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 cursor-pointer hover:border-emerald-300 hover:text-emerald-700 text-center">
+                      {galleryUploading ? 'Uploading…' : 'Upload images'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleGalleryUpload}
+                        disabled={galleryUploading}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>

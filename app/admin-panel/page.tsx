@@ -196,6 +196,12 @@ export default function AdminPanel() {
   const [practitionerRejectCustom, setPractitionerRejectCustom] = useState<Record<string, string>>({})
   const [practitionerApproveNote, setPractitionerApproveNote] = useState<Record<string, string>>({})
   const [practitionerFocusId, setPractitionerFocusId] = useState<string | null>(null)
+  const [practitionerReviewListingId, setPractitionerReviewListingId] = useState<string | null>(null)
+  const practitionerReviewListing = practitionerReviewListingId
+    ? practitionerEntries.find(
+        (entry) => entry?.type === 'LISTING' && entry?.listing?.id === practitionerReviewListingId
+      )?.listing
+    : null
 
   // Admin management states
   const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
@@ -1211,6 +1217,15 @@ https://www.helfi.ai`)
     }
   }
 
+  const updatePractitionerListing = (listingId: string, updates: Record<string, any>) => {
+    setPractitionerEntries((prev) =>
+      prev.map((entry) => {
+        if (entry?.type !== 'LISTING' || entry?.listing?.id !== listingId) return entry
+        return { ...entry, listing: { ...entry.listing, ...updates } }
+      })
+    )
+  }
+
   const handlePractitionerApprove = async (listingId: string) => {
     if (!adminToken) return
     if (!confirm('Approve this listing?')) return
@@ -1226,7 +1241,11 @@ https://www.helfi.ai`)
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Approval failed')
+      if (data?.listing) {
+        updatePractitionerListing(listingId, data.listing)
+      }
       await loadPractitionerEntries()
+      setPractitionerReviewListingId(null)
     } catch (err: any) {
       alert(err?.message || 'Approval failed')
     } finally {
@@ -1274,7 +1293,11 @@ https://www.helfi.ai`)
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Rejection failed')
+      if (data?.listing) {
+        updatePractitionerListing(listingId, data.listing)
+      }
       await loadPractitionerEntries()
+      setPractitionerReviewListingId(null)
     } catch (err: any) {
       alert(err?.message || 'Rejection failed')
     } finally {
@@ -1442,7 +1465,15 @@ https://www.helfi.ai`)
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  }, [activeTab, practitionerFocusId, practitionerEntries])
+    if (!practitionerReviewListingId) {
+      const match = practitionerEntries.find(
+        (entry) => entry?.type === 'LISTING' && entry?.listing?.id === practitionerFocusId
+      )
+      if (match) {
+        setPractitionerReviewListingId(practitionerFocusId)
+      }
+    }
+  }, [activeTab, practitionerFocusId, practitionerEntries, practitionerReviewListingId])
 
   // Email functionality
   const handleEmailSelect = (email: string) => {
@@ -3968,167 +3999,253 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               </div>
             )}
 
-            <div className="space-y-4">
-              {practitionerEntries.map((entry) => {
-                if (entry?.type === 'ACCOUNT') {
-                  const account = entry.account
-                  const accountEmail = account?.contactEmail || account?.userEmail || '—'
-                  return (
-                    <div
-                      key={account?.id || accountEmail}
-                      className="bg-white rounded-lg shadow p-6 border border-gray-200"
-                    >
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                        <div className="space-y-2">
-                          <div className="text-lg font-semibold text-gray-900">Practitioner account</div>
-                          <div className="text-sm text-gray-600">
-                            <span className="font-medium">Email:</span> {accountEmail}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            <span className="font-medium">Email verified:</span>{' '}
-                            {account?.emailVerified ? 'Yes' : 'No'}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            <span className="font-medium">Signed up:</span>{' '}
-                            {account?.createdAt ? new Date(account.createdAt).toLocaleString() : '—'}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            <span className="font-medium">Status:</span> Account only (no listing yet)
-                          </div>
-                        </div>
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700 lg:w-80">
-                          <div className="font-semibold text-red-800 mb-2">Delete account</div>
-                          <p className="text-xs text-red-700 mb-3">
-                            This permanently removes the practitioner account and all related data.
-                          </p>
-                          <button
-                            onClick={() => handlePractitionerAccountDelete(account.id, accountEmail)}
-                            disabled={!!practitionerActionLoading[account.id]}
-                            className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            {!practitionerLoading && !practitionerError && practitionerEntries.length > 0 && (
+              <div className="bg-white rounded-lg shadow">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Joined</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {practitionerEntries.map((entry) => {
+                        if (entry?.type === 'ACCOUNT') {
+                          const account = entry.account
+                          const accountEmail = account?.contactEmail || account?.userEmail || '—'
+                          return (
+                            <tr key={`account-${account?.id || accountEmail}`} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Account</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">Practitioner account</td>
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                <div>{accountEmail}</div>
+                                <div className="text-xs text-gray-500">
+                                  Verified: {account?.emailVerified ? 'Yes' : 'No'}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">Account only</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">—</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">
+                                {entry?.createdAt ? new Date(entry.createdAt).toLocaleDateString() : '—'}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  onClick={() => handlePractitionerAccountDelete(account.id, accountEmail)}
+                                  disabled={!!practitionerActionLoading[account.id]}
+                                  className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                  {practitionerActionLoading[account.id] ? 'Working…' : 'Delete'}
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        }
+
+                        const listing = entry.listing
+                        const reviewClass =
+                          listing.reviewStatus === 'APPROVED'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : listing.reviewStatus === 'FLAGGED'
+                              ? 'bg-amber-50 text-amber-700'
+                              : listing.reviewStatus === 'REJECTED'
+                                ? 'bg-red-50 text-red-700'
+                                : 'bg-gray-100 text-gray-700'
+                        const statusClass =
+                          listing.status === 'ACTIVE'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : listing.status === 'HIDDEN'
+                              ? 'bg-amber-50 text-amber-700'
+                              : listing.status === 'REJECTED'
+                                ? 'bg-red-50 text-red-700'
+                                : 'bg-gray-100 text-gray-700'
+                        const location = [listing.suburbCity, listing.stateRegion, listing.country].filter(Boolean).join(', ')
+
+                        return (
+                          <tr
+                            key={`listing-${listing.id}`}
+                            id={`practitioner-${listing.id}`}
+                            className={`${listing.id === practitionerFocusId ? 'bg-emerald-50/60' : ''} hover:bg-gray-50`}
                           >
-                            {practitionerActionLoading[account.id] ? 'Working…' : 'Delete Account'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                }
+                            <td className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Listing</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              <div className="font-medium">{listing.displayName}</div>
+                              <div className="text-xs text-gray-500">
+                                {listing.category?.name || '—'}
+                                {listing.subcategory?.name ? ` · ${listing.subcategory.name}` : ''}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              {listing.practitionerAccount?.contactEmail || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              <div className="flex flex-wrap gap-2">
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusClass}`}>
+                                  {listing.status}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${reviewClass}`}>
+                                  {listing.reviewStatus}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">{location || '—'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {entry?.createdAt ? new Date(entry.createdAt).toLocaleDateString() : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => setPractitionerReviewListingId(listing.id)}
+                                  className="px-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-700 hover:border-emerald-300 hover:text-emerald-700"
+                                >
+                                  Review
+                                </button>
+                                {listing.slug && (
+                                  <a
+                                    href={`/practitioners/${listing.slug}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-700 hover:border-emerald-300 hover:text-emerald-700"
+                                  >
+                                    View
+                                  </a>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
-                const listing = entry.listing
-                const selectedReason =
-                  PRACTITIONER_REJECTION_REASONS.find(
-                    (item) => item.id === (practitionerRejectReasonId[listing.id] || '')
-                  ) || null
-
-                return (
-                  <div
-                    key={listing.id}
-                    id={`practitioner-${listing.id}`}
-                    className={`bg-white rounded-lg shadow p-6 border ${listing.id === practitionerFocusId ? 'border-emerald-400' : 'border-gray-200'}`}
-                  >
-                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="text-lg font-semibold text-gray-900">{listing.displayName}</div>
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">Category:</span> {listing.category?.name || '—'}
-                        {listing.subcategory?.name ? ` · ${listing.subcategory.name}` : ''}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">Status:</span> {listing.status} · {listing.reviewStatus}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">Contact:</span> {listing.practitionerAccount?.contactEmail || '—'}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">Location:</span>{' '}
-                        {[listing.suburbCity, listing.stateRegion, listing.country].filter(Boolean).join(', ') || '—'}
-                      </div>
-                      {listing.slug && (
-                        <a
-                          href={`/practitioners/${listing.slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-block text-sm text-emerald-700 hover:underline"
-                        >
-                          View public listing
-                        </a>
-                      )}
+            {practitionerReviewListing && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl">
+                  <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                    <div>
+                      <div className="text-lg font-semibold text-gray-900">Review listing</div>
+                      <div className="text-sm text-gray-600">{practitionerReviewListing.displayName}</div>
                     </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 lg:w-80">
-                      <div className="font-semibold text-gray-900 mb-2">AI Review</div>
-                      <div><span className="font-medium">Risk:</span> {listing.aiRiskLevel || 'N/A'}</div>
-                      {listing.aiReasoning && <div className="mt-2 text-gray-600">{listing.aiReasoning}</div>}
-                      {listing.reviewFlagReason && (
-                        <div className="mt-2 text-gray-600 whitespace-pre-wrap">
-                          <span className="font-medium">Flags:</span> {listing.reviewFlagReason}
-                        </div>
-                      )}
-                    </div>
+                    <button
+                      onClick={() => setPractitionerReviewListingId(null)}
+                      className="text-gray-400 hover:text-gray-600"
+                      aria-label="Close"
+                    >
+                      ✕
+                    </button>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">Approval note (optional)</label>
-                      <textarea
-                        value={practitionerApproveNote[listing.id] || ''}
-                        onChange={(e) => setPractitionerApproveNote((prev) => ({ ...prev, [listing.id]: e.target.value }))}
-                        rows={2}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                        placeholder="Optional note for internal records..."
-                      />
-                      <button
-                        onClick={() => handlePractitionerApprove(listing.id)}
-                        disabled={!!practitionerActionLoading[listing.id]}
-                        className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {practitionerActionLoading[listing.id] ? 'Working…' : 'Approve Listing'}
-                      </button>
+                  <div className="px-6 py-5 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                      <div>
+                        <div><span className="font-medium">Category:</span> {practitionerReviewListing.category?.name || '—'}{practitionerReviewListing.subcategory?.name ? ` · ${practitionerReviewListing.subcategory.name}` : ''}</div>
+                        <div className="mt-1"><span className="font-medium">Status:</span> {practitionerReviewListing.status} · {practitionerReviewListing.reviewStatus}</div>
+                        <div className="mt-1"><span className="font-medium">Contact:</span> {practitionerReviewListing.practitionerAccount?.contactEmail || '—'}</div>
+                        <div className="mt-1"><span className="font-medium">Location:</span> {[practitionerReviewListing.suburbCity, practitionerReviewListing.stateRegion, practitionerReviewListing.country].filter(Boolean).join(', ') || '—'}</div>
+                        {practitionerReviewListing.slug && (
+                          <a
+                            href={`/practitioners/${practitionerReviewListing.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-block mt-2 text-emerald-700 hover:underline"
+                          >
+                            View public listing
+                          </a>
+                        )}
+                      </div>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div className="font-semibold text-gray-900 mb-2">AI Review</div>
+                        <div><span className="font-medium">Risk:</span> {practitionerReviewListing.aiRiskLevel || 'N/A'}</div>
+                        {practitionerReviewListing.aiReasoning && (
+                          <div className="mt-2 text-gray-600">{practitionerReviewListing.aiReasoning}</div>
+                        )}
+                        {practitionerReviewListing.reviewFlagReason && (
+                          <div className="mt-2 text-gray-600 whitespace-pre-wrap">
+                            <span className="font-medium">Flags:</span> {practitionerReviewListing.reviewFlagReason}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">Rejection reason</label>
-                      <select
-                        value={practitionerRejectReasonId[listing.id] || ''}
-                        onChange={(e) =>
-                          setPractitionerRejectReasonId((prev) => ({ ...prev, [listing.id]: e.target.value }))
-                        }
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                      >
-                        <option value="">Choose a reason</option>
-                        {PRACTITIONER_REJECTION_REASONS.map((reason) => (
-                          <option key={reason.id} value={reason.id}>
-                            {reason.label}
-                          </option>
-                        ))}
-                      </select>
-                      {selectedReason?.message && (
-                        <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
-                          {selectedReason.message}
-                        </div>
-                      )}
-                      <label className="block text-sm font-medium text-gray-700">Custom message (optional)</label>
-                      <textarea
-                        value={practitionerRejectCustom[listing.id] || ''}
-                        onChange={(e) =>
-                          setPractitionerRejectCustom((prev) => ({ ...prev, [listing.id]: e.target.value }))
-                        }
-                        rows={3}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                        placeholder="Add any extra detail for this applicant..."
-                      />
-                      <button
-                        onClick={() => handlePractitionerReject(listing.id)}
-                        disabled={!!practitionerActionLoading[listing.id]}
-                        className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {practitionerActionLoading[listing.id] ? 'Working…' : 'Reject Listing'}
-                      </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">Approval note (optional)</label>
+                        <textarea
+                          value={practitionerApproveNote[practitionerReviewListing.id] || ''}
+                          onChange={(e) =>
+                            setPractitionerApproveNote((prev) => ({ ...prev, [practitionerReviewListing.id]: e.target.value }))
+                          }
+                          rows={2}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                          placeholder="Optional note for internal records..."
+                        />
+                        <button
+                          onClick={() => handlePractitionerApprove(practitionerReviewListing.id)}
+                          disabled={!!practitionerActionLoading[practitionerReviewListing.id]}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {practitionerActionLoading[practitionerReviewListing.id] ? 'Working…' : 'Approve Listing'}
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">Rejection reason</label>
+                        <select
+                          value={practitionerRejectReasonId[practitionerReviewListing.id] || ''}
+                          onChange={(e) =>
+                            setPractitionerRejectReasonId((prev) => ({ ...prev, [practitionerReviewListing.id]: e.target.value }))
+                          }
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                        >
+                          <option value="">Choose a reason</option>
+                          {PRACTITIONER_REJECTION_REASONS.map((reason) => (
+                            <option key={reason.id} value={reason.id}>
+                              {reason.label}
+                            </option>
+                          ))}
+                        </select>
+                        {(() => {
+                          const selectedReason =
+                            PRACTITIONER_REJECTION_REASONS.find(
+                              (item) => item.id === (practitionerRejectReasonId[practitionerReviewListing.id] || '')
+                            ) || null
+                          return selectedReason?.message ? (
+                            <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+                              {selectedReason.message}
+                            </div>
+                          ) : null
+                        })()}
+                        <label className="block text-sm font-medium text-gray-700">Custom message (optional)</label>
+                        <textarea
+                          value={practitionerRejectCustom[practitionerReviewListing.id] || ''}
+                          onChange={(e) =>
+                            setPractitionerRejectCustom((prev) => ({ ...prev, [practitionerReviewListing.id]: e.target.value }))
+                          }
+                          rows={3}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                          placeholder="Add any extra detail for this applicant..."
+                        />
+                        <button
+                          onClick={() => handlePractitionerReject(practitionerReviewListing.id)}
+                          disabled={!!practitionerActionLoading[practitionerReviewListing.id]}
+                          className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {practitionerActionLoading[practitionerReviewListing.id] ? 'Working…' : 'Reject Listing'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-                )
-              })}
-            </div>
+              </div>
+            )}
           </div>
         )}
 

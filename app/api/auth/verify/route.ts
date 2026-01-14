@@ -142,8 +142,8 @@ The Helfi Team`
       console.error('❌ Welcome email failed (non-blocking):', emailError)
     }
 
-    // Redirect to sign-in after successful verification
-    return NextResponse.redirect(new URL('/auth/signin?message=verified', 'https://helfi.ai'))
+    // Redirect to verification success page
+    return NextResponse.redirect(new URL('/auth/verify?success=true', 'https://helfi.ai'))
 
   } catch (error) {
     console.error('❌ Email verification error:', error)

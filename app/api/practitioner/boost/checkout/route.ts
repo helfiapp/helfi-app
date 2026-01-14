@@ -44,15 +44,14 @@ export async function POST(request: NextRequest) {
       practitionerAccount: { userId: session.user.id },
       reviewStatus: 'APPROVED',
     },
-    include: { subscription: true },
   })
 
   if (!listing) {
     return NextResponse.json({ error: 'Listing not found or not approved yet.' }, { status: 404 })
   }
 
-  if (!listing.subscription || listing.subscription.status !== 'ACTIVE') {
-    return NextResponse.json({ error: 'Boosts are available after the subscription starts.' }, { status: 400 })
+  if (listing.status !== 'ACTIVE') {
+    return NextResponse.json({ error: 'Boosts are only available for active listings.' }, { status: 400 })
   }
 
   const geoKey = buildGeoKey({
