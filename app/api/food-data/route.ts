@@ -236,8 +236,8 @@ export async function GET(request: NextRequest) {
           servingText.includes('roll') ||
           servingText.includes('sub') ||
           servingText.includes('pita')
-        if (Number.isFinite(grams) && grams >= 120) return true
-        if (hasMealWord && Number.isFinite(grams) && grams >= 90) return true
+        if (typeof grams === 'number' && Number.isFinite(grams) && grams >= 120) return true
+        if (hasMealWord && typeof grams === 'number' && Number.isFinite(grams) && grams >= 90) return true
         if (Number.isFinite(calories) && calories >= 250) return true
         return false
       }
