@@ -16,8 +16,10 @@ export default function ListYourPracticePage() {
                 List your practice on Helfi
               </h1>
               <p className="text-lg text-gray-600 mt-4 max-w-3xl">
-                Reach people searching for trusted care. You get 2 months free, then it is $4.95/month (USD).
-                No card is needed to start. Your free period begins only after your listing is approved.
+                Reach people searching for trusted care. You get{' '}
+                <span className="font-semibold text-gray-900">2 months free</span>, then it is{' '}
+                <span className="font-semibold text-gray-900">$4.95/month</span> (USD). No card is needed to start.
+                Your free period begins only after your listing is approved.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
                 <Link
@@ -51,8 +53,8 @@ export default function ListYourPracticePage() {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-3">Safety review</h2>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Every listing is checked by AI for safety and fraud. If it looks good, it goes live and you are
-                emailed right away. If it is flagged, the listing stays hidden until a staff member reviews it.
+                Every listing is reviewed for safety and fraud. If it looks good, it goes live and you are emailed
+                right away. If it needs a closer look, the listing stays hidden until a staff member reviews it.
                 We will email you to explain that it is under review, and we will email you again once approved.
               </p>
             </div>
@@ -63,7 +65,7 @@ export default function ListYourPracticePage() {
               <h2 className="text-xl font-semibold text-gray-900 mb-3">How it works</h2>
               <ol className="space-y-2 text-sm text-gray-600 list-decimal pl-5">
                 <li>Create your listing and submit it.</li>
-                <li>AI review runs in seconds.</li>
+                <li>Review runs in seconds.</li>
                 <li>If approved, your listing goes live and your free 2 months start.</li>
                 <li>If flagged, your listing stays hidden until staff approves it.</li>
                 <li>Manage your listing, subscription, and boosts in your dashboard.</li>
@@ -75,7 +77,10 @@ export default function ListYourPracticePage() {
               <div className="text-sm text-gray-600 space-y-3">
                 <div>
                   <div className="font-semibold text-gray-900">Listing subscription</div>
-                  <div>2 months free (starts after approval), then $4.95/month per listing.</div>
+                  <div>
+                    <span className="font-semibold text-gray-900">2 months free</span> (starts after approval), then{' '}
+                    <span className="font-semibold text-gray-900">$4.95/month</span> per listing.
+                  </div>
                 </div>
                 <div>
                   <div className="font-semibold text-gray-900">Boosts (7 days)</div>
