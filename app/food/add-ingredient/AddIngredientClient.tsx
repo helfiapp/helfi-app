@@ -195,6 +195,51 @@ const normalizeBrandToken = (value: string) =>
     .replace(/[^a-z0-9]+/g, '')
     .trim()
 
+const parseServingGrams = (label?: string | null) => {
+  const raw = String(label || '').toLowerCase()
+  const match = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
+  if (!match) return null
+  const grams = Number(match[1])
+  return Number.isFinite(grams) ? grams : null
+}
+
+const MEAT_TOKENS = [
+  'beef',
+  'ground',
+  'mince',
+  'minced',
+  'lamb',
+  'pork',
+  'chicken',
+  'turkey',
+  'veal',
+  'sausage',
+  'bacon',
+  'meat',
+  'burger',
+  'patty',
+  'steak',
+]
+
+const shouldShowMeatFat = (item: NormalizedFoodItem, queryText: string) => {
+  if (item?.source !== 'usda') return false
+  const name = String(item?.name || '').toLowerCase()
+  const query = String(queryText || '').toLowerCase()
+  return MEAT_TOKENS.some((token) => name.includes(token) || query.includes(token))
+}
+
+const buildMeatFatLabel = (item: NormalizedFoodItem, queryText: string) => {
+  if (!shouldShowMeatFat(item, queryText)) return null
+  const grams = parseServingGrams(item?.serving_size)
+  const fat = Number(item?.fat_g)
+  if (!Number.isFinite(grams) || grams <= 0 || !Number.isFinite(fat) || fat <= 0) return null
+  const fatPercent = Math.round((fat / grams) * 100)
+  if (!Number.isFinite(fatPercent) || fatPercent <= 0 || fatPercent >= 100) return null
+  const leanPercent = Math.max(0, 100 - fatPercent)
+  if (leanPercent > 0) return `${leanPercent}% lean / ${fatPercent}% fat`
+  return `${fatPercent}% fat`
+}
+
 export default function AddIngredientClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -733,8 +778,10 @@ export default function AddIngredientClient() {
                 type="button"
                 disabled={loading}
                 onClick={() => {
+                  const nextSource = sourceChoice === 'usda' ? 'auto' : sourceChoice
                   setKind('packaged')
-                  if (query.trim().length >= 2) runSearch(query, 'packaged', sourceChoice)
+                  if (nextSource !== sourceChoice) setSourceChoice(nextSource)
+                  if (query.trim().length >= 2) runSearch(query, 'packaged', nextSource)
                 }}
                 className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
                   kind === 'packaged' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
@@ -746,8 +793,10 @@ export default function AddIngredientClient() {
                 type="button"
                 disabled={loading}
                 onClick={() => {
+                  const nextSource = sourceChoice === 'openfoodfacts' ? 'usda' : sourceChoice
                   setKind('single')
-                  if (query.trim().length >= 2) runSearch(query, 'single', sourceChoice)
+                  if (nextSource !== sourceChoice) setSourceChoice(nextSource)
+                  if (query.trim().length >= 2) runSearch(query, 'single', nextSource)
                 }}
                 className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
                   kind === 'single' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-gray-700 border-gray-200'
@@ -770,8 +819,11 @@ export default function AddIngredientClient() {
                     type="button"
                     disabled={loading}
                     onClick={() => {
+                      const nextKind =
+                        opt.key === 'usda' ? 'single' : opt.key === 'openfoodfacts' ? 'packaged' : kind
                       setSourceChoice(opt.key)
-                      if (query.trim().length >= 2) runSearch(query, kind, opt.key)
+                      if (nextKind !== kind) setKind(nextKind)
+                      if (query.trim().length >= 2) runSearch(query, nextKind, opt.key)
                     }}
                     className={`px-3 py-2 rounded-lg border text-xs font-semibold ${
                       sourceChoice === opt.key
@@ -782,6 +834,9 @@ export default function AddIngredientClient() {
                     {opt.label}
                   </button>
                 ))}
+              </div>
+              <div className="text-[11px] text-gray-500">
+                USDA works with Single food. OpenFoodFacts works with Packaged.
               </div>
             </div>
 
@@ -806,10 +861,14 @@ export default function AddIngredientClient() {
                           {display.title}
                           {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                         </div>
-                        <div className="mt-0.5 text-xs text-gray-600">
-                          {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
-                          {r.calories != null && !Number.isNaN(Number(r.calories)) && <span>{Math.round(Number(r.calories))} kcal</span>}
-                        </div>
+                          <div className="mt-0.5 text-xs text-gray-600">
+                            {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
+                            {r.calories != null && !Number.isNaN(Number(r.calories)) && <span>{Math.round(Number(r.calories))} kcal</span>}
+                            {(() => {
+                              const fatLabel = buildMeatFatLabel(r, query)
+                              return fatLabel ? <span className="ml-2">{fatLabel}</span> : null
+                            })()}
+                          </div>
                         <div className="mt-1 text-[11px] text-gray-400">
                           Source: {r.source === 'usda' ? 'USDA' : 'OpenFoodFacts'}
                         </div>

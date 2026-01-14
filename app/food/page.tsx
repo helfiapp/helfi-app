@@ -5546,6 +5546,51 @@ export default function FoodDiary() {
     return { title: name, showBrandSuffix: true }
   }
 
+  const parseServingGrams = (label?: string | null) => {
+    const raw = String(label || '').toLowerCase()
+    const match = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
+    if (!match) return null
+    const grams = Number(match[1])
+    return Number.isFinite(grams) ? grams : null
+  }
+
+  const MEAT_TOKENS = [
+    'beef',
+    'ground',
+    'mince',
+    'minced',
+    'lamb',
+    'pork',
+    'chicken',
+    'turkey',
+    'veal',
+    'sausage',
+    'bacon',
+    'meat',
+    'burger',
+    'patty',
+    'steak',
+  ]
+
+  const shouldShowMeatFat = (item: any, queryText: string) => {
+    if (item?.source !== 'usda') return false
+    const name = String(item?.name || '').toLowerCase()
+    const query = String(queryText || '').toLowerCase()
+    return MEAT_TOKENS.some((token) => name.includes(token) || query.includes(token))
+  }
+
+  const buildMeatFatLabel = (item: any, queryText: string) => {
+    if (!shouldShowMeatFat(item, queryText)) return null
+    const grams = parseServingGrams(item?.serving_size)
+    const fat = Number(item?.fat_g)
+    if (!Number.isFinite(grams) || grams <= 0 || !Number.isFinite(fat) || fat <= 0) return null
+    const fatPercent = Math.round((fat / grams) * 100)
+    if (!Number.isFinite(fatPercent) || fatPercent <= 0 || fatPercent >= 100) return null
+    const leanPercent = Math.max(0, 100 - fatPercent)
+    if (leanPercent > 0) return `${leanPercent}% lean / ${fatPercent}% fat`
+    return `${fatPercent}% fat`
+  }
+
   const handleOfficialSearch = async (mode: 'packaged' | 'single', queryOverride?: string) => {
     const query = (queryOverride ?? officialSearchQuery).trim()
     if (!query) {
@@ -15106,6 +15151,10 @@ Please add nutritional information manually if needed.`);
                             {r.calories != null && !Number.isNaN(Number(r.calories)) && (
                               <span>{Math.round(Number(r.calories))} kcal</span>
                             )}
+                            {(() => {
+                              const fatLabel = buildMeatFatLabel(r, officialSearchQuery)
+                              return fatLabel ? <span className="ml-2">{fatLabel}</span> : null
+                            })()}
                             {r.protein_g != null && (
                               <span className="ml-2">{`${r.protein_g} g protein`}</span>
                             )}
@@ -17954,6 +18003,10 @@ Please add nutritional information manually if needed.`);
                                       {r.calories != null && !Number.isNaN(Number(r.calories)) && (
                                         <span>{Math.round(Number(r.calories))} kcal</span>
                                       )}
+                                      {(() => {
+                                        const fatLabel = buildMeatFatLabel(r, officialSearchQuery)
+                                        return fatLabel ? <span className="ml-2">{fatLabel}</span> : null
+                                      })()}
                                       {r.protein_g != null && (
                                         <span className="ml-2">{`${r.protein_g} g protein`}</span>
                                       )}
