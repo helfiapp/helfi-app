@@ -307,6 +307,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     '/terms',
     '/help',
     '/faq',
+    '/list-your-practice',
     '/affiliate/apply',
     '/affiliate/terms',
   ]

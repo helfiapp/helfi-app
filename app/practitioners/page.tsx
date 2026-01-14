@@ -198,7 +198,7 @@ export default function PractitionerDirectoryPage() {
               Find a practitioner
             </a>
             <Link
-              href="/practitioner"
+              href="/list-your-practice"
               className="px-5 py-2.5 rounded-full border border-emerald-200 text-emerald-800 font-semibold text-sm text-center hover:border-emerald-300 hover:text-emerald-900 transition-colors"
             >
               List your practice

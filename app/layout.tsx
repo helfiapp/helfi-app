@@ -74,6 +74,7 @@ export default function RootLayout({
                     path === '/healthapp' ||
                     path === '/practitioners' ||
                     path.indexOf('/practitioners/') === 0 ||
+                    path === '/list-your-practice' ||
                     path === '/privacy' ||
                     path === '/terms' ||
                     path === '/help' ||

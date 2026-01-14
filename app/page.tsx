@@ -258,7 +258,7 @@ export default function SplashPage() {
                 Find a practitioner
               </Link>
               <Link
-                href="/practitioner"
+                href="/list-your-practice"
                 className="px-8 py-4 rounded-full border-2 border-emerald-200 text-emerald-800 font-semibold text-lg hover:border-emerald-300 hover:text-emerald-900 transition-colors"
               >
                 List your practice
