@@ -498,7 +498,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         storePendingNotificationId(pendingId)
       }
 
-      if (shouldCheckPending) {
+      const runPendingOpen = () => {
         fetch('/api/notifications/pending-open', { cache: 'no-store' as any })
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
@@ -514,6 +514,27 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           .catch(() => {})
       }
 
+      const finalizePendingCheck = () => {
+        runPendingOpen()
+        try {
+          sessionStorage.removeItem('helfi:notification-open')
+        } catch {
+          // Ignore storage errors
+        }
+      }
+
+      if (shouldCheckPending) {
+        finalizePendingCheck()
+      } else {
+        fetch('/api/notifications/notification-open', { cache: 'no-store' as any })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (!data?.open) return
+            finalizePendingCheck()
+          })
+          .catch(() => {})
+      }
+
       if (pendingId || notificationOpen) {
         params.delete('notificationId')
         params.delete('notificationOpen')
@@ -522,13 +543,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         window.history.replaceState(null, '', nextUrl)
       }
 
-      if (shouldCheckPending) {
-        try {
-          sessionStorage.removeItem('helfi:notification-open')
-        } catch {
-          // Ignore storage errors
-        }
-      }
     } catch {
       // Ignore URL errors
     }

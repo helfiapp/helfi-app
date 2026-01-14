@@ -15,3 +15,18 @@ export async function POST(request: NextRequest) {
   })
   return response
 }
+
+export async function GET(request: NextRequest) {
+  const open = request.cookies.get(COOKIE_NAME)?.value === '1'
+  const response = NextResponse.json({ open })
+  if (open) {
+    response.cookies.set(COOKIE_NAME, '', {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+      secure: request.nextUrl.protocol === 'https:',
+    })
+  }
+  return response
+}
