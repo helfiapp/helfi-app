@@ -2803,6 +2803,7 @@ export default function FoodDiary() {
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const favoritesReplaceTargetRef = useRef<number | null>(null)
   const favoritesActionRef = useRef<'analysis' | 'diary' | null>(null)
+  const favoritesListRef = useRef<HTMLDivElement | null>(null)
   const pendingDrinkOverrideRef = useRef<DrinkAmountOverride | null>(null)
   const pendingDrinkTypeRef = useRef<string | null>(null)
   const pendingDrinkWaterLogIdRef = useRef<string | null>(null)
@@ -10539,6 +10540,11 @@ Please add nutritional information manually if needed.`);
       cancelled = true
     }
   }, [showFavoritesPicker, selectedDate, userCacheKey, resumeTick])
+
+  useEffect(() => {
+    if (!showFavoritesPicker) return
+    favoritesListRef.current?.scrollTo({ top: 0, behavior: 'auto' })
+  }, [showFavoritesPicker, favoritesActiveTab, favoritesSearch, favoritesAllServerEntries])
 
   const foodNameOverrideMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -20397,9 +20403,9 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <div className="fixed inset-0 z-[50] bg-white overflow-y-auto">
-          <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-4">
-            <div className="w-full overflow-hidden border border-gray-200 rounded-2xl shadow-xl bg-white">
+        <div className="fixed inset-0 z-[50] bg-white">
+          <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-4 h-full">
+            <div className="w-full h-full overflow-hidden border border-gray-200 rounded-2xl shadow-xl bg-white flex flex-col min-h-0">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
                 <div>
                   <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
@@ -20421,7 +20427,7 @@ Please add nutritional information manually if needed.`);
                 </button>
               </div>
 
-              <div className="px-4 pt-3 space-y-3 border-b border-gray-200">
+              <div className="px-4 pt-3 space-y-3 border-b border-gray-200 shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 relative">
                     <input
@@ -20488,7 +20494,7 @@ Please add nutritional information manually if needed.`);
                 </div>
               </div>
 
-              <div className="py-6">
+              <div ref={favoritesListRef} className="flex-1 min-h-0 overflow-y-auto py-6">
                 {(() => {
                   const { allMeals, favoriteMeals, customMeals } = buildFavoritesDatasets()
                   const search = favoritesSearch.trim().toLowerCase()
