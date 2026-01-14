@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
   }
 
   const slug = await generateUniqueSlug(displayName)
+  const hoursNotes = String(body?.hoursNotes || '').trim()
 
   const listing = await prisma.practitionerListing.create({
     data: {
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
       lng: typeof body?.lng === 'number' ? body.lng : null,
       serviceType: body?.serviceType || 'IN_PERSON',
       languages: parseCommaList(body?.languages),
-      hoursJson: body?.hoursNotes ? { notes: String(body.hoursNotes).trim() } : null,
+      hoursJson: hoursNotes ? { notes: hoursNotes } : undefined,
       images: body?.images ? body.images : null,
       status: 'DRAFT',
       reviewStatus: 'PENDING',
