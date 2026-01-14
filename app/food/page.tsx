@@ -14956,7 +14956,7 @@ Please add nutritional information manually if needed.`);
                   {/* PROTECTED: ADD_INGREDIENT_MODAL_SEARCH START */}
 	                <div className="space-y-2">
 	                  <label className="block text-sm font-medium text-gray-900">
-	                    Search foods (USDA for single foods, FatSecret + OpenFoodFacts for packaged)
+	                    Search foods (USDA for single foods, OpenFoodFacts for packaged)
 	                  </label>
                   <div className="flex flex-col gap-2">
                     <div className="relative">
@@ -15082,7 +15082,7 @@ Please add nutritional information manually if needed.`);
                     </div>
                   </div>
 	                  <p className="text-xs text-gray-500">
-	                    Single food searches use USDA. Packaged searches use FatSecret + OpenFoodFacts. Plurals are OK — we auto-try the single word.
+	                    Single food searches use USDA. Packaged searches use OpenFoodFacts. Plurals are OK — we auto-try the single word.
 	                  </p>
 	                </div>
                 {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
@@ -15118,8 +15118,6 @@ Please add nutritional information manually if needed.`);
                             Source:{' '}
                             {r.source === 'usda'
                               ? 'USDA FoodData Central'
-                              : r.source === 'fatsecret'
-                              ? 'FatSecret'
                               : r.source === 'openfoodfacts'
                               ? 'OpenFoodFacts'
                               : officialResultsSource || 'Unknown'}
@@ -15705,7 +15703,7 @@ Please add nutritional information manually if needed.`);
                     <div className="flex-1">
                       <div className="text-base font-semibold text-gray-900">Barcode Scanner</div>
                       <div className="text-xs text-gray-500">
-                        Scan packaged foods • 3 credits per scan (FatSecret lookup)
+                        Scan packaged foods • 3 credits per scan
                       </div>
                     </div>
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -17802,7 +17800,7 @@ Please add nutritional information manually if needed.`);
 
                       <div className="pt-2 border-t border-gray-200">
                       <div className="text-sm font-medium text-gray-900">
-                          Find a better match (USDA for single foods, FatSecret + OpenFoodFacts for packaged)
+                          Find a better match (USDA for single foods, OpenFoodFacts for packaged)
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
                           Selecting a result replaces the item name, serving size, and macros.
@@ -17968,8 +17966,6 @@ Please add nutritional information manually if needed.`);
                                       Source:{' '}
                                       {r.source === 'usda'
                                         ? 'USDA FoodData Central'
-                                        : r.source === 'fatsecret'
-                                        ? 'FatSecret'
                                         : r.source === 'openfoodfacts'
                                         ? 'OpenFoodFacts'
                                         : officialResultsSource || 'Unknown'}
@@ -19894,7 +19890,7 @@ Please add nutritional information manually if needed.`);
                                         </div>
                                           <div className="flex-1">
                                             <div className="text-base font-semibold text-gray-900">Barcode Scanner</div>
-                                            <div className="text-xs text-gray-500">Scan packaged foods • 3 credits per scan (FatSecret lookup)</div>
+                                            <div className="text-xs text-gray-500">Scan packaged foods • 3 credits per scan</div>
                                           </div>
                                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

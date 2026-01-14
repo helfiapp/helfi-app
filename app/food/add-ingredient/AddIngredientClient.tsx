@@ -6,7 +6,7 @@ import UsageMeter from '@/components/UsageMeter'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 type SearchKind = 'packaged' | 'single'
-type SearchSource = 'auto' | 'usda' | 'fatsecret' | 'openfoodfacts'
+type SearchSource = 'auto' | 'usda' | 'openfoodfacts'
 
 type NormalizedFoodItem = {
   source: 'openfoodfacts' | 'usda' | 'fatsecret'
@@ -364,7 +364,7 @@ export default function AddIngredientClient() {
   }
 
   const loadServingOverride = async (r: NormalizedFoodItem): Promise<NormalizedFoodItem | null> => {
-    if (!r || (r.source !== 'usda' && r.source !== 'fatsecret')) return null
+    if (!r || r.source !== 'usda') return null
     if (!is100gServing(r.serving_size)) return null
     const key = `${r.source}:${r.id}`
     const cached = servingCacheRef.current.get(key)
@@ -759,11 +759,10 @@ export default function AddIngredientClient() {
 
             <div className="space-y-1">
               <div className="text-xs font-semibold text-gray-600">Source</div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {([
                   { key: 'auto', label: 'Best match' },
                   { key: 'usda', label: 'USDA' },
-                  { key: 'fatsecret', label: 'FatSecret' },
                   { key: 'openfoodfacts', label: 'OpenFoodFacts' },
                 ] as const).map((opt) => (
                   <button
@@ -812,7 +811,7 @@ export default function AddIngredientClient() {
                           {r.calories != null && !Number.isNaN(Number(r.calories)) && <span>{Math.round(Number(r.calories))} kcal</span>}
                         </div>
                         <div className="mt-1 text-[11px] text-gray-400">
-                          Source: {r.source === 'usda' ? 'USDA' : r.source === 'fatsecret' ? 'FatSecret' : 'OpenFoodFacts'}
+                          Source: {r.source === 'usda' ? 'USDA' : 'OpenFoodFacts'}
                         </div>
                       </div>
                       <button

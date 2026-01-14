@@ -269,34 +269,23 @@ export async function GET(request: NextRequest) {
         items = await searchUsdaSingleFood(query)
         actualSource = 'usda'
         if (items.length === 0) {
-          const perSource = Math.min(Math.max(Math.ceil(limit / 2), 10), 25)
-          const results = await Promise.allSettled([
-            searchFatSecretFoods(query, { pageSize: perSource }),
-            searchOpenFoodFactsByQuery(query, { pageSize: perSource }),
-          ])
-          const pooled: any[] = []
-          for (const res of results) {
-            if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-              pooled.push(...res.value)
-            }
-          }
+          const perSource = Math.min(Math.max(limit, 10), 25)
+          const pooled = await searchOpenFoodFactsByQuery(query, { pageSize: perSource })
           if (pooled.length > 0) {
             items = pooled.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
             actualSource = 'auto'
           }
         }
       } else {
-        const perSource = Math.min(Math.max(Math.ceil(limit / 2), 10), 25)
+        const perSource = Math.min(Math.max(limit, 10), 25)
 
         const requests =
           resolvedKind === 'packaged'
             ? [
-                searchFatSecretFoods(query, { pageSize: perSource }),
                 searchOpenFoodFactsByQuery(query, { pageSize: perSource }),
               ]
             : [
                 searchUsdaFoods(query, { pageSize: perSource, dataType: usdaDataType }),
-                searchFatSecretFoods(query, { pageSize: perSource }),
                 searchOpenFoodFactsByQuery(query, { pageSize: perSource }),
               ]
 
