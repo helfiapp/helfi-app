@@ -1405,6 +1405,8 @@ Anything marked ✅ in the audit is **locked**. Do not change, loosen, or bypass
 
 **This area is fragile and business‑critical. Do not change it without the owner’s written approval.**
 
+**Last verified working deployment:** 2026‑01‑14 12:30 UTC (commit `427f65b8`)
+
 **Protected files:**
 - `lib/notification-inbox.ts`
 - `app/notifications/inbox/page.tsx`
@@ -1429,9 +1431,17 @@ Anything marked ✅ in the audit is **locked**. Do not change, loosen, or bypass
 ### Restore steps (if this breaks again)
 If reminder taps open the wrong page OR the inbox does not clear after a completed reminder, restore in this order:
 
+0) Confirm you are testing on iPhone PWA, tapping the alert from the phone pop‑up
+   (not from inside the inbox list).
+
 1) Reminder tap routing must return a URL that includes a `notificationId`.
    - The pending‑open flow already returns `{ url, id }` and appends
      `?notificationId=<id>` when it redirects (see `app/pwa-entry/page.tsx`).
+   - The tap must also set a “notification open” marker before navigation so the
+     app knows a reminder was tapped (see `public/sw.js`).
+   - The app must check that marker on resume and call the pending‑open API
+     (see `components/LayoutWrapper.tsx`). If this step is missing, taps will
+     fall back to the last page.
 
 2) The reminder pages must capture that `notificationId` from the URL and save it
    so the save action can clear the inbox item.
