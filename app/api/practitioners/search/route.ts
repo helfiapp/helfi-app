@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculateDistanceKm } from '@/lib/practitioner-utils'
 
-function normalize(value: string | null): string {
+function normalize(value: string | null | undefined): string {
   return String(value || '').trim().toLowerCase()
 }
 
