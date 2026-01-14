@@ -1459,6 +1459,12 @@ If reminder taps open the wrong page OR the inbox does not clear after a complet
    - Tap a fresh reminder, complete it, then open inbox.
    - The alert must be gone. If not, step 2 is broken.
 
+5) If the inbox shows the same time for every alert:
+   - The list view is falling back to “now” because it cannot read the saved
+     time from storage.
+   - Fix by reading both `createdAt` and `createdat` (and the same for `readAt`)
+     in `lib/notification-inbox.ts` so the real saved time is used.
+
 ### Medium and low priority fixes that must stay locked
 - Session lifetime must not be multi-year, and admin logout/revoke must remain available.
 - No fallback default secrets in production. Missing secrets must be flagged, not silently replaced.

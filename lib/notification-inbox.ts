@@ -56,19 +56,29 @@ export async function ensureNotificationInboxTable() {
 
 function normalizeInboxRow(row: any): InboxNotification | null {
   if (!row) return null
+  const pick = (keys: string[]) => {
+    for (const key of keys) {
+      if (row[key] !== undefined && row[key] !== null) return row[key]
+    }
+    return null
+  }
+  const createdAtRaw = pick(['createdAt', 'createdat', 'created_at'])
+  const readAtRaw = pick(['readAt', 'readat', 'read_at'])
+  const userId = pick(['userId', 'userid'])
+  const eventKey = pick(['eventKey', 'eventkey'])
   return {
     id: row.id,
-    userId: row.userId,
+    userId: userId ? String(userId) : '',
     title: row.title,
     body: row.body ?? null,
     url: row.url ?? null,
     type: row.type ?? null,
     status: row.status === 'read' ? 'read' : 'unread',
     source: row.source ?? null,
-    eventKey: row.eventKey ?? null,
+    eventKey: eventKey ?? null,
     metadata: row.metadata ?? null,
-    createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
-    readAt: row.readAt ? new Date(row.readAt).toISOString() : null,
+    createdAt: createdAtRaw ? new Date(createdAtRaw).toISOString() : new Date().toISOString(),
+    readAt: readAtRaw ? new Date(readAtRaw).toISOString() : null,
   }
 }
 
