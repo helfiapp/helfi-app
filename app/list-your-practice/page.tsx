@@ -23,7 +23,7 @@ export default function ListYourPracticePage() {
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
                 <Link
-                  href="/practitioner"
+                  href="/list-your-practice/start"
                   className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-helfi-green text-white font-semibold text-base hover:bg-helfi-green/90 transition-colors"
                 >
                   Start your listing
@@ -123,7 +123,7 @@ export default function ListYourPracticePage() {
               </p>
               <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
-                  href="/practitioner"
+                  href="/list-your-practice/start"
                   className="px-8 py-4 rounded-full bg-helfi-green text-white font-semibold text-lg hover:bg-helfi-green/90 transition-colors"
                 >
                   Start your listing

@@ -12,11 +12,13 @@ function SearchParamsHandler({
   setMessage,
   setIsSignUp,
   setShowResendVerification,
+  setAuthContext,
 }: {
   setError: (error: string) => void
   setMessage: (message: string) => void
   setIsSignUp: (value: boolean) => void
   setShowResendVerification: (value: boolean) => void
+  setAuthContext: (value: 'default' | 'practitioner') => void
 }) {
   const searchParams = useSearchParams()
 
@@ -25,6 +27,7 @@ function SearchParamsHandler({
     const messageParam = searchParams.get('message')
     const planParam = searchParams.get('plan')
     const modeParam = searchParams.get('mode')
+    const contextParam = searchParams.get('context')
     
     // If plan parameter exists, show signup form by default
     if (planParam) {
@@ -35,6 +38,11 @@ function SearchParamsHandler({
     if (modeParam === 'signup') {
       setIsSignUp(true)
     }
+
+    if (contextParam === 'practitioner') {
+      setAuthContext('practitioner')
+    }
+
     
     if (errorParam) {
       switch (errorParam) {
@@ -115,6 +123,14 @@ const getInstallContext = () => {
   }
 }
 
+const sanitizeNextTarget = (value: string | null) => {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('/')) return null
+  if (trimmed.startsWith('//')) return null
+  return trimmed
+}
+
 export default function SignIn() {
   const router = useRouter()
   const { status } = useSession()
@@ -134,6 +150,7 @@ export default function SignIn() {
   const [installOutcome, setInstallOutcome] = useState<'accepted' | 'dismissed' | null>(null)
   const [isSafariIOS, setIsSafariIOS] = useState(false)
   const skipAutoRedirectRef = useRef(false)
+  const [authContext, setAuthContext] = useState<'default' | 'practitioner'>('default')
 
   // If the user is already logged in and somehow lands on the sign-in page
   // (for example, via the iOS Home Screen icon), immediately send them into
@@ -185,6 +202,19 @@ export default function SignIn() {
           console.error('Checkout redirect error:', error)
           // Fall through to normal redirect
         }
+      }
+
+      const nextParam = sanitizeNextTarget(searchParams.get('next'))
+      const contextParam = searchParams.get('context')
+      const isPractitionerFlow =
+        contextParam === 'practitioner' || (nextParam && nextParam.startsWith('/practitioner'))
+
+      if (nextParam && isPractitionerFlow) {
+        if (maybeShowInstallPrompt(nextParam)) {
+          return
+        }
+        router.replace(nextParam)
+        return
       }
 
       // First, check Health Setup status without changing its existing rules.
@@ -318,7 +348,10 @@ export default function SignIn() {
     // Check for plan parameter to preserve it through OAuth flow
     const searchParams = new URLSearchParams(window.location.search)
     const planParam = searchParams.get('plan')
-    const callbackUrl = planParam ? `/auth/signin?plan=${encodeURIComponent(planParam)}` : '/onboarding'
+    const nextParam = sanitizeNextTarget(searchParams.get('next'))
+    const callbackUrl = planParam
+      ? `/auth/signin?plan=${encodeURIComponent(planParam)}`
+      : nextParam || '/onboarding'
     await signIn('google', { callbackUrl })
   }
 
@@ -367,6 +400,12 @@ export default function SignIn() {
           // Success - check for plan parameter to preserve it
           const searchParams = new URLSearchParams(window.location.search)
           const planParam = searchParams.get('plan')
+          const nextParam = sanitizeNextTarget(searchParams.get('next'))
+          if (nextParam) {
+            try {
+              sessionStorage.setItem('helfi:postAuthTarget', nextParam)
+            } catch {}
+          }
           if (planParam) {
             // Store plan in sessionStorage to retrieve after email verification
             try {
@@ -387,7 +426,10 @@ export default function SignIn() {
         // Check for plan parameter to preserve it through auth flow
         const searchParams = new URLSearchParams(window.location.search)
         const planParam = searchParams.get('plan')
-        const callbackUrl = planParam ? `/auth/signin?plan=${encodeURIComponent(planParam)}` : '/onboarding'
+        const nextParam = sanitizeNextTarget(searchParams.get('next'))
+        const callbackUrl = planParam
+          ? `/auth/signin?plan=${encodeURIComponent(planParam)}`
+          : nextParam || '/onboarding'
         
         const res = await signIn('credentials', {
           email: normalizedEmail,
@@ -428,7 +470,19 @@ export default function SignIn() {
               console.error('Checkout redirect error:', error)
             }
           }
-          const nextTarget = '/onboarding'
+          let nextTarget = nextParam || '/onboarding'
+          if (!nextParam) {
+            try {
+              const storedTarget = sessionStorage.getItem('helfi:postAuthTarget')
+              if (storedTarget) {
+                sessionStorage.removeItem('helfi:postAuthTarget')
+                const sanitized = sanitizeNextTarget(storedTarget)
+                if (sanitized) {
+                  nextTarget = sanitized
+                }
+              }
+            } catch {}
+          }
           if (maybeShowInstallPrompt(nextTarget)) {
             return
           }
@@ -464,6 +518,7 @@ export default function SignIn() {
           setMessage={setMessage}
           setIsSignUp={setIsSignUp}
           setShowResendVerification={setShowResendVerification}
+          setAuthContext={setAuthContext}
         />
       </Suspense>
 
@@ -592,7 +647,10 @@ export default function SignIn() {
         <div className="max-w-md w-full space-y-8">
           {/* Logo */}
           <div className="flex justify-center">
-            <Link href="/" className="relative w-24 h-24">
+            <Link
+              href={authContext === 'practitioner' ? '/list-your-practice' : '/'}
+              className="relative w-24 h-24"
+            >
               <Image
                 src="/mobile-assets/LOGOS/helfi-01-01.png"
                 alt="Helfi Logo"
@@ -606,11 +664,28 @@ export default function SignIn() {
           {/* Sign In Form */}
           <div className="text-center">
             <h2 className="text-2xl font-bold text-helfi-black mb-4">
-              {isSignUp ? 'Create Account' : 'Welcome to Helfi'}
+              {isSignUp
+                ? authContext === 'practitioner'
+                  ? 'Create your practitioner account'
+                  : 'Create Account'
+                : authContext === 'practitioner'
+                  ? 'Practitioner sign in'
+                  : 'Welcome to Helfi'}
             </h2>
             <p className="text-gray-600 mb-8">
-              {isSignUp ? 'Create a new account to get started' : 'Sign in to your account'}
+              {isSignUp
+                ? authContext === 'practitioner'
+                  ? 'List your practice on Helfi and reach new patients.'
+                  : 'Create a new account to get started'
+                : authContext === 'practitioner'
+                  ? 'Sign in to manage your listing and boosts.'
+                  : 'Sign in to your account'}
             </p>
+            {authContext === 'practitioner' && (
+              <Link href="/list-your-practice" className="text-sm text-helfi-green hover:underline">
+                Back to list your practice
+              </Link>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -777,7 +852,11 @@ export default function SignIn() {
                 onClick={() => setIsSignUp(!isSignUp)}
                 className="text-helfi-green hover:underline text-sm"
               >
-                {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+                {isSignUp
+                  ? 'Already have an account? Sign in'
+                  : authContext === 'practitioner'
+                    ? 'New here? Create your practitioner account'
+                    : "Don't have an account? Sign up"}
               </button>
             </div>
           </div>
