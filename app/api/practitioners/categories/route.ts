@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getPractitionerCategories } from '@/lib/practitioner-categories'
 
+export const dynamic = 'force-dynamic'
+
 function buildTree(categories: Array<{ id: string; name: string; slug: string; parentId: string | null; synonyms: string[]; sortOrder: number }>) {
   const byId = new Map<string, any>()
   const roots: any[] = []

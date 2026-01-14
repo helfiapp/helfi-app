@@ -421,6 +421,9 @@ Implementation notes (do not remove):
 - Favorites rename flow is handled in `app/food/page.tsx` → `handleRenameFavorite`:
   - Updates the favorite label
   - Calls `renameEntriesWithFavoriteId(...)` to update diary entries
+- Rename helpers must also update the Favorites “All” snapshot cache:
+  - `renameEntriesWithFavoriteId(...)` updates `favoritesAllServerEntries` and calls `writeFavoritesAllSnapshot(...)`
+  - `renameEntriesWithLabel(...)` does the same for label-based renames
 - Helper functions that must stay wired:
   - `resolveFavoriteForEntry`, `updateFavoriteLabelById`, `renameEntriesWithFavoriteId`
   - `saveFoodNameOverride` (keeps aliases for older labels)
@@ -431,6 +434,27 @@ If this breaks again, restore in this order:
 2) In `handleRenameFavorite`, ensure it calls:
    - `renameEntriesWithFavoriteId`
 3) Confirm Favorites, All, and Food Diary labels match after rename.
+4) If “All” still shows old names, ensure:
+   - `renameEntriesWithFavoriteId` and `renameEntriesWithLabel` both update `favoritesAllServerEntries`
+   - `writeFavoritesAllSnapshot(...)` is called after those updates
+
+### 3.5.2 Favorites Modal Scroll Position (Jan 2026 – Locked)
+Goal: the **Add from favorites** list must always open at the **top**, so the first items are visible without manual scrolling.
+
+Must keep (source of truth in `app/food/page.tsx`):
+- The modal uses a full-height flex layout.
+- The list container is the **scrollable element** (`flex-1 overflow-y-auto`) and is wired to `favoritesListRef`.
+- A `useEffect` scrolls the list to top when:
+  - The modal opens
+  - The tab or search changes
+  - The Favorites “All” snapshot refreshes
+
+If this breaks again, restore in this order:
+1) Ensure the list container remains `flex-1 overflow-y-auto` and has `ref={favoritesListRef}`.
+2) Restore the scroll-to-top effect:
+   - `favoritesListRef.current?.scrollTo({ top: 0, behavior: 'auto' })`
+   - Dependencies must include `showFavoritesPicker`, `favoritesActiveTab`, `favoritesSearch`, and `favoritesAllServerEntries`.
+3) Confirm the first favorites appear immediately after opening the modal (no manual scroll).
 
 **Do NOT change or remove:**
 - The sidebar click override in `app/onboarding/page.tsx` that directly listens to left‑menu clicks while on `/onboarding` and forces navigation.
