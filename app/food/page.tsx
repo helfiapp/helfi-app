@@ -5581,9 +5581,10 @@ export default function FoodDiary() {
 
   const buildMeatFatLabel = (item: any, queryText: string) => {
     if (!shouldShowMeatFat(item, queryText)) return null
-    const grams = parseServingGrams(item?.serving_size)
+    const gramsValue = parseServingGrams(item?.serving_size)
     const fat = Number(item?.fat_g)
-    if (grams == null) return null
+    if (gramsValue == null) return null
+    const grams = gramsValue
     if (!Number.isFinite(grams) || grams <= 0 || !Number.isFinite(fat) || fat <= 0) return null
     const fatPercent = Math.round((fat / grams) * 100)
     if (!Number.isFinite(fatPercent) || fatPercent <= 0 || fatPercent >= 100) return null
