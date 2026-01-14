@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import type { PractitionerAiRiskLevel } from '@prisma/client'
 import { screenPractitionerListing } from '@/lib/practitioner-screening'
 import {
   sendPractitionerAdminActivatedEmail,
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
   }
 
-  const aiRiskLevel = screening.riskLevel
+  const aiRiskLevel = screening.riskLevel as PractitionerAiRiskLevel
   const aiReasoning = screening.reasoning
   const aiRawJson = screening.raw || null
   const needsManualReview = screening.recommendedAction === 'MANUAL_REVIEW' || aiRiskLevel !== 'LOW'
