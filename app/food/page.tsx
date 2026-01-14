@@ -2803,7 +2803,6 @@ export default function FoodDiary() {
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const favoritesReplaceTargetRef = useRef<number | null>(null)
   const favoritesActionRef = useRef<'analysis' | 'diary' | null>(null)
-  const favoritesListRef = useRef<HTMLDivElement | null>(null)
   const pendingDrinkOverrideRef = useRef<DrinkAmountOverride | null>(null)
   const pendingDrinkTypeRef = useRef<string | null>(null)
   const pendingDrinkWaterLogIdRef = useRef<string | null>(null)
@@ -10489,16 +10488,6 @@ Please add nutritional information manually if needed.`);
   }, [showFavoritesPicker, refreshFoodLibraryFromServer])
 
   useEffect(() => {
-    if (!showFavoritesPicker) return
-    const id = window.setTimeout(() => {
-      try {
-        favoritesListRef.current?.scrollTo({ top: 0, behavior: 'auto' })
-      } catch {}
-    }, 0)
-    return () => window.clearTimeout(id)
-  }, [showFavoritesPicker, favoritesActiveTab, favoritesSearch, favoritesAllServerEntries])
-
-  useEffect(() => {
     if (!showFavoritesPicker) {
       const cached = readFavoritesAllSnapshot(userCacheKey)
       setFavoritesAllServerEntries(cached && cached.length > 0 ? cached : null)
@@ -12119,15 +12108,6 @@ Please add nutritional information manually if needed.`);
 
     setTodaysFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
     setHistoryFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
-    setFavoritesAllServerEntries((prev) => {
-      if (!Array.isArray(prev)) return prev
-      const next = prev.map(updateEntry)
-      try {
-        writeFavoritesAllSnapshot(userCacheKey, next)
-      } catch {}
-      return next
-    })
-    setFoodLibrary((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
     renamePersistentDiaryEntries(updateEntry)
   }
 
@@ -12230,14 +12210,7 @@ Please add nutritional information manually if needed.`);
     }
     setTodaysFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
     setHistoryFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
-    setFavoritesAllServerEntries((prev) => {
-      if (!Array.isArray(prev)) return prev
-      const next = prev.map(updateEntry)
-      try {
-        writeFavoritesAllSnapshot(userCacheKey, next)
-      } catch {}
-      return next
-    })
+    setFavoritesAllServerEntries((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
     setFoodLibrary((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
     renamePersistentDiaryEntries(updateEntry)
   }
@@ -20423,9 +20396,9 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <div className="fixed inset-0 z-[50] bg-white">
-          <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-4 h-full flex flex-col">
-            <div className="w-full overflow-hidden border border-gray-200 rounded-2xl shadow-xl bg-white flex flex-col h-full">
+        <div className="fixed inset-0 z-[50] bg-white overflow-y-auto">
+          <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-4">
+            <div className="w-full overflow-hidden border border-gray-200 rounded-2xl shadow-xl bg-white">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
                 <div>
                   <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
@@ -20514,7 +20487,7 @@ Please add nutritional information manually if needed.`);
                 </div>
               </div>
 
-              <div ref={favoritesListRef} className="flex-1 overflow-y-auto py-6">
+              <div className="py-6">
                 {(() => {
                   const { allMeals, favoriteMeals, customMeals } = buildFavoritesDatasets()
                   const search = favoritesSearch.trim().toLowerCase()
