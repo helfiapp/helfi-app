@@ -36,12 +36,15 @@ type DirectoryMapProps = {
 
 export default function DirectoryMap({ center, radiusKm, markers, onMarkerClick }: DirectoryMapProps) {
   const zoom = radiusKm && radiusKm <= 5 ? 13 : radiusKm && radiusKm <= 10 ? 12 : radiusKm && radiusKm <= 25 ? 11 : 10
+  const mapProps = {
+    center: [center.lat, center.lng],
+    zoom,
+    scrollWheelZoom: true,
+  } as any
 
   return (
     <MapContainer
-      center={[center.lat, center.lng]}
-      zoom={zoom}
-      scrollWheelZoom
+      {...mapProps}
       className="h-full w-full rounded-2xl overflow-hidden border border-gray-200"
     >
       <SetViewOnChange center={[center.lat, center.lng]} zoom={zoom} />
