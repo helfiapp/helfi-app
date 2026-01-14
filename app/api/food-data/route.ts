@@ -39,9 +39,28 @@ export async function GET(request: NextRequest) {
 
     const normalizeForCompact = (value: any) => normalizeForMatch(value).replace(/\s+/g, '')
 
+    const singularizeToken = (value: string) => {
+      const lower = value.toLowerCase()
+      if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
+      if (
+        lower.endsWith('es') &&
+        value.length > 3 &&
+        !lower.endsWith('ses') &&
+        !lower.endsWith('xes') &&
+        !lower.endsWith('zes') &&
+        !lower.endsWith('ches') &&
+        !lower.endsWith('shes')
+      ) {
+        return value.slice(0, -2)
+      }
+      if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
+      return value
+    }
+
     const queryNorm = normalizeForMatch(query)
     const queryCompact = normalizeForCompact(query)
     const queryTokens = queryNorm ? queryNorm.split(' ').filter(Boolean) : []
+    const queryTokensNormalized = queryTokens.map((token) => singularizeToken(token))
     const queryFirstToken = queryTokens[0] || ''
 
     const scoreNameMatch = (name: any) => {
@@ -57,7 +76,7 @@ export async function GET(request: NextRequest) {
       if (n.includes(queryNorm)) return 500
       if (queryTokens.length > 0) {
         const hitCount = queryTokens.filter((t) => n.includes(t)).length
-        if (hitCount === queryTokens.length) return 350
+        if (hitCount === queryTokens.length) return 420
         return hitCount * 40
       }
       return 0
@@ -82,24 +101,6 @@ export async function GET(request: NextRequest) {
         .replace(/[^\w\s-]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-
-    const singularizeToken = (value: string) => {
-      const lower = value.toLowerCase()
-      if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
-      if (
-        lower.endsWith('es') &&
-        value.length > 3 &&
-        !lower.endsWith('ses') &&
-        !lower.endsWith('xes') &&
-        !lower.endsWith('zes') &&
-        !lower.endsWith('ches') &&
-        !lower.endsWith('shes')
-      ) {
-        return value.slice(0, -2)
-      }
-      if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
-      return value
-    }
 
     const buildSingleFoodFallbacks = (value: string) => {
       const original = value.trim()
@@ -142,43 +143,104 @@ export async function GET(request: NextRequest) {
       const resolvedKind = kind === 'packaged' ? 'packaged' : 'single'
       const usdaDataType = resolvedKind === 'packaged' ? 'all' : 'generic'
 
-      const scoredServing = (serving: string | null | undefined) => {
+      const scoredServing = (serving: string | null | undefined, calories?: number | null) => {
         const s = (serving || '').toLowerCase()
         if (!s) return 0
+        let score = 1
         // Prefer real package servings over "100 g" defaults.
-        if (s.includes('100 g') || s.includes('100g')) return -5
-        if (s.includes('serving')) return 2
-        if (s.includes('piece') || s.includes('biscuit') || s.includes('cookie') || s.includes('slice')) return 3
-        return 1
+        if (s.includes('100 g') || s.includes('100g')) score -= isMealQuery ? 8 : 5
+        if (s.includes('serving')) score += 2
+        if (
+          s.includes('piece') ||
+          s.includes('biscuit') ||
+          s.includes('cookie') ||
+          s.includes('slice') ||
+          s.includes('pack') ||
+          s.includes('packet') ||
+          s.includes('each')
+        ) {
+          score += 3
+        }
+        if (isMealQuery) {
+          if (
+            s.includes('kebab') ||
+            s.includes('kebap') ||
+            s.includes('shawarma') ||
+            s.includes('doner') ||
+            s.includes('gyro') ||
+            s.includes('burger') ||
+            s.includes('wrap') ||
+            s.includes('burrito') ||
+            s.includes('taco') ||
+            s.includes('pizza') ||
+            s.includes('sandwich') ||
+            s.includes('roll') ||
+            s.includes('sub') ||
+            s.includes('pita')
+          ) {
+            score += 4
+          }
+          const cal = Number(calories)
+          if (Number.isFinite(cal)) {
+            if (cal >= 250 && cal <= 1200) score += 3
+            if (cal > 0 && cal < 150) score -= 5
+          }
+        }
+        return score
       }
 
-    const parseServingGrams = (serving: any) => {
-      const raw = String(serving || '').toLowerCase()
-      const match = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
-      if (!match) return null
-      const grams = Number(match[1])
-      return Number.isFinite(grams) ? grams : null
-    }
+      const parseServingGrams = (serving: any) => {
+        const raw = String(serving || '').toLowerCase()
+        const match = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
+        if (!match) return null
+        const grams = Number(match[1])
+        return Number.isFinite(grams) ? grams : null
+      }
 
-    const mealKeywords = [
-      'kebab',
-      'kebap',
-      'shawarma',
-      'doner',
-      'gyro',
-      'burger',
-      'wrap',
-      'burrito',
-      'taco',
-      'pizza',
-      'sandwich',
-      'roll',
-      'sub',
-      'pita',
-      'meal',
-      'combo',
-    ]
-    const isMealQuery = queryTokens.some((token) => mealKeywords.includes(token))
+      const mealKeywords = [
+        'kebab',
+        'kebap',
+        'shawarma',
+        'doner',
+        'gyro',
+        'burger',
+        'wrap',
+        'burrito',
+        'taco',
+        'pizza',
+        'sandwich',
+        'roll',
+        'sub',
+        'pita',
+        'meal',
+        'combo',
+      ]
+      const isMealQuery = queryTokensNormalized.some((token) => mealKeywords.includes(token))
+
+      const isLikelyFullMeal = (it: any) => {
+        const servingText = String(it?.serving_size || '').toLowerCase()
+        const grams = parseServingGrams(it?.serving_size)
+        const calories = Number(it?.calories)
+        const hasMealWord =
+          servingText.includes('kebab') ||
+          servingText.includes('kebap') ||
+          servingText.includes('shawarma') ||
+          servingText.includes('doner') ||
+          servingText.includes('gyro') ||
+          servingText.includes('burger') ||
+          servingText.includes('wrap') ||
+          servingText.includes('burrito') ||
+          servingText.includes('taco') ||
+          servingText.includes('pizza') ||
+          servingText.includes('sandwich') ||
+          servingText.includes('roll') ||
+          servingText.includes('sub') ||
+          servingText.includes('pita')
+        if (Number.isFinite(grams) && grams >= 120) return true
+        if (hasMealWord && Number.isFinite(grams) && grams >= 90) return true
+        if (Number.isFinite(calories) && calories >= 250) return true
+        return false
+      }
 
     const scoreItem = (it: any) => {
       let score = 0
@@ -188,7 +250,7 @@ export async function GET(request: NextRequest) {
       if (it?.source === 'openfoodfacts') score += 1
       if (it?.brand) score += 2
       if (Number.isFinite(Number(it?.calories)) && Number(it.calories) > 0) score += 1
-      score += scoredServing(it?.serving_size)
+      score += scoredServing(it?.serving_size, it?.calories)
       if (isMealQuery) {
         const grams = parseServingGrams(it?.serving_size)
         if (typeof grams === 'number' && Number.isFinite(grams)) {
@@ -197,6 +259,8 @@ export async function GET(request: NextRequest) {
           if (grams > 0 && grams < 80) score -= 6
         }
         if (it?.source === 'openfoodfacts' && typeof grams === 'number' && grams < 80) score -= 4
+        if (it?.source === 'usda' && it?.brand) score += 2
+        if (Number.isFinite(Number(it?.calories)) && Number(it.calories) < 150) score -= 4
       }
       return score
     }
@@ -242,6 +306,14 @@ export async function GET(request: NextRequest) {
         for (const res of results) {
           if (res.status === 'fulfilled' && Array.isArray(res.value)) {
             pooled.push(...res.value)
+          }
+        }
+
+        if (resolvedKind === 'packaged' && isMealQuery) {
+          const hasFullMeal = pooled.some((it) => isLikelyFullMeal(it))
+          if (!hasFullMeal) {
+            const usdaBoost = await searchUsdaFoods(query, { pageSize: perSource, dataType: 'branded' })
+            pooled.push(...usdaBoost)
           }
         }
 
