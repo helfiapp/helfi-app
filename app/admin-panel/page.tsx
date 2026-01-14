@@ -184,8 +184,9 @@ export default function AdminPanel() {
   const [payoutResult, setPayoutResult] = useState<any>(null)
 
   // Practitioner directory admin states
-  const [practitionerListings, setPractitionerListings] = useState<any[]>([])
-  const [practitionerReviewFilter, setPractitionerReviewFilter] = useState('FLAGGED')
+  const [practitionerEntries, setPractitionerEntries] = useState<any[]>([])
+  const [practitionerReviewFilter, setPractitionerReviewFilter] = useState('ALL')
+  const [practitionerEntryFilter, setPractitionerEntryFilter] = useState('ALL')
   const [practitionerStatusFilter, setPractitionerStatusFilter] = useState('ALL')
   const [practitionerQuery, setPractitionerQuery] = useState('')
   const [practitionerLoading, setPractitionerLoading] = useState(false)
@@ -1177,7 +1178,7 @@ https://www.helfi.ai`)
     }
   }
 
-  const loadPractitionerListings = async () => {
+  const loadPractitionerEntries = async () => {
     if (!adminToken) return
     setPractitionerLoading(true)
     setPractitionerError('')
@@ -1189,6 +1190,9 @@ https://www.helfi.ai`)
       if (practitionerStatusFilter && practitionerStatusFilter !== 'ALL') {
         params.set('status', practitionerStatusFilter)
       }
+      if (practitionerEntryFilter && practitionerEntryFilter !== 'ALL') {
+        params.set('entryType', practitionerEntryFilter)
+      }
       if (practitionerQuery) {
         params.set('q', practitionerQuery)
       }
@@ -1198,10 +1202,10 @@ https://www.helfi.ai`)
         },
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'Failed to load listings')
-      setPractitionerListings(data?.listings || [])
+      if (!res.ok) throw new Error(data?.error || 'Failed to load entries')
+      setPractitionerEntries(data?.entries || [])
     } catch (err: any) {
-      setPractitionerError(err?.message || 'Failed to load listings')
+      setPractitionerError(err?.message || 'Failed to load entries')
     } finally {
       setPractitionerLoading(false)
     }
@@ -1222,7 +1226,7 @@ https://www.helfi.ai`)
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Approval failed')
-      await loadPractitionerListings()
+      await loadPractitionerEntries()
     } catch (err: any) {
       alert(err?.message || 'Approval failed')
     } finally {
@@ -1270,13 +1274,43 @@ https://www.helfi.ai`)
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Rejection failed')
-      await loadPractitionerListings()
+      await loadPractitionerEntries()
     } catch (err: any) {
       alert(err?.message || 'Rejection failed')
     } finally {
       setPractitionerActionLoading((prev) => {
         const next = { ...prev }
         delete next[listingId]
+        return next
+      })
+    }
+  }
+
+  const handlePractitionerAccountDelete = async (accountId: string, accountEmail: string) => {
+    if (!adminToken) return
+    const confirmText = window.prompt(
+      `Type DELETE to permanently delete the practitioner account for ${accountEmail}. This cannot be undone.`
+    )
+    if (confirmText !== 'DELETE') return
+    setPractitionerActionLoading((prev) => ({ ...prev, [accountId]: true }))
+    try {
+      const res = await fetch(`/api/admin/practitioners/accounts/${accountId}/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ confirm: confirmText }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Delete failed')
+      await loadPractitionerEntries()
+    } catch (err: any) {
+      alert(err?.message || 'Delete failed')
+    } finally {
+      setPractitionerActionLoading((prev) => {
+        const next = { ...prev }
+        delete next[accountId]
         return next
       })
     }
@@ -1361,7 +1395,7 @@ https://www.helfi.ai`)
       loadPartnerOutreachData()
     }
     if (tabId === 'practitioners') {
-      loadPractitionerListings()
+      loadPractitionerEntries()
     }
     if (tabId === 'settings') {
       checkPushNotificationStatus()
@@ -1392,7 +1426,7 @@ https://www.helfi.ai`)
       loadPartnerOutreachData()
     }
     if (activeTab === 'practitioners') {
-      loadPractitionerListings()
+      loadPractitionerEntries()
     }
     if (activeTab === 'usage') {
       loadVisionUsage(visionUsageRange)
@@ -1408,7 +1442,7 @@ https://www.helfi.ai`)
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  }, [activeTab, practitionerFocusId, practitionerListings])
+  }, [activeTab, practitionerFocusId, practitionerEntries])
 
   // Email functionality
   const handleEmailSelect = (email: string) => {
@@ -3860,10 +3894,10 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Practitioner Listings</h2>
-                  <p className="text-sm text-gray-600">Review and approve flagged listings.</p>
+                  <p className="text-sm text-gray-600">Review listings and new practitioner signups.</p>
                 </div>
                 <button
-                  onClick={() => loadPractitionerListings()}
+                  onClick={() => loadPractitionerEntries()}
                   className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700"
                 >
                   Refresh
@@ -3872,15 +3906,24 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
 
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <select
+                  value={practitionerEntryFilter}
+                  onChange={(e) => setPractitionerEntryFilter(e.target.value)}
+                  className="border rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="ALL">All entries</option>
+                  <option value="LISTINGS">Listings only</option>
+                  <option value="ACCOUNTS">Accounts only</option>
+                </select>
+                <select
                   value={practitionerReviewFilter}
                   onChange={(e) => setPractitionerReviewFilter(e.target.value)}
                   className="border rounded-md px-3 py-2 text-sm"
                 >
+                  <option value="ALL">All</option>
                   <option value="FLAGGED">Flagged</option>
                   <option value="PENDING">Pending</option>
                   <option value="APPROVED">Approved</option>
                   <option value="REJECTED">Rejected</option>
-                  <option value="ALL">All</option>
                 </select>
                 <select
                   value={practitionerStatusFilter}
@@ -3901,7 +3944,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   className="border rounded-md px-3 py-2 text-sm min-w-[220px] flex-1"
                 />
                 <button
-                  onClick={() => loadPractitionerListings()}
+                  onClick={() => loadPractitionerEntries()}
                   className="px-4 py-2 bg-gray-100 text-gray-800 rounded-md text-sm hover:bg-gray-200"
                 >
                   Search
@@ -3910,7 +3953,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             </div>
 
             {practitionerLoading && (
-              <div className="bg-white rounded-lg shadow p-6 text-sm text-gray-600">Loading listings…</div>
+              <div className="bg-white rounded-lg shadow p-6 text-sm text-gray-600">Loading entries…</div>
             )}
 
             {practitionerError && (
@@ -3919,14 +3962,59 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               </div>
             )}
 
-            {!practitionerLoading && !practitionerError && practitionerListings.length === 0 && (
+            {!practitionerLoading && !practitionerError && practitionerEntries.length === 0 && (
               <div className="bg-white rounded-lg shadow p-6 text-sm text-gray-600">
-                No listings match your filters.
+                No entries match your filters.
               </div>
             )}
 
             <div className="space-y-4">
-              {practitionerListings.map((listing) => {
+              {practitionerEntries.map((entry) => {
+                if (entry?.type === 'ACCOUNT') {
+                  const account = entry.account
+                  const accountEmail = account?.contactEmail || account?.userEmail || '—'
+                  return (
+                    <div
+                      key={account?.id || accountEmail}
+                      className="bg-white rounded-lg shadow p-6 border border-gray-200"
+                    >
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        <div className="space-y-2">
+                          <div className="text-lg font-semibold text-gray-900">Practitioner account</div>
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Email:</span> {accountEmail}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Email verified:</span>{' '}
+                            {account?.emailVerified ? 'Yes' : 'No'}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Signed up:</span>{' '}
+                            {account?.createdAt ? new Date(account.createdAt).toLocaleString() : '—'}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Status:</span> Account only (no listing yet)
+                          </div>
+                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700 lg:w-80">
+                          <div className="font-semibold text-red-800 mb-2">Delete account</div>
+                          <p className="text-xs text-red-700 mb-3">
+                            This permanently removes the practitioner account and all related data.
+                          </p>
+                          <button
+                            onClick={() => handlePractitionerAccountDelete(account.id, accountEmail)}
+                            disabled={!!practitionerActionLoading[account.id]}
+                            className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {practitionerActionLoading[account.id] ? 'Working…' : 'Delete Account'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+
+                const listing = entry.listing
                 const selectedReason =
                   PRACTITIONER_REJECTION_REASONS.find(
                     (item) => item.id === (practitionerRejectReasonId[listing.id] || '')

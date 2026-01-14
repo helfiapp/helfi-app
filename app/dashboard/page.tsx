@@ -687,7 +687,7 @@ export default function Dashboard() {
               <span className="text-[10px] font-bold text-helfi-green uppercase tracking-wider">Slide to view</span>
             </div>
 
-            <div className="flex overflow-x-auto gap-4 pb-2 mb-8 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 scrollbar-none">
+            <div className="flex overflow-x-auto gap-4 pb-2 mb-8 md:grid md:grid-cols-5 md:gap-4 md:overflow-visible md:pb-0 scrollbar-none">
               <Link href="/check-in" className="group block min-w-[260px] md:min-w-0">
                 <div className="p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
                   <div className="flex items-center space-x-3 mb-4">
@@ -744,6 +744,21 @@ export default function Dashboard() {
                   </p>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50">
                     Active
+                  </span>
+                </div>
+              </Link>
+
+              <Link href="/practitioners" className="group block min-w-[260px] md:min-w-0">
+                <div className="p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <span className="material-symbols-outlined text-emerald-600">medical_services</span>
+                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">Find a Practitioner</h3>
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                    Browse trusted practitioners by category and location.
+                  </p>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50">
+                    Browse
                   </span>
                 </div>
               </Link>

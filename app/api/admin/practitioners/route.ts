@@ -14,36 +14,97 @@ export async function GET(request: NextRequest) {
   const status = url.searchParams.get('status')
   const country = url.searchParams.get('country')
   const query = url.searchParams.get('q')
+  const entryType = url.searchParams.get('entryType') || 'ALL'
 
-  const where: any = {}
-  if (reviewStatus && reviewStatus !== 'ALL') {
-    where.reviewStatus = reviewStatus
-  }
-  if (status && status !== 'ALL') {
-    where.status = status
-  }
-  if (country) {
-    where.country = country
-  }
-  if (query) {
-    where.OR = [
-      { displayName: { contains: query, mode: 'insensitive' } },
-      { slug: { contains: query, mode: 'insensitive' } },
-      { description: { contains: query, mode: 'insensitive' } },
-      { practitionerAccount: { contactEmail: { contains: query, mode: 'insensitive' } } },
-    ]
+  const includeListings = entryType !== 'ACCOUNTS'
+  const includeAccounts = entryType !== 'LISTINGS'
+  const entries: any[] = []
+
+  if (includeListings) {
+    const where: any = {}
+    if (reviewStatus && reviewStatus !== 'ALL') {
+      where.reviewStatus = reviewStatus
+    }
+    if (status && status !== 'ALL') {
+      where.status = status
+    }
+    if (country) {
+      where.country = country
+    }
+    if (query) {
+      where.OR = [
+        { displayName: { contains: query, mode: 'insensitive' } },
+        { slug: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } },
+        { practitionerAccount: { contactEmail: { contains: query, mode: 'insensitive' } } },
+      ]
+    }
+
+    const listings = await prisma.practitionerListing.findMany({
+      where,
+      include: {
+        practitionerAccount: true,
+        category: true,
+        subcategory: true,
+        subscription: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    listings.forEach((listing) => {
+      entries.push({
+        type: 'LISTING',
+        createdAt: listing.createdAt,
+        listing,
+        account: listing.practitionerAccount,
+      })
+    })
   }
 
-  const listings = await prisma.practitionerListing.findMany({
-    where,
-    include: {
-      practitionerAccount: true,
-      category: true,
-      subcategory: true,
-      subscription: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  })
+  if (
+    includeAccounts &&
+    (!reviewStatus || reviewStatus === 'ALL') &&
+    (!status || status === 'ALL') &&
+    !country
+  ) {
+    const accountWhere: any = { listings: { none: {} } }
+    if (query) {
+      accountWhere.OR = [
+        { contactEmail: { contains: query, mode: 'insensitive' } },
+        { user: { email: { contains: query, mode: 'insensitive' } } },
+      ]
+    }
 
-  return NextResponse.json({ listings })
+    const accounts = await prisma.practitionerAccount.findMany({
+      where: accountWhere,
+      include: {
+        user: {
+          select: {
+            email: true,
+            emailVerified: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    accounts.forEach((account) => {
+      entries.push({
+        type: 'ACCOUNT',
+        createdAt: account.createdAt,
+        account: {
+          id: account.id,
+          userId: account.userId,
+          contactEmail: account.contactEmail,
+          createdAt: account.createdAt,
+          userEmail: account.user?.email || null,
+          emailVerified: !!account.user?.emailVerified,
+        },
+      })
+    })
+  }
+
+  entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  return NextResponse.json({ entries })
 }

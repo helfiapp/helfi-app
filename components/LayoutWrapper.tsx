@@ -316,9 +316,12 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const isFeaturePath = pathname.startsWith('/features')
   const isPractitionerDirectoryPath =
     pathname === '/practitioners' || pathname.startsWith('/practitioners/')
+  const isPractitionerPortalPath =
+    pathname === '/practitioner' || pathname.startsWith('/practitioner/')
   const isPublicPage = publicPages.includes(pathname) || isFeaturePath || isPractitionerDirectoryPath
   const isChatPage = pathname === '/chat'
   const isFoodDiaryPage = pathname === '/food'
+  const isPractitioner = !!session?.user?.isPractitioner
   
   // Admin panel paths should never show user sidebar
   const isAdminPanelPath =
@@ -331,6 +334,12 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     status === 'authenticated' &&
     !isAdminPanelPath &&
     (!isPublicPage || isOnboardingPath)
+
+  const isPractitionerAllowedPath =
+    isPractitionerPortalPath ||
+    isPractitionerDirectoryPath ||
+    isFeaturePath ||
+    (publicPages.includes(pathname) && !isOnboardingPath)
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -347,6 +356,14 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       // Ignore storage errors
     }
   }, [themeAllowed])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    if (!isPractitioner) return
+    if (isAdminPanelPath) return
+    if (isPractitionerAllowedPath) return
+    router.replace('/practitioner')
+  }, [status, isPractitioner, isAdminPanelPath, isPractitionerAllowedPath, router])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -422,7 +439,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   // their account by choosing "Don't ask me again".
   useEffect(() => {
     if (status !== 'authenticated') return
-    if (isPublicPage || isAdminPanelPath) return
+    if (isPublicPage || isAdminPanelPath || isPractitionerPortalPath) return
     if ((session as any)?.user?.needsVerification) return
 
     try {
@@ -456,13 +473,13 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
 
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, pathname, isAdminPanelPath, isPublicPage, session])
+  }, [status, pathname, isAdminPanelPath, isPublicPage, isPractitionerPortalPath, session])
 
   // Track the last in-app page the user visited (for “resume where I left off”).
   // We only store non-public, non-admin paths so onboarding / auth pages are excluded.
   useEffect(() => {
     if (status !== 'authenticated') return
-    if (isPublicPage || isAdminPanelPath) return
+    if (isPublicPage || isAdminPanelPath || isPractitionerPortalPath) return
     if (typeof window === 'undefined') return
     try {
       const fullPath = window.location.pathname + window.location.search
@@ -474,12 +491,12 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     } catch {
       // Ignore storage errors
     }
-  }, [status, pathname, isAdminPanelPath, isPublicPage])
+  }, [status, pathname, isAdminPanelPath, isPublicPage, isPractitionerPortalPath])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (status !== 'authenticated') return
-    if (isPublicPage || isAdminPanelPath) return
+    if (isPublicPage || isAdminPanelPath || isPractitionerPortalPath) return
 
     const locationKey = `${window.location.pathname}?${window.location.search}|${resumeTick}`
     if (lastLocationRef.current === locationKey) return
@@ -668,6 +685,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const shouldShowSidebar =
     status === 'authenticated' &&
     !isAdminPanelPath &&
+    !isPractitionerPortalPath &&
     (!isPublicPage || isOnboardingPath)
 
   const pullRefreshEnabled = shouldShowSidebar && !isChatPage && !isFoodDiaryPage

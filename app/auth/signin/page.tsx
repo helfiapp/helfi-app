@@ -28,6 +28,7 @@ function SearchParamsHandler({
     const planParam = searchParams.get('plan')
     const modeParam = searchParams.get('mode')
     const contextParam = searchParams.get('context')
+    const nextParam = searchParams.get('next')
     
     // If plan parameter exists, show signup form by default
     if (planParam) {
@@ -39,7 +40,7 @@ function SearchParamsHandler({
       setIsSignUp(true)
     }
 
-    if (contextParam === 'practitioner') {
+    if (contextParam === 'practitioner' || (nextParam && nextParam.startsWith('/practitioner'))) {
       setAuthContext('practitioner')
     }
 
@@ -349,9 +350,10 @@ export default function SignIn() {
     const searchParams = new URLSearchParams(window.location.search)
     const planParam = searchParams.get('plan')
     const nextParam = sanitizeNextTarget(searchParams.get('next'))
+    const fallbackTarget = authContext === 'practitioner' ? '/practitioner' : '/onboarding'
     const callbackUrl = planParam
       ? `/auth/signin?plan=${encodeURIComponent(planParam)}`
-      : nextParam || '/onboarding'
+      : nextParam || fallbackTarget
     await signIn('google', { callbackUrl })
   }
 
@@ -384,12 +386,16 @@ export default function SignIn() {
     if (isSignUp) {
       // Handle signup via direct API (no NextAuth flash)
       try {
+        const signupPayload: Record<string, string> = { email, password }
+        if (authContext === 'practitioner') {
+          signupPayload.accountType = 'practitioner'
+        }
         const response = await fetch('/api/auth/signup', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify(signupPayload),
         })
 
         const data = await response.json()
@@ -471,6 +477,9 @@ export default function SignIn() {
             }
           }
           let nextTarget = nextParam || '/onboarding'
+          if (!nextParam && authContext === 'practitioner') {
+            nextTarget = '/practitioner'
+          }
           if (!nextParam) {
             try {
               const storedTarget = sessionStorage.getItem('helfi:postAuthTarget')

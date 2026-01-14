@@ -85,7 +85,8 @@ async function sendVerificationEmail(email: string, token: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const { email, password, accountType } = await request.json()
+    const isPractitionerSignup = accountType === 'practitioner'
 
     if (!email || !password) {
       return NextResponse.json(
@@ -140,6 +141,15 @@ export async function POST(request: NextRequest) {
         freeInteractionReanalysisRemaining: 2,
       } as any
     })
+
+    if (isPractitionerSignup) {
+      await prisma.practitionerAccount.create({
+        data: {
+          userId: user.id,
+          contactEmail: user.email.toLowerCase(),
+        },
+      })
+    }
     
     // Generate verification token
     const verificationToken = generateVerificationToken()

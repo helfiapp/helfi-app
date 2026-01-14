@@ -419,7 +419,8 @@ export const authOptions: NextAuthOptions = {
         if (token?.email) {
           // CRITICAL: Validate that user still exists in database
           const dbUser = await prisma.user.findUnique({
-            where: { id: token.id as string }
+            where: { id: token.id as string },
+            include: { practitionerAccount: { select: { id: true } } },
           })
           
           if (!dbUser) {
@@ -449,7 +450,8 @@ export const authOptions: NextAuthOptions = {
             email: token.email as string,
             name: token.name as string,
             image: token.image as string || null,
-            needsVerification: !dbUser.emailVerified
+            needsVerification: !dbUser.emailVerified,
+            isPractitioner: !!dbUser.practitionerAccount,
           }
         }
         

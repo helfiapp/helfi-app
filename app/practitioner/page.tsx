@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { useSession } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 
 const DirectoryMap = dynamic(() => import('@/components/practitioner/DirectoryMap'), { ssr: false })
 
@@ -76,6 +76,8 @@ export default function PractitionerPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [boostRadiusTier, setBoostRadiusTier] = useState('R10')
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const subcategories = useMemo(() => {
     const parent = categories.find((cat) => cat.id === form.categoryId)
@@ -274,6 +276,30 @@ export default function PractitionerPage() {
     }
   }
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirm !== 'DELETE') {
+      setError('Please type DELETE to confirm account deletion.')
+      return
+    }
+    setDeleteLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const res = await fetch('/api/practitioner/account/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: deleteConfirm }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Delete failed')
+      await signOut({ callbackUrl: '/' })
+    } catch (err: any) {
+      setError(err?.message || 'Delete failed')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   const handleUseLocation = () => {
     if (!navigator.geolocation) {
       alert('Location is not available in this browser.')
@@ -314,16 +340,44 @@ export default function PractitionerPage() {
             <Link
               replace
               className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-              href="/auth/signin?mode=signup"
+              href="/auth/signin?context=practitioner&mode=signup&next=/practitioner"
             >
               Create account
             </Link>
             <Link
               replace
               className="px-5 py-2.5 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
-              href="/auth/signin"
+              href="/auth/signin?context=practitioner&next=/practitioner"
             >
               Sign in
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (session?.user?.isPractitioner === false) {
+    return (
+      <div className="min-h-screen p-6">
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-2xl font-bold text-gray-900">Practitioner Portal</h1>
+          <p className="text-gray-600 mt-2">
+            This portal is for practitioner accounts only. Please sign out and create a practitioner account to list your practice.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => signOut({ callbackUrl: '/list-your-practice/start' })}
+              className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+            >
+              Sign out and create practitioner account
+            </button>
+            <Link
+              replace
+              className="px-5 py-2.5 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
+              href="/list-your-practice"
+            >
+              Learn more
             </Link>
           </div>
         </div>
@@ -465,8 +519,9 @@ export default function PractitionerPage() {
         )}
 
         {!loading && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Listing name</label>
                 <input
@@ -680,25 +735,51 @@ export default function PractitionerPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={handleCreateOrSave}
-                disabled={saving}
-                className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving…' : 'Save listing'}
-              </button>
-              {dashboard?.listing?.id && (
+              <div className="flex flex-wrap gap-3">
                 <button
-                  onClick={handleSubmitForReview}
-                  disabled={submitting}
-                  className="px-5 py-2.5 rounded-full border border-emerald-200 text-emerald-700 font-semibold hover:border-emerald-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  onClick={handleCreateOrSave}
+                  disabled={saving}
+                  className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {submitting ? 'Submitting…' : 'Submit for review'}
+                  {saving ? 'Saving…' : 'Save listing'}
                 </button>
-              )}
+                {dashboard?.listing?.id && (
+                  <button
+                    onClick={handleSubmitForReview}
+                    disabled={submitting}
+                    className="px-5 py-2.5 rounded-full border border-emerald-200 text-emerald-700 font-semibold hover:border-emerald-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {submitting ? 'Submitting…' : 'Submit for review'}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-6 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Delete your account</h2>
+                <p className="text-sm text-gray-600">
+                  This permanently deletes your practitioner account and all related data. This cannot be undone.
+                </p>
+              </div>
+              <div className="max-w-sm space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Type DELETE to confirm</label>
+                <input
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="DELETE"
+                />
+              </div>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteLoading}
+                className="px-5 py-2.5 rounded-full bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {deleteLoading ? 'Deleting…' : 'Delete account'}
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -59,11 +59,14 @@ export default function TermsPage() {
       <div className="max-w-4xl mx-auto p-8 bg-white mt-8 rounded-lg shadow-sm">
         <div className="prose prose-lg max-w-none">
           <h1 className="text-4xl font-bold text-center mb-2 text-gray-900">Helfi Terms of Use</h1>
-          <p className="text-center text-gray-600 mb-8 text-lg">Last updated: December 29, 2025</p>
+          <p className="text-center text-gray-600 text-lg">Last updated: January 15, 2026</p>
+          <p className="text-center text-sm text-gray-500 mb-8">
+            Operated by Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)
+          </p>
           
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
             <p className="text-gray-700 leading-relaxed">
-              By accessing or using the Helfi app and related services ("Helfi", "we", "us", or "our"), you ("user", "you") agree to be bound by these Terms of Use and our Privacy Policy. Please read them carefully before using the app.
+              By accessing or using the Helfi app, website, or related services ("Helfi", "we", "us", or "our"), you ("user", "you") agree to be bound by these Terms of Use and our Privacy Policy. Please read them carefully before using the platform.
             </p>
           </div>
 
@@ -87,11 +90,37 @@ export default function TermsPage() {
             </section>
 
             <section>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">2a. Practitioner Directory (Users and Practitioners)</h2>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                Helfi operates as a technology platform and directory that helps users discover and contact independent practitioners.
+                We are not a healthcare provider, broker, referral service, medical advisor, employer, agent, or representative of any practitioner.
+              </p>
+              <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6 mb-3">
+                <li>We do not provide medical advice, diagnosis, or treatment.</li>
+                <li>We do not verify clinical competence, outcomes, or quality of care.</li>
+                <li>We do not control or participate in appointments, payments, or disputes between users and practitioners.</li>
+              </ul>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                Practitioners are independent third parties and are solely responsible for their services, listings, credentials,
+                and compliance with applicable laws and professional obligations.
+              </p>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                Once a user contacts a practitioner, the relationship is directly between them. Helfi is not responsible for any
+                interaction, advice, treatment, payment, or outcome that occurs between users and practitioners.
+              </p>
+              <p className="text-gray-700 leading-relaxed">
+                Listing order may consider location, relevance, listing completeness, and paid boosts (clearly marked).
+              </p>
+            </section>
+
+            <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">3. Subscription and Payment</h2>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>Helfi offers both free and paid subscription plans.</li>
                 <li>Paid features (e.g., AI health reports, symptom analyzer, wearable sync, unlimited goals, AI chatbot) require an active subscription.</li>
-                <li>All payments are billed in AUD and are non-refundable, except as required by law.</li>
+                <li>All payments are billed in the currency shown at checkout and are non-refundable, except as required by law.</li>
+                <li>Practitioner listing subscriptions and boosts are billed in USD.</li>
+                <li>Boosts provide additional visibility only and do not guarantee leads, bookings, or outcomes.</li>
                 <li>Subscriptions renew automatically unless canceled.</li>
               </ul>
             </section>
@@ -148,6 +177,7 @@ export default function TermsPage() {
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>We reserve the right to suspend or terminate accounts that violate these terms, misuse the platform, or engage in unlawful activity.</li>
                 <li>You may cancel your account at any time via your profile settings.</li>
+                <li>Practitioners can delete their account from the practitioner dashboard. This permanently removes all listing data and cannot be undone.</li>
               </ul>
             </section>
 

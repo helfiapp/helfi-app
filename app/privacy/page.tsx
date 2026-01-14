@@ -59,7 +59,10 @@ export default function PrivacyPage() {
       <div className="max-w-4xl mx-auto p-8 bg-white mt-8 rounded-lg shadow-sm">
         <div className="prose prose-lg max-w-none">
           <h1 className="text-4xl font-bold text-center mb-2 text-gray-900">Helfi Privacy Policy</h1>
-          <p className="text-center text-gray-600 mb-8 text-lg">Last updated: December 29, 2025</p>
+          <p className="text-center text-gray-600 text-lg">Last updated: January 15, 2026</p>
+          <p className="text-center text-sm text-gray-500 mb-8">
+            Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)
+          </p>
           
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
             <p className="text-gray-700 leading-relaxed">
@@ -98,8 +101,18 @@ export default function PrivacyPage() {
               <div>
                 <h3 className="text-xl font-semibold text-gray-800 mb-3">c. Data from Wearables & Third-Party Integrations (with your permission):</h3>
                 <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
-                  <li>Apple Health, Google Fit, Garmin, Withings, etc.</li>
+                  <li>Apple Health, Google Fit, Garmin Connect, Withings, etc.</li>
                   <li>Steps, heart rate, distance, sleep, calories, etc.</li>
+                </ul>
+              </div>
+
+              <div className="mb-4 mt-6">
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">d. Practitioner directory information (for practitioners):</h3>
+                <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
+                  <li>Business name, category, description, and services offered</li>
+                  <li>Practice address, service area, and location details</li>
+                  <li>Public contact details you choose to display (phone, email, website)</li>
+                  <li>Business hours, languages, and listing images</li>
                 </ul>
               </div>
 
@@ -141,6 +154,17 @@ export default function PrivacyPage() {
                 <li><strong>Business Transfers:</strong> If Helfi is involved in a merger, acquisition, or sale of assets, your data may be transferred</li>
                 <li><strong>With Consent:</strong> We may share data if you provide explicit permission</li>
               </ul>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">3a. Practitioner listings and public display</h2>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                If you are a practitioner, your listing details are displayed to users so they can find and contact you. This may
+                include your business name, services, location, and any public contact information you provide.
+              </p>
+              <p className="text-gray-700 leading-relaxed">
+                Users and practitioners connect directly. Helfi does not manage appointments, payments, or disputes between them.
+              </p>
             </section>
 
             <section>
@@ -251,6 +275,7 @@ export default function PrivacyPage() {
               <div className="text-gray-700 leading-relaxed">
                 <p className="mb-2">For questions about this Privacy Policy or your personal data, contact:</p>
                 <p><strong>Email:</strong> <a href="mailto:support@helfi.ai" className="text-green-600 hover:text-green-800 font-medium">support@helfi.ai</a></p>
+                <p><strong>Company:</strong> Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)</p>
                 <p><strong>Mailing Address:</strong> [Insert Business Address Here]</p>
               </div>
             </section>

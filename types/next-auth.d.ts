@@ -8,6 +8,7 @@ declare module 'next-auth' {
       name?: string | null
       image?: string | null
       needsVerification?: boolean
+      isPractitioner?: boolean
     }
   }
 
@@ -17,6 +18,7 @@ declare module 'next-auth' {
     name?: string | null
     image?: string | null
     needsVerification?: boolean
+    isPractitioner?: boolean
   }
 }
 
