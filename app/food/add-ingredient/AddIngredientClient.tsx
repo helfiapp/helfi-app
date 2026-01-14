@@ -9,7 +9,7 @@ type SearchKind = 'packaged' | 'single'
 type SearchSource = 'auto' | 'usda' | 'openfoodfacts'
 
 type NormalizedFoodItem = {
-  source: 'openfoodfacts' | 'usda'
+  source: 'openfoodfacts' | 'usda' | 'fatsecret'
   id: string
   name: string
   brand?: string | null
@@ -435,23 +435,10 @@ export default function AddIngredientClient() {
     }
   }
 
-  useEffect(() => {
-    if (sourceChoice === 'usda' && kind !== 'single') {
-      setKind('single')
-    }
-    if (sourceChoice === 'openfoodfacts' && kind !== 'packaged') {
-      setKind('packaged')
-    }
-  }, [sourceChoice, kind])
-
   const runSearch = async (qOverride?: string, kindOverride?: SearchKind, sourceOverride?: SearchSource) => {
     const q = String(qOverride ?? query).trim()
-    const rawKind = kindOverride ?? kind
     const source = sourceOverride ?? sourceChoice
-    const k = source === 'usda' ? 'single' : source === 'openfoodfacts' ? 'packaged' : rawKind
-    if (k !== rawKind) {
-      setKind(k)
-    }
+    const k = kindOverride ?? kind
     if (!q) {
       setError('Please type a food name to search.')
       return
