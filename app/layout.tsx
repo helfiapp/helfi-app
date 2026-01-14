@@ -72,6 +72,8 @@ export default function RootLayout({
                   var isPublic =
                     path === '/' ||
                     path === '/healthapp' ||
+                    path === '/practitioners' ||
+                    path.indexOf('/practitioners/') === 0 ||
                     path === '/privacy' ||
                     path === '/terms' ||
                     path === '/help' ||

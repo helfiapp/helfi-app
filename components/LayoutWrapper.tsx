@@ -312,7 +312,9 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   ]
 
   const isFeaturePath = pathname.startsWith('/features')
-  const isPublicPage = publicPages.includes(pathname) || isFeaturePath
+  const isPractitionerDirectoryPath =
+    pathname === '/practitioners' || pathname.startsWith('/practitioners/')
+  const isPublicPage = publicPages.includes(pathname) || isFeaturePath || isPractitionerDirectoryPath
   const isChatPage = pathname === '/chat'
   const isFoodDiaryPage = pathname === '/food'
   
