@@ -9,7 +9,7 @@ type SearchKind = 'packaged' | 'single'
 type SearchSource = 'auto' | 'usda' | 'openfoodfacts'
 
 type NormalizedFoodItem = {
-  source: 'openfoodfacts' | 'usda' | 'fatsecret'
+  source: 'openfoodfacts' | 'usda'
   id: string
   name: string
   brand?: string | null
@@ -232,7 +232,7 @@ const buildMeatFatLabel = (item: NormalizedFoodItem, queryText: string) => {
   if (!shouldShowMeatFat(item, queryText)) return null
   const grams = parseServingGrams(item?.serving_size)
   const fat = Number(item?.fat_g)
-  if (!Number.isFinite(grams) || grams <= 0 || !Number.isFinite(fat) || fat <= 0) return null
+  if (grams == null || !Number.isFinite(grams) || grams <= 0 || !Number.isFinite(fat) || fat <= 0) return null
   const fatPercent = Math.round((fat / grams) * 100)
   if (!Number.isFinite(fatPercent) || fatPercent <= 0 || fatPercent >= 100) return null
   const leanPercent = Math.max(0, 100 - fatPercent)
@@ -435,10 +435,23 @@ export default function AddIngredientClient() {
     }
   }
 
+  useEffect(() => {
+    if (sourceChoice === 'usda' && kind !== 'single') {
+      setKind('single')
+    }
+    if (sourceChoice === 'openfoodfacts' && kind !== 'packaged') {
+      setKind('packaged')
+    }
+  }, [sourceChoice, kind])
+
   const runSearch = async (qOverride?: string, kindOverride?: SearchKind, sourceOverride?: SearchSource) => {
     const q = String(qOverride ?? query).trim()
-    const k = kindOverride ?? kind
+    const rawKind = kindOverride ?? kind
     const source = sourceOverride ?? sourceChoice
+    const k = source === 'usda' ? 'single' : source === 'openfoodfacts' ? 'packaged' : rawKind
+    if (k !== rawKind) {
+      setKind(k)
+    }
     if (!q) {
       setError('Please type a food name to search.')
       return
