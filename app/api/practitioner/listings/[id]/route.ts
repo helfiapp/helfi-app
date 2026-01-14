@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { parseCommaList, normalizeUrl } from '@/lib/practitioner-utils'
 
 async function getListingForUser(listingId: string, userId: string) {
@@ -40,6 +41,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
   const body = await request.json().catch(() => ({}))
 
+  const hasHoursNotes = Object.prototype.hasOwnProperty.call(body, 'hoursNotes')
+  const hoursNotes = hasHoursNotes ? String(body?.hoursNotes || '').trim() : ''
+
   const updated = await prisma.practitionerListing.update({
     where: { id: listing.id },
     data: {
@@ -61,7 +65,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       lng: typeof body?.lng === 'number' ? body.lng : null,
       serviceType: body?.serviceType || listing.serviceType,
       languages: parseCommaList(body?.languages),
-      hoursJson: body?.hoursNotes ? { notes: String(body.hoursNotes).trim() } : null,
+      hoursJson: hasHoursNotes
+        ? hoursNotes
+          ? { notes: hoursNotes }
+          : Prisma.JsonNull
+        : undefined,
       images: body?.images ? body.images : null,
     },
   })
