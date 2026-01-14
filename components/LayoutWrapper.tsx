@@ -283,6 +283,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const sidebarNavLockRef = useRef(0)
   const [sidebarPortal, setSidebarPortal] = useState<HTMLElement | null>(null)
   const goalSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [resumeTick, setResumeTick] = useState(0)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const pullStartYRef = useRef<number | null>(null)
   const pullOffsetRef = useRef(0)
@@ -476,7 +477,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (status !== 'authenticated') return
     if (isPublicPage || isAdminPanelPath) return
 
-    const locationKey = `${window.location.pathname}?${window.location.search}`
+    const locationKey = `${window.location.pathname}?${window.location.search}|${resumeTick}`
     if (lastLocationRef.current === locationKey) return
     lastLocationRef.current = locationKey
 
@@ -547,6 +548,24 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       // Ignore URL errors
     }
   })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const bump = () => {
+      setResumeTick((prev) => prev + 1)
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') bump()
+    }
+    window.addEventListener('focus', bump)
+    window.addEventListener('pageshow', bump)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('focus', bump)
+      window.removeEventListener('pageshow', bump)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [])
 
   // Show sidebar only if:
   // 1. User is authenticated (status === 'authenticated') AND
