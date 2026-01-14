@@ -65,7 +65,7 @@ export default function ListYourPracticePage() {
               <h2 className="text-xl font-semibold text-gray-900 mb-3">How it works</h2>
               <ol className="space-y-2 text-sm text-gray-600 list-decimal pl-5">
                 <li>Create your listing and submit it.</li>
-                <li>Review runs in seconds.</li>
+                <li>Our system runs an automated review process.</li>
                 <li>If approved, your listing goes live and your free 2 months start.</li>
                 <li>If flagged, your listing stays hidden until staff approves it.</li>
                 <li>Manage your listing, subscription, and boosts in your dashboard.</li>
