@@ -44,6 +44,45 @@ self.addEventListener('notificationclick', (event) => {
     target.searchParams.set('notificationOpen', '1');
   }
   const targetUrl = target.href;
+  const storeNotificationOpen = () =>
+    new Promise((resolve) => {
+      try {
+        const request = indexedDB.open('helfi-notifications', 1);
+        request.onupgradeneeded = () => {
+          try {
+            request.result.createObjectStore('meta');
+          } catch (e) {}
+        };
+        request.onerror = () => resolve();
+        request.onsuccess = () => {
+          const db = request.result;
+          try {
+            const tx = db.transaction('meta', 'readwrite');
+            const store = tx.objectStore('meta');
+            store.put(Date.now(), 'notificationOpen');
+            tx.oncomplete = () => {
+              try {
+                db.close();
+              } catch (e) {}
+              resolve();
+            };
+            tx.onerror = () => {
+              try {
+                db.close();
+              } catch (e) {}
+              resolve();
+            };
+          } catch (e) {
+            try {
+              db.close();
+            } catch (err) {}
+            resolve();
+          }
+        };
+      } catch (e) {
+        resolve();
+      }
+    });
   const notifyOpen = () =>
     fetch('/api/notifications/notification-open', {
       method: 'POST',
@@ -106,6 +145,9 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     (async () => {
+      try {
+        await storeNotificationOpen();
+      } catch (e) {}
       try {
         await notifyOpen();
       } catch (e) {

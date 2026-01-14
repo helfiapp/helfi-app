@@ -519,6 +519,91 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           .catch(() => {})
       }
 
+      const readNotificationOpenFromDb = () =>
+        new Promise<boolean>((resolve) => {
+          if (typeof indexedDB === 'undefined') return resolve(false)
+          try {
+            const request = indexedDB.open('helfi-notifications', 1)
+            request.onupgradeneeded = () => {
+              try {
+                request.result.createObjectStore('meta')
+              } catch (e) {}
+            }
+            request.onerror = () => resolve(false)
+            request.onsuccess = () => {
+              const db = request.result
+              try {
+                const tx = db.transaction('meta', 'readonly')
+                const store = tx.objectStore('meta')
+                const getReq = store.get('notificationOpen')
+                getReq.onerror = () => {
+                  try {
+                    db.close()
+                  } catch {}
+                  resolve(false)
+                }
+                getReq.onsuccess = () => {
+                  const value = getReq.result
+                  const ts = typeof value === 'number' ? value : null
+                  const fresh = typeof ts === 'number' && Date.now() - ts < 5 * 60 * 1000
+                  try {
+                    db.close()
+                  } catch {}
+                  resolve(fresh)
+                }
+              } catch (e) {
+                try {
+                  db.close()
+                } catch {}
+                resolve(false)
+              }
+            }
+          } catch {
+            resolve(false)
+          }
+        })
+
+      const clearNotificationOpenFromDb = () =>
+        new Promise<void>((resolve) => {
+          if (typeof indexedDB === 'undefined') return resolve()
+          try {
+            const request = indexedDB.open('helfi-notifications', 1)
+            request.onupgradeneeded = () => {
+              try {
+                request.result.createObjectStore('meta')
+              } catch (e) {}
+            }
+            request.onerror = () => resolve()
+            request.onsuccess = () => {
+              const db = request.result
+              try {
+                const tx = db.transaction('meta', 'readwrite')
+                const store = tx.objectStore('meta')
+                store.delete('notificationOpen')
+                tx.oncomplete = () => {
+                  try {
+                    db.close()
+                  } catch {}
+                  resolve()
+                }
+                tx.onerror = () => {
+                  try {
+                    db.close()
+                  } catch {}
+                  resolve()
+                }
+              } catch (e) {
+                try {
+                  db.close()
+                } catch {}
+                resolve()
+              }
+            }
+          } catch {
+            resolve()
+          }
+        })
+
       const finalizePendingCheck = () => {
         runPendingOpen()
         try {
@@ -526,6 +611,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         } catch {
           // Ignore storage errors
         }
+        void clearNotificationOpenFromDb()
       }
 
       if (shouldCheckPending) {
@@ -538,6 +624,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
             finalizePendingCheck()
           })
           .catch(() => {})
+        readNotificationOpenFromDb().then((open) => {
+          if (!open) return
+          finalizePendingCheck()
+        })
       }
 
       if (pendingId || notificationOpen) {
