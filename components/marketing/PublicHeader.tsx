@@ -296,6 +296,12 @@ export default function PublicHeader() {
               </div>
             </div>
           </div>
+          <Link
+            href="/practitioners"
+            className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
+          >
+            Find a practitioner
+          </Link>
           <button
             type="button"
             onClick={() => scrollToSection('pricing')}

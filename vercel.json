@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/weekly-health-report",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/practitioner-trial-check",
+      "schedule": "0 5 * * *"
     }
   ]
 }

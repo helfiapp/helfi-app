@@ -224,6 +224,12 @@ export default function SplashPage() {
               lab reports, and medical images—all in one intelligent platform.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/practitioners"
+                className="btn-primary text-lg px-8 py-4 bg-helfi-green hover:bg-green-600 text-white text-center"
+              >
+                Find a practitioner
+              </Link>
               <button 
                 onClick={() => setShowDemoModal(true)}
                 className="btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white/20"
@@ -234,6 +240,32 @@ export default function SplashPage() {
           </div>
         </div>
 
+      </section>
+
+      {/* Practitioner Directory Section */}
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-emerald-50/60 border border-emerald-100 rounded-3xl p-8 md:p-12 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Practitioner Directory</h2>
+            <p className="text-gray-600 mt-3 text-lg">
+              Find trusted health professionals near you, or list your practice to reach new patients.
+            </p>
+            <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/practitioners"
+                className="px-8 py-4 rounded-full bg-helfi-green text-white font-semibold text-lg hover:bg-helfi-green/90 transition-colors"
+              >
+                Find a practitioner
+              </Link>
+              <Link
+                href="/practitioner"
+                className="px-8 py-4 rounded-full border-2 border-emerald-200 text-emerald-800 font-semibold text-lg hover:border-emerald-300 hover:text-emerald-900 transition-colors"
+              >
+                List your practice
+              </Link>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Features Section */}

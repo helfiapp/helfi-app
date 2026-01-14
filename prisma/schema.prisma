@@ -78,6 +78,7 @@ model User {
   affiliateApplications AffiliateApplication[] @relation("AffiliateApplicationUser")
   affiliateReferral   AffiliateReferral?     @relation("AffiliateReferredUser")
   affiliateConversions AffiliateConversion[] @relation("AffiliateConvertedUser")
+  practitionerAccount PractitionerAccount?
   supportTickets      SupportTicket[]
   interactionAnalyses InteractionAnalysis[]
   symptomAnalyses     SymptomAnalysis[]
@@ -613,6 +614,183 @@ model AffiliatePayout {
   @@index([payoutRunId])
 }
 
+model PractitionerAccount {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  contactEmail String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listings PractitionerListing[]
+  emailLogs PractitionerEmailLog[]
+}
+
+model PractitionerCategory {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  parentId  String?
+  synonyms  String[] @default([])
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent      PractitionerCategory?  @relation("PractitionerCategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    PractitionerCategory[] @relation("PractitionerCategoryHierarchy")
+  listings    PractitionerListing[]  @relation("PractitionerListingCategory")
+  subListings PractitionerListing[]  @relation("PractitionerListingSubcategory")
+  boosts      PractitionerBoostPurchase[]
+
+  @@index([parentId])
+  @@index([sortOrder])
+}
+
+model PractitionerListing {
+  id                    String                         @id @default(cuid())
+  practitionerAccountId String
+  displayName           String
+  slug                  String                         @unique
+  categoryId            String
+  subcategoryId         String?
+  tags                  String[]                       @default([])
+  description           String?
+  phone                 String?
+  websiteUrl            String?
+  emailPublic           String?
+  addressLine1          String?
+  addressLine2          String?
+  suburbCity            String?
+  stateRegion           String?
+  postcode              String?
+  country               String?
+  lat                   Float?
+  lng                   Float?
+  serviceType           PractitionerServiceType        @default(IN_PERSON)
+  languages             String[]                       @default([])
+  hoursJson             Json?
+  images                Json?
+  status                PractitionerListingStatus      @default(DRAFT)
+  visibilityReason      PractitionerVisibilityReason?
+  reviewStatus          PractitionerReviewStatus       @default(PENDING)
+  reviewNotes           String?
+  reviewFlagReason      String?
+  reviewDecisionAt      DateTime?
+  reviewedByAdminId     String?
+  aiRiskLevel           PractitionerAiRiskLevel?
+  aiReasoning           String?
+  aiRawJson             Json?
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+
+  practitionerAccount PractitionerAccount            @relation(fields: [practitionerAccountId], references: [id], onDelete: Cascade)
+  category            PractitionerCategory           @relation("PractitionerListingCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+  subcategory         PractitionerCategory?          @relation("PractitionerListingSubcategory", fields: [subcategoryId], references: [id], onDelete: SetNull)
+  reviewedBy          AdminUser?                     @relation("PractitionerListingReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  subscription        PractitionerListingSubscription?
+  boosts              PractitionerBoostPurchase[]
+  emailLogs           PractitionerEmailLog[]
+  moderationLogs      PractitionerModerationLog[]
+
+  @@index([practitionerAccountId])
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([status])
+  @@index([reviewStatus])
+  @@index([createdAt])
+}
+
+model PractitionerListingSubscription {
+  id                     String                          @id @default(cuid())
+  listingId              String                          @unique
+  provider               PractitionerSubscriptionProvider @default(STRIPE)
+  providerCustomerId     String?
+  providerSubscriptionId String?
+  plan                   PractitionerSubscriptionPlan     @default(LISTING_4_95)
+  trialStartAt           DateTime?
+  trialEndAt             DateTime?
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  status                 PractitionerSubscriptionStatus   @default(TRIALING)
+  cancelAtPeriodEnd      Boolean                         @default(false)
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
+
+  listing PractitionerListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([currentPeriodEnd])
+}
+
+model PractitionerBoostPurchase {
+  id                        String                    @id @default(cuid())
+  listingId                 String
+  categoryId                String
+  geoKey                    String
+  radiusTier                PractitionerRadiusTier
+  startsAt                  DateTime
+  endsAt                    DateTime
+  status                    PractitionerBoostStatus   @default(ACTIVE)
+  priceCents                Int
+  currency                  String
+  pausedAt                  DateTime?
+  remainingSeconds          Int?
+  providerCheckoutSessionId String?
+  providerPaymentIntentId   String?
+  createdAt                 DateTime                  @default(now())
+
+  listing  PractitionerListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  category PractitionerCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([listingId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([geoKey])
+  @@index([startsAt, endsAt])
+}
+
+model PractitionerBoostRotationState {
+  id                   String   @id @default(cuid())
+  bucketKey            String   @unique
+  lastServedListingId  String?
+  lastServedAt         DateTime?
+  updatedAt            DateTime @updatedAt
+}
+
+model PractitionerEmailLog {
+  id                    String                  @id @default(cuid())
+  practitionerAccountId String?
+  listingId             String?
+  type                  PractitionerEmailType
+  toEmail               String
+  sentAt                DateTime
+  metadata              Json?
+  createdAt             DateTime                @default(now())
+
+  practitionerAccount PractitionerAccount? @relation(fields: [practitionerAccountId], references: [id], onDelete: SetNull)
+  listing              PractitionerListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([type])
+  @@index([sentAt])
+}
+
+model PractitionerModerationLog {
+  id          String                      @id @default(cuid())
+  adminUserId String?
+  listingId   String
+  action      PractitionerModerationAction
+  reason      String?
+  createdAt   DateTime                    @default(now())
+
+  adminUser AdminUser?            @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  listing   PractitionerListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([adminUserId])
+  @@index([createdAt])
+}
+
 // Monetary credit top-ups valid for up to 12 months, consumed FIFO
 model CreditTopUp {
   id          String   @id @default(cuid())
@@ -680,6 +858,104 @@ enum AffiliatePayoutRunStatus {
   FAILED
 }
 
+enum PractitionerServiceType {
+  IN_PERSON
+  TELEHEALTH
+  BOTH
+}
+
+enum PractitionerListingStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  HIDDEN
+  SUSPENDED
+  REJECTED
+  DELETED
+}
+
+enum PractitionerVisibilityReason {
+  TRIAL_ACTIVE
+  SUB_ACTIVE
+  SUB_LAPSED
+  ADMIN_HIDDEN
+  PAYMENT_FAILED
+  POLICY
+  AI_REVIEW_PENDING
+  AI_FLAGGED
+  REJECTED
+}
+
+enum PractitionerReviewStatus {
+  PENDING
+  APPROVED
+  FLAGGED
+  REJECTED
+}
+
+enum PractitionerAiRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum PractitionerSubscriptionProvider {
+  STRIPE
+}
+
+enum PractitionerSubscriptionPlan {
+  LISTING_4_95
+}
+
+enum PractitionerSubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  EXPIRED
+}
+
+enum PractitionerBoostStatus {
+  ACTIVE
+  PAUSED
+  EXPIRED
+  CANCELED
+}
+
+enum PractitionerRadiusTier {
+  R5
+  R10
+  R25
+  R50
+}
+
+enum PractitionerEmailType {
+  TRIAL_14D
+  TRIAL_7D
+  TRIAL_1D
+  TRIAL_ENDED
+  SUB_FAILED
+  SUB_CANCELED
+  BOOST_PURCHASED
+  WEEKLY_REENGAGE
+  LISTING_SUBMITTED
+  LISTING_APPROVED
+  LISTING_FLAGGED
+  LISTING_REJECTED
+  LISTING_ACTIVATED
+}
+
+enum PractitionerModerationAction {
+  APPROVE
+  HIDE
+  SUSPEND
+  UNSUSPEND
+  EDIT
+  DELETE
+  REJECT
+}
+
 model Waitlist {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -721,6 +997,8 @@ model AdminUser {
   ticketResponses TicketResponse[] @relation("TicketResponses")
   reviewedAffiliateApplications AffiliateApplication[] @relation("AffiliateApplicationReviewedBy")
   affiliatePayoutRuns          AffiliatePayoutRun[]    @relation("AffiliatePayoutRunCreatedBy")
+  reviewedPractitionerListings PractitionerListing[] @relation("PractitionerListingReviewedBy")
+  practitionerModerationLogs   PractitionerModerationLog[]
 }
 
 enum AdminRole {

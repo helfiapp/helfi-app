@@ -5,6 +5,11 @@ import { Resend } from 'resend'
 import { notifyOwner } from '@/lib/owner-notifications'
 import { getEmailFooter } from '@/lib/email-footer'
 import { reportCriticalError } from '@/lib/error-reporter'
+import {
+  sendPractitionerPaymentFailedEmail,
+  sendPractitionerSubscriptionCanceledEmail,
+  sendPractitionerBoostReceiptEmail,
+} from '@/lib/practitioner-emails'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
@@ -40,6 +45,103 @@ function addDays(date: Date, days: number): Date {
   const d = new Date(date)
   d.setUTCDate(d.getUTCDate() + days)
   return d
+}
+
+async function updatePractitionerSubscriptionFromStripe(sub: Stripe.Subscription) {
+  const listingId = (sub.metadata as any)?.helfi_listing_id
+  if (!listingId) return false
+
+  const listing = await prisma.practitionerListing.findUnique({
+    where: { id: String(listingId) },
+    include: { practitionerAccount: true },
+  })
+  if (!listing) return true
+
+  const currentPeriodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000) : null
+  const currentPeriodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null
+  const trialStartAt = sub.trial_start ? new Date(sub.trial_start * 1000) : null
+  const trialEndAt = sub.trial_end ? new Date(sub.trial_end * 1000) : null
+
+  const normalizedStatus = (() => {
+    switch (sub.status) {
+      case 'active':
+        return 'ACTIVE'
+      case 'trialing':
+        return 'TRIALING'
+      case 'past_due':
+        return 'PAST_DUE'
+      case 'canceled':
+        return 'CANCELED'
+      case 'incomplete':
+        return 'INCOMPLETE'
+      case 'unpaid':
+        return 'EXPIRED'
+      default:
+        return 'EXPIRED'
+    }
+  })()
+
+  await prisma.practitionerListingSubscription.upsert({
+    where: { listingId: listing.id },
+    create: {
+      listingId: listing.id,
+      provider: 'STRIPE',
+      providerCustomerId: typeof sub.customer === 'string' ? sub.customer : sub.customer?.id,
+      providerSubscriptionId: sub.id,
+      plan: 'LISTING_4_95',
+      trialStartAt,
+      trialEndAt,
+      currentPeriodStart,
+      currentPeriodEnd,
+      status: normalizedStatus as any,
+      cancelAtPeriodEnd: sub.cancel_at_period_end || false,
+    },
+    update: {
+      providerCustomerId: typeof sub.customer === 'string' ? sub.customer : sub.customer?.id,
+      providerSubscriptionId: sub.id,
+      trialStartAt,
+      trialEndAt,
+      currentPeriodStart,
+      currentPeriodEnd,
+      status: normalizedStatus as any,
+      cancelAtPeriodEnd: sub.cancel_at_period_end || false,
+    },
+  })
+
+  const isActive = sub.status === 'active' || sub.status === 'trialing'
+  if (isActive && listing.reviewStatus === 'APPROVED') {
+    await prisma.practitionerListing.update({
+      where: { id: listing.id },
+      data: { status: 'ACTIVE', visibilityReason: 'SUB_ACTIVE' },
+    })
+  }
+
+  if (!isActive) {
+    const visibilityReason = sub.status === 'past_due' ? 'PAYMENT_FAILED' : 'SUB_LAPSED'
+    await prisma.practitionerListing.update({
+      where: { id: listing.id },
+      data: { status: 'HIDDEN', visibilityReason },
+    })
+  }
+
+  if (sub.cancel_at_period_end && listing.practitionerAccount) {
+    const existing = await prisma.practitionerEmailLog.findFirst({
+      where: { listingId: listing.id, type: 'SUB_CANCELED' },
+      select: { id: true },
+    })
+    if (!existing) {
+      sendPractitionerSubscriptionCanceledEmail({
+        practitionerAccountId: listing.practitionerAccountId,
+        listingId: listing.id,
+        toEmail: listing.practitionerAccount.contactEmail,
+        displayName: listing.displayName,
+      }).catch((error) => {
+        console.error('❌ Practitioner cancel email failed (non-blocking):', error)
+      })
+    }
+  }
+
+  return true
 }
 
 async function ensureSubscriberMilestonesTable() {
@@ -140,6 +242,9 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription
+        const handledListing = await updatePractitionerSubscriptionFromStripe(sub)
+        if (handledListing) break
+
         const currentPeriodStart = sub.current_period_start
           ? new Date(sub.current_period_start * 1000)
           : new Date()
@@ -322,6 +427,31 @@ export async function POST(request: NextRequest) {
       }
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription
+        const listingId = (sub.metadata as any)?.helfi_listing_id
+        if (listingId) {
+          await updatePractitionerSubscriptionFromStripe(sub)
+          const listing = await prisma.practitionerListing.findUnique({
+            where: { id: String(listingId) },
+            include: { practitionerAccount: true },
+          })
+          if (listing) {
+            const existing = await prisma.practitionerEmailLog.findFirst({
+              where: { listingId: listing.id, type: 'SUB_CANCELED' },
+              select: { id: true },
+            })
+            if (!existing) {
+              sendPractitionerSubscriptionCanceledEmail({
+                practitionerAccountId: listing.practitionerAccountId,
+                listingId: listing.id,
+                toEmail: listing.practitionerAccount.contactEmail,
+                displayName: listing.displayName,
+              }).catch((error) => {
+                console.error('❌ Practitioner cancel email failed (non-blocking):', error)
+              })
+            }
+          }
+          break
+        }
         const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
         let email: string | undefined
         if (customerId) {
@@ -501,6 +631,67 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Practitioner boost purchases
+        if (session.mode === 'payment' && session.payment_status === 'paid') {
+          const boostFlag = (session.metadata as any)?.helfi_boost
+          const listingId = (session.metadata as any)?.helfi_boost_listing_id
+          if (boostFlag && listingId) {
+            const radiusTier = String((session.metadata as any)?.helfi_boost_radius_tier || '')
+            const geoKey = String((session.metadata as any)?.helfi_boost_geo_key || '')
+            const categoryId = String((session.metadata as any)?.helfi_boost_category_id || '')
+            const durationDays = Number((session.metadata as any)?.helfi_boost_duration_days || 7)
+            const priceCents = Number((session.metadata as any)?.helfi_boost_price_cents || session.amount_total || 0)
+            const paymentIntentId =
+              typeof session.payment_intent === 'string' ? session.payment_intent : (session.payment_intent as any)?.id
+
+            const existingBoost = await prisma.practitionerBoostPurchase.findFirst({
+              where: {
+                providerCheckoutSessionId: session.id,
+              },
+            })
+
+            if (!existingBoost && radiusTier && geoKey && categoryId) {
+              const startsAt = new Date()
+              const endsAt = addDays(startsAt, durationDays || 7)
+              await prisma.practitionerBoostPurchase.create({
+                data: {
+                  listingId: String(listingId),
+                  categoryId,
+                  geoKey,
+                  radiusTier: radiusTier as any,
+                  startsAt,
+                  endsAt,
+                  status: 'ACTIVE',
+                  priceCents,
+                  currency: String(session.currency || 'usd').toLowerCase(),
+                  providerCheckoutSessionId: session.id,
+                  providerPaymentIntentId: paymentIntentId || null,
+                },
+              })
+
+              const listing = await prisma.practitionerListing.findUnique({
+                where: { id: String(listingId) },
+                include: { practitionerAccount: true },
+              })
+
+              if (listing) {
+                const radiusLabel =
+                  radiusTier === 'R5' ? '5 km' : radiusTier === 'R10' ? '10 km' : radiusTier === 'R25' ? '25 km' : '50 km'
+                sendPractitionerBoostReceiptEmail({
+                  practitionerAccountId: listing.practitionerAccountId,
+                  listingId: listing.id,
+                  toEmail: listing.practitionerAccount.contactEmail,
+                  displayName: listing.displayName,
+                  radiusLabel,
+                  priceCents,
+                }).catch((error) => {
+                  console.error('❌ Practitioner boost receipt failed (non-blocking):', error)
+                })
+              }
+            }
+          }
+        }
+
         // Affiliate attribution for top-ups (one-time payments)
         if (session.mode === 'payment' && session.payment_status === 'paid') {
           const affCode = (session.metadata as any)?.helfi_aff_code
@@ -583,6 +774,31 @@ export async function POST(request: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice
         const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
         const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+        if (subscriptionId) {
+          const listingSubscription = await prisma.practitionerListingSubscription.findFirst({
+            where: { providerSubscriptionId: subscriptionId },
+            include: { listing: { include: { practitionerAccount: true } } },
+          })
+          if (listingSubscription) {
+            await prisma.practitionerListingSubscription.update({
+              where: { listingId: listingSubscription.listingId },
+              data: { status: 'PAST_DUE' },
+            })
+            await prisma.practitionerListing.update({
+              where: { id: listingSubscription.listingId },
+              data: { status: 'HIDDEN', visibilityReason: 'PAYMENT_FAILED' },
+            })
+            sendPractitionerPaymentFailedEmail({
+              practitionerAccountId: listingSubscription.listing.practitionerAccountId,
+              listingId: listingSubscription.listingId,
+              toEmail: listingSubscription.listing.practitionerAccount.contactEmail,
+              displayName: listingSubscription.listing.displayName,
+            }).catch((error) => {
+              console.error('❌ Practitioner payment failed email (non-blocking):', error)
+            })
+            break
+          }
+        }
         let email: string | undefined
         if (customerId) {
           try {

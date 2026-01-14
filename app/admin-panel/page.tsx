@@ -4,6 +4,38 @@ import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
+const PRACTITIONER_REJECTION_REASONS = [
+  {
+    id: 'NOT_ENOUGH_INFO',
+    label: 'Not enough info',
+    message:
+      'We could not verify your listing because it is missing key details. Please add clear contact details, a full address, and a short description of your services.',
+  },
+  {
+    id: 'SUSPICIOUS_DETAILS',
+    label: 'Suspicious details',
+    message:
+      'Some details in the listing look incorrect or inconsistent. Please review and resubmit with accurate information.',
+  },
+  {
+    id: 'DUPLICATE_LISTING',
+    label: 'Duplicate listing',
+    message:
+      'We found another listing that appears to be the same practice. Please contact support if this is a mistake.',
+  },
+  {
+    id: 'CATEGORY_MISMATCH',
+    label: 'Outside allowed category',
+    message:
+      'This listing does not match our practitioner categories. Please update the category or listing details and resubmit.',
+  },
+  {
+    id: 'OTHER',
+    label: 'Other (custom message)',
+    message: '',
+  },
+]
+
 export default function AdminPanel() {
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -151,6 +183,19 @@ export default function AdminPanel() {
   const [payoutError, setPayoutError] = useState('')
   const [payoutResult, setPayoutResult] = useState<any>(null)
 
+  // Practitioner directory admin states
+  const [practitionerListings, setPractitionerListings] = useState<any[]>([])
+  const [practitionerReviewFilter, setPractitionerReviewFilter] = useState('FLAGGED')
+  const [practitionerStatusFilter, setPractitionerStatusFilter] = useState('ALL')
+  const [practitionerQuery, setPractitionerQuery] = useState('')
+  const [practitionerLoading, setPractitionerLoading] = useState(false)
+  const [practitionerError, setPractitionerError] = useState('')
+  const [practitionerActionLoading, setPractitionerActionLoading] = useState<Record<string, boolean>>({})
+  const [practitionerRejectReasonId, setPractitionerRejectReasonId] = useState<Record<string, string>>({})
+  const [practitionerRejectCustom, setPractitionerRejectCustom] = useState<Record<string, string>>({})
+  const [practitionerApproveNote, setPractitionerApproveNote] = useState<Record<string, string>>({})
+  const [practitionerFocusId, setPractitionerFocusId] = useState<string | null>(null)
+
   // Admin management states
   const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -273,6 +318,10 @@ export default function AdminPanel() {
         return null
       }
     })()
+    const listingId = new URLSearchParams(window.location.search).get('listingId')
+    if (listingId) {
+      setPractitionerFocusId(listingId)
+    }
     if (queryTab || storedTab) {
       handleTabChange(queryTab || storedTab || 'overview', tokenValue)
     }
@@ -1128,6 +1177,111 @@ https://www.helfi.ai`)
     }
   }
 
+  const loadPractitionerListings = async () => {
+    if (!adminToken) return
+    setPractitionerLoading(true)
+    setPractitionerError('')
+    try {
+      const params = new URLSearchParams()
+      if (practitionerReviewFilter && practitionerReviewFilter !== 'ALL') {
+        params.set('reviewStatus', practitionerReviewFilter)
+      }
+      if (practitionerStatusFilter && practitionerStatusFilter !== 'ALL') {
+        params.set('status', practitionerStatusFilter)
+      }
+      if (practitionerQuery) {
+        params.set('q', practitionerQuery)
+      }
+      const res = await fetch(`/api/admin/practitioners?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to load listings')
+      setPractitionerListings(data?.listings || [])
+    } catch (err: any) {
+      setPractitionerError(err?.message || 'Failed to load listings')
+    } finally {
+      setPractitionerLoading(false)
+    }
+  }
+
+  const handlePractitionerApprove = async (listingId: string) => {
+    if (!adminToken) return
+    if (!confirm('Approve this listing?')) return
+    setPractitionerActionLoading((prev) => ({ ...prev, [listingId]: true }))
+    try {
+      const res = await fetch(`/api/admin/practitioners/${listingId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ note: practitionerApproveNote[listingId] || '' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Approval failed')
+      await loadPractitionerListings()
+    } catch (err: any) {
+      alert(err?.message || 'Approval failed')
+    } finally {
+      setPractitionerActionLoading((prev) => {
+        const next = { ...prev }
+        delete next[listingId]
+        return next
+      })
+    }
+  }
+
+  const handlePractitionerReject = async (listingId: string) => {
+    if (!adminToken) return
+    const reasonId = practitionerRejectReasonId[listingId] || ''
+    const reasonConfig = PRACTITIONER_REJECTION_REASONS.find((item) => item.id === reasonId)
+    const customMessage = (practitionerRejectCustom[listingId] || '').trim()
+
+    if (!reasonConfig) {
+      alert('Please choose a rejection reason first.')
+      return
+    }
+
+    if (reasonConfig.id === 'OTHER' && !customMessage) {
+      alert('Please write a custom rejection message.')
+      return
+    }
+
+    const reason =
+      reasonConfig.id === 'OTHER'
+        ? customMessage
+        : customMessage
+          ? `${reasonConfig.message}\n\nAdditional note: ${customMessage}`
+          : reasonConfig.message
+
+    if (!confirm('Reject this listing and send the message to the applicant?')) return
+    setPractitionerActionLoading((prev) => ({ ...prev, [listingId]: true }))
+    try {
+      const res = await fetch(`/api/admin/practitioners/${listingId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ reason }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Rejection failed')
+      await loadPractitionerListings()
+    } catch (err: any) {
+      alert(err?.message || 'Rejection failed')
+    } finally {
+      setPractitionerActionLoading((prev) => {
+        const next = { ...prev }
+        delete next[listingId]
+        return next
+      })
+    }
+  }
+
   const runAffiliatePayout = async (dryRunOverride?: boolean) => {
     if (!adminToken) return
     setPayoutLoading(true)
@@ -1206,6 +1360,9 @@ https://www.helfi.ai`)
     if (tabId === 'partner-outreach') {
       loadPartnerOutreachData()
     }
+    if (tabId === 'practitioners') {
+      loadPractitionerListings()
+    }
     if (tabId === 'settings') {
       checkPushNotificationStatus()
       loadSecurityStatus(tokenOverride)
@@ -1234,6 +1391,9 @@ https://www.helfi.ai`)
     if (activeTab === 'partner-outreach') {
       loadPartnerOutreachData()
     }
+    if (activeTab === 'practitioners') {
+      loadPractitionerListings()
+    }
     if (activeTab === 'usage') {
       loadVisionUsage(visionUsageRange)
       loadFoodCostSim(foodCostSimRange)
@@ -1241,6 +1401,14 @@ https://www.helfi.ai`)
       loadServerCallUsage(serverCallUsageRange)
     }
   }
+
+  useEffect(() => {
+    if (activeTab !== 'practitioners' || !practitionerFocusId) return
+    const target = document.getElementById(`practitioner-${practitionerFocusId}`)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [activeTab, practitionerFocusId, practitionerListings])
 
   // Email functionality
   const handleEmailSelect = (email: string) => {
@@ -2684,6 +2852,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'usage', label: 'AI Usage' },
+              { id: 'practitioners', label: 'Practitioners' },
               { id: 'affiliates', label: 'Affiliates' },
               { id: 'waitlist', label: 'Waitlist' },
               { id: 'partner-outreach', label: 'Partners' },
@@ -2714,6 +2883,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             {[
               { id: 'overview', label: '📊 Overview', desc: 'Key metrics' },
               { id: 'usage', label: '💰 AI Usage', desc: 'Vision costs' },
+              { id: 'practitioners', label: '🧑‍⚕️ Practitioners', desc: 'Directory reviews' },
               { id: 'affiliates', label: '🤝 Affiliates', desc: 'Applications & payouts' },
               { id: 'events', label: '📋 Events', desc: 'Raw data' },
               { id: 'insights', label: '🤖 AI Insights', desc: 'OpenAI analysis' },
@@ -3680,6 +3850,196 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   <div className="text-xs text-gray-500">{foodBenchmarkResult.note}</div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'practitioners' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Practitioner Listings</h2>
+                  <p className="text-sm text-gray-600">Review and approve flagged listings.</p>
+                </div>
+                <button
+                  onClick={() => loadPractitionerListings()}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <select
+                  value={practitionerReviewFilter}
+                  onChange={(e) => setPractitionerReviewFilter(e.target.value)}
+                  className="border rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="FLAGGED">Flagged</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="ALL">All</option>
+                </select>
+                <select
+                  value={practitionerStatusFilter}
+                  onChange={(e) => setPractitionerStatusFilter(e.target.value)}
+                  className="border rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="ALL">Any status</option>
+                  <option value="PENDING_REVIEW">Pending review</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="HIDDEN">Hidden</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="SUSPENDED">Suspended</option>
+                </select>
+                <input
+                  value={practitionerQuery}
+                  onChange={(e) => setPractitionerQuery(e.target.value)}
+                  placeholder="Search by name, email, or text..."
+                  className="border rounded-md px-3 py-2 text-sm min-w-[220px] flex-1"
+                />
+                <button
+                  onClick={() => loadPractitionerListings()}
+                  className="px-4 py-2 bg-gray-100 text-gray-800 rounded-md text-sm hover:bg-gray-200"
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+
+            {practitionerLoading && (
+              <div className="bg-white rounded-lg shadow p-6 text-sm text-gray-600">Loading listings…</div>
+            )}
+
+            {practitionerError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                {practitionerError}
+              </div>
+            )}
+
+            {!practitionerLoading && !practitionerError && practitionerListings.length === 0 && (
+              <div className="bg-white rounded-lg shadow p-6 text-sm text-gray-600">
+                No listings match your filters.
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {practitionerListings.map((listing) => {
+                const selectedReason =
+                  PRACTITIONER_REJECTION_REASONS.find(
+                    (item) => item.id === (practitionerRejectReasonId[listing.id] || '')
+                  ) || null
+
+                return (
+                  <div
+                    key={listing.id}
+                    id={`practitioner-${listing.id}`}
+                    className={`bg-white rounded-lg shadow p-6 border ${listing.id === practitionerFocusId ? 'border-emerald-400' : 'border-gray-200'}`}
+                  >
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                    <div className="space-y-2">
+                      <div className="text-lg font-semibold text-gray-900">{listing.displayName}</div>
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">Category:</span> {listing.category?.name || '—'}
+                        {listing.subcategory?.name ? ` · ${listing.subcategory.name}` : ''}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">Status:</span> {listing.status} · {listing.reviewStatus}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">Contact:</span> {listing.practitionerAccount?.contactEmail || '—'}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">Location:</span>{' '}
+                        {[listing.suburbCity, listing.stateRegion, listing.country].filter(Boolean).join(', ') || '—'}
+                      </div>
+                      {listing.slug && (
+                        <a
+                          href={`/practitioners/${listing.slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block text-sm text-emerald-700 hover:underline"
+                        >
+                          View public listing
+                        </a>
+                      )}
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 lg:w-80">
+                      <div className="font-semibold text-gray-900 mb-2">AI Review</div>
+                      <div><span className="font-medium">Risk:</span> {listing.aiRiskLevel || 'N/A'}</div>
+                      {listing.aiReasoning && <div className="mt-2 text-gray-600">{listing.aiReasoning}</div>}
+                      {listing.reviewFlagReason && (
+                        <div className="mt-2 text-gray-600 whitespace-pre-wrap">
+                          <span className="font-medium">Flags:</span> {listing.reviewFlagReason}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">Approval note (optional)</label>
+                      <textarea
+                        value={practitionerApproveNote[listing.id] || ''}
+                        onChange={(e) => setPractitionerApproveNote((prev) => ({ ...prev, [listing.id]: e.target.value }))}
+                        rows={2}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                        placeholder="Optional note for internal records..."
+                      />
+                      <button
+                        onClick={() => handlePractitionerApprove(listing.id)}
+                        disabled={!!practitionerActionLoading[listing.id]}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {practitionerActionLoading[listing.id] ? 'Working…' : 'Approve Listing'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">Rejection reason</label>
+                      <select
+                        value={practitionerRejectReasonId[listing.id] || ''}
+                        onChange={(e) =>
+                          setPractitionerRejectReasonId((prev) => ({ ...prev, [listing.id]: e.target.value }))
+                        }
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      >
+                        <option value="">Choose a reason</option>
+                        {PRACTITIONER_REJECTION_REASONS.map((reason) => (
+                          <option key={reason.id} value={reason.id}>
+                            {reason.label}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedReason?.message && (
+                        <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+                          {selectedReason.message}
+                        </div>
+                      )}
+                      <label className="block text-sm font-medium text-gray-700">Custom message (optional)</label>
+                      <textarea
+                        value={practitionerRejectCustom[listing.id] || ''}
+                        onChange={(e) =>
+                          setPractitionerRejectCustom((prev) => ({ ...prev, [listing.id]: e.target.value }))
+                        }
+                        rows={3}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                        placeholder="Add any extra detail for this applicant..."
+                      />
+                      <button
+                        onClick={() => handlePractitionerReject(listing.id)}
+                        disabled={!!practitionerActionLoading[listing.id]}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {practitionerActionLoading[listing.id] ? 'Working…' : 'Reject Listing'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                )
+              })}
             </div>
           </div>
         )}
