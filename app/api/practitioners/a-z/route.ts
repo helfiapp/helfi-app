@@ -4,36 +4,29 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const listings = await prisma.practitionerListing.findMany({
+  const categories = await prisma.practitionerCategory.findMany({
     where: {
-      status: 'ACTIVE',
-      reviewStatus: 'APPROVED',
-      visibilityReason: { in: ['TRIAL_ACTIVE', 'SUB_ACTIVE'] },
+      parentId: null,
     },
-    select: {
-      id: true,
-      displayName: true,
-      slug: true,
-      category: { select: { name: true } },
-      subcategory: { select: { name: true } },
-      suburbCity: true,
-      stateRegion: true,
-      country: true,
+    include: {
+      children: {
+        orderBy: { sortOrder: 'asc' },
+      },
     },
     orderBy: {
-      displayName: 'asc',
+      sortOrder: 'asc',
     },
   })
 
-  const results = listings.map((listing) => ({
-    id: listing.id,
-    displayName: listing.displayName,
-    slug: listing.slug,
-    categoryName: listing.category?.name || null,
-    subcategoryName: listing.subcategory?.name || null,
-    location: [listing.suburbCity, listing.stateRegion, listing.country]
-      .filter(Boolean)
-      .join(', '),
+  const results = categories.map((category) => ({
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    children: category.children.map((child) => ({
+      id: child.id,
+      name: child.name,
+      slug: child.slug,
+    })),
   }))
 
   return NextResponse.json({ results })

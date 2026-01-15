@@ -350,7 +350,7 @@ export default function PractitionerPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Delete failed')
-      await signOut({ callbackUrl: '/' })
+      await signOut({ callbackUrl: '/practitioners' })
     } catch (err: any) {
       setError(err?.message || 'Delete failed')
     } finally {
@@ -424,7 +424,7 @@ export default function PractitionerPage() {
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
-              onClick={() => signOut({ callbackUrl: '/list-your-practice/start' })}
+              onClick={() => signOut({ callbackUrl: '/practitioners' })}
               className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
             >
               Sign out and create practitioner account
@@ -450,7 +450,7 @@ export default function PractitionerPage() {
             <h1 className="text-2xl font-bold text-gray-900">Practitioner Listing</h1>
             <div className="flex items-center gap-3 text-sm">
               <button
-                onClick={() => signOut({ callbackUrl: '/auth/signin?context=practitioner&next=/practitioner' })}
+                onClick={() => signOut({ callbackUrl: '/practitioners' })}
                 className="text-emerald-700 font-semibold hover:underline"
               >
                 Sign out

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculateDistanceKm } from '@/lib/practitioner-utils'
+import { createTrackingToken } from '@/lib/practitioner-tracking'
 
 function normalize(value: string | null | undefined): string {
   return String(value || '').trim().toLowerCase()
@@ -182,12 +183,17 @@ export async function GET(request: NextRequest) {
     phone: item.listing.phone,
     websiteUrl: item.listing.websiteUrl,
     emailPublic: item.listing.emailPublic,
+    addressLine1: item.listing.addressLine1,
+    suburbCity: item.listing.suburbCity,
+    stateRegion: item.listing.stateRegion,
+    country: item.listing.country,
     lat: item.listing.lat,
     lng: item.listing.lng,
     serviceType: item.listing.serviceType,
     distanceKm: item.distanceKm,
     isBoosted: boostedSet.has(item.listing.id),
     isTopBoost: topBoostId === item.listing.id,
+    trackingToken: createTrackingToken(item.listing.id),
   }))
 
   return NextResponse.json({

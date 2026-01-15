@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { useSearchParams } from 'next/navigation'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import MaterialSymbol from '@/components/MaterialSymbol'
 
@@ -25,12 +26,17 @@ type SearchResult = {
   phone: string | null
   websiteUrl: string | null
   emailPublic: string | null
+  addressLine1: string | null
+  suburbCity: string | null
+  stateRegion: string | null
+  country: string | null
   lat: number | null
   lng: number | null
   serviceType: string
   distanceKm: number | null
   isBoosted: boolean
   isTopBoost: boolean
+  trackingToken?: string | null
 }
 
 type LocationResult = {
@@ -73,6 +79,7 @@ const QUICK_ACCESS: QuickAccess[] = [
 ]
 
 export default function PractitionerDirectoryPage() {
+  const searchParams = useSearchParams()
   const [categories, setCategories] = useState<CategoryNode[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
@@ -85,7 +92,14 @@ export default function PractitionerDirectoryPage() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pendingScroll, setPendingScroll] = useState(false)
   const subcategoryRef = useRef<HTMLSelectElement | null>(null)
+  const resultsRef = useRef<HTMLDivElement | null>(null)
+
+  const isValidEmail = (value: string | null | undefined) => {
+    if (!value) return false
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+  }
 
   const persistLocation = (location: LocationResult) => {
     try {
@@ -135,6 +149,46 @@ export default function PractitionerDirectoryPage() {
       // Ignore storage errors
     }
   }, [])
+
+  React.useEffect(() => {
+    const categoryParam = searchParams?.get('categoryId') || ''
+    const subcategoryParam = searchParams?.get('subcategoryId') || ''
+    const queryParam = searchParams?.get('q') || ''
+
+    if (categoryParam || subcategoryParam || queryParam) {
+      setCategoryId(categoryParam)
+      setSubcategoryId(subcategoryParam)
+      setQuery(queryParam)
+      setPendingScroll(true)
+      handleSearch({ categoryId: categoryParam, subcategoryId: subcategoryParam, query: queryParam })
+      return
+    }
+
+    try {
+      const saved = sessionStorage.getItem('helfi:practitionerSearchState')
+      if (!saved) return
+      const parsed = JSON.parse(saved)
+      if (!parsed || !parsed.results) return
+      setCategoryId(parsed.categoryId || '')
+      setSubcategoryId(parsed.subcategoryId || '')
+      setQuery(parsed.query || '')
+      setLocationQuery(parsed.locationQuery || '')
+      setSelectedLocation(parsed.selectedLocation || null)
+      setRadiusKm(typeof parsed.radiusKm === 'number' ? parsed.radiusKm : 10)
+      setTelehealthOnly(Boolean(parsed.telehealthOnly))
+      setResults(Array.isArray(parsed.results) ? parsed.results : [])
+    } catch {
+      // Ignore bad state
+    }
+  }, [searchParams])
+
+  React.useEffect(() => {
+    if (!pendingScroll || loading) return
+    if (resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+    setPendingScroll(false)
+  }, [pendingScroll, loading, results])
 
   const handleLocationSearch = async () => {
     if (!locationQuery.trim()) return
@@ -203,9 +257,27 @@ export default function PractitionerDirectoryPage() {
     )
   }
 
+  const persistSearchState = (payload: {
+    categoryId: string
+    subcategoryId: string
+    query: string
+    locationQuery: string
+    selectedLocation: LocationResult | null
+    radiusKm: number
+    telehealthOnly: boolean
+    results: SearchResult[]
+  }) => {
+    try {
+      sessionStorage.setItem('helfi:practitionerSearchState', JSON.stringify(payload))
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
   const handleSearch = async (overrides?: { categoryId?: string; subcategoryId?: string; query?: string }) => {
     setLoading(true)
     setError(null)
+    setPendingScroll(true)
     try {
       const effectiveCategoryId = overrides?.categoryId ?? categoryId
       const effectiveSubcategoryId = overrides?.subcategoryId ?? subcategoryId
@@ -225,7 +297,18 @@ export default function PractitionerDirectoryPage() {
       const res = await fetch(`/api/practitioners/search?${params.toString()}`)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Search failed')
-      setResults(data?.results || [])
+      const nextResults = data?.results || []
+      setResults(nextResults)
+      persistSearchState({
+        categoryId: effectiveCategoryId,
+        subcategoryId: effectiveSubcategoryId,
+        query: effectiveQuery,
+        locationQuery,
+        selectedLocation,
+        radiusKm,
+        telehealthOnly,
+        results: nextResults,
+      })
     } catch (err: any) {
       setError(err?.message || 'Search failed')
     } finally {
@@ -259,9 +342,29 @@ export default function PractitionerDirectoryPage() {
         name: item.displayName,
         lat: item.lat as number,
         lng: item.lng as number,
+        address: [item.addressLine1, item.suburbCity, item.stateRegion, item.country].filter(Boolean).join(', '),
         isBoosted: item.isBoosted,
       }))
   }, [results])
+
+  const trackClick = (item: SearchResult, action: string) => {
+    if (!item?.trackingToken) return
+    const payload = JSON.stringify({
+      listingId: item.id,
+      action,
+      token: item.trackingToken,
+    })
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/practitioners/contact-click', new Blob([payload], { type: 'application/json' }))
+      return
+    }
+    fetch('/api/practitioners/contact-click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => undefined)
+  }
 
   const center = selectedLocation
     ? { lat: selectedLocation.lat, lng: selectedLocation.lng }
@@ -291,7 +394,7 @@ export default function PractitionerDirectoryPage() {
                 className="flex items-center gap-2 text-emerald-700 font-semibold hover:underline text-base"
                 href="/practitioners/a-z"
               >
-                Browse Practitioners A-Z
+                Browse Categories A-Z
                 <span className="text-sm">→</span>
               </Link>
             </div>
@@ -468,7 +571,11 @@ export default function PractitionerDirectoryPage() {
       </section>
 
       <section className="px-4 pb-16">
-        <div className="max-w-6xl mx-auto">
+        <div ref={resultsRef} className="max-w-6xl mx-auto scroll-mt-20">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-slate-900">Search Results</h2>
+            <p className="text-sm text-slate-500">Results stay here until you run a new search.</p>
+          </div>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl mb-6">
               {error}
@@ -507,14 +614,33 @@ export default function PractitionerDirectoryPage() {
                   )}
                   {item.description && <p className="text-sm text-slate-600">{item.description}</p>}
                   <div className="flex flex-wrap gap-3 text-sm text-emerald-700">
-                    <Link href={`/practitioners/${item.slug}`} className="hover:underline">View profile</Link>
-                    {item.phone && <a href={`tel:${item.phone}`} className="hover:underline">Call</a>}
+                    <Link
+                      href={`/practitioners/${item.slug}`}
+                      className="hover:underline"
+                    >
+                      View profile
+                    </Link>
+                    {item.phone && (
+                      <a href={`tel:${item.phone}`} className="hover:underline" onClick={() => trackClick(item, 'call')}>
+                        Call
+                      </a>
+                    )}
                     {item.websiteUrl && (
-                      <a href={item.websiteUrl} target="_blank" rel="noreferrer" className="hover:underline">
+                      <a
+                        href={item.websiteUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hover:underline"
+                        onClick={() => trackClick(item, 'website')}
+                      >
                         Website
                       </a>
                     )}
-                    {item.emailPublic && <a href={`mailto:${item.emailPublic}`} className="hover:underline">Email</a>}
+                    {isValidEmail(item.emailPublic) && (
+                      <a href={`mailto:${item.emailPublic}`} className="hover:underline" onClick={() => trackClick(item, 'email')}>
+                        Email
+                      </a>
+                    )}
                   </div>
                 </div>
               ))}

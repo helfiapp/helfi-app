@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/practitioner-trial-check",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/practitioner-contact-summary",
+      "schedule": "0 6 * * 1"
     }
   ]
 }

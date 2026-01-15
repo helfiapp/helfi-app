@@ -122,6 +122,21 @@ export async function sendPractitionerApprovedEmail(options: {
   })
 }
 
+function dispatchEmailNoLog(options: {
+  resend: Resend
+  label: string
+  message: { from: string; to: string; subject: string; html: string }
+}) {
+  options.resend.emails
+    .send(options.message)
+    .then((emailResponse) => {
+      console.log(`✅ [${options.label}] Sent to ${options.message.to} with ID: ${emailResponse.data?.id}`)
+    })
+    .catch((error) => {
+      console.error(`[${options.label}] Email failed`, error)
+    })
+}
+
 export async function sendPractitionerReviewEmail(options: {
   practitionerAccountId?: string | null
   listingId: string
@@ -546,6 +561,76 @@ export async function sendPractitionerReengageEmail(options: {
       listingId: options.listingId,
       type: 'WEEKLY_REENGAGE',
       toEmail: options.toEmail,
+    },
+  })
+}
+
+export async function sendPractitionerContactSummaryEmail(options: {
+  toEmail: string
+  displayName: string
+  slug: string
+  rangeStart: Date
+  rangeEnd: Date
+  events: { action: string; timestamp: Date }[]
+}) {
+  const resend = getResendClient()
+  if (!resend) return
+
+  const formatDate = (value: Date) =>
+    new Intl.DateTimeFormat('en-AU', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
+
+  const actionLabels: Record<string, string> = {
+    profile_view: 'Profile viewed',
+    call: 'Call clicked',
+    website: 'Website clicked',
+    email: 'Email clicked',
+  }
+
+  const counts = options.events.reduce<Record<string, number>>((acc, event) => {
+    acc[event.action] = (acc[event.action] || 0) + 1
+    return acc
+  }, {})
+
+  const listingUrl = `${getBaseUrl()}/practitioners/${options.slug}`
+  const rangeLabel = `${formatDate(options.rangeStart)} → ${formatDate(options.rangeEnd)}`
+
+  const summaryRows = Object.entries(actionLabels)
+    .map(([key, label]) => `<li><strong>${label}:</strong> ${counts[key] || 0}</li>`)
+    .join('')
+
+  const eventRows = options.events
+    .map((event) => `<li>${formatDate(event.timestamp)} — ${actionLabels[event.action] || event.action}</li>`)
+    .join('')
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h2 style="margin: 0 0 12px 0;">Weekly activity summary</h2>
+      <p style="margin: 0 0 12px 0;">Here is the latest activity for <strong>${options.displayName}</strong>.</p>
+      <p style="margin: 0 0 16px 0;"><strong>Range:</strong> ${rangeLabel}</p>
+      <ul style="margin: 0 0 16px 18px; padding: 0; list-style: disc;">
+        ${summaryRows}
+      </ul>
+      <p style="margin: 0 0 8px 0;"><strong>Activity details:</strong></p>
+      <ul style="margin: 0 0 16px 18px; padding: 0; list-style: disc;">
+        ${eventRows}
+      </ul>
+      <a href="${listingUrl}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:10px 16px;border-radius:999px;font-weight:600;">View listing</a>
+      ${getEmailFooter({
+        recipientEmail: options.toEmail,
+        emailType: 'support',
+        reasonText: 'You received this email because people interacted with your practitioner listing.'
+      })}
+    </div>
+  `
+
+  dispatchEmailNoLog({
+    resend,
+    label: 'PRACTITIONER CONTACT SUMMARY',
+    message: {
+      from: 'Helfi <support@helfi.ai>',
+      to: options.toEmail,
+      subject: 'Weekly listing activity summary',
+      html,
     },
   })
 }

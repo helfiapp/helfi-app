@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { geocodeAddress } from '@/lib/practitioner-utils'
+import { createTrackingToken } from '@/lib/practitioner-tracking'
 
 export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
   const listing = await prisma.practitionerListing.findFirst({
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
       images: listing.images,
       categoryName: listing.category?.name || null,
       subcategoryName: listing.subcategory?.name || null,
+      trackingToken: createTrackingToken(listing.id),
     },
   })
 }

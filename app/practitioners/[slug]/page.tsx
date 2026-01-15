@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 
 const DirectoryMap = dynamic(() => import('@/components/practitioner/DirectoryMap'), { ssr: false })
@@ -9,6 +9,32 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
   const [listing, setListing] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const trackedRef = useRef(false)
+
+  const isValidEmail = (value: string | null | undefined) => {
+    if (!value) return false
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+  }
+
+  const trackClick = (action: string) => {
+    if (!listing?.id || !listing?.trackingToken) return
+    const payload = JSON.stringify({
+      listingId: listing.id,
+      action,
+      token: listing.trackingToken,
+    })
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/practitioners/contact-click', new Blob([payload], { type: 'application/json' }))
+      return
+    }
+    fetch('/api/practitioners/contact-click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => undefined)
+  }
 
   useEffect(() => {
     const loadListing = async () => {
@@ -28,6 +54,12 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
 
     loadListing()
   }, [params.slug])
+
+  useEffect(() => {
+    if (!listing?.id || !listing?.trackingToken || trackedRef.current) return
+    trackedRef.current = true
+    trackClick('profile_view')
+  }, [listing])
 
   if (loading) {
     return (
@@ -55,6 +87,7 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
   const logoUrl = listing?.images?.logoUrl || null
   const galleryUrls = Array.isArray(listing?.images?.gallery) ? listing.images.gallery : []
   const hoursNotes = listing?.hours?.notes || null
+  const lightboxOpen = lightboxIndex !== null && galleryUrls[lightboxIndex]
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -84,21 +117,35 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
             {listing.phone && (
               <div>
                 <div className="text-xs font-semibold text-gray-500 uppercase">Phone</div>
-                <a href={`tel:${listing.phone}`} className="text-emerald-700 hover:underline">{listing.phone}</a>
+                <a href={`tel:${listing.phone}`} className="text-emerald-700 hover:underline" onClick={() => trackClick('call')}>
+                  {listing.phone}
+                </a>
               </div>
             )}
             {listing.websiteUrl && (
               <div>
                 <div className="text-xs font-semibold text-gray-500 uppercase">Website</div>
-                <a href={listing.websiteUrl} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline">
+                <a
+                  href={listing.websiteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-emerald-700 hover:underline"
+                  onClick={() => trackClick('website')}
+                >
                   {listing.websiteUrl}
                 </a>
               </div>
             )}
-            {listing.emailPublic && (
+            {isValidEmail(listing.emailPublic) && (
               <div>
                 <div className="text-xs font-semibold text-gray-500 uppercase">Email</div>
-                <a href={`mailto:${listing.emailPublic}`} className="text-emerald-700 hover:underline">{listing.emailPublic}</a>
+                <a
+                  href={`mailto:${listing.emailPublic}`}
+                  className="text-emerald-700 hover:underline"
+                  onClick={() => trackClick('email')}
+                >
+                  {listing.emailPublic}
+                </a>
               </div>
             )}
             {address && (
@@ -150,18 +197,73 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="text-sm font-semibold text-gray-700 mb-4">Photos</div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {galleryUrls.map((url: string) => (
-                <img
+              {galleryUrls.map((url: string, index: number) => (
+                <button
                   key={url}
-                  src={url}
-                  alt={`${listing.displayName} photo`}
-                  className="w-full h-40 rounded-xl object-cover border border-gray-100"
-                />
+                  type="button"
+                  onClick={() => setLightboxIndex(index)}
+                  className="group relative"
+                >
+                  <img
+                    src={url}
+                    alt={`${listing.displayName} photo`}
+                    className="w-full h-40 rounded-xl object-cover border border-gray-100 group-hover:opacity-90 transition-opacity"
+                  />
+                </button>
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {lightboxOpen && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"
+          onClick={() => setLightboxIndex(null)}
+        >
+          <div className="absolute top-4 right-4">
+            <button
+              type="button"
+              onClick={() => setLightboxIndex(null)}
+              className="px-3 py-2 rounded-full bg-white/90 text-gray-900 text-sm font-semibold"
+            >
+              Close
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              setLightboxIndex((prev) => {
+                if (prev === null) return prev
+                return prev === 0 ? galleryUrls.length - 1 : prev - 1
+              })
+            }}
+            className="absolute left-4 md:left-8 text-white text-3xl font-bold"
+          >
+            ‹
+          </button>
+          <img
+            src={galleryUrls[lightboxIndex as number]}
+            alt={`${listing.displayName} photo`}
+            className="max-h-[80vh] max-w-[90vw] rounded-2xl shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              setLightboxIndex((prev) => {
+                if (prev === null) return prev
+                return prev === galleryUrls.length - 1 ? 0 : prev + 1
+              })
+            }}
+            className="absolute right-4 md:right-8 text-white text-3xl font-bold"
+          >
+            ›
+          </button>
+        </div>
+      )}
     </div>
   )
 }

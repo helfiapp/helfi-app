@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Circle, Popup, useMap } from 'react-leaflet'
+import React, { useEffect, useMemo } from 'react'
+import { MapContainer, TileLayer, Marker, Circle, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 
 const defaultIcon = new L.Icon({
@@ -24,6 +24,7 @@ export type DirectoryMapMarker = {
   name: string
   lat: number
   lng: number
+  address?: string | null
   isBoosted?: boolean
 }
 
@@ -32,6 +33,34 @@ type DirectoryMapProps = {
   radiusKm?: number
   markers: DirectoryMapMarker[]
   onMarkerClick?: (id: string) => void
+}
+
+function MarkerItem({ marker, onMarkerClick }: { marker: DirectoryMapMarker; onMarkerClick?: (id: string) => void }) {
+  const map = useMap()
+  const hoverLabel = useMemo(() => {
+    if (!marker.address) return marker.name
+    return `${marker.name} · ${marker.address}`
+  }, [marker.address, marker.name])
+
+  return (
+    <Marker
+      key={marker.id}
+      position={[marker.lat, marker.lng]}
+      icon={defaultIcon}
+      eventHandlers={{
+        click: () => {
+          const targetZoom = Math.max(map.getZoom(), 14)
+          map.flyTo([marker.lat, marker.lng], targetZoom)
+          onMarkerClick?.(marker.id)
+        },
+      }}
+    >
+      <Tooltip direction="top" offset={[0, -16]} opacity={1} sticky>
+        <div className="text-xs font-semibold text-gray-900">{hoverLabel}</div>
+        {marker.isBoosted ? <div className="text-[10px] text-emerald-700">Boosted</div> : null}
+      </Tooltip>
+    </Marker>
+  )
 }
 
 export default function DirectoryMap({ center, radiusKm, markers, onMarkerClick }: DirectoryMapProps) {
@@ -60,19 +89,7 @@ export default function DirectoryMap({ center, radiusKm, markers, onMarkerClick 
         />
       ) : null}
       {markers.map((marker) => (
-        <Marker
-          key={marker.id}
-          position={[marker.lat, marker.lng]}
-          icon={defaultIcon}
-          eventHandlers={{
-            click: () => onMarkerClick?.(marker.id),
-          }}
-        >
-          <Popup>
-            <div className="text-sm font-semibold text-gray-900">{marker.name}</div>
-            {marker.isBoosted ? <div className="text-xs text-emerald-700">Boosted</div> : null}
-          </Popup>
-        </Marker>
+        <MarkerItem key={marker.id} marker={marker} onMarkerClick={onMarkerClick} />
       ))}
     </MapContainer>
   )
