@@ -3,7 +3,6 @@
 import React, { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { useSearchParams } from 'next/navigation'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import MaterialSymbol from '@/components/MaterialSymbol'
 
@@ -79,7 +78,6 @@ const QUICK_ACCESS: QuickAccess[] = [
 ]
 
 export default function PractitionerDirectoryPage() {
-  const searchParams = useSearchParams()
   const [categories, setCategories] = useState<CategoryNode[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
@@ -151,9 +149,11 @@ export default function PractitionerDirectoryPage() {
   }, [])
 
   React.useEffect(() => {
-    const categoryParam = searchParams?.get('categoryId') || ''
-    const subcategoryParam = searchParams?.get('subcategoryId') || ''
-    const queryParam = searchParams?.get('q') || ''
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const categoryParam = params.get('categoryId') || ''
+    const subcategoryParam = params.get('subcategoryId') || ''
+    const queryParam = params.get('q') || ''
 
     if (categoryParam || subcategoryParam || queryParam) {
       setCategoryId(categoryParam)
@@ -180,7 +180,7 @@ export default function PractitionerDirectoryPage() {
     } catch {
       // Ignore bad state
     }
-  }, [searchParams])
+  }, [])
 
   React.useEffect(() => {
     if (!pendingScroll || loading) return
