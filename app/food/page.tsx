@@ -9242,11 +9242,12 @@ Please add nutritional information manually if needed.`);
           drinkMeta = { ...drinkMeta, waterLogId: waterResult.id }
           editingDrinkMetaRef.current = drinkMeta
           if (waterResult.entry && waterResult.entry.localDate === selectedDate) {
+            const waterEntry = waterResult.entry
             setWaterEntries((prev) => {
               const next = Array.isArray(prev) ? [...prev] : []
-              const idx = next.findIndex((item) => item.id === waterResult.entry?.id)
-              if (idx >= 0) next[idx] = waterResult.entry
-              else next.unshift(waterResult.entry)
+              const idx = next.findIndex((item) => item.id === waterEntry.id)
+              if (idx >= 0) next[idx] = waterEntry
+              else next.unshift(waterEntry)
               return next
             })
           }
@@ -12590,11 +12591,12 @@ Please add nutritional information manually if needed.`);
           updateEntriesForPendingKey(pendingKey, () => entryForSave)
           updated = updated.map((item) => (item.id === pendingEntry.id ? entryForSave : item))
           if (waterResult.entry && waterResult.entry.localDate === selectedDate) {
+            const waterEntry = waterResult.entry
             setWaterEntries((prev) => {
               const next = Array.isArray(prev) ? [...prev] : []
-              const idx = next.findIndex((item) => item.id === waterResult.entry?.id)
-              if (idx >= 0) next[idx] = waterResult.entry
-              else next.unshift(waterResult.entry)
+              const idx = next.findIndex((item) => item.id === waterEntry.id)
+              if (idx >= 0) next[idx] = waterEntry
+              else next.unshift(waterEntry)
               return next
             })
           }
@@ -12824,11 +12826,12 @@ Please add nutritional information manually if needed.`);
           updateEntriesForPendingKey(pendingKey, () => entryForSave)
           updatedFoods = updatedFoods.map((item) => (item.id === pendingEntry.id ? entryForSave : item))
           if (waterResult.entry && waterResult.entry.localDate === selectedDate) {
+            const waterEntry = waterResult.entry
             setWaterEntries((prev) => {
               const next = Array.isArray(prev) ? [...prev] : []
-              const idx = next.findIndex((item) => item.id === waterResult.entry?.id)
-              if (idx >= 0) next[idx] = waterResult.entry
-              else next.unshift(waterResult.entry)
+              const idx = next.findIndex((item) => item.id === waterEntry.id)
+              if (idx >= 0) next[idx] = waterEntry
+              else next.unshift(waterEntry)
               return next
             })
           }
