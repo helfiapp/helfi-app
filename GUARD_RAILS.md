@@ -336,8 +336,8 @@ If this breaks again, restore these rules exactly.
 - `app/api/exercise-entries/[id]/route.ts`
 
 **Last verified deployment (water intake):**
-- Deployment ID: `dpl_H9uLV53WbgihAc75EyJANKuEnWcu`
-- Commit: `18cd98a50f911a3587e410fa39e5a2b0f29b0e37`
+- Deployment ID: `dpl_C42RQyRrGnbJzcNqZ2ap8zfzVyzk`
+- Commit: `5ae28d32`
 
 ### 3.1 Hydration goal rules (must not change without approval)
 - **Base goal uses profile only** (weight/height/gender/age/diet/primary goal).  
@@ -427,6 +427,18 @@ Implementation notes (do not remove):
 - Helper functions that must stay wired:
   - `resolveFavoriteForEntry`, `updateFavoriteLabelById`, `renameEntriesWithFavoriteId`
   - `saveFoodNameOverride` (keeps aliases for older labels)
+
+### 3.5.2 Water entry edit from Food Diary (Jan 2026 – Locked)
+- Water entries listed in **Food Diary** must expose **Edit Entry** in the kebab menu (desktop + mobile).
+- Editing a water entry must open a lightweight modal (amount + unit) and **PATCH** `/api/water-log/:id`.
+- Save must refresh the on‑screen list by updating `waterEntries` state (replace matching `id`, or prepend if missing).
+
+**Restore steps if it breaks again:**
+1. File: `app/food/page.tsx`.
+2. In `renderEntryCard`, ensure `actions` for `isWaterEntry` includes `{ label: 'Edit Entry', onClick: openWaterEdit }`.
+3. Confirm `openWaterEdit` resolves the water log id from `food.waterId` or `food.id` (strip `water:` prefix) and seeds amount/unit.
+4. Modal must render when `waterEditEntry` is set; Save calls `PATCH /api/water-log/:id` with `amount`, `unit`, `label`, `localDate`, `category`.
+5. If menu shows only Delete, search `isWaterEntry` action list and re‑add the Edit Entry flow + modal wiring.
 
 If this breaks again, restore in this order:
 1) In `updateFoodEntry`, ensure name changes call:
