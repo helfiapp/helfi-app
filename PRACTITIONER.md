@@ -21,13 +21,13 @@ Legend: ✅ = completed and working, ❌ = still needs work.
 - ✅ One-off weekly summary email triggered.
 - ✅ Practitioner dashboard now shows stats + weekly summary email toggle + test email button.
 
-## ❌ Still needs to be addressed (latest explicit requests)
-- ❌ Map tooltip formatting: on hover, show the practitioner name on one line and the address underneath. <span style="color: #16a34a;">DONE</span>
-- ❌ A–Z page: remove the “View category” buttons. <span style="color: #16a34a;">DONE</span>
-- ❌ A–Z back-to-search: prefill filters but DO NOT auto-scroll to results until “Search now” is clicked. <span style="color: #16a34a;">DONE</span>
-- ❌ Email crossover bug (URGENT): public listing shows a normal user email (info@sonicweb.com.au) instead of the practitioner’s public email. This is a serious breach and must be fixed and cleaned. <span style="color: #16a34a;">DONE</span>
-- ❌ One-off weekly summary email: trigger once so the format can be reviewed (send to practitioner account email). <span style="color: #16a34a;">DONE</span>
-- ❌ Practitioner stats dashboard + notifications: add a stats view for practitioners and a toggle for weekly summary emails. <span style="color: #16a34a;">DONE</span>
+## ✅ Previously requested items (now complete)
+- ✅ Map tooltip formatting: on hover, show the practitioner name on one line and the address underneath.
+- ✅ A–Z page: remove the “View category” buttons.
+- ✅ A–Z back-to-search: prefill filters but DO NOT auto-scroll to results until “Search now” is clicked.
+- ✅ Email crossover bug (URGENT): public listing shows a normal user email (info@sonicweb.com.au) instead of the practitioner’s public email. This is a serious breach and must be fixed and cleaned.
+- ✅ One-off weekly summary email: trigger once so the format can be reviewed (send to practitioner account email).
+- ✅ Practitioner stats dashboard + notifications: add a stats view for practitioners and a toggle for weekly summary emails.
 
 ## Important notes from the user
 - `PRACTITIONER_TRACKING_SECRET` has been added, saved, and redeployed.
