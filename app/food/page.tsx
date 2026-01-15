@@ -2759,6 +2759,11 @@ export default function FoodDiary() {
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [drinkAmountInput, setDrinkAmountInput] = useState<string>('')
   const [drinkUnitInput, setDrinkUnitInput] = useState<DrinkAmountOverride['unit']>('ml')
+  const [waterEditEntry, setWaterEditEntry] = useState<WaterLogEntry | null>(null)
+  const [waterEditAmountInput, setWaterEditAmountInput] = useState('')
+  const [waterEditUnit, setWaterEditUnit] = useState<DrinkAmountOverride['unit']>('ml')
+  const [waterEditSaving, setWaterEditSaving] = useState(false)
+  const [waterEditError, setWaterEditError] = useState<string | null>(null)
   const [aiEntryTab, setAiEntryTab] = useState<'ingredients' | 'recipe' | 'reason'>('ingredients')
   const [aiMealHistory, setAiMealHistory] = useState<any[]>([])
   const [aiMealHistoryCategory, setAiMealHistoryCategory] = useState<string>('')
@@ -9141,6 +9146,79 @@ Please add nutritional information manually if needed.`);
     const entry = data?.entry as WaterLogEntry | null
     const id = entry?.id ? String(entry.id) : ''
     return { id, entry }
+  }
+
+  const openWaterEdit = (food: any) => {
+    const waterId = food?.waterId ? String(food.waterId) : String(food?.id || '').replace(/^water:/, '')
+    const source = Array.isArray(waterEntries)
+      ? waterEntries.find((entry) => String(entry.id) === waterId)
+      : null
+    const fallback: WaterLogEntry = {
+      id: waterId,
+      amount: Number(food?.amount) || 0,
+      unit: String(food?.unit || 'ml').toLowerCase(),
+      amountMl: Number(food?.amountMl) || 0,
+      label: String(food?.label || 'Water'),
+      category: String(food?.category || 'uncategorized'),
+      localDate: String(food?.localDate || selectedDate),
+      createdAt: String(food?.createdAt || new Date().toISOString()),
+    }
+    const entry = source || fallback
+    setWaterEditEntry(entry)
+    setWaterEditAmountInput(entry.amount ? String(entry.amount) : '')
+    setWaterEditUnit(normalizeDrinkUnit(entry.unit) || 'ml')
+    setWaterEditError(null)
+  }
+
+  const closeWaterEdit = () => {
+    if (waterEditSaving) return
+    setWaterEditEntry(null)
+    setWaterEditAmountInput('')
+    setWaterEditUnit('ml')
+    setWaterEditError(null)
+  }
+
+  const saveWaterEdit = async () => {
+    if (!waterEditEntry) return
+    const amount = Number(waterEditAmountInput)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setWaterEditError('Enter a valid amount.')
+      return
+    }
+    const unit = normalizeDrinkUnit(waterEditUnit) || 'ml'
+    setWaterEditSaving(true)
+    setWaterEditError(null)
+    try {
+      const res = await fetch(`/api/water-log/${encodeURIComponent(waterEditEntry.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          amount,
+          unit,
+          label: waterEditEntry.label || 'Water',
+          localDate: waterEditEntry.localDate,
+          category: waterEditEntry.category,
+        }),
+      })
+      if (!res.ok) throw new Error('water edit failed')
+      const data = await res.json()
+      const entry = data?.entry as WaterLogEntry | null
+      if (entry) {
+        setWaterEntries((prev) => {
+          const next = Array.isArray(prev) ? [...prev] : []
+          const idx = next.findIndex((item) => String(item.id) === String(entry.id))
+          if (idx >= 0) next[idx] = entry
+          else next.unshift(entry)
+          return next
+        })
+      }
+      closeWaterEdit()
+    } catch {
+      setWaterEditError('Could not update this drink. Please try again.')
+    } finally {
+      setWaterEditSaving(false)
+    }
   }
 
   // New function to update existing entries with AI re-analysis
@@ -19469,8 +19547,14 @@ Please add nutritional information manually if needed.`);
                         runEdit()
                       }
 
+                      const startEditWaterEntry = () => {
+                        if (!isWaterEntry) return
+                        openWaterEdit(food)
+                      }
+
                       const actions = isWaterEntry
                         ? [
+                            { label: 'Edit Entry', onClick: startEditWaterEntry },
                             {
                               label: 'Delete',
                               onClick: handleDeleteAction,
@@ -21014,6 +21098,60 @@ Please add nutritional information manually if needed.`);
                 className="px-4 py-2 rounded-lg bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700"
               >
                 OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {waterEditEntry && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/30" onClick={closeWaterEdit} />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-200 p-5">
+            <div className="text-lg font-semibold text-gray-900 mb-1">
+              Edit {waterEditEntry.label || 'Water'}
+            </div>
+            <div className="text-xs text-gray-500 mb-4">Update the drink amount for this entry.</div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step={waterEditUnit === 'oz' ? 0.1 : waterEditUnit === 'l' ? 0.01 : 1}
+                value={waterEditAmountInput}
+                onFocus={(e) => e.currentTarget.select()}
+                onChange={(e) => setWaterEditAmountInput(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+              <select
+                value={waterEditUnit}
+                onChange={(e) =>
+                  setWaterEditUnit((normalizeDrinkUnit(e.target.value) || waterEditUnit) as DrinkAmountOverride['unit'])
+                }
+                className="w-24 px-2 py-2 border border-gray-300 rounded-lg bg-white text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                <option value="ml">ml</option>
+                <option value="l">L</option>
+                <option value="oz">oz</option>
+              </select>
+            </div>
+            {waterEditError && <div className="mt-2 text-xs text-red-600">{waterEditError}</div>}
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeWaterEdit}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                disabled={waterEditSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveWaterEdit}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                disabled={waterEditSaving}
+              >
+                Save
               </button>
             </div>
           </div>
