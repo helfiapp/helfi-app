@@ -616,8 +616,8 @@ export default function WaterIntakePage() {
 
   return (
     <div className="min-h-[100dvh] bg-[#f6f7f6] dark:bg-[#151d15] overflow-x-hidden">
-      <div className="max-w-md mx-auto min-h-[100dvh] flex flex-col shadow-xl bg-[#f6f7f6] dark:bg-[#151d15] overflow-x-hidden">
-        <div className="flex items-center p-4 pb-2 justify-between sticky top-0 z-10 bg-[#f6f7f6] dark:bg-[#151d15]">
+      <div className="max-w-md lg:max-w-6xl w-full mx-auto min-h-[100dvh] flex flex-col shadow-xl lg:shadow-none bg-[#f6f7f6] dark:bg-[#151d15] lg:bg-transparent overflow-x-hidden">
+        <div className="flex items-center p-4 pb-2 lg:px-8 lg:pt-6 lg:pb-4 justify-between sticky top-0 z-10 bg-[#f6f7f6] dark:bg-[#151d15]">
           <button
             type="button"
             onClick={handleBack}
@@ -656,7 +656,7 @@ export default function WaterIntakePage() {
           </div>
         )}
 
-        <div className="flex px-4 py-3">
+        <div className="flex px-4 py-3 lg:px-8 lg:pt-0 lg:pb-6">
           <div className="flex h-10 flex-1 items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-800 p-1">
             <button
               type="button"
@@ -685,217 +685,234 @@ export default function WaterIntakePage() {
           </div>
         </div>
 
-        <div className="p-4">
-          <div className="flex flex-col items-stretch justify-start rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] bg-white dark:bg-gray-900 overflow-hidden border border-gray-100 dark:border-gray-800">
-            <div className="flex w-full flex-col items-stretch justify-center gap-1 py-4 px-4">
-              <p className="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Daily Hydration Summary</p>
-              <div className="flex items-baseline gap-2">
-                <p className="text-[#111711] dark:text-white text-4xl font-bold leading-tight tracking-[-0.015em]">
-                  {formatMl(totalMl)}
-                </p>
-                <p className="text-gray-400 text-lg font-medium">
-                  {effectiveGoalMl ? `/ ${formatMl(effectiveGoalMl)}` : ''}
-                </p>
+        <div className="px-4 lg:px-10">
+          <div className="lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-8 lg:items-start">
+            <div className="space-y-6">
+              <div className="pt-4 lg:pt-2">
+                <div className="flex flex-col items-stretch justify-start rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] bg-white dark:bg-gray-900 overflow-hidden border border-gray-100 dark:border-gray-800">
+                  <div className="flex w-full flex-col items-stretch justify-center gap-1 py-4 px-4">
+                    <p className="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Daily Hydration Summary</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-[#111711] dark:text-white text-4xl font-bold leading-tight tracking-[-0.015em]">
+                        {formatMl(totalMl)}
+                      </p>
+                      <p className="text-gray-400 text-lg font-medium">
+                        {effectiveGoalMl ? `/ ${formatMl(effectiveGoalMl)}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2 mt-4">
+                      <div className="flex gap-6 justify-between items-center">
+                        <p className="text-[#111711] dark:text-white text-sm font-medium leading-normal">
+                          {effectiveGoalMl ? `${progressPercent}% of daily goal` : 'Set a daily goal'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={openGoalEditor}
+                          className="text-[#62b763] text-sm font-semibold hover:underline"
+                        >
+                          Edit Goal
+                        </button>
+                      </div>
+                      <div className="rounded-full bg-gray-200 dark:bg-gray-800 h-2.5 overflow-hidden">
+                        <div className="h-full rounded-full bg-[#62b763]" style={{ width: `${progressPercent}%` }}></div>
+                      </div>
+                    </div>
+                    {goalExerciseBonusMl > 0 && goalSource === 'auto' && (
+                      <p className="text-xs text-gray-500">Activity bonus: +{formatMl(goalExerciseBonusMl)} today</p>
+                    )}
+                    <p className="text-gray-500 dark:text-gray-400 text-xs mt-3">
+                      {entryCount} {entryCount === 1 ? 'entry' : 'entries'} logged today
+                      {goalLoading ? ' - loading goal' : ''}
+                    </p>
+                    {goalSource === 'custom' && (
+                      <p className="text-xs text-[#62b763] mt-1">Custom goal active</p>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-col gap-2 mt-4">
-                <div className="flex gap-6 justify-between items-center">
-                  <p className="text-[#111711] dark:text-white text-sm font-medium leading-normal">
-                    {effectiveGoalMl ? `${progressPercent}% of daily goal` : 'Set a daily goal'}
-                  </p>
+
+              <div className="pt-2">
+                <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-3">
+                  Quick Add
+                </h3>
+                <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide lg:flex-wrap lg:overflow-visible">
+                  {DRINK_TYPES.map((drink) => (
+                    <button
+                      key={drink.id}
+                      type="button"
+                      onClick={() => setActiveDrink(drink.id)}
+                      className={`flex items-center px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
+                        activeDrink === drink.id
+                          ? 'bg-[#62b763] text-white'
+                          : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {drink.id}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-4 gap-3">
+                  {QUICK_PRESETS.map((preset) => {
+                    const key = `${preset.amount}-${preset.unit}`
+                    const isActive = lastPresetKey === key
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleQuickAdd(preset.amount, preset.unit)}
+                        disabled={saving}
+                        className={`flex flex-col items-center justify-center p-3 rounded-xl border ${
+                          isActive
+                            ? 'border-[#62b763] bg-[#62b763]/5'
+                            : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-[#62b763]/50'
+                        }`}
+                      >
+                        <span
+                          className={`text-sm font-bold ${isActive ? 'text-[#62b763]' : 'text-[#111711] dark:text-white'}`}
+                        >
+                          {formatNumber(preset.amount)}
+                        </span>
+                        <span className={`text-[10px] ${isActive ? 'text-[#62b763]' : 'text-gray-500'}`}>
+                          {preset.unit === 'l' ? 'L' : preset.unit}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-3">
+                  Custom Entry
+                </h3>
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <input
+                      className="w-full h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-4 text-base focus:ring-[#62b763] focus:border-[#62b763] dark:text-white"
+                      placeholder="0"
+                      type="number"
+                      inputMode="decimal"
+                      enterKeyHint="done"
+                      min="0"
+                      step="0.1"
+                      value={customAmountInput}
+                      onChange={(e) => setCustomAmountInput(e.target.value)}
+                      onFocus={(e) => {
+                        setCustomAmountInput('')
+                        e.currentTarget.select()
+                      }}
+                    />
+                    <div ref={customUnitRef} className="absolute right-2 top-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomUnitPicker((prev) => !prev)}
+                        className="h-8 px-2 rounded-md text-xs text-gray-500 hover:text-gray-700 focus:outline-none"
+                        aria-expanded={showCustomUnitPicker}
+                        aria-haspopup="listbox"
+                      >
+                        {customUnit === 'ml' ? 'ml' : customUnit === 'l' ? 'L' : 'oz'}
+                      </button>
+                      {showCustomUnitPicker && (
+                        <div className="absolute right-0 mt-1 w-16 rounded-md border border-gray-200 bg-white shadow-lg text-xs text-gray-600 z-10">
+                          {(['ml', 'l', 'oz'] as const).map((unit) => (
+                            <button
+                              key={unit}
+                              type="button"
+                              onClick={() => {
+                                setCustomUnit(unit)
+                                setShowCustomUnitPicker(false)
+                              }}
+                              className="block w-full px-2 py-1 text-left hover:bg-gray-50"
+                            >
+                              {unit === 'l' ? 'L' : unit}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={openGoalEditor}
-                    className="text-[#62b763] text-sm font-semibold hover:underline"
+                    onClick={handleCustomAdd}
+                    disabled={saving}
+                    className="h-12 px-6 bg-[#62b763] text-white font-bold rounded-lg text-sm flex items-center justify-center disabled:opacity-60"
                   >
-                    Edit Goal
+                    Add Entry
                   </button>
                 </div>
-                <div className="rounded-full bg-gray-200 dark:bg-gray-800 h-2.5 overflow-hidden">
-                  <div className="h-full rounded-full bg-[#62b763]" style={{ width: `${progressPercent}%` }}></div>
-                </div>
               </div>
-              {goalExerciseBonusMl > 0 && goalSource === 'auto' && (
-                <p className="text-xs text-gray-500">Activity bonus: +{formatMl(goalExerciseBonusMl)} today</p>
-              )}
-              <p className="text-gray-500 dark:text-gray-400 text-xs mt-3">
-                {entryCount} {entryCount === 1 ? 'entry' : 'entries'} logged today
-                {goalLoading ? ' - loading goal' : ''}
-              </p>
-              {goalSource === 'custom' && (
-                <p className="text-xs text-[#62b763] mt-1">Custom goal active</p>
-              )}
             </div>
-          </div>
 
-        </div>
-
-        <div className="px-4 pt-2">
-          <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-3">Quick Add</h3>
-          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-            {DRINK_TYPES.map((drink) => (
-              <button
-                key={drink.id}
-                type="button"
-                onClick={() => setActiveDrink(drink.id)}
-                className={`flex items-center px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
-                  activeDrink === drink.id
-                    ? 'bg-[#62b763] text-white'
-                    : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                {drink.id}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-4 gap-3">
-            {QUICK_PRESETS.map((preset) => {
-              const key = `${preset.amount}-${preset.unit}`
-              const isActive = lastPresetKey === key
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handleQuickAdd(preset.amount, preset.unit)}
-                  disabled={saving}
-                  className={`flex flex-col items-center justify-center p-3 rounded-xl border ${
-                    isActive
-                      ? 'border-[#62b763] bg-[#62b763]/5'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-[#62b763]/50'
-                  }`}
-                >
-                  <span className={`text-sm font-bold ${isActive ? 'text-[#62b763]' : 'text-[#111711] dark:text-white'}`}>
-                    {formatNumber(preset.amount)}
-                  </span>
-                  <span className={`text-[10px] ${isActive ? 'text-[#62b763]' : 'text-gray-500'}`}>
-                    {preset.unit === 'l' ? 'L' : preset.unit}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="px-4 pt-8">
-          <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] pb-3">Custom Entry</h3>
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <input
-                className="w-full h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-4 text-base focus:ring-[#62b763] focus:border-[#62b763] dark:text-white"
-                placeholder="0"
-                type="number"
-                inputMode="decimal"
-                enterKeyHint="done"
-                min="0"
-                step="0.1"
-                value={customAmountInput}
-                onChange={(e) => setCustomAmountInput(e.target.value)}
-                onFocus={(e) => {
-                  setCustomAmountInput('')
-                  e.currentTarget.select()
-                }}
-              />
-              <div ref={customUnitRef} className="absolute right-2 top-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCustomUnitPicker((prev) => !prev)}
-                  className="h-8 px-2 rounded-md text-xs text-gray-500 hover:text-gray-700 focus:outline-none"
-                  aria-expanded={showCustomUnitPicker}
-                  aria-haspopup="listbox"
-                >
-                  {customUnit === 'ml' ? 'ml' : customUnit === 'l' ? 'L' : 'oz'}
-                </button>
-                {showCustomUnitPicker && (
-                  <div className="absolute right-0 mt-1 w-16 rounded-md border border-gray-200 bg-white shadow-lg text-xs text-gray-600 z-10">
-                    {(['ml', 'l', 'oz'] as const).map((unit) => (
-                      <button
-                        key={unit}
-                        type="button"
-                        onClick={() => {
-                          setCustomUnit(unit)
-                          setShowCustomUnitPicker(false)
-                        }}
-                        className="block w-full px-2 py-1 text-left hover:bg-gray-50"
-                      >
-                        {unit === 'l' ? 'L' : unit}
-                      </button>
-                    ))}
+            <div className="pt-4 pb-10 lg:pt-2">
+              <div className="flex justify-between items-end pb-3">
+                <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">
+                  Recent Logs
+                </h3>
+                <span className="text-xs text-gray-500 font-medium">History</span>
+              </div>
+              <div className="space-y-3">
+                {loading && (
+                  <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-sm text-gray-500">
+                    Loading entries...
                   </div>
                 )}
+                {!loading && loadError && (
+                  <button
+                    type="button"
+                    onClick={() => loadEntries(selectedDate)}
+                    className="w-full p-4 bg-white dark:bg-gray-900 rounded-xl border border-red-100 dark:border-red-900 text-sm text-red-600 text-left"
+                  >
+                    Could not load water entries. Tap to retry.
+                  </button>
+                )}
+                {!loading && entries.length === 0 && (
+                  <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-sm text-gray-500">
+                    No water entries yet. Add your first drink above.
+                  </div>
+                )}
+                {!loading &&
+                  entries.map((entry) => {
+                    const label = normalizeLabel(entry.label)
+                    const baseLabel = label.replace(/\s*\(.*\)\s*$/, '').trim()
+                    const drinkConfig = DRINK_TYPES.find((drink) => drink.id.toLowerCase() === baseLabel.toLowerCase())
+                    const icon = drinkConfig?.icon || '/mobile-assets/MOBILE%20ICONS/WATER.png'
+                    const accent =
+                      label.toLowerCase() === 'coffee'
+                        ? 'bg-orange-50 text-orange-500 dark:bg-orange-900/20'
+                        : 'bg-blue-50 text-blue-500 dark:bg-blue-900/20'
+                    return (
+                      <div
+                        key={entry.id}
+                        className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${accent}`}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={icon} alt={`${label} icon`} className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-[#111711] dark:text-white">{label}</p>
+                            <p className="text-xs text-gray-500">{formatTime(entry.createdAt)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <p className="text-sm font-bold text-[#111711] dark:text-white">{formatAmount(entry)}</p>
+                          <button
+                            type="button"
+                            onClick={() => deleteEntry(entry.id)}
+                            disabled={deletingId === entry.id}
+                            className="text-gray-300 hover:text-red-500 disabled:opacity-60"
+                            aria-label="Delete entry"
+                          >
+                            <MaterialSymbol name="delete" className="text-xl" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleCustomAdd}
-              disabled={saving}
-              className="h-12 px-6 bg-[#62b763] text-white font-bold rounded-lg text-sm flex items-center justify-center disabled:opacity-60"
-            >
-              Add Entry
-            </button>
-          </div>
-        </div>
-
-        <div className="px-4 pt-8 pb-10">
-          <div className="flex justify-between items-end pb-3">
-            <h3 className="text-[#111711] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">Recent Logs</h3>
-            <span className="text-xs text-gray-500 font-medium">History</span>
-          </div>
-          <div className="space-y-3">
-            {loading && (
-              <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-sm text-gray-500">
-                Loading entries...
-              </div>
-            )}
-            {!loading && loadError && (
-              <button
-                type="button"
-                onClick={() => loadEntries(selectedDate)}
-                className="w-full p-4 bg-white dark:bg-gray-900 rounded-xl border border-red-100 dark:border-red-900 text-sm text-red-600 text-left"
-              >
-                Could not load water entries. Tap to retry.
-              </button>
-            )}
-            {!loading && entries.length === 0 && (
-              <div className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-sm text-gray-500">
-                No water entries yet. Add your first drink above.
-              </div>
-            )}
-            {!loading && entries.map((entry) => {
-              const label = normalizeLabel(entry.label)
-              const baseLabel = label.replace(/\s*\(.*\)\s*$/, '').trim()
-              const drinkConfig = DRINK_TYPES.find((drink) => drink.id.toLowerCase() === baseLabel.toLowerCase())
-              const icon = drinkConfig?.icon || '/mobile-assets/MOBILE%20ICONS/WATER.png'
-              const accent =
-                label.toLowerCase() === 'coffee'
-                  ? 'bg-orange-50 text-orange-500 dark:bg-orange-900/20'
-                  : 'bg-blue-50 text-blue-500 dark:bg-blue-900/20'
-              return (
-                <div key={entry.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${accent}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={icon} alt={`${label} icon`} className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-[#111711] dark:text-white">{label}</p>
-                      <p className="text-xs text-gray-500">{formatTime(entry.createdAt)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <p className="text-sm font-bold text-[#111711] dark:text-white">{formatAmount(entry)}</p>
-                    <button
-                      type="button"
-                      onClick={() => deleteEntry(entry.id)}
-                      disabled={deletingId === entry.id}
-                      className="text-gray-300 hover:text-red-500 disabled:opacity-60"
-                      aria-label="Delete entry"
-                    >
-                      <MaterialSymbol name="delete" className="text-xl" />
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
           </div>
         </div>
 
