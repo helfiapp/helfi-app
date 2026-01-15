@@ -30,8 +30,10 @@ export async function GET(request: NextRequest) {
   const categoryId = url.searchParams.get('categoryId') || undefined
   const subcategoryId = url.searchParams.get('subcategoryId') || undefined
   const query = normalize(url.searchParams.get('q'))
-  const lat = Number(url.searchParams.get('lat') || '')
-  const lng = Number(url.searchParams.get('lng') || '')
+  const latParam = url.searchParams.get('lat')
+  const lngParam = url.searchParams.get('lng')
+  const lat = latParam ? Number(latParam) : Number.NaN
+  const lng = lngParam ? Number(lngParam) : Number.NaN
   const radiusKm = Number(url.searchParams.get('radiusKm') || 10)
   const telehealthOnly = url.searchParams.get('telehealth') === 'true'
   const geoKey = url.searchParams.get('geoKey') || undefined

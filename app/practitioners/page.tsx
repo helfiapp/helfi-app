@@ -56,6 +56,14 @@ type QuickAccess = {
   tone: string
 }
 
+type CategoryMatch = {
+  id: string
+  label: string
+  categoryId: string
+  subcategoryId?: string
+  parentLabel?: string
+}
+
 const QUICK_ACCESS: QuickAccess[] = [
   { label: 'Chiropractic', category: 'Allied Health', subcategory: 'Chiropractor', icon: 'self_improvement', tone: 'text-blue-500' },
   { label: 'Mental Health', category: 'Mental Health', icon: 'psychology', tone: 'text-teal-500' },
@@ -117,6 +125,35 @@ export default function PractitionerDirectoryPage() {
     const parent = categories.find((cat) => cat.id === categoryId)
     return parent?.children || []
   }, [categories, categoryId])
+
+  const categoryMatches = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    if (!normalizedQuery) return []
+    const matches: CategoryMatch[] = []
+    categories.forEach((category) => {
+      const categoryName = category.name.toLowerCase()
+      if (categoryName.includes(normalizedQuery)) {
+        matches.push({
+          id: `category-${category.id}`,
+          label: category.name,
+          categoryId: category.id,
+        })
+      }
+      category.children?.forEach((child) => {
+        const childName = child.name.toLowerCase()
+        if (childName.includes(normalizedQuery)) {
+          matches.push({
+            id: `subcategory-${child.id}`,
+            label: child.name,
+            categoryId: category.id,
+            subcategoryId: child.id,
+            parentLabel: category.name,
+          })
+        }
+      })
+    })
+    return matches.slice(0, 10)
+  }, [categories, query])
 
   const loadCategories = async () => {
     try {
@@ -334,6 +371,20 @@ export default function PractitionerDirectoryPage() {
     }
   }
 
+  const applyCategoryMatch = (match: CategoryMatch) => {
+    setCategoryId(match.categoryId)
+    setSubcategoryId(match.subcategoryId || '')
+    setQuery('')
+    setTimeout(() => {
+      subcategoryRef.current?.focus()
+    }, 0)
+    handleSearch({
+      categoryId: match.categoryId,
+      subcategoryId: match.subcategoryId || '',
+      query: '',
+    })
+  }
+
   const markers = useMemo(() => {
     return results
       .filter((item) => item.lat != null && item.lng != null)
@@ -462,8 +513,14 @@ export default function PractitionerDirectoryPage() {
                     <input
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          handleSearch()
+                        }
+                      }}
                       className="bg-transparent border-none p-0 text-base font-semibold focus:ring-0 w-full placeholder-slate-400"
-                      placeholder="Name, symptom, or service"
+                      placeholder="Name, symptom, or category"
                     />
                   </div>
                 </div>
@@ -508,6 +565,24 @@ export default function PractitionerDirectoryPage() {
                 </div>
               )}
 
+              {categoryMatches.length > 0 && (
+                <div className="mt-3 px-2">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Category matches</div>
+                  <div className="flex flex-wrap gap-2">
+                    {categoryMatches.map((match) => (
+                      <button
+                        key={match.id}
+                        onClick={() => applyCategoryMatch(match)}
+                        className="px-3 py-1 rounded-full border border-emerald-100 bg-emerald-50/60 text-xs font-semibold text-emerald-800 hover:border-emerald-200 hover:text-emerald-900 transition-colors"
+                      >
+                        {match.label}
+                        {match.parentLabel ? ` · ${match.parentLabel}` : ''}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-4 flex flex-wrap items-center gap-4 px-2">
                 <button
                   onClick={handleUseMyLocation}
@@ -520,7 +595,7 @@ export default function PractitionerDirectoryPage() {
                   <select
                     value={radiusKm}
                     onChange={(event) => setRadiusKm(Number(event.target.value))}
-                    className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold"
+                    className="border border-slate-200 rounded-xl px-3 py-2 pr-8 text-sm font-semibold min-w-[80px]"
                   >
                     <option value={5}>5 km</option>
                     <option value={10}>10 km</option>
