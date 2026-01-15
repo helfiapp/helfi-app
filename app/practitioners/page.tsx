@@ -4,6 +4,7 @@ import React, { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import PublicHeader from '@/components/marketing/PublicHeader'
+import MaterialSymbol from '@/components/MaterialSymbol'
 
 const DirectoryMap = dynamic(() => import('@/components/practitioner/DirectoryMap'), { ssr: false })
 
@@ -46,27 +47,29 @@ type QuickAccess = {
   label: string
   category: string
   subcategory?: string
+  icon: string
+  tone: string
 }
 
 const QUICK_ACCESS: QuickAccess[] = [
-  { label: 'Chiropractic', category: 'Allied Health', subcategory: 'Chiropractor' },
-  { label: 'Mental Health', category: 'Mental Health' },
-  { label: 'Dental Care', category: 'Dental & Oral Health', subcategory: 'Dentist' },
-  { label: 'Cardiology', category: 'GPs & Doctors', subcategory: 'Cardiologist' },
-  { label: 'Pediatrics', category: 'GPs & Doctors', subcategory: 'Paediatrician' },
-  { label: 'Physiotherapy', category: 'Allied Health', subcategory: 'Physiotherapist' },
-  { label: 'Dermatology', category: 'GPs & Doctors', subcategory: 'Dermatologist' },
-  { label: 'Optometry', category: 'Eye & Hearing', subcategory: 'Optometrist' },
-  { label: 'Podiatry', category: 'Allied Health', subcategory: 'Podiatrist' },
-  { label: 'Nutritionist', category: 'Nutrition & Metabolic Health', subcategory: 'Clinical Nutritionist' },
-  { label: 'Acupuncture', category: 'Holistic & Integrative', subcategory: 'Acupuncturist' },
-  { label: 'Occupational Therapy', category: 'Allied Health', subcategory: 'Occupational Therapist (OT)' },
-  { label: 'Speech Pathology', category: 'Allied Health', subcategory: 'Speech Pathologist' },
-  { label: 'ENT Specialist', category: 'GPs & Doctors', subcategory: 'ENT Specialist' },
-  { label: 'Orthopedics', category: 'Musculoskeletal & Pain' },
-  { label: 'Psychology', category: 'Mental Health', subcategory: 'Psychologist' },
-  { label: 'General Practitioner', category: 'GPs & Doctors', subcategory: 'General Practitioner (GP)' },
-  { label: 'Urology', category: 'GPs & Doctors', subcategory: 'Urologist' },
+  { label: 'Chiropractic', category: 'Allied Health', subcategory: 'Chiropractor', icon: 'self_improvement', tone: 'text-blue-500' },
+  { label: 'Mental Health', category: 'Mental Health', icon: 'psychology', tone: 'text-teal-500' },
+  { label: 'Dental Care', category: 'Dental & Oral Health', subcategory: 'Dentist', icon: 'dentistry', tone: 'text-orange-500' },
+  { label: 'Cardiology', category: 'GPs & Doctors', subcategory: 'Cardiologist', icon: 'favorite', tone: 'text-red-500' },
+  { label: 'Pediatrics', category: 'GPs & Doctors', subcategory: 'Paediatrician', icon: 'child_care', tone: 'text-indigo-500' },
+  { label: 'Physiotherapy', category: 'Allied Health', subcategory: 'Physiotherapist', icon: 'fitness_center', tone: 'text-emerald-600' },
+  { label: 'Dermatology', category: 'GPs & Doctors', subcategory: 'Dermatologist', icon: 'clear_all', tone: 'text-pink-500' },
+  { label: 'Optometry', category: 'Eye & Hearing', subcategory: 'Optometrist', icon: 'visibility', tone: 'text-cyan-500' },
+  { label: 'Podiatry', category: 'Allied Health', subcategory: 'Podiatrist', icon: 'footprint', tone: 'text-amber-700' },
+  { label: 'Nutritionist', category: 'Nutrition & Metabolic Health', subcategory: 'Clinical Nutritionist', icon: 'nutrition', tone: 'text-green-600' },
+  { label: 'Acupuncture', category: 'Holistic & Integrative', subcategory: 'Acupuncturist', icon: 'medical_services', tone: 'text-purple-500' },
+  { label: 'Occupational Therapy', category: 'Allied Health', subcategory: 'Occupational Therapist (OT)', icon: 'work', tone: 'text-blue-400' },
+  { label: 'Speech Pathology', category: 'Allied Health', subcategory: 'Speech Pathologist', icon: 'record_voice_over', tone: 'text-rose-400' },
+  { label: 'ENT Specialist', category: 'GPs & Doctors', subcategory: 'ENT Specialist', icon: 'hearing', tone: 'text-yellow-600' },
+  { label: 'Orthopedics', category: 'Musculoskeletal & Pain', icon: 'accessibility_new', tone: 'text-slate-500' },
+  { label: 'Psychology', category: 'Mental Health', subcategory: 'Psychologist', icon: 'psychology_alt', tone: 'text-violet-500' },
+  { label: 'General Practitioner', category: 'GPs & Doctors', subcategory: 'General Practitioner (GP)', icon: 'stethoscope', tone: 'text-emerald-700' },
+  { label: 'Urology', category: 'GPs & Doctors', subcategory: 'Urologist', icon: 'water_drop', tone: 'text-blue-700' },
 ]
 
 export default function PractitionerDirectoryPage() {
@@ -292,6 +295,14 @@ export default function PractitionerDirectoryPage() {
                 <span className="text-sm">→</span>
               </Link>
             </div>
+            <div className="flex justify-center">
+              <Link
+                href="/list-your-practice"
+                className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-emerald-600 text-white font-semibold text-base hover:bg-emerald-700 transition-colors"
+              >
+                List your practice
+              </Link>
+            </div>
           </div>
 
           <div className="max-w-6xl mx-auto relative z-30">
@@ -443,9 +454,10 @@ export default function PractitionerDirectoryPage() {
                     <button
                       key={item.label}
                       onClick={() => handleQuickAccess(item)}
-                      className="flex-none bg-white py-2.5 px-5 rounded-2xl text-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border border-slate-100 font-semibold text-sm text-slate-700"
+                      className="flex-none bg-white py-3 px-5 rounded-2xl text-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border border-slate-100 font-semibold text-sm text-slate-700 flex items-center gap-3"
                     >
-                      {item.label}
+                      <MaterialSymbol name={item.icon} className={`text-2xl ${item.tone}`} />
+                      <span className="whitespace-nowrap">{item.label}</span>
                     </button>
                   ))}
                 </div>

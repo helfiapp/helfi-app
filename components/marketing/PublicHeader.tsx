@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
+import { usePathname } from 'next/navigation'
 
 type MegaMenuItem = {
   label: string
@@ -18,8 +19,14 @@ type MegaMenuSection = {
 
 export default function PublicHeader() {
   const { data: session, status } = useSession()
-  const loginHref = '/auth/signin'
-  const signupHref = '/auth/signin?mode=signup'
+  const pathname = usePathname()
+  const isPractitionerDirectory = pathname === '/practitioners' || pathname?.startsWith('/practitioners/')
+  const loginHref = isPractitionerDirectory
+    ? '/auth/signin?context=practitioner&next=/practitioner'
+    : '/auth/signin'
+  const signupHref = isPractitionerDirectory
+    ? '/auth/signin?context=practitioner&mode=signup&next=/practitioner'
+    : '/auth/signin?mode=signup'
   const iconClassName = 'h-4 w-4 text-helfi-green'
 
   const megaMenuSections: MegaMenuSection[] = [
@@ -301,12 +308,6 @@ export default function PublicHeader() {
             className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
           >
             Find a practitioner
-          </Link>
-          <Link
-            href="/list-your-practice"
-            className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
-          >
-            List your practice
           </Link>
           <button
             type="button"

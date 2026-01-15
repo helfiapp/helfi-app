@@ -675,25 +675,38 @@ export default function SignIn() {
             <h2 className="text-2xl font-bold text-helfi-black mb-4">
               {isSignUp
                 ? authContext === 'practitioner'
-                  ? 'Create your practitioner account'
+                  ? 'Practitioner portal - create account'
                   : 'Create Account'
                 : authContext === 'practitioner'
-                  ? 'Practitioner sign in'
+                  ? 'Practitioner portal sign in'
                   : 'Welcome to Helfi'}
             </h2>
             <p className="text-gray-600 mb-8">
               {isSignUp
                 ? authContext === 'practitioner'
-                  ? 'List your practice on Helfi and reach new patients.'
+                  ? 'Create your practitioner account to list your practice on Helfi.'
                   : 'Create a new account to get started'
                 : authContext === 'practitioner'
                   ? 'Sign in to manage your listing and boosts.'
                   : 'Sign in to your account'}
             </p>
             {authContext === 'practitioner' && (
-              <Link href="/list-your-practice" className="text-sm text-helfi-green hover:underline">
-                Back to list your practice
-              </Link>
+              <div className="space-y-2 text-sm">
+                <Link href="/list-your-practice" className="text-helfi-green hover:underline block">
+                  Back to list your practice
+                </Link>
+                <div className="text-gray-600">
+                  Looking for the normal Helfi app?{' '}
+                  <Link href="/auth/signin" className="text-helfi-green hover:underline">
+                    User log in
+                  </Link>{' '}
+                  or{' '}
+                  <Link href="/auth/signin?mode=signup" className="text-helfi-green hover:underline">
+                    create a user account
+                  </Link>
+                  .
+                </div>
+              </div>
             )}
           </div>
 
