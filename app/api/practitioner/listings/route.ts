@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { parseCommaList, slugify, normalizeUrl } from '@/lib/practitioner-utils'
+import { parseCommaList, slugify, normalizeUrl, geocodeAddress } from '@/lib/practitioner-utils'
 
 async function ensurePractitionerAccount(userId: string, email: string) {
   let account = await prisma.practitionerAccount.findUnique({ where: { userId } })
@@ -58,6 +58,20 @@ export async function POST(request: NextRequest) {
 
   const slug = await generateUniqueSlug(displayName)
   const hoursNotes = String(body?.hoursNotes || '').trim()
+  const addressParts = [
+    body?.addressLine1,
+    body?.addressLine2,
+    body?.suburbCity,
+    body?.stateRegion,
+    body?.postcode,
+    body?.country,
+  ]
+    .map((item) => (item ? String(item).trim() : ''))
+    .filter(Boolean)
+  const addressString = addressParts.join(', ')
+  const providedLat = typeof body?.lat === 'number' ? body.lat : null
+  const providedLng = typeof body?.lng === 'number' ? body.lng : null
+  const geocoded = !providedLat && !providedLng && addressString ? await geocodeAddress(addressString) : null
 
   const listing = await prisma.practitionerListing.create({
     data: {
@@ -77,8 +91,8 @@ export async function POST(request: NextRequest) {
       stateRegion: body?.stateRegion ? String(body.stateRegion).trim() : null,
       postcode: body?.postcode ? String(body.postcode).trim() : null,
       country: body?.country ? String(body.country).trim() : null,
-      lat: typeof body?.lat === 'number' ? body.lat : null,
-      lng: typeof body?.lng === 'number' ? body.lng : null,
+      lat: providedLat ?? geocoded?.lat ?? null,
+      lng: providedLng ?? geocoded?.lng ?? null,
       serviceType: body?.serviceType || 'IN_PERSON',
       languages: parseCommaList(body?.languages),
       hoursJson: hoursNotes ? { notes: hoursNotes } : undefined,

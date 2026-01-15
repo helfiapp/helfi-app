@@ -52,11 +52,21 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
   const address = [listing.addressLine1, listing.addressLine2, listing.suburbCity, listing.stateRegion, listing.postcode, listing.country]
     .filter(Boolean)
     .join(', ')
+  const logoUrl = listing?.images?.logoUrl || null
+  const galleryUrls = Array.isArray(listing?.images?.gallery) ? listing.images.gallery : []
+  const hoursNotes = listing?.hours?.notes || null
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-2">
+          {logoUrl && (
+            <img
+              src={logoUrl}
+              alt={`${listing.displayName} logo`}
+              className="w-20 h-20 rounded-xl object-contain border border-gray-100 bg-white"
+            />
+          )}
           <h1 className="text-2xl font-bold text-gray-900">{listing.displayName}</h1>
           <div className="text-sm text-gray-600">
             {listing.categoryName}
@@ -106,6 +116,13 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
             </div>
           )}
 
+          {hoursNotes && (
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase">Opening hours</div>
+              <div className="text-sm text-gray-700 whitespace-pre-wrap">{hoursNotes}</div>
+            </div>
+          )}
+
           {Array.isArray(listing.tags) && listing.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {listing.tags.map((tag: string) => (
@@ -125,6 +142,22 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
                 center={{ lat: listing.lat, lng: listing.lng }}
                 markers={[{ id: listing.id, name: listing.displayName, lat: listing.lat, lng: listing.lng }]}
               />
+            </div>
+          </div>
+        )}
+
+        {galleryUrls.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="text-sm font-semibold text-gray-700 mb-4">Photos</div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {galleryUrls.map((url: string) => (
+                <img
+                  key={url}
+                  src={url}
+                  alt={`${listing.displayName} photo`}
+                  className="w-full h-40 rounded-xl object-cover border border-gray-100"
+                />
+              ))}
             </div>
           </div>
         )}

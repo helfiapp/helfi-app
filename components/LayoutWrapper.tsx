@@ -297,6 +297,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const publicPages = [
     '/',
     '/healthapp',
+    '/public-home',
     '/auth/signin',
     '/auth/verify',
     '/auth/check-email',

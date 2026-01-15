@@ -54,6 +54,14 @@ export default function PractitionerDirectoryPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const persistLocation = (location: LocationResult) => {
+    try {
+      localStorage.setItem('helfi:practitionerLocation', JSON.stringify(location))
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
   const geoKey = useMemo(() => {
     if (!selectedLocation) return ''
     const country = String(selectedLocation.country || '').trim().toLowerCase()
@@ -73,6 +81,21 @@ export default function PractitionerDirectoryPage() {
 
   React.useEffect(() => {
     loadCategories()
+  }, [])
+
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('helfi:practitionerLocation')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed?.lat && parsed?.lng) {
+          setSelectedLocation(parsed)
+          setLocationQuery(parsed.displayName || '')
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
   }, [])
 
   const handleLocationSearch = async () => {
@@ -125,6 +148,7 @@ export default function PractitionerDirectoryPage() {
           setSelectedLocation(location)
           setLocationQuery(location.displayName)
           setLocationResults([])
+          persistLocation(location)
         } catch {
           const location: LocationResult = {
             lat,
@@ -134,6 +158,7 @@ export default function PractitionerDirectoryPage() {
           setSelectedLocation(location)
           setLocationQuery(location.displayName)
           setLocationResults([])
+          persistLocation(location)
         }
       },
       () => alert('We could not access your location. Please enter it manually.')
@@ -182,7 +207,7 @@ export default function PractitionerDirectoryPage() {
     ? { lat: selectedLocation.lat, lng: selectedLocation.lng }
     : markers.length
       ? { lat: markers[0].lat, lng: markers[0].lng }
-      : { lat: 40.7128, lng: -74.006 }
+      : { lat: -37.8136, lng: 144.9631 }
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-6">
@@ -255,6 +280,7 @@ export default function PractitionerDirectoryPage() {
                         setSelectedLocation(item)
                         setLocationQuery(item.displayName)
                         setLocationResults([])
+                        persistLocation(item)
                       }}
                       className="w-full text-left px-3 py-2 hover:bg-gray-50"
                     >

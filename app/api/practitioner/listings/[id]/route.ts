@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
-import { parseCommaList, normalizeUrl } from '@/lib/practitioner-utils'
+import { parseCommaList, normalizeUrl, geocodeAddress } from '@/lib/practitioner-utils'
 
 async function getListingForUser(listingId: string, userId: string) {
   return prisma.practitionerListing.findFirst({
@@ -44,6 +44,22 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const hasHoursNotes = Object.prototype.hasOwnProperty.call(body, 'hoursNotes')
   const hoursNotes = hasHoursNotes ? String(body?.hoursNotes || '').trim() : ''
 
+  const addressParts = [
+    body?.addressLine1,
+    body?.addressLine2,
+    body?.suburbCity,
+    body?.stateRegion,
+    body?.postcode,
+    body?.country,
+  ]
+    .map((item) => (item ? String(item).trim() : ''))
+    .filter(Boolean)
+  const addressString = addressParts.join(', ')
+  const providedLat = typeof body?.lat === 'number' ? body.lat : null
+  const providedLng = typeof body?.lng === 'number' ? body.lng : null
+  const geocoded =
+    !providedLat && !providedLng && addressString ? await geocodeAddress(addressString) : null
+
   const updated = await prisma.practitionerListing.update({
     where: { id: listing.id },
     data: {
@@ -61,8 +77,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       stateRegion: body?.stateRegion ? String(body.stateRegion).trim() : null,
       postcode: body?.postcode ? String(body.postcode).trim() : null,
       country: body?.country ? String(body.country).trim() : null,
-      lat: typeof body?.lat === 'number' ? body.lat : null,
-      lng: typeof body?.lng === 'number' ? body.lng : null,
+      lat: providedLat ?? geocoded?.lat ?? listing.lat ?? null,
+      lng: providedLng ?? geocoded?.lng ?? listing.lng ?? null,
       serviceType: body?.serviceType || listing.serviceType,
       languages: parseCommaList(body?.languages),
       hoursJson: hasHoursNotes

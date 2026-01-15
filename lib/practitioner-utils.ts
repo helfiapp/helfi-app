@@ -28,6 +28,26 @@ export function normalizeUrl(url: string | null | undefined): string | null {
   return `https://${trimmed}`
 }
 
+export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  const apiKey =
+    process.env.GOOGLE_MAPS_API_KEY ||
+    process.env.GOOGLE_MAPS_SERVER_KEY ||
+    process.env.MAPS_API_KEY
+  if (!apiKey) return null
+  const trimmed = address.trim()
+  if (!trimmed) return null
+  const url = new URL('https://maps.googleapis.com/maps/api/geocode/json')
+  url.searchParams.set('address', trimmed)
+  url.searchParams.set('key', apiKey)
+  const res = await fetch(url.toString())
+  if (!res.ok) return null
+  const data = await res.json().catch(() => ({}))
+  if (data?.status !== 'OK') return null
+  const location = data?.results?.[0]?.geometry?.location
+  if (!location) return null
+  return { lat: Number(location.lat), lng: Number(location.lng) }
+}
+
 export function buildGeoKey(input: {
   country?: string | null
   stateRegion?: string | null

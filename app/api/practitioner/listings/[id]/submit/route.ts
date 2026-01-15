@@ -69,6 +69,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     ? await prisma.practitionerCategory.findUnique({ where: { id: listing.subcategoryId } })
     : null
 
+  const hasCoordinates = Boolean(listing.lat && listing.lng)
+  const hasFullAddress = Boolean(listing.addressLine1 && listing.suburbCity && listing.country)
+  const hasPhone = Boolean(listing.phone)
+  const hasWebsite = Boolean(listing.websiteUrl)
+  const hasPublicEmail = Boolean(listing.emailPublic)
+
   let screening
   try {
     screening = await screenPractitionerListing({
@@ -85,6 +91,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       subcategory: subcategory?.name || null,
       tags: listing.tags,
       languages: listing.languages,
+      hasCoordinates,
+      hasFullAddress,
+      hasPhone,
+      hasWebsite,
+      hasPublicEmail,
     })
   } catch (error: any) {
     screening = {

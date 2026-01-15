@@ -446,7 +446,15 @@ export default function PractitionerPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h1 className="text-2xl font-bold text-gray-900">Practitioner Listing</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Practitioner Listing</h1>
+            <a
+              href="/public-home"
+              className="text-sm text-emerald-700 hover:underline"
+            >
+              Go to the public homepage
+            </a>
+          </div>
           <p className="text-gray-600 mt-2">
             Create your listing, then submit it for a quick review. Listings only go live after review.
           </p>
@@ -477,6 +485,16 @@ export default function PractitionerPage() {
             {dashboard.listing.reviewStatus === 'REJECTED' && dashboard.listing.reviewNotes && (
               <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 whitespace-pre-wrap">
                 {dashboard.listing.reviewNotes}
+              </div>
+            )}
+            {dashboard.listing.slug && dashboard.listing.reviewStatus === 'APPROVED' && (
+              <div>
+                <a
+                  href={`/practitioners/${dashboard.listing.slug}`}
+                  className="inline-flex items-center px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 text-sm font-semibold hover:border-emerald-300 hover:text-emerald-800 transition-colors"
+                >
+                  View your listing
+                </a>
               </div>
             )}
           </div>
@@ -541,13 +559,21 @@ export default function PractitionerPage() {
                     Add your location to enable boosts.
                   </div>
                 )}
-                <button
-                  onClick={handleBoostPurchase}
-                  disabled={!form.lat || !form.lng}
-                  className="px-5 py-2.5 rounded-full bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
-                >
-                  Purchase boost
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleBoostPurchase}
+                    disabled={!form.lat || !form.lng}
+                    className="px-5 py-2.5 rounded-full bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
+                  >
+                    Purchase boost
+                  </button>
+                  <button
+                    onClick={handleUseLocation}
+                    className="px-5 py-2.5 rounded-full border border-gray-300 text-gray-700 font-semibold hover:border-emerald-300 hover:text-emerald-700 transition-colors"
+                  >
+                    Use my location
+                  </button>
+                </div>
               </div>
               {form.lat && form.lng && (
                 <div className="h-56">
@@ -679,13 +705,14 @@ export default function PractitionerPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Public email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Public email (shown on listing)</label>
                 <input
                   value={form.emailPublic}
                   onChange={(e) => updateField('emailPublic', e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   placeholder="hello@yourclinic.com"
                 />
+                <p className="text-xs text-gray-500 mt-1">This can be different from your login email.</p>
               </div>
             </div>
 
@@ -755,6 +782,14 @@ export default function PractitionerPage() {
                 />
               </div>
               <p className="text-xs text-gray-500">We will add the map picker next. For now, you can paste the coordinates.</p>
+              {form.lat && form.lng && (
+                <div className="h-56">
+                  <DirectoryMap
+                    center={{ lat: Number(form.lat), lng: Number(form.lng) }}
+                    markers={[{ id: 'listing', name: 'Your location', lat: Number(form.lat), lng: Number(form.lng) }]}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -811,6 +846,7 @@ export default function PractitionerPage() {
                       />
                     </label>
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">After uploading, click Save listing to publish the images.</p>
                 </div>
               </div>
             </div>

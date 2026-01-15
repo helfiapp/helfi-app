@@ -13,6 +13,11 @@ export type PractitionerScreeningInput = {
   subcategory?: string | null
   tags?: string[]
   languages?: string[]
+  hasCoordinates?: boolean
+  hasFullAddress?: boolean
+  hasPhone?: boolean
+  hasWebsite?: boolean
+  hasPublicEmail?: boolean
 }
 
 export type PractitionerScreeningResult = {
@@ -83,11 +88,17 @@ Return ONLY valid JSON with keys:
 - recommendedAction: one of AUTO_APPROVE|MANUAL_REVIEW
 - reasoning: short explanation in plain language
 - redFlags: array of strings (optional)
+
+IMPORTANT:
+- Only flag listings when there are clear, serious concerns (fraud, impersonation, illegal claims, guaranteed cures, miracle results, financial scams).
+- Normal wellness or holistic language is NOT a reason to flag a listing.
+- If the listing has a real address/coordinates and a phone number, that is a strong legitimacy signal.
+- If unsure, choose LOW and AUTO_APPROVE.
 `
   const user = {
     input,
     checks: [
-      'Suspicious or misleading claims',
+      'Only extreme or illegal medical claims (guaranteed cures, miracle results, curing cancer, etc.)',
       'Missing or inconsistent contact details',
       'Likely spam or automated content',
       'Unclear or fake business identity',

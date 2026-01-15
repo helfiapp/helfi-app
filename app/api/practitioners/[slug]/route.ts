@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { geocodeAddress } from '@/lib/practitioner-utils'
 
 export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
   const listing = await prisma.practitionerListing.findFirst({
@@ -17,6 +18,28 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
 
   if (!listing) {
     return NextResponse.json({ error: 'Listing not found.' }, { status: 404 })
+  }
+
+  if (!listing.lat || !listing.lng) {
+    const address = [
+      listing.addressLine1,
+      listing.addressLine2,
+      listing.suburbCity,
+      listing.stateRegion,
+      listing.postcode,
+      listing.country,
+    ]
+      .filter(Boolean)
+      .join(', ')
+    const geocoded = address ? await geocodeAddress(address) : null
+    if (geocoded?.lat && geocoded?.lng) {
+      const updated = await prisma.practitionerListing.update({
+        where: { id: listing.id },
+        data: { lat: geocoded.lat, lng: geocoded.lng },
+      })
+      listing.lat = updated.lat
+      listing.lng = updated.lng
+    }
   }
 
   return NextResponse.json({

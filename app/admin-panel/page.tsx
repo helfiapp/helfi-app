@@ -1184,8 +1184,9 @@ https://www.helfi.ai`)
     }
   }
 
-  const loadPractitionerEntries = async () => {
-    if (!adminToken) return
+  const loadPractitionerEntries = async (tokenOverride?: string) => {
+    const token = tokenOverride || adminToken
+    if (!token) return
     setPractitionerLoading(true)
     setPractitionerError('')
     try {
@@ -1204,7 +1205,7 @@ https://www.helfi.ai`)
       }
       const res = await fetch(`/api/admin/practitioners?${params.toString()}`, {
         headers: {
-          Authorization: `Bearer ${adminToken}`,
+          Authorization: `Bearer ${token}`,
         },
       })
       const data = await res.json().catch(() => ({}))
@@ -1300,6 +1301,37 @@ https://www.helfi.ai`)
       setPractitionerReviewListingId(null)
     } catch (err: any) {
       alert(err?.message || 'Rejection failed')
+    } finally {
+      setPractitionerActionLoading((prev) => {
+        const next = { ...prev }
+        delete next[listingId]
+        return next
+      })
+    }
+  }
+
+  const handlePractitionerListingDelete = async (listingId: string, displayName: string) => {
+    if (!adminToken) return
+    const confirmText = window.prompt(
+      `Type DELETE to permanently delete the listing "${displayName}". This cannot be undone.`
+    )
+    if (confirmText !== 'DELETE') return
+    setPractitionerActionLoading((prev) => ({ ...prev, [listingId]: true }))
+    try {
+      const res = await fetch(`/api/admin/practitioners/${listingId}/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ confirm: confirmText }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Delete failed')
+      await loadPractitionerEntries()
+      setPractitionerReviewListingId(null)
+    } catch (err: any) {
+      alert(err?.message || 'Delete failed')
     } finally {
       setPractitionerActionLoading((prev) => {
         const next = { ...prev }
@@ -1418,13 +1450,19 @@ https://www.helfi.ai`)
       loadPartnerOutreachData()
     }
     if (tabId === 'practitioners') {
-      loadPractitionerEntries()
+      loadPractitionerEntries(tokenOverride)
     }
     if (tabId === 'settings') {
       checkPushNotificationStatus()
       loadSecurityStatus(tokenOverride)
     }
   }
+
+  useEffect(() => {
+    if (activeTab !== 'practitioners') return
+    if (!adminToken) return
+    loadPractitionerEntries()
+  }, [activeTab, adminToken])
 
   const refreshData = () => {
     loadAnalyticsData()
@@ -4108,13 +4146,18 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                                 {listing.slug && (
                                   <a
                                     href={`/practitioners/${listing.slug}`}
-                                    target="_blank"
-                                    rel="noreferrer"
                                     className="px-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-700 hover:border-emerald-300 hover:text-emerald-700"
                                   >
                                     View
                                   </a>
                                 )}
+                                <button
+                                  onClick={() => handlePractitionerListingDelete(listing.id, listing.displayName)}
+                                  disabled={!!practitionerActionLoading[listing.id]}
+                                  className="px-3 py-1.5 border border-red-200 rounded-md text-xs text-red-700 hover:border-red-300 hover:text-red-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                  Delete
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -4153,8 +4196,6 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                         {practitionerReviewListing.slug && (
                           <a
                             href={`/practitioners/${practitionerReviewListing.slug}`}
-                            target="_blank"
-                            rel="noreferrer"
                             className="inline-block mt-2 text-emerald-700 hover:underline"
                           >
                             View public listing
@@ -4241,6 +4282,22 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                           {practitionerActionLoading[practitionerReviewListing.id] ? 'Working…' : 'Reject Listing'}
                         </button>
                       </div>
+                    </div>
+
+                    <div className="border-t border-gray-200 pt-4">
+                      <div className="text-sm text-gray-600 mb-2">Delete listing (permanent)</div>
+                      <button
+                        onClick={() =>
+                          handlePractitionerListingDelete(
+                            practitionerReviewListing.id,
+                            practitionerReviewListing.displayName
+                          )
+                        }
+                        disabled={!!practitionerActionLoading[practitionerReviewListing.id]}
+                        className="px-4 py-2 border border-red-200 text-red-700 rounded-md text-sm hover:border-red-300 hover:text-red-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {practitionerActionLoading[practitionerReviewListing.id] ? 'Working…' : 'Delete Listing'}
+                      </button>
                     </div>
                   </div>
                 </div>
