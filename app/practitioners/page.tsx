@@ -878,7 +878,6 @@ export default function PractitionerDirectoryPage() {
                 </div>
               )}
             </div>
-            </div>
           </div>
         </div>
       </section>
