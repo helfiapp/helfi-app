@@ -64,6 +64,12 @@ type CategoryMatch = {
   parentLabel?: string
 }
 
+type SymptomHint = {
+  terms: string[]
+  category: string
+  subcategory?: string
+}
+
 const QUICK_ACCESS: QuickAccess[] = [
   { label: 'Chiropractic', category: 'Allied Health', subcategory: 'Chiropractor', icon: 'self_improvement', tone: 'text-blue-500' },
   { label: 'Mental Health', category: 'Mental Health', icon: 'psychology', tone: 'text-teal-500' },
@@ -83,6 +89,28 @@ const QUICK_ACCESS: QuickAccess[] = [
   { label: 'Psychology', category: 'Mental Health', subcategory: 'Psychologist', icon: 'psychology_alt', tone: 'text-violet-500' },
   { label: 'General Practitioner', category: 'GPs & Doctors', subcategory: 'General Practitioner (GP)', icon: 'stethoscope', tone: 'text-emerald-700' },
   { label: 'Urology', category: 'GPs & Doctors', subcategory: 'Urologist', icon: 'water_drop', tone: 'text-blue-700' },
+]
+
+const SYMPTOM_CATEGORY_HINTS: SymptomHint[] = [
+  { terms: ['back pain', 'lower back', 'upper back', 'spine', 'sciatica'], category: 'Musculoskeletal & Pain', subcategory: 'Spinal / Back Pain Clinic' },
+  { terms: ['neck pain', 'shoulder pain', 'joint pain', 'muscle pain', 'injury', 'sprain', 'sports injury'], category: 'Musculoskeletal & Pain', subcategory: 'Sports Physiotherapy' },
+  { terms: ['headache', 'migraine', 'dizziness'], category: 'GPs & Doctors', subcategory: 'Neurologist' },
+  { terms: ['skin', 'rash', 'eczema', 'acne', 'psoriasis'], category: 'GPs & Doctors', subcategory: 'Dermatologist' },
+  { terms: ['anxiety', 'depression', 'stress', 'panic', 'ptsd', 'ocd', 'adhd'], category: 'Mental Health', subcategory: 'Psychologist' },
+  { terms: ['sleep', 'insomnia', 'snoring', 'sleep apnea'], category: 'Diagnostics & Testing', subcategory: 'Sleep Study Clinic' },
+  { terms: ['heart', 'chest pain', 'palpitations'], category: 'GPs & Doctors', subcategory: 'Cardiologist' },
+  { terms: ['allergy', 'hay fever', 'asthma'], category: 'GPs & Doctors', subcategory: 'Immunologist / Allergist' },
+  { terms: ['breathing', 'lung', 'cough'], category: 'GPs & Doctors', subcategory: 'Respiratory Physician / Pulmonologist' },
+  { terms: ['gut', 'ibs', 'constipation', 'diarrhea', 'bloating'], category: 'GPs & Doctors', subcategory: 'Gastroenterologist' },
+  { terms: ['diabetes', 'blood sugar'], category: 'Allied Health', subcategory: 'Diabetes Educator' },
+  { terms: ['weight loss', 'weight management'], category: 'Nutrition & Metabolic Health', subcategory: 'Weight Management Clinic' },
+  { terms: ['nutrition', 'diet', 'food'], category: 'Nutrition & Metabolic Health', subcategory: 'Dietitian' },
+  { terms: ['teeth', 'tooth', 'gum', 'dental'], category: 'Dental & Oral Health', subcategory: 'Dentist' },
+  { terms: ['eye', 'vision', 'blurred vision'], category: 'Eye & Hearing', subcategory: 'Optometrist' },
+  { terms: ['hearing', 'ear', 'tinnitus'], category: 'Eye & Hearing', subcategory: 'Audiologist' },
+  { terms: ['urinary', 'prostate', 'urology'], category: "Men's Health", subcategory: 'Urologist' },
+  { terms: ['blood test', 'pathology'], category: 'Diagnostics & Testing', subcategory: 'Blood Testing Clinic' },
+  { terms: ['x-ray', 'mri', 'ct', 'ultrasound'], category: 'Diagnostics & Testing', subcategory: 'Imaging / Radiology (X-ray, CT, MRI, Ultrasound)' },
 ]
 
 export default function PractitionerDirectoryPage() {
@@ -154,6 +182,58 @@ export default function PractitionerDirectoryPage() {
     })
     return matches.slice(0, 10)
   }, [categories, query])
+
+  const symptomMatches = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    if (!normalizedQuery || normalizedQuery.length < 3) return []
+    const matches: CategoryMatch[] = []
+    const categoryLookup = new Map<string, CategoryNode>()
+    categories.forEach((category) => {
+      categoryLookup.set(category.name.toLowerCase(), category)
+    })
+
+    SYMPTOM_CATEGORY_HINTS.forEach((hint) => {
+      const matched = hint.terms.some((term) => {
+        const normalizedTerm = term.toLowerCase()
+        return normalizedTerm.includes(normalizedQuery) || normalizedQuery.includes(normalizedTerm)
+      })
+      if (!matched) return
+      const category = categoryLookup.get(hint.category.toLowerCase())
+      if (!category) return
+      let subcategoryId: string | undefined
+      let parentLabel: string | undefined
+      if (hint.subcategory) {
+        const child = category.children?.find((item) => item.name.toLowerCase() === hint.subcategory?.toLowerCase())
+        if (child) {
+          subcategoryId = child.id
+          parentLabel = category.name
+        }
+      }
+      matches.push({
+        id: `symptom-${category.id}-${subcategoryId || 'all'}`,
+        label: hint.subcategory || category.name,
+        categoryId: category.id,
+        subcategoryId,
+        parentLabel,
+      })
+    })
+
+    return matches
+  }, [categories, query])
+
+  const suggestedMatches = useMemo(() => {
+    const merged: CategoryMatch[] = []
+    const seen = new Set<string>()
+    const addMatch = (match: CategoryMatch) => {
+      const key = `${match.categoryId}:${match.subcategoryId || ''}`
+      if (seen.has(key)) return
+      seen.add(key)
+      merged.push(match)
+    }
+    categoryMatches.forEach(addMatch)
+    symptomMatches.forEach(addMatch)
+    return merged.slice(0, 10)
+  }, [categoryMatches, symptomMatches])
 
   const loadCategories = async () => {
     try {
@@ -565,11 +645,11 @@ export default function PractitionerDirectoryPage() {
                 </div>
               )}
 
-              {categoryMatches.length > 0 && (
+              {suggestedMatches.length > 0 && (
                 <div className="mt-3 px-2">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Category matches</div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Suggested categories</div>
                   <div className="flex flex-wrap gap-2">
-                    {categoryMatches.map((match) => (
+                    {suggestedMatches.map((match) => (
                       <button
                         key={match.id}
                         onClick={() => applyCategoryMatch(match)}
