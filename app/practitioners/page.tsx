@@ -423,7 +423,7 @@ export default function PractitionerDirectoryPage() {
                   Telehealth only
                 </label>
                 <button
-                  onClick={handleSearch}
+                  onClick={() => handleSearch()}
                   className="ml-auto bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.98] transition-all"
                 >
                   {loading ? 'Searching…' : 'Search now'}
