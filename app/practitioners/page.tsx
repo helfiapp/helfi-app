@@ -703,7 +703,7 @@ export default function PractitionerDirectoryPage() {
             <div className="flex items-center justify-between mb-4 px-2">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Quick Access Categories</span>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 hidden md:block">
               {quickRows.map((row, index) => (
                 <div key={`row-${index}`} className="flex overflow-x-auto gap-3 pb-1 px-2">
                   {row.map((item) => (
@@ -717,6 +717,18 @@ export default function PractitionerDirectoryPage() {
                     </button>
                   ))}
                 </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 px-2 md:hidden">
+              {QUICK_ACCESS.map((item) => (
+                <button
+                  key={`mobile-${item.label}`}
+                  onClick={() => handleQuickAccess(item)}
+                  className="bg-white py-3 px-4 rounded-2xl text-left shadow-sm hover:shadow-md transition-all border border-slate-100 font-semibold text-sm text-slate-700 flex items-center gap-3"
+                >
+                  <MaterialSymbol name={item.icon} className={`text-2xl ${item.tone}`} />
+                  <span className="leading-tight">{item.label}</span>
+                </button>
               ))}
             </div>
           </div>
