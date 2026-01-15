@@ -276,6 +276,14 @@ const applyDrinkMetaToTotals = (totals: any, meta: DrinkEntryMeta | null) => {
   }
 }
 
+const stripWaterLogIdFromTotals = (totals: any) => {
+  if (!totals || typeof totals !== 'object') return totals
+  if (!Object.prototype.hasOwnProperty.call(totals, '__waterLogId')) return totals
+  const next: any = { ...(totals as any) }
+  delete next.__waterLogId
+  return next
+}
+
 const getDrinkMetaFromEntry = (entry: any): DrinkEntryMeta | null => {
   const source =
     entry?.nutrition && typeof entry.nutrition === 'object'
@@ -537,6 +545,7 @@ type FavoritesAllSnapshotStore = Record<string, FavoritesAllSnapshot>
 const FAVORITES_ALL_SNAPSHOT_TTL_MS = 5 * 60 * 1000
 const FAVORITES_ALL_SNAPSHOT_KEY = 'foodDiary:favoritesAllSnapshot'
 const FOOD_RESUME_LAST_PREFIX = 'food:resume:last:'
+const FOOD_RESUME_REFRESH_MIN_MS = 2 * 60 * 1000
 const FOOD_DIARY_LAST_VISIT_KEY = 'food:diary:lastVisitDate'
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
@@ -615,6 +624,7 @@ const shouldRefreshOnResume = (scope: string): boolean => {
   if (typeof window === 'undefined') return false
   const hiddenAt = readAppHiddenAt()
   if (!hiddenAt) return false
+  if (Date.now() - hiddenAt < FOOD_RESUME_REFRESH_MIN_MS) return false
   const lastHandled = readFoodResumeStamp(scope)
   return hiddenAt > lastHandled
 }
@@ -2747,6 +2757,8 @@ export default function FoodDiary() {
     maxHeight?: number
   } | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
+  const [drinkAmountInput, setDrinkAmountInput] = useState<string>('')
+  const [drinkUnitInput, setDrinkUnitInput] = useState<DrinkAmountOverride['unit']>('ml')
   const [aiEntryTab, setAiEntryTab] = useState<'ingredients' | 'recipe' | 'reason'>('ingredients')
   const [aiMealHistory, setAiMealHistory] = useState<any[]>([])
   const [aiMealHistoryCategory, setAiMealHistoryCategory] = useState<string>('')
@@ -2954,6 +2966,25 @@ export default function FoodDiary() {
       setShowFavoritesPicker(true)
     }
   }, [isAnalysisRoute, pathname])
+
+  useEffect(() => {
+    if (!editingEntry) {
+      editingDrinkMetaRef.current = null
+      setDrinkAmountInput('')
+      setDrinkUnitInput('ml')
+      return
+    }
+    const meta = getDrinkMetaFromEntry(editingEntry)
+    if (!meta?.type) {
+      setDrinkAmountInput('')
+      setDrinkUnitInput('ml')
+      return
+    }
+    editingDrinkMetaRef.current = meta
+    setDrinkAmountInput(formatNumberInputValue(meta.amount))
+    setDrinkUnitInput(meta.unit)
+  }, [editingEntry])
+
   const categoryRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const verifyMergeHoldRef = useRef<Record<string, number>>({})
   const verifyMergeTimerRef = useRef<Record<string, { id: number; fireAt: number }>>({})
@@ -9042,12 +9073,94 @@ Please add nutritional information manually if needed.`);
     }
   };
 
+  const buildDrinkMetaFromInput = (amountValue: string, unitValue: DrinkAmountOverride['unit']) => {
+    const base = editingDrinkMetaRef.current || getDrinkMetaFromEntry(editingEntry)
+    if (!base?.type) return null
+    const amount = Number(amountValue)
+    if (!Number.isFinite(amount) || amount <= 0) return null
+    const unit = normalizeDrinkUnit(unitValue) || base.unit
+    const amountMl = unit === 'l' ? amount * 1000 : unit === 'oz' ? amount * 29.5735 : amount
+    return {
+      ...base,
+      amount,
+      unit,
+      amountMl,
+    }
+  }
+
+  const updateDrinkMetaDraft = (amountValue: string, unitValue: DrinkAmountOverride['unit']) => {
+    const next = buildDrinkMetaFromInput(amountValue, unitValue)
+    if (!next) return
+    editingDrinkMetaRef.current = next
+  }
+
+  const applyDrinkMetaToEntry = (entry: any, meta: DrinkEntryMeta | null) => {
+    if (!entry || !meta) return entry
+    const baseNutrition = entry?.nutrition || entry?.total || null
+    const baseTotal = entry?.total || entry?.nutrition || null
+    return {
+      ...entry,
+      nutrition: applyDrinkMetaToTotals(baseNutrition, meta),
+      total: applyDrinkMetaToTotals(baseTotal, meta),
+    }
+  }
+
+  const syncDrinkWaterLog = async (meta: DrinkEntryMeta, localDate: string, category?: string | null) => {
+    const payload = {
+      amount: meta.amount,
+      unit: meta.unit,
+      label: meta.type,
+      localDate,
+      category: normalizeCategory(category) || 'uncategorized',
+    }
+
+    if (meta.waterLogId) {
+      const res = await fetch(`/api/water-log/${encodeURIComponent(meta.waterLogId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        return { id: meta.waterLogId, entry: data?.entry as WaterLogEntry | null }
+      }
+      if (res.status !== 404) {
+        throw new Error('water log update failed')
+      }
+    }
+
+    const res = await fetch('/api/water-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error('water log save failed')
+    const data = await res.json()
+    const entry = data?.entry as WaterLogEntry | null
+    const id = entry?.id ? String(entry.id) : ''
+    return { id, entry }
+  }
+
   // New function to update existing entries with AI re-analysis
   const updateFoodEntry = async () => {
     if (!editingEntry) return;
     if (labelBlocked) {
       showQuickToast('Please fix the label values before saving.')
       return
+    }
+    const baseDrinkMeta = editingDrinkMetaRef.current || getDrinkMetaFromEntry(editingEntry)
+    let resolvedDrinkMeta = baseDrinkMeta
+    if (baseDrinkMeta?.type) {
+      const amountValue = drinkAmountInput || String(baseDrinkMeta.amount || '')
+      const nextMeta = buildDrinkMetaFromInput(amountValue, drinkUnitInput)
+      if (!nextMeta) {
+        showQuickToast('Enter a valid drink amount.')
+        return
+      }
+      resolvedDrinkMeta = nextMeta
+      editingDrinkMetaRef.current = nextMeta
     }
 
     // Never override a user-provided title with an auto-generated ingredient summary.
@@ -9119,7 +9232,29 @@ Please add nutritional information manually if needed.`);
       return { favoriteId, origin, clientId, drinkMeta }
     })()
 
-    const drinkMeta = editingDrinkMetaRef.current || getDrinkMetaFromEntry(editingEntry)
+    const entryLocalDate = editingEntry.localDate || selectedDate
+    const entryCategory = editingEntry.category || editingEntry.meal
+    let drinkMeta = resolvedDrinkMeta
+    if (drinkMeta?.type) {
+      try {
+        const waterResult = await syncDrinkWaterLog(drinkMeta, entryLocalDate, entryCategory)
+        if (waterResult?.id) {
+          drinkMeta = { ...drinkMeta, waterLogId: waterResult.id }
+          editingDrinkMetaRef.current = drinkMeta
+          if (waterResult.entry && waterResult.entry.localDate === selectedDate) {
+            setWaterEntries((prev) => {
+              const next = Array.isArray(prev) ? [...prev] : []
+              const idx = next.findIndex((item) => item.id === waterResult.entry?.id)
+              if (idx >= 0) next[idx] = waterResult.entry
+              else next.unshift(waterResult.entry)
+              return next
+            })
+          }
+        }
+      } catch {
+        showQuickToast('Updated entry, but water intake did not update.')
+      }
+    }
 
     const mergedNutrition = (() => {
       const base = (analyzedNutrition || editingEntry.nutrition) as any
@@ -12312,8 +12447,8 @@ Please add nutritional information manually if needed.`);
       sourceId: (source as any)?.dbId || (source as any)?.id || null,
       label: cleanLabel || 'Favorite meal',
       description: cleanLabel || 'Favorite meal',
-      nutrition: source.nutrition || source.total || null,
-      total: source.total || source.nutrition || null,
+      nutrition: stripWaterLogIdFromTotals(source.nutrition || source.total || null),
+      total: stripWaterLogIdFromTotals(source.total || source.nutrition || null),
       items: clonedItems,
       photo: source.photo || null,
       method:
@@ -12393,7 +12528,7 @@ Please add nutritional information manually if needed.`);
     const finalTotals = adjusted.used ? adjusted.totals || totals : totals
     if (adjusted.used) pendingDrinkOverrideRef.current = null
     const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-    const totalsWithMeta = applyDrinkMetaToTotals(finalTotals, drinkMeta)
+    const totalsWithMeta = applyDrinkMetaToTotals(stripWaterLogIdFromTotals(finalTotals), drinkMeta)
     const newEntry = ensureEntryLoggedAt(
       applyEntryClientId(
         {
@@ -12429,7 +12564,7 @@ Please add nutritional information manually if needed.`);
       filterEntriesForDate(todaysFoods, selectedDate),
       { fallbackDate: selectedDate },
     )
-    const updated = dedupeEntries([pendingEntry, ...baseForDate], { fallbackDate: selectedDate })
+    let updated = dedupeEntries([pendingEntry, ...baseForDate], { fallbackDate: selectedDate })
     updateTodaysFoodsForDate(updated, selectedDate)
     maybeShowHealthCheckPrompt(pendingEntry)
     if (!isViewingToday) {
@@ -12440,7 +12575,35 @@ Please add nutritional information manually if needed.`);
     }
     setExpandedCategories((prev) => ({ ...prev, [category]: true }))
     queueScrollToDiaryEntry({ entryKey: pendingEntry.id, category })
-    enqueuePendingFoodLogSave(pendingEntry, selectedDate)
+    let entryForSave = pendingEntry
+    const drinkMetaForEntry = getDrinkMetaFromEntry(pendingEntry)
+    if (drinkMetaForEntry?.type && !drinkMetaForEntry.waterLogId) {
+      try {
+        const waterResult = await syncDrinkWaterLog(
+          drinkMetaForEntry,
+          pendingEntry.localDate || selectedDate,
+          pendingEntry.category || pendingEntry.meal,
+        )
+        if (waterResult?.id) {
+          const updatedMeta = { ...drinkMetaForEntry, waterLogId: waterResult.id }
+          entryForSave = applyDrinkMetaToEntry(pendingEntry, updatedMeta)
+          updateEntriesForPendingKey(pendingKey, () => entryForSave)
+          updated = updated.map((item) => (item.id === pendingEntry.id ? entryForSave : item))
+          if (waterResult.entry && waterResult.entry.localDate === selectedDate) {
+            setWaterEntries((prev) => {
+              const next = Array.isArray(prev) ? [...prev] : []
+              const idx = next.findIndex((item) => item.id === waterResult.entry?.id)
+              if (idx >= 0) next[idx] = waterResult.entry
+              else next.unshift(waterResult.entry)
+              return next
+            })
+          }
+        }
+      } catch {
+        showQuickToast('Added drink, but water intake did not update.')
+      }
+    }
+    enqueuePendingFoodLogSave(entryForSave, selectedDate)
     try {
       await syncSnapshotOnly(updated, selectedDate)
       showQuickToast(`Added to ${categoryLabel(category)}`)
@@ -12575,9 +12738,12 @@ Please add nutritional information manually if needed.`);
     const adjustedTotals = adjusted.used ? adjusted.totals || null : null
     if (adjusted.used) pendingDrinkOverrideRef.current = null
     const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-    const baseTotals = attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null)
+    const baseTotals = stripWaterLogIdFromTotals(attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null))
     const totalsWithMeta = applyDrinkMetaToTotals(baseTotals, drinkMeta)
-    const totalWithMeta = applyDrinkMetaToTotals(adjustedTotals || favorite.total || favorite.nutrition || null, drinkMeta)
+    const totalWithMeta = applyDrinkMetaToTotals(
+      stripWaterLogIdFromTotals(adjustedTotals || favorite.total || favorite.nutrition || null),
+      drinkMeta,
+    )
 
     const entry = ensureEntryLoggedAt(
       applyEntryClientId(
@@ -12627,7 +12793,7 @@ Please add nutritional information manually if needed.`);
       filterEntriesForDate(todaysFoods, selectedDate),
       { fallbackDate: selectedDate },
     )
-    const updatedFoods = dedupeEntries([pendingEntry, ...baseForDate], { fallbackDate: selectedDate })
+    let updatedFoods = dedupeEntries([pendingEntry, ...baseForDate], { fallbackDate: selectedDate })
     updateTodaysFoodsForDate(updatedFoods, selectedDate)
     triggerHaptic(10)
     queueScrollToDiaryEntry({ entryKey: pendingEntry.id, category })
@@ -12643,7 +12809,35 @@ Please add nutritional information manually if needed.`);
         return dedupeEntries([{ ...pendingEntry, dbId: undefined }, ...base], { fallbackDate: selectedDate })
       })
     }
-    enqueuePendingFoodLogSave(pendingEntry, selectedDate)
+    let entryForSave = pendingEntry
+    const drinkMetaForEntry = getDrinkMetaFromEntry(pendingEntry)
+    if (drinkMetaForEntry?.type && !drinkMetaForEntry.waterLogId) {
+      try {
+        const waterResult = await syncDrinkWaterLog(
+          drinkMetaForEntry,
+          pendingEntry.localDate || selectedDate,
+          pendingEntry.category || pendingEntry.meal,
+        )
+        if (waterResult?.id) {
+          const updatedMeta = { ...drinkMetaForEntry, waterLogId: waterResult.id }
+          entryForSave = applyDrinkMetaToEntry(pendingEntry, updatedMeta)
+          updateEntriesForPendingKey(pendingKey, () => entryForSave)
+          updatedFoods = updatedFoods.map((item) => (item.id === pendingEntry.id ? entryForSave : item))
+          if (waterResult.entry && waterResult.entry.localDate === selectedDate) {
+            setWaterEntries((prev) => {
+              const next = Array.isArray(prev) ? [...prev] : []
+              const idx = next.findIndex((item) => item.id === waterResult.entry?.id)
+              if (idx >= 0) next[idx] = waterResult.entry
+              else next.unshift(waterResult.entry)
+              return next
+            })
+          }
+        }
+      } catch {
+        showQuickToast('Added drink, but water intake did not update.')
+      }
+    }
+    enqueuePendingFoodLogSave(entryForSave, selectedDate)
     try {
       await syncSnapshotOnly(updatedFoods, selectedDate)
       showQuickToast(`Added to ${categoryLabel(category)}`)
@@ -17411,6 +17605,47 @@ Please add nutritional information manually if needed.`);
                                     </select>
                                   </div>
                                 </div>
+                                {editingEntry &&
+                                  index === 0 &&
+                                  (editingDrinkMetaRef.current || getDrinkMetaFromEntry(editingEntry))?.type && (
+                                  <div className="flex items-center justify-between gap-3 mt-2">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Drink amount</span>
+                                    <div className="flex items-center bg-slate-100 rounded-xl px-4 py-2 border border-transparent">
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min={0}
+                                        step={drinkUnitInput === 'oz' ? 0.1 : drinkUnitInput === 'l' ? 0.01 : 1}
+                                        value={drinkAmountInput}
+                                        onFocus={() => {
+                                          setDrinkAmountInput('')
+                                        }}
+                                        onChange={(e) => {
+                                          const v = e.target.value
+                                          setDrinkAmountInput(v)
+                                          updateDrinkMetaDraft(v, drinkUnitInput)
+                                        }}
+                                        className="w-16 bg-transparent border-none font-bold text-lg text-slate-900 text-right outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
+                                        style={{ outline: 'none', boxShadow: 'none' }}
+                                      />
+                                      <div className="w-px h-6 bg-slate-300 mx-3" />
+                                      <select
+                                        value={drinkUnitInput}
+                                        onChange={(e) => {
+                                          const nextUnit = (normalizeDrinkUnit(e.target.value) || drinkUnitInput) as DrinkAmountOverride['unit']
+                                          setDrinkUnitInput(nextUnit)
+                                          updateDrinkMetaDraft(drinkAmountInput, nextUnit)
+                                        }}
+                                        className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none"
+                                        style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
+                                      >
+                                        <option value="ml">ml</option>
+                                        <option value="l">L</option>
+                                        <option value="oz">oz</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                )}
                                 {baseWeightPerServing && (
                                   <div className="text-xs text-slate-400">
                                     Total amount ≈{' '}
