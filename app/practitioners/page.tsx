@@ -377,7 +377,8 @@ export default function PractitionerDirectoryPage() {
   return (
     <div className="min-h-screen bg-white">
       <PublicHeader />
-      <section className="relative bg-white pt-20 pb-20 overflow-hidden">
+      <section className="relative bg-gradient-to-b from-emerald-50/60 via-white to-white pt-20 pb-20 overflow-hidden border-b border-emerald-100/70">
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-100/40 to-transparent -z-10" />
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl -z-10" />
         <div className="absolute top-1/2 -right-24 w-80 h-80 bg-blue-50/70 rounded-full blur-3xl -z-10" />
 
