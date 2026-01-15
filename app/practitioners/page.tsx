@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import MaterialSymbol from '@/components/MaterialSymbol'
+import { PRACTITIONER_SYMPTOM_HINTS } from '@/data/practitioner-symptoms'
 
 const DirectoryMap = dynamic(() => import('@/components/practitioner/DirectoryMap'), { ssr: false })
 
@@ -12,6 +13,7 @@ type CategoryNode = {
   id: string
   name: string
   slug: string
+  synonyms?: string[]
   children?: CategoryNode[]
 }
 
@@ -64,12 +66,6 @@ type CategoryMatch = {
   parentLabel?: string
 }
 
-type SymptomHint = {
-  terms: string[]
-  category: string
-  subcategory?: string
-}
-
 const QUICK_ACCESS: QuickAccess[] = [
   { label: 'Chiropractic', category: 'Allied Health', subcategory: 'Chiropractor', icon: 'self_improvement', tone: 'text-blue-500' },
   { label: 'Mental Health', category: 'Mental Health', icon: 'psychology', tone: 'text-teal-500' },
@@ -91,27 +87,7 @@ const QUICK_ACCESS: QuickAccess[] = [
   { label: 'Urology', category: 'GPs & Doctors', subcategory: 'Urologist', icon: 'water_drop', tone: 'text-blue-700' },
 ]
 
-const SYMPTOM_CATEGORY_HINTS: SymptomHint[] = [
-  { terms: ['back pain', 'lower back', 'upper back', 'spine', 'sciatica'], category: 'Musculoskeletal & Pain', subcategory: 'Spinal / Back Pain Clinic' },
-  { terms: ['neck pain', 'shoulder pain', 'joint pain', 'muscle pain', 'injury', 'sprain', 'sports injury'], category: 'Musculoskeletal & Pain', subcategory: 'Sports Physiotherapy' },
-  { terms: ['headache', 'migraine', 'dizziness'], category: 'GPs & Doctors', subcategory: 'Neurologist' },
-  { terms: ['skin', 'rash', 'eczema', 'acne', 'psoriasis'], category: 'GPs & Doctors', subcategory: 'Dermatologist' },
-  { terms: ['anxiety', 'depression', 'stress', 'panic', 'ptsd', 'ocd', 'adhd'], category: 'Mental Health', subcategory: 'Psychologist' },
-  { terms: ['sleep', 'insomnia', 'snoring', 'sleep apnea'], category: 'Diagnostics & Testing', subcategory: 'Sleep Study Clinic' },
-  { terms: ['heart', 'chest pain', 'palpitations'], category: 'GPs & Doctors', subcategory: 'Cardiologist' },
-  { terms: ['allergy', 'hay fever', 'asthma'], category: 'GPs & Doctors', subcategory: 'Immunologist / Allergist' },
-  { terms: ['breathing', 'lung', 'cough'], category: 'GPs & Doctors', subcategory: 'Respiratory Physician / Pulmonologist' },
-  { terms: ['gut', 'ibs', 'constipation', 'diarrhea', 'bloating'], category: 'GPs & Doctors', subcategory: 'Gastroenterologist' },
-  { terms: ['diabetes', 'blood sugar'], category: 'Allied Health', subcategory: 'Diabetes Educator' },
-  { terms: ['weight loss', 'weight management'], category: 'Nutrition & Metabolic Health', subcategory: 'Weight Management Clinic' },
-  { terms: ['nutrition', 'diet', 'food'], category: 'Nutrition & Metabolic Health', subcategory: 'Dietitian' },
-  { terms: ['teeth', 'tooth', 'gum', 'dental'], category: 'Dental & Oral Health', subcategory: 'Dentist' },
-  { terms: ['eye', 'vision', 'blurred vision'], category: 'Eye & Hearing', subcategory: 'Optometrist' },
-  { terms: ['hearing', 'ear', 'tinnitus'], category: 'Eye & Hearing', subcategory: 'Audiologist' },
-  { terms: ['urinary', 'prostate', 'urology'], category: "Men's Health", subcategory: 'Urologist' },
-  { terms: ['blood test', 'pathology'], category: 'Diagnostics & Testing', subcategory: 'Blood Testing Clinic' },
-  { terms: ['x-ray', 'mri', 'ct', 'ultrasound'], category: 'Diagnostics & Testing', subcategory: 'Imaging / Radiology (X-ray, CT, MRI, Ultrasound)' },
-]
+const SYMPTOM_CATEGORY_HINTS = PRACTITIONER_SYMPTOM_HINTS
 
 export default function PractitionerDirectoryPage() {
   const [categories, setCategories] = useState<CategoryNode[]>([])
@@ -160,7 +136,9 @@ export default function PractitionerDirectoryPage() {
     const matches: CategoryMatch[] = []
     categories.forEach((category) => {
       const categoryName = category.name.toLowerCase()
-      if (categoryName.includes(normalizedQuery)) {
+      const categorySynonyms = category.synonyms || []
+      const categoryMatch = categoryName.includes(normalizedQuery) || categorySynonyms.some((syn) => syn.toLowerCase().includes(normalizedQuery))
+      if (categoryMatch) {
         matches.push({
           id: `category-${category.id}`,
           label: category.name,
@@ -169,7 +147,9 @@ export default function PractitionerDirectoryPage() {
       }
       category.children?.forEach((child) => {
         const childName = child.name.toLowerCase()
-        if (childName.includes(normalizedQuery)) {
+        const childSynonyms = child.synonyms || []
+        const childMatch = childName.includes(normalizedQuery) || childSynonyms.some((syn) => syn.toLowerCase().includes(normalizedQuery))
+        if (childMatch) {
           matches.push({
             id: `subcategory-${child.id}`,
             label: child.name,
