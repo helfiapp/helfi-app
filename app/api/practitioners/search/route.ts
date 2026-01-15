@@ -27,6 +27,7 @@ function computeQualityScore(listing: any) {
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const categoryId = url.searchParams.get('categoryId') || undefined
+  const subcategoryId = url.searchParams.get('subcategoryId') || undefined
   const query = normalize(url.searchParams.get('q'))
   const lat = Number(url.searchParams.get('lat') || '')
   const lng = Number(url.searchParams.get('lng') || '')
@@ -41,6 +42,9 @@ export async function GET(request: NextRequest) {
   }
   if (categoryId) {
     where.categoryId = categoryId
+  }
+  if (subcategoryId) {
+    where.subcategoryId = subcategoryId
   }
 
   const listings = await prisma.practitionerListing.findMany({

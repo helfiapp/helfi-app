@@ -35,6 +35,13 @@ export default function ListYourPracticePage() {
                   Find a practitioner
                 </Link>
               </div>
+              <div className="mt-4 text-sm text-gray-600">
+                Already have a practitioner account?{' '}
+                <Link href="/auth/signin?context=practitioner&next=/practitioner" className="text-emerald-700 font-semibold hover:underline">
+                  Sign in here
+                </Link>
+                .
+              </div>
             </div>
           </section>
 

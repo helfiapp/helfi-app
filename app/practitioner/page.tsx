@@ -448,12 +448,20 @@ export default function PractitionerPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h1 className="text-2xl font-bold text-gray-900">Practitioner Listing</h1>
-            <a
-              href="/public-home"
-              className="text-sm text-emerald-700 hover:underline"
-            >
-              Go to the public homepage
-            </a>
+            <div className="flex items-center gap-3 text-sm">
+              <button
+                onClick={() => signOut({ callbackUrl: '/auth/signin?context=practitioner&next=/practitioner' })}
+                className="text-emerald-700 font-semibold hover:underline"
+              >
+                Sign out
+              </button>
+              <a
+                href="/public-home"
+                className="text-emerald-700 hover:underline"
+              >
+                Go to the public homepage
+              </a>
+            </div>
           </div>
           <p className="text-gray-600 mt-2">
             Create your listing, then submit it for a quick review. Listings only go live after review.

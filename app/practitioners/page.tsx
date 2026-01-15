@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import PublicHeader from '@/components/marketing/PublicHeader'
 
 const DirectoryMap = dynamic(() => import('@/components/practitioner/DirectoryMap'), { ssr: false })
 
@@ -41,9 +42,37 @@ type LocationResult = {
   postcode?: string
 }
 
+type QuickAccess = {
+  label: string
+  category: string
+  subcategory?: string
+}
+
+const QUICK_ACCESS: QuickAccess[] = [
+  { label: 'Chiropractic', category: 'Allied Health', subcategory: 'Chiropractor' },
+  { label: 'Mental Health', category: 'Mental Health' },
+  { label: 'Dental Care', category: 'Dental & Oral Health', subcategory: 'Dentist' },
+  { label: 'Cardiology', category: 'GPs & Doctors', subcategory: 'Cardiologist' },
+  { label: 'Pediatrics', category: 'GPs & Doctors', subcategory: 'Paediatrician' },
+  { label: 'Physiotherapy', category: 'Allied Health', subcategory: 'Physiotherapist' },
+  { label: 'Dermatology', category: 'GPs & Doctors', subcategory: 'Dermatologist' },
+  { label: 'Optometry', category: 'Eye & Hearing', subcategory: 'Optometrist' },
+  { label: 'Podiatry', category: 'Allied Health', subcategory: 'Podiatrist' },
+  { label: 'Nutritionist', category: 'Nutrition & Metabolic Health', subcategory: 'Clinical Nutritionist' },
+  { label: 'Acupuncture', category: 'Holistic & Integrative', subcategory: 'Acupuncturist' },
+  { label: 'Occupational Therapy', category: 'Allied Health', subcategory: 'Occupational Therapist (OT)' },
+  { label: 'Speech Pathology', category: 'Allied Health', subcategory: 'Speech Pathologist' },
+  { label: 'ENT Specialist', category: 'GPs & Doctors', subcategory: 'ENT Specialist' },
+  { label: 'Orthopedics', category: 'Musculoskeletal & Pain' },
+  { label: 'Psychology', category: 'Mental Health', subcategory: 'Psychologist' },
+  { label: 'General Practitioner', category: 'GPs & Doctors', subcategory: 'General Practitioner (GP)' },
+  { label: 'Urology', category: 'GPs & Doctors', subcategory: 'Urologist' },
+]
+
 export default function PractitionerDirectoryPage() {
   const [categories, setCategories] = useState<CategoryNode[]>([])
   const [categoryId, setCategoryId] = useState('')
+  const [subcategoryId, setSubcategoryId] = useState('')
   const [query, setQuery] = useState('')
   const [locationQuery, setLocationQuery] = useState('')
   const [locationResults, setLocationResults] = useState<LocationResult[]>([])
@@ -53,6 +82,7 @@ export default function PractitionerDirectoryPage() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const subcategoryRef = useRef<HTMLSelectElement | null>(null)
 
   const persistLocation = (location: LocationResult) => {
     try {
@@ -67,6 +97,11 @@ export default function PractitionerDirectoryPage() {
     const country = String(selectedLocation.country || '').trim().toLowerCase()
     return country ? country : ''
   }, [selectedLocation])
+
+  const subcategories = useMemo(() => {
+    const parent = categories.find((cat) => cat.id === categoryId)
+    return parent?.children || []
+  }, [categories, categoryId])
 
   const loadCategories = async () => {
     try {
@@ -165,13 +200,17 @@ export default function PractitionerDirectoryPage() {
     )
   }
 
-  const handleSearch = async () => {
+  const handleSearch = async (overrides?: { categoryId?: string; subcategoryId?: string; query?: string }) => {
     setLoading(true)
     setError(null)
     try {
+      const effectiveCategoryId = overrides?.categoryId ?? categoryId
+      const effectiveSubcategoryId = overrides?.subcategoryId ?? subcategoryId
+      const effectiveQuery = overrides?.query ?? query
       const params = new URLSearchParams()
-      if (categoryId) params.set('categoryId', categoryId)
-      if (query.trim()) params.set('q', query.trim())
+      if (effectiveCategoryId) params.set('categoryId', effectiveCategoryId)
+      if (effectiveSubcategoryId) params.set('subcategoryId', effectiveSubcategoryId)
+      if (effectiveQuery.trim()) params.set('q', effectiveQuery.trim())
       if (selectedLocation) {
         params.set('lat', String(selectedLocation.lat))
         params.set('lng', String(selectedLocation.lng))
@@ -188,6 +227,24 @@ export default function PractitionerDirectoryPage() {
       setError(err?.message || 'Search failed')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleQuickAccess = (item: QuickAccess) => {
+    const category = categories.find((cat) => cat.name === item.category)
+    if (!category) {
+      setQuery(item.label)
+      handleSearch({ query: item.label })
+      return
+    }
+    setCategoryId(category.id)
+    if (item.subcategory) {
+      const subcategory = category.children?.find((child) => child.name === item.subcategory)
+      setSubcategoryId(subcategory?.id || '')
+      handleSearch({ categoryId: category.id, subcategoryId: subcategory?.id || '' })
+    } else {
+      setSubcategoryId('')
+      handleSearch({ categoryId: category.id, subcategoryId: '' })
     }
   }
 
@@ -209,70 +266,116 @@ export default function PractitionerDirectoryPage() {
       ? { lat: markers[0].lat, lng: markers[0].lng }
       : { lat: -37.8136, lng: 144.9631 }
 
+  const quickRows = [QUICK_ACCESS.slice(0, 6), QUICK_ACCESS.slice(6, 12), QUICK_ACCESS.slice(12, 18)]
+
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h1 className="text-2xl font-bold text-gray-900">Find a practitioner</h1>
-          <p className="text-gray-600 mt-2">Browse trusted practitioners by category and location.</p>
-          <div className="mt-5 flex flex-col sm:flex-row gap-3">
-            <a
-              href="#directory-search"
-              className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold text-sm text-center hover:bg-helfi-green/90 transition-colors"
-            >
-              Find a practitioner
-            </a>
-            <Link
-              href="/list-your-practice"
-              className="px-5 py-2.5 rounded-full border border-emerald-200 text-emerald-800 font-semibold text-sm text-center hover:border-emerald-300 hover:text-emerald-900 transition-colors"
-            >
-              List your practice
-            </Link>
+    <div className="min-h-screen bg-white">
+      <PublicHeader />
+      <section className="relative bg-white pt-20 pb-20 overflow-hidden">
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl -z-10" />
+        <div className="absolute top-1/2 -right-24 w-80 h-80 bg-blue-50/70 rounded-full blur-3xl -z-10" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="text-center max-w-4xl mx-auto mb-12">
+            <h1 className="text-4xl md:text-6xl font-bold text-slate-900 mb-6 leading-tight">
+              Your health, <span className="text-emerald-600">simplified</span> and within reach.
+            </h1>
+            <p className="text-lg md:text-xl text-slate-600 mb-8 px-4 leading-relaxed">
+              Discover trusted healthcare practitioners. Search by name, location, or category to find the right care.
+            </p>
+            <div className="flex justify-center mb-6">
+              <Link
+                className="flex items-center gap-2 text-emerald-700 font-semibold hover:underline text-base"
+                href="/practitioners/a-z"
+              >
+                Browse Practitioners A-Z
+                <span className="text-sm">→</span>
+              </Link>
+            </div>
           </div>
 
-          <div id="directory-search" className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">All categories</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="Physio, chiro, anxiety..."
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-              <div className="flex gap-2">
-                <input
-                  value={locationQuery}
-                  onChange={(e) => setLocationQuery(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  placeholder="City or suburb"
-                />
-                <button
-                  onClick={handleLocationSearch}
-                  className="px-3 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm hover:bg-gray-200"
-                >
-                  Find
-                </button>
+          <div className="max-w-6xl mx-auto relative z-30">
+            <div className="bg-white p-2 rounded-3xl shadow-[0_30px_100px_-20px_rgba(0,0,0,0.12)] border border-slate-100">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <div className="flex items-center px-5 py-4 bg-slate-50/60 rounded-2xl">
+                  <div className="flex flex-col text-left w-full relative">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Practitioner</span>
+                    <select
+                      value={categoryId}
+                      onChange={(event) => {
+                        setCategoryId(event.target.value)
+                        setSubcategoryId('')
+                        setTimeout(() => {
+                          subcategoryRef.current?.focus()
+                        }, 0)
+                      }}
+                      className="bg-transparent border-none p-0 text-base font-semibold focus:ring-0 w-full cursor-pointer appearance-none pr-6 text-slate-900"
+                    >
+                      <option value="">All categories</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className={`flex items-center px-5 py-4 rounded-2xl ${categoryId ? 'bg-slate-50/60' : 'bg-slate-50/30 text-slate-400'}`}>
+                  <div className="flex flex-col text-left w-full relative">
+                    <span className="text-[10px] font-bold uppercase tracking-widest mb-1">Subcategory</span>
+                    <select
+                      value={subcategoryId}
+                      onChange={(event) => setSubcategoryId(event.target.value)}
+                      ref={subcategoryRef}
+                      className="bg-transparent border-none p-0 text-base font-semibold focus:ring-0 w-full cursor-pointer appearance-none pr-6"
+                      disabled={!categoryId}
+                    >
+                      <option value="">Select a specialty</option>
+                      {subcategories.map((subcategory) => (
+                        <option key={subcategory.id} value={subcategory.id}>
+                          {subcategory.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center px-5 py-4 bg-slate-50/60 rounded-2xl">
+                  <div className="flex flex-col text-left w-full">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Search</span>
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      className="bg-transparent border-none p-0 text-base font-semibold focus:ring-0 w-full placeholder-slate-400"
+                      placeholder="Name, symptom, or service"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center px-5 py-4 bg-slate-50/60 rounded-2xl">
+                  <div className="flex flex-col text-left w-full">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Location</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={locationQuery}
+                        onChange={(event) => setLocationQuery(event.target.value)}
+                        className="bg-transparent border-none p-0 text-base font-semibold focus:ring-0 w-full placeholder-slate-400"
+                        placeholder="City or suburb"
+                      />
+                      <button
+                        onClick={handleLocationSearch}
+                        className="text-xs font-semibold text-slate-600 hover:text-emerald-700"
+                      >
+                        Find
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
+
               {locationResults.length > 0 && (
-                <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm max-h-56 overflow-y-auto text-sm">
+                <div className="mt-3 border border-slate-200 rounded-2xl bg-white shadow-sm max-h-56 overflow-y-auto text-sm">
                   {locationResults.map((item) => (
                     <button
                       key={item.displayName}
@@ -282,116 +385,137 @@ export default function PractitionerDirectoryPage() {
                         setLocationResults([])
                         persistLocation(item)
                       }}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                      className="w-full text-left px-4 py-2 hover:bg-slate-50"
                     >
                       {item.displayName}
                     </button>
                   ))}
                 </div>
               )}
-              <button
-                onClick={handleUseMyLocation}
-                className="mt-2 text-xs text-emerald-700 hover:underline"
-              >
-                Use my current location
-              </button>
-            </div>
-          </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Radius</label>
-              <select
-                value={radiusKm}
-                onChange={(e) => setRadiusKm(Number(e.target.value))}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value={5}>5 km</option>
-                <option value={10}>10 km</option>
-                <option value={25}>25 km</option>
-                <option value={50}>50 km</option>
-              </select>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={telehealthOnly}
-                onChange={(e) => setTelehealthOnly(e.target.checked)}
-                className="h-4 w-4 text-emerald-600 border-gray-300 rounded"
-              />
-              Telehealth only
-            </label>
-            <button
-              onClick={handleSearch}
-              className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-            >
-              {loading ? 'Searching…' : 'Search'}
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6">
-          <div className="space-y-4">
-            {loading && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-sm text-gray-600">
-                Loading results…
-              </div>
-            )}
-            {!loading && results.length === 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-sm text-gray-600">
-                No results yet. Try a different category or radius.
-              </div>
-            )}
-            {!loading && results.map((item) => (
-              <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-2">
+              <div className="mt-4 flex flex-wrap items-center gap-4 px-2">
+                <button
+                  onClick={handleUseMyLocation}
+                  className="text-xs font-semibold text-emerald-700 hover:underline"
+                >
+                  Use my current location
+                </button>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold text-gray-900">{item.displayName}</h3>
-                  {item.isTopBoost && (
-                    <span className="px-2 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 rounded-full">Top boost</span>
-                  )}
-                  {item.isBoosted && !item.isTopBoost && (
-                    <span className="px-2 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-full">Boosted</span>
-                  )}
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Radius</span>
+                  <select
+                    value={radiusKm}
+                    onChange={(event) => setRadiusKm(Number(event.target.value))}
+                    className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold"
+                  >
+                    <option value={5}>5 km</option>
+                    <option value={10}>10 km</option>
+                    <option value={25}>25 km</option>
+                    <option value={50}>50 km</option>
+                  </select>
                 </div>
-                <div className="text-sm text-gray-600">
-                  {item.categoryName}
-                  {item.subcategoryName ? ` · ${item.subcategoryName}` : ''}
-                </div>
-                {item.distanceKm !== null && (
-                  <div className="text-sm text-gray-500">{item.distanceKm.toFixed(1)} km away</div>
-                )}
-                {item.description && <p className="text-sm text-gray-600">{item.description}</p>}
-                <div className="flex flex-wrap gap-3 text-sm text-emerald-700">
-                  <a href={`/practitioners/${item.slug}`} className="hover:underline">View profile</a>
-                  {item.phone && <a href={`tel:${item.phone}`} className="hover:underline">Call</a>}
-                  {item.websiteUrl && (
-                    <a href={item.websiteUrl} target="_blank" rel="noreferrer" className="hover:underline">
-                      Website
-                    </a>
-                  )}
-                  {item.emailPublic && <a href={`mailto:${item.emailPublic}`} className="hover:underline">Email</a>}
-                </div>
+                <label className="flex items-center gap-2 text-sm text-slate-700 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={telehealthOnly}
+                    onChange={(event) => setTelehealthOnly(event.target.checked)}
+                    className="h-4 w-4 text-emerald-600 border-slate-300 rounded"
+                  />
+                  Telehealth only
+                </label>
+                <button
+                  onClick={handleSearch}
+                  className="ml-auto bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:brightness-105 active:scale-[0.98] transition-all"
+                >
+                  {loading ? 'Searching…' : 'Search now'}
+                </button>
               </div>
-            ))}
+            </div>
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 min-h-[420px]">
-            <div className="text-sm font-semibold text-gray-700 mb-3">Map view</div>
-            <div className="h-[520px]">
-              <DirectoryMap
-                center={center}
-                radiusKm={radiusKm}
-                markers={markers}
-              />
+
+          <div className="mt-12">
+            <div className="flex items-center justify-between mb-4 px-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Quick Access Categories</span>
+            </div>
+            <div className="space-y-3">
+              {quickRows.map((row, index) => (
+                <div key={`row-${index}`} className="flex overflow-x-auto gap-3 pb-1 px-2">
+                  {row.map((item) => (
+                    <button
+                      key={item.label}
+                      onClick={() => handleQuickAccess(item)}
+                      className="flex-none bg-white py-2.5 px-5 rounded-2xl text-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border border-slate-100 font-semibold text-sm text-slate-700"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <section className="px-4 pb-16">
+        <div className="max-w-6xl mx-auto">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl mb-6">
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6">
+            <div className="space-y-4">
+              {loading && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 text-sm text-slate-600">
+                  Loading results…
+                </div>
+              )}
+              {!loading && results.length === 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 text-sm text-slate-600">
+                  No results yet. Try a different search, category, or radius.
+                </div>
+              )}
+              {!loading && results.map((item) => (
+                <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg font-semibold text-slate-900">{item.displayName}</h3>
+                    {item.isTopBoost && (
+                      <span className="px-2 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 rounded-full">Top boost</span>
+                    )}
+                    {item.isBoosted && !item.isTopBoost && (
+                      <span className="px-2 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-full">Boosted</span>
+                    )}
+                  </div>
+                  <div className="text-sm text-slate-600">
+                    {item.categoryName}
+                    {item.subcategoryName ? ` · ${item.subcategoryName}` : ''}
+                  </div>
+                  {item.distanceKm !== null && (
+                    <div className="text-sm text-slate-500">{item.distanceKm.toFixed(1)} km away</div>
+                  )}
+                  {item.description && <p className="text-sm text-slate-600">{item.description}</p>}
+                  <div className="flex flex-wrap gap-3 text-sm text-emerald-700">
+                    <Link href={`/practitioners/${item.slug}`} className="hover:underline">View profile</Link>
+                    {item.phone && <a href={`tel:${item.phone}`} className="hover:underline">Call</a>}
+                    {item.websiteUrl && (
+                      <a href={item.websiteUrl} target="_blank" rel="noreferrer" className="hover:underline">
+                        Website
+                      </a>
+                    )}
+                    {item.emailPublic && <a href={`mailto:${item.emailPublic}`} className="hover:underline">Email</a>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 min-h-[420px]">
+              <div className="text-sm font-semibold text-slate-700 mb-3">Map view</div>
+              <div className="h-[520px]">
+                <DirectoryMap center={center} radiusKm={radiusKm} markers={markers} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
