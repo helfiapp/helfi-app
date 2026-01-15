@@ -20321,34 +20321,58 @@ Please add nutritional information manually if needed.`);
 	                                        </svg>
 	                                      </button>
 
-	                                      <button
-	                                        type="button"
-	                                        onClick={() => {
-	                                          setShowPhotoOptions(false)
-	                                          setPhotoOptionsAnchor(null)
-	                                          router.push(`/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`)
-	                                        }}
-	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-	                                      >
-	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mr-3 text-emerald-700">
-	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-	                                          </svg>
-	                                        </div>
-	                                        <div className="flex-1">
-	                                          <div className="text-base font-semibold text-gray-900">Build a meal</div>
-	                                          <div className="text-xs text-gray-500">Combine multiple ingredients into one entry</div>
-	                                        </div>
-	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-	                                        </svg>
-	                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowPhotoOptions(false)
+                                          setPhotoOptionsAnchor(null)
+                                          router.push(`/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`)
+                                        }}
+                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mr-3 text-emerald-700">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                          </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-base font-semibold text-gray-900">Build a meal</div>
+                                          <div className="text-xs text-gray-500">Combine multiple ingredients into one entry</div>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
 
-                                        {(() => {
-                                          const entriesForCombine = entriesByCategory[cat.key] || []
-                                          return Array.isArray(entriesForCombine) && entriesForCombine.length > 1 ? (
-                                            <button
-                                              type="button"
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowPhotoOptions(false)
+                                          setPhotoOptionsAnchor(null)
+                                          const qs = new URLSearchParams()
+                                          qs.set('date', selectedDate)
+                                          qs.set('category', cat.key)
+                                          router.push(`/food/water?${qs.toString()}`)
+                                        }}
+                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center mr-3 text-sky-600">
+                                          <span className="material-symbols-outlined text-xl">water_drop</span>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-base font-semibold text-gray-900">Log Water Intake</div>
+                                          <div className="text-xs text-gray-500">Add water, tea, coffee, or bottle sizes</div>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
+
+                                      {(() => {
+                                        const entriesForCombine = entriesByCategory[cat.key] || []
+                                        return Array.isArray(entriesForCombine) && entriesForCombine.length > 1 ? (
+                                          <button
+                                            type="button"
                                               onClick={() => {
                                                 setShowPhotoOptions(false)
                                                 setPhotoOptionsAnchor(null)
