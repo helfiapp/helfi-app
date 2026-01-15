@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
 type MegaMenuItem = {
   label: string
@@ -17,9 +17,14 @@ type MegaMenuSection = {
   items: MegaMenuItem[]
 }
 
-export default function PublicHeader() {
+type PublicHeaderProps = {
+  mobileVariant?: 'default' | 'back'
+}
+
+export default function PublicHeader({ mobileVariant = 'default' }: PublicHeaderProps) {
   const { data: session, status } = useSession()
   const pathname = usePathname()
+  const router = useRouter()
   const isPractitionerDirectory = pathname === '/practitioners' || pathname?.startsWith('/practitioners/')
   const loginHref = isPractitionerDirectory
     ? '/auth/signin?context=practitioner&next=/practitioner'
@@ -28,6 +33,8 @@ export default function PublicHeader() {
     ? '/auth/signin?context=practitioner&mode=signup&next=/practitioner'
     : '/auth/signin?mode=signup'
   const iconClassName = 'h-4 w-4 text-helfi-green'
+  const showMobileBack = mobileVariant === 'back'
+  const hideMobileCtas = mobileVariant === 'back'
 
   const megaMenuSections: MegaMenuSection[] = [
     {
@@ -224,7 +231,25 @@ export default function PublicHeader() {
   return (
     <nav className="relative z-50 px-6 py-1">
       <div className="max-w-6xl mx-auto flex justify-between items-center">
-        <div className="flex items-center">
+        <div className="flex items-center gap-3">
+          {showMobileBack && (
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  router.back()
+                } else {
+                  window.location.href = '/'
+                }
+              }}
+              className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-full border border-emerald-100 text-emerald-700 hover:bg-emerald-50 transition-colors"
+              aria-label="Go back"
+            >
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -232,7 +257,7 @@ export default function PublicHeader() {
                 window.location.href = '/'
               }
             }}
-            className="w-28 h-28 md:w-40 md:h-40 cursor-pointer hover:opacity-80 transition-opacity"
+            className={`w-28 h-28 md:w-40 md:h-40 cursor-pointer hover:opacity-80 transition-opacity ${showMobileBack ? 'hidden md:block' : ''}`}
             aria-label="Go to homepage"
           >
             <Image
@@ -355,31 +380,33 @@ export default function PublicHeader() {
           )}
         </div>
 
-        <div className="md:hidden flex items-center space-x-3">
-          {status === 'authenticated' ? (
-            <Link
-              href="/dashboard"
-              className="btn-primary text-base px-3 py-2 bg-helfi-green hover:bg-green-600 text-white"
-            >
-              Dashboard
-            </Link>
-          ) : (
-            <>
+        {!hideMobileCtas && (
+          <div className="md:hidden flex items-center space-x-3">
+            {status === 'authenticated' ? (
               <Link
-                href={loginHref}
-                className="btn-secondary text-base px-3 py-2 text-helfi-green hover:bg-helfi-green hover:text-white transition-colors"
-              >
-                Log in
-              </Link>
-              <Link
-                href={signupHref}
+                href="/dashboard"
                 className="btn-primary text-base px-3 py-2 bg-helfi-green hover:bg-green-600 text-white"
               >
-                Sign up
+                Dashboard
               </Link>
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                <Link
+                  href={loginHref}
+                  className="btn-secondary text-base px-3 py-2 text-helfi-green hover:bg-helfi-green hover:text-white transition-colors"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href={signupHref}
+                  className="btn-primary text-base px-3 py-2 bg-helfi-green hover:bg-green-600 text-white"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   )

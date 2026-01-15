@@ -90,6 +90,7 @@ const QUICK_ACCESS: QuickAccess[] = [
 const SYMPTOM_CATEGORY_HINTS = PRACTITIONER_SYMPTOM_HINTS
 
 export default function PractitionerDirectoryPage() {
+  const [quickAccessOpen, setQuickAccessOpen] = useState(false)
   const [categories, setCategories] = useState<CategoryNode[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
@@ -103,8 +104,14 @@ export default function PractitionerDirectoryPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingScroll, setPendingScroll] = useState(false)
+  const [pullOffset, setPullOffset] = useState(0)
+  const [pullRefreshing, setPullRefreshing] = useState(false)
   const subcategoryRef = useRef<HTMLSelectElement | null>(null)
   const resultsRef = useRef<HTMLDivElement | null>(null)
+  const pullStartYRef = useRef<number | null>(null)
+  const pullOffsetRef = useRef(0)
+  const pullScrollParentRef = useRef<HTMLElement | null>(null)
+  const pullRefreshingRef = useRef(false)
 
   const isValidEmail = (value: string | null | undefined) => {
     if (!value) return false
@@ -502,9 +509,134 @@ export default function PractitionerDirectoryPage() {
 
   const quickRows = [QUICK_ACCESS.slice(0, 6), QUICK_ACCESS.slice(6, 12), QUICK_ACCESS.slice(12, 18)]
 
+  const PULL_REFRESH_ACTIVATE = 80
+  const PULL_REFRESH_THRESHOLD = 320
+  const PULL_REFRESH_MAX = 420
+  const PULL_REFRESH_START_ZONE = 140
+  const getScrollTop = () => {
+    if (typeof window === 'undefined') return 0
+    const scroller = document.scrollingElement
+    if (scroller && Number.isFinite(scroller.scrollTop)) return scroller.scrollTop
+    return window.scrollY || 0
+  }
+  const getScrollParent = (target: EventTarget | null) => {
+    if (typeof window === 'undefined') return null
+    if (!(target instanceof Element)) return null
+    let el: Element | null = target
+    while (el && el !== document.body) {
+      const style = window.getComputedStyle(el)
+      const overflowY = style?.overflowY
+      if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+        return el as HTMLElement
+      }
+      el = el.parentElement
+    }
+    return null
+  }
+  const isEditableElement = (target: EventTarget | null) => {
+    if (typeof document === 'undefined') return false
+    if (!(target instanceof Element)) return false
+    return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+  }
+  const refreshPage = async () => {
+    if (pullRefreshingRef.current) return
+    pullRefreshingRef.current = true
+    setPullRefreshing(true)
+    setTimeout(() => {
+      if (typeof window !== 'undefined') window.location.reload()
+    }, 200)
+  }
+  const handlePullStart = (e: React.TouchEvent) => {
+    if (typeof window === 'undefined') return
+    if (getScrollTop() > 0) return
+    if (pullRefreshingRef.current) return
+    if (isEditableElement(e.target) || isEditableElement(document.activeElement)) return
+    const scrollParent = getScrollParent(e.target)
+    if (scrollParent && scrollParent.scrollTop > 0) return
+    pullOffsetRef.current = 0
+    setPullOffset(0)
+    const startY = e.touches[0]?.clientY ?? null
+    if (startY === null || startY > PULL_REFRESH_START_ZONE) return
+    pullScrollParentRef.current = scrollParent
+    pullStartYRef.current = startY
+  }
+  const handlePullMove = (e: React.TouchEvent) => {
+    if (pullStartYRef.current === null) return
+    if (isEditableElement(e.target) || isEditableElement(document.activeElement)) {
+      pullStartYRef.current = null
+      pullOffsetRef.current = 0
+      pullScrollParentRef.current = null
+      setPullOffset(0)
+      return
+    }
+    if (pullScrollParentRef.current && pullScrollParentRef.current.scrollTop > 0) {
+      pullStartYRef.current = null
+      pullOffsetRef.current = 0
+      pullScrollParentRef.current = null
+      setPullOffset(0)
+      return
+    }
+    if (getScrollTop() > 0) {
+      pullStartYRef.current = null
+      pullOffsetRef.current = 0
+      pullScrollParentRef.current = null
+      setPullOffset(0)
+      return
+    }
+    const currentY = e.touches[0]?.clientY ?? 0
+    const delta = currentY - (pullStartYRef.current || 0)
+    if (delta <= PULL_REFRESH_ACTIVATE) {
+      pullOffsetRef.current = 0
+      setPullOffset(0)
+      return
+    }
+    const nextOffset = Math.min(PULL_REFRESH_MAX, delta - PULL_REFRESH_ACTIVATE)
+    pullOffsetRef.current = nextOffset
+    setPullOffset(nextOffset)
+  }
+  const handlePullEnd = async () => {
+    if (pullStartYRef.current === null) return
+    const shouldRefresh = pullOffsetRef.current >= PULL_REFRESH_THRESHOLD
+    pullStartYRef.current = null
+    pullOffsetRef.current = 0
+    pullScrollParentRef.current = null
+    setPullOffset(0)
+    if (shouldRefresh) {
+      await refreshPage()
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-white">
-      <PublicHeader />
+    <div
+      className="min-h-screen bg-white"
+      onTouchStart={handlePullStart}
+      onTouchMove={handlePullMove}
+      onTouchEnd={handlePullEnd}
+      onTouchCancel={handlePullEnd}
+    >
+      {(pullRefreshing || pullOffset > 0) && (
+        <div
+          className="flex items-center justify-center text-sm text-gray-500 transition-all duration-150"
+          style={{ height: pullRefreshing ? 48 : Math.min(pullOffset, 80) }}
+        >
+          {pullRefreshing ? (
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Refreshing...
+            </span>
+          ) : (
+            <span>{pullOffset >= PULL_REFRESH_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}</span>
+          )}
+        </div>
+      )}
+      <PublicHeader mobileVariant="back" />
       <section className="relative bg-gradient-to-b from-emerald-50/60 via-white to-white pt-20 pb-20 overflow-hidden border-b border-emerald-100/70">
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-100/40 to-transparent -z-10" />
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl -z-10" />
@@ -719,17 +851,33 @@ export default function PractitionerDirectoryPage() {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 px-2 md:hidden">
-              {QUICK_ACCESS.map((item) => (
-                <button
-                  key={`mobile-${item.label}`}
-                  onClick={() => handleQuickAccess(item)}
-                  className="bg-white py-3 px-4 rounded-2xl text-left shadow-sm hover:shadow-md transition-all border border-slate-100 font-semibold text-sm text-slate-700 flex items-center gap-3"
-                >
-                  <MaterialSymbol name={item.icon} className={`text-2xl ${item.tone}`} />
-                  <span className="leading-tight">{item.label}</span>
-                </button>
-              ))}
+            <div className="md:hidden px-2">
+              <button
+                type="button"
+                onClick={() => setQuickAccessOpen((prev) => !prev)}
+                className="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500"
+              >
+                {quickAccessOpen ? 'Hide quick access' : 'Show quick access'}
+                <span className={`text-base transition-transform ${quickAccessOpen ? 'rotate-180' : ''}`}>▾</span>
+              </button>
+              {quickAccessOpen && (
+                <p className="text-xs text-slate-500 mb-3">Tap a category to run a quick search.</p>
+              )}
+              {quickAccessOpen && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {QUICK_ACCESS.map((item) => (
+                    <button
+                      key={`mobile-${item.label}`}
+                      onClick={() => handleQuickAccess(item)}
+                      className="bg-white py-3 px-4 rounded-2xl text-left shadow-sm hover:shadow-md transition-all border border-slate-100 font-semibold text-sm text-slate-700 flex items-center gap-3"
+                    >
+                      <MaterialSymbol name={item.icon} className={`text-2xl ${item.tone}`} />
+                      <span className="leading-tight">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             </div>
           </div>
         </div>
