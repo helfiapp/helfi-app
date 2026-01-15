@@ -261,6 +261,23 @@ export default function PractitionerDirectoryPage() {
       return
     }
 
+    let isReload = false
+    try {
+      const navigationEntry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+      isReload = navigationEntry?.type === 'reload' || (performance as any)?.navigation?.type === 1
+    } catch {
+      isReload = false
+    }
+
+    if (isReload) {
+      try {
+        sessionStorage.removeItem('helfi:practitionerSearchState')
+      } catch {
+        // Ignore storage errors
+      }
+      return
+    }
+
     try {
       const saved = sessionStorage.getItem('helfi:practitionerSearchState')
       if (!saved) return
