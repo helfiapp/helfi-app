@@ -832,7 +832,7 @@ export default function PractitionerDirectoryPage() {
           </div>
 
           <div className="mt-12">
-            <div className="flex items-center justify-between mb-4 px-2">
+            <div className="hidden md:flex items-center justify-between mb-4 px-2">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Quick Access Categories</span>
             </div>
             <div className="space-y-3 hidden md:block">
@@ -855,14 +855,11 @@ export default function PractitionerDirectoryPage() {
               <button
                 type="button"
                 onClick={() => setQuickAccessOpen((prev) => !prev)}
-                className="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500"
+                className="mb-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500"
               >
-                {quickAccessOpen ? 'Hide quick access' : 'Show quick access'}
+                Quick Access Categories
                 <span className={`text-base transition-transform ${quickAccessOpen ? 'rotate-180' : ''}`}>▾</span>
               </button>
-              {quickAccessOpen && (
-                <p className="text-xs text-slate-500 mb-3">Tap a category to run a quick search.</p>
-              )}
               {quickAccessOpen && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {QUICK_ACCESS.map((item) => (
