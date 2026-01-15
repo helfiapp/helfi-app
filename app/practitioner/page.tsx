@@ -41,6 +41,18 @@ type ListingForm = {
   galleryUrls: string
 }
 
+type PractitionerStats = {
+  rangeStart: string
+  rangeEnd: string
+  counts: {
+    profile_view: number
+    call: number
+    website: number
+    email: number
+  }
+  total: number
+}
+
 const emptyForm: ListingForm = {
   displayName: '',
   categoryId: '',
@@ -75,6 +87,15 @@ export default function PractitionerPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [stats, setStats] = useState<PractitionerStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [weeklySummaryEnabled, setWeeklySummaryEnabled] = useState(true)
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const [notificationsSaving, setNotificationsSaving] = useState(false)
+  const [notificationsError, setNotificationsError] = useState<string | null>(null)
+  const [testSummaryLoading, setTestSummaryLoading] = useState(false)
+  const [testSummaryMessage, setTestSummaryMessage] = useState<string | null>(null)
   const [boostRadiusTier, setBoostRadiusTier] = useState('R10')
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -158,10 +179,42 @@ export default function PractitionerPage() {
     }
   }
 
+  const loadStats = async () => {
+    setStatsLoading(true)
+    setStatsError(null)
+    try {
+      const res = await fetch('/api/practitioner/stats', { cache: 'no-store' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to load stats')
+      setStats(data?.stats || null)
+    } catch (err: any) {
+      setStatsError(err?.message || 'Failed to load stats')
+    } finally {
+      setStatsLoading(false)
+    }
+  }
+
+  const loadNotifications = async () => {
+    setNotificationsLoading(true)
+    setNotificationsError(null)
+    try {
+      const res = await fetch('/api/practitioner/notifications', { cache: 'no-store' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to load email preferences')
+      setWeeklySummaryEnabled(data?.preferences?.weeklySummaryEnabled !== false)
+    } catch (err: any) {
+      setNotificationsError(err?.message || 'Failed to load email preferences')
+    } finally {
+      setNotificationsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!session?.user) return
     loadCategories()
     loadDashboard()
+    loadStats()
+    loadNotifications()
   }, [session])
 
   useEffect(() => {
@@ -173,6 +226,56 @@ export default function PractitionerPage() {
       setSuccess('Boost purchase confirmed.')
     }
   }, [])
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleDateString()
+  }
+
+  const updateWeeklySummaryEnabled = async (nextValue: boolean) => {
+    const previous = weeklySummaryEnabled
+    setWeeklySummaryEnabled(nextValue)
+    setNotificationsSaving(true)
+    setNotificationsError(null)
+    setTestSummaryMessage(null)
+    try {
+      const res = await fetch('/api/practitioner/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weeklySummaryEnabled: nextValue }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to save email preferences')
+      setWeeklySummaryEnabled(Boolean(data?.preferences?.weeklySummaryEnabled))
+    } catch (err: any) {
+      setNotificationsError(err?.message || 'Failed to save email preferences')
+      setWeeklySummaryEnabled(previous)
+    } finally {
+      setNotificationsSaving(false)
+    }
+  }
+
+  const sendTestSummary = async () => {
+    setTestSummaryLoading(true)
+    setNotificationsError(null)
+    setTestSummaryMessage(null)
+    try {
+      const res = await fetch('/api/practitioner/contact-summary-test', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to send test email')
+      if (data?.sent) {
+        setTestSummaryMessage('Test summary sent. Please check your inbox.')
+      } else {
+        setTestSummaryMessage(data?.message || 'No recent activity to include yet.')
+      }
+    } catch (err: any) {
+      setNotificationsError(err?.message || 'Failed to send test email')
+    } finally {
+      setTestSummaryLoading(false)
+    }
+  }
 
   const updateField = (key: keyof ListingForm, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -505,6 +608,104 @@ export default function PractitionerPage() {
                 </a>
               </div>
             )}
+          </div>
+        )}
+
+        {!loading && dashboard?.listing && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Performance</h2>
+                <p className="text-sm text-gray-600">Last 7 days of activity from your listing.</p>
+              </div>
+              <button
+                onClick={loadStats}
+                className="px-4 py-2 rounded-full border border-gray-200 text-gray-700 text-sm font-semibold hover:border-emerald-200 hover:text-emerald-700 transition-colors"
+                disabled={statsLoading}
+              >
+                {statsLoading ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+
+            {statsError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {statsError}
+              </div>
+            )}
+
+            {!statsLoading && !statsError && !stats && (
+              <div className="text-sm text-gray-600">No activity yet. Your stats will appear after people interact with your listing.</div>
+            )}
+
+            {!statsLoading && !statsError && stats && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/60">
+                    <div className="text-xs uppercase tracking-wide text-gray-500">Profile views</div>
+                    <div className="text-2xl font-semibold text-gray-900">{stats.counts.profile_view}</div>
+                  </div>
+                  <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/60">
+                    <div className="text-xs uppercase tracking-wide text-gray-500">Calls</div>
+                    <div className="text-2xl font-semibold text-gray-900">{stats.counts.call}</div>
+                  </div>
+                  <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/60">
+                    <div className="text-xs uppercase tracking-wide text-gray-500">Website clicks</div>
+                    <div className="text-2xl font-semibold text-gray-900">{stats.counts.website}</div>
+                  </div>
+                  <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/60">
+                    <div className="text-xs uppercase tracking-wide text-gray-500">Emails</div>
+                    <div className="text-2xl font-semibold text-gray-900">{stats.counts.email}</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                  <span>Range: {formatDate(stats.rangeStart)} – {formatDate(stats.rangeEnd)}</span>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold">
+                    Total actions: {stats.total}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!loading && dashboard?.listing && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Email preferences</h2>
+              <p className="text-sm text-gray-600">Control whether you receive the weekly activity summary email.</p>
+            </div>
+
+            {notificationsError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {notificationsError}
+              </div>
+            )}
+
+            {testSummaryMessage && (
+              <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                {testSummaryMessage}
+              </div>
+            )}
+
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <label className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={weeklySummaryEnabled}
+                  onChange={(event) => updateWeeklySummaryEnabled(event.target.checked)}
+                  disabled={notificationsLoading || notificationsSaving}
+                  className="h-4 w-4 text-emerald-600 border-gray-300 rounded"
+                />
+                Weekly summary emails
+              </label>
+              <button
+                onClick={sendTestSummary}
+                className="px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 text-sm font-semibold hover:border-emerald-300 hover:text-emerald-800 transition-colors"
+                disabled={testSummaryLoading || notificationsLoading || notificationsSaving}
+              >
+                {testSummaryLoading ? 'Sending…' : 'Send a test summary'}
+              </button>
+            </div>
           </div>
         )}
 

@@ -138,7 +138,7 @@ export default function PractitionerAZPage() {
                     <div className="grid gap-3">
                       {items.map((item) => (
                         <div key={item.id} className="border border-slate-100 rounded-2xl p-4 bg-white shadow-sm">
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div className="flex flex-col gap-3">
                             <div>
                               <div className="text-lg font-semibold text-slate-900">{item.name}</div>
                               {item.children.length > 0 && (
@@ -155,12 +155,6 @@ export default function PractitionerAZPage() {
                                 </div>
                               )}
                             </div>
-                            <Link
-                              href={`/practitioners?categoryId=${encodeURIComponent(item.id)}`}
-                              className="inline-flex items-center justify-center px-4 py-2 rounded-2xl border border-emerald-200 text-emerald-700 font-semibold hover:border-emerald-300 hover:text-emerald-800 transition-colors"
-                            >
-                              View category
-                            </Link>
                           </div>
                         </div>
                       ))}

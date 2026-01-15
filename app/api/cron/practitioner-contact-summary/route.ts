@@ -26,6 +26,28 @@ async function ensureAnalyticsTable() {
   `)
 }
 
+async function ensurePreferencesTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PractitionerNotificationPreference" (
+      "practitionerAccountId" TEXT PRIMARY KEY,
+      "weeklySummaryEnabled" BOOLEAN NOT NULL DEFAULT true,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `)
+}
+
+async function getWeeklySummaryEnabled(accountId: string): Promise<boolean> {
+  const rows = await prisma.$queryRawUnsafe<Array<{ weeklySummaryEnabled: boolean }>>(
+    `SELECT "weeklySummaryEnabled"
+     FROM "PractitionerNotificationPreference"
+     WHERE "practitionerAccountId" = $1`,
+    accountId
+  )
+  if (!rows.length) return true
+  return Boolean(rows[0].weeklySummaryEnabled)
+}
+
 function normalizePayload(value: any): any {
   if (!value) return {}
   if (typeof value === 'string') {
@@ -44,6 +66,7 @@ export async function POST(request: NextRequest) {
   }
 
   await ensureAnalyticsTable()
+  await ensurePreferencesTable()
 
   const rangeEnd = new Date()
   const rangeStart = new Date(rangeEnd.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -92,6 +115,8 @@ export async function POST(request: NextRequest) {
   for (const listingId of listingIds) {
     const listing = listingMap.get(listingId)
     if (!listing?.practitionerAccount?.contactEmail) continue
+    const weeklySummaryEnabled = await getWeeklySummaryEnabled(listing.practitionerAccountId)
+    if (!weeklySummaryEnabled) continue
     const listingEvents = events
       .filter((event) => event.listingId === listingId)
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())

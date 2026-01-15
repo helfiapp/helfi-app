@@ -37,10 +37,10 @@ type DirectoryMapProps = {
 
 function MarkerItem({ marker, onMarkerClick }: { marker: DirectoryMapMarker; onMarkerClick?: (id: string) => void }) {
   const map = useMap()
-  const hoverLabel = useMemo(() => {
-    if (!marker.address) return marker.name
-    return `${marker.name} · ${marker.address}`
-  }, [marker.address, marker.name])
+  const addressLine = useMemo(() => {
+    const trimmed = String(marker.address || '').trim()
+    return trimmed ? trimmed : null
+  }, [marker.address])
 
   return (
     <Marker
@@ -56,7 +56,8 @@ function MarkerItem({ marker, onMarkerClick }: { marker: DirectoryMapMarker; onM
       }}
     >
       <Tooltip direction="top" offset={[0, -16]} opacity={1} sticky>
-        <div className="text-xs font-semibold text-gray-900">{hoverLabel}</div>
+        <div className="text-xs font-semibold text-gray-900 whitespace-nowrap">{marker.name}</div>
+        {addressLine ? <div className="text-[10px] text-gray-600 leading-snug">{addressLine}</div> : null}
         {marker.isBoosted ? <div className="text-[10px] text-emerald-700">Boosted</div> : null}
       </Tooltip>
     </Marker>

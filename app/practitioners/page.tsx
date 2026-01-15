@@ -159,8 +159,8 @@ export default function PractitionerDirectoryPage() {
       setCategoryId(categoryParam)
       setSubcategoryId(subcategoryParam)
       setQuery(queryParam)
-      setPendingScroll(true)
-      handleSearch({ categoryId: categoryParam, subcategoryId: subcategoryParam, query: queryParam })
+      setResults([])
+      setError(null)
       return
     }
 
