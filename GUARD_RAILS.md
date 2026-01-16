@@ -336,8 +336,8 @@ If this breaks again, restore these rules exactly.
 - `app/api/exercise-entries/[id]/route.ts`
 
 **Last verified deployment (water intake):**
-- Deployment ID: `dpl_C42RQyRrGnbJzcNqZ2ap8zfzVyzk`
-- Commit: `5ae28d32`
+- Deployment ID: `dpl_Hy2ErZry7DJvQyKXtWTrogZaGSXN`
+- Commit: `8d20da96`
 
 ### 3.1 Hydration goal rules (must not change without approval)
 - **Base goal uses profile only** (weight/height/gender/age/diet/primary goal).  
