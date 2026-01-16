@@ -42,10 +42,13 @@ export default function VoiceChat({
 }: VoiceChatProps) {
   const router = useRouter()
   const VOICE_CHAT_COST_CREDITS = 10
+  const PHOTO_ANALYSIS_COST_CREDITS = 10
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null)
+  const [pendingPhotoName, setPendingPhotoName] = useState<string>('')
   const [isListening, setIsListening] = useState(false)
   const [currentThreadCharged, setCurrentThreadCharged] = useState(false)
   const [lastChargedCost, setLastChargedCost] = useState<number | null>(null)
@@ -63,13 +66,16 @@ export default function VoiceChat({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deletePending, setDeletePending] = useState(false)
   const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
+  const photoInputRef = useRef<HTMLInputElement | null>(null)
   const storageKey = useMemo(() => 'helfi:chat:talk', [])
   const archivedKey = useMemo(() => 'helfi:chat:talk:archived', [])
   const hasHealthTipContext = !!context?.healthTipSummary
   const healthTipTitle = context?.healthTipTitle
   const healthTipCategory = context?.healthTipCategory
   const healthTipSuggestedQuestions = context?.healthTipSuggestedQuestions
-  const estimatedCost = currentThreadCharged ? 0 : VOICE_CHAT_COST_CREDITS
+  const estimatedChatCost = currentThreadCharged ? 0 : VOICE_CHAT_COST_CREDITS
+  const estimatedPhotoCost = pendingPhoto ? PHOTO_ANALYSIS_COST_CREDITS : 0
+  const estimatedCost = estimatedChatCost + estimatedPhotoCost
 
   const healthTipSuggestionQuestions = useMemo(() => {
     if (!hasHealthTipContext) return []
@@ -544,12 +550,120 @@ export default function VoiceChat({
     }
   }
 
+  const buildLocalDatePayload = () => {
+    const now = new Date()
+    const tzOffsetMin = now.getTimezoneOffset()
+    const localDate = new Date(now.getTime() - tzOffsetMin * 60 * 1000).toISOString().slice(0, 10)
+    return { localDate, tzOffsetMin }
+  }
+
+  const openPhotoPicker = () => {
+    if (loading) return
+    photoInputRef.current?.click()
+  }
+
+  const clearPendingPhoto = () => {
+    setPendingPhoto(null)
+    setPendingPhotoName('')
+    if (photoInputRef.current) {
+      photoInputRef.current.value = ''
+    }
+  }
+
+  const handlePhotoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setPendingPhoto(file)
+    setPendingPhotoName(file.name || 'Photo')
+  }
+
+  const sendFridgePhoto = async (note: string) => {
+    if (!pendingPhoto) return
+    setLoading(true)
+    setError(null)
+    stopListening()
+    setLastChargedCost(null)
+    setLastChargedAt(null)
+
+    const userMessage = note ? `Fridge/pantry photo: ${note}` : 'Fridge/pantry photo'
+    setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
+    setInput('')
+
+    const { localDate, tzOffsetMin } = buildLocalDatePayload()
+    const formData = new FormData()
+    formData.append('image', pendingPhoto)
+    formData.append('message', note)
+    formData.append('threadId', currentThreadId || '')
+    formData.append('newThread', 'false')
+    formData.append('localDate', localDate)
+    formData.append('tzOffsetMin', String(tzOffsetMin))
+
+    try {
+      const res = await fetch('/api/chat/fridge', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (res.status === 402) {
+        const data = await res.json()
+        setError(`Insufficient credits. Estimated cost: ${data.estimatedCost} credits. Available: ${data.availableCredits} credits.`)
+        setLoading(false)
+        return
+      }
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError('Unable to analyze the photo right now.')
+        setLoading(false)
+        return
+      }
+
+      if (typeof data?.assistant === 'string') {
+        setMessages((prev) => [...prev, { role: 'assistant', content: data.assistant }])
+      }
+
+      if (data?.threadId) {
+        setCurrentThreadId(data.threadId)
+      }
+
+      if (typeof data?.chargedCents === 'number') {
+        setLastChargedCost(data.chargedCents)
+        setLastChargedAt(new Date().toISOString())
+      }
+      if (data?.chargedChat) {
+        setCurrentThreadCharged(true)
+      }
+
+      try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
+
+      const threadsRes = await fetch('/api/chat/threads')
+      if (threadsRes.ok) {
+        const threadsData = await threadsRes.json()
+        if (threadsData.threads) {
+          setThreads(threadsData.threads)
+        }
+      }
+
+      clearPendingPhoto()
+    } catch (err) {
+      console.error('Failed to analyze fridge photo:', err)
+      setError('Unable to analyze the photo right now.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const text = input.trim()
-    if (!text) {
+    if (!text && !pendingPhoto) {
       setError('Enter a question or use voice input.')
+      return
+    }
+
+    if (pendingPhoto) {
+      await sendFridgePhoto(text)
       return
     }
 
@@ -567,6 +681,7 @@ export default function VoiceChat({
       if (onCostEstimate) onCostEstimate(estimatedCost)
 
       const url = `/api/chat/voice`
+      const { localDate, tzOffsetMin } = buildLocalDatePayload()
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
@@ -574,6 +689,8 @@ export default function VoiceChat({
           message: text, 
           threadId: currentThreadId || undefined,
           newThread: false, // Never create a new thread automatically - user must click "+ New Chat"
+          localDate,
+          tzOffsetMin,
           ...context 
         }),
       })
@@ -1048,10 +1165,15 @@ export default function VoiceChat({
             <div className="mx-auto max-w-3xl px-4">
               {(estimatedCost !== null || lastChargedCost !== null) && (
                 <div className="flex flex-wrap gap-4 text-[11px] text-gray-500 mb-3">
-                  {estimatedCost !== null && (
+                  {estimatedChatCost !== null && (
                     <span>
-                      Estimated <span className="font-semibold text-gray-700">{estimatedCost} credits</span>{' '}
+                      Estimated <span className="font-semibold text-gray-700">{estimatedChatCost} credits</span>{' '}
                       {currentThreadCharged ? '(already covered)' : 'per chat'}
+                    </span>
+                  )}
+                  {estimatedPhotoCost > 0 && (
+                    <span>
+                      Photo analysis <span className="font-semibold text-gray-700">{estimatedPhotoCost} credits</span> per photo
                     </span>
                   )}
                   {lastChargedCost !== null && (
@@ -1072,6 +1194,26 @@ export default function VoiceChat({
                 onSubmit={handleSubmit}
                 style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
               >
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handlePhotoSelected}
+                />
+                {pendingPhoto && (
+                  <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                    <span className="truncate">{pendingPhotoName || 'Photo ready'} (adds {PHOTO_ANALYSIS_COST_CREDITS} credits)</span>
+                    <button
+                      type="button"
+                      onClick={clearPendingPhoto}
+                      className="ml-3 rounded-lg px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -1082,6 +1224,15 @@ export default function VoiceChat({
                   className="max-h-[200px] min-h-[60px] w-full resize-none bg-transparent px-4 py-[18px] text-[16px] text-black placeholder-gray-400 focus:outline-none border-none focus:ring-0"
                 />
                 <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={openPhotoPicker}
+                    disabled={loading || isListening}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+                    aria-label="Add fridge or pantry photo"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>photo_camera</span>
+                  </button>
                   {hasSpeechRecognition && (
                     <button
                       type="button"
@@ -1099,7 +1250,7 @@ export default function VoiceChat({
                   )}
                   <button
                     type="submit"
-                    disabled={loading || !input.trim() || isListening}
+                    disabled={loading || isListening || (!input.trim() && !pendingPhoto)}
                     className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 transition-all shadow-sm"
                     aria-label="Send message"
                   >

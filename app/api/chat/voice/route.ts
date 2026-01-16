@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { logAIUsage } from '@/lib/ai-usage-logger'
+import { buildFoodDiarySnapshot, FoodDiarySnapshot } from '@/lib/food-diary-context'
 import {
   ensureTalkToAITables,
   listMessages,
@@ -192,7 +193,27 @@ async function loadFullUserContext(userId: string) {
   }
 }
 
-function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContext>>): string {
+const isValidDateString = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+
+const formatMacroValue = (value: number | null, unit: 'kcal' | 'g') => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'N/A'
+  const rounded = unit === 'kcal' ? Math.round(value) : Math.round(value * 10) / 10
+  return `${rounded} ${unit}`
+}
+
+const formatRemaining = (value: FoodDiarySnapshot['remaining'][keyof FoodDiarySnapshot['remaining']]) => {
+  if (!value) return 'N/A'
+  const remaining = typeof value.remainingClamped === 'number' ? value.remainingClamped : value.remaining
+  const over = value.overBy
+  if (typeof over === 'number' && over > 0) return `Over by ${Math.round(over * 10) / 10}`
+  if (typeof remaining === 'number') return `${Math.round(remaining * 10) / 10} left`
+  return 'N/A'
+}
+
+function buildSystemPrompt(
+  context: Awaited<ReturnType<typeof loadFullUserContext>>,
+  foodDiarySnapshot: FoodDiarySnapshot | null,
+): string {
   if (!context) {
     return 'You are Helfi, a helpful AI health assistant. Provide accurate, supportive health guidance.'
   }
@@ -264,6 +285,43 @@ function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContex
     parts.push('')
   }
 
+  if (foodDiarySnapshot) {
+    parts.push('FOOD DIARY SNAPSHOT (TODAY):')
+    parts.push(`- Local date: ${foodDiarySnapshot.localDate}`)
+    parts.push(`- Logged entries counted: ${foodDiarySnapshot.logCount}`)
+    parts.push(
+      `- Consumed: ${formatMacroValue(foodDiarySnapshot.totals.calories, 'kcal')}, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.protein_g, 'g')} protein, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.carbs_g, 'g')} carbs, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.fat_g, 'g')} fat, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.fiber_g, 'g')} fiber, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.sugar_g, 'g')} sugar`,
+    )
+    parts.push(
+      `- Targets: ${formatMacroValue(foodDiarySnapshot.targets.calories, 'kcal')}, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.protein_g, 'g')} protein, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.carbs_g, 'g')} carbs, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.fat_g, 'g')} fat, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.fiber_g, 'g')} fiber, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.sugar_g, 'g')} sugar (max)`,
+    )
+    parts.push(
+      `- Remaining: ${formatRemaining(foodDiarySnapshot.remaining.calories)} kcal, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.protein_g)} protein, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.carbs_g)} carbs, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.fat_g)} fat, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.fiber_g)} fiber, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.sugar_g)} sugar`,
+    )
+    if (foodDiarySnapshot.priority.low.length > 0) {
+      parts.push(`- Priority focus (most behind): ${foodDiarySnapshot.priority.low.join(', ')}`)
+    }
+    if (foodDiarySnapshot.priority.nearCap.length > 0) {
+      parts.push(`- Near/over cap: ${foodDiarySnapshot.priority.nearCap.join(', ')}`)
+    }
+    parts.push('')
+  }
+
   parts.push(
     'CLINICAL STYLE (CRITICAL):',
     '- Act like a careful primary care clinician talking to a patient.',
@@ -308,6 +366,9 @@ function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContex
     '',
     'USER DATA USAGE:',
     '- Only reference user data when directly relevant to their question',
+    '- If asked about food, macros, or meal ideas, use the FOOD DIARY SNAPSHOT to guide suggestions',
+    '- Prioritize nutrients that are most behind target; avoid nutrients at or over cap',
+    '- Mention micronutrients only when they are provided; otherwise say they are unavailable',
     '- Do NOT list all their supplements/medications unless specifically asked',
     '- Do NOT dump their entire health profile unless requested',
     '- When asked for "concise" or "brief" answers, provide ONLY the essential information',
@@ -423,9 +484,21 @@ export async function POST(req: NextRequest) {
     const historyMessages = history.map((m) => ({ role: m.role, content: m.content }))
     const memorySnippets = await loadChatMemorySnippets(session.user.id, question, threadId)
 
+    const resolvedTzOffset =
+      Number.isFinite(Number(body?.tzOffsetMin)) ? Number(body.tzOffsetMin) : new Date().getTimezoneOffset()
+    const requestedLocalDate = typeof body?.localDate === 'string' ? body.localDate.trim() : ''
+    const resolvedLocalDate = isValidDateString(requestedLocalDate)
+      ? requestedLocalDate
+      : new Date(Date.now() - resolvedTzOffset * 60 * 1000).toISOString().slice(0, 10)
+
     // Load full user context
     const context = await loadFullUserContext(session.user.id)
-    let systemPrompt = buildSystemPrompt(context)
+    const foodDiarySnapshot = await buildFoodDiarySnapshot({
+      userId: session.user.id,
+      localDate: resolvedLocalDate,
+      tzOffsetMin: resolvedTzOffset,
+    })
+    let systemPrompt = buildSystemPrompt(context, foodDiarySnapshot)
 
     // Optional additional focus: a health tip summary passed from inline chat (e.g. on Health Tips page)
     const healthTipSummary =
