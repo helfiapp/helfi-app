@@ -6719,7 +6719,7 @@ function BloodResultsStep({
         <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 px-4 py-4">
           <h3 className="text-sm font-semibold text-gray-800 mb-2">Add a new report (PDF)</h3>
           <p className="text-xs text-gray-600 mb-3">
-            Every upload is saved to your history. When you get new results later, just upload again here.
+            You can select multiple PDFs at once and we will combine them into one report. Every upload is saved to your history.
           </p>
           <LabReportUpload compact={true} onUploadComplete={() => loadHistory()} />
           {reports.length > 0 && (

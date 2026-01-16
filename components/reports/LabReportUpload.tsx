@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
+import { PDFDocument } from 'pdf-lib';
 import ConsentGate, { ConsentData } from './ConsentGate';
 
 interface LabReportUploadProps {
@@ -9,7 +10,7 @@ interface LabReportUploadProps {
 }
 
 export default function LabReportUpload({ onUploadComplete, compact }: LabReportUploadProps) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [password, setPassword] = useState('');
   const [consentData, setConsentData] = useState<ConsentData | null>(null);
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
@@ -19,22 +20,27 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0) return;
 
-    // Validate file type
-    if (!selectedFile.name.toLowerCase().endsWith('.pdf')) {
+    if (isPasswordProtected && selectedFiles.length > 1) {
+      setError('For password-protected PDFs, upload one file at a time.');
+      return;
+    }
+
+    const nonPdf = selectedFiles.find((item) => !item.name.toLowerCase().endsWith('.pdf'));
+    if (nonPdf) {
       setError('Only PDF files are allowed');
       return;
     }
 
-    // Validate file size (25MB max)
-    if (selectedFile.size > 25 * 1024 * 1024) {
-      setError('File size must be less than 25MB');
+    const totalSize = selectedFiles.reduce((sum, item) => sum + item.size, 0);
+    if (totalSize > 25 * 1024 * 1024) {
+      setError('Combined file size must be less than 25MB');
       return;
     }
 
-    setFile(selectedFile);
+    setFiles(selectedFiles);
     setError(null);
     setConsentData(null); // Reset consent when file changes
   };
@@ -44,7 +50,7 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
   };
 
   const handleUpload = async () => {
-    if (!file || !consentData) {
+    if (!files.length || !consentData) {
       setError('Please select a file and provide consent');
       return;
     }
@@ -54,10 +60,30 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
       return;
     }
 
+    if (isPasswordProtected && files.length > 1) {
+      setError('For password-protected PDFs, upload one file at a time.');
+      return;
+    }
+
     setUploadStatus('uploading');
     setError(null);
 
     try {
+      let uploadFile = files[0];
+      if (files.length > 1) {
+        const merged = await PDFDocument.create();
+        for (const item of files) {
+          const bytes = await item.arrayBuffer();
+          const pdf = await PDFDocument.load(bytes);
+          const pages = await merged.copyPages(pdf, pdf.getPageIndices());
+          pages.forEach((page) => merged.addPage(page));
+        }
+        const mergedBytes = await merged.save();
+        uploadFile = new File([mergedBytes], `lab-report-${Date.now()}.pdf`, {
+          type: 'application/pdf',
+        });
+      }
+
       // Step 1: Create report record and get report ID
       const presignResponse = await fetch('/api/reports/presign', {
         method: 'POST',
@@ -65,8 +91,8 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          fileName: file.name,
-          fileSize: file.size,
+          fileName: uploadFile.name,
+          fileSize: uploadFile.size,
           isPasswordProtected,
           password: isPasswordProtected ? password : undefined,
           decryptionConsent: consentData.decryptionConsent,
@@ -85,7 +111,7 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
 
       // Step 2: Upload to Vercel Blob
       const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
+      uploadFormData.append('file', uploadFile);
 
       const uploadResponse = await fetch(`/api/reports/${newReportId}/upload`, {
         method: 'POST',
@@ -147,36 +173,53 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
           {/* File Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select PDF File
+              Select PDF file(s)
             </label>
             <input
               ref={fileInputRef}
               type="file"
               accept=".pdf"
+              multiple
               onChange={handleFileSelect}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
             />
-            {file && (
-              <p className="mt-2 text-sm text-gray-600">
-                Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-              </p>
+            {files.length > 0 && (
+              <div className="mt-2 text-sm text-gray-600">
+                <div>
+                  Selected: {files.length} file{files.length > 1 ? 's' : ''} (
+                  {(files.reduce((sum, item) => sum + item.size, 0) / 1024 / 1024).toFixed(2)} MB)
+                </div>
+                {files.length <= 3 && (
+                  <ul className="mt-1 list-disc list-inside">
+                    {files.map((item) => (
+                      <li key={item.name}>{item.name}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
           </div>
 
           {/* Password Protection Detection */}
-          {file && (
+          {files.length > 0 && (
             <div>
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   checked={isPasswordProtected}
                   onChange={(e) => setIsPasswordProtected(e.target.checked)}
+                  disabled={files.length > 1}
                   className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-700">
                   My PDF is password-protected
                 </span>
               </label>
+              {files.length > 1 && (
+                <p className="mt-2 text-xs text-gray-500">
+                  For multiple files, please upload unlocked PDFs or upload one at a time.
+                </p>
+              )}
 
               {isPasswordProtected && (
                 <div className="mt-3">
@@ -199,7 +242,7 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
           )}
 
           {/* Consent Gate */}
-          {file && (
+          {files.length > 0 && (
             <div>
               <ConsentGate
                 onConsent={handleConsent}
@@ -209,7 +252,7 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
           )}
 
           {/* Upload Button */}
-          {file && consentData && (
+          {files.length > 0 && consentData && (
             <button
               onClick={handleUpload}
               className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
