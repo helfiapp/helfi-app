@@ -2,12 +2,17 @@
 
 import { Suspense } from 'react'
 import VoiceChat from '@/components/VoiceChat'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 function ChatPageContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const entryContext = searchParams.get('context') === 'food' ? 'food' : 'general'
-  return <VoiceChat className="flex-1" entryContext={entryContext} />
+  const isFood = searchParams.get('context') === 'food'
+  const entryContext = isFood ? 'food' : 'general'
+  const handleExit = () => {
+    router.push('/food')
+  }
+  return <VoiceChat className="flex-1" entryContext={entryContext} onExit={isFood ? handleExit : undefined} />
 }
 
 export default function ChatPage() {

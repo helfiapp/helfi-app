@@ -246,7 +246,10 @@ export async function POST(req: NextRequest) {
       'Use the FOOD DIARY SNAPSHOT to prioritize nutrients that are most behind target.',
       'Avoid suggestions that would worsen nutrients at or over cap.',
       'Use only the items detected in the photo when possible; if items are insufficient, suggest simple add-ons.',
-      'Include approximate macro grams for each suggestion when available; if unknown, say "macros unavailable".',
+      'Start with a single "Current totals" line using the snapshot data.',
+      'Include estimated calories, protein, carbs, fat, fiber, and sugar for each suggestion.',
+      'After each suggestion, show the updated daily totals if the user ate that option.',
+      'If you must estimate, say "approximate". If unknown, say "unknown".',
       'If micronutrients are not available, state that they are unavailable.',
       'Keep answers concise, structured, and easy to scan.',
     ].join(' ')

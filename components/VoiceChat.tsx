@@ -1058,7 +1058,7 @@ export default function VoiceChat({
         >
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-gray-400" style={{ fontSize: 20 }}>add</span>
-            <span className="text-sm font-medium text-gray-600">New chat</span>
+            <span className="text-[16px] md:text-sm font-medium text-gray-600">New chat</span>
           </div>
           <span className="material-symbols-outlined text-gray-300" style={{ fontSize: 18 }}>edit_square</span>
         </button>
@@ -1067,7 +1067,7 @@ export default function VoiceChat({
         {threadGroups.map((group) => (
           group.items.length > 0 ? (
             <div key={group.label} className="flex flex-col gap-1">
-              <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
+              <h3 className="text-[12px] md:text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
                 {group.label}
               </h3>
                   {group.items.map((thread) => (
@@ -1095,7 +1095,7 @@ export default function VoiceChat({
                         }`}
                         style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
                       >
-                        <span className={`flex-1 min-w-0 truncate text-[13px] font-medium ${
+                        <span className={`flex-1 min-w-0 truncate text-[15px] md:text-[13px] font-medium ${
                           currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
                         }`}>
                           {thread.title || 'New chat'}
@@ -1108,7 +1108,7 @@ export default function VoiceChat({
         ))}
         {archivedThreads.length > 0 && (
           <div className="flex flex-col gap-1">
-            <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
+            <h3 className="text-[12px] md:text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
               Archived
             </h3>
             {archivedThreads.map((thread) => (
@@ -1136,7 +1136,7 @@ export default function VoiceChat({
                   }`}
                   style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
                 >
-                  <span className={`flex-1 min-w-0 truncate text-[13px] font-medium ${
+                  <span className={`flex-1 min-w-0 truncate text-[15px] md:text-[13px] font-medium ${
                     currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
                   }`}>
                     {thread.title || 'New chat'}
@@ -1147,7 +1147,7 @@ export default function VoiceChat({
           </div>
         )}
         {!hasVisibleThreads && archivedThreads.length === 0 && (
-          <div className="px-3 text-xs text-gray-400">No chats yet.</div>
+          <div className="px-3 text-[13px] md:text-xs text-gray-400">No chats yet.</div>
         )}
       </div>
     </div>
@@ -1181,7 +1181,7 @@ export default function VoiceChat({
           </button>
         </div>
         <div className="flex-1 text-center">
-          <div className="text-sm font-semibold text-gray-900">Talk to Helfi</div>
+          <div className="text-[16px] md:text-sm font-semibold text-gray-900">Talk to Helfi</div>
           <div className="text-[11px] text-gray-400 hidden md:block truncate">{currentThreadTitle}</div>
         </div>
         <div className="flex items-center gap-2">
@@ -1252,19 +1252,19 @@ export default function VoiceChat({
                       <h1 className="mt-6 text-2xl font-bold tracking-tight text-gray-900">
                         {isFoodEntry ? 'Food Diary Macro Coach' : 'How can I help you today?'}
                       </h1>
-                      <div className="mt-4 w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-4 text-left text-sm text-gray-600 shadow-sm">
+                      <div className="mt-4 w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-4 text-left text-[16px] md:text-sm text-gray-600 shadow-sm">
                         <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                           {isFoodEntry ? 'What this can do' : 'How Talk to Helfi works'}
                         </div>
                         {isFoodEntry ? (
-                          <ul className="mt-3 space-y-2 text-[13px] text-gray-600">
+                          <ul className="mt-3 space-y-2 text-[15px] md:text-[13px] text-gray-600">
                             <li>Uses your current Food Diary totals to spot macro gaps.</li>
                             <li>Suggests what to eat right now based on what you are missing.</li>
                             <li>Upload a fridge/pantry photo to get ideas from what you have.</li>
                             <li>Photo analysis costs an extra 10 credits per image.</li>
                           </ul>
                         ) : (
-                          <ul className="mt-3 space-y-2 text-[13px] text-gray-600">
+                          <ul className="mt-3 space-y-2 text-[15px] md:text-[13px] text-gray-600">
                             <li>Each chat costs 10 credits once (not per response).</li>
                             <li>We show the estimate before sending and confirm the charge after the first response.</li>
                             <li>Your chats are saved unless you delete them, so you can revisit past conversations.</li>
@@ -1275,14 +1275,14 @@ export default function VoiceChat({
                       <div className="mt-8 w-full max-w-sm">
                         <div className="flex items-center justify-center gap-2 mb-3">
                           <span className="material-symbols-outlined text-[#10a27e] text-xl">lightbulb</span>
-                          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Examples</h3>
+                          <h3 className="text-[12px] md:text-xs font-bold uppercase tracking-wider text-gray-400">Examples</h3>
                         </div>
                         <div className="flex flex-col gap-3">
                           {exampleQuestions.map((q) => (
                             <button
                               key={q}
                               onClick={() => setInput(q)}
-                              className="rounded-xl border border-gray-200 bg-white p-4 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-[0.98]"
+                              className="rounded-xl border border-gray-200 bg-white p-4 text-[16px] md:text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-[0.98]"
                               type="button"
                             >
                               “{q}”
@@ -1309,13 +1309,13 @@ export default function VoiceChat({
                   <div className={`${m.role === 'user' ? 'max-w-[85%] text-right' : 'flex-1'}`}>
                     {m.role === 'assistant' ? (
                       <div className="space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Health Assistant</div>
-                        <div className="text-[16px] md:text-[15px] leading-7 text-gray-800">
+                        <div className="text-[12px] md:text-[11px] font-bold uppercase tracking-wide text-gray-400">Health Assistant</div>
+                        <div className="text-[18px] md:text-[16px] leading-7 text-gray-800">
                           {renderFormattedContent(m.content)}
                         </div>
                       </div>
                     ) : (
-                      <div className="text-[16px] md:text-[15px] leading-7 text-gray-900 font-medium">
+                      <div className="text-[18px] md:text-[16px] leading-7 text-gray-900 font-medium">
                         {renderFormattedContent(m.content)}
                       </div>
                     )}
@@ -1346,7 +1346,7 @@ export default function VoiceChat({
           <div className="relative bg-gradient-to-t from-[#f6f8f7] via-[#f6f8f7]/95 to-transparent pt-8 pb-6">
             <div className="mx-auto max-w-3xl px-4">
               {(estimatedCost !== null || lastChargedCost !== null) && (
-                <div className="flex flex-wrap gap-4 text-[11px] text-gray-500 mb-3">
+                <div className="flex flex-wrap gap-4 text-[13px] md:text-[11px] text-gray-500 mb-3">
                   {estimatedChatCost !== null && (
                     <span>
                       Estimated <span className="font-semibold text-gray-700">{estimatedChatCost} credits</span>{' '}
@@ -1385,12 +1385,12 @@ export default function VoiceChat({
                   onChange={handlePhotoSelected}
                 />
                 {pendingPhoto && (
-                  <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                  <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[14px] md:text-[12px] text-amber-800">
                     <span className="truncate">{pendingPhotoName || 'Photo ready'} (adds {PHOTO_ANALYSIS_COST_CREDITS} credits)</span>
                     <button
                       type="button"
                       onClick={clearPendingPhoto}
-                      className="ml-3 rounded-lg px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                      className="ml-3 rounded-lg px-2 py-1 text-[13px] md:text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
                     >
                       Remove
                     </button>
@@ -1403,7 +1403,7 @@ export default function VoiceChat({
                   onKeyDown={onComposerKeyDown}
                   placeholder="Message Talk to Helfi..."
                   rows={1}
-                  className="max-h-[200px] min-h-[60px] w-full resize-none bg-transparent px-4 py-[18px] text-[16px] text-black placeholder-gray-400 focus:outline-none border-none focus:ring-0"
+                  className="max-h-[200px] min-h-[60px] w-full resize-none bg-transparent px-4 py-[18px] text-[18px] md:text-[16px] text-black placeholder-gray-400 focus:outline-none border-none focus:ring-0"
                 />
                 <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
                   <button
@@ -1440,8 +1440,8 @@ export default function VoiceChat({
                   </button>
                 </div>
               </form>
-              {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
-              <div className="mt-3 text-center text-[11px] text-gray-400">
+              {error && <div className="mt-2 text-[13px] md:text-xs text-red-600">{error}</div>}
+              <div className="mt-3 text-center text-[13px] md:text-[11px] text-gray-400">
                 AI can make mistakes. Please verify important information.
               </div>
             </div>

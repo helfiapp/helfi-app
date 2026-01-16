@@ -216,6 +216,32 @@ async function loadFullUserContext(userId: string) {
 
 const isValidDateString = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
 
+const shiftDateString = (date: string, deltaDays: number) => {
+  if (!isValidDateString(date)) return date
+  const [y, m, d] = date.split('-').map((v) => parseInt(v, 10))
+  const base = new Date(Date.UTC(y, m - 1, d))
+  base.setUTCDate(base.getUTCDate() + deltaDays)
+  const year = base.getUTCFullYear()
+  const month = String(base.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(base.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const resolveDateFromQuestion = (question: string, defaultDate: string) => {
+  const text = String(question || '').toLowerCase()
+  const isoMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/)
+  if (isoMatch && isValidDateString(isoMatch[1])) {
+    return isoMatch[1]
+  }
+  if (text.includes('yesterday') || text.includes('previous day')) {
+    return shiftDateString(defaultDate, -1)
+  }
+  if (text.includes('tomorrow')) {
+    return shiftDateString(defaultDate, 1)
+  }
+  return defaultDate
+}
+
 const formatMacroValue = (value: number | null, unit: 'kcal' | 'g') => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'N/A'
   const rounded = unit === 'kcal' ? Math.round(value) : Math.round(value * 10) / 10
@@ -422,6 +448,10 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null): str
     'Avoid suggestions that would worsen nutrients that are at or over their cap.',
     'Give clear, simple food options the user can eat right now.',
     'If micronutrients are unknown, say they are unavailable.',
+    'Start with a single "Current totals" line using the numbers above.',
+    'For each option, include estimated calories, protein, carbs, fat, fiber, and sugar.',
+    'After each option, show the updated daily totals if the user ate that option.',
+    'If you must estimate, say “approximate”. If unknown, say “unknown”.',
     '',
     `Today (${foodDiarySnapshot.localDate})`,
     `Consumed: ${formatMacroValue(foodDiarySnapshot.totals.calories, 'kcal')}, ` +
@@ -430,6 +460,12 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null): str
       `${formatMacroValue(foodDiarySnapshot.totals.fat_g, 'g')} fat, ` +
       `${formatMacroValue(foodDiarySnapshot.totals.fiber_g, 'g')} fiber, ` +
       `${formatMacroValue(foodDiarySnapshot.totals.sugar_g, 'g')} sugar`,
+    `Targets: ${formatMacroValue(foodDiarySnapshot.targets.calories, 'kcal')}, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.protein_g, 'g')} protein, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.carbs_g, 'g')} carbs, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.fat_g, 'g')} fat, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.fiber_g, 'g')} fiber, ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.sugar_g, 'g')} sugar (max)`,
     `Remaining: ${formatRemaining(foodDiarySnapshot.remaining.calories)} kcal, ` +
       `${formatRemaining(foodDiarySnapshot.remaining.protein_g)} protein, ` +
       `${formatRemaining(foodDiarySnapshot.remaining.carbs_g)} carbs, ` +
@@ -575,12 +611,13 @@ export async function POST(req: NextRequest) {
     const resolvedLocalDate = isValidDateString(requestedLocalDate)
       ? requestedLocalDate
       : new Date(Date.now() - resolvedTzOffset * 60 * 1000).toISOString().slice(0, 10)
+    const effectiveLocalDate = resolveDateFromQuestion(question, resolvedLocalDate)
 
     // Load full user context
     const context = isFoodChat ? null : await loadFullUserContext(session.user.id)
     const foodDiarySnapshot = await buildFoodDiarySnapshot({
       userId: session.user.id,
-      localDate: resolvedLocalDate,
+      localDate: effectiveLocalDate,
       tzOffsetMin: resolvedTzOffset,
     })
     let systemPrompt = isFoodChat
