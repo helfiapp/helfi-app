@@ -42,11 +42,34 @@ export async function GET(request: NextRequest) {
 
     const listings = await prisma.practitionerListing.findMany({
       where,
-      include: {
-        practitionerAccount: true,
-        category: true,
-        subcategory: true,
-        subscription: true,
+      select: {
+        id: true,
+        displayName: true,
+        slug: true,
+        status: true,
+        reviewStatus: true,
+        reviewFlagReason: true,
+        aiRiskLevel: true,
+        aiReasoning: true,
+        suburbCity: true,
+        stateRegion: true,
+        country: true,
+        createdAt: true,
+        practitionerAccount: {
+          select: {
+            contactEmail: true,
+          },
+        },
+        category: {
+          select: {
+            name: true,
+          },
+        },
+        subcategory: {
+          select: {
+            name: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     })
