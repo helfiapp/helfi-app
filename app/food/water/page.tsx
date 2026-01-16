@@ -432,6 +432,7 @@ export default function WaterIntakePage() {
       fat_g: 0,
       fiber_g: 0,
       sugar_g: sugar,
+      ...(safeSweetener > 0 ? { weightAmount: safeSweetener, weightUnit: 'g' } : {}),
     }
     const category =
       sourceCategory ||

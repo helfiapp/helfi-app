@@ -9556,6 +9556,11 @@ Please add nutritional information manually if needed.`);
       item.fat_g = Number(mergedTotal?.fat) || 0
       item.fiber_g = Number(mergedTotal?.fiber) || 0
       item.sugar_g = Number(mergedTotal?.sugar) || 0
+      const grams = resolvedSweetenerMeta?.grams ?? baseSweetenerMeta?.grams ?? null
+      if (Number.isFinite(Number(grams)) && Number(grams) > 0) {
+        item.weightAmount = Math.round(Number(grams) * 100) / 100
+        item.weightUnit = 'g'
+      }
       return [item]
     })()
 
