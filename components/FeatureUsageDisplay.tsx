@@ -37,8 +37,9 @@ type UsageCacheEntry = {
 }
 
 const usageCache: Record<string, UsageCacheEntry> = {}
-const USAGE_CACHE_TTL_MS = 2000
+const USAGE_CACHE_TTL_MS = 30 * 1000
 const USAGE_SNAPSHOT_TTL_MS = 5 * 60 * 1000
+const USAGE_EVENT_MIN_MS = 5 * 1000
 
 type FeatureUsageSnapshot = {
   usage: FeatureUsage
@@ -73,6 +74,14 @@ const writeFeatureUsageSnapshot = (featureName: FeatureKey, usage: FeatureUsage,
     }
     sessionStorage.setItem(buildSnapshotKey(featureName), JSON.stringify(payload))
   } catch {}
+}
+
+const getLastUsageFetchAt = (featureName: FeatureKey) => {
+  const key = String(featureName)
+  const cached = usageCache[key]?.fetchedAt
+  if (cached) return cached
+  const snapshot = readFeatureUsageSnapshot(featureName)
+  return snapshot?.fetchedAt || 0
 }
 
 async function fetchFeatureUsage(featureName: FeatureKey, forceRefresh: boolean): Promise<FeatureUsageData | null> {
@@ -120,7 +129,10 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
     const fetchUsage = async () => {
       if (!usage) setLoading(true)
       try {
-        const forceRefresh = Boolean((refreshTrigger || 0) > 0 || eventTick > 0)
+        const now = Date.now()
+        const lastFetchedAt = getLastUsageFetchAt(featureName)
+        const allowForceRefresh = now - lastFetchedAt >= USAGE_EVENT_MIN_MS
+        const forceRefresh = Boolean((refreshTrigger || 0) > 0 || eventTick > 0) && allowForceRefresh
         const data = await fetchFeatureUsage(featureName, forceRefresh)
         if (data) {
           const value = data.featureUsage[featureName]

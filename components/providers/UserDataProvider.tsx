@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { clearClientCache, isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
-import { markAppHidden } from '@/lib/app-visibility'
+import { markAppHidden, readAppHiddenAt } from '@/lib/app-visibility'
 
 interface UserData {
   profileImage?: string
@@ -27,6 +27,8 @@ interface UserDataContextType {
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined)
 
 const USER_DATA_CACHE_TTL_MS = 5 * 60_000
+const USER_DATA_FOCUS_REFRESH_MIN_MS = 2 * 60_000
+const USER_DATA_FOCUS_REFRESH_TTL_MS = 3 * 60_000
 const HEALTH_SETUP_GRACE_MS = 2 * 60_000
 const LOCAL_OVERRIDE_GRACE_MS = 30 * 1000
 const HEALTH_SETUP_KEYS = new Set([
@@ -74,6 +76,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const userDataRef = useRef<UserData | null>(null)
   const pendingLocalUpdatesRef = useRef<Record<string, number>>({})
+  const lastFetchAtRef = useRef(0)
 
   // Profile image is either the saved Cloudinary image or the auth provider image.
   // We intentionally do NOT provide a graphic default here so UI components can
@@ -147,6 +150,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
             if (cacheKey) {
               writeClientCache(cacheKey, merged)
             }
+            lastFetchAtRef.current = Date.now()
           }
         }
       } catch (error) {
@@ -156,8 +160,9 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
     if (!force && cached && isCacheFresh(cached, USER_DATA_CACHE_TTL_MS)) {
       setIsLoading(false)
-      // Keep data in sync across devices, even when the cache is fresh.
-      void fetchLatest()
+      if (Date.now() - cached.updatedAt >= USER_DATA_FOCUS_REFRESH_TTL_MS) {
+        void fetchLatest()
+      }
       return
     }
 
@@ -224,8 +229,17 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!session) return
     if (typeof window === 'undefined' || typeof document === 'undefined') return
+    const shouldRefreshOnResume = () => {
+      const now = Date.now()
+      const hiddenAt = readAppHiddenAt()
+      if (hiddenAt && now - hiddenAt >= USER_DATA_FOCUS_REFRESH_MIN_MS) return true
+      const cached = cacheKey ? readClientCache<UserData>(cacheKey) : null
+      const lastUpdated = lastFetchAtRef.current || cached?.updatedAt || 0
+      if (!lastUpdated) return true
+      return now - lastUpdated >= USER_DATA_FOCUS_REFRESH_TTL_MS
+    }
     const handleFocus = () => {
-      refreshData()
+      if (shouldRefreshOnResume()) refreshData()
     }
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') {
@@ -233,7 +247,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
         return
       }
       if (document.visibilityState === 'visible') {
-        refreshData()
+        if (shouldRefreshOnResume()) refreshData()
       }
     }
     const handlePageHide = () => {

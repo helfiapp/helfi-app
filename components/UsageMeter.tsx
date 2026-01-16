@@ -20,6 +20,7 @@ type CreditStatusCacheEntry = {
 
 const creditStatusCache: Record<string, CreditStatusCacheEntry> = {}
 const CREDIT_STATUS_TTL_MS = 60 * 1000
+const CREDIT_STATUS_EVENT_MIN_MS = 5 * 1000
 const CREDIT_STATUS_STORAGE_PREFIX = 'helfi:credits:status'
 
 const buildCreditStatusStorageKey = (userKey: string, feature?: string) =>
@@ -202,7 +203,15 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
         return
       }
       try {
-        const forceRefresh = Boolean((refreshTrigger || 0) > 0 || eventTick > 0)
+        const key = feature || 'all'
+        const now = Date.now()
+        const lastFetchedAt =
+          creditStatusCache[key]?.fetchedAt ||
+          readStoredCreditStatus(userCacheKey, feature)?.fetchedAt ||
+          readLastStoredCreditStatus(feature)?.fetchedAt ||
+          0
+        const allowForceRefresh = now - lastFetchedAt >= CREDIT_STATUS_EVENT_MIN_MS
+        const forceRefresh = Boolean((refreshTrigger || 0) > 0 || eventTick > 0) && allowForceRefresh
         const data = await fetchCreditStatus(feature, forceRefresh)
         if (data) {
           applyCreditStatus(data)
