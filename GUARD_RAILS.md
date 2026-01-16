@@ -389,7 +389,7 @@ If this breaks again, restore these rules exactly.
 ### 3.5 Water Intake Enhancements (Jan 2026 – Locked)
 - Quick Add drink row must hide the horizontal scrollbar/grey line while still allowing swipe.
 - Non‑water drinks must open the Drink Details modal:
-  - Choices: **Sugar‑free** or **Contains sugar**.
+  - Choices: **Sugar‑free**, **Sugar**, or **Honey**.
   - Sugar amount supports `g`, `tsp`, `tbsp`, clears on focus, uses numeric keypad, and must not overflow on iPhone.
   - “Add with sugar” logs **both** a water entry (label includes sugar amount) and a Food Diary entry with calories/carbs/sugar derived from sugar grams.
   - Food Diary must show **one single drink entry** (product name + drink icon + amount). The linked water log **stays only in Water Intake** and is **hidden from Food Diary lists**.

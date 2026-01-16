@@ -53,6 +53,29 @@ const sugarToGrams = (amount: number, unit: SugarUnit): number => {
   return amount * 4
 }
 
+const honeyToGrams = (amount: number, unit: SugarUnit): number => {
+  if (!Number.isFinite(amount) || amount <= 0) return 0
+  if (unit === 'g') return amount
+  if (unit === 'tbsp') return amount * 21
+  return amount * 7
+}
+
+const sweetenerToMacros = (grams: number, type: 'sugar' | 'honey') => {
+  if (!Number.isFinite(grams) || grams <= 0) {
+    return { calories: 0, carbs: 0, sugar: 0 }
+  }
+  if (type === 'honey') {
+    const calories = Math.round(grams * 3.04 * 10) / 10
+    const carbs = Math.round(grams * 0.82 * 10) / 10
+    const sugar = carbs
+    return { calories, carbs, sugar }
+  }
+  const calories = Math.round(grams * 4 * 10) / 10
+  const carbs = Math.round(grams * 10) / 10
+  const sugar = carbs
+  return { calories, carbs, sugar }
+}
+
 function todayLocalDate() {
   return formatLocalDate(new Date())
 }
@@ -129,7 +152,7 @@ export default function WaterIntakePage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [drinkDetail, setDrinkDetail] = useState<{ amount: number; unit: string } | null>(null)
-  const [drinkSugarChoice, setDrinkSugarChoice] = useState<'free' | 'sugar' | null>(null)
+  const [drinkSugarChoice, setDrinkSugarChoice] = useState<'free' | 'sugar' | 'honey' | null>(null)
   const [drinkSugarAmount, setDrinkSugarAmount] = useState('')
   const [drinkSugarUnit, setDrinkSugarUnit] = useState<SugarUnit>('tsp')
   const [drinkDetailError, setDrinkDetailError] = useState<string | null>(null)
@@ -361,7 +384,8 @@ export default function WaterIntakePage() {
 
   const addDrinkFoodLog = async ({
     label,
-    sugarGrams = 0,
+    sweetenerType,
+    sweetenerGrams = 0,
     displayAmount,
     displayUnit,
     drinkAmount,
@@ -369,7 +393,8 @@ export default function WaterIntakePage() {
     waterLogId,
   }: {
     label: string
-    sugarGrams?: number
+    sweetenerType?: 'sugar' | 'honey'
+    sweetenerGrams?: number
     displayAmount?: number
     displayUnit?: SugarUnit
     drinkAmount: number
@@ -378,13 +403,17 @@ export default function WaterIntakePage() {
   }) => {
     const drinkAmountMl =
       drinkUnit === 'l' ? drinkAmount * 1000 : drinkUnit === 'oz' ? drinkAmount * 29.5735 : drinkAmount
-    const safeSugar = Number.isFinite(sugarGrams) && sugarGrams > 0 ? sugarGrams : 0
-    const calories = Math.round(safeSugar * 4)
-    const carbs = Math.round(safeSugar * 10) / 10
-    const sugar = Math.round(safeSugar * 10) / 10
+    const safeSweetener = Number.isFinite(sweetenerGrams) && sweetenerGrams > 0 ? sweetenerGrams : 0
+    const macros =
+      safeSweetener > 0 && sweetenerType
+        ? sweetenerToMacros(safeSweetener, sweetenerType)
+        : { calories: 0, carbs: 0, sugar: 0 }
+    const calories = macros.calories
+    const carbs = macros.carbs
+    const sugar = macros.sugar
     const description =
-      safeSugar > 0 && displayAmount && displayUnit
-        ? `${label} with sugar (${formatNumber(displayAmount)} ${displayUnit})`
+      safeSweetener > 0 && sweetenerType && displayAmount && displayUnit
+        ? `${label} with ${sweetenerType} (${formatNumber(displayAmount)} ${displayUnit})`
         : label
     const item = {
       name: label,
@@ -473,26 +502,31 @@ export default function WaterIntakePage() {
     }
   }
 
-  const handleSugarDrink = async () => {
+  const handleSweetenedDrink = async () => {
     if (!drinkDetail) return
+    if (drinkSugarChoice !== 'sugar' && drinkSugarChoice !== 'honey') return
     const rawAmount = Number(drinkSugarAmount)
     if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
-      setDrinkDetailError('Enter a valid sugar amount.')
+      setDrinkDetailError('Enter a valid sweetener amount.')
       return
     }
-    const sugarGrams = sugarToGrams(rawAmount, drinkSugarUnit)
-    if (sugarGrams <= 0) {
-      setDrinkDetailError('Enter a valid sugar amount.')
+    const sweetenerGrams =
+      drinkSugarChoice === 'honey'
+        ? honeyToGrams(rawAmount, drinkSugarUnit)
+        : sugarToGrams(rawAmount, drinkSugarUnit)
+    if (sweetenerGrams <= 0) {
+      setDrinkDetailError('Enter a valid sweetener amount.')
       return
     }
     setDrinkDetailSaving(true)
     setDrinkDetailError(null)
     try {
-      const sugarLabel = `${activeDrink} (sugar ${formatNumber(rawAmount)} ${drinkSugarUnit})`
-      const waterEntry = await addEntry(drinkDetail.amount, drinkDetail.unit, sugarLabel)
+      const sweetenerLabel = `${activeDrink} (${drinkSugarChoice} ${formatNumber(rawAmount)} ${drinkSugarUnit})`
+      const waterEntry = await addEntry(drinkDetail.amount, drinkDetail.unit, sweetenerLabel)
       await addDrinkFoodLog({
         label: activeDrink,
-        sugarGrams,
+        sweetenerType: drinkSugarChoice,
+        sweetenerGrams,
         displayAmount: rawAmount,
         displayUnit: drinkSugarUnit,
         drinkAmount: drinkDetail.amount,
@@ -964,7 +998,7 @@ export default function WaterIntakePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-base font-semibold text-[#111711] dark:text-white">Drink details</div>
-                  <div className="text-xs text-gray-500">Tell us if this drink has sugar.</div>
+                  <div className="text-xs text-gray-500">Select a sweetener option.</div>
                 </div>
                 <button
                   type="button"
@@ -981,7 +1015,7 @@ export default function WaterIntakePage() {
                   Amount: {formatNumber(drinkDetail.amount)} {drinkDetail.unit === 'l' ? 'L' : drinkDetail.unit}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setDrinkSugarChoice('free')}
@@ -1002,14 +1036,27 @@ export default function WaterIntakePage() {
                       : 'bg-white text-gray-700 border-gray-200'
                   }`}
                 >
-                  Contains sugar
+                  Sugar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDrinkSugarChoice('honey')}
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold border ${
+                    drinkSugarChoice === 'honey'
+                      ? 'bg-amber-600 text-white border-amber-600'
+                      : 'bg-white text-gray-700 border-gray-200'
+                  }`}
+                >
+                  Honey
                 </button>
               </div>
 
-              {drinkSugarChoice === 'sugar' && (
+              {(drinkSugarChoice === 'sugar' || drinkSugarChoice === 'honey') && (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Sugar amount</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">
+                      {drinkSugarChoice === 'honey' ? 'Honey amount' : 'Sugar amount'}
+                    </label>
                     <div className="flex gap-2">
                       <input
                         type="number"
@@ -1041,11 +1088,11 @@ export default function WaterIntakePage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={handleSugarDrink}
+                      onClick={handleSweetenedDrink}
                       disabled={drinkDetailSaving}
                       className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
                     >
-                      Add with sugar
+                      Add with {drinkSugarChoice === 'honey' ? 'honey' : 'sugar'}
                     </button>
                     <button
                       type="button"
