@@ -722,7 +722,77 @@ export default function VoiceChat({
         return
       }
 
-      if (res.ok && (res.headers.get('content-type') || '').includes('text/event-stream') && res.body) {
+      const contentType = (res.headers.get('content-type') || '').toLowerCase()
+      const isEventStream = contentType.includes('text/event-stream')
+
+      const parseSsePayload = async (rawPayload: string) => {
+        const chunks = rawPayload.split('\n\n')
+        let fullResponse = ''
+        let sawEnd = false
+        for (const chunk of chunks) {
+          const trimmed = chunk.trim()
+          if (!trimmed) continue
+          if (trimmed.startsWith('event: charged')) {
+            const dataLine = trimmed
+              .split('\n')
+              .map((line) => line.trim())
+              .find((line) => line.startsWith('data:'))
+            const raw = dataLine ? dataLine.replace(/^data:\s*/, '') : ''
+            try {
+              const payload = JSON.parse(raw)
+              if (typeof payload?.chargedCents === 'number') {
+                setLastChargedCost(payload.chargedCents)
+                setLastChargedAt(new Date().toISOString())
+                if (typeof payload?.chargedOnce === 'boolean') {
+                  setCurrentThreadCharged(payload.chargedOnce)
+                } else if (payload.chargedCents >= 0) {
+                  setCurrentThreadCharged(true)
+                }
+                try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
+              }
+            } catch {
+              // Ignore malformed charge payloads
+            }
+          } else if (trimmed.startsWith('data:')) {
+            const raw = trimmed.replace(/^data:\s*/, '')
+            let token = ''
+            try {
+              const parsed = JSON.parse(raw)
+              if (typeof parsed === 'string') {
+                token = parsed
+              } else if (parsed && typeof parsed.token === 'string') {
+                token = parsed.token
+              } else {
+                token = raw
+              }
+            } catch {
+              token = raw
+            }
+            fullResponse += token
+          } else if (trimmed.startsWith('event: end')) {
+            sawEnd = true
+          }
+        }
+
+        if (fullResponse) {
+          setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }])
+        }
+
+        if (sawEnd) {
+          const threadsRes = await fetch('/api/chat/threads')
+          if (threadsRes.ok) {
+            const threadsData = await threadsRes.json()
+            if (threadsData.threads) {
+              setThreads(threadsData.threads)
+              if (!currentThreadId && threadsData.threads.length > 0) {
+                setCurrentThreadId(threadsData.threads[0].id)
+              }
+            }
+          }
+        }
+      }
+
+      if (res.ok && isEventStream && res.body) {
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
@@ -800,6 +870,9 @@ export default function VoiceChat({
             }
           }
         }
+      } else if (res.ok && isEventStream) {
+        const raw = await res.text()
+        await parseSsePayload(raw)
       } else {
         const data = await res.json().catch(() => null)
         const textOut = data?.assistant as string | undefined
