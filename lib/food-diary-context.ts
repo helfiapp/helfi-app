@@ -92,6 +92,17 @@ const buildRemaining = (target: number | null, consumed: number | null) => {
   }
 }
 
+const getExerciseCaloriesForDate = async (userId: string, date: string) => {
+  const entries = await prisma.exerciseEntry.findMany({
+    where: { userId, localDate: date },
+    select: { calories: true },
+  })
+  if (!entries.length) return 0
+  const totalCalories = entries.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0)
+  if (!Number.isFinite(totalCalories) || totalCalories <= 0) return 0
+  return Math.round(totalCalories)
+}
+
 const loadFoodLogsForDate = async (userId: string, date: string, tzOffsetMin: number) => {
   const [y, m, d] = date.split('-').map((v) => parseInt(v, 10))
   const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) + tzOffsetMin * 60 * 1000)
@@ -249,14 +260,54 @@ export async function buildFoodDiarySnapshot(params: {
     Promise.resolve(buildTargetsForUser(user)),
   ])
 
-  const totals = buildMacroTotals(logs)
+  const totalsRaw = buildMacroTotals(logs)
+  const macroCalories =
+    (totalsRaw.protein_g || 0) * 4 +
+    (totalsRaw.carbs_g || 0) * 4 +
+    (totalsRaw.fat_g || 0) * 9
+  const totals: MacroTotals = {
+    ...totalsRaw,
+    calories:
+      Number.isFinite(macroCalories) && macroCalories > 0
+        ? Math.round(macroCalories)
+        : totalsRaw.calories,
+  }
+
+  const exerciseCalories = await getExerciseCaloriesForDate(userId, localDate)
+  const adjustedTargets: MacroTotals = { ...targets }
+  if (exerciseCalories > 0) {
+    if (typeof adjustedTargets.calories === 'number' && adjustedTargets.calories > 0) {
+      adjustedTargets.calories = adjustedTargets.calories + exerciseCalories
+    }
+
+    const protein = Number(adjustedTargets.protein_g)
+    const carbs = Number(adjustedTargets.carbs_g)
+    const fat = Number(adjustedTargets.fat_g)
+    if (Number.isFinite(protein) && Number.isFinite(carbs) && Number.isFinite(fat)) {
+      if (protein > 0 && carbs > 0 && fat > 0) {
+        const proteinCals = protein * 4
+        const carbCals = carbs * 4
+        const fatCals = fat * 9
+        const totalMacroCals = proteinCals + carbCals + fatCals
+        if (Number.isFinite(totalMacroCals) && totalMacroCals > 0) {
+          const pShare = proteinCals / totalMacroCals
+          const cShare = carbCals / totalMacroCals
+          const fShare = fatCals / totalMacroCals
+          adjustedTargets.protein_g = protein + (exerciseCalories * pShare) / 4
+          adjustedTargets.carbs_g = carbs + (exerciseCalories * cShare) / 4
+          adjustedTargets.fat_g = fat + (exerciseCalories * fShare) / 9
+        }
+      }
+    }
+  }
+
   const remaining = {
-    calories: buildRemaining(targets.calories, totals.calories),
-    protein_g: buildRemaining(targets.protein_g, totals.protein_g),
-    carbs_g: buildRemaining(targets.carbs_g, totals.carbs_g),
-    fat_g: buildRemaining(targets.fat_g, totals.fat_g),
-    fiber_g: buildRemaining(targets.fiber_g, totals.fiber_g),
-    sugar_g: buildRemaining(targets.sugar_g, totals.sugar_g),
+    calories: buildRemaining(adjustedTargets.calories, totals.calories),
+    protein_g: buildRemaining(adjustedTargets.protein_g, totals.protein_g),
+    carbs_g: buildRemaining(adjustedTargets.carbs_g, totals.carbs_g),
+    fat_g: buildRemaining(adjustedTargets.fat_g, totals.fat_g),
+    fiber_g: buildRemaining(adjustedTargets.fiber_g, totals.fiber_g),
+    sugar_g: buildRemaining(adjustedTargets.sugar_g, totals.sugar_g),
   }
 
   const deficitCandidates: Array<{ key: string; ratio: number }> = []
@@ -276,12 +327,12 @@ export async function buildFoodDiarySnapshot(params: {
     deficitCandidates.push({ key: label, ratio })
   }
 
-  pushDeficit('Protein', targets.protein_g, totals.protein_g)
-  pushDeficit('Fiber', targets.fiber_g, totals.fiber_g)
-  pushDeficit('Carbs', targets.carbs_g, totals.carbs_g)
-  pushDeficit('Fat', targets.fat_g, totals.fat_g)
-  pushDeficit('Sugar', targets.sugar_g, totals.sugar_g)
-  pushDeficit('Calories', targets.calories, totals.calories)
+  pushDeficit('Protein', adjustedTargets.protein_g, totals.protein_g)
+  pushDeficit('Fiber', adjustedTargets.fiber_g, totals.fiber_g)
+  pushDeficit('Carbs', adjustedTargets.carbs_g, totals.carbs_g)
+  pushDeficit('Fat', adjustedTargets.fat_g, totals.fat_g)
+  pushDeficit('Sugar', adjustedTargets.sugar_g, totals.sugar_g)
+  pushDeficit('Calories', adjustedTargets.calories, totals.calories)
 
   const low = deficitCandidates
     .sort((a, b) => b.ratio - a.ratio)
@@ -291,7 +342,7 @@ export async function buildFoodDiarySnapshot(params: {
     localDate,
     tzOffsetMin,
     totals,
-    targets,
+    targets: adjustedTargets,
     remaining,
     priority: {
       low: low.slice(0, 3),

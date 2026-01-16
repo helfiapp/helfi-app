@@ -1063,6 +1063,18 @@ export default function VoiceChat({
             const headingSource = lineContent.replace(/^\*\*([^*]+)\*\*/, '$1')
             const optionSource = headingSource.replace(/^\*\*(Option\s+\d+:)\*\*/i, '$1')
 
+            const macroHeadingMatch = headingSource.match(/^Macros(?:\s*\([^)]+\))?:?\s*(.*)$/i)
+            if (macroHeadingMatch) {
+              const label = headingSource.split(':')[0].trim() || 'Macros'
+              const rest = macroHeadingMatch[1] || ''
+              return (
+                <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
+                  <strong className="font-semibold text-gray-900">{label}:</strong>{' '}
+                  {renderMacroSegments(rest)}
+                </div>
+              )
+            }
+
             const headingMatch = headingSource.match(headingRegex)
             if (headingMatch) {
               const label = headingMatch[1]
