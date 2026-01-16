@@ -1245,6 +1245,9 @@ https://www.helfi.ai`)
       if (data?.listing) {
         updatePractitionerListing(listingId, data.listing)
       }
+      if (data?.emailSent === false) {
+        alert(data?.emailError || 'Rejection email failed to send.')
+      }
       await loadPractitionerEntries()
       setPractitionerReviewListingId(null)
     } catch (err: any) {

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     },
   })
 
-  sendPractitionerRejectedEmail({
+  const emailResult = await sendPractitionerRejectedEmail({
     practitionerAccountId: listing.practitionerAccountId,
     listingId: listing.id,
     toEmail: listing.practitionerAccount.contactEmail,
@@ -54,5 +54,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     reason,
   })
 
-  return NextResponse.json({ listing: updated })
+  return NextResponse.json({
+    listing: updated,
+    emailSent: emailResult.ok,
+    emailError: emailResult.ok ? null : emailResult.error || 'Email failed',
+  })
 }

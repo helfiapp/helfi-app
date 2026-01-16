@@ -185,9 +185,11 @@ export async function sendPractitionerRejectedEmail(options: {
   toEmail: string
   displayName: string
   reason: string
-}) {
+}): Promise<{ ok: boolean; error?: string }> {
   const resend = getResendClient()
-  if (!resend) return
+  if (!resend) {
+    return { ok: false, error: 'Resend API key is not configured.' }
+  }
 
   const subject = `Update on your Helfi listing`
   const html = `
@@ -205,23 +207,26 @@ export async function sendPractitionerRejectedEmail(options: {
     </div>
   `
 
-  dispatchEmail({
-    resend,
-    label: 'PRACTITIONER REJECTED',
-    message: {
+  try {
+    const emailResponse = await resend.emails.send({
       from: 'Helfi <support@helfi.ai>',
       to: options.toEmail,
       subject,
       html,
-    },
-    log: {
+    })
+    console.log(`✅ [PRACTITIONER REJECTED] Sent to ${options.toEmail} with ID: ${emailResponse.data?.id}`)
+    await logEmail({
       practitionerAccountId: options.practitionerAccountId,
       listingId: options.listingId,
       type: 'LISTING_REJECTED',
       toEmail: options.toEmail,
       metadata: { reason: options.reason },
-    },
-  })
+    })
+    return { ok: true }
+  } catch (error: any) {
+    console.error('[PRACTITIONER REJECTED] Email failed', error)
+    return { ok: false, error: error?.message || 'Email failed' }
+  }
 }
 
 export async function sendPractitionerAdminFlaggedEmail(options: {
