@@ -1084,18 +1084,16 @@ export default function VoiceChat({
             const lineTrimmed = line.trim()
             if (!lineTrimmed) return <div key={lineIdx} className="h-2" />
 
-            if (lineTrimmed.startsWith('**') && lineTrimmed.endsWith('**') && lineTrimmed.length > 4) {
-              return (
-                <div key={lineIdx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
-                  {lineTrimmed.slice(2, -2)}
-                </div>
-              )
-            }
+            const boldLine =
+              lineTrimmed.startsWith('**') && lineTrimmed.endsWith('**') && lineTrimmed.length > 4
+            const lineContent = boldLine ? lineTrimmed.slice(2, -2).trim() : lineTrimmed
+            const headingSource = lineContent.replace(/^\*\*([^*]+)\*\*/, '$1')
+            const optionSource = headingSource.replace(/^\*\*(Option\s+\d+:)\*\*/i, '$1')
 
-            const headingMatch = lineTrimmed.match(headingRegex)
+            const headingMatch = headingSource.match(headingRegex)
             if (headingMatch) {
               const label = headingMatch[1]
-              const rest = lineTrimmed.replace(headingRegex, '')
+              const rest = headingSource.replace(headingRegex, '')
               return (
                 <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
                   <strong className="font-semibold text-gray-900">{label}:</strong>{' '}
@@ -1104,10 +1102,10 @@ export default function VoiceChat({
               )
             }
 
-            const optionMatch = lineTrimmed.match(optionRegex)
+            const optionMatch = optionSource.match(optionRegex)
             if (optionMatch) {
               const label = optionMatch[0].trim()
-              const rest = lineTrimmed.replace(optionRegex, '')
+              const rest = optionSource.replace(optionRegex, '')
               return (
                 <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
                   <strong className="font-semibold text-gray-900">{label}</strong>{' '}
@@ -1116,7 +1114,7 @@ export default function VoiceChat({
               )
             }
 
-            const numberedMatch = lineTrimmed.match(/^(\d+)\.\s+(.+)$/)
+            const numberedMatch = lineContent.match(/^(\d+)\.\s+(.+)$/)
             if (numberedMatch) {
               const parts = numberedMatch[2].split(/(\*\*.*?\*\*)/g)
               return (
@@ -1126,13 +1124,13 @@ export default function VoiceChat({
                     if (part.startsWith('**') && part.endsWith('**')) {
                       return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
                     }
-                    return <span key={j}>{part}</span>
+                    return <span key={j} className={boldLine ? 'font-semibold' : undefined}>{part}</span>
                   })}
                 </div>
               )
             }
 
-            const bulletMatch = lineTrimmed.match(/^[-•*]\s+(.+)$/)
+            const bulletMatch = lineContent.match(/^[-•*]\s+(.+)$/)
             if (bulletMatch) {
               const parts = bulletMatch[1].split(/(\*\*.*?\*\*)/g)
               return (
@@ -1142,13 +1140,13 @@ export default function VoiceChat({
                     if (part.startsWith('**') && part.endsWith('**')) {
                       return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
                     }
-                    return <span key={j}>{part}</span>
+                    return <span key={j} className={boldLine ? 'font-semibold' : undefined}>{part}</span>
                   })}
                 </div>
               )
             }
 
-            const normalized = normalizeMacroSeparators(lineTrimmed)
+            const normalized = normalizeMacroSeparators(lineContent)
             const parts = normalized.split(/(\*\*.*?\*\*)/g)
             return (
               <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
@@ -1160,7 +1158,17 @@ export default function VoiceChat({
                   const macroKey = Object.keys(macroColorMap).find((key) => lower.includes(key))
                   const style = macroKey ? { color: macroColorMap[macroKey] } : undefined
                   return (
-                    <span key={j} style={style} className={macroKey ? 'font-semibold' : undefined}>
+                    <span
+                      key={j}
+                      style={style}
+                      className={
+                        macroKey
+                          ? 'font-semibold'
+                          : boldLine
+                          ? 'font-semibold'
+                          : undefined
+                      }
+                    >
                       {part}
                     </span>
                   )
