@@ -6,10 +6,13 @@ export async function ensureTalkToAITables(): Promise<void> {
   if (tablesEnsured) return
   try {
     await prisma.$executeRawUnsafe(
-      'CREATE TABLE IF NOT EXISTS "TalkToAIChatThread" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "title" TEXT, "chargedOnce" BOOLEAN NOT NULL DEFAULT FALSE, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+      'CREATE TABLE IF NOT EXISTS "TalkToAIChatThread" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "title" TEXT, "context" TEXT NOT NULL DEFAULT \'general\', "chargedOnce" BOOLEAN NOT NULL DEFAULT FALSE, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
     )
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "TalkToAIChatThread" ADD COLUMN IF NOT EXISTS "chargedOnce" BOOLEAN NOT NULL DEFAULT FALSE'
+    )
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "TalkToAIChatThread" ADD COLUMN IF NOT EXISTS "context" TEXT NOT NULL DEFAULT \'general\''
     )
     await prisma.$executeRawUnsafe(
       'CREATE TABLE IF NOT EXISTS "TalkToAIChatMessage" ("id" TEXT PRIMARY KEY, "threadId" TEXT NOT NULL, "role" TEXT NOT NULL, "content" TEXT NOT NULL, "tokenCount" INTEGER NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), CONSTRAINT "TalkToAIChatMessage_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "TalkToAIChatThread"("id") ON DELETE CASCADE)'
@@ -19,6 +22,9 @@ export async function ensureTalkToAITables(): Promise<void> {
     )
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "TalkToAIChatThread_userId_idx" ON "TalkToAIChatThread" ("userId")'
+    )
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "TalkToAIChatThread_userId_context_idx" ON "TalkToAIChatThread" ("userId", "context")'
     )
     tablesEnsured = true
   } catch (error) {
@@ -34,18 +40,46 @@ function uuid(): string {
   })
 }
 
-export type ChatThread = { id: string; title: string | null; chargedOnce: boolean; createdAt: string; updatedAt: string }
+export type ChatThread = {
+  id: string
+  title: string | null
+  chargedOnce: boolean
+  context: string
+  createdAt: string
+  updatedAt: string
+}
 
-export async function listThreads(userId: string): Promise<ChatThread[]> {
+export function normalizeChatContext(value?: string | null): 'general' | 'food' {
+  return value === 'food' ? 'food' : 'general'
+}
+
+export async function listThreads(userId: string, context?: string): Promise<ChatThread[]> {
   await ensureTalkToAITables()
-  const rows: Array<{ id: string; title: string | null; chargedOnce: boolean; createdAt: Date; updatedAt: Date }> = await prisma.$queryRawUnsafe(
-    'SELECT "id","title","chargedOnce","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "userId" = $1 ORDER BY "updatedAt" DESC LIMIT 50',
-    userId
-  )
+  const normalizedContext = normalizeChatContext(context)
+  const rows: Array<{
+    id: string
+    title: string | null
+    chargedOnce: boolean
+    context: string | null
+    createdAt: Date
+    updatedAt: Date
+  }> =
+    normalizedContext === 'food'
+      ? await prisma.$queryRawUnsafe(
+          'SELECT "id","title","chargedOnce","context","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "userId" = $1 AND "context" = $2 ORDER BY "updatedAt" DESC LIMIT 50',
+          userId,
+          normalizedContext
+        )
+      : await prisma.$queryRawUnsafe(
+          'SELECT "id","title","chargedOnce","context","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "userId" = $1 AND ("context" IS NULL OR "context" = $2) ORDER BY "updatedAt" DESC LIMIT 50',
+          userId,
+          normalizedContext
+        )
   return rows.map((r) => ({
     id: r.id,
     title: r.title,
     chargedOnce: Boolean(r.chargedOnce),
+    context: normalizeChatContext(r.context),
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   }))
@@ -68,14 +102,16 @@ export async function markThreadCharged(threadId: string): Promise<void> {
   )
 }
 
-export async function createThread(userId: string, title?: string): Promise<{ id: string }> {
+export async function createThread(userId: string, title?: string, context?: string): Promise<{ id: string }> {
   await ensureTalkToAITables()
   const id = uuid()
+  const normalizedContext = normalizeChatContext(context)
   await prisma.$executeRawUnsafe(
-    'INSERT INTO "TalkToAIChatThread" ("id","userId","title") VALUES ($1,$2,$3)',
+    'INSERT INTO "TalkToAIChatThread" ("id","userId","title","context") VALUES ($1,$2,$3,$4)',
     id,
     userId,
-    title || null
+    title || null,
+    normalizedContext
   )
   return { id }
 }

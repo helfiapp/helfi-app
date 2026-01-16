@@ -16,6 +16,7 @@ import {
   listThreads,
   getThreadChargeStatus,
   markThreadCharged,
+  normalizeChatContext,
 } from '@/lib/talk-to-ai-chat-store'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
@@ -56,9 +57,15 @@ function extractKeywords(text: string) {
   return unique.slice(0, 8)
 }
 
-async function loadChatMemorySnippets(userId: string, question: string, threadId?: string) {
+async function loadChatMemorySnippets(
+  userId: string,
+  question: string,
+  threadId: string | undefined,
+  context: string
+) {
   await ensureTalkToAITables()
 
+  const normalizedContext = normalizeChatContext(context)
   const keywords = extractKeywords(question)
   let rows: Array<{ content: string; createdAt: Date }> = []
 
@@ -70,8 +77,15 @@ async function loadChatMemorySnippets(userId: string, question: string, threadId
        FROM "TalkToAIChatMessage" m
        JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
        WHERE t."userId" = $1 AND m."role" = 'user' AND m."content" ILIKE ANY($2)`
+    if (normalizedContext === 'food') {
+      query += ' AND t."context" = $3'
+      params.push(normalizedContext)
+    } else {
+      query += ' AND (t."context" IS NULL OR t."context" = $3)'
+      params.push(normalizedContext)
+    }
     if (threadId) {
-      query += ' AND m."threadId" <> $3'
+      query += ' AND m."threadId" <> $4'
       params.push(threadId)
     }
     query += ` ORDER BY m."createdAt" DESC LIMIT ${MEMORY_MATCH_LIMIT}`
@@ -87,8 +101,15 @@ async function loadChatMemorySnippets(userId: string, question: string, threadId
        FROM "TalkToAIChatMessage" m
        JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
        WHERE t."userId" = $1 AND m."role" = 'user'`
+    if (normalizedContext === 'food') {
+      query += ' AND t."context" = $2'
+      params.push(normalizedContext)
+    } else {
+      query += ' AND (t."context" IS NULL OR t."context" = $2)'
+      params.push(normalizedContext)
+    }
     if (threadId) {
-      query += ' AND m."threadId" <> $2'
+      query += ' AND m."threadId" <> $3'
       params.push(threadId)
     }
     query += ` ORDER BY m."createdAt" DESC LIMIT ${MEMORY_FALLBACK_LIMIT}`
@@ -443,22 +464,23 @@ export async function POST(req: NextRequest) {
 
     // Get or create thread
     await ensureTalkToAITables()
+    const chatContext = normalizeChatContext(body?.entryContext ?? body?.context)
     let threadId: string
     if (body.newThread) {
       // Create new thread only if explicitly requested
-      const thread = await createThread(session.user.id)
+      const thread = await createThread(session.user.id, undefined, chatContext)
       threadId = thread.id
     } else if (body.threadId) {
       // Use existing thread
       threadId = body.threadId
     } else {
       // Get most recent thread or create new one ONLY if no threads exist
-      const threads = await listThreads(session.user.id)
+      const threads = await listThreads(session.user.id, chatContext)
       if (threads.length > 0) {
         threadId = threads[0].id
       } else {
         // Only create if truly no threads exist
-        const thread = await createThread(session.user.id)
+        const thread = await createThread(session.user.id, undefined, chatContext)
         threadId = thread.id
       }
     }
@@ -482,7 +504,7 @@ export async function POST(req: NextRequest) {
     // Load message history for context
     const history = await listMessages(threadId, 30)
     const historyMessages = history.map((m) => ({ role: m.role, content: m.content }))
-    const memorySnippets = await loadChatMemorySnippets(session.user.id, question, threadId)
+    const memorySnippets = await loadChatMemorySnippets(session.user.id, question, threadId, chatContext)
 
     const resolvedTzOffset =
       Number.isFinite(Number(body?.tzOffsetMin)) ? Number(body.tzOffsetMin) : new Date().getTimezoneOffset()
@@ -517,7 +539,7 @@ export async function POST(req: NextRequest) {
     const accept = (req.headers.get('accept') || '').toLowerCase()
     const wantsStream = accept.includes('text/event-stream')
 
-    const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+    const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
     // Add formatting reminder to user message for better compliance
     const enhancedQuestion = `${question}\n\nPlease format your response with proper paragraphs, line breaks, and structure. Keep it concise and ask any clarifying questions first.`
     const chatMessages = [
@@ -530,7 +552,7 @@ export async function POST(req: NextRequest) {
     await appendMessage(threadId, 'user', question)
 
     // Auto-generate title from first message if thread has no title
-    const threads = await listThreads(session.user.id)
+    const threads = await listThreads(session.user.id, chatContext)
     const currentThread = threads.find(t => t.id === threadId)
     if (currentThread && !currentThread.title) {
       const title = question.length > 50 ? question.substring(0, 47) + '...' : question

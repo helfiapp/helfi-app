@@ -16,6 +16,7 @@ import {
   listThreads,
   getThreadChargeStatus,
   markThreadCharged,
+  normalizeChatContext,
 } from '@/lib/talk-to-ai-chat-store'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
     const note = readFormString(form, 'message')
     const incomingThreadId = readFormString(form, 'threadId')
     const forceNewThread = readFormString(form, 'newThread') === 'true'
+    const chatContext = normalizeChatContext(readFormString(form, 'entryContext') || readFormString(form, 'context'))
     const requestedLocalDate = readFormString(form, 'localDate')
     const requestedTzOffset = Number(readFormString(form, 'tzOffsetMin'))
     const resolvedTzOffset = Number.isFinite(requestedTzOffset) ? requestedTzOffset : new Date().getTimezoneOffset()
@@ -102,16 +104,16 @@ export async function POST(req: NextRequest) {
     await ensureTalkToAITables()
     let threadId: string
     if (forceNewThread) {
-      const thread = await createThread(session.user.id)
+      const thread = await createThread(session.user.id, undefined, chatContext)
       threadId = thread.id
     } else if (incomingThreadId) {
       threadId = incomingThreadId
     } else {
-      const threads = await listThreads(session.user.id)
+      const threads = await listThreads(session.user.id, chatContext)
       if (threads.length > 0) {
         threadId = threads[0].id
       } else {
-        const thread = await createThread(session.user.id)
+        const thread = await createThread(session.user.id, undefined, chatContext)
         threadId = thread.id
       }
     }
@@ -250,7 +252,7 @@ export async function POST(req: NextRequest) {
     ].join(' ')
 
     const assistantResult = await chatCompletionWithCost(openai, {
-      model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
+      model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2',
       messages: [
         { role: 'system', content: suggestionPrompt },
         {
@@ -283,7 +285,7 @@ export async function POST(req: NextRequest) {
     await appendMessage(threadId, 'user', userMessage)
     await appendMessage(threadId, 'assistant', assistantMessage)
 
-    const threads = await listThreads(session.user.id)
+    const threads = await listThreads(session.user.id, chatContext)
     const currentThread = threads.find((thread) => thread.id === threadId)
     if (currentThread && !currentThread.title) {
       await updateThreadTitle(threadId, 'Fridge photo')
@@ -302,7 +304,7 @@ export async function POST(req: NextRequest) {
     try {
       await logAIUsage({
         context: { feature: 'voice:fridge-photo:suggestions', userId: user.id },
-        model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
+        model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2',
         promptTokens: assistantResult.promptTokens,
         completionTokens: assistantResult.completionTokens,
         costCents: assistantResult.costCents,

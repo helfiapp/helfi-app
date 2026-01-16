@@ -69,8 +69,12 @@ export default function VoiceChat({
   const [deletePending, setDeletePending] = useState(false)
   const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
   const photoInputRef = useRef<HTMLInputElement | null>(null)
-  const storageKey = useMemo(() => 'helfi:chat:talk', [])
-  const archivedKey = useMemo(() => 'helfi:chat:talk:archived', [])
+  const storageKey = useMemo(() => `helfi:chat:talk:${entryContext}`, [entryContext])
+  const archivedKey = useMemo(() => `helfi:chat:talk:${entryContext}:archived`, [entryContext])
+  const threadsUrl = useMemo(
+    () => (entryContext === 'food' ? '/api/chat/threads?context=food' : '/api/chat/threads'),
+    [entryContext]
+  )
   const hasHealthTipContext = !!context?.healthTipSummary
   const isFoodEntry = entryContext === 'food'
   const healthTipTitle = context?.healthTipTitle
@@ -166,6 +170,16 @@ export default function VoiceChat({
     [threads, archivedThreadIds]
   )
 
+  useEffect(() => {
+    setThreads([])
+    setCurrentThreadId(null)
+    setCurrentThreadCharged(false)
+    setMessages([])
+    setLastChargedCost(null)
+    setLastChargedAt(null)
+    setThreadsOpen(false)
+  }, [entryContext])
+
   const showExitButton = Boolean(onExit)
 
   const handleExit = useCallback(() => {
@@ -213,9 +227,10 @@ export default function VoiceChat({
 
   // Load threads and current thread on mount
   useEffect(() => {
+    if (currentThreadId) return
     async function loadThreads() {
       try {
-        const res = await fetch('/api/chat/threads')
+        const res = await fetch(threadsUrl)
         if (res.ok) {
           const data = await res.json()
           if (data.threads && Array.isArray(data.threads)) {
@@ -235,8 +250,7 @@ export default function VoiceChat({
       }
     }
     loadThreads()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [currentThreadId, threadsUrl])
 
   async function loadThreadMessages(threadId: string) {
     try {
@@ -265,7 +279,7 @@ export default function VoiceChat({
       const res = await fetch('/api/chat/threads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ context: entryContext }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -277,7 +291,7 @@ export default function VoiceChat({
         setLastChargedAt(null)
         setThreadsOpen(false)
         // Reload threads
-        const threadsRes = await fetch('/api/chat/threads')
+        const threadsRes = await fetch(threadsUrl)
         if (threadsRes.ok) {
           const threadsData = await threadsRes.json()
           if (threadsData.threads) setThreads(threadsData.threads)
@@ -297,7 +311,7 @@ export default function VoiceChat({
       })
       if (res.ok) {
         // Reload threads
-        const threadsRes = await fetch('/api/chat/threads')
+        const threadsRes = await fetch(threadsUrl)
         if (threadsRes.ok) {
           const threadsData = await threadsRes.json()
           if (threadsData.threads) {
@@ -334,7 +348,7 @@ export default function VoiceChat({
         body: JSON.stringify({ threadId, title: trimmed }),
       })
       if (res.ok) {
-        const threadsRes = await fetch('/api/chat/threads')
+        const threadsRes = await fetch(threadsUrl)
         if (threadsRes.ok) {
           const threadsData = await threadsRes.json()
           if (threadsData.threads) setThreads(threadsData.threads)
@@ -396,7 +410,7 @@ export default function VoiceChat({
     closeThreadActions()
   }
 
-  // Load saved conversation on mount
+  // Load saved conversation on mount/context change
   useEffect(() => {
     // Only load from localStorage if no thread is loaded from server
     if (currentThreadId) return
@@ -409,8 +423,7 @@ export default function VoiceChat({
         }
       }
     } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentThreadId])
+  }, [currentThreadId, storageKey])
 
   useEffect(() => {
     setLastChargedCost(null)
@@ -615,6 +628,7 @@ export default function VoiceChat({
     formData.append('message', note)
     formData.append('threadId', currentThreadId || '')
     formData.append('newThread', 'false')
+    formData.append('entryContext', entryContext)
     formData.append('localDate', localDate)
     formData.append('tzOffsetMin', String(tzOffsetMin))
 
@@ -656,7 +670,7 @@ export default function VoiceChat({
 
       try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
 
-      const threadsRes = await fetch('/api/chat/threads')
+      const threadsRes = await fetch(threadsUrl)
       if (threadsRes.ok) {
         const threadsData = await threadsRes.json()
         if (threadsData.threads) {
@@ -709,6 +723,7 @@ export default function VoiceChat({
           message: text, 
           threadId: currentThreadId || undefined,
           newThread: false, // Never create a new thread automatically - user must click "+ New Chat"
+          entryContext,
           localDate,
           tzOffsetMin,
           ...context 
@@ -729,7 +744,7 @@ export default function VoiceChat({
         try {
           let threadId = currentThreadId
           if (!threadId) {
-            const threadsRes = await fetch('/api/chat/threads')
+            const threadsRes = await fetch(threadsUrl)
             if (threadsRes.ok) {
               const threadsData = await threadsRes.json()
               const latest = threadsData?.threads?.[0]
@@ -814,7 +829,7 @@ export default function VoiceChat({
         }
 
         if (sawEnd) {
-          const threadsRes = await fetch('/api/chat/threads')
+          const threadsRes = await fetch(threadsUrl)
           if (threadsRes.ok) {
             const threadsData = await threadsRes.json()
             if (threadsData.threads) {
@@ -891,7 +906,7 @@ export default function VoiceChat({
               }
             } else if (chunk.startsWith('event: end')) {
               // Response complete - reload threads to get updated title
-              const threadsRes = await fetch('/api/chat/threads')
+              const threadsRes = await fetch(threadsUrl)
               if (threadsRes.ok) {
                 const threadsData = await threadsRes.json()
                 if (threadsData.threads) {
