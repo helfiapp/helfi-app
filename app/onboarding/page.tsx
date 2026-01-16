@@ -6703,6 +6703,19 @@ function BloodResultsStep({
           </div>
         </div>
 
+        <div className="mb-6 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+          <h3 className="font-semibold mb-2">How your blood results are kept safe</h3>
+          <ul className="list-disc list-inside space-y-1 text-emerald-900">
+            <li>Your report is stored in a locked format so only your account can read it.</li>
+            <li>We never save your PDF password. It is used once to read the file and then discarded.</li>
+            <li>By default, the original PDF is removed after we read it, unless you choose to keep it.</li>
+          </ul>
+          <div className="mt-3 text-emerald-900">
+            <strong>Password‑protected PDFs:</strong> tick “My PDF is password‑protected”, enter the password, and then upload.
+            If the password is wrong, the upload will stop and you can try again with the correct one.
+          </div>
+        </div>
+
         <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 px-4 py-4">
           <h3 className="text-sm font-semibold text-gray-800 mb-2">Add a new report (PDF)</h3>
           <p className="text-xs text-gray-600 mb-3">
