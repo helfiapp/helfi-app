@@ -7,6 +7,7 @@ import { consumeRateLimit } from '@/lib/rate-limit'
 import { CreditManager } from '@/lib/credit-system'
 import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
+import { decryptFieldsBatch } from '@/lib/encryption'
 
 const INSIGHTS_RATE_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
 const INSIGHTS_RATE_MAX = 2
@@ -36,6 +37,17 @@ export async function POST(request: Request) {
   let recentHealthLogs: any[] = []
   // Aggregated nutrition snapshot for the last 7 days (best-effort, safe fallbacks)
   let weeklyNutritionSummary: any = null
+  let labTrends: Array<{
+    name: string
+    latestValue: number
+    previousValue: number
+    unit: string | null
+    change: number
+    direction: 'up' | 'down' | 'flat'
+    latestDate: string
+    previousDate: string
+  }> = []
+  let labReportCount = 0
   try {
     const session = await getServerSession(authOptions)
     if (session?.user?.id) {
@@ -59,6 +71,64 @@ export async function POST(request: Request) {
       // Include nutrients when available so the AI can be specific
       recentFood = (profile?.foodLogs || []).map((f: any) => ({ name: f.name, nutrients: f.nutrients || null, createdAt: f.createdAt }))
       recentHealthLogs = (profile?.healthLogs || []).map((h: any) => ({ goal: h.goal?.name, rating: h.rating, createdAt: h.createdAt }))
+
+      // Include recent lab trends (best-effort) for insights personalization
+      try {
+        labReportCount = await prisma.report.count({ where: { userId: session.user.id } })
+        const trendWindowStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+        const labResults = await prisma.labResult.findMany({
+          where: { report: { userId: session.user.id, createdAt: { gte: trendWindowStart } } },
+          include: { report: { select: { createdAt: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 120,
+        })
+
+        const analyteMap = new Map<string, Array<{ value: number; unit: string | null; date: Date }>>()
+        for (const result of labResults) {
+          const encryptedFields: Record<string, string> = {
+            analyteName: result.analyteNameEncrypted,
+            value: result.valueEncrypted,
+          }
+          if (result.unitEncrypted) encryptedFields.unit = result.unitEncrypted
+          if (result.collectionDateEncrypted) encryptedFields.collectionDate = result.collectionDateEncrypted
+          const decrypted = await decryptFieldsBatch(encryptedFields, result.dataKeyEncrypted)
+          const name = String(decrypted.analyteName || '').trim()
+          if (!name) continue
+          const rawValue = String(decrypted.value || '').trim()
+          const match = rawValue.match(/-?\d+(\.\d+)?/)
+          const numeric = match ? Number(match[0]) : NaN
+          if (!Number.isFinite(numeric)) continue
+          const unit = decrypted.unit ? String(decrypted.unit).trim() : null
+          const date = decrypted.collectionDate ? new Date(decrypted.collectionDate) : result.report?.createdAt || result.createdAt
+          if (Number.isNaN(date.getTime())) continue
+          const existing = analyteMap.get(name) || []
+          existing.push({ value: numeric, unit, date })
+          analyteMap.set(name, existing)
+        }
+
+        analyteMap.forEach((entries, name) => {
+          const sorted = entries.sort((a, b) => b.date.getTime() - a.date.getTime())
+          if (sorted.length < 2) return
+          const latest = sorted[0]
+          const previous = sorted[1]
+          const change = +(latest.value - previous.value).toFixed(2)
+          const direction = change === 0 ? 'flat' : change > 0 ? 'up' : 'down'
+          labTrends.push({
+            name,
+            latestValue: latest.value,
+            previousValue: previous.value,
+            unit: latest.unit || previous.unit || null,
+            change,
+            direction,
+            latestDate: latest.date.toISOString(),
+            previousDate: previous.date.toISOString(),
+          })
+        })
+        labTrends = labTrends.slice(0, 8)
+      } catch {
+        labTrends = []
+        labReportCount = 0
+      }
     }
   } catch {
     // non-blocking
@@ -220,9 +290,11 @@ export async function POST(request: Request) {
           recentFood,
           recentHealthLogs,
           weeklyNutritionSummary,
+          labReportCount,
+          labTrends,
         })
 
-        const prompt = `You are a careful, data-driven health coach. Based ONLY on the JSON profile below, generate 6 high-value, personalized insights. Avoid generic advice. Use the user's goals, supplements, medications, recent foods (with nutrients), health logs, and the 7-day nutrition summary.
+        const prompt = `You are a careful, data-driven health coach. Based ONLY on the JSON profile below, generate 6 high-value, personalized insights. Avoid generic advice. Use the user's goals, supplements, medications, recent foods (with nutrients), health logs, lab trends, and the 7-day nutrition summary.
 
 Return a JSON array of items where each item has:
   id (string),
@@ -240,6 +312,13 @@ Nutrition guidance rules:
 - If sugar is high (> 50 g/day) or sodium high (> 2300 mg/day), suggest reductions with practical substitutions.
 - Use recentFood to cite examples (e.g., "based on frequent item: greek yogurt").
 - Cross-link supplements/medications with timing and interactions (advice as "check with your clinician").
+
+Lab guidance rules:
+- If labTrends exist, use them to suggest items to discuss with a clinician (supplements, foods, or possible medication questions).
+- Never claim a result is good/bad or diagnose anything; describe movement only (higher/lower/flat vs last result).
+- If recommending a supplement or food, check the user's current medications and warn about possible interactions when relevant.
+- If you mention medications, phrase it as a discussion point ("ask your clinician if...") and never suggest stopping or starting meds.
+- Any lab-based suggestion must include a safety note to check with a medical professional.
 
 Keep each insight skimmable but substantive. Do not return prose outside of the JSON array.
 

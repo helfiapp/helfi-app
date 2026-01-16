@@ -31,6 +31,8 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const [isUpdating, setIsUpdating] = useState(false)
   const [updateMessage, setUpdateMessage] = useState<string | null>(null)
   const [weeklyStatus, setWeeklyStatus] = useState<any>(initialWeeklyStatus || null)
+  const [isCreatingReport, setIsCreatingReport] = useState(false)
+  const [createReportMessage, setCreateReportMessage] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<{
     days: number
     hours: number
@@ -138,6 +140,31 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     } catch (error) {
       setUpdateMessage('Failed to regenerate insights. Please try again.')
       setIsUpdating(false)
+    }
+  }
+
+  async function handleCreateReportNow() {
+    if (isCreatingReport) return
+    setIsCreatingReport(true)
+    setCreateReportMessage('Creating your report now. This can take a minute.')
+    try {
+      const response = await fetch('/api/reports/weekly/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setCreateReportMessage('Your report is being created. Refresh this page or open the report in a minute.')
+        setTimeout(() => {
+          router.refresh()
+        }, 2000)
+      } else {
+        setCreateReportMessage(data?.error || 'Sorry, we could not create the report right now.')
+      }
+    } catch (error) {
+      setCreateReportMessage('Sorry, we could not create the report right now.')
+    } finally {
+      setIsCreatingReport(false)
     }
   }
 
@@ -331,8 +358,23 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   Edit Health Setup (optional)
                 </Link>
               )}
+              {!weeklyStatus?.reportReady && (
+                <button
+                  type="button"
+                  onClick={handleCreateReportNow}
+                  disabled={isCreatingReport}
+                  className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isCreatingReport ? 'Creating report...' : 'Create report now'}
+                </button>
+              )}
             </div>
           </div>
+          {createReportMessage && (
+            <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              {createReportMessage}
+            </div>
+          )}
         </section>
         {issues.length === 0 ? (
           !onboardingComplete ? (

@@ -6697,14 +6697,23 @@ function BloodResultsStep({
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-700">
-                <strong>Optional but recommended:</strong> Blood results help us build stronger weekly reports. You can upload multiple reports and keep a history here.
+                <strong>Optional but recommended:</strong> You can upload as many blood reports as you like. Each upload is saved below, so you can add new results any time.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 px-4 py-4">
+          <h3 className="text-sm font-semibold text-gray-800 mb-2">Add a new report (PDF)</h3>
+          <p className="text-xs text-gray-600 mb-3">
+            Every upload is saved to your history. When you get new results later, just upload again here.
+          </p>
           <LabReportUpload compact={true} onUploadComplete={() => loadHistory()} />
+          {reports.length > 0 && (
+            <p className="mt-3 text-xs text-gray-500">
+              Want to add more? Use the upload box above and it will appear in the list below.
+            </p>
+          )}
         </div>
 
         <div className="mb-6">
@@ -6721,7 +6730,9 @@ function BloodResultsStep({
         </div>
 
         <div className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Previous reports</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">
+            Previous reports{reports.length > 0 ? ` (${reports.length})` : ''}
+          </h3>
           {isLoadingHistory ? (
             <div className="text-sm text-gray-500">Loading report history...</div>
           ) : reports.length === 0 ? (
