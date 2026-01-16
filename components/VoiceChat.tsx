@@ -715,10 +715,14 @@ export default function VoiceChat({
       if (onCostEstimate) onCostEstimate(estimatedCost)
 
       const url = `/api/chat/voice`
+      const wantsStream = entryContext !== 'food'
       const { localDate, tzOffsetMin } = buildLocalDatePayload()
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: wantsStream ? 'text/event-stream' : 'application/json',
+        },
         body: JSON.stringify({ 
           message: text, 
           threadId: currentThreadId || undefined,
@@ -732,6 +736,17 @@ export default function VoiceChat({
       if (res.status === 402) {
         const data = await res.json()
         setError(`Insufficient credits. Estimated cost: ${data.estimatedCost} credits. Available: ${data.availableCredits} credits.`)
+        setLoading(false)
+        return
+      }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        const message =
+          (typeof data?.message === 'string' && data.message.trim()) ||
+          (typeof data?.error === 'string' && data.error.trim()) ||
+          'Sorry, something went wrong. Please try again.'
+        setError(message)
         setLoading(false)
         return
       }
