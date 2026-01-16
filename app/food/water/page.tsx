@@ -359,21 +359,33 @@ export default function WaterIntakePage() {
     setDrinkDetailError(null)
   }
 
-  const addDrinkFoodLog = async (
-    label: string,
-    sugarGrams: number,
-    displayAmount: number,
-    displayUnit: SugarUnit,
-    drinkAmount: number,
-    drinkUnit: string,
-    waterLogId?: string | null,
-  ) => {
+  const addDrinkFoodLog = async ({
+    label,
+    sugarGrams = 0,
+    displayAmount,
+    displayUnit,
+    drinkAmount,
+    drinkUnit,
+    waterLogId,
+  }: {
+    label: string
+    sugarGrams?: number
+    displayAmount?: number
+    displayUnit?: SugarUnit
+    drinkAmount: number
+    drinkUnit: string
+    waterLogId?: string | null
+  }) => {
     const drinkAmountMl =
       drinkUnit === 'l' ? drinkAmount * 1000 : drinkUnit === 'oz' ? drinkAmount * 29.5735 : drinkAmount
-    const calories = Math.round(sugarGrams * 4)
-    const carbs = Math.round(sugarGrams * 10) / 10
-    const sugar = Math.round(sugarGrams * 10) / 10
-    const description = `${label} with sugar (${formatNumber(displayAmount)} ${displayUnit})`
+    const safeSugar = Number.isFinite(sugarGrams) && sugarGrams > 0 ? sugarGrams : 0
+    const calories = Math.round(safeSugar * 4)
+    const carbs = Math.round(safeSugar * 10) / 10
+    const sugar = Math.round(safeSugar * 10) / 10
+    const description =
+      safeSugar > 0 && displayAmount && displayUnit
+        ? `${label} with sugar (${formatNumber(displayAmount)} ${displayUnit})`
+        : label
     const item = {
       name: label,
       brand: null,
@@ -428,10 +440,17 @@ export default function WaterIntakePage() {
     setDrinkDetailSaving(true)
     setDrinkDetailError(null)
     try {
-      await addEntry(drinkDetail.amount, drinkDetail.unit)
+      const waterEntry = await addEntry(drinkDetail.amount, drinkDetail.unit, activeDrink)
+      if (!waterEntry?.id) throw new Error('missing water log')
+      await addDrinkFoodLog({
+        label: activeDrink,
+        drinkAmount: drinkDetail.amount,
+        drinkUnit: drinkDetail.unit,
+        waterLogId: waterEntry.id,
+      })
       closeDrinkDetail()
     } catch {
-      setDrinkDetailError('Could not save this drink. Please try again.')
+      setDrinkDetailError('Saved water intake, but could not create the drink entry. Please try again.')
     } finally {
       setDrinkDetailSaving(false)
     }
@@ -454,15 +473,15 @@ export default function WaterIntakePage() {
     try {
       const sugarLabel = `${activeDrink} (sugar ${formatNumber(rawAmount)} ${drinkSugarUnit})`
       const waterEntry = await addEntry(drinkDetail.amount, drinkDetail.unit, sugarLabel)
-      await addDrinkFoodLog(
-        activeDrink,
+      await addDrinkFoodLog({
+        label: activeDrink,
         sugarGrams,
-        rawAmount,
-        drinkSugarUnit,
-        drinkDetail.amount,
-        drinkDetail.unit,
-        waterEntry?.id,
-      )
+        displayAmount: rawAmount,
+        displayUnit: drinkSugarUnit,
+        drinkAmount: drinkDetail.amount,
+        drinkUnit: drinkDetail.unit,
+        waterLogId: waterEntry?.id,
+      })
       closeDrinkDetail()
     } catch {
       setDrinkDetailError('Could not save this drink. Please try again.')
