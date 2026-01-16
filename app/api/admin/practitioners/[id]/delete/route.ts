@@ -19,20 +19,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   })
 
   if (!listing) {
-    return NextResponse.json({ error: 'Listing not found.' }, { status: 404 })
+    return NextResponse.json({ ok: true, message: 'Listing already deleted.' })
   }
 
   await prisma.practitionerListing.delete({
     where: { id: listing.id },
-  })
-
-  await prisma.practitionerModerationLog.create({
-    data: {
-      listingId: listing.id,
-      adminUserId: admin.adminId,
-      action: 'DELETE',
-      reason: 'Deleted by admin',
-    },
   })
 
   return NextResponse.json({ ok: true })
