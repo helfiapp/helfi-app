@@ -282,10 +282,10 @@ export async function POST(req: NextRequest) {
       'Use this exact format:',
       'Current totals: ...',
       'Option 1: ...',
-      'Macros: kcal, protein g, carbs g, fat g, fiber g, sugar g',
+      'Macros: kcal - protein g - carbs g - fat g - fiber g - sugar g',
       'After eating: ...',
       'Option 2: ...',
-      'Macros: kcal, protein g, carbs g, fat g, fiber g, sugar g',
+      'Macros: kcal - protein g - carbs g - fat g - fiber g - sugar g',
       'After eating: ...',
     ].join('\n')
 

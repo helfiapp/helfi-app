@@ -456,30 +456,30 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null): str
     'Use this exact format:',
     'Current totals: ...',
     'Option 1: ...',
-    'Macros: kcal, protein g, carbs g, fat g, fiber g, sugar g',
+    'Macros: kcal - protein g - carbs g - fat g - fiber g - sugar g',
     'After eating: ...',
     'Option 2: ...',
-    'Macros: kcal, protein g, carbs g, fat g, fiber g, sugar g',
+    'Macros: kcal - protein g - carbs g - fat g - fiber g - sugar g',
     'After eating: ...',
     '',
     `Today (${foodDiarySnapshot.localDate})`,
-    `Consumed: ${formatMacroValue(foodDiarySnapshot.totals.calories, 'kcal')}, ` +
-      `${formatMacroValue(foodDiarySnapshot.totals.protein_g, 'g')} protein, ` +
-      `${formatMacroValue(foodDiarySnapshot.totals.carbs_g, 'g')} carbs, ` +
-      `${formatMacroValue(foodDiarySnapshot.totals.fat_g, 'g')} fat, ` +
-      `${formatMacroValue(foodDiarySnapshot.totals.fiber_g, 'g')} fiber, ` +
+    `Consumed: ${formatMacroValue(foodDiarySnapshot.totals.calories, 'kcal')} - ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.protein_g, 'g')} protein - ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.carbs_g, 'g')} carbs - ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.fat_g, 'g')} fat - ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.fiber_g, 'g')} fiber - ` +
       `${formatMacroValue(foodDiarySnapshot.totals.sugar_g, 'g')} sugar`,
-    `Targets: ${formatMacroValue(foodDiarySnapshot.targets.calories, 'kcal')}, ` +
-      `${formatMacroValue(foodDiarySnapshot.targets.protein_g, 'g')} protein, ` +
-      `${formatMacroValue(foodDiarySnapshot.targets.carbs_g, 'g')} carbs, ` +
-      `${formatMacroValue(foodDiarySnapshot.targets.fat_g, 'g')} fat, ` +
-      `${formatMacroValue(foodDiarySnapshot.targets.fiber_g, 'g')} fiber, ` +
+    `Targets: ${formatMacroValue(foodDiarySnapshot.targets.calories, 'kcal')} - ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.protein_g, 'g')} protein - ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.carbs_g, 'g')} carbs - ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.fat_g, 'g')} fat - ` +
+      `${formatMacroValue(foodDiarySnapshot.targets.fiber_g, 'g')} fiber - ` +
       `${formatMacroValue(foodDiarySnapshot.targets.sugar_g, 'g')} sugar (max)`,
-    `Remaining: ${formatRemaining(foodDiarySnapshot.remaining.calories)} kcal, ` +
-      `${formatRemaining(foodDiarySnapshot.remaining.protein_g)} protein, ` +
-      `${formatRemaining(foodDiarySnapshot.remaining.carbs_g)} carbs, ` +
-      `${formatRemaining(foodDiarySnapshot.remaining.fat_g)} fat, ` +
-      `${formatRemaining(foodDiarySnapshot.remaining.fiber_g)} fiber, ` +
+    `Remaining: ${formatRemaining(foodDiarySnapshot.remaining.calories)} kcal - ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.protein_g)} protein - ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.carbs_g)} carbs - ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.fat_g)} fat - ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.fiber_g)} fiber - ` +
       `${formatRemaining(foodDiarySnapshot.remaining.sugar_g)} sugar`,
     foodDiarySnapshot.priority.low.length > 0
       ? `Most behind: ${foodDiarySnapshot.priority.low.join(', ')}`

@@ -70,6 +70,7 @@ export default function VoiceChat({
   const [deletePending, setDeletePending] = useState(false)
   const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
   const photoInputRef = useRef<HTMLInputElement | null>(null)
+  const [dynamicExampleQuestions, setDynamicExampleQuestions] = useState<string[] | null>(null)
   const storageKey = useMemo(() => `helfi:chat:talk:${entryContext}`, [entryContext])
   const archivedKey = useMemo(() => `helfi:chat:talk:${entryContext}:archived`, [entryContext])
   const threadsUrl = useMemo(
@@ -110,22 +111,18 @@ export default function VoiceChat({
     ]
   }, [hasHealthTipContext, healthTipTitle, healthTipCategory, healthTipSuggestedQuestions])
 
-  const exampleQuestions = useMemo(() => {
-    if (isFoodEntry) {
-      return [
-        'Based on my macros today, what should I eat right now?',
-        'My protein is low and fat is near max. Give me 3 options.',
-        'What can I make with what I have in my fridge/pantry?',
-        'How can I add more fiber without adding much fat?',
-      ]
-    }
-    return [
+  const exampleQuestions = useMemo(
+    () => [
       'What supplements should I take?',
       'How are my medications interacting?',
       'Why am I feeling tired?',
       'What should I eat today?',
-    ]
-  }, [isFoodEntry])
+    ],
+    []
+  )
+
+  const effectiveExampleQuestions =
+    isFoodEntry && dynamicExampleQuestions?.length ? dynamicExampleQuestions : exampleQuestions
 
   const currentThreadTitle = useMemo(() => {
     if (!currentThreadId) return 'New chat'
@@ -612,6 +609,35 @@ export default function VoiceChat({
     return { localDate: dateFromSelection, tzOffsetMin }
   }
 
+  const exampleDatePayload = useMemo(() => buildLocalDatePayload(), [selectedDate])
+
+  useEffect(() => {
+    if (!isFoodEntry) {
+      setDynamicExampleQuestions(null)
+      return
+    }
+    const { localDate, tzOffsetMin } = exampleDatePayload
+    const params = new URLSearchParams({
+      context: 'food',
+      localDate,
+      tzOffsetMin: String(tzOffsetMin),
+    })
+    fetch(`/api/chat/examples?${params.toString()}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data?.questions) && data.questions.length > 0) {
+          setDynamicExampleQuestions(
+            data.questions.filter((q: any) => typeof q === 'string' && q.trim().length > 0)
+          )
+        } else {
+          setDynamicExampleQuestions(null)
+        }
+      })
+      .catch(() => {
+        setDynamicExampleQuestions(null)
+      })
+  }, [exampleDatePayload, isFoodEntry])
+
   const openPhotoPicker = () => {
     if (loading) return
     photoInputRef.current?.click()
@@ -1015,6 +1041,39 @@ export default function VoiceChat({
   const renderFormattedContent = (content: string) => {
     const formatted = formatChatContent(content)
     const paragraphs = formatted.split(/\n\n+/)
+    const macroColorMap: Record<string, string> = {
+      protein: '#ef4444',
+      carbs: '#22c55e',
+      fat: '#6366f1',
+      fiber: '#12adc9',
+      fibre: '#12adc9',
+      sugar: '#f97316',
+    }
+    const headingLabels = ['Macros', 'After eating', 'Current totals', 'Consumed', 'Targets', 'Remaining']
+    const headingRegex = new RegExp(`^(${headingLabels.join('|')}):\\s*`, 'i')
+    const optionRegex = /^Option\s+\d+:\s*/i
+    const shouldNormalizeMacros = (value: string) =>
+      /(?:kcal|calories|protein|carbs|fat|fiber|fibre|sugar)/i.test(value) &&
+      /(?:\d|kcal|\bg\b|unknown|approximate)/i.test(value)
+    const normalizeMacroSeparators = (value: string) => {
+      if (!shouldNormalizeMacros(value)) return value
+      return value.replace(/,\s+/g, ' - ').replace(/\s+-\s+/g, ' - ').trim()
+    }
+    const renderMacroSegments = (line: string) => {
+      const normalized = normalizeMacroSeparators(line)
+      const parts = normalized.split(' - ').filter(Boolean)
+      return parts.map((part, idx) => {
+        const lower = part.toLowerCase()
+        const macroKey = Object.keys(macroColorMap).find((key) => lower.includes(key))
+        const style = macroKey ? { color: macroColorMap[macroKey] } : undefined
+        return (
+          <span key={`${part}-${idx}`} style={style} className={macroKey ? 'font-semibold' : undefined}>
+            {part}
+            {idx < parts.length - 1 ? ' - ' : ''}
+          </span>
+        )
+      })
+    }
     return paragraphs.map((para, paraIdx) => {
       const trimmed = para.trim()
       if (!trimmed) return null
@@ -1029,6 +1088,30 @@ export default function VoiceChat({
               return (
                 <div key={lineIdx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
                   {lineTrimmed.slice(2, -2)}
+                </div>
+              )
+            }
+
+            const headingMatch = lineTrimmed.match(headingRegex)
+            if (headingMatch) {
+              const label = headingMatch[1]
+              const rest = lineTrimmed.replace(headingRegex, '')
+              return (
+                <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
+                  <strong className="font-semibold text-gray-900">{label}:</strong>{' '}
+                  {renderMacroSegments(rest)}
+                </div>
+              )
+            }
+
+            const optionMatch = lineTrimmed.match(optionRegex)
+            if (optionMatch) {
+              const label = optionMatch[0].trim()
+              const rest = lineTrimmed.replace(optionRegex, '')
+              return (
+                <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
+                  <strong className="font-semibold text-gray-900">{label}</strong>{' '}
+                  {rest}
                 </div>
               )
             }
@@ -1065,14 +1148,22 @@ export default function VoiceChat({
               )
             }
 
-            const parts = lineTrimmed.split(/(\*\*.*?\*\*)/g)
+            const normalized = normalizeMacroSeparators(lineTrimmed)
+            const parts = normalized.split(/(\*\*.*?\*\*)/g)
             return (
               <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
                 {parts.map((part, j) => {
                   if (part.startsWith('**') && part.endsWith('**')) {
                     return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
                   }
-                  return <span key={j}>{part}</span>
+                  const lower = part.toLowerCase()
+                  const macroKey = Object.keys(macroColorMap).find((key) => lower.includes(key))
+                  const style = macroKey ? { color: macroColorMap[macroKey] } : undefined
+                  return (
+                    <span key={j} style={style} className={macroKey ? 'font-semibold' : undefined}>
+                      {part}
+                    </span>
+                  )
                 })}
               </div>
             )
@@ -1312,7 +1403,7 @@ export default function VoiceChat({
                           <h3 className="text-[12px] md:text-xs font-bold uppercase tracking-wider text-gray-400">Examples</h3>
                         </div>
                         <div className="flex flex-col gap-3">
-                          {exampleQuestions.map((q) => (
+                          {effectiveExampleQuestions.map((q) => (
                             <button
                               key={q}
                               onClick={() => setInput(q)}
@@ -1334,7 +1425,7 @@ export default function VoiceChat({
                 const assistantRef = m.role === 'assistant' && isLast ? latestAssistantRef : undefined
                 return (
                 <div ref={assistantRef} key={idx} className={`group flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                  <div className={`hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                     m.role === 'user'
                       ? 'bg-black text-white shadow-md'
                       : 'border border-gray-100 bg-white text-black shadow-sm'
@@ -1345,7 +1436,7 @@ export default function VoiceChat({
                   </div>
                   <div className={`${m.role === 'user' ? 'max-w-[85%] text-right' : 'flex-1'}`}>
                     {m.role === 'assistant' ? (
-                      <div className="space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
+                      <div className="w-full space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
                         <div className="text-[12px] md:text-[11px] font-bold uppercase tracking-wide text-gray-400">Health Assistant</div>
                         <div className="text-[18px] md:text-[16px] leading-7 text-gray-800">
                           {renderFormattedContent(m.content)}
@@ -1362,7 +1453,7 @@ export default function VoiceChat({
 
               {loading && (
                 <div className="group flex gap-4">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-100 bg-white text-black shadow-sm">
+                  <div className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-100 bg-white text-black shadow-sm">
                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>smart_toy</span>
                   </div>
                   <div className="flex-1">
