@@ -58,6 +58,17 @@ const parseJsonRelaxed = (raw: string): any | null => {
 const describeMacro = (value: number | null) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.round(value * 10) / 10 : null
 
+const extractAssistantContent = (message: any) => {
+  if (!message) return ''
+  const content = message.content
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content.map((part: any) => (typeof part?.text === 'string' ? part.text : '')).join('')
+  }
+  if (typeof message.refusal === 'string') return message.refusal
+  return ''
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -278,7 +289,7 @@ export async function POST(req: NextRequest) {
     } as any)
 
     const assistantMessage =
-      assistantResult.completion.choices?.[0]?.message?.content ||
+      extractAssistantContent(assistantResult.completion.choices?.[0]?.message) ||
       'I could not generate suggestions from the photo.'
 
     const userMessage = note

@@ -490,6 +490,17 @@ const trimMessageContent = (value: string) => {
   return `${text.slice(0, MAX_MESSAGE_CHARS).trim()}...`
 }
 
+const extractAssistantContent = (message: any) => {
+  if (!message) return ''
+  const content = message.content
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content.map((part: any) => (typeof part?.text === 'string' ? part.text : '')).join('')
+  }
+  if (typeof message.refusal === 'string') return message.refusal
+  return ''
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -697,7 +708,7 @@ export async function POST(req: NextRequest) {
       } as any)
 
       const assistantMessage =
-        wrapped.completion.choices?.[0]?.message?.content ||
+        extractAssistantContent(wrapped.completion.choices?.[0]?.message) ||
         'I apologize, but I could not generate a response.'
 
       const apiCostCents = wrapped.costCents * 2
@@ -802,7 +813,9 @@ export async function POST(req: NextRequest) {
         // Ignore logging failures
       }
 
-      const assistantMessage = wrapped.completion.choices[0]?.message?.content || 'I apologize, but I could not generate a response.'
+      const assistantMessage =
+        extractAssistantContent(wrapped.completion.choices?.[0]?.message) ||
+        'I apologize, but I could not generate a response.'
 
       // Save assistant message
       await appendMessage(threadId, 'assistant', assistantMessage)
