@@ -238,8 +238,8 @@ export default function VoiceChat({
           const data = await res.json()
           if (data.threads && Array.isArray(data.threads)) {
             setThreads(data.threads)
-            if (data.threads.length > 0 && !currentThreadId) {
-              // Load most recent thread
+            if (!isFoodEntry && data.threads.length > 0 && !currentThreadId) {
+              // Load most recent thread (general chat only).
               const latestThread = data.threads[0]
               const threadId = latestThread.id
               setCurrentThreadId(threadId)
@@ -253,7 +253,7 @@ export default function VoiceChat({
       }
     }
     loadThreads()
-  }, [currentThreadId, threadsUrl])
+  }, [currentThreadId, isFoodEntry, threadsUrl])
 
   async function loadThreadMessages(threadId: string) {
     try {
@@ -416,17 +416,21 @@ export default function VoiceChat({
   // Load saved conversation on mount/context change
   useEffect(() => {
     // Only load from localStorage if no thread is loaded from server
-    if (currentThreadId) return
+    if (currentThreadId || isFoodEntry) return
     try {
       const saved = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null
       if (saved) {
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed)) {
-          setMessages(parsed.filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')).slice(-50))
+          setMessages(
+            parsed
+              .filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'))
+              .slice(-50)
+          )
         }
       }
     } catch {}
-  }, [currentThreadId, storageKey])
+  }, [currentThreadId, isFoodEntry, storageKey])
 
   useEffect(() => {
     setLastChargedCost(null)
@@ -652,8 +656,9 @@ export default function VoiceChat({
       formData.append('image', file)
     })
     formData.append('message', note)
+    const forceNewThread = isFoodEntry && !currentThreadId
     formData.append('threadId', currentThreadId || '')
-    formData.append('newThread', 'false')
+    formData.append('newThread', forceNewThread ? 'true' : 'false')
     formData.append('entryContext', entryContext)
     formData.append('localDate', localDate)
     formData.append('tzOffsetMin', String(tzOffsetMin))
@@ -749,14 +754,14 @@ export default function VoiceChat({
           'Content-Type': 'application/json',
           Accept: wantsStream ? 'text/event-stream' : 'application/json',
         },
-        body: JSON.stringify({ 
-          message: text, 
+        body: JSON.stringify({
+          message: text,
           threadId: currentThreadId || undefined,
-          newThread: false, // Never create a new thread automatically - user must click "+ New Chat"
+          newThread: isFoodEntry && !currentThreadId,
           entryContext,
           localDate,
           tzOffsetMin,
-          ...context 
+          ...context,
         }),
       })
       if (res.status === 402) {
@@ -875,9 +880,9 @@ export default function VoiceChat({
             const threadsData = await threadsRes.json()
             if (threadsData.threads) {
               setThreads(threadsData.threads)
-              if (!currentThreadId && threadsData.threads.length > 0) {
-                setCurrentThreadId(threadsData.threads[0].id)
-              }
+                if (!currentThreadId && threadsData.threads.length > 0 && !isFoodEntry) {
+                  setCurrentThreadId(threadsData.threads[0].id)
+                }
             }
           }
         }
@@ -953,7 +958,7 @@ export default function VoiceChat({
                 if (threadsData.threads) {
                   setThreads(threadsData.threads)
                   // Update currentThreadId if we created a new thread
-                  if (!currentThreadId && threadsData.threads.length > 0) {
+                  if (!currentThreadId && threadsData.threads.length > 0 && !isFoodEntry) {
                     setCurrentThreadId(threadsData.threads[0].id)
                   }
                 }
@@ -985,6 +990,9 @@ export default function VoiceChat({
               setError('No response received. Please try again.')
             }
           }
+        }
+        if (typeof data?.threadId === 'string' && data.threadId) {
+          setCurrentThreadId(data.threadId)
         }
         if (typeof data?.chargedCostCents === 'number') {
           setLastChargedCost(data.chargedCostCents)
