@@ -5567,7 +5567,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   );
 }
 
-function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void }) {
+function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequestAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void, onRequestAnalysis?: () => void }) {
   const [medications, setMedications] = useState(initial?.medications || []);
   
   // Fix data loading race condition - update medications when initial data loads
@@ -5960,6 +5960,9 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   const handleNext = () => {
     requestNavigation(() => {
+      if (onRequestAnalysis) {
+        onRequestAnalysis();
+      }
       onNext({ medications: medicationsToSave && medicationsToSave.length ? medicationsToSave : medications });
     }, triggerPopup);
   };
@@ -7008,7 +7011,7 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
   );
 }
 
-function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onAnalysisSettled?: () => void }) {
+function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, analysisRequestId }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onAnalysisSettled?: () => void, analysisRequestId?: number }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -7028,19 +7031,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
     loadPreviousAnalyses();
   }, []);
 
-  // Reset accordion state when initial data changes to prevent stale state issues
+  // Reset interaction accordion state after a fresh analysis completes
   useEffect(() => {
-    setExpandedInteractions(new Set<string>());
-    setExpandedHistoryItems(new Set());
-    setShowAnalysisHistory(false);
-    setShowRecommendations(false);
-  }, [initial?.supplements, initial?.medications]);
-
-  // CRITICAL FIX: Reset interaction accordion state when analysisResult changes
-  useEffect(() => {
+    if (!didFreshAnalysis) return;
     setExpandedInteractions(new Set<string>());
     setShowRecommendations(false);
-  }, [analysisResult]);
+  }, [analysisResult, didFreshAnalysis]);
 
   // Reset navigation state only when a FRESH analysis finishes (avoid loops when loading history)
   useEffect(() => {
@@ -7063,19 +7059,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
         const analyses = data.analyses || [];
         setPreviousAnalyses(analyses);
         
-        // Check if we have supplements or medications to analyze
-        const currentSupplements = initial?.supplements || [];
-        const currentMedications = initial?.medications || [];
-        const hasDataToAnalyze = currentSupplements.length > 0 || currentMedications.length > 0;
-        
-        // If no previous analyses AND we have data to analyze, trigger fresh analysis
-        if (analyses.length === 0 && hasDataToAnalyze) {
-          console.log('🔄 No previous analyses found but have data - triggering fresh analysis');
-          setIsLoadingHistory(false);
-          performAnalysis();
-          return;
-        }
-        
         // Load the most recent analysis to display on page 8
         if (analyses.length > 0) {
           const mostRecentAnalysis = analyses[0]; // Assuming newest first
@@ -7087,10 +7070,10 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
           // Set a default empty state so page doesn't get stuck
           setAnalysisResult({
             overallRisk: 'low',
-            summary: 'No previous interaction analysis found. Add supplements and medications on the previous pages to get started.',
+            summary: 'No previous interaction analysis found. Go back and tap "Analyze for Interactions" to create one.',
             interactions: [],
             timingOptimization: {},
-            generalRecommendations: ['Go back to add your supplements and medications for a comprehensive interaction analysis.'],
+            generalRecommendations: ['Go back and tap "Analyze for Interactions" to create your first report.'],
             disclaimer: 'This analysis is for informational purposes only and should not replace professional medical advice.'
           });
         }
@@ -7193,6 +7176,14 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
       setIsAnalyzing(false);
     }
   };
+
+  const lastRequestIdRef = useRef(0);
+  useEffect(() => {
+    if (!analysisRequestId) return;
+    if (analysisRequestId === lastRequestIdRef.current) return;
+    lastRequestIdRef.current = analysisRequestId;
+    performAnalysis();
+  }, [analysisRequestId]);
 
   const handleRetry = () => {
     performAnalysis();
@@ -7813,6 +7804,7 @@ export default function Onboarding() {
   const [showGlobalUpdatePopup, setShowGlobalUpdatePopup] = useState(false);
   const [isGlobalGenerating, setIsGlobalGenerating] = useState(false);
   const [serverHydrationKey, setServerHydrationKey] = useState(0);
+  const [analysisRequestId, setAnalysisRequestId] = useState(0);
   // Track if the user has dismissed the first-time modal during this visit,
   // so they can actually complete the intake instead of being stuck.
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
@@ -8879,7 +8871,7 @@ export default function Onboarding() {
               goToStep(7);
             }
           }} />}
-          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={(data?: any) => {
+          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} onRequestAnalysis={() => setAnalysisRequestId((prev) => prev + 1)} onNavigateToAnalysis={(data?: any) => {
             // REAL FIX: Use flushSync to ensure state updates complete before navigation
             if (data) {
               flushSync(() => {
@@ -8912,6 +8904,7 @@ export default function Onboarding() {
             onNext={handleNext} 
             onBack={handleBack} 
             initial={form} 
+            analysisRequestId={analysisRequestId}
             onAnalysisSettled={() => { 
               setIsNavigating(false); 
               setIsLoading(false);
