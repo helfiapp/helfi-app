@@ -39,6 +39,21 @@ const addUnique = (list: string[], value: string) => {
   list.push(value)
 }
 
+const computeRemainingCalories = (snapshot: any) => {
+  if (!snapshot) return null
+  const target = Number(snapshot?.targets?.calories)
+  if (!Number.isFinite(target) || target <= 0) return null
+  const protein = Number(snapshot?.totals?.protein_g) || 0
+  const carbs = Number(snapshot?.totals?.carbs_g) || 0
+  const fat = Number(snapshot?.totals?.fat_g) || 0
+  const macroCalories = protein * 4 + carbs * 4 + fat * 9
+  const consumed = Number.isFinite(macroCalories) && macroCalories > 0
+    ? macroCalories
+    : Number(snapshot?.totals?.calories) || 0
+  if (!Number.isFinite(consumed) || consumed < 0) return null
+  return Math.round(target - consumed)
+}
+
 const buildFoodQuestions = async (userId: string, localDate: string, tzOffsetMin: number) => {
   const snapshot = await buildFoodDiarySnapshot({ userId, localDate, tzOffsetMin })
   if (!snapshot) return FOOD_EXAMPLES
@@ -50,10 +65,10 @@ const buildFoodQuestions = async (userId: string, localDate: string, tzOffsetMin
   const avoidRaw = pickAvoidLabel(snapshot.priority.nearCap)
   const avoid = avoidRaw ? toLabel(avoidRaw) : null
 
-  const remainingCaloriesRaw = snapshot.remaining?.calories?.remainingClamped
+  const remainingCaloriesRaw = computeRemainingCalories(snapshot)
   const remainingCalories =
     typeof remainingCaloriesRaw === 'number' && Number.isFinite(remainingCaloriesRaw)
-      ? Math.max(0, Math.round(remainingCaloriesRaw))
+      ? Math.max(0, remainingCaloriesRaw)
       : null
 
   const questions: string[] = []
