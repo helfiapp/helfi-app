@@ -658,6 +658,7 @@ model PractitionerListing {
   phone                 String?
   websiteUrl            String?
   emailPublic           String?
+  businessRegistrationNumber String?
   addressLine1          String?
   addressLine2          String?
   suburbCity            String?

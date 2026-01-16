@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { signOut, useSession } from 'next-auth/react'
+import { getBusinessRegistrationRule, validateBusinessRegistrationNumber } from '@/lib/practitioner-registration'
 
 const DirectoryMap = dynamic(() => import('@/components/practitioner/DirectoryMap'), { ssr: false })
 
@@ -26,6 +27,7 @@ type ListingForm = {
   phone: string
   websiteUrl: string
   emailPublic: string
+  businessRegistrationNumber: string
   addressLine1: string
   addressLine2: string
   suburbCity: string
@@ -69,6 +71,7 @@ const emptyForm: ListingForm = {
   phone: '',
   websiteUrl: '',
   emailPublic: '',
+  businessRegistrationNumber: '',
   addressLine1: '',
   addressLine2: '',
   suburbCity: '',
@@ -116,6 +119,7 @@ export default function PractitionerPage() {
   const [upgradeLoading, setUpgradeLoading] = useState(false)
   const [upgradeError, setUpgradeError] = useState<string | null>(null)
   const upgradeInFlightRef = useRef(false)
+  const [registrationTouched, setRegistrationTouched] = useState(false)
 
   const subcategories = useMemo(() => {
     const parent = categories.find((cat) => cat.id === form.categoryId)
@@ -170,6 +174,7 @@ export default function PractitionerPage() {
             phone: listing.phone || '',
             websiteUrl: listing.websiteUrl || '',
             emailPublic: listing.emailPublic || '',
+            businessRegistrationNumber: listing.businessRegistrationNumber || '',
             addressLine1: listing.addressLine1 || '',
             addressLine2: listing.addressLine2 || '',
             suburbCity: listing.suburbCity || '',
@@ -242,6 +247,14 @@ export default function PractitionerPage() {
       setAddressLoading(false)
     }
   }
+
+  const registrationRule = useMemo(() => getBusinessRegistrationRule(form.country), [form.country])
+  const registrationValidation = useMemo(
+    () => validateBusinessRegistrationNumber(form.businessRegistrationNumber, form.country),
+    [form.businessRegistrationNumber, form.country]
+  )
+  const registrationError =
+    registrationTouched && !registrationValidation.valid ? registrationValidation.error : null
 
   useEffect(() => {
     if (!addressQuery || addressQuery.trim().length < 3) {
@@ -425,6 +438,16 @@ export default function PractitionerPage() {
     setSaving(true)
     setError(null)
     setSuccess(null)
+    const registrationCheck = validateBusinessRegistrationNumber(
+      form.businessRegistrationNumber,
+      form.country
+    )
+    if (!registrationCheck.valid) {
+      setRegistrationTouched(true)
+      setError(registrationCheck.error || 'Business registration number is required.')
+      setSaving(false)
+      return
+    }
     try {
       const payload = {
         ...form,
@@ -466,6 +489,16 @@ export default function PractitionerPage() {
     setSubmitting(true)
     setError(null)
     setSuccess(null)
+    const registrationCheck = validateBusinessRegistrationNumber(
+      form.businessRegistrationNumber,
+      form.country
+    )
+    if (!registrationCheck.valid) {
+      setRegistrationTouched(true)
+      setError(registrationCheck.error || 'Business registration number is required.')
+      setSubmitting(false)
+      return
+    }
     try {
       const res = await fetch(`/api/practitioner/listings/${dashboard.listing.id}/submit`, {
         method: 'POST',
@@ -1087,6 +1120,24 @@ export default function PractitionerPage() {
                   placeholder="hello@yourclinic.com"
                 />
                 <p className="text-xs text-gray-500 mt-1">This can be different from your login email.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Business registration number
+                </label>
+                <input
+                  value={form.businessRegistrationNumber}
+                  onChange={(e) => updateField('businessRegistrationNumber', e.target.value)}
+                  onBlur={() => setRegistrationTouched(true)}
+                  inputMode="numeric"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder={registrationRule.label === 'Business registration number'
+                    ? 'Enter registration number'
+                    : `${registrationRule.label} number`}
+                />
+                <p className={`text-xs mt-1 ${registrationError ? 'text-red-600' : 'text-gray-500'}`}>
+                  {registrationError ? registrationError : `Expected: ${registrationRule.helper}`}
+                </p>
               </div>
             </div>
 

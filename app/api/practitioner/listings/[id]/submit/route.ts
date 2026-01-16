@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import type { PractitionerAiRiskLevel } from '@prisma/client'
 import { screenPractitionerListing } from '@/lib/practitioner-screening'
 import { detectTestSignals, lookupPlaceMatch } from '@/lib/practitioner-review'
+import { validateBusinessRegistrationNumber } from '@/lib/practitioner-registration'
 import {
   sendPractitionerAdminActivatedEmail,
   sendPractitionerAdminFlaggedEmail,
@@ -52,6 +53,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       { error: 'Please add contact details and a location before submitting.' },
       { status: 400 }
     )
+  }
+
+  const registrationCheck = validateBusinessRegistrationNumber(
+    listing.businessRegistrationNumber,
+    listing.country
+  )
+  if (!registrationCheck.valid) {
+    return NextResponse.json({ error: registrationCheck.error }, { status: 400 })
   }
 
   await prisma.practitionerListing.update({

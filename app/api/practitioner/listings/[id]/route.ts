@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { parseCommaList, normalizeUrl, geocodeAddress } from '@/lib/practitioner-utils'
+import { validateBusinessRegistrationNumber } from '@/lib/practitioner-registration'
 
 async function getListingForUser(listingId: string, userId: string) {
   return prisma.practitionerListing.findFirst({
@@ -40,6 +41,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 
   const body = await request.json().catch(() => ({}))
+  const businessRegistrationNumber = body?.businessRegistrationNumber
+    ? String(body.businessRegistrationNumber).trim()
+    : listing.businessRegistrationNumber || ''
 
   const hasHoursNotes = Object.prototype.hasOwnProperty.call(body, 'hoursNotes')
   const hoursNotes = hasHoursNotes ? String(body?.hoursNotes || '').trim() : ''
@@ -60,6 +64,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const geocoded =
     !providedLat && !providedLng && addressString ? await geocodeAddress(addressString) : null
 
+  const registrationCheck = validateBusinessRegistrationNumber(
+    businessRegistrationNumber,
+    body?.country ?? listing.country
+  )
+  if (!registrationCheck.valid) {
+    return NextResponse.json({ error: registrationCheck.error }, { status: 400 })
+  }
+
   const updated = await prisma.practitionerListing.update({
     where: { id: listing.id },
     data: {
@@ -71,6 +83,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       phone: body?.phone ? String(body.phone).trim() : null,
       websiteUrl: normalizeUrl(body?.websiteUrl || null),
       emailPublic: body?.emailPublic ? String(body.emailPublic).trim().toLowerCase() : null,
+      businessRegistrationNumber: businessRegistrationNumber || null,
       addressLine1: body?.addressLine1 ? String(body.addressLine1).trim() : null,
       addressLine2: body?.addressLine2 ? String(body.addressLine2).trim() : null,
       suburbCity: body?.suburbCity ? String(body.suburbCity).trim() : null,

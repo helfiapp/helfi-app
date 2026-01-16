@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseCommaList, slugify, normalizeUrl, geocodeAddress } from '@/lib/practitioner-utils'
+import { validateBusinessRegistrationNumber } from '@/lib/practitioner-registration'
 
 async function ensurePractitionerAccount(userId: string, email: string) {
   let account = await prisma.practitionerAccount.findUnique({ where: { userId } })
@@ -42,9 +43,17 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const displayName = String(body?.displayName || '').trim()
   const categoryId = String(body?.categoryId || '').trim()
+  const businessRegistrationNumber = body?.businessRegistrationNumber
+    ? String(body.businessRegistrationNumber).trim()
+    : ''
 
   if (!displayName || !categoryId) {
     return NextResponse.json({ error: 'Display name and category are required.' }, { status: 400 })
+  }
+
+  const registrationCheck = validateBusinessRegistrationNumber(businessRegistrationNumber, body?.country)
+  if (!registrationCheck.valid) {
+    return NextResponse.json({ error: registrationCheck.error }, { status: 400 })
   }
 
   const account = await ensurePractitionerAccount(session.user.id, session.user.email)
@@ -85,6 +94,7 @@ export async function POST(request: NextRequest) {
       phone: body?.phone ? String(body.phone).trim() : null,
       websiteUrl: normalizeUrl(body?.websiteUrl || null),
       emailPublic: body?.emailPublic ? String(body.emailPublic).trim().toLowerCase() : null,
+      businessRegistrationNumber: businessRegistrationNumber || null,
       addressLine1: body?.addressLine1 ? String(body.addressLine1).trim() : null,
       addressLine2: body?.addressLine2 ? String(body.addressLine2).trim() : null,
       suburbCity: body?.suburbCity ? String(body.suburbCity).trim() : null,
