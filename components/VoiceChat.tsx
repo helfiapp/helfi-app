@@ -714,7 +714,6 @@ export default function VoiceChat({
           ...context 
         }),
       })
-
       if (res.status === 402) {
         const data = await res.json()
         setError(`Insufficient credits. Estimated cost: ${data.estimatedCost} credits. Available: ${data.availableCredits} credits.`)
@@ -724,6 +723,40 @@ export default function VoiceChat({
 
       const contentType = (res.headers.get('content-type') || '').toLowerCase()
       const isEventStream = contentType.includes('text/event-stream')
+      const resClone = isEventStream ? null : res.clone()
+
+      const recoverAssistantMessage = async () => {
+        try {
+          let threadId = currentThreadId
+          if (!threadId) {
+            const threadsRes = await fetch('/api/chat/threads')
+            if (threadsRes.ok) {
+              const threadsData = await threadsRes.json()
+              const latest = threadsData?.threads?.[0]
+              if (latest?.id) {
+                threadId = latest.id
+                setCurrentThreadId(latest.id)
+                setCurrentThreadCharged(Boolean(latest.chargedOnce))
+              }
+            }
+          }
+          if (!threadId) return false
+          const messagesRes = await fetch(`/api/chat/voice?threadId=${threadId}`)
+          if (!messagesRes.ok) return false
+          const messagesData = await messagesRes.json().catch(() => null)
+          const messageList = Array.isArray(messagesData?.messages) ? messagesData.messages : []
+          const lastAssistant = [...messageList].reverse().find((msg) => msg.role === 'assistant')
+          if (!lastAssistant?.content) return false
+          setMessages((prev) => {
+            const last = prev[prev.length - 1]
+            if (last?.role === 'assistant' && last.content === lastAssistant.content) return prev
+            return [...prev, { role: 'assistant', content: lastAssistant.content }]
+          })
+          return true
+        } catch {
+          return false
+        }
+      }
 
       const parseSsePayload = async (rawPayload: string) => {
         const chunks = rawPayload.split('\n\n')
@@ -776,6 +809,8 @@ export default function VoiceChat({
 
         if (fullResponse) {
           setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }])
+        } else {
+          await recoverAssistantMessage()
         }
 
         if (sawEnd) {
@@ -870,6 +905,12 @@ export default function VoiceChat({
             }
           }
         }
+        if (!hasAssistant && !fullResponse) {
+          const recovered = await recoverAssistantMessage()
+          if (!recovered) {
+            setError('No response received. Please try again.')
+          }
+        }
       } else if (res.ok && isEventStream) {
         const raw = await res.text()
         await parseSsePayload(raw)
@@ -878,6 +919,16 @@ export default function VoiceChat({
         const textOut = data?.assistant as string | undefined
         if (textOut) {
           setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
+        } else {
+          const raw = resClone ? await resClone.text().catch(() => '') : ''
+          if (raw.includes('data:')) {
+            await parseSsePayload(raw)
+          } else {
+            const recovered = await recoverAssistantMessage()
+            if (!recovered) {
+              setError('No response received. Please try again.')
+            }
+          }
         }
         if (typeof data?.chargedCostCents === 'number') {
           setLastChargedCost(data.chargedCostCents)
