@@ -408,14 +408,40 @@ function buildSystemPrompt(
 }
 
 function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null): string {
-  const snapshotText = foodDiarySnapshot ? JSON.stringify(foodDiarySnapshot) : 'null'
+  if (!foodDiarySnapshot) {
+    return [
+      'You are Helfi, a food and macro coach.',
+      'The user has no food diary data for today.',
+      'Ask a short question to confirm what they have eaten so far, then give 2-3 simple ideas.',
+    ].join('\n')
+  }
+
   return [
     'You are Helfi, a food and macro coach.',
-    'Use the FOOD DIARY SNAPSHOT to focus on nutrients that are most behind target.',
-    'Avoid suggestions that would worsen nutrients at or over cap.',
+    'Use today’s food diary summary below to focus on nutrients that are most behind target.',
+    'Avoid suggestions that would worsen nutrients that are at or over their cap.',
     'Give clear, simple food options the user can eat right now.',
     'If micronutrients are unknown, say they are unavailable.',
-    `FOOD DIARY SNAPSHOT (JSON): ${snapshotText}`,
+    '',
+    `Today (${foodDiarySnapshot.localDate})`,
+    `Consumed: ${formatMacroValue(foodDiarySnapshot.totals.calories, 'kcal')}, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.protein_g, 'g')} protein, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.carbs_g, 'g')} carbs, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.fat_g, 'g')} fat, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.fiber_g, 'g')} fiber, ` +
+      `${formatMacroValue(foodDiarySnapshot.totals.sugar_g, 'g')} sugar`,
+    `Remaining: ${formatRemaining(foodDiarySnapshot.remaining.calories)} kcal, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.protein_g)} protein, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.carbs_g)} carbs, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.fat_g)} fat, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.fiber_g)} fiber, ` +
+      `${formatRemaining(foodDiarySnapshot.remaining.sugar_g)} sugar`,
+    foodDiarySnapshot.priority.low.length > 0
+      ? `Most behind: ${foodDiarySnapshot.priority.low.join(', ')}`
+      : 'Most behind: unknown',
+    foodDiarySnapshot.priority.nearCap.length > 0
+      ? `Near/over cap: ${foodDiarySnapshot.priority.nearCap.join(', ')}`
+      : 'Near/over cap: none',
   ].join('\n')
 }
 
@@ -485,7 +511,17 @@ export async function POST(req: NextRequest) {
 
     // Get or create thread
     await ensureTalkToAITables()
-    const chatContext = normalizeChatContext(body?.entryContext ?? body?.context)
+    let chatContext = normalizeChatContext(body?.entryContext ?? body?.context)
+    if (body.threadId) {
+      const rows: Array<{ context: string | null }> = await prisma.$queryRawUnsafe(
+        'SELECT "context" FROM "TalkToAIChatThread" WHERE "id" = $1 AND "userId" = $2',
+        body.threadId,
+        session.user.id
+      )
+      if (rows[0]?.context) {
+        chatContext = normalizeChatContext(rows[0].context)
+      }
+    }
     const isFoodChat = chatContext === 'food'
     let threadId: string
     if (body.newThread) {
@@ -524,7 +560,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Load message history for context
-    const history = await listMessages(threadId, isFoodChat ? MAX_HISTORY_MESSAGES : 30)
+    const history = isFoodChat ? [] : await listMessages(threadId, 30)
     const historyMessages = history.map((m) => ({
       role: m.role,
       content: trimMessageContent(m.content),
