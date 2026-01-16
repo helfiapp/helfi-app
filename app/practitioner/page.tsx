@@ -85,7 +85,7 @@ const emptyForm: ListingForm = {
 }
 
 export default function PractitionerPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status, update } = useSession()
   const [categories, setCategories] = useState<CategoryNode[]>([])
   const [dashboard, setDashboard] = useState<any>(null)
   const [form, setForm] = useState<ListingForm>(emptyForm)
@@ -113,6 +113,9 @@ export default function PractitionerPage() {
   const [addressLoading, setAddressLoading] = useState(false)
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
   const addressRequestRef = useRef(0)
+  const [upgradeLoading, setUpgradeLoading] = useState(false)
+  const [upgradeError, setUpgradeError] = useState<string | null>(null)
+  const upgradeInFlightRef = useRef(false)
 
   const subcategories = useMemo(() => {
     const parent = categories.find((cat) => cat.id === form.categoryId)
@@ -307,6 +310,51 @@ export default function PractitionerPage() {
     loadDashboard()
     loadStats()
     loadNotifications()
+  }, [session])
+
+  const attemptUpgradeToPractitioner = async () => {
+    if (upgradeInFlightRef.current) return
+    upgradeInFlightRef.current = true
+    setUpgradeLoading(true)
+    setUpgradeError(null)
+    try {
+      const res = await fetch('/api/practitioner/account', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Could not create practitioner account.')
+      try {
+        sessionStorage.removeItem('helfi:practitionerSignup')
+      } catch {}
+      if (typeof update === 'function') {
+        await update()
+      }
+      await loadDashboard()
+    } catch (err: any) {
+      setUpgradeError(err?.message || 'Could not create practitioner account.')
+    } finally {
+      setUpgradeLoading(false)
+      upgradeInFlightRef.current = false
+    }
+  }
+
+  useEffect(() => {
+    if (!session?.user) return
+    if (session.user.isPractitioner !== false) return
+    if (typeof window === 'undefined') return
+    let shouldUpgrade = false
+    try {
+      if (sessionStorage.getItem('helfi:practitionerSignup') === '1') {
+        shouldUpgrade = true
+      }
+    } catch {}
+    if (!shouldUpgrade) {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('practitionerSignup') === '1') {
+        shouldUpgrade = true
+      }
+    }
+    if (shouldUpgrade) {
+      void attemptUpgradeToPractitioner()
+    }
   }, [session])
 
   useEffect(() => {
@@ -617,7 +665,19 @@ export default function PractitionerPage() {
           <p className="text-gray-600 mt-2">
             This portal is for practitioner accounts only. Please sign out and create a practitioner account to list your practice.
           </p>
+          {upgradeError && (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {upgradeError}
+            </div>
+          )}
           <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={attemptUpgradeToPractitioner}
+              disabled={upgradeLoading}
+              className="px-5 py-2.5 rounded-full border border-emerald-200 text-emerald-700 font-semibold hover:border-emerald-400 hover:text-emerald-800 transition-colors disabled:opacity-60"
+            >
+              {upgradeLoading ? 'Creating practitioner profile...' : 'Use this account for my listing'}
+            </button>
             <button
               onClick={() => signOut({ callbackUrl: '/practitioners' })}
               className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"

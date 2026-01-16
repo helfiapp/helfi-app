@@ -132,6 +132,18 @@ const sanitizeNextTarget = (value: string | null) => {
   return trimmed
 }
 
+const withQueryParam = (value: string, key: string, val: string) => {
+  if (!value) return value
+  try {
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://helfi.ai'
+    const url = new URL(value, base)
+    url.searchParams.set(key, val)
+    return url.pathname + url.search + url.hash
+  } catch {
+    return value
+  }
+}
+
 export default function SignIn() {
   const router = useRouter()
   const { status, data: session } = useSession()
@@ -387,10 +399,18 @@ export default function SignIn() {
     const searchParams = new URLSearchParams(window.location.search)
     const planParam = searchParams.get('plan')
     const nextParam = sanitizeNextTarget(searchParams.get('next'))
-    const fallbackTarget = authContext === 'practitioner' ? '/practitioner' : '/onboarding'
+    const fallbackTarget = authContext === 'practitioner' ? '/practitioner?practitionerSignup=1' : '/onboarding'
+    const nextTarget = authContext === 'practitioner' && (nextParam === '/practitioner' || nextParam?.startsWith('/practitioner'))
+      ? withQueryParam(nextParam, 'practitionerSignup', '1')
+      : nextParam
     const callbackUrl = planParam
       ? `/auth/signin?plan=${encodeURIComponent(planParam)}`
-      : nextParam || fallbackTarget
+      : nextTarget || fallbackTarget
+    if (authContext === 'practitioner') {
+      try {
+        sessionStorage.setItem('helfi:practitionerSignup', '1')
+      } catch {}
+    }
     await signIn('google', { callbackUrl })
   }
 
@@ -515,7 +535,10 @@ export default function SignIn() {
           }
           let nextTarget = nextParam || '/onboarding'
           if (!nextParam && authContext === 'practitioner') {
-            nextTarget = '/practitioner'
+            nextTarget = '/practitioner?practitionerSignup=1'
+          }
+          if (authContext === 'practitioner' && nextTarget.startsWith('/practitioner')) {
+            nextTarget = withQueryParam(nextTarget, 'practitionerSignup', '1')
           }
           if (!nextParam) {
             try {
