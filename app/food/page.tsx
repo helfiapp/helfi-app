@@ -547,7 +547,6 @@ const FAVORITES_ALL_SNAPSHOT_KEY = 'foodDiary:favoritesAllSnapshot'
 const FOOD_RESUME_LAST_PREFIX = 'food:resume:last:'
 const FOOD_RESUME_REFRESH_MIN_MS = 2 * 60 * 1000
 const FOOD_DIARY_LAST_VISIT_KEY = 'food:diary:lastVisitDate'
-const FOOD_DIARY_REFRESH_KEY = 'food:diary:refresh'
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
@@ -3263,29 +3262,6 @@ export default function FoodDiary() {
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const checkRefreshSignal = () => {
-      try {
-        const raw = localStorage.getItem(FOOD_DIARY_REFRESH_KEY)
-        if (!raw) return
-        const parsed = JSON.parse(raw)
-        const date = typeof parsed === 'string' ? parsed : parsed?.date
-        if (date && date === selectedDate) {
-          localStorage.removeItem(FOOD_DIARY_REFRESH_KEY)
-          setResumeTick((prev) => prev + 1)
-        }
-      } catch {}
-    }
-    checkRefreshSignal()
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== FOOD_DIARY_REFRESH_KEY) return
-      checkRefreshSignal()
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [selectedDate])
 
   useEffect(() => {
     if (deviceStatusHydratedRef.current) return
