@@ -28,6 +28,7 @@ interface VoiceChatProps {
   startExpanded?: boolean
   hideExpandToggle?: boolean
   entryContext?: 'general' | 'food'
+  selectedDate?: string
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
@@ -41,6 +42,7 @@ export default function VoiceChat({
   startExpanded = false,
   hideExpandToggle = false,
   entryContext = 'general',
+  selectedDate,
 }: VoiceChatProps) {
   const router = useRouter()
   const VOICE_CHAT_COST_CREDITS = 10
@@ -586,8 +588,12 @@ export default function VoiceChat({
   const buildLocalDatePayload = () => {
     const now = new Date()
     const tzOffsetMin = now.getTimezoneOffset()
-    const localDate = new Date(now.getTime() - tzOffsetMin * 60 * 1000).toISOString().slice(0, 10)
-    return { localDate, tzOffsetMin }
+    const fallbackDate = new Date(now.getTime() - tzOffsetMin * 60 * 1000).toISOString().slice(0, 10)
+    const dateFromSelection =
+      typeof selectedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate)
+        ? selectedDate
+        : fallbackDate
+    return { localDate: dateFromSelection, tzOffsetMin }
   }
 
   const openPhotoPicker = () => {

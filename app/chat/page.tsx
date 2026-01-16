@@ -8,11 +8,19 @@ function ChatPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isFood = searchParams.get('context') === 'food'
+  const selectedDate = searchParams.get('date') || ''
   const entryContext = isFood ? 'food' : 'general'
   const handleExit = () => {
     router.push('/food')
   }
-  return <VoiceChat className="flex-1" entryContext={entryContext} onExit={isFood ? handleExit : undefined} />
+  return (
+    <VoiceChat
+      className="flex-1"
+      entryContext={entryContext}
+      selectedDate={selectedDate}
+      onExit={isFood ? handleExit : undefined}
+    />
+  )
 }
 
 export default function ChatPage() {

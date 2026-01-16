@@ -62,6 +62,9 @@ const extractAssistantContent = (message: any) => {
   if (!message) return ''
   const content = message.content
   if (typeof content === 'string') return content
+  if (content && typeof content === 'object' && typeof content.text === 'string') {
+    return content.text
+  }
   if (Array.isArray(content)) {
     return content.map((part: any) => (typeof part?.text === 'string' ? part.text : '')).join('')
   }

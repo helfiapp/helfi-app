@@ -19554,7 +19554,7 @@ Please add nutritional information manually if needed.`);
 		              <div className="flex items-center justify-between mb-4">
 		                <h3 className="text-lg font-semibold">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
 		                <Link
-		                  href="/chat?context=food"
+		                  href={`/chat?context=food&date=${encodeURIComponent(selectedDate)}`}
 		                  className="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
 		                >
 		                  Ask AI
