@@ -351,6 +351,13 @@ export default function WaterIntakePage() {
     setDrinkDetailError(null)
   }
 
+  const notifyFoodDiaryRefresh = (date: string) => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem('food:diary:refresh', JSON.stringify({ date, at: Date.now() }))
+    } catch {}
+  }
+
   const closeDrinkDetail = () => {
     if (drinkDetailSaving) return
     setDrinkDetail(null)
@@ -448,6 +455,7 @@ export default function WaterIntakePage() {
         drinkUnit: drinkDetail.unit,
         waterLogId: waterEntry.id,
       })
+      notifyFoodDiaryRefresh(selectedDate)
       closeDrinkDetail()
     } catch {
       setDrinkDetailError('Saved water intake, but could not create the drink entry. Please try again.')
@@ -482,6 +490,7 @@ export default function WaterIntakePage() {
         drinkUnit: drinkDetail.unit,
         waterLogId: waterEntry?.id,
       })
+      notifyFoodDiaryRefresh(selectedDate)
       closeDrinkDetail()
     } catch {
       setDrinkDetailError('Could not save this drink. Please try again.')
