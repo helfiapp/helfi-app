@@ -28,9 +28,13 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
       return;
     }
 
-    const nonPdf = selectedFiles.find((item) => !item.name.toLowerCase().endsWith('.pdf'));
-    if (nonPdf) {
-      setError('Only PDF files are allowed');
+    const isAllowedType = (name: string) => {
+      const lower = name.toLowerCase();
+      return lower.endsWith('.pdf') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png');
+    };
+    const invalidFile = selectedFiles.find((item) => !isAllowedType(item.name));
+    if (invalidFile) {
+      setError('Only PDF, JPG, or PNG files are allowed');
       return;
     }
 
@@ -38,6 +42,14 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
     if (totalSize > 25 * 1024 * 1024) {
       setError('Combined file size must be less than 25MB');
       return;
+    }
+
+    if (isPasswordProtected) {
+      const onlyPdf = selectedFiles.every((item) => item.name.toLowerCase().endsWith('.pdf'));
+      if (!onlyPdf) {
+        setError('Password-protected upload only works with a single PDF file.');
+        return;
+      }
     }
 
     setFiles(selectedFiles);
@@ -65,6 +77,14 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
       return;
     }
 
+    if (isPasswordProtected) {
+      const onlyPdf = files.every((item) => item.name.toLowerCase().endsWith('.pdf'));
+      if (!onlyPdf) {
+        setError('Password-protected upload only works with a single PDF file.');
+        return;
+      }
+    }
+
     setUploadStatus('uploading');
     setError(null);
 
@@ -74,14 +94,75 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
         const merged = await PDFDocument.create();
         for (const item of files) {
           const bytes = await item.arrayBuffer();
-          const pdf = await PDFDocument.load(bytes);
-          const pages = await merged.copyPages(pdf, pdf.getPageIndices());
-          pages.forEach((page) => merged.addPage(page));
+          const lower = item.name.toLowerCase();
+          if (lower.endsWith('.pdf')) {
+            const pdf = await PDFDocument.load(bytes);
+            const pages = await merged.copyPages(pdf, pdf.getPageIndices());
+            pages.forEach((page) => merged.addPage(page));
+          } else if (lower.endsWith('.png')) {
+            const image = await merged.embedPng(bytes);
+            const page = merged.addPage([image.width, image.height]);
+            page.drawImage(image, {
+              x: 0,
+              y: 0,
+              width: image.width,
+              height: image.height,
+            });
+          } else {
+            const image = await merged.embedJpg(bytes);
+            const page = merged.addPage([image.width, image.height]);
+            page.drawImage(image, {
+              x: 0,
+              y: 0,
+              width: image.width,
+              height: image.height,
+            });
+          }
         }
         const mergedBytes = await merged.save();
+        if (mergedBytes.byteLength > 25 * 1024 * 1024) {
+          setError('Combined file size must be less than 25MB');
+          setUploadStatus('error');
+          return;
+        }
         uploadFile = new File([mergedBytes], `lab-report-${Date.now()}.pdf`, {
           type: 'application/pdf',
         });
+      } else if (files.length === 1) {
+        const single = files[0];
+        const lower = single.name.toLowerCase();
+        if (!lower.endsWith('.pdf')) {
+          const merged = await PDFDocument.create();
+          const bytes = await single.arrayBuffer();
+          if (lower.endsWith('.png')) {
+            const image = await merged.embedPng(bytes);
+            const page = merged.addPage([image.width, image.height]);
+            page.drawImage(image, {
+              x: 0,
+              y: 0,
+              width: image.width,
+              height: image.height,
+            });
+          } else {
+            const image = await merged.embedJpg(bytes);
+            const page = merged.addPage([image.width, image.height]);
+            page.drawImage(image, {
+              x: 0,
+              y: 0,
+              width: image.width,
+              height: image.height,
+            });
+          }
+          const mergedBytes = await merged.save();
+          if (mergedBytes.byteLength > 25 * 1024 * 1024) {
+            setError('File size must be less than 25MB');
+            setUploadStatus('error');
+            return;
+          }
+          uploadFile = new File([mergedBytes], `lab-report-${Date.now()}.pdf`, {
+            type: 'application/pdf',
+          });
+        }
       }
 
       // Step 1: Create report record and get report ID
@@ -173,12 +254,12 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
           {/* File Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select PDF file(s)
+              Select PDF or image file(s)
             </label>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf"
+              accept=".pdf,.png,.jpg,.jpeg"
               multiple
               onChange={handleFileSelect}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
@@ -208,16 +289,16 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
                   type="checkbox"
                   checked={isPasswordProtected}
                   onChange={(e) => setIsPasswordProtected(e.target.checked)}
-                  disabled={files.length > 1}
+                  disabled={files.length > 1 || files.some((item) => !item.name.toLowerCase().endsWith('.pdf'))}
                   className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-700">
                   My PDF is password-protected
                 </span>
               </label>
-              {files.length > 1 && (
+              {(files.length > 1 || files.some((item) => !item.name.toLowerCase().endsWith('.pdf'))) && (
                 <p className="mt-2 text-xs text-gray-500">
-                  For multiple files, please upload unlocked PDFs or upload one at a time.
+                  For multiple files or image uploads, please use unlocked files or upload one PDF at a time.
                 </p>
               )}
 
