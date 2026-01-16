@@ -46,6 +46,12 @@ const QUICK_PRESETS = [
 const SUGAR_UNITS = ['g', 'tsp', 'tbsp'] as const
 type SugarUnit = (typeof SUGAR_UNITS)[number]
 
+const HONEY_TBSP_GRAMS = 21
+const HONEY_TSP_GRAMS = 7
+const HONEY_CAL_PER_GRAM = 64 / HONEY_TBSP_GRAMS
+const HONEY_CARBS_PER_GRAM = 17.3 / HONEY_TBSP_GRAMS
+const HONEY_SUGAR_PER_GRAM = 17.2 / HONEY_TBSP_GRAMS
+
 const sugarToGrams = (amount: number, unit: SugarUnit): number => {
   if (!Number.isFinite(amount) || amount <= 0) return 0
   if (unit === 'g') return amount
@@ -56,8 +62,8 @@ const sugarToGrams = (amount: number, unit: SugarUnit): number => {
 const honeyToGrams = (amount: number, unit: SugarUnit): number => {
   if (!Number.isFinite(amount) || amount <= 0) return 0
   if (unit === 'g') return amount
-  if (unit === 'tbsp') return amount * 21
-  return amount * 7
+  if (unit === 'tbsp') return amount * HONEY_TBSP_GRAMS
+  return amount * HONEY_TSP_GRAMS
 }
 
 const sweetenerToMacros = (grams: number, type: 'sugar' | 'honey') => {
@@ -65,9 +71,9 @@ const sweetenerToMacros = (grams: number, type: 'sugar' | 'honey') => {
     return { calories: 0, carbs: 0, sugar: 0 }
   }
   if (type === 'honey') {
-    const calories = Math.round(grams * 3.04 * 10) / 10
-    const carbs = Math.round(grams * 0.82 * 10) / 10
-    const sugar = carbs
+    const calories = Math.round(grams * HONEY_CAL_PER_GRAM * 10) / 10
+    const carbs = Math.round(grams * HONEY_CARBS_PER_GRAM * 10) / 10
+    const sugar = Math.round(grams * HONEY_SUGAR_PER_GRAM * 10) / 10
     return { calories, carbs, sugar }
   }
   const calories = Math.round(grams * 4 * 10) / 10
@@ -434,6 +440,18 @@ export default function WaterIntakePage() {
         const params = new URLSearchParams(window.location.search)
         return params.get('category')
       })()
+    const sweetenerMeta =
+      safeSweetener > 0 && sweetenerType && displayAmount && displayUnit
+        ? {
+            __sweetenerType: sweetenerType,
+            __sweetenerAmount: displayAmount,
+            __sweetenerUnit: displayUnit,
+            __sweetenerGrams: safeSweetener,
+            __sweetenerCalories: calories,
+            __sweetenerCarbs: carbs,
+            __sweetenerSugar: sugar,
+          }
+        : {}
     const nutrition = {
       calories,
       protein: 0,
@@ -446,6 +464,7 @@ export default function WaterIntakePage() {
       __drinkUnit: drinkUnit,
       __drinkAmountMl: Number.isFinite(drinkAmountMl) ? drinkAmountMl : undefined,
       ...(waterLogId ? { __waterLogId: waterLogId } : {}),
+      ...sweetenerMeta,
     }
     const res = await fetch('/api/food-log', {
       method: 'POST',

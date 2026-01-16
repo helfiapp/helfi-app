@@ -390,6 +390,9 @@ If this breaks again, restore these rules exactly.
 - Quick Add drink row must hide the horizontal scrollbar/grey line while still allowing swipe.
 - Non‑water drinks must open the Drink Details modal:
   - Choices: **Sugar‑free**, **Sugar**, or **Honey**.
+  - Honey macros use USDA basis: 1 tbsp = **21g**, **64 kcal**, **17.3g carbs**, **17.2g sugar** (1 tsp = 7g).
+  - Drink entries must store sweetener metadata (`__sweetenerType`, `__sweetenerAmount`, `__sweetenerUnit`) so it is editable later.
+  - Food editor for drink entries must expose **Sweetener** (None/Sugar/Honey) and persist those fields on save.
   - Sugar amount supports `g`, `tsp`, `tbsp`, clears on focus, uses numeric keypad, and must not overflow on iPhone.
   - “Add with sugar” logs **both** a water entry (label includes sugar amount) and a Food Diary entry with calories/carbs/sugar derived from sugar grams.
   - Food Diary must show **one single drink entry** (product name + drink icon + amount). The linked water log **stays only in Water Intake** and is **hidden from Food Diary lists**.

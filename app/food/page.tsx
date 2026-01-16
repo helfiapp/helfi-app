@@ -276,6 +276,128 @@ const applyDrinkMetaToTotals = (totals: any, meta: DrinkEntryMeta | null) => {
   }
 }
 
+const SWEETENER_UNITS = ['g', 'tsp', 'tbsp'] as const
+type SweetenerUnit = (typeof SWEETENER_UNITS)[number]
+type SweetenerType = 'sugar' | 'honey'
+type SweetenerMeta = {
+  type: SweetenerType
+  amount: number
+  unit: SweetenerUnit
+  grams: number
+  calories: number
+  carbs: number
+  sugar: number
+}
+
+const HONEY_TBSP_GRAMS = 21
+const HONEY_TSP_GRAMS = 7
+const HONEY_CAL_PER_GRAM = 64 / HONEY_TBSP_GRAMS
+const HONEY_CARBS_PER_GRAM = 17.3 / HONEY_TBSP_GRAMS
+const HONEY_SUGAR_PER_GRAM = 17.2 / HONEY_TBSP_GRAMS
+
+const sweetenerToGrams = (type: SweetenerType, amount: number, unit: SweetenerUnit): number => {
+  if (!Number.isFinite(amount) || amount <= 0) return 0
+  if (unit === 'g') return amount
+  if (type === 'honey') {
+    return unit === 'tbsp' ? amount * HONEY_TBSP_GRAMS : amount * HONEY_TSP_GRAMS
+  }
+  return unit === 'tbsp' ? amount * 12 : amount * 4
+}
+
+const sweetenerToMacros = (type: SweetenerType, grams: number) => {
+  if (!Number.isFinite(grams) || grams <= 0) return { calories: 0, carbs: 0, sugar: 0 }
+  if (type === 'honey') {
+    return {
+      calories: Math.round(grams * HONEY_CAL_PER_GRAM * 10) / 10,
+      carbs: Math.round(grams * HONEY_CARBS_PER_GRAM * 10) / 10,
+      sugar: Math.round(grams * HONEY_SUGAR_PER_GRAM * 10) / 10,
+    }
+  }
+  const calories = Math.round(grams * 4 * 10) / 10
+  const carbs = Math.round(grams * 10) / 10
+  const sugar = carbs
+  return { calories, carbs, sugar }
+}
+
+const getSweetenerMetaFromEntry = (entry: any): SweetenerMeta | null => {
+  const source =
+    entry?.nutrition && typeof entry.nutrition === 'object'
+      ? entry.nutrition
+      : entry?.total && typeof entry.total === 'object'
+      ? entry.total
+      : null
+  if (!source) return null
+  const typeRaw = typeof (source as any).__sweetenerType === 'string' ? String((source as any).__sweetenerType) : ''
+  const type = typeRaw === 'honey' || typeRaw === 'sugar' ? (typeRaw as SweetenerType) : null
+  if (!type) return null
+  const amount = Number((source as any).__sweetenerAmount)
+  const unitRaw = (source as any).__sweetenerUnit
+  const unit = (SWEETENER_UNITS as readonly string[]).includes(String(unitRaw))
+    ? (unitRaw as SweetenerUnit)
+    : 'tsp'
+  const gramsRaw = Number((source as any).__sweetenerGrams)
+  const grams = Number.isFinite(gramsRaw) && gramsRaw > 0 ? gramsRaw : sweetenerToGrams(type, amount, unit)
+  const caloriesRaw = Number((source as any).__sweetenerCalories)
+  const carbsRaw = Number((source as any).__sweetenerCarbs)
+  const sugarRaw = Number((source as any).__sweetenerSugar)
+  const macros = sweetenerToMacros(type, grams)
+  return {
+    type,
+    amount: Number.isFinite(amount) ? amount : 0,
+    unit,
+    grams,
+    calories: Number.isFinite(caloriesRaw) ? caloriesRaw : macros.calories,
+    carbs: Number.isFinite(carbsRaw) ? carbsRaw : macros.carbs,
+    sugar: Number.isFinite(sugarRaw) ? sugarRaw : macros.sugar,
+  }
+}
+
+const stripSweetenerMetaFromTotals = (totals: any) => {
+  if (!totals || typeof totals !== 'object') return totals
+  const next: any = { ...(totals as any) }
+  delete next.__sweetenerType
+  delete next.__sweetenerAmount
+  delete next.__sweetenerUnit
+  delete next.__sweetenerGrams
+  delete next.__sweetenerCalories
+  delete next.__sweetenerCarbs
+  delete next.__sweetenerSugar
+  return next
+}
+
+const removeSweetenerFromTotals = (totals: any, meta: SweetenerMeta | null) => {
+  if (!totals || typeof totals !== 'object' || !meta) return totals
+  const base: any = { ...(totals as any) }
+  const calories = Number(base.calories || 0) - meta.calories
+  const carbs = Number(base.carbs || 0) - meta.carbs
+  const sugar = Number(base.sugar || 0) - meta.sugar
+  base.calories = Math.max(0, Math.round(calories * 10) / 10)
+  base.carbs = Math.max(0, Math.round(carbs * 10) / 10)
+  base.sugar = Math.max(0, Math.round(sugar * 10) / 10)
+  return base
+}
+
+const applySweetenerMetaToTotals = (totals: any, meta: SweetenerMeta | null) => {
+  if (!meta) return totals
+  const base: any = totals && typeof totals === 'object' ? { ...totals } : {}
+  const calories = Number(base.calories || 0) + meta.calories
+  const carbs = Number(base.carbs || 0) + meta.carbs
+  const sugar = Number(base.sugar || 0) + meta.sugar
+  return {
+    ...base,
+    calories: Math.round(calories * 10) / 10,
+    carbs: Math.round(carbs * 10) / 10,
+    sugar: Math.round(sugar * 10) / 10,
+    __sweetenerType: meta.type,
+    __sweetenerAmount: meta.amount,
+    __sweetenerUnit: meta.unit,
+    __sweetenerGrams: meta.grams,
+    __sweetenerCalories: meta.calories,
+    __sweetenerCarbs: meta.carbs,
+    __sweetenerSugar: meta.sugar,
+  }
+}
+
 const stripWaterLogIdFromTotals = (totals: any) => {
   if (!totals || typeof totals !== 'object') return totals
   if (!Object.prototype.hasOwnProperty.call(totals, '__waterLogId')) return totals
@@ -2759,6 +2881,9 @@ export default function FoodDiary() {
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [drinkAmountInput, setDrinkAmountInput] = useState<string>('')
   const [drinkUnitInput, setDrinkUnitInput] = useState<DrinkAmountOverride['unit']>('ml')
+  const [sweetenerTypeInput, setSweetenerTypeInput] = useState<'none' | 'sugar' | 'honey'>('none')
+  const [sweetenerAmountInput, setSweetenerAmountInput] = useState<string>('')
+  const [sweetenerUnitInput, setSweetenerUnitInput] = useState<SweetenerUnit>('tsp')
   const [waterEditEntry, setWaterEditEntry] = useState<WaterLogEntry | null>(null)
   const [waterEditAmountInput, setWaterEditAmountInput] = useState('')
   const [waterEditUnit, setWaterEditUnit] = useState<DrinkAmountOverride['unit']>('ml')
@@ -2977,17 +3102,33 @@ export default function FoodDiary() {
       editingDrinkMetaRef.current = null
       setDrinkAmountInput('')
       setDrinkUnitInput('ml')
+      setSweetenerTypeInput('none')
+      setSweetenerAmountInput('')
+      setSweetenerUnitInput('tsp')
       return
     }
     const meta = getDrinkMetaFromEntry(editingEntry)
     if (!meta?.type) {
       setDrinkAmountInput('')
       setDrinkUnitInput('ml')
+      setSweetenerTypeInput('none')
+      setSweetenerAmountInput('')
+      setSweetenerUnitInput('tsp')
       return
     }
     editingDrinkMetaRef.current = meta
     setDrinkAmountInput(formatNumberInputValue(meta.amount))
     setDrinkUnitInput(meta.unit)
+    const sweetenerMeta = getSweetenerMetaFromEntry(editingEntry)
+    if (sweetenerMeta) {
+      setSweetenerTypeInput(sweetenerMeta.type)
+      setSweetenerAmountInput(formatNumberInputValue(sweetenerMeta.amount))
+      setSweetenerUnitInput(sweetenerMeta.unit)
+    } else {
+      setSweetenerTypeInput('none')
+      setSweetenerAmountInput('')
+      setSweetenerUnitInput('tsp')
+    }
   }, [editingEntry])
 
   const categoryRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -9240,6 +9381,33 @@ Please add nutritional information manually if needed.`);
       resolvedDrinkMeta = nextMeta
       editingDrinkMetaRef.current = nextMeta
     }
+    const baseSweetenerMeta = getSweetenerMetaFromEntry(editingEntry)
+    let resolvedSweetenerMeta: SweetenerMeta | null = null
+    if (sweetenerTypeInput !== 'none') {
+      const amountValue = sweetenerAmountInput || String(baseSweetenerMeta?.amount || '')
+      const amount = Number(amountValue)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        showQuickToast('Enter a valid sweetener amount.')
+        return
+      }
+      const unit = sweetenerUnitInput
+      const type = sweetenerTypeInput
+      const grams = sweetenerToGrams(type, amount, unit)
+      if (!Number.isFinite(grams) || grams <= 0) {
+        showQuickToast('Enter a valid sweetener amount.')
+        return
+      }
+      const macros = sweetenerToMacros(type, grams)
+      resolvedSweetenerMeta = {
+        type,
+        amount,
+        unit,
+        grams,
+        calories: macros.calories,
+        carbs: macros.carbs,
+        sugar: macros.sugar,
+      }
+    }
 
     // Never override a user-provided title with an auto-generated ingredient summary.
     const baseDescription = extractBaseMealDescription(originalEditingEntry?.description || editingEntry?.description || '')
@@ -9336,9 +9504,11 @@ Please add nutritional information manually if needed.`);
     }
 
     const mergedNutrition = (() => {
-      const base = (analyzedNutrition || editingEntry.nutrition) as any
+      const base = stripSweetenerMetaFromTotals((analyzedNutrition || editingEntry.nutrition) as any)
       if (!base || typeof base !== 'object') return base
-      const next: any = { ...(base as any) }
+      let next: any = removeSweetenerFromTotals(base, baseSweetenerMeta)
+      next = applyDrinkMetaToTotals(next, drinkMeta)
+      next = applySweetenerMetaToTotals(next, resolvedSweetenerMeta)
       if (meta.favoriteId) next.__favoriteId = meta.favoriteId
       if (meta.origin) next.__origin = meta.origin
       if (meta.clientId) next.__clientId = meta.clientId
@@ -9350,7 +9520,13 @@ Please add nutritional information manually if needed.`);
       }
       return next
     })()
-    const mergedTotal = applyDrinkMetaToTotals(analyzedTotal || (editingEntry.total || null), drinkMeta)
+    const mergedTotal = (() => {
+      const base = stripSweetenerMetaFromTotals(analyzedTotal || (editingEntry.total || null))
+      let next: any = removeSweetenerFromTotals(base, baseSweetenerMeta)
+      next = applyDrinkMetaToTotals(next, drinkMeta)
+      next = applySweetenerMetaToTotals(next, resolvedSweetenerMeta)
+      return next
+    })()
 
     const resolveDbId = () => {
       if (editingEntry.dbId) return editingEntry.dbId
@@ -9367,6 +9543,22 @@ Please add nutritional information manually if needed.`);
     }
     const resolvedDbId = resolveDbId()
 
+    const updatedItems = (() => {
+      const baseItems =
+        analyzedItems && analyzedItems.length > 0 ? analyzedItems : (editingEntry.items || null)
+      if (!Array.isArray(baseItems) || baseItems.length !== 1) return baseItems
+      if (!resolvedDrinkMeta?.type) return baseItems
+      if (!resolvedSweetenerMeta && !baseSweetenerMeta) return baseItems
+      const item = { ...(baseItems[0] || {}) }
+      item.calories = Number(mergedTotal?.calories) || 0
+      item.protein_g = Number(mergedTotal?.protein) || 0
+      item.carbs_g = Number(mergedTotal?.carbs) || 0
+      item.fat_g = Number(mergedTotal?.fat) || 0
+      item.fiber_g = Number(mergedTotal?.fiber) || 0
+      item.sugar_g = Number(mergedTotal?.sugar) || 0
+      return [item]
+    })()
+
     const updatedEntry = {
       ...editingEntry,
       ...(resolvedDbId ? { dbId: resolvedDbId } : {}),
@@ -9375,7 +9567,7 @@ Please add nutritional information manually if needed.`);
       description: finalDescription,
       photo: photoPreview || editingEntry.photo,
       nutrition: mergedNutrition,
-      items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : (editingEntry.items || null),
+      items: updatedItems,
       total: mergedTotal || (editingEntry.total || null)
     };
 
@@ -17724,6 +17916,62 @@ Please add nutritional information manually if needed.`);
                                         <option value="l">L</option>
                                         <option value="oz">oz</option>
                                       </select>
+                                    </div>
+                                  </div>
+                                )}
+                                {editingEntry &&
+                                  index === 0 &&
+                                  (editingDrinkMetaRef.current || getDrinkMetaFromEntry(editingEntry))?.type && (
+                                  <div className="flex items-center justify-between gap-3 mt-2">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sweetener</span>
+                                    <div className="flex flex-wrap items-center gap-2 bg-slate-100 rounded-xl px-4 py-2 border border-transparent">
+                                      <select
+                                        value={sweetenerTypeInput}
+                                        onChange={(e) => {
+                                          const next = e.target.value as typeof sweetenerTypeInput
+                                          setSweetenerTypeInput(next)
+                                          if (next === 'none') {
+                                            setSweetenerAmountInput('')
+                                          }
+                                        }}
+                                        className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none"
+                                        style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
+                                      >
+                                        <option value="none">None</option>
+                                        <option value="sugar">Sugar</option>
+                                        <option value="honey">Honey</option>
+                                      </select>
+                                      {sweetenerTypeInput !== 'none' && (
+                                        <>
+                                          <div className="w-px h-6 bg-slate-300" />
+                                          <input
+                                            type="number"
+                                            inputMode="decimal"
+                                            min={0}
+                                            step={0.1}
+                                            value={sweetenerAmountInput}
+                                            onFocus={() => {
+                                              setSweetenerAmountInput('')
+                                            }}
+                                            onChange={(e) => setSweetenerAmountInput(e.target.value)}
+                                            className="w-16 bg-transparent border-none font-bold text-lg text-slate-900 text-right outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
+                                            style={{ outline: 'none', boxShadow: 'none' }}
+                                          />
+                                          <div className="w-px h-6 bg-slate-300" />
+                                          <select
+                                            value={sweetenerUnitInput}
+                                            onChange={(e) => setSweetenerUnitInput(e.target.value as SweetenerUnit)}
+                                            className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none"
+                                            style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
+                                          >
+                                            {SWEETENER_UNITS.map((unit) => (
+                                              <option key={unit} value={unit}>
+                                                {unit}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                 )}
