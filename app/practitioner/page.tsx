@@ -731,9 +731,22 @@ export default function PractitionerPage() {
 
         {!loading && dashboard?.listing && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-2">
-            <div className="text-sm text-gray-600">Status</div>
-            <div className="text-lg font-semibold text-gray-900">
-              {dashboard.listing.status} · {dashboard.listing.reviewStatus}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <div className="text-sm text-gray-600">Status</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {dashboard.listing.status} · {dashboard.listing.reviewStatus}
+                </div>
+              </div>
+              {dashboard?.listing?.id && (
+                <button
+                  onClick={handleSubmitForReview}
+                  disabled={submitting}
+                  className="px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 text-sm font-semibold hover:border-emerald-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Submitting…' : 'Submit for review'}
+                </button>
+              )}
             </div>
             {dashboard.listing.trialDaysLeft !== null && (
               <div className="text-sm text-gray-600">
