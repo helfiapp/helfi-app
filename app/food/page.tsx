@@ -668,6 +668,7 @@ const FAVORITES_ALL_SNAPSHOT_TTL_MS = 5 * 60 * 1000
 const FAVORITES_ALL_SNAPSHOT_KEY = 'foodDiary:favoritesAllSnapshot'
 const FOOD_RESUME_LAST_PREFIX = 'food:resume:last:'
 const FOOD_RESUME_REFRESH_MIN_MS = 2 * 60 * 1000
+const FOOD_AUTO_REFRESH_ON_RESUME = false
 const FOOD_DIARY_LAST_VISIT_KEY = 'food:diary:lastVisitDate'
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
@@ -3394,6 +3395,7 @@ export default function FoodDiary() {
   }, [])
 
   useEffect(() => {
+    if (!FOOD_AUTO_REFRESH_ON_RESUME) return
     if (typeof document === 'undefined') return
     const handleVisibility = () => {
       if (document.visibilityState !== 'visible') return

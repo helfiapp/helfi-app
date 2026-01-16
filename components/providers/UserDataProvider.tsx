@@ -29,6 +29,7 @@ const UserDataContext = createContext<UserDataContextType | undefined>(undefined
 const USER_DATA_CACHE_TTL_MS = 5 * 60_000
 const USER_DATA_FOCUS_REFRESH_MIN_MS = 2 * 60_000
 const USER_DATA_FOCUS_REFRESH_TTL_MS = 3 * 60_000
+const USER_DATA_AUTO_REFRESH_ON_RESUME = false
 const HEALTH_SETUP_GRACE_MS = 2 * 60_000
 const LOCAL_OVERRIDE_GRACE_MS = 30 * 1000
 const HEALTH_SETUP_KEYS = new Set([
@@ -227,6 +228,7 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   // Keep data fresh when the user returns to the app or tab.
   useEffect(() => {
+    if (!USER_DATA_AUTO_REFRESH_ON_RESUME) return
     if (!session) return
     if (typeof window === 'undefined' || typeof document === 'undefined') return
     const shouldRefreshOnResume = () => {
