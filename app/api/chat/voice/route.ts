@@ -407,6 +407,27 @@ function buildSystemPrompt(
   return parts.join('\n')
 }
 
+function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null): string {
+  const snapshotText = foodDiarySnapshot ? JSON.stringify(foodDiarySnapshot) : 'null'
+  return [
+    'You are Helfi, a food and macro coach.',
+    'Use the FOOD DIARY SNAPSHOT to focus on nutrients that are most behind target.',
+    'Avoid suggestions that would worsen nutrients at or over cap.',
+    'Give clear, simple food options the user can eat right now.',
+    'If micronutrients are unknown, say they are unavailable.',
+    `FOOD DIARY SNAPSHOT (JSON): ${snapshotText}`,
+  ].join('\n')
+}
+
+const MAX_HISTORY_MESSAGES = 16
+const MAX_MESSAGE_CHARS = 2000
+
+const trimMessageContent = (value: string) => {
+  const text = String(value || '')
+  if (text.length <= MAX_MESSAGE_CHARS) return text
+  return `${text.slice(0, MAX_MESSAGE_CHARS).trim()}...`
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -465,6 +486,7 @@ export async function POST(req: NextRequest) {
     // Get or create thread
     await ensureTalkToAITables()
     const chatContext = normalizeChatContext(body?.entryContext ?? body?.context)
+    const isFoodChat = chatContext === 'food'
     let threadId: string
     if (body.newThread) {
       // Create new thread only if explicitly requested
@@ -502,9 +524,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Load message history for context
-    const history = await listMessages(threadId, 30)
-    const historyMessages = history.map((m) => ({ role: m.role, content: m.content }))
-    const memorySnippets = await loadChatMemorySnippets(session.user.id, question, threadId, chatContext)
+    const history = await listMessages(threadId, isFoodChat ? MAX_HISTORY_MESSAGES : 30)
+    const historyMessages = history.map((m) => ({
+      role: m.role,
+      content: trimMessageContent(m.content),
+    }))
+    const memorySnippets = isFoodChat
+      ? []
+      : await loadChatMemorySnippets(session.user.id, question, threadId, chatContext)
 
     const resolvedTzOffset =
       Number.isFinite(Number(body?.tzOffsetMin)) ? Number(body.tzOffsetMin) : new Date().getTimezoneOffset()
@@ -514,13 +541,15 @@ export async function POST(req: NextRequest) {
       : new Date(Date.now() - resolvedTzOffset * 60 * 1000).toISOString().slice(0, 10)
 
     // Load full user context
-    const context = await loadFullUserContext(session.user.id)
+    const context = isFoodChat ? null : await loadFullUserContext(session.user.id)
     const foodDiarySnapshot = await buildFoodDiarySnapshot({
       userId: session.user.id,
       localDate: resolvedLocalDate,
       tzOffsetMin: resolvedTzOffset,
     })
-    let systemPrompt = buildSystemPrompt(context, foodDiarySnapshot)
+    let systemPrompt = isFoodChat
+      ? buildFoodSystemPrompt(foodDiarySnapshot)
+      : buildSystemPrompt(context, foodDiarySnapshot)
 
     // Optional additional focus: a health tip summary passed from inline chat (e.g. on Health Tips page)
     const healthTipSummary =
@@ -529,7 +558,7 @@ export async function POST(req: NextRequest) {
       systemPrompt += `\n\nCURRENT HEALTH TIP CONTEXT (IMPORTANT):\n${healthTipSummary}\n\nWhen the user asks questions in this chat, assume they are asking follow-up questions about this specific tip unless they clearly change the subject.`
     }
 
-    if (memorySnippets.length) {
+    if (!isFoodChat && memorySnippets.length) {
       const memoryLines = memorySnippets
         .slice(0, 10)
         .map((item) => `- ${item.createdAt.toISOString().slice(0, 10)}: ${clipMemoryText(item.content)}`)
@@ -541,7 +570,8 @@ export async function POST(req: NextRequest) {
 
     const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
     // Add formatting reminder to user message for better compliance
-    const enhancedQuestion = `${question}\n\nPlease format your response with proper paragraphs, line breaks, and structure. Keep it concise and ask any clarifying questions first.`
+    const trimmedQuestion = trimMessageContent(question)
+    const enhancedQuestion = `${trimmedQuestion}\n\nPlease format your response with proper paragraphs, line breaks, and structure. Keep it concise and ask any clarifying questions first.`
     const chatMessages = [
       { role: 'system' as const, content: systemPrompt },
       ...historyMessages,
@@ -714,6 +744,14 @@ export async function POST(req: NextRequest) {
     }
   } catch (err: any) {
     console.error('[voice-chat] Error:', err)
+    const message = String(err?.message || '')
+    const lower = message.toLowerCase()
+    if (lower.includes('tokens') && lower.includes('limit')) {
+      return NextResponse.json(
+        { error: 'That chat is too long. Please start a new chat and try again.' },
+        { status: 400 }
+      )
+    }
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
   }
 }
