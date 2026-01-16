@@ -565,11 +565,16 @@ export async function queueWeeklyReportNotification(
     await updateWeeklyReportRecord(report.userId, report.id, { notifyAt })
   }
 
+  const immediateReason =
+    immediate && 'responseBody' in immediate && typeof immediate.responseBody === 'string'
+      ? immediate.responseBody
+      : immediate?.reason
+
   return {
     scheduled: !!fallback?.scheduled,
     timezone,
     notifyAt: fallback?.scheduled ? notifyAt : undefined,
-    reason: immediate?.reason || fallback?.reason || immediate?.responseBody || 'dispatch_failed',
+    reason: immediateReason || fallback?.reason || 'dispatch_failed',
   }
 }
 
