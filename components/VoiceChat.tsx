@@ -27,6 +27,7 @@ interface VoiceChatProps {
   onExit?: () => void
   startExpanded?: boolean
   hideExpandToggle?: boolean
+  entryContext?: 'general' | 'food'
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
@@ -39,6 +40,7 @@ export default function VoiceChat({
   onExit,
   startExpanded = false,
   hideExpandToggle = false,
+  entryContext = 'general',
 }: VoiceChatProps) {
   const router = useRouter()
   const VOICE_CHAT_COST_CREDITS = 10
@@ -70,6 +72,7 @@ export default function VoiceChat({
   const storageKey = useMemo(() => 'helfi:chat:talk', [])
   const archivedKey = useMemo(() => 'helfi:chat:talk:archived', [])
   const hasHealthTipContext = !!context?.healthTipSummary
+  const isFoodEntry = entryContext === 'food'
   const healthTipTitle = context?.healthTipTitle
   const healthTipCategory = context?.healthTipCategory
   const healthTipSuggestedQuestions = context?.healthTipSuggestedQuestions
@@ -101,6 +104,23 @@ export default function VoiceChat({
       `How could I adapt the "${titleSnippet}" tip to better fit my daily routine and preferences?`,
     ]
   }, [hasHealthTipContext, healthTipTitle, healthTipCategory, healthTipSuggestedQuestions])
+
+  const exampleQuestions = useMemo(() => {
+    if (isFoodEntry) {
+      return [
+        'Based on my macros today, what should I eat right now?',
+        'My protein is low and fat is near max. Give me 3 options.',
+        'What can I make with what I have in my fridge/pantry?',
+        'How can I add more fiber without adding much fat?',
+      ]
+    }
+    return [
+      'What supplements should I take?',
+      'How are my medications interacting?',
+      'Why am I feeling tired?',
+      'What should I eat today?',
+    ]
+  }, [isFoodEntry])
 
   const currentThreadTitle = useMemo(() => {
     if (!currentThreadId) return 'New chat'
@@ -1075,15 +1095,28 @@ export default function VoiceChat({
                       <div className="w-full max-w-md">
                         <UsageMeter inline className="w-full" feature="voiceChat" />
                       </div>
-                      <h1 className="mt-6 text-2xl font-bold tracking-tight text-gray-900">How can I help you today?</h1>
+                      <h1 className="mt-6 text-2xl font-bold tracking-tight text-gray-900">
+                        {isFoodEntry ? 'Food Diary Macro Coach' : 'How can I help you today?'}
+                      </h1>
                       <div className="mt-4 w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-4 text-left text-sm text-gray-600 shadow-sm">
-                        <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">How Talk to Helfi works</div>
-                        <ul className="mt-3 space-y-2 text-[13px] text-gray-600">
-                          <li>Each chat costs 10 credits once (not per response).</li>
-                          <li>We show the estimate before sending and confirm the charge after the first response.</li>
-                          <li>Your chats are saved unless you delete them, so you can revisit past conversations.</li>
-                          <li>Helfi can reference older chats when it helps answer a new question.</li>
-                        </ul>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                          {isFoodEntry ? 'What this can do' : 'How Talk to Helfi works'}
+                        </div>
+                        {isFoodEntry ? (
+                          <ul className="mt-3 space-y-2 text-[13px] text-gray-600">
+                            <li>Uses your current Food Diary totals to spot macro gaps.</li>
+                            <li>Suggests what to eat right now based on what you are missing.</li>
+                            <li>Upload a fridge/pantry photo to get ideas from what you have.</li>
+                            <li>Photo analysis costs an extra 10 credits per image.</li>
+                          </ul>
+                        ) : (
+                          <ul className="mt-3 space-y-2 text-[13px] text-gray-600">
+                            <li>Each chat costs 10 credits once (not per response).</li>
+                            <li>We show the estimate before sending and confirm the charge after the first response.</li>
+                            <li>Your chats are saved unless you delete them, so you can revisit past conversations.</li>
+                            <li>Helfi can reference older chats when it helps answer a new question.</li>
+                          </ul>
+                        )}
                       </div>
                       <div className="mt-8 w-full max-w-sm">
                         <div className="flex items-center justify-center gap-2 mb-3">
@@ -1091,12 +1124,7 @@ export default function VoiceChat({
                           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Examples</h3>
                         </div>
                         <div className="flex flex-col gap-3">
-                          {[
-                            'What supplements should I take?',
-                            'How are my medications interacting?',
-                            'Why am I feeling tired?',
-                            'What should I eat today?',
-                          ].map((q) => (
+                          {exampleQuestions.map((q) => (
                             <button
                               key={q}
                               onClick={() => setInput(q)}
