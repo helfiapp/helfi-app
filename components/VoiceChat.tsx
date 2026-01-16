@@ -235,14 +235,6 @@ export default function VoiceChat({
           const data = await res.json()
           if (data.threads && Array.isArray(data.threads)) {
             setThreads(data.threads)
-            if (!isFoodEntry && data.threads.length > 0 && !currentThreadId) {
-              // Load most recent thread (general chat only).
-              const latestThread = data.threads[0]
-              const threadId = latestThread.id
-              setCurrentThreadId(threadId)
-              setCurrentThreadCharged(Boolean(latestThread.chargedOnce))
-              loadThreadMessages(threadId)
-            }
           }
         }
       } catch (err) {
@@ -316,13 +308,7 @@ export default function VoiceChat({
           const threadsData = await threadsRes.json()
           if (threadsData.threads) {
             setThreads(threadsData.threads)
-            if (threadsData.threads.length > 0) {
-              const nextThread = threadsData.threads[0]
-              const newThreadId = nextThread.id
-              setCurrentThreadId(newThreadId)
-              setCurrentThreadCharged(Boolean(nextThread.chargedOnce))
-              loadThreadMessages(newThreadId)
-            } else {
+            if (currentThreadId === threadId) {
               setCurrentThreadId(null)
               setCurrentThreadCharged(false)
               setMessages([])
@@ -400,34 +386,18 @@ export default function VoiceChat({
       : [...archivedThreadIds, threadId]
     setArchivedThreadIds(nextArchived)
     if (!isArchived && currentThreadId === threadId) {
-      const nextThread = threads.find((thread) => !nextArchived.includes(thread.id))
-      if (nextThread) {
-        handleSelectThread(nextThread.id)
-      } else {
-        handleNewChat()
-      }
+      setCurrentThreadId(null)
+      setCurrentThreadCharged(false)
+      setMessages([])
+      setLastChargedCost(null)
+      setLastChargedAt(null)
     }
     closeThreadActions()
   }
 
-  // Load saved conversation on mount/context change
   useEffect(() => {
-    // Only load from localStorage if no thread is loaded from server
-    if (currentThreadId || isFoodEntry) return
-    try {
-      const saved = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) {
-          setMessages(
-            parsed
-              .filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'))
-              .slice(-50)
-          )
-        }
-      }
-    } catch {}
-  }, [currentThreadId, isFoodEntry, storageKey])
+    // Start with a blank chat unless the user explicitly selects a thread.
+  }, [])
 
   useEffect(() => {
     setLastChargedCost(null)
@@ -682,7 +652,7 @@ export default function VoiceChat({
       formData.append('image', file)
     })
     formData.append('message', note)
-    const forceNewThread = isFoodEntry && !currentThreadId
+    const forceNewThread = !currentThreadId
     formData.append('threadId', currentThreadId || '')
     formData.append('newThread', forceNewThread ? 'true' : 'false')
     formData.append('entryContext', entryContext)
@@ -783,7 +753,7 @@ export default function VoiceChat({
         body: JSON.stringify({
           message: text,
           threadId: currentThreadId || undefined,
-          newThread: isFoodEntry && !currentThreadId,
+          newThread: !currentThreadId,
           entryContext,
           localDate,
           tzOffsetMin,
@@ -1038,7 +1008,7 @@ export default function VoiceChat({
     }
   }
 
-  const renderFormattedContent = (content: string) => {
+  const renderFormattedContent = (content: string, enableMacroColors = false) => {
     const formatted = formatChatContent(content)
     const paragraphs = formatted.split(/\n\n+/)
     const macroColorMap: Record<string, string> = {
@@ -1056,6 +1026,7 @@ export default function VoiceChat({
       /(?:kcal|calories|protein|carbs|fat|fiber|fibre|sugar)/i.test(value) &&
       /(?:\d|kcal|\bg\b|unknown|approximate)/i.test(value)
     const normalizeMacroSeparators = (value: string) => {
+      if (!enableMacroColors) return value
       if (!shouldNormalizeMacros(value)) return value
       return value.replace(/,\s+/g, ' - ').replace(/\s+-\s+/g, ' - ').trim()
     }
@@ -1064,7 +1035,9 @@ export default function VoiceChat({
       const parts = normalized.split(' - ').filter(Boolean)
       return parts.map((part, idx) => {
         const lower = part.toLowerCase()
-        const macroKey = Object.keys(macroColorMap).find((key) => lower.includes(key))
+        const macroKey = enableMacroColors && shouldNormalizeMacros(part)
+          ? Object.keys(macroColorMap).find((key) => lower.includes(key))
+          : undefined
         const style = macroKey ? { color: macroColorMap[macroKey] } : undefined
         return (
           <span key={`${part}-${idx}`} style={style} className={macroKey ? 'font-semibold' : undefined}>
@@ -1124,7 +1097,27 @@ export default function VoiceChat({
                     if (part.startsWith('**') && part.endsWith('**')) {
                       return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
                     }
-                    return <span key={j} className={boldLine ? 'font-semibold' : undefined}>{part}</span>
+                    const lower = part.toLowerCase()
+                    const macroKey =
+                      enableMacroColors && shouldNormalizeMacros(part)
+                        ? Object.keys(macroColorMap).find((key) => lower.includes(key))
+                        : undefined
+                    const style = macroKey ? { color: macroColorMap[macroKey] } : undefined
+                    return (
+                      <span
+                        key={j}
+                        style={style}
+                        className={
+                          macroKey
+                            ? 'font-semibold'
+                            : boldLine
+                            ? 'font-semibold'
+                            : undefined
+                        }
+                      >
+                        {part}
+                      </span>
+                    )
                   })}
                 </div>
               )
@@ -1140,7 +1133,27 @@ export default function VoiceChat({
                     if (part.startsWith('**') && part.endsWith('**')) {
                       return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
                     }
-                    return <span key={j} className={boldLine ? 'font-semibold' : undefined}>{part}</span>
+                    const lower = part.toLowerCase()
+                    const macroKey =
+                      enableMacroColors && shouldNormalizeMacros(part)
+                        ? Object.keys(macroColorMap).find((key) => lower.includes(key))
+                        : undefined
+                    const style = macroKey ? { color: macroColorMap[macroKey] } : undefined
+                    return (
+                      <span
+                        key={j}
+                        style={style}
+                        className={
+                          macroKey
+                            ? 'font-semibold'
+                            : boldLine
+                            ? 'font-semibold'
+                            : undefined
+                        }
+                      >
+                        {part}
+                      </span>
+                    )
                   })}
                 </div>
               )
@@ -1155,7 +1168,10 @@ export default function VoiceChat({
                     return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
                   }
                   const lower = part.toLowerCase()
-                  const macroKey = Object.keys(macroColorMap).find((key) => lower.includes(key))
+                  const macroKey =
+                    enableMacroColors && shouldNormalizeMacros(part)
+                      ? Object.keys(macroColorMap).find((key) => lower.includes(key))
+                      : undefined
                   const style = macroKey ? { color: macroColorMap[macroKey] } : undefined
                   return (
                     <span
@@ -1447,12 +1463,12 @@ export default function VoiceChat({
                       <div className="w-full space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
                         <div className="text-[12px] md:text-[11px] font-bold uppercase tracking-wide text-gray-400">Health Assistant</div>
                         <div className="text-[18px] md:text-[16px] leading-7 text-gray-800">
-                          {renderFormattedContent(m.content)}
+                          {renderFormattedContent(m.content, true)}
                         </div>
                       </div>
                     ) : (
                       <div className="text-[18px] md:text-[16px] leading-7 text-gray-900 font-medium">
-                        {renderFormattedContent(m.content)}
+                        {renderFormattedContent(m.content, false)}
                       </div>
                     )}
                   </div>
@@ -1638,9 +1654,9 @@ export default function VoiceChat({
             onClick={closeThreadActions}
             aria-label="Close chat actions"
           />
-          <div className="relative w-full max-w-sm bg-white rounded-t-2xl shadow-xl">
+          <div className="relative w-full max-w-none sm:max-w-md bg-white rounded-t-3xl shadow-2xl pb-3">
             {!renameOpen && !deleteConfirmOpen && (
-              <div className="px-2 py-3">
+              <div className="px-3 py-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -1648,35 +1664,35 @@ export default function VoiceChat({
                     setRenameOpen(true)
                     setRenameCleared(false)
                   }}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-gray-900 hover:bg-gray-50 rounded-lg"
+                  className="w-full flex items-center justify-between px-6 py-4 text-left text-base text-gray-900 hover:bg-gray-50 rounded-xl"
                 >
                   Rename
-                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 20 }}>edit_square</span>
+                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 24 }}>edit_square</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => actionThreadId && handleArchiveThread(actionThreadId)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-gray-900 hover:bg-gray-50 rounded-lg"
+                  className="w-full flex items-center justify-between px-6 py-4 text-left text-base text-gray-900 hover:bg-gray-50 rounded-xl"
                 >
                   {actionThreadArchived ? 'Unarchive' : 'Archive'}
-                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 20 }}>
+                  <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 24 }}>
                     {actionThreadArchived ? 'unarchive' : 'archive'}
                   </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setDeleteConfirmOpen(true)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 active:translate-y-[1px] active:scale-[0.99] transition rounded-lg"
+                  className="w-full flex items-center justify-between px-6 py-4 text-left text-base text-red-600 hover:bg-red-50 active:bg-red-100 active:translate-y-[1px] active:scale-[0.99] transition rounded-xl"
                 >
                   Delete
-                  <span className="material-symbols-outlined text-red-500" style={{ fontSize: 20 }}>delete</span>
+                  <span className="material-symbols-outlined text-red-500" style={{ fontSize: 24 }}>delete</span>
                 </button>
               </div>
             )}
 
             {renameOpen && (
-              <div className="px-4 py-4 overflow-hidden">
-                <div className="text-sm font-semibold text-gray-900 mb-3">Rename chat</div>
+              <div className="px-6 py-5 overflow-hidden">
+                <div className="text-base font-semibold text-gray-900 mb-3">Rename chat</div>
                 <input
                   type="text"
                   value={renameValue}
@@ -1688,14 +1704,14 @@ export default function VoiceChat({
                     }
                   }}
                   placeholder="Chat title"
-                  className="w-full min-w-0 max-w-full rounded-lg border border-gray-200 px-3 py-2 text-[16px] leading-6 focus:outline-none focus:ring-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                  className="w-full min-w-0 max-w-full rounded-xl border border-gray-200 px-4 py-3 text-[16px] leading-6 focus:outline-none focus:ring-0 overflow-hidden text-ellipsis whitespace-nowrap"
                   style={{ WebkitTextSizeAdjust: '100%' }}
                 />
-                <div className="mt-4 flex gap-2">
+                <div className="mt-5 flex gap-3">
                   <button
                     type="button"
                     onClick={closeThreadActions}
-                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                    className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-600 hover:bg-gray-50"
                   >
                     Cancel
                   </button>
@@ -1706,7 +1722,7 @@ export default function VoiceChat({
                       await handleRenameThread(actionThreadId, renameValue)
                       closeThreadActions()
                     }}
-                    className="flex-1 rounded-lg bg-black px-3 py-2 text-sm text-white hover:bg-gray-800"
+                    className="flex-1 rounded-xl bg-black px-4 py-3 text-base text-white hover:bg-gray-800"
                   >
                     Save
                   </button>
@@ -1715,14 +1731,14 @@ export default function VoiceChat({
             )}
 
             {deleteConfirmOpen && (
-              <div className="px-4 py-4">
-                <div className="text-sm font-semibold text-gray-900 mb-2">Delete this chat?</div>
-                <div className="text-xs text-gray-500 mb-4">This can’t be undone.</div>
-                <div className="flex gap-2">
+              <div className="px-6 py-5">
+                <div className="text-base font-semibold text-gray-900 mb-2">Delete this chat?</div>
+                <div className="text-sm text-gray-500 mb-5">This can’t be undone.</div>
+                <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={closeThreadActions}
-                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                    className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-600 hover:bg-gray-50"
                   >
                     Cancel
                   </button>
@@ -1736,7 +1752,7 @@ export default function VoiceChat({
                       closeThreadActions()
                     }}
                     disabled={deletePending}
-                    className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 active:bg-red-700 active:translate-y-[1px] active:scale-[0.99] transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-base text-white hover:bg-red-700 active:bg-red-700 active:translate-y-[1px] active:scale-[0.99] transition disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {deletePending ? 'Deleting…' : 'Delete'}
                   </button>
