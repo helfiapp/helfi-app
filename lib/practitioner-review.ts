@@ -145,7 +145,7 @@ export async function lookupPlaceMatch(input: {
   }
 
   const placeName = result?.name ? String(result.name) : null
-  const placeTypes = Array.isArray(result?.types)
+  const placeTypes: string[] = Array.isArray(result?.types)
     ? result.types.map((type: any) => String(type).toLowerCase())
     : []
   const businessStatus = result?.business_status ? String(result.business_status) : null
