@@ -18249,9 +18249,8 @@ Please add nutritional information manually if needed.`);
 
             {/* Item Edit Modal */}
             {showItemEditModal && editingItemIndex !== null && analyzedItems[editingItemIndex] && (
-              <div className="fixed inset-0 z-50 bg-black/30">
-                <div className="h-full w-full flex items-stretch sm:items-center sm:justify-center p-0 sm:p-6">
-                  <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90dvh] sm:max-w-3xl sm:rounded-2xl sm:shadow-2xl flex flex-col overflow-hidden">
+              <div className="fixed inset-0 z-50 bg-white sm:bg-black/30 sm:flex sm:items-center sm:justify-center sm:p-6">
+                <div className="h-[100dvh] w-full sm:h-auto sm:max-h-[90dvh] sm:max-w-3xl bg-white sm:rounded-2xl sm:shadow-2xl flex flex-col overflow-hidden">
                   <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-gray-900">Adjust Food Details</h3>
                     <button
