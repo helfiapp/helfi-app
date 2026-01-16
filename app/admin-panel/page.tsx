@@ -191,6 +191,10 @@ export default function AdminPanel() {
   const [practitionerQuery, setPractitionerQuery] = useState('')
   const [practitionerLoading, setPractitionerLoading] = useState(false)
   const [practitionerError, setPractitionerError] = useState('')
+  const [practitionerPage, setPractitionerPage] = useState(1)
+  const [practitionerPageSize, setPractitionerPageSize] = useState(50)
+  const [practitionerTotal, setPractitionerTotal] = useState(0)
+  const [practitionerTotalPages, setPractitionerTotalPages] = useState(1)
   const [practitionerActionLoading, setPractitionerActionLoading] = useState<Record<string, boolean>>({})
   const [practitionerRejectReasonId, setPractitionerRejectReasonId] = useState<Record<string, string>>({})
   const [practitionerRejectCustom, setPractitionerRejectCustom] = useState<Record<string, string>>({})
@@ -1184,9 +1188,11 @@ https://www.helfi.ai`)
     }
   }
 
-  const loadPractitionerEntries = async (tokenOverride?: string) => {
+  const loadPractitionerEntries = async (tokenOverride?: string, pageOverride?: number, pageSizeOverride?: number) => {
     const token = tokenOverride || adminToken
     if (!token) return
+    const requestedPage = pageOverride ?? practitionerPage
+    const requestedPageSize = pageSizeOverride ?? practitionerPageSize
     setPractitionerLoading(true)
     setPractitionerError('')
     try {
@@ -1203,6 +1209,8 @@ https://www.helfi.ai`)
       if (practitionerQuery) {
         params.set('q', practitionerQuery)
       }
+      params.set('page', String(requestedPage))
+      params.set('pageSize', String(requestedPageSize))
       const res = await fetch(`/api/admin/practitioners?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1211,6 +1219,11 @@ https://www.helfi.ai`)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Failed to load entries')
       setPractitionerEntries(data?.entries || [])
+      const pagination = data?.pagination || {}
+      setPractitionerPage(pagination.page || requestedPage)
+      setPractitionerPageSize(pagination.pageSize || requestedPageSize)
+      setPractitionerTotal(pagination.total || 0)
+      setPractitionerTotalPages(pagination.totalPages || 1)
     } catch (err: any) {
       setPractitionerError(err?.message || 'Failed to load entries')
     } finally {
@@ -1465,7 +1478,7 @@ https://www.helfi.ai`)
     if (activeTab !== 'practitioners') return
     if (!adminToken) return
     loadPractitionerEntries()
-  }, [activeTab, adminToken])
+  }, [activeTab, adminToken, practitionerPage, practitionerPageSize])
 
   const refreshData = () => {
     loadAnalyticsData()
@@ -3979,7 +3992,10 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <select
                   value={practitionerEntryFilter}
-                  onChange={(e) => setPractitionerEntryFilter(e.target.value)}
+                  onChange={(e) => {
+                    setPractitionerEntryFilter(e.target.value)
+                    setPractitionerPage(1)
+                  }}
                   className="border rounded-md px-3 py-2 text-sm"
                 >
                   <option value="ALL">All entries</option>
@@ -3988,7 +4004,10 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 </select>
                 <select
                   value={practitionerReviewFilter}
-                  onChange={(e) => setPractitionerReviewFilter(e.target.value)}
+                  onChange={(e) => {
+                    setPractitionerReviewFilter(e.target.value)
+                    setPractitionerPage(1)
+                  }}
                   className="border rounded-md px-3 py-2 text-sm"
                 >
                   <option value="ALL">All</option>
@@ -3999,7 +4018,10 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 </select>
                 <select
                   value={practitionerStatusFilter}
-                  onChange={(e) => setPractitionerStatusFilter(e.target.value)}
+                  onChange={(e) => {
+                    setPractitionerStatusFilter(e.target.value)
+                    setPractitionerPage(1)
+                  }}
                   className="border rounded-md px-3 py-2 text-sm"
                 >
                   <option value="ALL">Any status</option>
@@ -4011,12 +4033,15 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 </select>
                 <input
                   value={practitionerQuery}
-                  onChange={(e) => setPractitionerQuery(e.target.value)}
+                  onChange={(e) => {
+                    setPractitionerQuery(e.target.value)
+                    setPractitionerPage(1)
+                  }}
                   placeholder="Search by name, email, or text..."
                   className="border rounded-md px-3 py-2 text-sm min-w-[220px] flex-1"
                 />
                 <button
-                  onClick={() => loadPractitionerEntries()}
+                  onClick={() => loadPractitionerEntries(undefined, 1)}
                   className="px-4 py-2 bg-gray-100 text-gray-800 rounded-md text-sm hover:bg-gray-200"
                 >
                   Search
@@ -4168,6 +4193,40 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                       })}
                     </tbody>
                   </table>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
+                  <div>
+                    Page {practitionerPage} of {practitionerTotalPages} · {practitionerTotal} entries
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-xs font-medium text-gray-500">Rows</label>
+                    <select
+                      value={practitionerPageSize}
+                      onChange={(e) => {
+                        setPractitionerPageSize(Number(e.target.value))
+                        setPractitionerPage(1)
+                      }}
+                      className="border rounded-md px-2 py-1 text-xs"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <button
+                      onClick={() => setPractitionerPage((prev) => Math.max(1, prev - 1))}
+                      disabled={practitionerPage <= 1}
+                      className="px-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-700 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      onClick={() => setPractitionerPage((prev) => Math.min(practitionerTotalPages, prev + 1))}
+                      disabled={practitionerPage >= practitionerTotalPages}
+                      className="px-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-700 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
