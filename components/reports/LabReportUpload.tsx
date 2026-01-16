@@ -298,7 +298,7 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
           </p>
           <button
             onClick={() => {
-              setFile(null);
+              setFiles([]);
               setPassword('');
               setConsentData(null);
               setUploadStatus('idle');
