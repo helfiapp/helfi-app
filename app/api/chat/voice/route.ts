@@ -653,6 +653,7 @@ export async function POST(req: NextRequest) {
     const wantsStream = accept.includes('text/event-stream')
 
     const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
+    const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o'
     // Add formatting reminder to user message for better compliance
     const trimmedQuestion = trimMessageContent(question)
     const enhancedQuestion = `${trimmedQuestion}\n\nPlease format your response with proper paragraphs, line breaks, and structure. Keep it concise and ask any clarifying questions first.`
@@ -700,16 +701,32 @@ export async function POST(req: NextRequest) {
     const maxTokens = 500
 
     if (wantsStream) {
-      const wrapped = await chatCompletionWithCost(openai, {
+      let usedModel = model
+      let wrapped = await chatCompletionWithCost(openai, {
         model,
         messages: chatMessages,
         max_tokens: maxTokens,
         temperature: 0.3,
       } as any)
 
-      const assistantMessage =
-        extractAssistantContent(wrapped.completion.choices?.[0]?.message) ||
-        'I apologize, but I could not generate a response.'
+      let assistantMessage = extractAssistantContent(wrapped.completion.choices?.[0]?.message)
+      if (!assistantMessage) {
+        const retry = await chatCompletionWithCost(openai, {
+          model: fallbackModel,
+          messages: chatMessages,
+          max_tokens: maxTokens,
+          temperature: 0.3,
+        } as any)
+        const retryMessage = extractAssistantContent(retry.completion.choices?.[0]?.message)
+        if (retryMessage) {
+          wrapped = retry
+          assistantMessage = retryMessage
+          usedModel = fallbackModel
+        }
+      }
+      if (!assistantMessage) {
+        assistantMessage = 'I apologize, but I could not generate a response.'
+      }
 
       const apiCostCents = wrapped.costCents * 2
       const chargedCents = shouldCharge ? (allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS) : 0
@@ -739,7 +756,7 @@ export async function POST(req: NextRequest) {
       try {
         await logAIUsage({
           context: { feature: 'voice:chat', userId: user.id },
-          model,
+          model: usedModel,
           promptTokens: wrapped.promptTokens,
           completionTokens: wrapped.completionTokens,
           costCents: apiCostCents,
@@ -772,7 +789,8 @@ export async function POST(req: NextRequest) {
       })
     } else {
       // Non-streaming
-      const wrapped = await chatCompletionWithCost(openai, {
+      let usedModel = model
+      let wrapped = await chatCompletionWithCost(openai, {
         model,
         messages: chatMessages,
         max_tokens: maxTokens,
@@ -800,22 +818,37 @@ export async function POST(req: NextRequest) {
         await markThreadCharged(threadId)
       }
 
+      let assistantMessage = extractAssistantContent(wrapped.completion.choices?.[0]?.message)
+      if (!assistantMessage) {
+        const retry = await chatCompletionWithCost(openai, {
+          model: fallbackModel,
+          messages: chatMessages,
+          max_tokens: maxTokens,
+          temperature: 0.3,
+        })
+        const retryMessage = extractAssistantContent(retry.completion.choices?.[0]?.message)
+        if (retryMessage) {
+          wrapped = retry
+          assistantMessage = retryMessage
+          usedModel = fallbackModel
+        }
+      }
+      if (!assistantMessage) {
+        assistantMessage = 'I apologize, but I could not generate a response.'
+      }
+
       // Log AI usage for cost tracking (voice chat, non-streaming)
       try {
         await logAIUsage({
           context: { feature: 'voice:chat', userId: user.id },
-          model,
+          model: usedModel,
           promptTokens: wrapped.promptTokens,
           completionTokens: wrapped.completionTokens,
-          costCents: apiCostCents,
+          costCents: wrapped.costCents * 2,
         })
       } catch {
         // Ignore logging failures
       }
-
-      const assistantMessage =
-        extractAssistantContent(wrapped.completion.choices?.[0]?.message) ||
-        'I apologize, but I could not generate a response.'
 
       // Save assistant message
       await appendMessage(threadId, 'assistant', assistantMessage)

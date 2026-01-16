@@ -265,8 +265,10 @@ export async function POST(req: NextRequest) {
       'Keep answers concise, structured, and easy to scan.',
     ].join(' ')
 
-    const assistantResult = await chatCompletionWithCost(openai, {
-      model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2',
+    const assistantModel = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
+    const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o'
+    let assistantResult = await chatCompletionWithCost(openai, {
+      model: assistantModel,
       messages: [
         { role: 'system', content: suggestionPrompt },
         {
@@ -288,9 +290,41 @@ export async function POST(req: NextRequest) {
       temperature: 0.3,
     } as any)
 
-    const assistantMessage =
-      extractAssistantContent(assistantResult.completion.choices?.[0]?.message) ||
-      'I could not generate suggestions from the photo.'
+    let assistantMessage = extractAssistantContent(assistantResult.completion.choices?.[0]?.message)
+    let usedModel = assistantModel
+    if (!assistantMessage) {
+      const retry = await chatCompletionWithCost(openai, {
+        model: fallbackModel,
+        messages: [
+          { role: 'system', content: suggestionPrompt },
+          {
+            role: 'user',
+            content: [
+              'FOOD DIARY SNAPSHOT (JSON):',
+              JSON.stringify(foodDiarySnapshot || null),
+              '',
+              'VISIBLE ITEMS WITH MACROS (JSON):',
+              JSON.stringify(enrichedItems),
+              '',
+              note ? `User note: ${note}` : 'User note: (none)',
+              '',
+              'Task: Suggest 3-6 options the user can eat right now to help close macro gaps.',
+            ].join('\n'),
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.3,
+      } as any)
+      const retryMessage = extractAssistantContent(retry.completion.choices?.[0]?.message)
+      if (retryMessage) {
+        assistantResult = retry
+        assistantMessage = retryMessage
+        usedModel = fallbackModel
+      }
+    }
+    if (!assistantMessage) {
+      assistantMessage = 'I could not generate suggestions from the photo.'
+    }
 
     const userMessage = note
       ? `Fridge/pantry photo: ${note}`
@@ -318,7 +352,7 @@ export async function POST(req: NextRequest) {
     try {
       await logAIUsage({
         context: { feature: 'voice:fridge-photo:suggestions', userId: user.id },
-        model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2',
+        model: usedModel,
         promptTokens: assistantResult.promptTokens,
         completionTokens: assistantResult.completionTokens,
         costCents: assistantResult.costCents,
