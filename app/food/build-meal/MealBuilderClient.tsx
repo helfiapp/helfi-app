@@ -308,6 +308,22 @@ export default function MealBuilderClient() {
       const converted = convertToBuilderItems(favItems)
       setItems(converted)
       setExpandedId(converted[0]?.id || null)
+    } else {
+      const total = (fav as any)?.total || (fav as any)?.nutrition || null
+      const fallbackItem = {
+        name: label || 'Favorite',
+        serving_size: '1 serving',
+        servings: 1,
+        calories: total?.calories ?? null,
+        protein_g: total?.protein ?? total?.protein_g ?? null,
+        carbs_g: total?.carbs ?? total?.carbs_g ?? null,
+        fat_g: total?.fat ?? total?.fat_g ?? null,
+        fiber_g: total?.fiber ?? total?.fiber_g ?? null,
+        sugar_g: total?.sugar ?? total?.sugar_g ?? null,
+      }
+      const converted = convertToBuilderItems([fallbackItem])
+      setItems(converted)
+      setExpandedId(converted[0]?.id || null)
     }
 
     setLoadedFavoriteId(editFavoriteId)
@@ -1198,11 +1214,6 @@ export default function MealBuilderClient() {
           setError('Could not find that saved meal to edit. Please reopen from Favorites → Custom.')
           return
         }
-        if (!isCustomMealFavorite(existing)) {
-          setError('Only custom meals (Build-a-meal / Combined) can be edited here.')
-          return
-        }
-
         const updatedFavorite = {
           ...existing,
           label: title,
@@ -1210,8 +1221,7 @@ export default function MealBuilderClient() {
           nutrition: payload.nutrition,
           total: payload.nutrition,
           items: cleanedItems,
-          method: existing?.method || 'meal-builder',
-          customMeal: true,
+          method: existing?.method || (existing?.customMeal ? 'meal-builder' : 'text'),
           meal: existing?.meal || category,
           createdAt: existing?.createdAt || Date.now(),
         }
@@ -1520,21 +1530,19 @@ export default function MealBuilderClient() {
 
                             {favoritesActiveTab !== 'all' && favoriteId && (
                               <div className="flex items-center pr-2 gap-1">
-                                {isCustomMealFavorite(favorite) && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault()
-                                      e.stopPropagation()
-                                      openEditFavorite(favorite)
-                                    }}
-                                    className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
-                                    title="Edit meal"
-                                    aria-label="Edit meal"
-                                  >
-                                    Edit
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    openEditFavorite(favorite)
+                                  }}
+                                  className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                                  title="Edit meal"
+                                  aria-label="Edit meal"
+                                >
+                                  Edit
+                                </button>
                                 <button
                                   type="button"
                                   onClick={(e) => {

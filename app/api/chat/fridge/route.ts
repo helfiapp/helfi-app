@@ -23,8 +23,8 @@ import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 const VOICE_CHAT_COST_CENTS = 10
 const FRIDGE_PHOTO_COST_CENTS = 10
-const MAX_DETECTED_ITEMS = 12
-const MAX_LOOKUP_ITEMS = 8
+const MAX_DETECTED_ITEMS = 20
+const MAX_LOOKUP_ITEMS = 12
 
 const isValidDateString = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
 
@@ -61,14 +61,24 @@ const describeMacro = (value: number | null) =>
 const extractAssistantContent = (message: any) => {
   if (!message) return ''
   const content = message.content
-  if (typeof content === 'string') return content
+  if (typeof content === 'string') return content.trim()
   if (content && typeof content === 'object' && typeof content.text === 'string') {
-    return content.text
+    return content.text.trim()
   }
   if (Array.isArray(content)) {
-    return content.map((part: any) => (typeof part?.text === 'string' ? part.text : '')).join('')
+    const joined = content
+      .map((part: any) => {
+        if (typeof part?.text === 'string') return part.text
+        if (typeof part?.text?.value === 'string') return part.text.value
+        if (typeof part?.text?.content === 'string') return part.text.content
+        if (typeof part?.content === 'string') return part.content
+        return ''
+      })
+      .join('')
+    return joined.trim()
   }
-  if (typeof message.refusal === 'string') return message.refusal
+  if (typeof message.refusal === 'string') return message.refusal.trim()
+  if (typeof (message as any).output_text === 'string') return String((message as any).output_text).trim()
   return ''
 }
 
@@ -85,8 +95,8 @@ export async function POST(req: NextRequest) {
     }
 
     const form = await req.formData()
-    const imageFile = form.get('image') as File | null
-    if (!imageFile) {
+    const imageFiles = form.getAll('image').filter((file) => file instanceof File) as File[]
+    if (imageFiles.length === 0) {
       return NextResponse.json({ error: 'Image required' }, { status: 400 })
     }
 
@@ -150,7 +160,8 @@ export async function POST(req: NextRequest) {
     }
 
     const totalChargeCents =
-      FRIDGE_PHOTO_COST_CENTS + (shouldChargeChat && !allowChatViaFreeUse ? VOICE_CHAT_COST_CENTS : 0)
+      FRIDGE_PHOTO_COST_CENTS * imageFiles.length +
+      (shouldChargeChat && !allowChatViaFreeUse ? VOICE_CHAT_COST_CENTS : 0)
 
     const cm = new CreditManager(user.id)
     const wallet = await cm.getWalletStatus()
@@ -192,8 +203,13 @@ export async function POST(req: NextRequest) {
       tzOffsetMin: resolvedTzOffset,
     })
 
-    const imageBuffer = await imageFile.arrayBuffer()
-    const imageBase64 = Buffer.from(imageBuffer).toString('base64')
+    const imageBase64List = await Promise.all(
+      imageFiles.map(async (file) => Buffer.from(await file.arrayBuffer()).toString('base64'))
+    )
+    const imageParts = imageFiles.map((file, idx) => ({
+      type: 'image_url',
+      image_url: { url: `data:${file.type};base64,${imageBase64List[idx]}`, detail: 'high' },
+    }))
 
     const vision = await chatCompletionWithCost(openai, {
       model: 'gpt-4o',
@@ -201,19 +217,16 @@ export async function POST(req: NextRequest) {
         {
           role: 'system',
           content:
-            'You are a food inventory extractor. Identify distinct edible items visible in a fridge, pantry, or cupboard photo. ' +
+            'You are a food inventory extractor. Identify distinct edible items visible across fridge, pantry, or cupboard photos. ' +
             `Return JSON only with this exact shape: {"items":[{"name":"string"}]}. ` +
             'List clear, human-friendly item names (e.g., "eggs", "chicken breast", "Greek yogurt", "brown rice", "canned tuna"). ' +
-            `Limit to ${MAX_DETECTED_ITEMS} items. If nothing edible is visible, return {"items": []}.`,
+            `Include as many obvious items as possible, up to ${MAX_DETECTED_ITEMS}. If nothing edible is visible, return {"items": []}.`,
         },
         {
           role: 'user',
           content: [
-            { type: 'text', text: 'Identify foods in this photo.' },
-            {
-              type: 'image_url',
-              image_url: { url: `data:${imageFile.type};base64,${imageBase64}`, detail: 'high' },
-            },
+            { type: 'text', text: 'Identify foods in these photos.' },
+            ...imageParts,
           ],
         },
       ],
@@ -260,13 +273,21 @@ export async function POST(req: NextRequest) {
       'Use the FOOD DIARY SNAPSHOT to prioritize nutrients that are most behind target.',
       'Avoid suggestions that would worsen nutrients at or over cap.',
       'Use only the items detected in the photo when possible; if items are insufficient, suggest simple add-ons.',
-      'Start with a single "Current totals" line using the snapshot data.',
       'Include estimated calories, protein, carbs, fat, fiber, and sugar for each suggestion.',
       'After each suggestion, show the updated daily totals if the user ate that option.',
       'If you must estimate, say "approximate". If unknown, say "unknown".',
       'If micronutrients are not available, state that they are unavailable.',
       'Keep answers concise, structured, and easy to scan.',
-    ].join(' ')
+      '',
+      'Use this exact format:',
+      'Current totals: ...',
+      'Option 1: ...',
+      'Macros: kcal, protein g, carbs g, fat g, fiber g, sugar g',
+      'After eating: ...',
+      'Option 2: ...',
+      'Macros: kcal, protein g, carbs g, fat g, fiber g, sugar g',
+      'After eating: ...',
+    ].join('\n')
 
     const assistantModel = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
     const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o'
@@ -329,9 +350,8 @@ export async function POST(req: NextRequest) {
       assistantMessage = 'I could not generate suggestions from the photo.'
     }
 
-    const userMessage = note
-      ? `Fridge/pantry photo: ${note}`
-      : 'Fridge/pantry photo'
+    const photoLabel = imageFiles.length > 1 ? `Fridge/pantry photos (${imageFiles.length})` : 'Fridge/pantry photo'
+    const userMessage = note ? `${photoLabel}: ${note}` : photoLabel
 
     await appendMessage(threadId, 'user', userMessage)
     await appendMessage(threadId, 'assistant', assistantMessage)
@@ -367,7 +387,7 @@ export async function POST(req: NextRequest) {
       threadId,
       chargedCents: totalChargeCents,
       chargedChat: shouldChargeChat,
-      chargedPhoto: FRIDGE_PHOTO_COST_CENTS,
+      chargedPhoto: FRIDGE_PHOTO_COST_CENTS * imageFiles.length,
     })
   } catch (error: any) {
     console.error('[chat-fridge.POST] error', error)

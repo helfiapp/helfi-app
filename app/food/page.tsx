@@ -18249,8 +18249,9 @@ Please add nutritional information manually if needed.`);
 
             {/* Item Edit Modal */}
             {showItemEditModal && editingItemIndex !== null && analyzedItems[editingItemIndex] && (
-              <div className="fixed inset-0 z-50 bg-white">
-                <div className="h-[100dvh] flex flex-col">
+              <div className="fixed inset-0 z-50 bg-black/30">
+                <div className="h-full w-full flex items-stretch sm:items-center sm:justify-center p-0 sm:p-6">
+                  <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90dvh] sm:max-w-3xl sm:rounded-2xl sm:shadow-2xl flex flex-col overflow-hidden">
                   <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-gray-900">Adjust Food Details</h3>
                     <button
@@ -18651,28 +18652,25 @@ Please add nutritional information manually if needed.`);
                           const factor = Math.pow(10, decimals)
                           return String(Math.round(scaled * factor) / factor)
                         }
-                        const computeServingsFromTotal = (value: any, perServingValue: any) => {
+                        const computePerServingFromTotal = (value: any) => {
                           const total = Number(value)
-                          const per = Number(perServingValue)
-                          const multiplier = macroMultiplier > 0 ? macroMultiplier : 1
-                          if (!Number.isFinite(total) || !Number.isFinite(per) || per <= 0) return null
-                          const next = total / (per * multiplier)
-                          return Number.isFinite(next) ? next : null
+                          if (!Number.isFinite(total)) return null
+                          if (totalMultiplier > 0) return total / totalMultiplier
+                          return total
                         }
-                        const updateServingsFromMacroTotal = (value: any, fieldName: string) => {
-                          const perServingValue = (item as any)?.[fieldName]
-                          const nextServings = computeServingsFromTotal(value, perServingValue)
-                          if (nextServings !== null) {
-                            updateItemField(editingItemIndex, 'servings', nextServings)
-                            return
-                          }
-                          updateItemField(editingItemIndex, fieldName as any, value)
+                        const updateMacroFromTotalInput = (value: any, fieldName: string) => {
+                          const perServingValue = computePerServingFromTotal(value)
+                          if (perServingValue === null) return
+                          updateItemField(editingItemIndex, fieldName as any, perServingValue)
                         }
                         const totalLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         return (
                           <div>
                             <div className="block text-sm font-medium text-gray-700 mb-2">
                               Totals for {totalLabel}
+                            </div>
+                            <div className="text-xs text-gray-500 mb-2">
+                              Changing these numbers will not change servings or weight.
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
@@ -18696,7 +18694,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:calories`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'calories')
+                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'calories')
                                   }}
                                   onBlur={() => {
                                     const key = `ai:modal:${editingItemIndex}:calories`
@@ -18731,7 +18729,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:protein_g`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'protein_g')
+                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'protein_g')
                                   }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:protein_g`
@@ -18766,7 +18764,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:carbs_g`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'carbs_g')
+                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'carbs_g')
                                   }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:carbs_g`
@@ -18801,7 +18799,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:fat_g`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'fat_g')
+                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'fat_g')
                                   }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:fat_g`
@@ -18836,7 +18834,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:fiber_g`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'fiber_g')
+                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'fiber_g')
                                   }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:fiber_g`
@@ -18871,7 +18869,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:sugar_g`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') updateServingsFromMacroTotal(v, 'sugar_g')
+                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'sugar_g')
                                   }}
                               onBlur={() => {
                                 const key = `ai:modal:${editingItemIndex}:sugar_g`
@@ -21255,18 +21253,14 @@ Please add nutritional information manually if needed.`);
                                     const fav = item.favorite
                                     const favId = favoriteId ? String(favoriteId) : ''
                                     if (fav && favId) {
-                                      if (isCustomMealFavorite(fav)) {
-                                        const favCategory =
-                                          (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
-                                        closeFavoritesPicker()
-                                        router.push(
-                                          `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
-                                            favCategory,
-                                          )}&editFavoriteId=${encodeURIComponent(favId)}`,
-                                        )
-                                      } else {
-                                        handleRenameFavorite(favId)
-                                      }
+                                      const favCategory =
+                                        (fav?.meal && String(fav.meal)) || (fav?.category && String(fav.category)) || selectedAddCategory
+                                      closeFavoritesPicker()
+                                      router.push(
+                                        `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(
+                                          favCategory,
+                                        )}&editFavoriteId=${encodeURIComponent(favId)}`,
+                                      )
                                       return
                                     }
 
@@ -21301,8 +21295,8 @@ Please add nutritional information manually if needed.`);
                                   } catch {}
                                 }}
                                 className="px-3 flex items-center justify-center hover:bg-gray-50 text-gray-700"
-                                title={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Edit'}
-                                aria-label={item.favorite && isCustomMealFavorite(item.favorite) ? 'Edit meal' : 'Edit'}
+                                title={item.favorite ? 'Edit meal' : 'Edit'}
+                                aria-label={item.favorite ? 'Edit meal' : 'Edit'}
                               >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path

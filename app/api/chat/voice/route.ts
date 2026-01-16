@@ -453,6 +453,15 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null): str
     'After each option, show the updated daily totals if the user ate that option.',
     'If you must estimate, say “approximate”. If unknown, say “unknown”.',
     '',
+    'Use this exact format:',
+    'Current totals: ...',
+    'Option 1: ...',
+    'Macros: kcal, protein g, carbs g, fat g, fiber g, sugar g',
+    'After eating: ...',
+    'Option 2: ...',
+    'Macros: kcal, protein g, carbs g, fat g, fiber g, sugar g',
+    'After eating: ...',
+    '',
     `Today (${foodDiarySnapshot.localDate})`,
     `Consumed: ${formatMacroValue(foodDiarySnapshot.totals.calories, 'kcal')}, ` +
       `${formatMacroValue(foodDiarySnapshot.totals.protein_g, 'g')} protein, ` +
@@ -493,14 +502,24 @@ const trimMessageContent = (value: string) => {
 const extractAssistantContent = (message: any) => {
   if (!message) return ''
   const content = message.content
-  if (typeof content === 'string') return content
+  if (typeof content === 'string') return content.trim()
   if (content && typeof content === 'object' && typeof content.text === 'string') {
-    return content.text
+    return content.text.trim()
   }
   if (Array.isArray(content)) {
-    return content.map((part: any) => (typeof part?.text === 'string' ? part.text : '')).join('')
+    const joined = content
+      .map((part: any) => {
+        if (typeof part?.text === 'string') return part.text
+        if (typeof part?.text?.value === 'string') return part.text.value
+        if (typeof part?.text?.content === 'string') return part.text.content
+        if (typeof part?.content === 'string') return part.content
+        return ''
+      })
+      .join('')
+    return joined.trim()
   }
-  if (typeof message.refusal === 'string') return message.refusal
+  if (typeof message.refusal === 'string') return message.refusal.trim()
+  if (typeof (message as any).output_text === 'string') return String((message as any).output_text).trim()
   return ''
 }
 

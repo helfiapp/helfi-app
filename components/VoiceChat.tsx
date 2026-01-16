@@ -51,8 +51,7 @@ export default function VoiceChat({
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null)
-  const [pendingPhotoName, setPendingPhotoName] = useState<string>('')
+  const [pendingPhotos, setPendingPhotos] = useState<File[]>([])
   const [isListening, setIsListening] = useState(false)
   const [currentThreadCharged, setCurrentThreadCharged] = useState(false)
   const [lastChargedCost, setLastChargedCost] = useState<number | null>(null)
@@ -83,7 +82,7 @@ export default function VoiceChat({
   const healthTipCategory = context?.healthTipCategory
   const healthTipSuggestedQuestions = context?.healthTipSuggestedQuestions
   const estimatedChatCost = currentThreadCharged ? 0 : VOICE_CHAT_COST_CREDITS
-  const estimatedPhotoCost = pendingPhoto ? PHOTO_ANALYSIS_COST_CREDITS : 0
+  const estimatedPhotoCost = pendingPhotos.length * PHOTO_ANALYSIS_COST_CREDITS
   const estimatedCost = estimatedChatCost + estimatedPhotoCost
 
   const healthTipSuggestionQuestions = useMemo(() => {
@@ -203,6 +202,8 @@ export default function VoiceChat({
   const resizeRafRef = useRef<number | null>(null)
   const longPressTimerRef = useRef<number | null>(null)
   const longPressTriggeredRef = useRef(false)
+  const latestAssistantRef = useRef<HTMLDivElement | null>(null)
+  const lastMessageCountRef = useRef(0)
 
   // Smooth, single-frame resize to avoid jumpiness when typing.
   const resizeTextarea = useCallback(() => {
@@ -543,7 +544,18 @@ export default function VoiceChat({
     const container = containerRef.current
     if (!container) return
     if (messages.length === 0 && !loading) return
-    container.scrollTop = container.scrollHeight
+
+    const isNewMessage = messages.length !== lastMessageCountRef.current
+    if (isNewMessage) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage?.role === 'assistant' && latestAssistantRef.current) {
+        latestAssistantRef.current.scrollIntoView({ block: 'start' })
+      } else {
+        container.scrollTop = container.scrollHeight
+      }
+      lastMessageCountRef.current = messages.length
+    }
+
     return () => {
       if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
     }
@@ -601,36 +613,44 @@ export default function VoiceChat({
     photoInputRef.current?.click()
   }
 
-  const clearPendingPhoto = () => {
-    setPendingPhoto(null)
-    setPendingPhotoName('')
+  const clearPendingPhotos = () => {
+    setPendingPhotos([])
     if (photoInputRef.current) {
       photoInputRef.current.value = ''
     }
   }
 
+  const removePendingPhoto = (index: number) => {
+    setPendingPhotos((prev) => prev.filter((_, idx) => idx !== index))
+  }
+
   const handlePhotoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    setPendingPhoto(file)
-    setPendingPhotoName(file.name || 'Photo')
+    const files = Array.from(event.target.files || [])
+    if (files.length === 0) return
+    setPendingPhotos((prev) => [...prev, ...files])
+    if (photoInputRef.current) {
+      photoInputRef.current.value = ''
+    }
   }
 
   const sendFridgePhoto = async (note: string) => {
-    if (!pendingPhoto) return
+    if (pendingPhotos.length === 0) return
     setLoading(true)
     setError(null)
     stopListening()
     setLastChargedCost(null)
     setLastChargedAt(null)
 
-    const userMessage = note ? `Fridge/pantry photo: ${note}` : 'Fridge/pantry photo'
+    const photoLabel = pendingPhotos.length > 1 ? `Fridge/pantry photos (${pendingPhotos.length})` : 'Fridge/pantry photo'
+    const userMessage = note ? `${photoLabel}: ${note}` : photoLabel
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
     setInput('')
 
     const { localDate, tzOffsetMin } = buildLocalDatePayload()
     const formData = new FormData()
-    formData.append('image', pendingPhoto)
+    pendingPhotos.forEach((file) => {
+      formData.append('image', file)
+    })
     formData.append('message', note)
     formData.append('threadId', currentThreadId || '')
     formData.append('newThread', 'false')
@@ -684,7 +704,7 @@ export default function VoiceChat({
         }
       }
 
-      clearPendingPhoto()
+      clearPendingPhotos()
     } catch (err) {
       console.error('Failed to analyze fridge photo:', err)
       setError('Unable to analyze the photo right now.')
@@ -697,12 +717,12 @@ export default function VoiceChat({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const text = input.trim()
-    if (!text && !pendingPhoto) {
+    if (!text && pendingPhotos.length === 0) {
       setError('Enter a question or use voice input.')
       return
     }
 
-    if (pendingPhoto) {
+    if (pendingPhotos.length > 0) {
       await sendFridgePhoto(text)
       return
     }
@@ -1301,8 +1321,11 @@ export default function VoiceChat({
                 </div>
               )}
 
-              {messages.map((m, idx) => (
-                <div key={idx} className={`group flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              {messages.map((m, idx) => {
+                const isLast = idx === messages.length - 1
+                const assistantRef = m.role === 'assistant' && isLast ? latestAssistantRef : undefined
+                return (
+                <div ref={assistantRef} key={idx} className={`group flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                     m.role === 'user'
                       ? 'bg-black text-white shadow-md'
@@ -1327,7 +1350,7 @@ export default function VoiceChat({
                     )}
                   </div>
                 </div>
-              ))}
+              )})}
 
               {loading && (
                 <div className="group flex gap-4">
@@ -1361,7 +1384,8 @@ export default function VoiceChat({
                   )}
                   {estimatedPhotoCost > 0 && (
                     <span>
-                      Photo analysis <span className="font-semibold text-gray-700">{estimatedPhotoCost} credits</span> per photo
+                      Photo analysis <span className="font-semibold text-gray-700">{estimatedPhotoCost} credits</span>
+                      {' '}for {pendingPhotos.length} photo{pendingPhotos.length > 1 ? 's' : ''}
                     </span>
                   )}
                   {lastChargedCost !== null && (
@@ -1387,19 +1411,38 @@ export default function VoiceChat({
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  multiple
                   className="hidden"
                   onChange={handlePhotoSelected}
                 />
-                {pendingPhoto && (
-                  <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[14px] md:text-[12px] text-amber-800">
-                    <span className="truncate">{pendingPhotoName || 'Photo ready'} (adds {PHOTO_ANALYSIS_COST_CREDITS} credits)</span>
-                    <button
-                      type="button"
-                      onClick={clearPendingPhoto}
-                      className="ml-3 rounded-lg px-2 py-1 text-[13px] md:text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
-                    >
-                      Remove
-                    </button>
+                {pendingPhotos.length > 0 && (
+                  <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[14px] md:text-[12px] text-amber-800">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>
+                        {pendingPhotos.length} photo{pendingPhotos.length > 1 ? 's' : ''} selected
+                        {' '} (adds {PHOTO_ANALYSIS_COST_CREDITS * pendingPhotos.length} credits)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearPendingPhotos}
+                        className="rounded-lg px-2 py-1 text-[13px] md:text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                      >
+                        Remove all
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {pendingPhotos.map((photo, idx) => (
+                        <button
+                          key={`${photo.name}-${idx}`}
+                          type="button"
+                          onClick={() => removePendingPhoto(idx)}
+                          className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-white px-3 py-1 text-[12px] md:text-[11px] text-amber-900 hover:bg-amber-100"
+                        >
+                          <span className="truncate max-w-[160px]">{photo.name || `Photo ${idx + 1}`}</span>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 <textarea
@@ -1438,7 +1481,7 @@ export default function VoiceChat({
                   )}
                   <button
                     type="submit"
-                    disabled={loading || isListening || (!input.trim() && !pendingPhoto)}
+                    disabled={loading || isListening || (!input.trim() && pendingPhotos.length === 0)}
                     className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 transition-all shadow-sm"
                     aria-label="Send message"
                   >
