@@ -18,6 +18,14 @@ export type PractitionerScreeningInput = {
   hasPhone?: boolean
   hasWebsite?: boolean
   hasPublicEmail?: boolean
+  placeMatch?: {
+    status: 'MATCH' | 'MISMATCH' | 'NOT_FOUND' | 'UNKNOWN'
+    reason?: string
+    placeName?: string | null
+    placeTypes?: string[]
+    businessStatus?: string | null
+  }
+  testSignals?: string[]
 }
 
 export type PractitionerScreeningResult = {
@@ -93,7 +101,9 @@ IMPORTANT:
 - Only flag listings when there are clear, serious concerns (fraud, impersonation, illegal claims, guaranteed cures, miracle results, financial scams).
 - Normal wellness or holistic language is NOT a reason to flag a listing.
 - If the listing has a real address/coordinates and a phone number, that is a strong legitimacy signal.
-- If unsure, choose LOW and AUTO_APPROVE.
+- If the listing includes obvious test/dummy language, choose MANUAL_REVIEW.
+- If the place match status is MISMATCH or NOT_FOUND, choose MANUAL_REVIEW.
+- If unsure, choose MANUAL_REVIEW.
 `
   const user = {
     input,
@@ -103,6 +113,8 @@ IMPORTANT:
       'Likely spam or automated content',
       'Unclear or fake business identity',
       'High-risk language or scams',
+      'Test or placeholder content',
+      'Google Places mismatch or missing business listing',
     ],
   }
 

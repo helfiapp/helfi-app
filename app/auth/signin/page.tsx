@@ -1,6 +1,6 @@
 'use client'
 
-import { signIn, useSession } from 'next-auth/react'
+import { signIn, signOut, useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState, useEffect, Suspense, useRef } from 'react'
@@ -134,7 +134,7 @@ const sanitizeNextTarget = (value: string | null) => {
 
 export default function SignIn() {
   const router = useRouter()
-  const { status } = useSession()
+  const { status, data: session } = useSession()
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -167,10 +167,20 @@ export default function SignIn() {
       router.replace('/dashboard')
       return
     }
+    const searchParams = new URLSearchParams(window.location.search)
+    if (searchParams.get('reauth') === '1') {
+      return
+    }
 
     const resume = async () => {
+      if (session?.user?.isPractitioner) {
+        if (maybeShowInstallPrompt('/practitioner')) {
+          return
+        }
+        router.replace('/practitioner')
+        return
+      }
       // Check for plan parameter - first from URL, then from sessionStorage (for post-verification flow)
-      const searchParams = new URLSearchParams(window.location.search)
       let planParam = searchParams.get('plan')
       
       // If no plan in URL, check sessionStorage (stored during signup)
@@ -250,7 +260,34 @@ export default function SignIn() {
     }
 
     void resume()
-  }, [status, router, installPromptVisible])
+  }, [status, router, installPromptVisible, session])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (status === 'loading') return
+    const searchParams = new URLSearchParams(window.location.search)
+    if (searchParams.get('reauth') !== '1') return
+
+    skipAutoRedirectRef.current = true
+    const clearSession = async () => {
+      try {
+        await signOut({ redirect: false })
+      } catch (error) {
+        console.warn('Session clear failed', error)
+      }
+      try {
+        const nextUrl = new URL(window.location.href)
+        nextUrl.searchParams.delete('reauth')
+        window.history.replaceState({}, '', nextUrl.toString())
+      } catch {
+        // Ignore URL cleanup errors
+      } finally {
+        skipAutoRedirectRef.current = false
+      }
+    }
+
+    void clearSession()
+  }, [status])
 
   useEffect(() => {
     if (typeof window === 'undefined') return

@@ -32,7 +32,10 @@ export async function middleware(request: NextRequest) {
     if (token) {
       // PWA guard rail: signed-in Home Screen opens must skip login/marketing.
       // If you touch this, read GUARD_RAILS.md (PWA Home Screen / Entry Path).
-      if (request.nextUrl.pathname === '/auth/signin' || request.nextUrl.pathname === '/') {
+      const forceLogin =
+        request.nextUrl.searchParams.get('reauth') === '1' ||
+        request.nextUrl.searchParams.get('forceLogin') === '1'
+      if (!forceLogin && (request.nextUrl.pathname === '/auth/signin' || request.nextUrl.pathname === '/')) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/pwa-entry'
         return NextResponse.redirect(redirectUrl)

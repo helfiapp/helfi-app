@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { PractitionerAiRiskLevel } from '@prisma/client'
 import { screenPractitionerListing } from '@/lib/practitioner-screening'
+import { detectTestSignals, lookupPlaceMatch } from '@/lib/practitioner-review'
 import {
   sendPractitionerAdminActivatedEmail,
   sendPractitionerAdminFlaggedEmail,
@@ -75,28 +76,81 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const hasWebsite = Boolean(listing.websiteUrl)
   const hasPublicEmail = Boolean(listing.emailPublic)
 
+  const addressString = [listing.addressLine1, listing.suburbCity, listing.stateRegion, listing.postcode, listing.country]
+    .filter(Boolean)
+    .join(', ')
+
+  const testSignals = detectTestSignals({
+    displayName: listing.displayName,
+    description: listing.description,
+    websiteUrl: listing.websiteUrl,
+    emailPublic: listing.emailPublic,
+    phone: listing.phone,
+    tags: listing.tags,
+    address: addressString,
+  })
+
+  const placeMatch = await lookupPlaceMatch({
+    displayName: listing.displayName,
+    address: addressString,
+    categoryName: category?.name || null,
+    subcategoryName: subcategory?.name || null,
+    categorySynonyms: category?.synonyms || [],
+    subcategorySynonyms: subcategory?.synonyms || [],
+  })
+
+  const manualReviewReasons: string[] = []
+  if (testSignals.length > 0) {
+    manualReviewReasons.push(...testSignals)
+  }
+  if (placeMatch.status === 'NOT_FOUND') {
+    manualReviewReasons.push('No Google business listing found for the name/address.')
+  }
+  if (placeMatch.status === 'MISMATCH') {
+    manualReviewReasons.push(placeMatch.reason)
+  }
+  if (placeMatch.status === 'UNKNOWN' && placeMatch.reason === 'Google returned only generic place types.') {
+    manualReviewReasons.push('Google does not show this address as a business listing.')
+  }
+
   let screening
   try {
-    screening = await screenPractitionerListing({
-      listingId: listing.id,
-      displayName: listing.displayName,
-      description: listing.description,
-      websiteUrl: listing.websiteUrl,
-      phone: listing.phone,
-      emailPublic: listing.emailPublic,
-      address: [listing.addressLine1, listing.suburbCity, listing.stateRegion, listing.postcode, listing.country]
-        .filter(Boolean)
-        .join(', '),
-      category: category?.name || null,
-      subcategory: subcategory?.name || null,
-      tags: listing.tags,
-      languages: listing.languages,
-      hasCoordinates,
-      hasFullAddress,
-      hasPhone,
-      hasWebsite,
-      hasPublicEmail,
-    })
+    if (manualReviewReasons.length > 0) {
+      screening = {
+        riskLevel: 'MEDIUM',
+        recommendedAction: 'MANUAL_REVIEW',
+        reasoning: 'Listing requires manual review based on verification checks.',
+        redFlags: manualReviewReasons,
+        raw: { manualReviewReasons, placeMatch },
+      }
+    } else {
+      screening = await screenPractitionerListing({
+        listingId: listing.id,
+        displayName: listing.displayName,
+        description: listing.description,
+        websiteUrl: listing.websiteUrl,
+        phone: listing.phone,
+        emailPublic: listing.emailPublic,
+        address: addressString,
+        category: category?.name || null,
+        subcategory: subcategory?.name || null,
+        tags: listing.tags,
+        languages: listing.languages,
+        hasCoordinates,
+        hasFullAddress,
+        hasPhone,
+        hasWebsite,
+        hasPublicEmail,
+        placeMatch: {
+          status: placeMatch.status,
+          reason: placeMatch.reason,
+          placeName: placeMatch.placeName || null,
+          placeTypes: placeMatch.placeTypes || [],
+          businessStatus: placeMatch.businessStatus || null,
+        },
+        testSignals,
+      })
+    }
   } catch (error: any) {
     screening = {
       riskLevel: 'MEDIUM',
@@ -109,7 +163,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const aiRiskLevel = screening.riskLevel as PractitionerAiRiskLevel
   const aiReasoning = screening.reasoning
   const aiRawJson = screening.raw || null
-  const needsManualReview = screening.recommendedAction === 'MANUAL_REVIEW' || aiRiskLevel !== 'LOW'
+  const needsManualReview =
+    manualReviewReasons.length > 0 || screening.recommendedAction === 'MANUAL_REVIEW' || aiRiskLevel !== 'LOW'
 
   if (needsManualReview) {
     const updated = await prisma.practitionerListing.update({

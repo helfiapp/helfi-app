@@ -34,7 +34,7 @@ export default async function PwaEntryPage({
   const session = await getServerSession(authOptions)
   const email = session?.user?.email?.toLowerCase()
   if (!email) {
-    redirect('/auth/signin')
+    redirect('/auth/signin?reauth=1')
   }
 
   // Read the last in-app page recorded by the client.
@@ -52,7 +52,7 @@ export default async function PwaEntryPage({
   })
 
   if (!user) {
-    redirect('/auth/signin')
+    redirect('/auth/signin?reauth=1')
   }
 
   const visibleGoals = user.healthGoals.filter((goal) => !goal.name.startsWith('__'))

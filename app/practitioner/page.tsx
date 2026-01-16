@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { signOut, useSession } from 'next-auth/react'
@@ -53,6 +53,13 @@ type PractitionerStats = {
   total: number
 }
 
+type AddressPrediction = {
+  placeId: string
+  description: string
+  mainText: string
+  secondaryText: string
+}
+
 const emptyForm: ListingForm = {
   displayName: '',
   categoryId: '',
@@ -101,6 +108,11 @@ export default function PractitionerPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [logoUploading, setLogoUploading] = useState(false)
   const [galleryUploading, setGalleryUploading] = useState(false)
+  const [addressQuery, setAddressQuery] = useState('')
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressPrediction[]>([])
+  const [addressLoading, setAddressLoading] = useState(false)
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
+  const addressRequestRef = useRef(0)
 
   const subcategories = useMemo(() => {
     const parent = categories.find((cat) => cat.id === form.categoryId)
@@ -145,6 +157,7 @@ export default function PractitionerPage() {
         const listingJson = await listingRes.json().catch(() => ({}))
         if (listingRes.ok && listingJson?.listing) {
           const listing = listingJson.listing
+          setAddressQuery(listing.addressLine1 || '')
           setForm({
             displayName: listing.displayName || '',
             categoryId: listing.categoryId || '',
@@ -171,6 +184,7 @@ export default function PractitionerPage() {
         }
       } else {
         setForm(emptyForm)
+        setAddressQuery('')
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to load your listing')
@@ -178,6 +192,84 @@ export default function PractitionerPage() {
       setLoading(false)
     }
   }
+
+  const findAddressComponent = (components: any[], types: string[]) => {
+    return components.find((component) => types.some((type) => component?.types?.includes(type)))
+  }
+
+  const handleAddressSelect = async (prediction: AddressPrediction) => {
+    setAddressQuery(prediction.description)
+    setShowAddressSuggestions(false)
+    setAddressLoading(true)
+    try {
+      const res = await fetch(`/api/practitioner/places/details?placeId=${encodeURIComponent(prediction.placeId)}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to load address details')
+
+      const components = Array.isArray(data?.place?.addressComponents) ? data.place.addressComponents : []
+      const streetNumber = findAddressComponent(components, ['street_number'])?.long_name || ''
+      const route = findAddressComponent(components, ['route'])?.long_name || ''
+      const line1 = [streetNumber, route].filter(Boolean).join(' ')
+      const subpremise = findAddressComponent(components, ['subpremise'])?.long_name || ''
+      const city =
+        findAddressComponent(components, ['locality'])?.long_name ||
+        findAddressComponent(components, ['postal_town'])?.long_name ||
+        findAddressComponent(components, ['sublocality_level_1'])?.long_name ||
+        findAddressComponent(components, ['administrative_area_level_2'])?.long_name ||
+        ''
+      const state = findAddressComponent(components, ['administrative_area_level_1'])?.short_name || ''
+      const postcode = findAddressComponent(components, ['postal_code'])?.long_name || ''
+      const country = findAddressComponent(components, ['country'])?.long_name || ''
+      const location = data?.place?.geometry?.location
+
+      setForm((prev) => ({
+        ...prev,
+        addressLine1: line1 || prediction.description,
+        addressLine2: subpremise,
+        suburbCity: city,
+        stateRegion: state,
+        postcode,
+        country,
+        lat: location?.lat != null ? String(location.lat) : prev.lat,
+        lng: location?.lng != null ? String(location.lng) : prev.lng,
+      }))
+    } catch (err) {
+      console.error('Address lookup failed', err)
+    } finally {
+      setAddressLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!addressQuery || addressQuery.trim().length < 3) {
+      setAddressSuggestions([])
+      setAddressLoading(false)
+      return
+    }
+
+    const requestId = ++addressRequestRef.current
+    const timeout = window.setTimeout(async () => {
+      setAddressLoading(true)
+      try {
+        const res = await fetch(`/api/practitioner/places/autocomplete?q=${encodeURIComponent(addressQuery.trim())}`)
+        const data = await res.json().catch(() => ({}))
+        if (requestId !== addressRequestRef.current) return
+        if (!res.ok) throw new Error(data?.error || 'Failed to load suggestions')
+        setAddressSuggestions(Array.isArray(data?.predictions) ? data.predictions : [])
+      } catch (err) {
+        console.error('Address autocomplete failed', err)
+        if (requestId === addressRequestRef.current) {
+          setAddressSuggestions([])
+        }
+      } finally {
+        if (requestId === addressRequestRef.current) {
+          setAddressLoading(false)
+        }
+      }
+    }, 250)
+
+    return () => window.clearTimeout(timeout)
+  }, [addressQuery])
 
   const loadStats = async () => {
     setStatsLoading(true)
@@ -939,6 +1031,45 @@ export default function PractitionerPage() {
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Search address</label>
+                  <div className="relative">
+                    <input
+                      value={addressQuery}
+                      onChange={(e) => {
+                        setAddressQuery(e.target.value)
+                        setShowAddressSuggestions(true)
+                      }}
+                      onFocus={() => setShowAddressSuggestions(true)}
+                      onBlur={() => {
+                        window.setTimeout(() => setShowAddressSuggestions(false), 150)
+                      }}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      placeholder="Start typing your address..."
+                    />
+                    {showAddressSuggestions && (addressSuggestions.length > 0 || addressLoading) && (
+                      <div className="absolute z-20 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-64 overflow-auto">
+                        {addressLoading && (
+                          <div className="px-4 py-3 text-sm text-gray-500">Searching addresses...</div>
+                        )}
+                        {addressSuggestions.map((item) => (
+                          <button
+                            type="button"
+                            key={item.placeId}
+                            onClick={() => handleAddressSelect(item)}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm"
+                          >
+                            <div className="font-medium text-gray-900">{item.mainText || item.description}</div>
+                            {item.secondaryText && (
+                              <div className="text-xs text-gray-500">{item.secondaryText}</div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Select a suggestion to auto-fill the address fields.</p>
+                </div>
                 <input
                   value={form.addressLine1}
                   onChange={(e) => updateField('addressLine1', e.target.value)}
