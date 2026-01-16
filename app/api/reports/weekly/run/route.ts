@@ -701,7 +701,7 @@ export async function POST(request: NextRequest) {
     talkToAi: talkToAiSummary,
   }
 
-  const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+  const model = process.env.OPENAI_WEEKLY_REPORT_MODEL || 'gpt-5.2-chat-latest'
   const llmEnabledRaw = (process.env.ENABLE_INSIGHTS_LLM || '').toLowerCase().trim()
   const llmEnabled = llmEnabledRaw === 'true' || llmEnabledRaw === '1' || llmEnabledRaw === 'yes'
   let reportPayload: any = null
