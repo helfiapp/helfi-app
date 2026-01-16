@@ -12,6 +12,7 @@ import { useUserData } from '@/components/providers/UserDataProvider';
 import MobileMoreMenu from '@/components/MobileMoreMenu';
 import UsageMeter from '@/components/UsageMeter';
 import InsightsProgressBar from '@/components/InsightsProgressBar';
+import LabReportUpload from '@/components/reports/LabReportUpload';
 import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import MaterialSymbol from '@/components/MaterialSymbol';
 import { DIET_CATEGORIES, DIET_OPTIONS, getDietOption, normalizeDietTypes } from '@/lib/diets';
@@ -62,20 +63,53 @@ const shouldStampHealthSetup = (payload: any) => {
   return Object.keys(payload).some((key) => HEALTH_SETUP_STAMP_KEYS.has(key))
 }
 
+const normalizeTimingList = (timing: any) => {
+  if (Array.isArray(timing)) {
+    return timing.map((value) => String(value || '').trim()).filter(Boolean).sort().join('|')
+  }
+  if (timing === null || timing === undefined) return ''
+  return String(timing).trim()
+}
+
+const buildItemKey = (item: any) => {
+  const name = String(item?.name || '').trim().toLowerCase()
+  const dosage = String(item?.dosage || '').trim().toLowerCase()
+  const timing = normalizeTimingList(item?.timing)
+  const scheduleInfo = String(item?.scheduleInfo || '').trim().toLowerCase()
+  const imageUrl = String(item?.imageUrl || '').trim().toLowerCase()
+  return `${name}|${dosage}|${timing}|${scheduleInfo}|${imageUrl}`
+}
+
+const dedupeItems = (items: any[]) => {
+  const seen = new Set<string>()
+  const result: any[] = []
+  items.forEach((item) => {
+    if (!item || !item.name) return
+    const key = buildItemKey(item)
+    if (seen.has(key)) return
+    seen.add(key)
+    result.push(item)
+  })
+  return result
+}
+
 const sanitizeUserDataPayload = (payload: any, options?: { forceStamp?: boolean }) => {
   if (!payload || typeof payload !== 'object') return payload;
   // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
   const { todaysFoods, favorites, ...rest } = payload as any;
+  const sanitizedSupplements = Array.isArray(rest.supplements) ? dedupeItems(rest.supplements) : rest.supplements
+  const sanitizedMedications = Array.isArray(rest.medications) ? dedupeItems(rest.medications) : rest.medications
+  const sanitized = { ...rest, supplements: sanitizedSupplements, medications: sanitizedMedications }
   if (options?.forceStamp && shouldStampHealthSetup(rest)) {
-    return { ...rest, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() }
+    return { ...sanitized, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() }
   }
-  if (rest.healthSetupUpdatedAt) {
-    return rest;
+  if (sanitized.healthSetupUpdatedAt) {
+    return sanitized;
   }
-  if (shouldStampHealthSetup(rest)) {
-    return { ...rest, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() }
+  if (shouldStampHealthSetup(sanitized)) {
+    return { ...sanitized, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() }
   }
-  return rest;
+  return sanitized;
 };
 
 const AUTO_UPDATE_INSIGHTS_ON_EXIT = true;
@@ -4536,7 +4570,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   // Fix data loading race condition - update supplements when initial data loads
   useEffect(() => {
     if (initial?.supplements) {
-      setSupplements(initial.supplements);
+      setSupplements(dedupeItems(initial.supplements));
     }
   }, [initial?.supplements]);
   useEffect(() => {
@@ -4874,9 +4908,9 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       
       if (editingIndex !== null) {
         // Update existing supplement - show popup after saving
-        const updatedSupplements = supplements.map((item: any, index: number) => 
+        const updatedSupplements = dedupeItems(supplements.map((item: any, index: number) => 
           index === editingIndex ? supplementData : item
-        );
+        ));
         setSupplements(updatedSupplements);
         setSupplementsToSave(updatedSupplements);
         setEditingIndex(null);
@@ -4900,7 +4934,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       } else {
         // Add new supplement - defer popup until user tries to navigate away
         setSupplements((prev: any[]) => {
-          const updatedSupplements = [...prev, supplementData];
+          const updatedSupplements = dedupeItems([...prev, supplementData]);
           setSupplementsToSave(updatedSupplements);
           // Mark as having unsaved changes for future navigation prompts
           setHasUnsavedChanges(true);
@@ -5008,7 +5042,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   };
 
   const removeSupplement = async (index: number) => {
-    const updatedSupplements = supplements.filter((_: any, i: number) => i !== index);
+    const updatedSupplements = dedupeItems(supplements.filter((_: any, i: number) => i !== index));
     setSupplements(updatedSupplements);
     
     // Store updated supplements for potential update action
@@ -5539,7 +5573,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   // Fix data loading race condition - update medications when initial data loads
   useEffect(() => {
     if (initial?.medications) {
-      setMedications(initial.medications);
+      setMedications(dedupeItems(initial.medications));
     }
   }, [initial?.medications]);
   
@@ -5846,9 +5880,9 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       if (editingIndex !== null) {
         // Update existing medication - show popup after saving
-        const updatedMedications = medications.map((item: any, index: number) => 
+        const updatedMedications = dedupeItems(medications.map((item: any, index: number) => 
           index === editingIndex ? medicationData : item
-        );
+        ));
         setMedications(updatedMedications);
         setMedicationsToSave(updatedMedications);
         setEditingIndex(null);
@@ -5872,7 +5906,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       } else {
         // Add new medication - defer popup until navigation
         setMedications((prev: any[]) => {
-          const updatedMedications = [...prev, medicationData];
+          const updatedMedications = dedupeItems([...prev, medicationData]);
           setMedicationsToSave(updatedMedications);
           // Mark as having unsaved changes for future prompts
           setHasUnsavedChanges(true);
@@ -5980,7 +6014,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   };
 
   const removeMedication = async (index: number) => {
-    const updatedMedications = medications.filter((_: any, i: number) => i !== index);
+    const updatedMedications = dedupeItems(medications.filter((_: any, i: number) => i !== index));
     setMedications(updatedMedications);
     
     // Store updated medications for potential update action
@@ -6505,127 +6539,142 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   );
 }
 
-function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
-  const [uploadMethod, setUploadMethod] = useState<'documents' | 'images'>(initial?.bloodResults?.uploadMethod || initial?.uploadMethod || 'documents');
-  const [documents, setDocuments] = useState<File[]>(initial?.bloodResults?.documents || initial?.documents || []);
-  const [images, setImages] = useState<File[]>(initial?.bloodResults?.images || initial?.images || []);
-  const [notes, setNotes] = useState(initial?.bloodResults?.notes || initial?.notes || '');
-  const [skipped, setSkipped] = useState(initial?.bloodResults?.skipped || initial?.skipped || false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
-  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+function BloodResultsStep({
+  onNext,
+  onBack,
+  initial,
+  onPartialSave,
+}: {
+  onNext: (data: any) => void
+  onBack: () => void
+  initial?: any
+  onPartialSave?: (data: any) => void
+}) {
+  const [notes, setNotes] = useState(initial?.bloodResults?.notes || initial?.notes || '')
+  const [skipped, setSkipped] = useState(initial?.bloodResults?.skipped || initial?.skipped || false)
+  const [reports, setReports] = useState<Array<{ id: string; originalFileName: string; status: string; createdAt: string; processingError?: string | null }>>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false)
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false)
+  const { requestNavigation, beforeUnloadHandler, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges)
 
-  // Track changes from initial values
+  const loadHistory = async () => {
+    setIsLoadingHistory(true)
+    try {
+      const res = await fetch('/api/reports/list')
+      if (res.ok) {
+        const data = await res.json()
+        const nextReports = Array.isArray(data?.reports) ? data.reports : []
+        setReports(nextReports)
+        if (onPartialSave) {
+          onPartialSave({
+            bloodResults: {
+              reportIds: nextReports.map((r: any) => r.id),
+              notes: notes.trim(),
+              skipped,
+            },
+          })
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load report history', error)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
   useEffect(() => {
-    const initialDocs = initial?.bloodResults?.documents || initial?.documents || [];
-    const initialImgs = initial?.bloodResults?.images || initial?.images || [];
-    const initialNotes = initial?.bloodResults?.notes || initial?.notes || '';
-    const docsChanged = documents.length !== initialDocs.length || 
-                       documents.some((doc, idx) => doc.name !== initialDocs[idx]?.name);
-    const imgsChanged = images.length !== initialImgs.length || 
-                        images.some((img, idx) => img.name !== initialImgs[idx]?.name);
-    const notesChanged = notes.trim() !== initialNotes.trim();
-    setHasUnsavedChanges((docsChanged || imgsChanged || notesChanged) && !skipped && (documents.length > 0 || images.length > 0 || notes.trim()));
-  }, [documents, images, notes, skipped, initial]);
+    loadHistory()
+  }, [])
 
-  // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
-    window.addEventListener('beforeunload', beforeUnloadHandler);
-    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
-  }, [beforeUnloadHandler]);
+    const initialNotes = initial?.bloodResults?.notes || initial?.notes || ''
+    const notesChanged = notes.trim() !== String(initialNotes || '').trim()
+    setHasUnsavedChanges(notesChanged && !skipped)
+    if (onPartialSave) {
+      onPartialSave({
+        bloodResults: {
+          reportIds: reports.map((r) => r.id),
+          notes: notes.trim(),
+          skipped,
+        },
+      })
+    }
+  }, [notes, skipped, reports, onPartialSave, initial])
 
-  // Handle Update Insights button click
+  useEffect(() => {
+    window.addEventListener('beforeunload', beforeUnloadHandler)
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler)
+  }, [beforeUnloadHandler])
+
   const handleUpdateInsights = async () => {
-    setIsGeneratingInsights(true);
+    setIsGeneratingInsights(true)
     try {
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sanitizeUserDataPayload({ 
-          bloodResults: {
-            uploadMethod,
-            documents: documents.map(f => f.name),
-            images: images.map(f => f.name),
-            notes: notes.trim(),
-            skipped: false
-          }
-        }))
-      });
-      
+        body: JSON.stringify(
+          sanitizeUserDataPayload({
+            bloodResults: {
+              reportIds: reports.map((r) => r.id),
+              notes: notes.trim(),
+              skipped: false,
+            },
+          })
+        ),
+      })
+
       if (response.ok) {
-        // Data saved successfully
-        setHasUnsavedChanges(false);
-        
-        // Fire regen in background WITHOUT waiting
-        fireAndForgetInsightsRegen(['blood_results']);
-        
-        // Close popup immediately
-        setShowUpdatePopup(false);
+        setHasUnsavedChanges(false)
+        fireAndForgetInsightsRegen(['blood_results'])
+        setShowUpdatePopup(false)
       } else {
-        alert('Failed to save your changes. Please try again.');
+        alert('Failed to save your changes. Please try again.')
       }
     } catch (error) {
-      console.error('Error saving data:', error);
-      alert('Failed to save your changes. Please try again.');
+      console.error('Error saving data:', error)
+      alert('Failed to save your changes. Please try again.')
     } finally {
-      setIsGeneratingInsights(false);
+      setIsGeneratingInsights(false)
     }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'documents' | 'images') => {
-    const files = Array.from(e.target.files || []);
-    if (type === 'documents') {
-      setDocuments(prev => [...prev, ...files]);
-    } else {
-      setImages(prev => [...prev, ...files]);
-    }
-  };
-
-  const removeFile = (index: number, type: 'documents' | 'images') => {
-    if (type === 'documents') {
-      setDocuments(prev => prev.filter((_, i) => i !== index));
-    } else {
-      setImages(prev => prev.filter((_, i) => i !== index));
-    }
-  };
+  }
 
   const triggerPopup = () => {
     if (!showUpdatePopup) {
-      setShowUpdatePopup(true);
+      setShowUpdatePopup(true)
     }
-  };
+  }
 
   const handleNext = () => {
     requestNavigation(() => {
-      const bloodResultsData = {
-        uploadMethod,
-        documents: documents.filter(f => f != null).map(f => f.name),
-        images: images.filter(f => f != null).map(f => f.name),
-        notes: notes.trim(),
-        skipped
-      };
-      onNext({ bloodResults: bloodResultsData });
-    }, triggerPopup);
-  };
+      onNext({
+        bloodResults: {
+          reportIds: reports.map((r) => r.id),
+          notes: notes.trim(),
+          skipped,
+        },
+      })
+    }, triggerPopup)
+  }
 
   const handleBack = () => {
-    requestNavigation(onBack, triggerPopup);
-  };
+    requestNavigation(onBack, triggerPopup)
+  }
 
   const handleSkip = () => {
     requestNavigation(() => {
-      setSkipped(true);
-      onNext({ bloodResults: { skipped: true, uploadMethod: 'documents', documents: [], images: [], notes: '' } });
-    }, triggerPopup);
-  };
+      setSkipped(true)
+      onNext({ bloodResults: { skipped: true, reportIds: [], notes: '' } })
+    }, triggerPopup)
+  }
 
   return (
     <div className="max-w-2xl mx-auto mt-8">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Upload your recent blood results</h2>
-          <button 
+          <button
             onClick={handleBack}
             className="text-gray-600 hover:text-gray-900 flex items-center"
           >
@@ -6645,145 +6694,52 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-700">
-                <strong>Optional but recommended:</strong> Blood results help our AI provide more accurate health insights and personalized recommendations. You can upload PDFs or take photos of your results.
+                <strong>Optional but recommended:</strong> Blood results help us build stronger weekly reports. You can upload multiple reports and keep a history here.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Upload Method Toggle */}
         <div className="mb-6">
-          <div className="flex rounded-lg border border-gray-200 p-1">
-            <button
-              onClick={() => setUploadMethod('documents')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'documents'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              📄 Upload PDFs
-            </button>
-            <button
-              onClick={() => setUploadMethod('images')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'images'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              📷 Take Photos
-            </button>
-          </div>
+          <LabReportUpload compact={true} onUploadComplete={() => loadHistory()} />
         </div>
 
-        {/* Document Upload */}
-        {uploadMethod === 'documents' && (
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Upload Blood Test Reports (PDF format)
-            </label>
-            <div className="relative">
-              <input
-                type="file"
-                accept=".pdf"
-                multiple
-                onChange={(e) => handleFileChange(e, 'documents')}
-                className="hidden"
-                id="document-upload"
-              />
-              <label
-                htmlFor="document-upload"
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <div className="text-center">
-                  <div className="text-gray-400 text-2xl mb-1">📄</div>
-                  <div className="text-sm text-gray-600">Click to upload PDF files</div>
-                  <div className="text-xs text-gray-500 mt-1">Multiple files allowed</div>
-                </div>
-              </label>
-            </div>
-
-            {/* Uploaded Documents */}
-            {documents.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <h4 className="text-sm font-medium text-gray-700">Uploaded Documents:</h4>
-                {documents.filter(file => file != null).map((file, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                    <span className="text-sm text-gray-600">{file.name}</span>
-                    <button
-                      onClick={() => removeFile(index, 'documents')}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Image Upload */}
-        {uploadMethod === 'images' && (
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Take Photos of Blood Test Results
-            </label>
-            <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                multiple
-                onChange={(e) => handleFileChange(e, 'images')}
-                className="hidden"
-                id="image-upload"
-              />
-              <label
-                htmlFor="image-upload"
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <div className="text-center">
-                  <div className="text-gray-400 text-2xl mb-1">📷</div>
-                  <div className="text-sm text-gray-600">Tap to take photos</div>
-                  <div className="text-xs text-gray-500 mt-1">Multiple images allowed</div>
-                </div>
-              </label>
-            </div>
-
-            {/* Uploaded Images */}
-            {images.length > 0 && (
-              <div className="mt-4 space-y-2">
-                <h4 className="text-sm font-medium text-gray-700">Uploaded Images:</h4>
-                {images.filter(file => file != null).map((file, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                    <span className="text-sm text-gray-600">{file.name}</span>
-                    <button
-                      onClick={() => removeFile(index, 'images')}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Additional Notes */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Additional notes about your blood results (optional)
+            Notes about your blood results (optional)
           </label>
           <textarea
             className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 resize-none"
             rows={3}
-            placeholder="e.g., Date of test, any specific concerns, doctor's comments..."
+            placeholder="e.g., Date of test, doctor comments, or any concerns..."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
+        </div>
+
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Previous reports</h3>
+          {isLoadingHistory ? (
+            <div className="text-sm text-gray-500">Loading report history...</div>
+          ) : reports.length === 0 ? (
+            <div className="text-sm text-gray-500">No reports uploaded yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {reports.map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <div>
+                    <div className="text-sm font-medium text-gray-800">{item.originalFileName || 'Lab report'}</div>
+                    <div className="text-xs text-gray-500">
+                      {new Date(item.createdAt).toLocaleDateString()} • {item.status || 'PENDING'}
+                    </div>
+                    {item.processingError ? (
+                      <div className="text-xs text-rose-600">Needs attention: {item.processingError}</div>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between">
@@ -6802,21 +6758,20 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
         </div>
       </div>
 
-      {/* Update Insights Popup */}
       <UpdateInsightsPopup
         isOpen={showUpdatePopup}
         onClose={() => {
-          setShowUpdatePopup(false);
+          setShowUpdatePopup(false)
         }}
         onAddMore={() => {
-          acknowledgeUnsavedChanges();
-          setShowUpdatePopup(false);
+          acknowledgeUnsavedChanges()
+          setShowUpdatePopup(false)
         }}
         onUpdateInsights={handleUpdateInsights}
         isGenerating={isGeneratingInsights}
       />
     </div>
-  );
+  )
 }
 
 function AIInsightsStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
@@ -6986,11 +6941,10 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         {data.bloodResults && !data.bloodResults.skipped && (
           <div className="mt-4 p-3 bg-green-50 rounded-lg">
             <div><b>Blood Results:</b></div>
-            {data.bloodResults.uploadMethod === 'documents' && data.bloodResults.documents?.length > 0 && (
-              <div className="ml-2 text-sm"><b>Documents:</b> {data.bloodResults.documents.join(', ')}</div>
-            )}
-            {data.bloodResults.uploadMethod === 'images' && data.bloodResults.images?.length > 0 && (
-              <div className="ml-2 text-sm"><b>Images:</b> {data.bloodResults.images.join(', ')}</div>
+            {Array.isArray(data.bloodResults.reportIds) && data.bloodResults.reportIds.length > 0 && (
+              <div className="ml-2 text-sm">
+                <b>Reports uploaded:</b> {data.bloodResults.reportIds.length}
+              </div>
             )}
             {data.bloodResults.notes && (
               <div className="ml-2 text-sm"><b>Notes:</b> {data.bloodResults.notes}</div>
@@ -8963,7 +8917,7 @@ export default function Onboarding() {
               setIsLoading(false);
             }}
           />}
-          {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} />}
           {step === 9 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 10 && <ReviewStep onBack={handleBack} data={form} />}
         </div>

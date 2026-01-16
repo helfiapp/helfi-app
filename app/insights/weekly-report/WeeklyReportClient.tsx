@@ -75,8 +75,21 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
   const sections = payload?.sections || {}
   const wins = Array.isArray(payload?.wins) ? payload.wins : []
   const gaps = Array.isArray(payload?.gaps) ? payload.gaps : []
-  const dataWarning = (report?.dataSummary as any)?.dataWarning as string | null
-  const talkToAiSummary = (report?.dataSummary as any)?.talkToAiSummary as
+  const parsedSummary = useMemo(() => {
+    if (!report?.dataSummary) return null
+    if (typeof report.dataSummary === 'string') {
+      try {
+        return JSON.parse(report.dataSummary)
+      } catch {
+        return null
+      }
+    }
+    if (typeof report.dataSummary !== 'object') return null
+    return report.dataSummary as any
+  }, [report])
+
+  const dataWarning = (parsedSummary as any)?.dataWarning as string | null
+  const talkToAiSummary = (parsedSummary as any)?.talkToAiSummary as
     | {
         messageCount?: number
         userMessageCount?: number
@@ -86,7 +99,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
         highlights?: Array<{ content?: string; createdAt?: string }>
       }
     | undefined
-  const coverage = (report?.dataSummary as any)?.coverage as
+  const coverage = (parsedSummary as any)?.coverage as
     | {
         daysActive?: number
         totalEvents?: number
@@ -100,7 +113,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
         talkToAiCount?: number
       }
     | undefined
-  const hydrationSummary = (report?.dataSummary as any)?.hydrationSummary as
+  const hydrationSummary = (parsedSummary as any)?.hydrationSummary as
     | {
         entries?: number
         totalMl?: number
@@ -109,13 +122,21 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
         topDrinks?: Array<{ label?: string; count?: number }>
       }
     | undefined
+  const labTrends = (parsedSummary as any)?.labTrends as
+    | Array<{
+        name?: string
+        latestValue?: number
+        previousValue?: number
+        unit?: string | null
+        change?: number
+        direction?: 'up' | 'down' | 'flat'
+        latestDate?: string
+        previousDate?: string
+      }>
+    | undefined
   const pdfHref = useMemo(() => {
-    if (!report) return null
-    const params = new URLSearchParams()
-    if (report.periodStart) params.set('from', `${report.periodStart}T00:00:00`)
-    if (report.periodEnd) params.set('to', `${report.periodEnd}T23:59:59`)
-    const query = params.toString()
-    return query ? `/api/export/pdf?${query}` : '/api/export/pdf'
+    if (!report?.id) return null
+    return `/api/reports/weekly/pdf?reportId=${encodeURIComponent(report.id)}`
   }, [report])
 
   if (!report) {
@@ -368,6 +389,27 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
           </div>
         ) : null}
 
+        {labTrends && labTrends.length > 0 && (
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Lab results movement</h2>
+            <p className="text-sm text-slate-600 mt-2">
+              Changes are shown without judging good or bad. Share with your clinician if needed.
+            </p>
+            <div className="mt-4 space-y-3">
+              {labTrends.slice(0, 6).map((trend, idx) => (
+                <div key={`lab-${idx}`} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="font-semibold text-slate-900">{trend.name || 'Lab value'}</div>
+                  <div className="text-sm text-slate-700 mt-1">
+                    {trend.previousValue ?? '-'} → {trend.latestValue ?? '-'}
+                    {trend.unit ? ` ${trend.unit}` : ''} (
+                    {trend.direction === 'up' ? 'up' : trend.direction === 'down' ? 'down' : 'flat'})
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {(wins.length > 0 || gaps.length > 0) && (
           <div className="mt-6 grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-6 shadow-sm">
@@ -444,15 +486,29 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
           <div className="mt-10">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Previous reports</h3>
             <div className="grid gap-3 md:grid-cols-2">
-              {reports.slice(0, 4).map((item) => (
-                <Link
+              {reports.map((item) => (
+                <div
                   key={item.id}
-                  href={`/insights/weekly-report?id=${encodeURIComponent(item.id)}`}
-                  className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700 hover:border-helfi-green"
+                  className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700"
                 >
-                  <div className="font-semibold">{item.periodStart} to {item.periodEnd}</div>
-                  <div className="text-xs text-gray-500 mt-1">Generated {new Date(item.createdAt).toLocaleDateString()}</div>
-                </Link>
+                  <Link
+                    href={`/insights/weekly-report?id=${encodeURIComponent(item.id)}`}
+                    className="block hover:text-helfi-green"
+                  >
+                    <div className="font-semibold">{item.periodStart} to {item.periodEnd}</div>
+                    <div className="text-xs text-gray-500 mt-1">Generated {new Date(item.createdAt).toLocaleDateString()}</div>
+                  </Link>
+                  <div className="mt-3 flex items-center gap-3">
+                    <a
+                      href={`/api/reports/weekly/pdf?reportId=${encodeURIComponent(item.id)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center rounded-lg border border-helfi-green px-3 py-1.5 text-xs font-semibold text-helfi-green hover:bg-helfi-green/10"
+                    >
+                      Download PDF
+                    </a>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

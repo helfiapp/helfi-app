@@ -67,11 +67,12 @@ export async function POST(req: NextRequest) {
     const title = isLocked
       ? 'Your 7-day health report is ready to unlock'
       : 'Your 7-day health report is ready'
+    const emailSubject = 'View your seven day health report'
     const bodyText = isLocked
       ? 'Unlock your report to see what is working, what to focus on next, and what to avoid.'
       : 'Open your report to see what is working, what to focus on next, and what to avoid.'
     const baseUrl = getBaseUrl()
-    const reportUrl = isLocked ? `${baseUrl}/billing` : `${baseUrl}/insights/weekly-report`
+    const reportUrl = `${baseUrl}/insights/weekly-report?id=${encodeURIComponent(report.id)}`
 
     const results: Record<string, string> = {}
     let loggedInbox = false
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
             const payload = JSON.stringify({
               title,
               body: bodyText,
-              url: isLocked ? '/billing' : '/insights/weekly-report',
+              url: `/insights/weekly-report?id=${reportId}`,
             })
             const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
               webpush.sendNotification(sub, payload)
@@ -133,14 +134,14 @@ export async function POST(req: NextRequest) {
       } else if (!resend) {
         results.emailStatus = 'resend_not_configured'
       } else {
-        const subject = title
+        const subject = emailSubject
         const periodText = report.periodStart && report.periodEnd
           ? `${report.periodStart} to ${report.periodEnd}`
           : ''
         const summaryText = report.summary
           ? `<p style="margin: 12px 0; color: #475569;">${escapeHtml(report.summary)}</p>`
           : ''
-        const actionLabel = isLocked ? 'Unlock report' : 'View report'
+        const actionLabel = 'Health Report'
 
         const html = `
           <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #0f172a;">
@@ -156,7 +157,7 @@ export async function POST(req: NextRequest) {
             })}
           </div>
         `
-        const text = `${title}\n${bodyText}\n${periodText ? `Period: ${periodText}\n` : ''}${report.summary || ''}\n\nView: ${reportUrl}`
+        const text = `${emailSubject}\n${bodyText}\n${periodText ? `Period: ${periodText}\n` : ''}${report.summary || ''}\n\nView: ${reportUrl}`
 
         try {
           await resend.emails.send({
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
         userId,
         title,
         body: bodyText,
-        url: isLocked ? '/billing' : '/insights/weekly-report',
+        url: `/insights/weekly-report?id=${reportId}`,
         type: 'weekly_report',
         source: 'system',
         eventKey: `weekly_report:${reportId}`,

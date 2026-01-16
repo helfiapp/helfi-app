@@ -5,9 +5,10 @@ import ConsentGate, { ConsentData } from './ConsentGate';
 
 interface LabReportUploadProps {
   onUploadComplete?: (reportId: string) => void;
+  compact?: boolean;
 }
 
-export default function LabReportUpload({ onUploadComplete }: LabReportUploadProps) {
+export default function LabReportUpload({ onUploadComplete, compact }: LabReportUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
   const [consentData, setConsentData] = useState<ConsentData | null>(null);
@@ -129,13 +130,17 @@ export default function LabReportUpload({ onUploadComplete }: LabReportUploadPro
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">
-        Upload Laboratory Report
-      </h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Processing uses AI credits (2× OpenAI cost). Typical: 6–10 credits depending on file length and extraction.
-      </p>
+    <div className={compact ? 'max-w-3xl mx-auto' : 'max-w-3xl mx-auto p-6'}>
+      {!compact && (
+        <>
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">
+            Upload Laboratory Report
+          </h1>
+          <p className="text-sm text-gray-600 mb-4">
+            Processing uses AI credits (2× OpenAI cost). Typical: 6–10 credits depending on file length and extraction.
+          </p>
+        </>
+      )}
 
       {uploadStatus === 'idle' && (
         <div className="space-y-6">

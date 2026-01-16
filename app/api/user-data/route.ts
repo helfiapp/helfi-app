@@ -8,6 +8,36 @@ import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-servi
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { computeHydrationGoal } from '@/lib/hydration-goal'
 
+const normalizeTimingList = (timing: any) => {
+  if (Array.isArray(timing)) {
+    return timing.map((value) => String(value || '').trim()).filter(Boolean).sort().join('|')
+  }
+  if (timing === null || timing === undefined) return ''
+  return String(timing).trim()
+}
+
+const buildItemKey = (item: any) => {
+  const name = String(item?.name || '').trim().toLowerCase()
+  const dosage = String(item?.dosage || '').trim().toLowerCase()
+  const timing = normalizeTimingList(item?.timing)
+  const scheduleInfo = String(item?.scheduleInfo || '').trim().toLowerCase()
+  const imageUrl = String(item?.imageUrl || '').trim().toLowerCase()
+  return `${name}|${dosage}|${timing}|${scheduleInfo}|${imageUrl}`
+}
+
+const dedupeItems = (items: any[]) => {
+  const seen = new Set<string>()
+  const result: any[] = []
+  items.forEach((item) => {
+    if (!item || !item.name) return
+    const key = buildItemKey(item)
+    if (seen.has(key)) return
+    seen.add(key)
+    result.push(item)
+  })
+  return result
+}
+
 export async function GET(request: NextRequest) {
   try {
     console.log('=== GET /api/user-data DEBUG START ===')
@@ -185,15 +215,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Get blood results data
-    let bloodResultsData = { uploadMethod: 'documents', documents: [], images: [], notes: '', skipped: false };
+    let bloodResultsData = { uploadMethod: 'documents', documents: [], images: [], reportIds: [], notes: '', skipped: false };
     try {
       const storedBloodResults = user.healthGoals.find((goal: any) => goal.name === '__BLOOD_RESULTS_DATA__');
       if (storedBloodResults && storedBloodResults.category) {
         const parsed = JSON.parse(storedBloodResults.category);
         bloodResultsData = {
           uploadMethod: parsed.uploadMethod || 'documents',
-          documents: parsed.documents || [],
-          images: parsed.images || [],
+          documents: Array.isArray(parsed.documents) ? parsed.documents : [],
+          images: Array.isArray(parsed.images) ? parsed.images : [],
+          reportIds: Array.isArray(parsed.reportIds) ? parsed.reportIds : [],
           notes: parsed.notes || '',
           skipped: parsed.skipped || false
         };
@@ -485,7 +516,7 @@ export async function GET(request: NextRequest) {
         : user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
       healthSituations: healthSituationsData,
       bloodResults: bloodResultsData,
-      supplements: user.supplements.map((supp: any) => ({
+      supplements: dedupeItems(user.supplements.map((supp: any) => ({
         name: supp.name,
         dosage: supp.dosage,
         timing: supp.timing,
@@ -493,8 +524,8 @@ export async function GET(request: NextRequest) {
         method: supp.method || 'manual',
         scheduleInfo: supp.scheduleInfo || 'Daily',
         imageUrl: supp.imageUrl || null
-      })),
-      medications: user.medications.map((med: any) => ({
+      }))),
+      medications: dedupeItems(user.medications.map((med: any) => ({
         name: med.name,
         dosage: med.dosage,
         timing: med.timing,
@@ -502,7 +533,7 @@ export async function GET(request: NextRequest) {
         method: med.method || 'manual',
         scheduleInfo: med.scheduleInfo || 'Daily',
         imageUrl: med.imageUrl || null
-      })),
+      }))),
       profileImage: user.image || null,
       todaysFoods: normalizedTodaysFoods,
       favorites,
@@ -1274,10 +1305,11 @@ export async function POST(request: NextRequest) {
           }
           return isValid
         })
+        const dedupedSupplements = dedupeItems(validSupplements)
         
-        console.log('✅ Valid supplements to process:', validSupplements.length)
+        console.log('✅ Valid supplements to process:', dedupedSupplements.length)
         
-        if (validSupplements.length === 0) {
+        if (dedupedSupplements.length === 0) {
           console.log('⚠️ No valid supplements to save - all supplement data was invalid')
           return NextResponse.json({ 
             success: true, 
@@ -1290,7 +1322,7 @@ export async function POST(request: NextRequest) {
         await prisma.$transaction([
           prisma.supplement.deleteMany({ where: { userId: user.id } }),
           prisma.supplement.createMany({
-            data: validSupplements.map((supp: any) => ({
+            data: dedupedSupplements.map((supp: any) => ({
               userId: user.id,
               name: supp.name,
               dosage: supp.dosage || '',
@@ -1299,7 +1331,7 @@ export async function POST(request: NextRequest) {
             }))
           })
         ])
-        console.log('✅ Replaced supplements via bulk operation:', validSupplements.length)
+        console.log('✅ Replaced supplements via bulk operation:', dedupedSupplements.length)
         
         // BACKUP: Also store supplements as JSON in health goals as failsafe
         try {
@@ -1314,7 +1346,7 @@ export async function POST(request: NextRequest) {
             data: {
               userId: user.id,
               name: '__SUPPLEMENTS_BACKUP_DATA__',
-              category: JSON.stringify({ supplements: validSupplements, timestamp: new Date().toISOString() }),
+              category: JSON.stringify({ supplements: dedupedSupplements, timestamp: new Date().toISOString() }),
               currentRating: 0,
             }
           })
@@ -1386,10 +1418,11 @@ export async function POST(request: NextRequest) {
         
         // Bulk replace for performance: delete all then insert all
         const validMeds = (data.medications || []).filter((m: any) => m && typeof m.name === 'string' && m.name.trim().length > 0)
+        const dedupedMeds = dedupeItems(validMeds)
         await prisma.$transaction([
           prisma.medication.deleteMany({ where: { userId: user.id } }),
           prisma.medication.createMany({
-            data: validMeds.map((med: any) => ({
+            data: dedupedMeds.map((med: any) => ({
               userId: user.id,
               name: med.name,
               dosage: med.dosage || '',
@@ -1398,7 +1431,7 @@ export async function POST(request: NextRequest) {
             }))
           })
         ])
-        console.log('✅ Replaced medications via bulk operation:', validMeds.length)
+        console.log('✅ Replaced medications via bulk operation:', dedupedMeds.length)
       } else {
         console.log('ℹ️ No medications to update')
       }

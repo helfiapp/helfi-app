@@ -16,13 +16,15 @@ interface WeeklyReportPageProps {
 export default async function WeeklyReportPage({ searchParams }: WeeklyReportPageProps) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
-    redirect('/auth/signin')
+    const reportId = typeof searchParams?.id === 'string' ? searchParams?.id : ''
+    const callback = reportId ? `/insights/weekly-report?id=${encodeURIComponent(reportId)}` : '/insights/weekly-report'
+    redirect(`/auth/signin?callbackUrl=${encodeURIComponent(callback)}`)
   }
 
   const reportId = typeof searchParams?.id === 'string' ? searchParams?.id : ''
   const [report, reports, state] = await Promise.all([
     reportId ? getWeeklyReportById(session.user.id, reportId) : getLatestWeeklyReport(session.user.id),
-    listWeeklyReports(session.user.id, 8),
+    listWeeklyReports(session.user.id, 50),
     getWeeklyReportState(session.user.id),
   ])
 

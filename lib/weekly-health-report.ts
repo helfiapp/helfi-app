@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { minutesUntilNext, scheduleWeeklyReportNotificationWithQStash } from '@/lib/qstash'
+import { publishWithQStash, scheduleWeeklyReportNotificationWithQStash } from '@/lib/qstash'
 import { randomUUID } from 'crypto'
 
 const REPORT_PERIOD_DAYS = 7
@@ -498,6 +498,14 @@ export async function resolveWeeklyReportTimezone(userId: string): Promise<strin
   return 'UTC'
 }
 
+function getBaseUrl() {
+  let base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
+  if (!base) return ''
+  base = base.trim()
+  if (!/^https?:\/\//i.test(base)) base = `https://${base}`
+  return base.replace(/\/+$/, '')
+}
+
 export async function queueWeeklyReportNotification(
   report: WeeklyReportRecord | null
 ): Promise<{ scheduled: boolean; timezone: string; notifyAt?: string; reason?: string }> {
@@ -510,28 +518,58 @@ export async function queueWeeklyReportNotification(
   }
 
   const timezone = await resolveWeeklyReportTimezone(report.userId)
-  const deltaMinutes = minutesUntilNext('12:00', timezone)
-  const notifyAt = new Date(Date.now() + deltaMinutes * 60_000).toISOString()
+  const notifyAt = new Date().toISOString()
 
-  const scheduled = await scheduleWeeklyReportNotificationWithQStash(
-    report.userId,
+  const immediate = await publishWithQStash('/api/reports/weekly/dispatch', {
+    userId: report.userId,
+    reportId: report.id,
     timezone,
-    report.id,
-    '12:00'
-  ).catch((error) => {
-    console.warn('[weekly-report] Failed to schedule notification', error)
-    return { scheduled: false, reason: 'schedule_error' }
+  }).catch((error) => {
+    console.warn('[weekly-report] Failed to dispatch notification', error)
+    return { ok: false, reason: 'dispatch_error' }
   })
 
-  if (scheduled?.scheduled) {
+  if (immediate?.ok) {
+    await updateWeeklyReportRecord(report.userId, report.id, { notifyAt })
+    return { scheduled: true, timezone, notifyAt }
+  }
+
+  const base = getBaseUrl()
+  const schedulerSecret = process.env.SCHEDULER_SECRET || ''
+  if (base && schedulerSecret) {
+    try {
+      const res = await fetch(`${base}/api/reports/weekly/dispatch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${schedulerSecret}`,
+        },
+        body: JSON.stringify({ userId: report.userId, reportId: report.id, timezone }),
+      })
+      if (res.ok) {
+        await updateWeeklyReportRecord(report.userId, report.id, { notifyAt })
+        return { scheduled: true, timezone, notifyAt }
+      }
+    } catch (error) {
+      console.warn('[weekly-report] Direct dispatch failed', error)
+    }
+  }
+
+  const fallback = await scheduleWeeklyReportNotificationWithQStash(report.userId, timezone, report.id, '12:00')
+    .catch((error) => {
+      console.warn('[weekly-report] Failed to schedule notification', error)
+      return { scheduled: false, reason: 'schedule_error' }
+    })
+
+  if (fallback?.scheduled) {
     await updateWeeklyReportRecord(report.userId, report.id, { notifyAt })
   }
 
   return {
-    scheduled: !!scheduled?.scheduled,
+    scheduled: !!fallback?.scheduled,
     timezone,
-    notifyAt: scheduled?.scheduled ? notifyAt : undefined,
-    reason: scheduled?.reason,
+    notifyAt: fallback?.scheduled ? notifyAt : undefined,
+    reason: immediate?.reason || fallback?.reason || immediate?.responseBody || 'dispatch_failed',
   }
 }
 

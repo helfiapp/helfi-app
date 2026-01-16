@@ -5,6 +5,7 @@ import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { ensureTalkToAITables } from '@/lib/talk-to-ai-chat-store'
+import { decryptFieldsBatch } from '@/lib/encryption'
 import {
   createWeeklyReportRecord,
   getNextDueAt,
@@ -399,7 +400,11 @@ export async function POST(request: NextRequest) {
       },
       readyAt: now.toISOString(),
     })
-    await upsertWeeklyReportState(userId, { lastStatus: 'LOCKED' })
+    await upsertWeeklyReportState(userId, {
+      lastReportAt: now.toISOString(),
+      nextReportDueAt: getNextDueAt(now).toISOString(),
+      lastStatus: 'LOCKED',
+    })
     await queueWeeklyReportNotification(lockedReport).catch(() => {})
     return NextResponse.json({ status: 'locked' })
   }
@@ -467,6 +472,71 @@ export async function POST(request: NextRequest) {
     select: { id: true, createdAt: true },
     take: 20,
   })
+
+  let labTrends: Array<{
+    name: string
+    latestValue: number
+    previousValue: number
+    unit: string | null
+    change: number
+    direction: 'up' | 'down' | 'flat'
+    latestDate: string
+    previousDate: string
+  }> = []
+  try {
+    const trendWindowStart = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+    const labResults = await prisma.labResult.findMany({
+      where: { report: { userId, createdAt: { gte: trendWindowStart } } },
+      include: { report: { select: { createdAt: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 120,
+    })
+
+    const analyteMap = new Map<string, Array<{ value: number; unit: string | null; date: Date }>>()
+    for (const result of labResults) {
+      const encryptedFields: Record<string, string> = {
+        analyteName: result.analyteNameEncrypted,
+        value: result.valueEncrypted,
+      }
+      if (result.unitEncrypted) encryptedFields.unit = result.unitEncrypted
+      if (result.collectionDateEncrypted) encryptedFields.collectionDate = result.collectionDateEncrypted
+      const decrypted = await decryptFieldsBatch(encryptedFields, result.dataKeyEncrypted)
+      const name = String(decrypted.analyteName || '').trim()
+      if (!name) continue
+      const rawValue = String(decrypted.value || '').trim()
+      const match = rawValue.match(/-?\d+(\.\d+)?/)
+      const numeric = match ? Number(match[0]) : NaN
+      if (!Number.isFinite(numeric)) continue
+      const unit = decrypted.unit ? String(decrypted.unit).trim() : null
+      const date = decrypted.collectionDate ? new Date(decrypted.collectionDate) : result.report?.createdAt || result.createdAt
+      if (Number.isNaN(date.getTime())) continue
+      const existing = analyteMap.get(name) || []
+      existing.push({ value: numeric, unit, date })
+      analyteMap.set(name, existing)
+    }
+
+    analyteMap.forEach((entries, name) => {
+      const sorted = entries.sort((a, b) => b.date.getTime() - a.date.getTime())
+      if (sorted.length < 2) return
+      const latest = sorted[0]
+      const previous = sorted[1]
+      const change = +(latest.value - previous.value).toFixed(2)
+      const direction = change === 0 ? 'flat' : change > 0 ? 'up' : 'down'
+      labTrends.push({
+        name,
+        latestValue: latest.value,
+        previousValue: previous.value,
+        unit: latest.unit || previous.unit || null,
+        change,
+        direction,
+        latestDate: latest.date.toISOString(),
+        previousDate: previous.date.toISOString(),
+      })
+    })
+    labTrends = labTrends.slice(0, 8)
+  } catch (error) {
+    console.warn('[weekly-report] Failed to build lab trends', error)
+  }
 
   await ensureTalkToAITables()
   const talkToAiMessages = await prisma.$queryRawUnsafe<
@@ -621,6 +691,7 @@ export async function POST(request: NextRequest) {
       createdAt: s.createdAt,
     })),
     labs: { count: labReports.length },
+    labTrends,
     exerciseEntries: (user.exerciseEntries || []).slice(0, 20).map((e) => ({
       label: e.label,
       durationMinutes: e.durationMinutes,
@@ -668,6 +739,9 @@ Rules:
 - Only use information from the JSON. Do not invent labs or diagnoses.
 - If talkToAi data exists, connect it to logged data in the relevant sections and summary.
 - Use supportive, non-alarming language.
+- If data is thin, say that clearly and suggest exactly what to track next week (specific to missing areas).
+- Avoid filler phrases. Every sentence must reference a data point or a clear pattern.
+- If labTrends are present, describe movement (up/down/flat) without claiming good or bad.
 
 JSON data:
 ${JSON.stringify(reportContext)}
@@ -725,12 +799,17 @@ ${JSON.stringify(reportContext)}
         dataWarning,
         talkToAiSummary,
         hydrationSummary,
+        labTrends,
         lockedReason: 'insufficient_credits',
       },
       report: null,
       readyAt: now.toISOString(),
     })
-    await upsertWeeklyReportState(userId, { lastStatus: 'LOCKED' })
+    await upsertWeeklyReportState(userId, {
+      lastReportAt: now.toISOString(),
+      nextReportDueAt: getNextDueAt(now).toISOString(),
+      lastStatus: 'LOCKED',
+    })
     await queueWeeklyReportNotification(lockedReport).catch(() => {})
     return NextResponse.json({ status: 'locked' })
   }
@@ -743,6 +822,7 @@ ${JSON.stringify(reportContext)}
       dataWarning,
       talkToAiSummary,
       hydrationSummary,
+      labTrends,
     },
     report: reportPayload,
     model,

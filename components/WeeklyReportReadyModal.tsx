@@ -60,7 +60,7 @@ export default function WeeklyReportReadyModal() {
       body: JSON.stringify({ reportId: status.reportId, action: 'viewed' }),
     }).catch(() => {})
     setIsOpen(false)
-    router.push(isLocked ? '/billing' : '/insights/weekly-report')
+    router.push(isLocked ? '/billing' : `/insights/weekly-report?id=${encodeURIComponent(status.reportId)}`)
   }
 
   const handleDontShow = async () => {
