@@ -432,7 +432,24 @@ export default function WaterIntakePage() {
         allowDuplicate: true,
       }),
     })
+    const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error('food log failed')
+    if (data?.deduped && data?.id) {
+      await fetch('/api/food-log', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          id: data.id,
+          description,
+          nutrition,
+          items: [item],
+          localDate: selectedDate,
+          meal: category,
+          category,
+        }),
+      })
+    }
   }
 
   const handleSugarFreeDrink = async () => {
