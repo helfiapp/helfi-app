@@ -19550,7 +19550,7 @@ Please add nutritional information manually if needed.`);
 
                 const macroViewOptions: Array<'targets' | 'consumed'> = ['targets', 'consumed']
 
-                const macroRows: Array<{
+                type MacroRow = {
                   key: 'protein' | 'carbs' | 'fat' | 'fibre' | 'sugar'
                   label: string
                   consumed: number
@@ -19558,13 +19558,16 @@ Please add nutritional information manually if needed.`);
                   unit: string
                   color: string
                   fatSplit?: { good: number; bad: number }
-                }> = [
+                }
+
+                const macroRows = [
                   { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargetsWithExercise.protein || 0, unit: 'g', color: '#ef4444' },
                   { key: 'carbs', label: 'Carbs', consumed: carbGrams, target: macroTargetsWithExercise.carbs || 0, unit: 'g', color: '#22c55e' },
                   { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargetsWithExercise.fat || 0, unit: 'g', color: '#6366f1', fatSplit: normalizedFatSplit },
                   { key: 'fibre', label: 'Fibre', consumed: fibreGrams, target: macroTargetsWithExercise.fiber || 0, unit: 'g', color: '#12adc9' },
                   { key: 'sugar', label: 'Sugar (max)', consumed: sugarGrams, target: macroTargetsWithExercise.sugar || 0, unit: 'g', color: '#f97316' },
-                ].filter((row) => row.target > 0)
+                ] satisfies MacroRow[]
+                const macroRowsFiltered = macroRows.filter((row) => row.target > 0)
 
                 return (
                   <div className="space-y-4">
@@ -19648,10 +19651,10 @@ Please add nutritional information manually if needed.`);
                           )
 
                           // Slide 2: macro bars
-                          if (macroRows.length > 0) {
+                          if (macroRowsFiltered.length > 0) {
                             slides.push(
                               <div className="order-2 md:order-1 space-y-2 mt-6 md:mt-0">
-                                {macroRows.map((row) => {
+                                {macroRowsFiltered.map((row) => {
                                   const pctRaw = row.target > 0 ? row.consumed / row.target : 0
                                   const pct = Math.max(0, pctRaw)
                                   const percentDisplay = row.target > 0 ? Math.round(pctRaw * 100) : 0
