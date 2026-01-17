@@ -3292,6 +3292,10 @@ export default function FoodDiary() {
     energyLabel?: string
     macros: MacroSegment[]
   } | null>(null)
+  const [fatDetailState, setFatDetailState] = useState<{
+    type: 'good' | 'bad' | 'unclear'
+    source: 'bar' | 'ring'
+  } | null>(null)
   const [quickToast, setQuickToast] = useState<string | null>(null)
   const MULTI_COPY_CLIPBOARD_KEY = 'foodDiary:multiCopyClipboard'
   const [multiCopyClipboardCount, setMultiCopyClipboardCount] = useState<number>(0)
@@ -19305,64 +19309,348 @@ Please add nutritional information manually if needed.`);
                 }
 
                 const fatGoodKeywords = [
+                  'extra virgin olive oil',
+                  'cold pressed olive oil',
+                  'cold-pressed olive oil',
+                  'olive oil',
+                  'avocado oil',
+                  'cold pressed avocado oil',
+                  'cold-pressed avocado oil',
+                  'macadamia oil',
+                  'high oleic sunflower oil',
+                  'cold pressed almond oil',
+                  'cold-pressed almond oil',
+                  'cold pressed hazelnut oil',
+                  'cold-pressed hazelnut oil',
+                  'pistachio oil',
+                  'pecan oil',
+                  'walnut oil',
+                  'perilla oil',
+                  'camelina oil',
+                  'black sesame oil',
+                  'white sesame oil',
+                  'cod liver oil',
+                  'salmon oil',
+                  'fish roe',
+                  'avocado',
+                  'avocados',
+                  'green olives',
+                  'kalamata olives',
+                  'black olives',
+                  'olive',
+                  'olives',
+                  'macadamia nut',
+                  'macadamia nuts',
+                  'almond',
+                  'almonds',
+                  'hazelnut',
+                  'hazelnuts',
+                  'pecan',
+                  'pecans',
+                  'cashew',
+                  'cashews',
+                  'pistachio',
+                  'pistachios',
+                  'brazil nut',
+                  'brazil nuts',
+                  'pine nut',
+                  'pine nuts',
+                  'peanuts',
+                  'marcona almonds',
+                  'pili nuts',
+                  'baru nuts',
+                  'kukui nuts',
+                  'candlenut',
+                  'candlenuts',
+                  'tiger nuts',
+                  'chufa',
+                  'peanut butter',
+                  'almond butter',
+                  'walnut butter',
+                  'cashew butter',
+                  'tahini',
+                  'wild salmon',
+                  'sockeye salmon',
+                  'king salmon',
+                  'atlantic salmon',
                   'salmon',
                   'sardine',
                   'sardines',
-                  'tuna',
+                  'atlantic mackerel',
+                  'spanish mackerel',
                   'mackerel',
-                  'trout',
+                  'kingfish',
                   'herring',
                   'anchovy',
                   'anchovies',
-                  'cod',
-                  'snapper',
-                  'halibut',
-                  'avocado',
-                  'olive oil',
-                  'extra virgin',
-                  'evoo',
-                  'olive',
-                  'olives',
+                  'rainbow trout',
+                  'trout',
+                  'arctic char',
+                  'albacore tuna',
+                  'skipjack tuna',
+                  'bluefin tuna',
+                  'tuna',
+                  'smoked salmon',
+                  'smoked trout',
+                  'oyster',
+                  'oysters',
+                  'mussel',
+                  'mussels',
+                  'clam',
+                  'clams',
+                  'scallop',
+                  'scallops',
+                  'crab',
+                  'lobster',
+                  'prawn',
+                  'prawns',
+                  'chia seed',
+                  'chia seeds',
+                  'flaxseed',
+                  'flaxseeds',
+                  'linseed',
+                  'linseeds',
+                  'flaxseed meal',
+                  'ground flaxseed',
+                  'hemp seed',
+                  'hemp seeds',
+                  'hemp hearts',
+                  'perilla seed',
+                  'perilla seeds',
+                  'camelina seed',
+                  'camelina seeds',
                   'walnut',
                   'walnuts',
                   'wallnut',
                   'wallnuts',
-                  'almond',
-                  'almonds',
-                  'cashew',
-                  'cashews',
-                  'pecan',
-                  'pecans',
-                  'pistachio',
-                  'pistachios',
-                  'macadamia',
-                  'macadamias',
-                  'hazelnut',
-                  'hazelnuts',
-                  'brazil nut',
-                  'brazil nuts',
-                  'peanut',
-                  'peanuts',
-                  'peanut butter',
-                  'almond butter',
-                  'cashew butter',
-                  'chia',
-                  'flax',
-                  'hemp',
-                  'pumpkin seed',
-                  'pumpkin seeds',
-                  'sunflower seed',
-                  'sunflower seeds',
-                  'sesame',
-                  'sesame seed',
-                  'sesame seeds',
-                  'tahini',
+                  'grass fed butter',
+                  'grass-fed butter',
+                  'cultured butter',
+                  'ghee',
+                  'beef tallow',
+                  'lamb tallow',
+                  'duck fat',
+                  'goose fat',
+                  'pork lard',
+                  'pasture raised lard',
+                  'suet',
+                  'bone marrow',
+                  'schmaltz',
+                  'rendered chicken fat',
+                  'rendered turkey fat',
+                  'bison tallow',
+                  'venison fat',
+                  'goat fat',
+                  'kangaroo fat',
+                  'emu oil',
+                  'full cream milk',
+                  'full-cream milk',
+                  'thickened cream',
+                  'double cream',
+                  'sour cream',
+                  'creme fraiche',
+                  'greek yoghurt',
+                  'greek yogurt',
+                  'skyr',
+                  'kefir',
+                  'cream cheese',
+                  'mascarpone',
+                  'ricotta',
+                  'cottage cheese',
+                  'brie',
+                  'camembert',
+                  'cheddar',
+                  'gouda',
+                  'edam',
+                  'parmesan',
+                  'pecorino',
+                  'manchego',
+                  'blue cheese',
+                  'feta',
+                  'halloumi',
+                  'gruyere',
+                  'emmental',
+                  'jarlsberg',
+                  'raclette',
+                  'provolone',
+                  'asiago',
+                  'roquefort',
+                  'stilton',
+                  'burrata',
+                  'mozzarella',
+                  'egg',
+                  'eggs',
+                  'duck egg',
+                  'duck eggs',
+                  'quail egg',
+                  'quail eggs',
+                  'coconut oil',
+                  'virgin coconut oil',
+                  'mct oil',
+                  'coconut cream',
+                  'coconut milk',
+                  'coconut butter',
+                  'cacao butter',
+                  'red palm oil',
+                  'shea butter',
+                  'dark chocolate',
+                  'cacao nibs',
+                  'cocoa nibs',
+                  'raw cacao',
                 ]
 
                 const fatBadKeywords = [
-                  'pizza',
+                  'margarine',
+                  'vegetable shortening',
+                  'shortening',
+                  'hydrogenated',
+                  'butter substitute',
+                  'shortening blend',
+                  'commercial cake',
+                  'packaged cake',
+                  'cupcake',
+                  'cupcakes',
+                  'donut',
+                  'donuts',
+                  'doughnut',
+                  'doughnuts',
+                  'pastry',
+                  'pastries',
+                  'croissant',
+                  'croissants',
+                  'danish',
+                  'sweet roll',
+                  'sweet rolls',
+                  'muffin',
+                  'muffins',
+                  'brownie',
+                  'brownies',
+                  'shelf stable pastry',
+                  'shelf-stable pastry',
+                  'shelf stable frosting',
+                  'frosting',
+                  'cracker',
+                  'crackers',
+                  'biscuit',
+                  'biscuits',
+                  'cookie',
+                  'cookies',
+                  'wafer',
+                  'wafers',
+                  'microwave popcorn',
+                  'packaged popcorn',
+                  'rice cracker',
+                  'rice crackers',
+                  'extruded corn snack',
+                  'extruded corn snacks',
+                  'corn snacks',
+                  'fried chicken',
+                  'fried fish',
+                  'chips',
+                  'chip',
+                  'fries',
+                  'onion rings',
+                  'hash browns',
+                  'nugget',
+                  'nuggets',
+                  'battered',
+                  'fried',
+                  'deep fried',
+                  'canola oil',
+                  'rapeseed oil',
+                  'soybean oil',
+                  'corn oil',
+                  'cottonseed oil',
+                  'grapeseed oil',
+                  'rice bran oil',
+                  'refined sunflower oil',
+                  'sunflower oil refined',
+                  'safflower oil',
+                  'vegetable oil',
+                  'vegetable oil blend',
+                  'peanut oil',
+                  'palm kernel oil',
+                  'hydrogenated palm oil',
+                  'interesterified',
+                  'fully hydrogenated',
+                  'industrial frying oil',
+                  'frying oil',
+                  'mayonnaise',
+                  'aioli',
+                  'salad dressing',
+                  'salad dressings',
+                  'marinade',
+                  'marinades',
+                  'stir fry sauce',
+                  'stir-fry sauce',
+                  'dip',
+                  'dips',
+                  'spread',
+                  'spreads',
+                  'ready made meal',
+                  'ready-made meal',
+                  'frozen meal',
+                  'frozen meals',
+                  'takeaway food',
+                  'restaurant fried',
+                  'bakery bread',
+                  'wrap',
+                  'wraps',
+                  'flatbread',
+                  'flatbreads',
+                  'tortilla chip',
+                  'tortilla chips',
                   'burger',
                   'burgers',
+                  'pizza',
+                  'fried wrap',
+                  'fried wraps',
+                  'loaded fries',
+                  'fried dessert',
+                  'fried desserts',
+                  'fried pastry',
+                  'fried pastries',
+                  'instant noodles',
+                  'boxed meal',
+                  'boxed meals',
+                  'frozen pie',
+                  'frozen pies',
+                  'sausage roll',
+                  'sausage rolls',
+                  'meat pie',
+                  'meat pies',
+                  'packaged sandwich',
+                  'packaged sandwiches',
+                  'sweet snack bar',
+                  'sweet snack bars',
+                  'protein bar',
+                  'protein bars',
+                  'cheap chocolate',
+                  'chocolate spread',
+                  'chocolate spreads',
+                  'filled biscuit',
+                  'filled biscuits',
+                  'cream filled wafer',
+                  'cream filled wafers',
+                  'candy bar',
+                  'candy bars',
+                  'cooking spray',
+                  'aerosol cooking spray',
+                  'flavoured cooking spray',
+                  'flavored cooking spray',
+                  'popcorn oil',
+                  'grill release oil',
+                  'pre seasoned',
+                  'pre-seasoned',
+                  'pre marinated',
+                  'pre-marinated',
+                  'shelf stable pesto',
+                  'jarred curry',
+                  'coffee creamer',
+                  'coffee creamers',
+                  'non dairy whipped',
+                  'non-dairy whipped',
+                  'pizza',
                   'mcdonald',
                   'mcdonalds',
                   'mc donald',
@@ -19374,27 +19662,11 @@ Please add nutritional information manually if needed.`);
                   'fish & chips',
                   'fish &chip',
                   'chip shop',
-                  'chips',
-                  'chip',
-                  'fries',
                   'crisps',
-                  'battered',
-                  'fried',
-                  'deep fried',
-                  'nugget',
-                  'nuggets',
                   'donut',
                   'donuts',
                   'doughnut',
                   'doughnuts',
-                  'pastry',
-                  'pastries',
-                  'cake',
-                  'cakes',
-                  'cookie',
-                  'cookies',
-                  'biscuit',
-                  'biscuits',
                   'hot dog',
                   'hot dogs',
                   'sausage',
@@ -19435,14 +19707,32 @@ Please add nutritional information manually if needed.`);
                 const classifyFatLabel = (label: any) => {
                   const hasBad = matchesFatKeywords(label, fatBadKeywords)
                   const hasGood = matchesFatKeywords(label, fatGoodKeywords)
-                  if (hasBad && hasGood) return 'mixed'
+                  if (hasBad && hasGood) return 'unclear'
                   if (hasBad) return 'bad'
                   if (hasGood) return 'good'
-                  return 'bad'
+                  return 'unclear'
+                }
+
+                const fatDetails = {
+                  good: new Map<string, number>(),
+                  bad: new Map<string, number>(),
+                  unclear: new Map<string, number>(),
+                }
+
+                const normalizeFatItemLabel = (value: any) => {
+                  const label = String(value || '').trim()
+                  return label.length > 0 ? label : 'Unknown item'
+                }
+
+                const addFatDetail = (bucket: 'good' | 'bad' | 'unclear', label: any, grams: number) => {
+                  if (!Number.isFinite(grams) || grams <= 0) return
+                  const name = normalizeFatItemLabel(label)
+                  const map = fatDetails[bucket]
+                  map.set(name, (map.get(name) || 0) + grams)
                 }
 
                 const splitFatFromItems = (items: any[]) => {
-                  const split = { good: 0, bad: 0 }
+                  const split = { good: 0, bad: 0, unclear: 0 }
                   if (!items || items.length === 0) return split
                   items.forEach((entry: any) => {
                     const servings = effectiveServings(entry)
@@ -19453,17 +19743,19 @@ Please add nutritional information manually if needed.`);
                     const bucket = classifyFatLabel(label)
                     if (bucket === 'good') {
                       split.good += fat
-                    } else if (bucket === 'mixed') {
-                      split.good += fat / 2
-                      split.bad += fat / 2
-                    } else {
+                      addFatDetail('good', label, fat)
+                    } else if (bucket === 'bad') {
                       split.bad += fat
+                      addFatDetail('bad', label, fat)
+                    } else {
+                      split.unclear += fat
+                      addFatDetail('unclear', label, fat)
                     }
                   })
                   return split
                 }
 
-                const fatSplit = { good: 0, bad: 0 }
+                const fatSplit = { good: 0, bad: 0, unclear: 0 }
 
                 const totals = source.reduce((acc: Record<typeof NUTRIENT_DISPLAY_ORDER[number], number>, item: any) => {
                   const derivedItems = deriveItemsForEntry(item)
@@ -19479,6 +19771,7 @@ Please add nutritional information manually if needed.`);
                     if (splitFromItems) {
                       fatSplit.good += splitFromItems.good
                       fatSplit.bad += splitFromItems.bad
+                      fatSplit.unclear += splitFromItems.unclear
                     }
                     return acc
                   }
@@ -19503,16 +19796,19 @@ Please add nutritional information manually if needed.`);
                   if (splitFromItems) {
                     fatSplit.good += splitFromItems.good
                     fatSplit.bad += splitFromItems.bad
+                    fatSplit.unclear += splitFromItems.unclear
                   } else {
                     const entryLabel = item?.label || item?.name || item?.description || ''
                     const bucket = classifyFatLabel(entryLabel)
                     if (bucket === 'good') {
                       fatSplit.good += storedTotals.fat
-                    } else if (bucket === 'mixed') {
-                      fatSplit.good += storedTotals.fat / 2
-                      fatSplit.bad += storedTotals.fat / 2
-                    } else {
+                      addFatDetail('good', entryLabel, storedTotals.fat)
+                    } else if (bucket === 'bad') {
                       fatSplit.bad += storedTotals.fat
+                      addFatDetail('bad', entryLabel, storedTotals.fat)
+                    } else {
+                      fatSplit.unclear += storedTotals.fat
+                      addFatDetail('unclear', entryLabel, storedTotals.fat)
                     }
                   }
                   return acc
@@ -19550,16 +19846,26 @@ Please add nutritional information manually if needed.`);
                 const carbNonSugar = Math.max(0, carbGrams - sugarGrams)
                 const fibreGrams = totals.fiber || 0
                 const fatConsumed = Math.max(0, totals.fat || 0)
-                const fatSplitTotal = fatSplit.good + fatSplit.bad
+                const fatSplitTotal = fatSplit.good + fatSplit.bad + fatSplit.unclear
                 const normalizedFatSplit = (() => {
                   if (!Number.isFinite(fatSplitTotal) || fatSplitTotal <= 0 || fatConsumed <= 0) {
-                    return { good: 0, bad: fatConsumed }
+                    return { good: 0, bad: 0, unclear: fatConsumed }
                   }
                   const scale = fatConsumed / fatSplitTotal
                   const good = Math.max(0, Math.min(fatConsumed, fatSplit.good * scale))
-                  const bad = Math.max(0, fatConsumed - good)
-                  return { good, bad }
+                  const bad = Math.max(0, Math.min(fatConsumed - good, fatSplit.bad * scale))
+                  const unclear = Math.max(0, fatConsumed - good - bad)
+                  return { good, bad, unclear }
                 })()
+                const fatDetailList = (map: Map<string, number>) =>
+                  Array.from(map.entries())
+                    .map(([label, grams]) => ({ label, grams }))
+                    .sort((a, b) => b.grams - a.grams)
+                const fatDetailItems = {
+                  good: fatDetailList(fatDetails.good),
+                  bad: fatDetailList(fatDetails.bad),
+                  unclear: fatDetailList(fatDetails.unclear),
+                }
 
                 const macroTargets = {
                   protein: dailyTargets.protein ?? null,
@@ -19610,7 +19916,7 @@ Please add nutritional information manually if needed.`);
                   target: number
                   unit: string
                   color: string
-                  fatSplit?: { good: number; bad: number }
+                  fatSplit?: { good: number; bad: number; unclear: number }
                 }
 
                 const macroRows = [
@@ -19662,6 +19968,32 @@ Please add nutritional information manually if needed.`);
                       )}
                       {(() => {
                           const slides: JSX.Element[] = []
+                          const fatDetailTitles = {
+                            good: 'Healthy fats',
+                            bad: 'Unhealthy fats',
+                            unclear: 'Unclear fats',
+                          }
+                          const fatDetailColors = {
+                            good: '#22c55e',
+                            bad: '#ef4444',
+                            unclear: '#60a5fa',
+                          }
+                          const openFatDetail = (type: 'good' | 'bad' | 'unclear', source: 'bar' | 'ring') => {
+                            if (isMobile) return
+                            setFatDetailState({ type, source })
+                          }
+                          const closeFatDetail = (source: 'bar' | 'ring') => {
+                            if (isMobile) return
+                            if (fatDetailState?.source === source) {
+                              setFatDetailState(null)
+                            }
+                          }
+                          const toggleFatDetail = (type: 'good' | 'bad' | 'unclear', source: 'bar' | 'ring') => {
+                            if (!isMobile) return
+                            setFatDetailState((prev) =>
+                              prev?.type === type && prev?.source === source ? null : { type, source }
+                            )
+                          }
 
                           // Slide 1: Separate used vs remaining rings
                           slides.push(
@@ -19715,16 +20047,27 @@ Please add nutritional information manually if needed.`);
                                   const percentColor = over ? 'text-red-600' : 'text-gray-900'
                                   const remaining = Math.max(0, row.target - row.consumed)
                                   const fatSplitValues = row.key === 'fat' ? row.fatSplit : null
-                                  const fatSplitTotal = fatSplitValues ? fatSplitValues.good + fatSplitValues.bad : 0
+                                  const fatSplitTotal = fatSplitValues
+                                    ? fatSplitValues.good + fatSplitValues.bad + fatSplitValues.unclear
+                                    : 0
                                   const fatGoodPct =
                                     fatSplitValues && fatSplitTotal > 0
                                       ? Math.max(0, Math.min(100, (fatSplitValues.good / fatSplitTotal) * 100))
                                       : 0
                                   const fatBadPct =
                                     fatSplitValues && fatSplitTotal > 0
-                                      ? Math.max(0, Math.min(100, 100 - fatGoodPct))
+                                      ? Math.max(0, Math.min(100, (fatSplitValues.bad / fatSplitTotal) * 100))
+                                      : 0
+                                  const fatUnclearPct =
+                                    fatSplitValues && fatSplitTotal > 0
+                                      ? Math.max(0, Math.min(100, (fatSplitValues.unclear / fatSplitTotal) * 100))
                                       : 0
                                   const barWidth = Math.min(100, pct * 100)
+                                  const activeFatType =
+                                    row.key === 'fat' && fatDetailState?.source === 'bar'
+                                      ? fatDetailState.type
+                                      : null
+                                  const activeFatItems = activeFatType ? fatDetailItems[activeFatType] : []
                                   return (
                                     <div key={row.key} className="space-y-1">
                                       <div className="flex items-center justify-between text-sm">
@@ -19741,20 +20084,45 @@ Please add nutritional information manually if needed.`);
                                           {percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
                                         </div>
                                       </div>
-                                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                                      <div
+                                        className="relative h-2 w-full bg-gray-200 rounded-full overflow-hidden"
+                                        onMouseLeave={() => row.key === 'fat' && closeFatDetail('bar')}
+                                      >
                                         {row.key === 'fat' && fatSplitValues && fatSplitTotal > 0 ? (
                                           <div
                                             className="h-2 rounded-full overflow-hidden transition-all flex"
                                             style={{ width: `${barWidth}%` }}
                                           >
-                                            <div
-                                              className="h-2 transition-all"
-                                              style={{ width: `${fatGoodPct}%`, backgroundColor: '#22c55e' }}
-                                            />
-                                            <div
-                                              className="h-2 transition-all"
-                                              style={{ width: `${fatBadPct}%`, backgroundColor: '#ef4444' }}
-                                            />
+                                            {fatGoodPct > 0 && (
+                                              <button
+                                                type="button"
+                                                className="h-2 cursor-pointer focus:outline-none"
+                                                style={{ width: `${fatGoodPct}%`, backgroundColor: fatDetailColors.good }}
+                                                onMouseEnter={() => openFatDetail('good', 'bar')}
+                                                onClick={() => toggleFatDetail('good', 'bar')}
+                                                aria-label="Healthy fats"
+                                              />
+                                            )}
+                                            {fatBadPct > 0 && (
+                                              <button
+                                                type="button"
+                                                className="h-2 cursor-pointer focus:outline-none"
+                                                style={{ width: `${fatBadPct}%`, backgroundColor: fatDetailColors.bad }}
+                                                onMouseEnter={() => openFatDetail('bad', 'bar')}
+                                                onClick={() => toggleFatDetail('bad', 'bar')}
+                                                aria-label="Unhealthy fats"
+                                              />
+                                            )}
+                                            {fatUnclearPct > 0 && (
+                                              <button
+                                                type="button"
+                                                className="h-2 cursor-pointer focus:outline-none"
+                                                style={{ width: `${fatUnclearPct}%`, backgroundColor: fatDetailColors.unclear }}
+                                                onMouseEnter={() => openFatDetail('unclear', 'bar')}
+                                                onClick={() => toggleFatDetail('unclear', 'bar')}
+                                                aria-label="Unclear fats"
+                                              />
+                                            )}
                                           </div>
                                         ) : (
                                           <div
@@ -19762,10 +20130,104 @@ Please add nutritional information manually if needed.`);
                                             style={{ width: `${barWidth}%`, backgroundColor: over ? '#ef4444' : row.color }}
                                           />
                                         )}
+                                        {row.key === 'fat' && activeFatType && (
+                                          <div className="absolute left-0 top-full mt-2 z-20 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-3">
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <span
+                                                className="inline-block h-2 w-2 rounded-full"
+                                                style={{ backgroundColor: fatDetailColors[activeFatType] }}
+                                              />
+                                              <span className="text-xs font-semibold text-gray-900">
+                                                {fatDetailTitles[activeFatType]}
+                                              </span>
+                                            </div>
+                                            {activeFatItems.length === 0 ? (
+                                              <div className="text-xs text-gray-500">No items yet today.</div>
+                                            ) : (
+                                              <ul className="space-y-1 max-h-28 overflow-y-auto text-xs text-gray-700">
+                                                {activeFatItems.map((item) => (
+                                                  <li key={item.label} className="flex items-center justify-between gap-3">
+                                                    <span className="truncate">{item.label}</span>
+                                                    <span className="font-semibold text-gray-900">
+                                                      {formatMacroValue(item.grams, 'g')}
+                                                    </span>
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   )
                                 })}
+                              </div>
+                            )
+                          }
+
+                          if (fatConsumed > 0) {
+                            const fatRingItems = [
+                              { type: 'good' as const, label: 'Good fat', value: normalizedFatSplit.good, color: fatDetailColors.good },
+                              { type: 'bad' as const, label: 'Bad fat', value: normalizedFatSplit.bad, color: fatDetailColors.bad },
+                              { type: 'unclear' as const, label: 'Unclear', value: normalizedFatSplit.unclear, color: fatDetailColors.unclear },
+                            ]
+                            slides.push(
+                              <div
+                                className="order-3 md:order-1 space-y-3 mt-6 md:mt-0"
+                                onMouseLeave={() => closeFatDetail('ring')}
+                              >
+                                <div className="text-sm font-semibold text-gray-800">Fat quality</div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                  {fatRingItems.map((item) => {
+                                    const percent = fatConsumed > 0 ? item.value / fatConsumed : 0
+                                    return (
+                                      <div key={item.type} className="flex justify-center">
+                                        <button
+                                          type="button"
+                                          className="cursor-pointer focus:outline-none"
+                                          onMouseEnter={() => openFatDetail(item.type, 'ring')}
+                                          onClick={() => toggleFatDetail(item.type, 'ring')}
+                                          aria-label={`${item.label} details`}
+                                        >
+                                          <TargetRing
+                                            label={item.label}
+                                            valueLabel={formatMacroValue(item.value, 'g')}
+                                            percent={percent}
+                                            tone="primary"
+                                            color={item.color}
+                                          />
+                                        </button>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                                {fatDetailState?.source === 'ring' && (
+                                  <div className="rounded-lg border border-gray-200 bg-white shadow-sm p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span
+                                        className="inline-block h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: fatDetailColors[fatDetailState.type] }}
+                                      />
+                                      <span className="text-xs font-semibold text-gray-900">
+                                        {fatDetailTitles[fatDetailState.type]}
+                                      </span>
+                                    </div>
+                                    {fatDetailItems[fatDetailState.type].length === 0 ? (
+                                      <div className="text-xs text-gray-500">No items yet today.</div>
+                                    ) : (
+                                      <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
+                                        {fatDetailItems[fatDetailState.type].map((item) => (
+                                          <li key={item.label} className="flex items-center justify-between gap-3">
+                                            <span className="truncate">{item.label}</span>
+                                            <span className="font-semibold text-gray-900">
+                                              {formatMacroValue(item.grams, 'g')}
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )
                           }
@@ -19784,7 +20246,7 @@ Please add nutritional information manually if needed.`);
                               <div
                                 ref={summaryCarouselRef}
                                 onScroll={handleSummaryScroll}
-                                className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0"
+                                className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0"
                               >
                                 {slides.map((slide, idx) => (
                                   <div
@@ -19804,6 +20266,12 @@ Please add nutritional information manually if needed.`);
                                     />
                                   ))}
                                 </div>
+                              )}
+                              {fatConsumed > 0 && (
+                                <p className="mt-3 text-[11px] text-gray-500 leading-relaxed">
+                                  Fat is split into healthy (green), unhealthy (red), and unclear (blue) based on the food name.
+                                  Hover or tap any colored bar or circle to see which foods were counted.
+                                </p>
                               )}
                             </>
                           )
