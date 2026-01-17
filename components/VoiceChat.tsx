@@ -61,6 +61,10 @@ export default function VoiceChat({
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const [barcodeValue, setBarcodeValue] = useState('')
   const [showManualBarcodeInput, setShowManualBarcodeInput] = useState(false)
+  const [pendingBarcodeContext, setPendingBarcodeContext] = useState<{
+    label: string
+    foodContext: string
+  } | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [currentThreadCharged, setCurrentThreadCharged] = useState(false)
   const [lastChargedCost, setLastChargedCost] = useState<number | null>(null)
@@ -386,7 +390,10 @@ export default function VoiceChat({
 
         setShowBarcodeScanner(false)
         resetBarcodeState()
-        await sendChatMessageRef.current?.(question, { foodContextOverride })
+        setPendingBarcodeContext({
+          label: brand ? `${itemName} (${brand})` : itemName,
+          foodContext: foodContextOverride,
+        })
       } catch (err) {
         setBarcodeError('Barcode lookup failed. Please try again.')
         setBarcodeStatus('idle')
@@ -888,6 +895,10 @@ export default function VoiceChat({
     }
   }
 
+  const clearPendingBarcodeContext = () => {
+    setPendingBarcodeContext(null)
+  }
+
   const removePendingPhoto = (index: number) => {
     setPendingPhotos((prev) => prev.filter((_, idx) => idx !== index))
   }
@@ -989,7 +1000,11 @@ export default function VoiceChat({
   async function sendChatMessage(messageText: string, options?: { foodContextOverride?: string }) {
     const text = messageText.trim()
     if (!text && pendingPhotos.length === 0) {
-      setError('Enter a question or use voice input.')
+      if (pendingBarcodeContext) {
+        setError('Type a question about the scanned item, then send.')
+      } else {
+        setError('Enter a question or use voice input.')
+      }
       return
     }
 
@@ -1008,7 +1023,12 @@ export default function VoiceChat({
       const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }]
       setMessages(nextMessages)
       setInput('')
-      const foodContextOverride = options?.foodContextOverride?.trim()
+      const inlineOverride = options?.foodContextOverride?.trim()
+      const foodContextOverride =
+        inlineOverride || pendingBarcodeContext?.foodContext || undefined
+      if (!inlineOverride && pendingBarcodeContext) {
+        setPendingBarcodeContext(null)
+      }
 
       if (onCostEstimate) onCostEstimate(estimatedCost)
 
@@ -1794,6 +1814,18 @@ export default function VoiceChat({
 
           <div className="relative bg-gradient-to-t from-[#f6f8f7] via-[#f6f8f7]/95 to-transparent pt-8 pb-6">
             <div className="mx-auto max-w-3xl px-4">
+              {pendingBarcodeContext && (
+                <div className="mb-3 flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-[14px] md:text-[12px] text-blue-900">
+                  <span>Scanned item ready: {pendingBarcodeContext.label}</span>
+                  <button
+                    type="button"
+                    onClick={clearPendingBarcodeContext}
+                    className="rounded-lg px-2 py-1 text-[12px] md:text-[11px] font-semibold text-blue-900 hover:bg-blue-100"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
               {(estimatedCost !== null || lastChargedCost !== null) && (
                 <div className="flex flex-wrap gap-4 text-[13px] md:text-[11px] text-gray-500 mb-3">
                   {estimatedChatCost !== null && (
