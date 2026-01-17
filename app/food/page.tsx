@@ -20085,7 +20085,7 @@ Please add nutritional information manually if needed.`);
                                   percent={1}
                                   tone="primary"
                                   color="#22c55e"
-                                  size={isMobile ? 'compact' : 'normal'}
+                                  size="normal"
                                   isMobile={isMobile}
                                 />
                                 <TargetRing
@@ -20099,7 +20099,7 @@ Please add nutritional information manually if needed.`);
                                   percent={1}
                                   tone="primary"
                                   color="#ef4444"
-                                  size={isMobile ? 'compact' : 'normal'}
+                                  size="normal"
                                   isMobile={isMobile}
                                 />
                               </div>
@@ -20235,6 +20235,33 @@ Please add nutritional information manually if needed.`);
                                     </div>
                                   )
                                 })}
+                                {isMobile && fatDetailState?.source === 'bar' && (
+                                  <div className="mt-2 rounded-lg border border-gray-200 bg-white shadow-sm p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span
+                                        className="inline-block h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: fatDetailColors[fatDetailState.type] }}
+                                      />
+                                      <span className="text-xs font-semibold text-gray-900">
+                                        {fatDetailTitles[fatDetailState.type]}
+                                      </span>
+                                    </div>
+                                    {fatDetailItems[fatDetailState.type].length === 0 ? (
+                                      <div className="text-xs text-gray-500">No items yet today.</div>
+                                    ) : (
+                                      <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
+                                        {fatDetailItems[fatDetailState.type].map((item) => (
+                                          <li key={item.label} className="flex items-center justify-between gap-3">
+                                            <span className="truncate">{item.label}</span>
+                                            <span className="font-semibold text-gray-900">
+                                              {formatMacroValue(item.grams, 'g')}
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )
                           }
@@ -20277,6 +20304,33 @@ Please add nutritional information manually if needed.`);
                                     )
                                   })}
                                 </div>
+                                {isMobile && fatDetailState?.source === 'ring' && (
+                                  <div className="rounded-lg border border-gray-200 bg-white shadow-sm p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span
+                                        className="inline-block h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: fatDetailColors[fatDetailState.type] }}
+                                      />
+                                      <span className="text-xs font-semibold text-gray-900">
+                                        {fatDetailTitles[fatDetailState.type]}
+                                      </span>
+                                    </div>
+                                    {fatDetailItems[fatDetailState.type].length === 0 ? (
+                                      <div className="text-xs text-gray-500">No items yet today.</div>
+                                    ) : (
+                                      <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
+                                        {fatDetailItems[fatDetailState.type].map((item) => (
+                                          <li key={item.label} className="flex items-center justify-between gap-3">
+                                            <span className="truncate">{item.label}</span>
+                                            <span className="font-semibold text-gray-900">
+                                              {formatMacroValue(item.grams, 'g')}
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )}
                                 {!isMobile && fatDetailState?.source === 'ring' && (
                                   <div className="rounded-lg border border-gray-200 bg-white shadow-sm p-3">
                                     <div className="flex items-center gap-2 mb-2">
@@ -20304,6 +20358,10 @@ Please add nutritional information manually if needed.`);
                                     )}
                                   </div>
                                 )}
+                                <p className="text-sm text-gray-600 leading-snug">
+                                  Fat is split into healthy (green), unhealthy (red), and unclear (blue) based on the food name.
+                                  Hover or tap any colored bar or circle to see which foods were counted.
+                                </p>
                               </div>
                             )
                           }
@@ -20323,7 +20381,7 @@ Please add nutritional information manually if needed.`);
                                 ref={summaryCarouselRef}
                                 onScroll={handleSummaryScroll}
                                 style={isMobile && summarySlideHeight ? { height: summarySlideHeight } : undefined}
-                                className="flex gap-4 overflow-x-auto overflow-y-visible snap-x snap-mandatory pb-2 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0 transition-[height] duration-200"
+                                className="flex gap-4 overflow-x-auto overflow-y-hidden snap-x snap-mandatory pb-2 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0 transition-[height] duration-200"
                               >
                                 {slides.map((slide, idx) => (
                                   <div
@@ -20331,7 +20389,7 @@ Please add nutritional information manually if needed.`);
                                     ref={(node) => {
                                       summarySlideRefs.current[idx] = node
                                     }}
-                                    className="flex-shrink-0 w-full snap-center md:w-auto"
+                                    className="flex-shrink-0 w-full snap-center md:w-auto px-2 md:px-0"
                                   >
                                     {slide}
                                   </div>
@@ -20346,39 +20404,6 @@ Please add nutritional information manually if needed.`);
                                     />
                                   ))}
                                 </div>
-                              )}
-                              {isMobile && fatDetailState && (
-                                <div className="mt-2 rounded-lg border border-gray-200 bg-white shadow-sm p-3">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span
-                                      className="inline-block h-2 w-2 rounded-full"
-                                      style={{ backgroundColor: fatDetailColors[fatDetailState.type] }}
-                                    />
-                                    <span className="text-xs font-semibold text-gray-900">
-                                      {fatDetailTitles[fatDetailState.type]}
-                                    </span>
-                                  </div>
-                                  {fatDetailItems[fatDetailState.type].length === 0 ? (
-                                    <div className="text-xs text-gray-500">No items yet today.</div>
-                                  ) : (
-                                    <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
-                                      {fatDetailItems[fatDetailState.type].map((item) => (
-                                        <li key={item.label} className="flex items-center justify-between gap-3">
-                                          <span className="truncate">{item.label}</span>
-                                          <span className="font-semibold text-gray-900">
-                                            {formatMacroValue(item.grams, 'g')}
-                                          </span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                </div>
-                              )}
-                              {fatConsumed > 0 && (
-                                <p className="mt-2 text-sm text-gray-600 leading-snug">
-                                  Fat is split into healthy (green), unhealthy (red), and unclear (blue) based on the food name.
-                                  Hover or tap any colored bar or circle to see which foods were counted.
-                                </p>
                               )}
                             </>
                           )
