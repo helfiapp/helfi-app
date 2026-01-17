@@ -1635,6 +1635,29 @@ export default function VoiceChat({
             </button>
           )}
         </div>
+        {selectionMode && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[13px] md:text-[11px] text-gray-500">{selectedCount} selected</span>
+            <button
+              type="button"
+              onClick={archiveSelectedThreads}
+              disabled={selectedCount === 0 || bulkActionPending}
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[13px] md:text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>archive</span>
+              Archive
+            </button>
+            <button
+              type="button"
+              onClick={deleteSelectedThreads}
+              disabled={selectedCount === 0 || bulkActionPending}
+              className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[13px] md:text-[11px] font-semibold text-red-700 shadow-sm hover:bg-red-100 disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+              Delete
+            </button>
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-5">
         {threadGroups.map((group) => (
@@ -1789,31 +1812,6 @@ export default function VoiceChat({
           <div className="px-3 text-[13px] md:text-xs text-gray-400">No chats yet.</div>
         )}
       </div>
-      {selectionMode && (
-        <div className="border-t border-gray-200 p-3">
-          <div className="flex items-center justify-between text-[13px] md:text-[11px] text-gray-500">
-            <span>{selectedCount} selected</span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={archiveSelectedThreads}
-                disabled={selectedCount === 0 || bulkActionPending}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              >
-                Archive
-              </button>
-              <button
-                type="button"
-                onClick={deleteSelectedThreads}
-                disabled={selectedCount === 0 || bulkActionPending}
-                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-red-700 hover:bg-red-100 disabled:opacity-50"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 
