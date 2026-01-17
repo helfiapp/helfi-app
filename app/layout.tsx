@@ -14,7 +14,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Helfi - Your AI Health Intelligence Platform',
   description: 'Transform your health with personalized AI insights, comprehensive tracking, and intelligent recommendations.',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
+  viewport: 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, user-scalable=yes',
   manifest: '/manifest.json',
   icons: {
     icon: [

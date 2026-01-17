@@ -396,6 +396,54 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
 
   useEffect(() => {
     if (typeof document === 'undefined') return
+    const meta = document.querySelector('meta[name="viewport"]')
+    if (!meta) return
+
+    const allowZoomContent =
+      'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, user-scalable=yes'
+    const lockZoomContent =
+      'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=yes'
+    meta.setAttribute('content', allowZoomContent)
+
+    let resetTimer: ReturnType<typeof setTimeout> | null = null
+    const resetZoom = () => {
+      meta.setAttribute('content', lockZoomContent)
+      if (resetTimer) {
+        clearTimeout(resetTimer)
+      }
+      resetTimer = setTimeout(() => {
+        meta.setAttribute('content', allowZoomContent)
+      }, 50)
+    }
+
+    const handleZoomChange = () => {
+      if (window.visualViewport && window.visualViewport.scale > 1) {
+        resetZoom()
+      }
+    }
+
+    const handleGestureEnd = () => {
+      handleZoomChange()
+    }
+
+    document.addEventListener('gestureend', handleGestureEnd, true)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleZoomChange)
+    }
+
+    return () => {
+      document.removeEventListener('gestureend', handleGestureEnd, true)
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleZoomChange)
+      }
+      if (resetTimer) {
+        clearTimeout(resetTimer)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
     let startX = 0
     let startY = 0
     let moved = false
