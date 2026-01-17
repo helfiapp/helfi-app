@@ -2875,6 +2875,7 @@ export default function FoodDiary() {
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
   const [summaryRenderNonce, setSummaryRenderNonce] = useState(0)
+  const [summaryMinHeight, setSummaryMinHeight] = useState<number | null>(null)
   const [resumeTick, setResumeTick] = useState(0)
   
   // Manual food entry states
@@ -2928,6 +2929,7 @@ export default function FoodDiary() {
   const editPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const selectPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const summarySwipeStartRef = useRef<{ x: number; y: number } | null>(null)
+  const summaryActiveSlideRef = useRef<HTMLDivElement | null>(null)
   const pageTopRef = useRef<HTMLDivElement | null>(null)
   const desktopAddMenuRef = useRef<HTMLDivElement | null>(null)
   const barcodeLabelTimeoutRef = useRef<number | null>(null)
@@ -3431,6 +3433,24 @@ export default function FoodDiary() {
     setSummarySlideIndex(0)
     setSummaryRenderNonce((prev) => prev + 1)
   }, [selectedDate, isMobile])
+
+  useEffect(() => {
+    if (!isMobile) {
+      setSummaryMinHeight(null)
+      return
+    }
+    setSummaryMinHeight(null)
+  }, [selectedDate, isMobile, summaryRenderNonce])
+
+  useEffect(() => {
+    if (!isMobile) return
+    const node = summaryActiveSlideRef.current
+    if (!node) return
+    const height = node.offsetHeight
+    if (height > 0) {
+      setSummaryMinHeight((prev) => (prev === null ? height : Math.max(prev, height)))
+    }
+  }, [isMobile, summarySlideIndex, fatDetailState, summaryRenderNonce])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -19508,6 +19528,343 @@ Please add nutritional information manually if needed.`);
                   'raw cacao',
                 ]
 
+                const fatZeroKeywords = [
+                  'apple',
+                  'green apple',
+                  'red apple',
+                  'granny smith apple',
+                  'fuji apple',
+                  'gala apple',
+                  'pear',
+                  'nashi pear',
+                  'asian pear',
+                  'banana',
+                  'cavendish banana',
+                  'lady finger banana',
+                  'plantain',
+                  'orange',
+                  'blood orange',
+                  'mandarin',
+                  'clementine',
+                  'tangerine',
+                  'grapefruit',
+                  'pomelo',
+                  'lemon',
+                  'lime',
+                  'yuzu',
+                  'citron',
+                  'pineapple',
+                  'mango',
+                  'papaya',
+                  'watermelon',
+                  'rockmelon',
+                  'cantaloupe',
+                  'honeydew',
+                  'galia melon',
+                  'canary melon',
+                  'strawberry',
+                  'blueberry',
+                  'raspberry',
+                  'blackberry',
+                  'boysenberry',
+                  'cranberry',
+                  'red currant',
+                  'black currant',
+                  'gooseberry',
+                  'elderberry',
+                  'mulberry',
+                  'cherry',
+                  'sour cherry',
+                  'peach',
+                  'white peach',
+                  'nectarine',
+                  'apricot',
+                  'plum',
+                  'greengage plum',
+                  'mirabelle plum',
+                  'fig',
+                  'kiwi',
+                  'gold kiwi',
+                  'passionfruit',
+                  'dragon fruit',
+                  'pitaya',
+                  'star fruit',
+                  'carambola',
+                  'lychee',
+                  'longan',
+                  'rambutan',
+                  'mangosteen',
+                  'jackfruit',
+                  'durian',
+                  'guava',
+                  'feijoa',
+                  'persimmon',
+                  'pomegranate',
+                  'quince',
+                  'tamarillo',
+                  'loquat',
+                  'sapodilla',
+                  'custard apple',
+                  'sugar apple',
+                  'soursop',
+                  'breadfruit',
+                  'ackee',
+                  'lettuce',
+                  'iceberg',
+                  'romaine',
+                  'cos lettuce',
+                  'butter lettuce',
+                  'oak leaf lettuce',
+                  'endive',
+                  'escarole',
+                  'radicchio',
+                  'rocket',
+                  'arugula',
+                  'spinach',
+                  'baby spinach',
+                  'silverbeet',
+                  'swiss chard',
+                  'kale',
+                  'tatsoi',
+                  'mizuna',
+                  'mustard greens',
+                  'watercress',
+                  'beet greens',
+                  'turnip greens',
+                  'dandelion greens',
+                  'broccoli',
+                  'broccolini',
+                  'cauliflower',
+                  'romanesco',
+                  'brussels sprouts',
+                  'cabbage',
+                  'savoy cabbage',
+                  'napa cabbage',
+                  'bok choy',
+                  'pak choy',
+                  'kai lan',
+                  'kohlrabi',
+                  'potato',
+                  'sweet potato',
+                  'yam',
+                  'cassava',
+                  'taro',
+                  'jerusalem artichoke',
+                  'turnip',
+                  'rutabaga',
+                  'parsnip',
+                  'carrot',
+                  'daikon',
+                  'radish',
+                  'beetroot',
+                  'salsify',
+                  'burdock',
+                  'tomato',
+                  'capsicum',
+                  'bell pepper',
+                  'chili pepper',
+                  'jalapeno',
+                  'cayenne pepper',
+                  'eggplant',
+                  'aubergine',
+                  'tomatillo',
+                  'onion',
+                  'spring onion',
+                  'scallion',
+                  'shallot',
+                  'garlic',
+                  'leek',
+                  'chive',
+                  'zucchini',
+                  'courgette',
+                  'yellow squash',
+                  'pumpkin',
+                  'butternut squash',
+                  'acorn squash',
+                  'spaghetti squash',
+                  'kabocha',
+                  'choko',
+                  'chayote',
+                  'bottle gourd',
+                  'ridge gourd',
+                  'bitter melon',
+                  'green beans',
+                  'french beans',
+                  'runner beans',
+                  'snow peas',
+                  'snap peas',
+                  'garden peas',
+                  'edamame',
+                  'mung bean sprouts',
+                  'soybean sprouts',
+                  'cucumber',
+                  'celery',
+                  'fennel',
+                  'asparagus',
+                  'artichoke',
+                  'okra',
+                  'bamboo shoots',
+                  'water chestnuts',
+                  'lotus root',
+                  'jicama',
+                  'hearts of palm',
+                  'seaweed',
+                  'nori',
+                  'wakame',
+                  'kombu',
+                  'kelp',
+                  'lentils',
+                  'split peas',
+                  'chickpeas',
+                  'white beans',
+                  'cannellini beans',
+                  'navy beans',
+                  'kidney beans',
+                  'pinto beans',
+                  'black beans',
+                  'adzuki beans',
+                  'mung beans',
+                  'fava beans',
+                  'butter beans',
+                  'lima beans',
+                  'white rice',
+                  'jasmine rice',
+                  'basmati rice',
+                  'brown rice',
+                  'arborio rice',
+                  'sushi rice',
+                  'wild rice',
+                  'quinoa',
+                  'millet',
+                  'sorghum',
+                  'buckwheat',
+                  'barley',
+                  'farro',
+                  'spelt',
+                  'bulgur',
+                  'couscous',
+                  'amaranth',
+                  'teff',
+                  'corn kernels',
+                  'polenta',
+                  'grits',
+                  'oats',
+                  'rice noodles',
+                  'glass noodles',
+                  'wheat noodles',
+                  'udon',
+                  'soba',
+                  'rice paper',
+                  'corn tortilla',
+                  'plain bread',
+                  'plain pita',
+                  'plain wrap',
+                  'rice cakes',
+                  'rice crackers',
+                  'plain popcorn',
+                  'egg whites',
+                  'fat free',
+                  'fat-free',
+                  'skim milk',
+                  'fat free milk',
+                  'fat-free milk',
+                  'fat free yogurt',
+                  'fat-free yogurt',
+                  'fat free yoghurt',
+                  'fat-free yoghurt',
+                  'fat free cottage cheese',
+                  'fat-free cottage cheese',
+                  'apple sauce',
+                  'applesauce',
+                  'fruit puree',
+                  'fruit cup',
+                  'dried apple',
+                  'dried apples',
+                  'raisins',
+                  'sultanas',
+                  'currants',
+                  'dates',
+                  'dried apricot',
+                  'dried apricots',
+                  'dried mango',
+                  'dried pineapple',
+                  'freeze dried',
+                  'basil',
+                  'parsley',
+                  'coriander',
+                  'mint',
+                  'dill',
+                  'thyme',
+                  'rosemary',
+                  'sage',
+                  'oregano',
+                  'bay leaf',
+                  'tarragon',
+                  'chervil',
+                  'lemongrass',
+                  'black pepper',
+                  'white pepper',
+                  'paprika',
+                  'smoked paprika',
+                  'chili powder',
+                  'turmeric',
+                  'cumin',
+                  'coriander seed',
+                  'cinnamon',
+                  'nutmeg',
+                  'clove',
+                  'allspice',
+                  'cardamom',
+                  'star anise',
+                  'sumac',
+                  'mustard',
+                  'vinegar',
+                  'soy sauce',
+                  'tamari',
+                  'coconut aminos',
+                  'hot sauce',
+                  'tomato paste',
+                  'tomato passata',
+                  'salsa',
+                  'pickles',
+                  'sauerkraut',
+                  'kimchi',
+                  'relish',
+                  'water',
+                  'mineral water',
+                  'sparkling water',
+                  'soda water',
+                  'black coffee',
+                  'espresso',
+                  'long black',
+                  'americano',
+                  'cold brew',
+                  'tea',
+                  'green tea',
+                  'white tea',
+                  'herbal tea',
+                  'kombucha',
+                  'vegetable juice',
+                  'fruit juice',
+                  'coconut water',
+                  'electrolyte drink',
+                  'sugar',
+                  'white sugar',
+                  'brown sugar',
+                  'raw sugar',
+                  'honey',
+                  'maple syrup',
+                  'golden syrup',
+                  'rice malt syrup',
+                  'agave',
+                  'stevia',
+                  'monk fruit',
+                  'erythritol',
+                  'xylitol',
+                  'glucose syrup',
+                  'fructose',
+                ]
+
                 const fatBadKeywords = [
                   'margarine',
                   'vegetable shortening',
@@ -19753,6 +20110,14 @@ Please add nutritional information manually if needed.`);
                   })
                 }
 
+                const ZERO_FAT_GRAMS = 0.5
+
+                const isZeroFatItem = (label: any, grams: number) => {
+                  const fatValue = Number(grams || 0)
+                  if (!Number.isFinite(fatValue) || fatValue <= 0) return true
+                  return fatValue <= ZERO_FAT_GRAMS && matchesFatKeywords(label, fatZeroKeywords)
+                }
+
                 const classifyFatLabel = (label: any) => {
                   if (matchesFatKeywords(label, fatBadOverrides)) return 'bad'
                   const hasBad = matchesFatKeywords(label, fatBadKeywords)
@@ -19790,6 +20155,7 @@ Please add nutritional information manually if needed.`);
                     const fat = Number(entry?.fat_g || 0) * servings * multiplier
                     if (!Number.isFinite(fat) || fat <= 0) return
                     const label = entry?.name || entry?.label || entry?.description || ''
+                    if (isZeroFatItem(label, fat)) return
                     const bucket = classifyFatLabel(label)
                     if (bucket === 'good') {
                       split.good += fat
@@ -19849,6 +20215,7 @@ Please add nutritional information manually if needed.`);
                     fatSplit.unclear += splitFromItems.unclear
                   } else {
                     const entryLabel = item?.label || item?.name || item?.description || ''
+                    if (isZeroFatItem(entryLabel, storedTotals.fat)) return acc
                     const bucket = classifyFatLabel(entryLabel)
                     if (bucket === 'good') {
                       fatSplit.good += storedTotals.fat
@@ -20214,6 +20581,12 @@ Please add nutritional information manually if needed.`);
                                     </div>
                                   )
                                 })}
+                                {fatConsumed > 0 && (
+                                  <p className="text-sm text-gray-600 leading-snug">
+                                    Fat is split into healthy (green), unhealthy (red), and unclear (blue) based on the food name.
+                                    Hover or tap any colored bar or circle to see which foods were counted.
+                                  </p>
+                                )}
                                 {isMobile && fatDetailState?.source === 'bar' && (
                                   <div className="mt-2 rounded-lg border border-gray-200 bg-white shadow-sm p-3">
                                     <div className="flex items-center gap-2 mb-2">
@@ -20368,8 +20741,13 @@ Please add nutritional information manually if needed.`);
                           return (
                             <>
                               {isMobile ? (
-                                <div onTouchStart={handleSummaryTouchStart} onTouchEnd={handleSummaryTouchEnd} className="w-full">
-                                  <div className="px-2">
+                                <div
+                                  onTouchStart={handleSummaryTouchStart}
+                                  onTouchEnd={handleSummaryTouchEnd}
+                                  className="w-full"
+                                  style={summaryMinHeight ? { minHeight: summaryMinHeight } : undefined}
+                                >
+                                  <div ref={summaryActiveSlideRef} className="px-2">
                                     {slides[activeSlideIndex]}
                                   </div>
                                 </div>
