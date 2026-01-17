@@ -20531,7 +20531,7 @@ Please add nutritional information manually if needed.`);
                           }
 
                           // Slide 1: Separate used vs remaining rings
-                          slides.push(
+                          const energyPanel = (
                             <div className="flex flex-col items-center order-1 md:order-2 w-full">
                               <div className="grid grid-cols-2 gap-4 sm:gap-6 w-full items-stretch">
                                 <TargetRing
@@ -20573,10 +20573,12 @@ Please add nutritional information manually if needed.`);
                               )}
                             </div>
                           )
+                          slides.push(energyPanel)
 
                           // Slide 2: macro bars
+                          let macroPanel: JSX.Element | null = null
                           if (macroRowsFiltered.length > 0) {
-                            slides.push(
+                            macroPanel = (
                               <div className="order-2 md:order-1 space-y-2 mt-4 md:mt-0">
                                 {macroRowsFiltered.map((row) => {
                                   const pctRaw = row.target > 0 ? row.consumed / row.target : 0
@@ -20730,15 +20732,17 @@ Please add nutritional information manually if needed.`);
                                 )}
                               </div>
                             )
+                            slides.push(macroPanel)
                           }
 
+                          let fatPanel: JSX.Element | null = null
                           if (fatConsumed > 0) {
                             const fatRingItems = [
                               { type: 'good' as const, label: 'Good fat', value: normalizedFatSplit.good, color: fatDetailColors.good },
                               { type: 'bad' as const, label: 'Bad fat', value: normalizedFatSplit.bad, color: fatDetailColors.bad },
                               { type: 'unclear' as const, label: 'Unclear', value: normalizedFatSplit.unclear, color: fatDetailColors.unclear },
                             ]
-                            slides.push(
+                            fatPanel = (
                               <div
                                 className="order-3 md:order-1 space-y-3 mt-4 md:mt-0"
                                 onMouseLeave={() => closeFatDetail('ring')}
@@ -20826,6 +20830,7 @@ Please add nutritional information manually if needed.`);
                                 )}
                               </div>
                             )
+                            slides.push(fatPanel)
                           }
 
                           const totalSlides = slides.length
@@ -20875,13 +20880,58 @@ Please add nutritional information manually if needed.`);
                                   )}
                                 </div>
                               ) : (
-                                <div className="grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] items-start gap-4">
-                                  {slides.map((slide, idx) => (
-                                    <div key={idx} className="w-full">
-                                      {slide}
+                                (() => {
+                                  const desktopPanels: JSX.Element[] = []
+                                  const mainPanel = macroPanel ? (
+                                    <div className="grid lg:grid-cols-[260px_minmax(0,1fr)] items-start gap-4">
+                                      <div className="w-full">{energyPanel}</div>
+                                      <div className="w-full">{macroPanel}</div>
                                     </div>
-                                  ))}
-                                </div>
+                                  ) : (
+                                    <div className="w-full">{energyPanel}</div>
+                                  )
+                                  desktopPanels.push(mainPanel)
+                                  if (fatPanel) desktopPanels.push(fatPanel)
+                                  const desktopActiveIndex = Math.max(0, Math.min(summarySlideIndex, desktopPanels.length - 1))
+                                  return (
+                                    <div className="w-full">
+                                      {desktopPanels[desktopActiveIndex]}
+                                      {desktopPanels.length > 1 && (
+                                        <div className="flex items-center justify-between mt-4">
+                                          <button
+                                            type="button"
+                                            onClick={() => setSummarySlideIndex(Math.max(0, desktopActiveIndex - 1))}
+                                            disabled={desktopActiveIndex === 0}
+                                            className="h-9 w-9 rounded-full border border-gray-200 text-gray-700 flex items-center justify-center disabled:opacity-30"
+                                            aria-label="Previous panel"
+                                          >
+                                            <span aria-hidden>‹</span>
+                                          </button>
+                                          <div className="flex items-center gap-2">
+                                            {desktopPanels.map((_, idx) => (
+                                              <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => setSummarySlideIndex(idx)}
+                                                className={`w-2 h-2 rounded-full ${desktopActiveIndex === idx ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                                aria-label={`Show panel ${idx + 1}`}
+                                              />
+                                            ))}
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => setSummarySlideIndex(Math.min(desktopPanels.length - 1, desktopActiveIndex + 1))}
+                                            disabled={desktopActiveIndex === desktopPanels.length - 1}
+                                            className="h-9 w-9 rounded-full border border-gray-200 text-gray-700 flex items-center justify-center disabled:opacity-30"
+                                            aria-label="Next panel"
+                                          >
+                                            <span aria-hidden>›</span>
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()
                               )}
                             </>
                           )
