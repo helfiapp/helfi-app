@@ -3005,6 +3005,8 @@ export default function FoodDiary() {
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
+  const midnightTimerRef = useRef<number | null>(null)
+  const todayIsoRef = useRef<string>(buildTodayIso())
   const openMenuKeyRef = useRef<string | null>(null)
   const consumePendingDrinkMeta = (override: DrinkAmountOverride | null) => {
     const drinkType = pendingDrinkTypeRef.current
@@ -3097,6 +3099,35 @@ export default function FoodDiary() {
       setShowFavoritesPicker(true)
     }
   }, [isAnalysisRoute, pathname])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const scheduleNext = () => {
+      if (midnightTimerRef.current) {
+        window.clearTimeout(midnightTimerRef.current)
+      }
+      const now = new Date()
+      const nextMidnight = new Date(now)
+      nextMidnight.setHours(24, 0, 0, 0)
+      const delay = nextMidnight.getTime() - now.getTime()
+      midnightTimerRef.current = window.setTimeout(() => {
+        const previousToday = todayIsoRef.current
+        const nextToday = buildTodayIso()
+        todayIsoRef.current = nextToday
+        try {
+          localStorage.setItem(FOOD_DIARY_LAST_VISIT_KEY, nextToday)
+        } catch {}
+        setSelectedDate((prev) => (prev === previousToday ? nextToday : prev))
+        scheduleNext()
+      }, Math.max(1000, delay))
+    }
+    scheduleNext()
+    return () => {
+      if (midnightTimerRef.current) {
+        window.clearTimeout(midnightTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!editingEntry) {
