@@ -18,6 +18,17 @@
     overscroll-behavior-x: none;
   }
 
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
   body {
     @apply bg-white text-helfi-black antialiased;
     position: relative;
