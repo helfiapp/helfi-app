@@ -19513,6 +19513,8 @@ Please add nutritional information manually if needed.`);
                   'burrata',
                   'mozzarella',
                   'swiss cheese',
+                  'cheese slice',
+                  'cheese slices',
                   'egg',
                   'eggs',
                   'duck egg',
@@ -20068,6 +20070,26 @@ Please add nutritional information manually if needed.`);
                   'takeout',
                 ]
 
+                const fatChainKeywords = [
+                  'mcdonald',
+                  'mcdonalds',
+                  'mc donald',
+                  'maccas',
+                  'kfc',
+                  'burger king',
+                  'hungry jacks',
+                ]
+
+                const fatFastFoodKeywords = [
+                  'fast food',
+                  'takeaway',
+                  'takeout',
+                  'takeaway food',
+                  'drive thru',
+                  'drive-thru',
+                  'food court',
+                ]
+
                 const fatBadOverrides = [
                   'processed',
                   'ultra processed',
@@ -20075,8 +20097,6 @@ Please add nutritional information manually if needed.`);
                   'processed cheese product',
                   'cheese product',
                   'cheese food',
-                  'cheese slice',
-                  'cheese slices',
                   'cheese single',
                   'cheese singles',
                   'sandwich cheese',
@@ -20126,8 +20146,16 @@ Please add nutritional information manually if needed.`);
 
                 const classifyFatLabel = (label: any) => {
                   if (matchesFatKeywords(label, fatBadOverrides)) return 'bad'
+                  if (matchesFatKeywords(label, fatChainKeywords)) return 'bad'
                   const hasBad = matchesFatKeywords(label, fatBadKeywords)
                   const hasGood = matchesFatKeywords(label, fatGoodKeywords)
+                  const raw = normalizeFatLabel(label)
+                  const hasCheese = raw.includes('cheese')
+                  const hasBurger = raw.includes('burger')
+                  const hasFastFood = matchesFatKeywords(label, fatFastFoodKeywords)
+                  if (hasCheese && (hasBurger || hasFastFood) && !matchesFatKeywords(label, fatChainKeywords)) {
+                    return 'unclear'
+                  }
                   if (hasBad && hasGood) return 'unclear'
                   if (hasBad) return 'bad'
                   if (hasGood) return 'good'
