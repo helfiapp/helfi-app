@@ -697,11 +697,15 @@ export default function WaterIntakePage() {
   }
 
   const handleBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back()
-      return
+    const params = new URLSearchParams()
+    if (isValidDate(selectedDate)) {
+      params.set('date', selectedDate)
     }
-    router.push('/food')
+    if (sourceCategory) {
+      params.set('category', sourceCategory)
+    }
+    const target = params.toString()
+    router.push(target ? `/food?${target}` : '/food')
   }
 
   return (
