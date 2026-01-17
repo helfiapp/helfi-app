@@ -55,14 +55,12 @@ export default async function InsightsPage() {
     )
   }
 
-  const weeklyState = await getWeeklyReportState(session.user.id)
+  let weeklyState = await getWeeklyReportState(session.user.id)
   if (!weeklyState?.nextReportDueAt) {
     await markWeeklyReportOnboardingComplete(session.user.id)
+    weeklyState = await getWeeklyReportState(session.user.id)
   }
-  const [latestReport, refreshedState] = await Promise.all([
-    getLatestWeeklyReport(session.user.id),
-    getWeeklyReportState(session.user.id),
-  ])
+  const latestReport = await getLatestWeeklyReport(session.user.id)
   const reportReady = latestReport?.status === 'READY'
   const reportLocked = latestReport?.status === 'LOCKED'
 
@@ -80,7 +78,7 @@ export default async function InsightsPage() {
       initialWeeklyStatus={{
         reportReady,
         reportLocked,
-        nextReportDueAt: refreshedState?.nextReportDueAt ?? null,
+        nextReportDueAt: weeklyState?.nextReportDueAt ?? null,
       }}
     />
   )

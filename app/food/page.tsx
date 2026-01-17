@@ -9215,10 +9215,17 @@ Please add nutritional information manually if needed.`);
 
     // Save to database (this triggers background insight regeneration)
     setIsSavingEntry(true)
+    let releasedSaveState = false
+    const releaseSaveState = () => {
+      if (releasedSaveState) return
+      releasedSaveState = true
+      setIsSavingEntry(false)
+    }
     try {
       await saveFoodEntries(updatedFoods)
-      await refreshEntriesFromServer()
-      await saveBarcodeLabelIfNeeded(newEntry.items)
+      releaseSaveState()
+      void refreshEntriesFromServer()
+      void saveBarcodeLabelIfNeeded(newEntry.items)
       
       // Show subtle notification that insights are updating
       setInsightsNotification({
@@ -9248,7 +9255,7 @@ Please add nutritional information manually if needed.`);
         router.push('/food')
       }
     } finally {
-      setIsSavingEntry(false)
+      releaseSaveState()
     }
   };
 
@@ -9627,6 +9634,12 @@ Please add nutritional information manually if needed.`);
     );
     
     setIsSavingEntry(true)
+    let releasedSaveState = false
+    const releaseSaveState = () => {
+      if (releasedSaveState) return
+      releasedSaveState = true
+      setIsSavingEntry(false)
+    }
     try {
       if (isViewingToday) {
         setTodaysFoods(updatedFoods);
@@ -9690,10 +9703,11 @@ Please add nutritional information manually if needed.`);
 
       // Keep local snapshot in sync (but do not create a new history row)
       await saveFoodEntries(updatedFoods, { appendHistory: false });
+      releaseSaveState()
       if (serverUpdated) {
-        await refreshEntriesFromServer();
+        void refreshEntriesFromServer();
       }
-      await saveBarcodeLabelIfNeeded(updatedEntry.items)
+      void saveBarcodeLabelIfNeeded(updatedEntry.items)
       
       // Reset all form states
       resetAnalyzerPanel()
@@ -9703,7 +9717,7 @@ Please add nutritional information manually if needed.`);
       }
     } finally {
       editingDrinkMetaRef.current = null
-      setIsSavingEntry(false)
+      releaseSaveState()
     }
   };
 

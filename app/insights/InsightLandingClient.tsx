@@ -60,6 +60,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   }, [issues, router])
 
   useEffect(() => {
+    if (initialWeeklyStatus) return
     let mounted = true
     fetch('/api/reports/weekly/status', { method: 'GET' })
       .then((res) => (res.ok ? res.json() : null))
@@ -71,7 +72,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     return () => {
       mounted = false
     }
-  }, [])
+  }, [initialWeeklyStatus])
 
   useEffect(() => {
     const dueRaw = weeklyStatus?.nextReportDueAt
