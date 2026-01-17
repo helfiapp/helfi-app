@@ -19461,6 +19461,7 @@ Please add nutritional information manually if needed.`);
                   'wallnuts',
                   'grass fed butter',
                   'grass-fed butter',
+                  'butter',
                   'cultured butter',
                   'ghee',
                   'beef tallow',
@@ -20115,6 +20116,13 @@ Please add nutritional information manually if needed.`);
                   'cheese flavor',
                   'cheese flavoured',
                   'cheese flavored',
+                  'butter blend',
+                  'butter spread',
+                  'spreadable butter',
+                  'butter substitute',
+                  'butter flavored',
+                  'butter flavoured',
+                  'buttery spread',
                   'seed oil',
                   'seed oils',
                   'roasted seed',
@@ -20758,10 +20766,6 @@ Please add nutritional information manually if needed.`);
                                     )}
                                   </div>
                                 )}
-                                <p className="text-sm text-gray-600 leading-snug">
-                                  Fat is split into healthy (green), unhealthy (red), and unclear (blue) based on the food name.
-                                  Hover or tap any colored bar or circle to see which foods were counted.
-                                </p>
                               </div>
                             )
                           }
