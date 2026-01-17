@@ -3439,16 +3439,22 @@ export default function FoodDiary() {
       setSummaryMinHeight(null)
       return
     }
-    setSummaryMinHeight(null)
   }, [selectedDate, isMobile, summaryRenderNonce])
 
   useEffect(() => {
     if (!isMobile) return
     const node = summaryActiveSlideRef.current
     if (!node) return
-    const height = node.offsetHeight
-    if (height > 0) {
-      setSummaryMinHeight((prev) => (prev === null ? height : Math.max(prev, height)))
+    const updateHeight = () => {
+      const height = node.offsetHeight
+      if (height > 0) {
+        setSummaryMinHeight(height)
+      }
+    }
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(updateHeight)
+    } else {
+      updateHeight()
     }
   }, [isMobile, summarySlideIndex, fatDetailState, summaryRenderNonce])
 
