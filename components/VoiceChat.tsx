@@ -81,6 +81,10 @@ export default function VoiceChat({
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const barcodeVideoRef = useRef<HTMLVideoElement | null>(null)
   const barcodeScannerRef = useRef<{ reader: any; controls: any } | null>(null)
+  const inputRef = useRef<string>('')
+  const sendChatMessageRef = useRef<
+    ((messageText: string, options?: { foodContextOverride?: string }) => Promise<void> | void) | null
+  >(null)
   const [dynamicExampleQuestions, setDynamicExampleQuestions] = useState<string[] | null>(null)
   const storageKey = useMemo(() => `helfi:chat:talk:${entryContext}`, [entryContext])
   const archivedKey = useMemo(() => `helfi:chat:talk:${entryContext}:archived`, [entryContext])
@@ -377,17 +381,18 @@ export default function VoiceChat({
           .join('\n')
 
         const question =
-          input.trim() || `I scanned a barcode for ${itemName}. How does it fit my macros today?`
+          inputRef.current.trim() ||
+          `I scanned a barcode for ${itemName}. How does it fit my macros today?`
 
         setShowBarcodeScanner(false)
         resetBarcodeState()
-        await sendChatMessage(question, { foodContextOverride })
+        await sendChatMessageRef.current?.(question, { foodContextOverride })
       } catch (err) {
         setBarcodeError('Barcode lookup failed. Please try again.')
         setBarcodeStatus('idle')
       }
     },
-    [input, resetBarcodeState, sendChatMessage]
+    [resetBarcodeState]
   )
 
   const handleBarcodeDetected = useCallback(
@@ -406,6 +411,7 @@ export default function VoiceChat({
     setBarcodeStatus('loading')
     setBarcodeStatusHint('Starting camera…')
     try {
+      if (barcodeScannerRef.current) return
       stopBarcodeScanner()
       const videoEl = barcodeVideoRef.current
       if (!videoEl) {
@@ -453,6 +459,9 @@ export default function VoiceChat({
       })
 
       barcodeScannerRef.current = { reader, controls }
+      try {
+        await videoEl.play()
+      } catch {}
       setBarcodeStatus('scanning')
       setBarcodeStatusHint('Scanning…')
     } catch (err) {
@@ -698,6 +707,10 @@ export default function VoiceChat({
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  useEffect(() => {
+    inputRef.current = input
+  }, [input])
 
   useEffect(() => {
     try {
@@ -1275,6 +1288,10 @@ export default function VoiceChat({
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    sendChatMessageRef.current = sendChatMessage
+  }, [sendChatMessage])
 
   const renderFormattedContent = (content: string, enableMacroColors = false) => {
     const formatted = formatChatContent(content)
@@ -1967,7 +1984,10 @@ export default function VoiceChat({
             <div className="text-base font-semibold">Scan barcode</div>
             <button
               type="button"
-              onClick={() => setShowBarcodeScanner(false)}
+              onClick={() => {
+                stopBarcodeScanner()
+                setShowBarcodeScanner(false)
+              }}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
               aria-label="Close barcode scanner"
             >
@@ -2012,6 +2032,16 @@ export default function VoiceChat({
                 </div>
               )}
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                stopBarcodeScanner()
+                setShowBarcodeScanner(false)
+              }}
+              className="mt-2 w-full rounded-full border border-white/40 px-4 py-3 text-sm font-semibold text-white"
+            >
+              Close scanner
+            </button>
           </div>
         </div>
       )}
