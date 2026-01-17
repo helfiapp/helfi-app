@@ -21,7 +21,7 @@ type NormalizedFoodItem = {
   sugar_g?: number | null
 }
 
-type BuilderUnit = 'g' | 'oz' | 'ml'
+type BuilderUnit = 'g' | 'oz' | 'ml' | 'tsp' | 'tbsp' | 'cup'
 
 type BuilderItem = {
   id: string
@@ -113,7 +113,7 @@ const parseServingBase = (servingSize: any): { amount: number | null; unit: Buil
   const paren = raw.match(/\(([^)]*)\)/)
   const target = paren?.[1] ? paren[1] : raw
 
-  const m = target.match(/(\d+(?:\.\d+)?)\s*(g|grams?|ml|mL|oz|ounces?)/i)
+  const m = target.match(/(\d+(?:\.\d+)?)\s*(g|grams?|ml|mL|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?|cup|cups?)/i)
   if (!m) return { amount: null, unit: null }
   const amount = parseFloat(m[1])
   if (!Number.isFinite(amount) || amount <= 0) return { amount: null, unit: null }
@@ -122,6 +122,9 @@ const parseServingBase = (servingSize: any): { amount: number | null; unit: Buil
   if (unitRaw.startsWith('g')) return { amount, unit: 'g' }
   if (unitRaw === 'ml' || unitRaw === 'ml'.toLowerCase() || unitRaw === 'mL'.toLowerCase()) return { amount, unit: 'ml' }
   if (unitRaw.startsWith('oz') || unitRaw.startsWith('ounce')) return { amount, unit: 'oz' }
+  if (unitRaw.startsWith('tsp') || unitRaw.startsWith('teaspoon')) return { amount, unit: 'tsp' }
+  if (unitRaw.startsWith('tbsp') || unitRaw.startsWith('tablespoon')) return { amount, unit: 'tbsp' }
+  if (unitRaw.startsWith('cup')) return { amount, unit: 'cup' }
   return { amount: null, unit: null }
 }
 
@@ -129,9 +132,21 @@ const convertAmount = (amount: number, from: BuilderUnit, to: BuilderUnit) => {
   if (!Number.isFinite(amount)) return amount
   if (from === to) return amount
 
+  const weightUnits: BuilderUnit[] = ['g', 'oz', 'tsp', 'tbsp', 'cup']
+  const weightToGrams: Record<BuilderUnit, number> = {
+    g: 1,
+    oz: 28,
+    tsp: 5,
+    tbsp: 14,
+    cup: 218,
+    ml: 0,
+  }
+
   // Weight conversions
-  if (from === 'g' && to === 'oz') return amount / 28.3495
-  if (from === 'oz' && to === 'g') return amount * 28.3495
+  if (weightUnits.includes(from) && weightUnits.includes(to)) {
+    const grams = amount * weightToGrams[from]
+    return grams / weightToGrams[to]
+  }
 
   // Volume conversions (US fl oz)
   if (from === 'ml' && to === 'oz') return amount / 29.5735
@@ -142,10 +157,18 @@ const convertAmount = (amount: number, from: BuilderUnit, to: BuilderUnit) => {
 }
 
 const allowedUnitsForBase = (baseUnit: BuilderUnit | null): BuilderUnit[] => {
-  if (baseUnit === 'g') return ['g', 'oz']
+  if (!baseUnit) return []
   if (baseUnit === 'ml') return ['ml', 'oz']
-  if (baseUnit === 'oz') return ['oz', 'ml']
-  return []
+  return ['g', 'tsp', 'tbsp', 'cup', 'oz']
+}
+
+const formatUnitLabel = (unit: BuilderUnit) => {
+  if (unit === 'g') return 'g'
+  if (unit === 'tsp') return 'tsp — 5g'
+  if (unit === 'tbsp') return 'tbsp — 14g'
+  if (unit === 'cup') return 'cup — 218g'
+  if (unit === 'oz') return 'oz — 28g'
+  return unit
 }
 
 const macroOrZero = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
@@ -211,6 +234,7 @@ export default function MealBuilderClient() {
   const abortRef = useRef<AbortController | null>(null)
   const seqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
+  const queryInputRef = useRef<HTMLInputElement | null>(null)
 
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
@@ -439,8 +463,8 @@ export default function MealBuilderClient() {
     return { title: name, showBrandSuffix: true }
   }
 
-  const runSearch = async () => {
-    const q = query.trim()
+  const runSearch = async (searchQuery?: string) => {
+    const q = String(searchQuery ?? query).trim()
     if (!q) {
       setError('Please type a food name to search.')
       return
@@ -449,6 +473,7 @@ export default function MealBuilderClient() {
     setError(null)
     setSearchLoading(true)
     setResults([])
+    if (q !== query) setQuery(q)
 
     try {
       abortRef.current?.abort()
@@ -1708,10 +1733,12 @@ export default function MealBuilderClient() {
             className="relative"
             onSubmit={(e) => {
               e.preventDefault()
-              runSearch()
+              const raw = queryInputRef.current?.value ?? query
+              runSearch(raw)
             }}
           >
             <input
+              ref={queryInputRef}
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value)
@@ -1725,9 +1752,13 @@ export default function MealBuilderClient() {
               className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             />
             <button
-              type="submit"
+              type="button"
               aria-label="Search"
               disabled={busy || query.trim().length === 0}
+              onClick={() => {
+                const raw = queryInputRef.current?.value ?? query
+                runSearch(raw)
+              }}
               className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
             >
               {busy ? (
@@ -1952,7 +1983,7 @@ export default function MealBuilderClient() {
                               >
                                 {baseUnits.map((u) => (
                                   <option key={u} value={u}>
-                                    {u}
+                                    {formatUnitLabel(u)}
                                   </option>
                                 ))}
                               </select>
