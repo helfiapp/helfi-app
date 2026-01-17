@@ -190,9 +190,6 @@ export default function MealBuilderClient() {
   const mealNameWasClearedOnFocusRef = useRef(false)
 
   const [query, setQuery] = useState('')
-  const queryBackupRef = useRef<string>('')
-  const queryEditedRef = useRef(false)
-  const queryWasClearedOnFocusRef = useRef(false)
   const [kind, setKind] = useState<'packaged' | 'single'>('packaged')
   const [searchLoading, setSearchLoading] = useState(false)
   const [savingMeal, setSavingMeal] = useState(false)
@@ -1707,34 +1704,30 @@ export default function MealBuilderClient() {
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
           <div className="text-sm font-semibold text-gray-900">Search ingredients</div>
-          <div className="relative">
+          <form
+            className="relative"
+            onSubmit={(e) => {
+              e.preventDefault()
+              runSearch()
+            }}
+          >
             <input
               value={query}
-              onFocus={() => {
-                queryBackupRef.current = query
-                queryEditedRef.current = false
-                queryWasClearedOnFocusRef.current = query.trim().length > 0
-                if (queryWasClearedOnFocusRef.current) setQuery('')
-              }}
               onChange={(e) => {
-                queryEditedRef.current = true
                 setQuery(e.target.value)
               }}
-              onBlur={() => {
-                if (queryWasClearedOnFocusRef.current && !queryEditedRef.current) {
-                  setQuery(queryBackupRef.current)
-                }
-                queryWasClearedOnFocusRef.current = false
-                queryEditedRef.current = false
-              }}
               placeholder="e.g. chicken breast"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              enterKeyHint="search"
               className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             />
             <button
-              type="button"
+              type="submit"
               aria-label="Search"
               disabled={busy || query.trim().length === 0}
-              onClick={runSearch}
               className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
             >
               {busy ? (
@@ -1746,7 +1739,7 @@ export default function MealBuilderClient() {
                 </svg>
               )}
             </button>
-          </div>
+          </form>
           <div className="flex gap-2">
             <button
               type="button"
