@@ -20621,51 +20621,53 @@ Please add nutritional information manually if needed.`);
                                         </div>
                                       </div>
                                       <div
-                                        className="relative h-2 w-full bg-gray-200 rounded-full overflow-hidden"
+                                        className="relative"
                                         onMouseLeave={() => row.key === 'fat' && closeFatDetail('bar')}
                                       >
-                                        {row.key === 'fat' && fatSplitValues && fatSplitTotal > 0 ? (
-                                          <div
-                                            className="h-2 rounded-full overflow-hidden transition-all flex"
-                                            style={{ width: `${barWidth}%` }}
-                                          >
-                                            {fatGoodPct > 0 && (
-                                              <button
-                                                type="button"
-                                                className="h-2 cursor-pointer focus:outline-none"
-                                                style={{ width: `${fatGoodPct}%`, backgroundColor: fatDetailColors.good }}
-                                                onMouseEnter={() => openFatDetail('good', 'bar')}
-                                                onClick={() => toggleFatDetail('good', 'bar')}
-                                                aria-label="Healthy fats"
-                                              />
-                                            )}
-                                            {fatBadPct > 0 && (
-                                              <button
-                                                type="button"
-                                                className="h-2 cursor-pointer focus:outline-none"
-                                                style={{ width: `${fatBadPct}%`, backgroundColor: fatDetailColors.bad }}
-                                                onMouseEnter={() => openFatDetail('bad', 'bar')}
-                                                onClick={() => toggleFatDetail('bad', 'bar')}
-                                                aria-label="Unhealthy fats"
-                                              />
-                                            )}
-                                            {fatUnclearPct > 0 && (
-                                              <button
-                                                type="button"
-                                                className="h-2 cursor-pointer focus:outline-none"
-                                                style={{ width: `${fatUnclearPct}%`, backgroundColor: fatDetailColors.unclear }}
-                                                onMouseEnter={() => openFatDetail('unclear', 'bar')}
-                                                onClick={() => toggleFatDetail('unclear', 'bar')}
-                                                aria-label="Unclear fats"
-                                              />
-                                            )}
-                                          </div>
-                                        ) : (
-                                          <div
-                                            className="h-2 rounded-full transition-all"
-                                            style={{ width: `${barWidth}%`, backgroundColor: over ? '#ef4444' : row.color }}
-                                          />
-                                        )}
+                                        <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                                          {row.key === 'fat' && fatSplitValues && fatSplitTotal > 0 ? (
+                                            <div
+                                              className="h-2 rounded-full overflow-hidden transition-all flex"
+                                              style={{ width: `${barWidth}%` }}
+                                            >
+                                              {fatGoodPct > 0 && (
+                                                <button
+                                                  type="button"
+                                                  className="h-2 cursor-pointer focus:outline-none"
+                                                  style={{ width: `${fatGoodPct}%`, backgroundColor: fatDetailColors.good }}
+                                                  onMouseEnter={() => openFatDetail('good', 'bar')}
+                                                  onClick={() => toggleFatDetail('good', 'bar')}
+                                                  aria-label="Healthy fats"
+                                                />
+                                              )}
+                                              {fatBadPct > 0 && (
+                                                <button
+                                                  type="button"
+                                                  className="h-2 cursor-pointer focus:outline-none"
+                                                  style={{ width: `${fatBadPct}%`, backgroundColor: fatDetailColors.bad }}
+                                                  onMouseEnter={() => openFatDetail('bad', 'bar')}
+                                                  onClick={() => toggleFatDetail('bad', 'bar')}
+                                                  aria-label="Unhealthy fats"
+                                                />
+                                              )}
+                                              {fatUnclearPct > 0 && (
+                                                <button
+                                                  type="button"
+                                                  className="h-2 cursor-pointer focus:outline-none"
+                                                  style={{ width: `${fatUnclearPct}%`, backgroundColor: fatDetailColors.unclear }}
+                                                  onMouseEnter={() => openFatDetail('unclear', 'bar')}
+                                                  onClick={() => toggleFatDetail('unclear', 'bar')}
+                                                  aria-label="Unclear fats"
+                                                />
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <div
+                                              className="h-2 rounded-full transition-all"
+                                              style={{ width: `${barWidth}%`, backgroundColor: over ? '#ef4444' : row.color }}
+                                            />
+                                          )}
+                                        </div>
                                         {row.key === 'fat' && fatDetailState?.source === 'bar' && !isMobile && (
                                           <div className="absolute left-0 top-full mt-2 z-20 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-3">
                                             <div className="flex items-center gap-2 mb-2">
@@ -20680,7 +20682,7 @@ Please add nutritional information manually if needed.`);
                                             {fatDetailItems[fatDetailState.type].length === 0 ? (
                                               <div className="text-xs text-gray-500">No items yet today.</div>
                                             ) : (
-                                              <ul className="space-y-1 max-h-28 overflow-y-auto text-xs text-gray-700">
+                                              <ul className="space-y-1 text-xs text-gray-700">
                                                 {fatDetailItems[fatDetailState.type].map((item) => (
                                                   <li key={item.label} className="flex items-center justify-between gap-3">
                                                     <span className="truncate">{item.label}</span>
@@ -20815,7 +20817,7 @@ Please add nutritional information manually if needed.`);
                                     {fatDetailItems[fatDetailState.type].length === 0 ? (
                                       <div className="text-xs text-gray-500">No items yet today.</div>
                                     ) : (
-                                      <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
+                                      <ul className="space-y-1 text-xs text-gray-700">
                                         {fatDetailItems[fatDetailState.type].map((item) => (
                                           <li key={item.label} className="flex items-center justify-between gap-3">
                                             <span className="truncate">{item.label}</span>
