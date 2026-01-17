@@ -280,6 +280,8 @@ export default function AddIngredientClient() {
   const servingPendingRef = useRef<Set<string>>(new Set())
   const seqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
+  const queryInputRef = useRef<HTMLInputElement | null>(null)
+  const searchPressRef = useRef(0)
 
   const cleanSingleFoodQuery = (value: string) =>
     value
@@ -502,6 +504,14 @@ export default function AddIngredientClient() {
     } finally {
       if (seqRef.current === seq) setLoading(false)
     }
+  }
+
+  const triggerSearchFromButton = () => {
+    const now = Date.now()
+    if (now - searchPressRef.current < 300) return
+    searchPressRef.current = now
+    const raw = queryInputRef.current?.value ?? query
+    runSearch(raw)
   }
 
   useEffect(() => {
@@ -748,18 +758,39 @@ export default function AddIngredientClient() {
               Search foods (use the source buttons below if results look off)
             </div>
 
-            <div className="relative">
+            <form
+              className="relative"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const raw = queryInputRef.current?.value ?? query
+                runSearch(raw)
+              }}
+            >
               <input
+                ref={queryInputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="e.g. pizza"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                enterKeyHint="search"
                 className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
               <button
                 type="button"
                 aria-label="Search"
                 disabled={loading || query.trim().length === 0}
-                onClick={() => runSearch()}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  triggerSearchFromButton()
+                }}
+                onTouchStart={(e) => {
+                  e.preventDefault()
+                  triggerSearchFromButton()
+                }}
+                onClick={triggerSearchFromButton}
                 className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
               >
                 {loading ? (
@@ -771,7 +802,7 @@ export default function AddIngredientClient() {
                   </svg>
                 )}
               </button>
-            </div>
+            </form>
 
             <div className="grid grid-cols-2 gap-2">
               <button

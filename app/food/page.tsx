@@ -2853,6 +2853,8 @@ export default function FoodDiary() {
   const officialSearchAbortRef = useRef<AbortController | null>(null)
   const officialSearchSeqRef = useRef(0)
   const officialSearchDebounceRef = useRef<any>(null)
+  const officialSearchInputRef = useRef<HTMLInputElement | null>(null)
+  const officialSearchPressRef = useRef(0)
   const analysisSequenceRef = useRef(0)
   const analysisHealthCheckKeyRef = useRef<string | null>(null)
   const pendingAnalysisHealthCheckRef = useRef<{
@@ -5962,6 +5964,18 @@ export default function FoodDiary() {
         setOfficialLoading(false)
       }
     }
+  }
+
+  const triggerOfficialSearchFromButton = () => {
+    const now = Date.now()
+    if (now - officialSearchPressRef.current < 300) return
+    officialSearchPressRef.current = now
+    try {
+      if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+    } catch {}
+    officialSearchDebounceRef.current = null
+    const raw = officialSearchInputRef.current?.value ?? officialSearchQuery
+    handleOfficialSearch(officialSource, raw)
   }
 
 const applyStructuredItems = (
@@ -15567,6 +15581,7 @@ Please add nutritional information manually if needed.`);
                     <div className="relative">
                       <input
                         type="text"
+                        ref={officialSearchInputRef}
                         value={officialSearchQuery}
                         onChange={(e) => {
                           const next = e.target.value
@@ -15593,13 +15608,26 @@ Please add nutritional information manually if needed.`);
                           }
                         }}
                         placeholder={'e.g., pizza'}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        enterKeyHint="search"
                         className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                       />
                       <button
                         type="button"
                         aria-label="Search"
                         disabled={officialLoading || officialSearchQuery.trim().length === 0}
-                        onClick={() => handleOfficialSearch(officialSource)}
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          triggerOfficialSearchFromButton()
+                        }}
+                        onTouchStart={(e) => {
+                          e.preventDefault()
+                          triggerOfficialSearchFromButton()
+                        }}
+                        onClick={triggerOfficialSearchFromButton}
                         className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
                       >
                         {officialLoading ? (
@@ -18515,6 +18543,7 @@ Please add nutritional information manually if needed.`);
                           <div className="relative">
                             <input
                               type="text"
+                              ref={officialSearchInputRef}
                               value={officialSearchQuery}
                               onChange={(e) => {
                                 const next = e.target.value
@@ -18541,13 +18570,26 @@ Please add nutritional information manually if needed.`);
                                 }
                               }}
                               placeholder="e.g., Christmas pudding"
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="none"
+                              spellCheck={false}
+                              enterKeyHint="search"
                               className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                             />
                             <button
                               type="button"
                               aria-label="Search"
                               disabled={officialLoading || officialSearchQuery.trim().length === 0}
-                              onClick={() => handleOfficialSearch(officialSource)}
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                triggerOfficialSearchFromButton()
+                              }}
+                              onTouchStart={(e) => {
+                                e.preventDefault()
+                                triggerOfficialSearchFromButton()
+                              }}
+                              onClick={triggerOfficialSearchFromButton}
                               className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
                             >
                               {officialLoading ? (
