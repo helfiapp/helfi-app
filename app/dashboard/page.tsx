@@ -921,7 +921,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 flex items-center justify-center bg-white dark:bg-slate-700 rounded-xl shadow-sm">
-                        <img src="/brands/huawei-health.png" alt="Huawei Health" className="h-6 w-auto" />
+                        <span className="material-symbols-outlined text-xl text-slate-400 dark:text-slate-300">devices</span>
                       </div>
                       <span className="font-semibold text-sm">Huawei Health</span>
                     </div>
@@ -1034,7 +1034,7 @@ export default function Dashboard() {
 
                   <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl flex flex-col items-center text-center border border-slate-100 dark:border-slate-800/50">
                     <div className="h-12 w-full flex items-center justify-center mb-6">
-                      <img src="/brands/huawei-health.png" alt="Huawei Health" className="h-8 w-auto object-contain" />
+                      <span className="material-symbols-outlined text-3xl text-slate-400 dark:text-slate-300">devices</span>
                     </div>
                     <span className="text-sm font-semibold mb-6">Huawei Health</span>
                     <button
