@@ -13,6 +13,7 @@ import {
   appendMessage,
   createThread,
   updateThreadTitle,
+  updateThreadFoodContext,
   listThreads,
   getThreadChargeStatus,
   markThreadCharged,
@@ -217,10 +218,11 @@ export async function POST(req: NextRequest) {
         {
           role: 'system',
           content:
-            'You are a food inventory extractor. Identify distinct edible items visible across fridge, pantry, or cupboard photos. ' +
-            `Return JSON only with this exact shape: {"items":[{"name":"string"}]}. ` +
-            'List clear, human-friendly item names (e.g., "eggs", "chicken breast", "Greek yogurt", "brown rice", "canned tuna"). ' +
-            `Include as many obvious items as possible, up to ${MAX_DETECTED_ITEMS}. If nothing edible is visible, return {"items": []}.`,
+            'You are a food photo extractor. If the photo is a cafe menu, read the menu and list the menu items. ' +
+            'If the photo is a fridge/pantry/cupboard, list the foods you can clearly see. ' +
+            `Return JSON only with this exact shape: {"type":"menu|inventory","items":[{"name":"string"}]}. ` +
+            'List clear, human-friendly item names (e.g., "croissant", "eggs", "chicken breast", "Greek yogurt"). ' +
+            `Include as many obvious items as possible, up to ${MAX_DETECTED_ITEMS}. If nothing edible is visible, return {"type":"inventory","items": []}.`,
         },
         {
           role: 'user',
@@ -236,6 +238,8 @@ export async function POST(req: NextRequest) {
 
     const visionText = vision.completion.choices?.[0]?.message?.content || ''
     const parsed = parseJsonRelaxed(visionText)
+    const parsedTypeRaw = typeof parsed?.type === 'string' ? parsed.type.trim().toLowerCase() : ''
+    const parsedType = parsedTypeRaw === 'menu' ? 'menu' : 'inventory'
     const rawItems = Array.isArray(parsed?.items) ? parsed.items : []
     const items = rawItems
       .map((item: any) => String(item?.name || '').trim())
@@ -272,7 +276,7 @@ export async function POST(req: NextRequest) {
       'You are Helfi, a food and macro coach.',
       'Use the FOOD DIARY SNAPSHOT to prioritize nutrients that are most behind target.',
       'Avoid suggestions that would worsen nutrients at or over cap.',
-      'Use only the items detected in the photo when possible; if items are insufficient, suggest simple add-ons.',
+      'Use the items detected in the photo (menu or pantry) when possible; if items are insufficient, suggest simple add-ons.',
       'Include estimated calories, protein, carbs, fat, fiber, and sugar for each suggestion.',
       'After each suggestion, show the updated daily totals if the user ate that option.',
       'If you must estimate, say "approximate". If unknown, say "unknown".',
@@ -350,16 +354,20 @@ export async function POST(req: NextRequest) {
       assistantMessage = 'I could not generate suggestions from the photo.'
     }
 
-    const photoLabel = imageFiles.length > 1 ? `Fridge/pantry photos (${imageFiles.length})` : 'Fridge/pantry photo'
+    const photoLabel = imageFiles.length > 1 ? `Photo set (${imageFiles.length})` : 'Photo'
     const userMessage = note ? `${photoLabel}: ${note}` : photoLabel
 
     await appendMessage(threadId, 'user', userMessage)
     await appendMessage(threadId, 'assistant', assistantMessage)
+    const contextSummary = items.length > 0
+      ? `${parsedType === 'menu' ? 'Menu items' : 'Photo items'}: ${items.join(', ')}`
+      : null
+    await updateThreadFoodContext(threadId, contextSummary ? contextSummary.slice(0, 1200) : null)
 
     const threads = await listThreads(session.user.id, chatContext)
     const currentThread = threads.find((thread) => thread.id === threadId)
     if (currentThread && !currentThread.title) {
-      await updateThreadTitle(threadId, 'Fridge photo')
+      await updateThreadTitle(threadId, parsedType === 'menu' ? 'Menu photo' : 'Food photo')
     }
 
     try {

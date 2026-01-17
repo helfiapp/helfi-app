@@ -641,7 +641,7 @@ export default function VoiceChat({
     setLastChargedCost(null)
     setLastChargedAt(null)
 
-    const photoLabel = pendingPhotos.length > 1 ? `Fridge/pantry photos (${pendingPhotos.length})` : 'Fridge/pantry photo'
+    const photoLabel = pendingPhotos.length > 1 ? `Photo set (${pendingPhotos.length})` : 'Photo'
     const userMessage = note ? `${photoLabel}: ${note}` : photoLabel
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
     setInput('')
@@ -707,7 +707,7 @@ export default function VoiceChat({
 
       clearPendingPhotos()
     } catch (err) {
-      console.error('Failed to analyze fridge photo:', err)
+      console.error('Failed to analyze photo:', err)
       setError('Unable to analyze the photo right now.')
     } finally {
       setLoading(false)
@@ -1421,7 +1421,7 @@ export default function VoiceChat({
                           <ul className="mt-3 space-y-2 text-[15px] md:text-[13px] text-gray-600">
                             <li>Uses your current Food Diary totals to spot macro gaps.</li>
                             <li>Suggests what to eat right now based on what you are missing.</li>
-                            <li>Upload a fridge/pantry photo to get ideas from what you have.</li>
+                            <li>Upload a menu, fridge, or pantry photo to get ideas from what you have.</li>
                             <li>Photo analysis costs an extra 10 credits per image.</li>
                           </ul>
                         ) : (
@@ -1595,7 +1595,7 @@ export default function VoiceChat({
                     onClick={openPhotoPicker}
                     disabled={loading || isListening}
                     className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
-                    aria-label="Add fridge or pantry photo"
+                    aria-label="Add menu, fridge, or pantry photo"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 20 }}>photo_camera</span>
                   </button>

@@ -15,6 +15,9 @@ export async function ensureTalkToAITables(): Promise<void> {
       'ALTER TABLE "TalkToAIChatThread" ADD COLUMN IF NOT EXISTS "context" TEXT NOT NULL DEFAULT \'general\''
     )
     await prisma.$executeRawUnsafe(
+      'ALTER TABLE "TalkToAIChatThread" ADD COLUMN IF NOT EXISTS "foodContext" TEXT'
+    )
+    await prisma.$executeRawUnsafe(
       'CREATE TABLE IF NOT EXISTS "TalkToAIChatMessage" ("id" TEXT PRIMARY KEY, "threadId" TEXT NOT NULL, "role" TEXT NOT NULL, "content" TEXT NOT NULL, "tokenCount" INTEGER NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), CONSTRAINT "TalkToAIChatMessage_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "TalkToAIChatThread"("id") ON DELETE CASCADE)'
     )
     await prisma.$executeRawUnsafe(
@@ -123,6 +126,24 @@ export async function updateThreadTitle(threadId: string, title: string): Promis
     title,
     threadId
   )
+}
+
+export async function updateThreadFoodContext(threadId: string, foodContext: string | null): Promise<void> {
+  await ensureTalkToAITables()
+  await prisma.$executeRawUnsafe(
+    'UPDATE "TalkToAIChatThread" SET "foodContext" = $1, "updatedAt" = NOW() WHERE "id" = $2',
+    foodContext,
+    threadId
+  )
+}
+
+export async function getThreadFoodContext(threadId: string): Promise<string | null> {
+  await ensureTalkToAITables()
+  const rows: Array<{ foodContext: string | null }> = await prisma.$queryRawUnsafe(
+    'SELECT "foodContext" FROM "TalkToAIChatThread" WHERE "id" = $1',
+    threadId
+  )
+  return rows[0]?.foodContext ?? null
 }
 
 export async function deleteThread(threadId: string): Promise<void> {

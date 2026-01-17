@@ -17,6 +17,7 @@ import {
   getThreadChargeStatus,
   markThreadCharged,
   normalizeChatContext,
+  getThreadFoodContext,
 } from '@/lib/talk-to-ai-chat-store'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
@@ -656,6 +657,18 @@ export async function POST(req: NextRequest) {
     let systemPrompt = isFoodChat
       ? buildFoodSystemPrompt(foodDiarySnapshot)
       : buildSystemPrompt(context, foodDiarySnapshot)
+    if (isFoodChat && threadId) {
+      const foodContext = await getThreadFoodContext(threadId)
+      if (foodContext) {
+        systemPrompt += [
+          '',
+          'RECENT PHOTO CONTEXT (IMPORTANT):',
+          foodContext,
+          'If the user refers to the menu or photo, use the items listed above.',
+          'Do not say you cannot see the photo. If the item is not listed, ask them to re-upload the photo.',
+        ].join('\n')
+      }
+    }
 
     // Optional additional focus: a health tip summary passed from inline chat (e.g. on Health Tips page)
     const healthTipSummary =
