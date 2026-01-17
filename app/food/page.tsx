@@ -19314,33 +19314,57 @@ Please add nutritional information manually if needed.`);
                   'herring',
                   'anchovy',
                   'anchovies',
+                  'cod',
+                  'snapper',
+                  'halibut',
                   'avocado',
                   'olive oil',
                   'extra virgin',
+                  'evoo',
+                  'olive',
                   'olives',
                   'walnut',
+                  'walnuts',
+                  'wallnut',
+                  'wallnuts',
                   'almond',
+                  'almonds',
                   'cashew',
+                  'cashews',
                   'pecan',
+                  'pecans',
                   'pistachio',
+                  'pistachios',
                   'macadamia',
+                  'macadamias',
                   'hazelnut',
+                  'hazelnuts',
                   'brazil nut',
+                  'brazil nuts',
                   'peanut',
+                  'peanuts',
                   'peanut butter',
+                  'almond butter',
+                  'cashew butter',
                   'chia',
                   'flax',
                   'hemp',
                   'pumpkin seed',
+                  'pumpkin seeds',
                   'sunflower seed',
+                  'sunflower seeds',
                   'sesame',
+                  'sesame seed',
+                  'sesame seeds',
                   'tahini',
                 ]
 
                 const fatBadKeywords = [
                   'pizza',
                   'burger',
+                  'burgers',
                   'mcdonald',
+                  'mcdonalds',
                   'mc donald',
                   'maccas',
                   'kfc',
@@ -19351,6 +19375,7 @@ Please add nutritional information manually if needed.`);
                   'fish &chip',
                   'chip shop',
                   'chips',
+                  'chip',
                   'fries',
                   'crisps',
                   'battered',
@@ -19359,16 +19384,27 @@ Please add nutritional information manually if needed.`);
                   'nugget',
                   'nuggets',
                   'donut',
+                  'donuts',
                   'doughnut',
+                  'doughnuts',
                   'pastry',
+                  'pastries',
                   'cake',
+                  'cakes',
                   'cookie',
+                  'cookies',
                   'biscuit',
+                  'biscuits',
                   'hot dog',
+                  'hot dogs',
                   'sausage',
+                  'sausages',
                   'bacon',
                   'salami',
                   'pepperoni',
+                  'processed meat',
+                  'processed meats',
+                  'ultra processed',
                   'processed',
                   'fast food',
                   'takeaway',
@@ -19385,12 +19421,23 @@ Please add nutritional information manually if needed.`);
                   if (!label) return false
                   const raw = normalizeFatLabel(label)
                   const clean = scrubFatLabel(label)
-                  return keywords.some((keyword) => raw.includes(keyword) || clean.includes(keyword))
+                  const tokens = clean.split(' ').filter(Boolean)
+                  return keywords.some((keyword) => {
+                    const needle = keyword.toLowerCase().trim()
+                    if (!needle) return false
+                    if (needle.includes(' ')) {
+                      return raw.includes(needle) || clean.includes(needle)
+                    }
+                    return tokens.includes(needle)
+                  })
                 }
 
                 const classifyFatLabel = (label: any) => {
-                  if (matchesFatKeywords(label, fatBadKeywords)) return 'bad'
-                  if (matchesFatKeywords(label, fatGoodKeywords)) return 'good'
+                  const hasBad = matchesFatKeywords(label, fatBadKeywords)
+                  const hasGood = matchesFatKeywords(label, fatGoodKeywords)
+                  if (hasBad && hasGood) return 'mixed'
+                  if (hasBad) return 'bad'
+                  if (hasGood) return 'good'
                   return 'bad'
                 }
 
@@ -19406,6 +19453,9 @@ Please add nutritional information manually if needed.`);
                     const bucket = classifyFatLabel(label)
                     if (bucket === 'good') {
                       split.good += fat
+                    } else if (bucket === 'mixed') {
+                      split.good += fat / 2
+                      split.bad += fat / 2
                     } else {
                       split.bad += fat
                     }
@@ -19458,6 +19508,9 @@ Please add nutritional information manually if needed.`);
                     const bucket = classifyFatLabel(entryLabel)
                     if (bucket === 'good') {
                       fatSplit.good += storedTotals.fat
+                    } else if (bucket === 'mixed') {
+                      fatSplit.good += storedTotals.fat / 2
+                      fatSplit.bad += storedTotals.fat / 2
                     } else {
                       fatSplit.bad += storedTotals.fat
                     }
