@@ -1027,10 +1027,13 @@ type RingProps = {
   percent: number
   tone: 'primary' | 'target'
   color?: string
+  size?: 'normal' | 'compact'
 }
 
-function TargetRing({ label, valueLabel, percent, tone, color }: RingProps) {
-  const radius = typeof window !== 'undefined' && window.innerWidth < 640 ? 56 : 50
+function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal' }: RingProps) {
+  const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 640
+  const isCompact = size === 'compact'
+  const radius = isCompact ? (isSmallScreen ? 34 : 42) : isSmallScreen ? 56 : 50
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(percent, 1))
 
@@ -1040,8 +1043,8 @@ function TargetRing({ label, valueLabel, percent, tone, color }: RingProps) {
   // For primary we currently don't use this component, but we keep support
   // for a simple single-colour ring.
   const isTarget = tone === 'target'
-  const strokeWidth = 8
-  const svgSize = typeof window !== 'undefined' && window.innerWidth < 640 ? 144 : 132
+  const strokeWidth = isCompact ? 7 : 8
+  const svgSize = isCompact ? (isSmallScreen ? 96 : 112) : isSmallScreen ? 144 : 132
 
   const parts = (valueLabel || '').split(' ')
   const mainValue = parts[0] || valueLabel
@@ -1104,15 +1107,19 @@ function TargetRing({ label, valueLabel, percent, tone, color }: RingProps) {
         </svg>
         {/* Center value */}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-xl font-bold text-gray-900 leading-[1.35] pt-0.5 tabular-nums">{mainValue}</div>
+          <div
+            className={`${isCompact ? 'text-lg' : 'text-xl'} font-bold text-gray-900 leading-[1.35] pt-0.5 tabular-nums`}
+          >
+            {mainValue}
+          </div>
           {unitPart && (
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className={`${isCompact ? 'text-[11px]' : 'text-xs'} text-gray-500 mt-0.5`}>
               {unitPart}
             </div>
           )}
         </div>
       </div>
-      <div className="mt-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
+      <div className={`${isCompact ? 'mt-1 text-[11px]' : 'mt-2 text-xs'} font-semibold text-gray-700 uppercase tracking-wide`}>
         {label}
       </div>
     </div>
@@ -19353,8 +19360,6 @@ Please add nutritional information manually if needed.`);
                   'pistachios',
                   'brazil nut',
                   'brazil nuts',
-                  'pine nut',
-                  'pine nuts',
                   'peanuts',
                   'marcona almonds',
                   'pili nuts',
@@ -19478,6 +19483,7 @@ Please add nutritional information manually if needed.`);
                   'stilton',
                   'burrata',
                   'mozzarella',
+                  'swiss cheese',
                   'egg',
                   'eggs',
                   'duck egg',
@@ -19650,6 +19656,19 @@ Please add nutritional information manually if needed.`);
                   'coffee creamers',
                   'non dairy whipped',
                   'non-dairy whipped',
+                  'seed oil',
+                  'seed oils',
+                  'roasted seed',
+                  'roasted seeds',
+                  'seed snack',
+                  'seed snacks',
+                  'flavoured seed',
+                  'flavored seed',
+                  'seed cracker',
+                  'seed crackers',
+                  'seed bar',
+                  'seed bars',
+                  'trail mix',
                   'pizza',
                   'mcdonald',
                   'mcdonalds',
@@ -19683,6 +19702,33 @@ Please add nutritional information manually if needed.`);
                   'takeout',
                 ]
 
+                const fatBadOverrides = [
+                  'processed',
+                  'ultra processed',
+                  'processed cheese',
+                  'processed cheese product',
+                  'cheese product',
+                  'cheese food',
+                  'cheese slice',
+                  'cheese slices',
+                  'cheese single',
+                  'cheese singles',
+                  'sandwich cheese',
+                  'american cheese',
+                  'velveeta',
+                  'cheese whiz',
+                  'plastic cheese',
+                  'nacho cheese',
+                  'cheese sauce',
+                  'cheese dip',
+                  'cheese spread',
+                  'cheese powder',
+                  'powdered cheese',
+                  'cheese flavor',
+                  'cheese flavoured',
+                  'cheese flavored',
+                ]
+
                 const normalizeFatLabel = (value: any) =>
                   String(value || '').toLowerCase()
 
@@ -19705,6 +19751,7 @@ Please add nutritional information manually if needed.`);
                 }
 
                 const classifyFatLabel = (label: any) => {
+                  if (matchesFatKeywords(label, fatBadOverrides)) return 'bad'
                   const hasBad = matchesFatKeywords(label, fatBadKeywords)
                   const hasGood = matchesFatKeywords(label, fatGoodKeywords)
                   if (hasBad && hasGood) return 'unclear'
@@ -20177,9 +20224,9 @@ Please add nutritional information manually if needed.`);
                                 onMouseLeave={() => closeFatDetail('ring')}
                               >
                                 <div className="text-sm font-semibold text-gray-800">Fat quality</div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-3 gap-2 sm:gap-4">
                                   {fatRingItems.map((item) => {
-                                    const percent = fatConsumed > 0 ? item.value / fatConsumed : 0
+                                    const percent = item.value > 0 ? 1 : 0
                                     return (
                                       <div key={item.type} className="flex justify-center">
                                         <button
@@ -20195,6 +20242,7 @@ Please add nutritional information manually if needed.`);
                                             percent={percent}
                                             tone="primary"
                                             color={item.color}
+                                            size="compact"
                                           />
                                         </button>
                                       </div>
