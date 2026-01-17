@@ -10,8 +10,47 @@
     --foreground: 0 0% 3.9%;
   }
 
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
+
   body {
     @apply bg-white text-helfi-black antialiased;
+    position: relative;
+  }
+
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+  button,
+  [role='button'],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: transform 75ms ease, opacity 75ms ease;
+  }
+
+  button:active,
+  [role='button']:active,
+  input[type='button']:active,
+  input[type='submit']:active,
+  input[type='reset']:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+
+  a:active {
+    opacity: 0.85;
   }
 
   /* Dark mode foundation (only applies when <html class="dark"> is present) */
@@ -173,11 +212,11 @@ input.goal-pace-slider:focus-visible::-moz-range-thumb {
 
 @layer components {
   .btn-primary {
-    @apply bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green-dark transition-colors;
+    @apply bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green-dark transition active:scale-[0.98] active:opacity-90;
   }
 
   .btn-secondary {
-    @apply border border-helfi-green text-helfi-green px-4 py-2 rounded-lg hover:bg-helfi-green hover:text-white transition-colors;
+    @apply border border-helfi-green text-helfi-green px-4 py-2 rounded-lg hover:bg-helfi-green hover:text-white transition active:scale-[0.98] active:opacity-90;
   }
 
   .input-primary {

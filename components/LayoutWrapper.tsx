@@ -395,6 +395,59 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   }, [router])
 
   useEffect(() => {
+    if (typeof document === 'undefined') return
+    let startX = 0
+    let startY = 0
+    let moved = false
+    let lastTouchTime = 0
+    const threshold = 8
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 1) return
+      const touch = event.touches[0]
+      startX = touch.clientX
+      startY = touch.clientY
+      moved = false
+    }
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (event.touches.length !== 1) return
+      const touch = event.touches[0]
+      const dx = Math.abs(touch.clientX - startX)
+      const dy = Math.abs(touch.clientY - startY)
+      if (dx > threshold || dy > threshold) {
+        moved = true
+      }
+    }
+
+    const handleTouchEnd = () => {
+      lastTouchTime = Date.now()
+    }
+
+    const handleClickCapture = (event: MouseEvent) => {
+      if (!moved) return
+      if (Date.now() - lastTouchTime > 450) return
+      event.preventDefault()
+      event.stopPropagation()
+      moved = false
+    }
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
+    document.addEventListener('touchmove', handleTouchMove, { passive: true })
+    document.addEventListener('touchend', handleTouchEnd, { passive: true })
+    document.addEventListener('touchcancel', handleTouchEnd, { passive: true })
+    document.addEventListener('click', handleClickCapture, true)
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('touchend', handleTouchEnd)
+      document.removeEventListener('touchcancel', handleTouchEnd)
+      document.removeEventListener('click', handleClickCapture, true)
+    }
+  }, [])
+
+  useEffect(() => {
     if (typeof window === 'undefined') return
     const handler = () => {
       setGoalSyncNotice('We refreshed your goal from your latest saved data to keep devices in sync.')
@@ -1010,7 +1063,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           onTouchMove={handlePullMove}
           onTouchEnd={handlePullEnd}
           onTouchCancel={handlePullEnd}
-          className={`md:pl-64 flex flex-col flex-1 relative ${
+          className={`md:pl-64 flex flex-col flex-1 relative overflow-x-hidden ${
             isChatPage ? 'overflow-hidden h-[100dvh]' : 'overflow-y-auto'
           }`}
         >
@@ -1097,7 +1150,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   // Public pages or unauthenticated users - no sidebar
   const showBackToTop = status !== 'authenticated'
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden">
       {children}
       <SupportChatWidget />
       {showBackToTop && <BackToTopButton />}
