@@ -968,7 +968,7 @@ export default function VoiceChat({
   }
 
 
-  const sendChatMessage = async (messageText: string, options?: { foodContextOverride?: string }) => {
+  async function sendChatMessage(messageText: string, options?: { foodContextOverride?: string }) {
     const text = messageText.trim()
     if (!text && pendingPhotos.length === 0) {
       setError('Enter a question or use voice input.')
