@@ -1028,12 +1028,15 @@ type RingProps = {
   tone: 'primary' | 'target'
   color?: string
   size?: 'normal' | 'compact'
+  isMobile?: boolean
 }
 
-function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal' }: RingProps) {
-  const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 640
+function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal', isMobile }: RingProps) {
+  const isSmallScreen = typeof isMobile === 'boolean'
+    ? isMobile
+    : typeof window !== 'undefined' && window.innerWidth < 640
   const isCompact = size === 'compact'
-  const radius = isCompact ? (isSmallScreen ? 40 : 46) : isSmallScreen ? 56 : 50
+  const radius = isCompact ? (isSmallScreen ? 44 : 46) : isSmallScreen ? 56 : 50
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(percent, 1))
 
@@ -1044,7 +1047,7 @@ function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal' }
   // for a simple single-colour ring.
   const isTarget = tone === 'target'
   const strokeWidth = isCompact ? 7 : 8
-  const svgSize = isCompact ? (isSmallScreen ? 112 : 124) : isSmallScreen ? 144 : 132
+  const svgSize = isCompact ? (isSmallScreen ? 108 : 124) : isSmallScreen ? 144 : 132
 
   const parts = (valueLabel || '').split(' ')
   const mainValue = parts[0] || valueLabel
@@ -1053,6 +1056,8 @@ function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal' }
   // For target rings, `percent` is the *used* fraction (0–1)
   const usedFraction = clamped
   const usedLength = usedFraction * circumference
+
+  const showFullPrimary = !isTarget && clamped >= 0.999
 
   return (
     <div className="flex flex-col items-center">
@@ -1098,7 +1103,7 @@ function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal' }
               strokeWidth={strokeWidth}
               stroke={color || '#22c55e'}
               fill="none"
-              strokeDasharray={`${clamped * circumference} ${circumference}`}
+              strokeDasharray={showFullPrimary ? `${circumference}` : `${clamped * circumference} ${circumference}`}
               strokeDashoffset={0}
               strokeLinecap="butt"
               transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
@@ -3437,15 +3442,16 @@ export default function FoodDiary() {
       return
     }
     const node = summarySlideRefs.current[summarySlideIndex]
-    if (!node) return
-    const updateHeight = () => {
-      const nextHeight = node.offsetHeight
+    if (!node || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const nextHeight = Math.round(entry.contentRect.height)
       setSummarySlideHeight(nextHeight > 0 ? nextHeight : null)
-    }
-    updateHeight()
-    window.addEventListener('resize', updateHeight)
-    return () => window.removeEventListener('resize', updateHeight)
-  }, [isMobile, summarySlideIndex, summaryRenderNonce, fatDetailState])
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [isMobile, summarySlideIndex, summaryRenderNonce])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -19997,7 +20003,7 @@ Please add nutritional information manually if needed.`);
                   <div className="space-y-4">
                     {/* Daily rings header */}
                     <div
-                      className="mb-2 bg-transparent border-0 shadow-none rounded-none px-2 py-2 sm:bg-white sm:border sm:border-gray-200 sm:rounded-xl sm:shadow-sm sm:px-4 sm:py-4"
+                      className="mb-2 bg-transparent border-0 shadow-none rounded-none px-4 py-2 sm:bg-white sm:border sm:border-gray-200 sm:rounded-xl sm:shadow-sm sm:px-4 sm:py-4"
                       style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
                       key={selectedDate}
                     >
@@ -20079,6 +20085,8 @@ Please add nutritional information manually if needed.`);
                                   percent={1}
                                   tone="primary"
                                   color="#22c55e"
+                                  size={isMobile ? 'compact' : 'normal'}
+                                  isMobile={isMobile}
                                 />
                                 <TargetRing
                                   key={`used-${selectedDate}-${summaryRenderNonce}`}
@@ -20091,6 +20099,8 @@ Please add nutritional information manually if needed.`);
                                   percent={1}
                                   tone="primary"
                                   color="#ef4444"
+                                  size={isMobile ? 'compact' : 'normal'}
+                                  isMobile={isMobile}
                                 />
                               </div>
                               {baseAllowanceInUnit !== null && (
@@ -20132,11 +20142,6 @@ Please add nutritional information manually if needed.`);
                                       ? Math.max(0, Math.min(100, (fatSplitValues.unclear / fatSplitTotal) * 100))
                                       : 0
                                   const barWidth = Math.min(100, pct * 100)
-                                  const activeFatType =
-                                    row.key === 'fat' && fatDetailState?.source === 'bar'
-                                      ? fatDetailState.type
-                                      : null
-                                  const activeFatItems = activeFatType ? fatDetailItems[activeFatType] : []
                                   return (
                                     <div key={row.key} className="space-y-1">
                                       <div className="flex items-center justify-between text-sm">
@@ -20199,22 +20204,22 @@ Please add nutritional information manually if needed.`);
                                             style={{ width: `${barWidth}%`, backgroundColor: over ? '#ef4444' : row.color }}
                                           />
                                         )}
-                                        {row.key === 'fat' && activeFatType && (
+                                        {row.key === 'fat' && fatDetailState?.source === 'bar' && !isMobile && (
                                           <div className="absolute left-0 top-full mt-2 z-20 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-3">
                                             <div className="flex items-center gap-2 mb-2">
                                               <span
                                                 className="inline-block h-2 w-2 rounded-full"
-                                                style={{ backgroundColor: fatDetailColors[activeFatType] }}
+                                                style={{ backgroundColor: fatDetailColors[fatDetailState.type] }}
                                               />
                                               <span className="text-xs font-semibold text-gray-900">
-                                                {fatDetailTitles[activeFatType]}
+                                                {fatDetailTitles[fatDetailState.type]}
                                               </span>
                                             </div>
-                                            {activeFatItems.length === 0 ? (
+                                            {fatDetailItems[fatDetailState.type].length === 0 ? (
                                               <div className="text-xs text-gray-500">No items yet today.</div>
                                             ) : (
                                               <ul className="space-y-1 max-h-28 overflow-y-auto text-xs text-gray-700">
-                                                {activeFatItems.map((item) => (
+                                                {fatDetailItems[fatDetailState.type].map((item) => (
                                                   <li key={item.label} className="flex items-center justify-between gap-3">
                                                     <span className="truncate">{item.label}</span>
                                                     <span className="font-semibold text-gray-900">
@@ -20264,14 +20269,15 @@ Please add nutritional information manually if needed.`);
                                             percent={percent}
                                             tone="primary"
                                             color={item.color}
-                                            size="compact"
+                                            size={isMobile ? 'compact' : 'normal'}
+                                            isMobile={isMobile}
                                           />
                                         </button>
                                       </div>
                                     )
                                   })}
                                 </div>
-                                {fatDetailState?.source === 'ring' && (
+                                {!isMobile && fatDetailState?.source === 'ring' && (
                                   <div className="rounded-lg border border-gray-200 bg-white shadow-sm p-3">
                                     <div className="flex items-center gap-2 mb-2">
                                       <span
@@ -20317,7 +20323,7 @@ Please add nutritional information manually if needed.`);
                                 ref={summaryCarouselRef}
                                 onScroll={handleSummaryScroll}
                                 style={isMobile && summarySlideHeight ? { height: summarySlideHeight } : undefined}
-                                className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0 transition-[height] duration-200"
+                                className="flex gap-4 overflow-x-auto overflow-y-visible snap-x snap-mandatory pb-2 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0 transition-[height] duration-200"
                               >
                                 {slides.map((slide, idx) => (
                                   <div
@@ -20332,13 +20338,40 @@ Please add nutritional information manually if needed.`);
                                 ))}
                               </div>
                               {isMobile && slides.length > 1 && (
-                                <div className="flex justify-center gap-2 -mt-1">
+                                <div className="flex justify-center gap-2 mt-2">
                                   {slides.map((_, idx) => (
                                     <span
                                       key={idx}
                                       className={`w-2 h-2 rounded-full ${summarySlideIndex === idx ? 'bg-emerald-500' : 'bg-gray-300'}`}
                                     />
                                   ))}
+                                </div>
+                              )}
+                              {isMobile && fatDetailState && (
+                                <div className="mt-2 rounded-lg border border-gray-200 bg-white shadow-sm p-3">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span
+                                      className="inline-block h-2 w-2 rounded-full"
+                                      style={{ backgroundColor: fatDetailColors[fatDetailState.type] }}
+                                    />
+                                    <span className="text-xs font-semibold text-gray-900">
+                                      {fatDetailTitles[fatDetailState.type]}
+                                    </span>
+                                  </div>
+                                  {fatDetailItems[fatDetailState.type].length === 0 ? (
+                                    <div className="text-xs text-gray-500">No items yet today.</div>
+                                  ) : (
+                                    <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
+                                      {fatDetailItems[fatDetailState.type].map((item) => (
+                                        <li key={item.label} className="flex items-center justify-between gap-3">
+                                          <span className="truncate">{item.label}</span>
+                                          <span className="font-semibold text-gray-900">
+                                            {formatMacroValue(item.grams, 'g')}
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
                                 </div>
                               )}
                               {fatConsumed > 0 && (
