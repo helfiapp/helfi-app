@@ -20389,6 +20389,7 @@ Please add nutritional information manually if needed.`);
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
+                                          setSelectedAddCategory(cat.key);
                                           favoritesReplaceTargetRef.current = null;
                                           favoritesActionRef.current = 'diary';
                                           setShowFavoritesPicker(true);
@@ -20728,6 +20729,7 @@ Please add nutritional information manually if needed.`);
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
+                                          setSelectedAddCategory(cat.key);
                                           favoritesReplaceTargetRef.current = null;
                                           favoritesActionRef.current = 'diary';
                                           setShowFavoritesPicker(true);
