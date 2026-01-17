@@ -20750,6 +20750,19 @@ Please add nutritional information manually if needed.`);
                                   <div ref={summaryActiveSlideRef} className="px-2">
                                     {slides[activeSlideIndex]}
                                   </div>
+                                  {totalSlides > 1 && (
+                                    <div className="flex justify-center gap-2 mt-1">
+                                      {slides.map((_, idx) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => setSummarySlideIndex(idx)}
+                                          className={`w-2 h-2 rounded-full ${activeSlideIndex === idx ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                          aria-label={`Show panel ${idx + 1}`}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               ) : (
                                 <div className="grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] items-start gap-4">
@@ -20757,19 +20770,6 @@ Please add nutritional information manually if needed.`);
                                     <div key={idx} className="w-full">
                                       {slide}
                                     </div>
-                                  ))}
-                                </div>
-                              )}
-                              {isMobile && totalSlides > 1 && (
-                                <div className="flex justify-center gap-2 mt-2">
-                                  {slides.map((_, idx) => (
-                                    <button
-                                      key={idx}
-                                      type="button"
-                                      onClick={() => setSummarySlideIndex(idx)}
-                                      className={`w-2 h-2 rounded-full ${activeSlideIndex === idx ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                      aria-label={`Show panel ${idx + 1}`}
-                                    />
                                   ))}
                                 </div>
                               )}
