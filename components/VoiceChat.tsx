@@ -295,8 +295,13 @@ export default function VoiceChat({
       } catch {}
     }
     barcodeScannerRef.current = null
-    if (barcodeVideoRef.current) {
-      barcodeVideoRef.current.srcObject = null
+    const videoEl = barcodeVideoRef.current
+    const stream = videoEl?.srcObject as MediaStream | null
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop())
+    }
+    if (videoEl) {
+      videoEl.srcObject = null
     }
   }, [])
 
@@ -312,24 +317,24 @@ export default function VoiceChat({
       setBarcodeError(null)
 
       try {
-        const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(normalized)}`)
-        const data = await res.json().catch(() => null)
-        if (!res.ok || !data?.found) {
-          const fallbackMessage =
-            (typeof data?.message === 'string' && data.message.trim()) ||
-            'No product found for that barcode.'
-          setBarcodeError(fallbackMessage)
-          setBarcodeStatus('scanning')
-          setBarcodeStatusHint('Scanning…')
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content: `${fallbackMessage} Would you like to scan the nutrition label instead?`,
-            },
-          ])
-          return
-        }
+      const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(normalized)}`)
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.found) {
+        const fallbackMessage =
+          (typeof data?.message === 'string' && data.message.trim()) ||
+          'No product found for that barcode.'
+        setBarcodeError(fallbackMessage)
+        setBarcodeStatus('scanning')
+        setBarcodeStatusHint('Scanning…')
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: `${fallbackMessage} Would you like to scan the nutrition label instead?`,
+          },
+        ])
+        return
+      }
 
         const food = data.food || {}
         const formatValue = (value: any) => {
@@ -1027,7 +1032,11 @@ export default function VoiceChat({
           (typeof data?.message === 'string' && data.message.trim()) ||
           (typeof data?.error === 'string' && data.error.trim()) ||
           'Sorry, something went wrong. Please try again.'
-        setError(message)
+        const safeMessage =
+          message.toLowerCase().includes('prisma') || message.toLowerCase().includes('transaction')
+            ? 'Something went wrong. Please try again.'
+            : message
+        setError(safeMessage)
         setLoading(false)
         return
       }
@@ -1256,7 +1265,12 @@ export default function VoiceChat({
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Something went wrong')
+      const raw = err?.message || 'Something went wrong'
+      const safeMessage =
+        raw.toLowerCase().includes('prisma') || raw.toLowerCase().includes('transaction')
+          ? 'Something went wrong. Please try again.'
+          : raw
+      setError(safeMessage)
     } finally {
       setLoading(false)
     }
@@ -1948,63 +1962,55 @@ export default function VoiceChat({
       )}
 
       {showBarcodeScanner && (
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setShowBarcodeScanner(false)}
-            aria-label="Close barcode scanner"
-          />
-          <div className="relative w-full max-w-none sm:max-w-md bg-white rounded-t-3xl shadow-2xl pb-4">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-              <div className="text-base font-semibold text-gray-900">Scan barcode</div>
+        <div className="fixed inset-0 z-[9999] bg-black text-white">
+          <div className="flex items-center justify-between px-4 py-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}>
+            <div className="text-base font-semibold">Scan barcode</div>
+            <button
+              type="button"
+              onClick={() => setShowBarcodeScanner(false)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
+              aria-label="Close barcode scanner"
+            >
+              <span className="material-symbols-outlined text-2xl text-white">close</span>
+            </button>
+          </div>
+          <div className="px-4 pb-6 space-y-4">
+            <div className="rounded-3xl overflow-hidden bg-black border border-white/10">
+              <video ref={barcodeVideoRef} className="h-[65vh] w-full object-cover" />
+            </div>
+            <div className="text-sm text-gray-200">{barcodeStatusHint}</div>
+            {barcodeError && <div className="text-sm text-red-300">{barcodeError}</div>}
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => setShowBarcodeScanner(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-gray-100"
-                aria-label="Close barcode scanner"
+                onClick={() => setShowManualBarcodeInput((prev) => !prev)}
+                className="self-start rounded-lg border border-white/30 px-3 py-2 text-sm font-medium text-white hover:bg-white/10"
               >
-                <span className="material-symbols-outlined text-xl text-gray-700">close</span>
+                {showManualBarcodeInput ? 'Hide barcode input' : 'Type barcode instead'}
               </button>
-            </div>
-            <div className="px-4 py-4 space-y-4">
-              <div className="rounded-2xl overflow-hidden bg-black">
-                <video ref={barcodeVideoRef} className="h-[320px] w-full object-cover" />
-              </div>
-              <div className="text-sm text-gray-600">{barcodeStatusHint}</div>
-              {barcodeError && <div className="text-sm text-red-600">{barcodeError}</div>}
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowManualBarcodeInput((prev) => !prev)}
-                  className="self-start rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  {showManualBarcodeInput ? 'Hide barcode input' : 'Type barcode instead'}
-                </button>
-                {showManualBarcodeInput && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={barcodeValue}
-                      onChange={(event) => setBarcodeValue(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          lookupBarcodeAndAsk(barcodeValue)
-                        }
-                      }}
-                      placeholder="Enter barcode"
-                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#10a27e]/30"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => lookupBarcodeAndAsk(barcodeValue)}
-                      className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
-                    >
-                      Search
-                    </button>
-                  </div>
-                )}
-              </div>
+              {showManualBarcodeInput && (
+                <div className="flex items-center gap-2">
+                  <input
+                    value={barcodeValue}
+                    onChange={(event) => setBarcodeValue(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        lookupBarcodeAndAsk(barcodeValue)
+                      }
+                    }}
+                    placeholder="Enter barcode"
+                    className="flex-1 rounded-lg border border-white/30 bg-black/40 px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => lookupBarcodeAndAsk(barcodeValue)}
+                    className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-gray-100"
+                  >
+                    Search
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
