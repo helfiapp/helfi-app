@@ -1033,7 +1033,7 @@ type RingProps = {
 function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal' }: RingProps) {
   const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 640
   const isCompact = size === 'compact'
-  const radius = isCompact ? (isSmallScreen ? 34 : 42) : isSmallScreen ? 56 : 50
+  const radius = isCompact ? (isSmallScreen ? 40 : 46) : isSmallScreen ? 56 : 50
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(percent, 1))
 
@@ -1044,7 +1044,7 @@ function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal' }
   // for a simple single-colour ring.
   const isTarget = tone === 'target'
   const strokeWidth = isCompact ? 7 : 8
-  const svgSize = isCompact ? (isSmallScreen ? 96 : 112) : isSmallScreen ? 144 : 132
+  const svgSize = isCompact ? (isSmallScreen ? 112 : 124) : isSmallScreen ? 144 : 132
 
   const parts = (valueLabel || '').split(' ')
   const mainValue = parts[0] || valueLabel
@@ -2870,6 +2870,7 @@ export default function FoodDiary() {
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
   const [summaryRenderNonce, setSummaryRenderNonce] = useState(0)
+  const [summarySlideHeight, setSummarySlideHeight] = useState<number | null>(null)
   const [resumeTick, setResumeTick] = useState(0)
   
   // Manual food entry states
@@ -2923,6 +2924,7 @@ export default function FoodDiary() {
   const editPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const selectPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const summaryCarouselRef = useRef<HTMLDivElement | null>(null)
+  const summarySlideRefs = useRef<Array<HTMLDivElement | null>>([])
   const pageTopRef = useRef<HTMLDivElement | null>(null)
   const desktopAddMenuRef = useRef<HTMLDivElement | null>(null)
   const barcodeLabelTimeoutRef = useRef<number | null>(null)
@@ -3428,6 +3430,22 @@ export default function FoodDiary() {
     if (!summaryCarouselRef.current) return
     summaryCarouselRef.current.scrollTo({ left: 0, behavior: 'auto' })
   }, [selectedDate, isMobile])
+
+  useEffect(() => {
+    if (!isMobile) {
+      setSummarySlideHeight(null)
+      return
+    }
+    const node = summarySlideRefs.current[summarySlideIndex]
+    if (!node) return
+    const updateHeight = () => {
+      const nextHeight = node.offsetHeight
+      setSummarySlideHeight(nextHeight > 0 ? nextHeight : null)
+    }
+    updateHeight()
+    window.addEventListener('resize', updateHeight)
+    return () => window.removeEventListener('resize', updateHeight)
+  }, [isMobile, summarySlideIndex, summaryRenderNonce, fatDetailState])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -19978,7 +19996,11 @@ Please add nutritional information manually if needed.`);
                 return (
                   <div className="space-y-4">
                     {/* Daily rings header */}
-                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-2" key={selectedDate}>
+                    <div
+                      className="mb-2 bg-transparent border-0 shadow-none rounded-none px-2 py-2 sm:bg-white sm:border sm:border-gray-200 sm:rounded-xl sm:shadow-sm sm:px-4 sm:py-4"
+                      style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
+                      key={selectedDate}
+                    >
                       <div className="flex items-center justify-between mb-3">
                         <div className="text-sm font-semibold text-gray-800">
                           {isViewingToday ? 'Today\u2019s energy summary' : 'Energy summary'}
@@ -20072,7 +20094,7 @@ Please add nutritional information manually if needed.`);
                                 />
                               </div>
                               {baseAllowanceInUnit !== null && (
-                                <div className="mt-3 text-[11px] text-gray-500 text-center col-span-2">
+                                <div className="mt-2 text-xs text-gray-500 text-center col-span-2">
                                   Daily allowance:{' '}
                                   <span className="font-semibold">
                                     {Math.round(baseAllowanceInUnit)} {energyUnit}
@@ -20085,7 +20107,7 @@ Please add nutritional information manually if needed.`);
                           // Slide 2: macro bars
                           if (macroRowsFiltered.length > 0) {
                             slides.push(
-                              <div className="order-2 md:order-1 space-y-2 mt-6 md:mt-0">
+                              <div className="order-2 md:order-1 space-y-2 mt-4 md:mt-0">
                                 {macroRowsFiltered.map((row) => {
                                   const pctRaw = row.target > 0 ? row.consumed / row.target : 0
                                   const pct = Math.max(0, pctRaw)
@@ -20220,7 +20242,7 @@ Please add nutritional information manually if needed.`);
                             ]
                             slides.push(
                               <div
-                                className="order-3 md:order-1 space-y-3 mt-6 md:mt-0"
+                                className="order-3 md:order-1 space-y-3 mt-4 md:mt-0"
                                 onMouseLeave={() => closeFatDetail('ring')}
                               >
                                 <div className="text-sm font-semibold text-gray-800">Fat quality</div>
@@ -20294,11 +20316,15 @@ Please add nutritional information manually if needed.`);
                               <div
                                 ref={summaryCarouselRef}
                                 onScroll={handleSummaryScroll}
-                                className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0"
+                                style={isMobile && summarySlideHeight ? { height: summarySlideHeight } : undefined}
+                                className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0 transition-[height] duration-200"
                               >
                                 {slides.map((slide, idx) => (
                                   <div
                                     key={idx}
+                                    ref={(node) => {
+                                      summarySlideRefs.current[idx] = node
+                                    }}
                                     className="flex-shrink-0 w-full snap-center md:w-auto"
                                   >
                                     {slide}
@@ -20316,7 +20342,7 @@ Please add nutritional information manually if needed.`);
                                 </div>
                               )}
                               {fatConsumed > 0 && (
-                                <p className="mt-3 text-[11px] text-gray-500 leading-relaxed">
+                                <p className="mt-2 text-sm text-gray-600 leading-snug">
                                   Fat is split into healthy (green), unhealthy (red), and unclear (blue) based on the food name.
                                   Hover or tap any colored bar or circle to see which foods were counted.
                                 </p>
