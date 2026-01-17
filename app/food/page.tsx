@@ -8259,48 +8259,56 @@ const applyStructuredItems = (
 
 
 
-  // OPTIMIZED: Ultra-aggressive compression for speed
-  const compressImage = (file: File, maxWidth: number = 300, quality: number = 0.5): Promise<File> => {
+  const compressImage = (
+    file: File,
+    maxDimension: number = 300,
+    quality: number = 0.5,
+    maxBytes: number = 900 * 1024,
+  ): Promise<File> => {
+    if (file.size <= maxBytes) return Promise.resolve(file);
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = document.createElement('img');
-      
+
       if (!ctx) {
         reject(new Error('Cannot get canvas context'));
         return;
       }
-      
+
       img.onload = () => {
-        // Calculate new dimensions - smaller for faster loading
-        const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
-        const newWidth = img.width * ratio;
-        const newHeight = img.height * ratio;
-        
-        // Set canvas size
+        const ratio = Math.min(1, maxDimension / img.width, maxDimension / img.height);
+        const newWidth = Math.max(1, Math.round(img.width * ratio));
+        const newHeight = Math.max(1, Math.round(img.height * ratio));
+
         canvas.width = newWidth;
         canvas.height = newHeight;
-        
-        // Draw and compress
         ctx.drawImage(img, 0, 0, newWidth, newHeight);
-        
+
         canvas.toBlob((blob) => {
-          if (blob) {
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            console.log(`Image compressed: ${file.size} → ${blob.size} bytes (${Math.round((1 - blob.size/file.size) * 100)}% reduction)`);
-            resolve(compressedFile);
-          } else {
+          if (!blob) {
             reject(new Error('Failed to compress image'));
+            return;
           }
+          if (blob.size >= file.size) {
+            resolve(file);
+            return;
+          }
+          const compressedFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+          console.log(
+            `Image compressed: ${file.size} → ${blob.size} bytes (${Math.round(
+              (1 - blob.size / file.size) * 100,
+            )}% reduction)`,
+          );
+          resolve(compressedFile);
         }, 'image/jpeg', quality);
-        
-        // Clean up
+
         URL.revokeObjectURL(img.src);
       };
-      
+
       img.onerror = () => {
         URL.revokeObjectURL(img.src);
         reject(new Error('Failed to load image'));

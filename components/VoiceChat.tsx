@@ -995,6 +995,54 @@ export default function VoiceChat({
     }
   }
 
+  const compressChatImage = (
+    file: File,
+    maxDimension: number,
+    quality: number,
+    maxBytes: number,
+  ): Promise<File> => {
+    if (file.size <= maxBytes) return Promise.resolve(file)
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      const img = document.createElement('img')
+      if (!ctx) {
+        reject(new Error('Cannot get canvas context'))
+        return
+      }
+      img.onload = () => {
+        const ratio = Math.min(1, maxDimension / img.width, maxDimension / img.height)
+        const newWidth = Math.max(1, Math.round(img.width * ratio))
+        const newHeight = Math.max(1, Math.round(img.height * ratio))
+        canvas.width = newWidth
+        canvas.height = newHeight
+        ctx.drawImage(img, 0, 0, newWidth, newHeight)
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Failed to compress image'))
+            return
+          }
+          if (blob.size >= file.size) {
+            resolve(file)
+            return
+          }
+          resolve(
+            new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            }),
+          )
+        }, 'image/jpeg', quality)
+        URL.revokeObjectURL(img.src)
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(img.src)
+        reject(new Error('Failed to load image'))
+      }
+      img.src = URL.createObjectURL(file)
+    })
+  }
+
   const sendFridgePhoto = async (note: string) => {
     if (pendingPhotos.length === 0) return
     setLoading(true)
@@ -1012,7 +1060,21 @@ export default function VoiceChat({
 
     const { localDate, tzOffsetMin } = buildLocalDatePayload()
     const formData = new FormData()
-    pendingPhotos.forEach((file) => {
+    const wantsLabelDetail = photoMode === 'label'
+    const maxDimension = wantsLabelDetail ? 1600 : 1280
+    const quality = wantsLabelDetail ? 0.9 : 0.82
+    const maxBytes = wantsLabelDetail ? 1500 * 1024 : 900 * 1024
+    const preparedPhotos = await Promise.all(
+      pendingPhotos.map(async (file) => {
+        try {
+          return await compressChatImage(file, maxDimension, quality, maxBytes)
+        } catch (err) {
+          console.warn('Photo compression failed; using original file.', err)
+          return file
+        }
+      }),
+    )
+    preparedPhotos.forEach((file) => {
       formData.append('image', file)
     })
     formData.append('message', note)
