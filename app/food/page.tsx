@@ -19440,6 +19440,8 @@ Please add nutritional information manually if needed.`);
                   'prawns',
                   'chia seed',
                   'chia seeds',
+                  'seed',
+                  'seeds',
                   'flaxseed',
                   'flaxseeds',
                   'linseed',
@@ -20113,6 +20115,19 @@ Please add nutritional information manually if needed.`);
                   'cheese flavor',
                   'cheese flavoured',
                   'cheese flavored',
+                  'seed oil',
+                  'seed oils',
+                  'roasted seed',
+                  'roasted seeds',
+                  'seed snack',
+                  'seed snacks',
+                  'seed cracker',
+                  'seed crackers',
+                  'seed bar',
+                  'seed bars',
+                  'trail mix',
+                  'flavoured seed',
+                  'flavored seed',
                 ]
 
                 const normalizeFatLabel = (value: any) =>
@@ -20136,12 +20151,11 @@ Please add nutritional information manually if needed.`);
                   })
                 }
 
-                const ZERO_FAT_GRAMS = 0.5
-
                 const isZeroFatItem = (label: any, grams: number) => {
                   const fatValue = Number(grams || 0)
                   if (!Number.isFinite(fatValue) || fatValue <= 0) return true
-                  return fatValue <= ZERO_FAT_GRAMS && matchesFatKeywords(label, fatZeroKeywords)
+                  if (matchesFatKeywords(label, fatZeroKeywords)) return true
+                  return false
                 }
 
                 const classifyFatLabel = (label: any) => {
