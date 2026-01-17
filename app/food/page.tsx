@@ -19304,9 +19304,121 @@ Please add nutritional information manually if needed.`);
                   }
                 }
 
+                const fatGoodKeywords = [
+                  'salmon',
+                  'sardine',
+                  'sardines',
+                  'tuna',
+                  'mackerel',
+                  'trout',
+                  'herring',
+                  'anchovy',
+                  'anchovies',
+                  'avocado',
+                  'olive oil',
+                  'extra virgin',
+                  'olives',
+                  'walnut',
+                  'almond',
+                  'cashew',
+                  'pecan',
+                  'pistachio',
+                  'macadamia',
+                  'hazelnut',
+                  'brazil nut',
+                  'peanut',
+                  'peanut butter',
+                  'chia',
+                  'flax',
+                  'hemp',
+                  'pumpkin seed',
+                  'sunflower seed',
+                  'sesame',
+                  'tahini',
+                ]
+
+                const fatBadKeywords = [
+                  'pizza',
+                  'burger',
+                  'mcdonald',
+                  'mc donald',
+                  'maccas',
+                  'kfc',
+                  'burger king',
+                  'hungry jacks',
+                  'fish and chips',
+                  'fish & chips',
+                  'fish &chip',
+                  'chip shop',
+                  'chips',
+                  'fries',
+                  'crisps',
+                  'battered',
+                  'fried',
+                  'deep fried',
+                  'nugget',
+                  'nuggets',
+                  'donut',
+                  'doughnut',
+                  'pastry',
+                  'cake',
+                  'cookie',
+                  'biscuit',
+                  'hot dog',
+                  'sausage',
+                  'bacon',
+                  'salami',
+                  'pepperoni',
+                  'processed',
+                  'fast food',
+                  'takeaway',
+                  'takeout',
+                ]
+
+                const normalizeFatLabel = (value: any) =>
+                  String(value || '').toLowerCase()
+
+                const scrubFatLabel = (value: any) =>
+                  normalizeFatLabel(value).replace(/[^a-z0-9]+/g, ' ').trim()
+
+                const matchesFatKeywords = (label: any, keywords: string[]) => {
+                  if (!label) return false
+                  const raw = normalizeFatLabel(label)
+                  const clean = scrubFatLabel(label)
+                  return keywords.some((keyword) => raw.includes(keyword) || clean.includes(keyword))
+                }
+
+                const classifyFatLabel = (label: any) => {
+                  if (matchesFatKeywords(label, fatBadKeywords)) return 'bad'
+                  if (matchesFatKeywords(label, fatGoodKeywords)) return 'good'
+                  return 'bad'
+                }
+
+                const splitFatFromItems = (items: any[]) => {
+                  const split = { good: 0, bad: 0 }
+                  if (!items || items.length === 0) return split
+                  items.forEach((entry: any) => {
+                    const servings = effectiveServings(entry)
+                    const multiplier = macroMultiplierForItem(entry)
+                    const fat = Number(entry?.fat_g || 0) * servings * multiplier
+                    if (!Number.isFinite(fat) || fat <= 0) return
+                    const label = entry?.name || entry?.label || entry?.description || ''
+                    const bucket = classifyFatLabel(label)
+                    if (bucket === 'good') {
+                      split.good += fat
+                    } else {
+                      split.bad += fat
+                    }
+                  })
+                  return split
+                }
+
+                const fatSplit = { good: 0, bad: 0 }
+
                 const totals = source.reduce((acc: Record<typeof NUTRIENT_DISPLAY_ORDER[number], number>, item: any) => {
                   const derivedItems = deriveItemsForEntry(item)
                   const recalculated = derivedItems ? recalculateNutritionFromItems(derivedItems) : null
+                  const splitFromItems = derivedItems ? splitFatFromItems(derivedItems) : null
                   if (recalculated) {
                     acc.calories += recalculated.calories || 0
                     acc.protein += recalculated.protein || 0
@@ -19314,6 +19426,10 @@ Please add nutritional information manually if needed.`);
                     acc.fat += recalculated.fat || 0
                     acc.fiber += recalculated.fiber || 0
                     acc.sugar += recalculated.sugar || 0
+                    if (splitFromItems) {
+                      fatSplit.good += splitFromItems.good
+                      fatSplit.bad += splitFromItems.bad
+                    }
                     return acc
                   }
 
@@ -19334,6 +19450,18 @@ Please add nutritional information manually if needed.`);
                   acc.fat += storedTotals.fat
                   acc.fiber += storedTotals.fiber
                   acc.sugar += storedTotals.sugar
+                  if (splitFromItems) {
+                    fatSplit.good += splitFromItems.good
+                    fatSplit.bad += splitFromItems.bad
+                  } else {
+                    const entryLabel = item?.label || item?.name || item?.description || ''
+                    const bucket = classifyFatLabel(entryLabel)
+                    if (bucket === 'good') {
+                      fatSplit.good += storedTotals.fat
+                    } else {
+                      fatSplit.bad += storedTotals.fat
+                    }
+                  }
                   return acc
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 })
 
@@ -19368,6 +19496,17 @@ Please add nutritional information manually if needed.`);
                 const carbGrams = totals.carbs || 0
                 const carbNonSugar = Math.max(0, carbGrams - sugarGrams)
                 const fibreGrams = totals.fiber || 0
+                const fatConsumed = Math.max(0, totals.fat || 0)
+                const fatSplitTotal = fatSplit.good + fatSplit.bad
+                const normalizedFatSplit = (() => {
+                  if (!Number.isFinite(fatSplitTotal) || fatSplitTotal <= 0 || fatConsumed <= 0) {
+                    return { good: 0, bad: fatConsumed }
+                  }
+                  const scale = fatConsumed / fatSplitTotal
+                  const good = Math.max(0, Math.min(fatConsumed, fatSplit.good * scale))
+                  const bad = Math.max(0, fatConsumed - good)
+                  return { good, bad }
+                })()
 
                 const macroTargets = {
                   protein: dailyTargets.protein ?? null,
@@ -19411,10 +19550,18 @@ Please add nutritional information manually if needed.`);
 
                 const macroViewOptions: Array<'targets' | 'consumed'> = ['targets', 'consumed']
 
-                const macroRows = [
+                const macroRows: Array<{
+                  key: 'protein' | 'carbs' | 'fat' | 'fibre' | 'sugar'
+                  label: string
+                  consumed: number
+                  target: number
+                  unit: string
+                  color: string
+                  fatSplit?: { good: number; bad: number }
+                }> = [
                   { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargetsWithExercise.protein || 0, unit: 'g', color: '#ef4444' },
                   { key: 'carbs', label: 'Carbs', consumed: carbGrams, target: macroTargetsWithExercise.carbs || 0, unit: 'g', color: '#22c55e' },
-                  { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargetsWithExercise.fat || 0, unit: 'g', color: '#6366f1' },
+                  { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargetsWithExercise.fat || 0, unit: 'g', color: '#6366f1', fatSplit: normalizedFatSplit },
                   { key: 'fibre', label: 'Fibre', consumed: fibreGrams, target: macroTargetsWithExercise.fiber || 0, unit: 'g', color: '#12adc9' },
                   { key: 'sugar', label: 'Sugar (max)', consumed: sugarGrams, target: macroTargetsWithExercise.sugar || 0, unit: 'g', color: '#f97316' },
                 ].filter((row) => row.target > 0)
@@ -19511,6 +19658,17 @@ Please add nutritional information manually if needed.`);
                                   const over = percentDisplay > 100
                                   const percentColor = over ? 'text-red-600' : 'text-gray-900'
                                   const remaining = Math.max(0, row.target - row.consumed)
+                                  const fatSplitValues = row.key === 'fat' ? row.fatSplit : null
+                                  const fatSplitTotal = fatSplitValues ? fatSplitValues.good + fatSplitValues.bad : 0
+                                  const fatGoodPct =
+                                    fatSplitValues && fatSplitTotal > 0
+                                      ? Math.max(0, Math.min(100, (fatSplitValues.good / fatSplitTotal) * 100))
+                                      : 0
+                                  const fatBadPct =
+                                    fatSplitValues && fatSplitTotal > 0
+                                      ? Math.max(0, Math.min(100, 100 - fatGoodPct))
+                                      : 0
+                                  const barWidth = Math.min(100, pct * 100)
                                   return (
                                     <div key={row.key} className="space-y-1">
                                       <div className="flex items-center justify-between text-sm">
@@ -19528,10 +19686,26 @@ Please add nutritional information manually if needed.`);
                                         </div>
                                       </div>
                                       <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                          className="h-2 rounded-full transition-all"
-                                          style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: over ? '#ef4444' : row.color }}
-                                        />
+                                        {row.key === 'fat' && fatSplitValues && fatSplitTotal > 0 ? (
+                                          <div
+                                            className="h-2 rounded-full overflow-hidden transition-all flex"
+                                            style={{ width: `${barWidth}%` }}
+                                          >
+                                            <div
+                                              className="h-2 transition-all"
+                                              style={{ width: `${fatGoodPct}%`, backgroundColor: '#22c55e' }}
+                                            />
+                                            <div
+                                              className="h-2 transition-all"
+                                              style={{ width: `${fatBadPct}%`, backgroundColor: '#ef4444' }}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div
+                                            className="h-2 rounded-full transition-all"
+                                            style={{ width: `${barWidth}%`, backgroundColor: over ? '#ef4444' : row.color }}
+                                          />
+                                        )}
                                       </div>
                                     </div>
                                   )
