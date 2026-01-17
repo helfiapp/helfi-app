@@ -11056,7 +11056,7 @@ Please add nutritional information manually if needed.`);
   useEffect(() => {
     if (!showFavoritesPicker) return
     favoritesListRef.current?.scrollTo({ top: 0, behavior: 'auto' })
-  }, [showFavoritesPicker, favoritesActiveTab, favoritesSearch, favoritesAllServerEntries])
+  }, [showFavoritesPicker, favoritesActiveTab, favoritesSearch])
 
   const foodNameOverrideMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -11402,6 +11402,22 @@ Please add nutritional information manually if needed.`);
     const serverEntries =
       Array.isArray(favoritesAllServerEntries) && favoritesAllServerEntries.length > 0 ? favoritesAllServerEntries : null
     const history = collectHistoryMeals(serverEntries ? { baseEntries: serverEntries } : undefined)
+    const buildFavoriteFallbackId = (fav: any, index?: number) => {
+      const labelRaw = favoriteDisplayLabel(fav) || fav?.label || fav?.description || 'favorite'
+      const labelKey = normalizeFoodName(normalizeMealLabel(labelRaw))
+      const created = resolveFavoriteCreatedAtMs(fav)
+      const sourceId = fav?.sourceId ? String(fav.sourceId) : ''
+      const base = labelKey || sourceId || 'favorite'
+      const suffix = Number.isFinite(created) && created > 0 ? created : index || 0
+      return `fav-${base}-${suffix}`
+    }
+    const buildEntryFallbackId = (entry: any, label: string, createdAtValue: number, index?: number) => {
+      const labelKey = normalizeFoodName(normalizeMealLabel(label || 'meal'))
+      const created = Number.isFinite(createdAtValue) && createdAtValue > 0 ? createdAtValue : 0
+      const base = labelKey || 'meal'
+      const suffix = created || index || 0
+      return `all-${base}-${suffix}`
+    }
     const parseEntryTimeToMs = (entry: any) => {
       const dateKey = dateKeyForEntry(entry)
       if (!dateKey) return NaN
@@ -11652,7 +11668,7 @@ Please add nutritional information manually if needed.`);
       const createdAtValue = resolveEntryCreatedAtMs(entry)
 
       return {
-        id: entry?.dbId ? `log-${entry.dbId}` : entry?.id || `all-${idx}`,
+        id: entry?.dbId ? `log-${entry.dbId}` : entry?.id || buildEntryFallbackId(entry, label, createdAtValue, idx),
         label,
         entry,
         favorite,
@@ -11683,7 +11699,7 @@ Please add nutritional information manually if needed.`);
       if (favId && usedFavoriteIds.has(favId)) return
       if (labelKey && usedLabels.has(labelKey)) return
       allMealsWithFavorites.push({
-        id: favId || `fav-${Math.random()}`,
+        id: favId || buildFavoriteFallbackId(fav, allMealsWithFavorites.length),
         label,
         entry: null,
         favorite: fav,
@@ -11695,8 +11711,8 @@ Please add nutritional information manually if needed.`);
       })
     })
 
-    const favoriteMeals = (favorites || []).map((fav: any) => ({
-      id: fav?.id || `fav-${Math.random()}`,
+    const favoriteMeals = (favorites || []).map((fav: any, index: number) => ({
+      id: fav?.id || buildFavoriteFallbackId(fav, index),
       label: applyFoodNameOverride(fav?.label || fav?.description || 'Favorite meal') || favoriteDisplayLabel(fav) || normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal'),
       favorite: fav,
       createdAt: resolveFavoriteCreatedAtMs(fav),
@@ -22430,7 +22446,11 @@ Please add nutritional information manually if needed.`);
                 </div>
               </div>
 
-              <div ref={favoritesListRef} className="flex-1 min-h-0 overflow-y-auto py-6">
+              <div
+                ref={favoritesListRef}
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-6"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
                 {(() => {
                   const { allMeals, favoriteMeals, customMeals } = buildFavoritesDatasets()
                   const search = favoritesSearch.trim().toLowerCase()
