@@ -1,4 +1,5 @@
 import 'server-only'
+import { prisma } from '@/lib/prisma'
 
 export interface NormalizedFoodItem {
   source: 'openfoodfacts' | 'usda' | 'fatsecret'
@@ -92,6 +93,47 @@ function parseNumber(value: any): number | null {
   const n = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(n)) return null
   return n
+}
+
+export async function searchLocalFoods(
+  query: string,
+  opts: { pageSize?: number; sources?: string[] } = {},
+): Promise<NormalizedFoodItem[]> {
+  const q = String(query || '').trim()
+  if (!q) return []
+  const pageSize = opts.pageSize ?? 10
+  const sources = Array.isArray(opts.sources) && opts.sources.length > 0 ? opts.sources : null
+
+  try {
+    const searchFilter = {
+      OR: [
+        { name: { contains: q, mode: 'insensitive' as const } },
+        { brand: { contains: q, mode: 'insensitive' as const } },
+      ],
+    }
+    const where = sources ? { AND: [{ source: { in: sources } }, searchFilter] } : searchFilter
+    const rows = await prisma.foodLibraryItem.findMany({
+      where,
+      take: pageSize,
+      orderBy: { name: 'asc' },
+    })
+    return rows.map((row) => ({
+      source: 'usda',
+      id: String(row.fdcId ?? row.id),
+      name: row.name,
+      brand: row.brand ?? undefined,
+      serving_size: row.servingSize || '100 g',
+      calories: row.calories ?? null,
+      protein_g: row.proteinG ?? null,
+      carbs_g: row.carbsG ?? null,
+      fat_g: row.fatG ?? null,
+      fiber_g: row.fiberG ?? null,
+      sugar_g: row.sugarG ?? null,
+    }))
+  } catch (err) {
+    console.warn('Local food search failed', err)
+    return []
+  }
 }
 
 function normalizeOpenFoodFactsProduct(product: any): NormalizedFoodItem | null {

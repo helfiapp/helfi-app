@@ -171,6 +171,39 @@ async function fetchFoodFromHelfiBarcode(barcode: string): Promise<NormalizedFoo
   }
 }
 
+// ============ Local USDA Cache ============
+
+async function fetchFoodFromLocalBarcode(barcode: string): Promise<NormalizedFood | null> {
+  try {
+    const record = await prisma.foodLibraryItem.findFirst({
+      where: { gtinUpc: barcode },
+    })
+    if (!record) return null
+    return {
+      source: 'usda',
+      id: String(record.fdcId ?? record.id),
+      name: record.name || 'Scanned food',
+      brand: record.brand || null,
+      serving_size: record.servingSize || '100 g',
+      calories: record.calories ?? null,
+      protein_g: record.proteinG ?? null,
+      carbs_g: record.carbsG ?? null,
+      fat_g: record.fatG ?? null,
+      fiber_g: record.fiberG ?? null,
+      sugar_g: record.sugarG ?? null,
+      barcode,
+      basis: null,
+      quantity_g: null,
+      piecesPerServing: null,
+      pieces: null,
+      energyUnit: null,
+    }
+  } catch (err) {
+    console.warn('Local barcode lookup failed', err)
+    return null
+  }
+}
+
 // ============ FatSecret API ============
 
 async function getFatSecretAccessToken(): Promise<string | null> {
@@ -544,6 +577,11 @@ export async function GET(req: NextRequest) {
 
   // Try Helfi cache first (user-labeled nutrition from barcode scans)
   food = await fetchFoodFromHelfiBarcode(code)
+
+  // Try local USDA cache next (branded foods with barcodes)
+  if (!food) {
+    food = await fetchFoodFromLocalBarcode(code)
+  }
 
   // Try FatSecret first (best for packaged foods)
   if (!food) {

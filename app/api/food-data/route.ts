@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
-import { searchOpenFoodFactsByQuery, searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition } from '@/lib/food-data'
+import { searchOpenFoodFactsByQuery, searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition, searchLocalFoods } from '@/lib/food-data'
 
 // Lightweight read-only endpoint that proxies to external food databases
 // and returns a normalized list of items in a format compatible with the
@@ -139,6 +139,16 @@ export async function GET(request: NextRequest) {
       return []
     }
 
+    const searchLocalPreferred = async (value: string, resolvedKind: 'packaged' | 'single') => {
+      if (!value) return []
+      if (resolvedKind === 'packaged') {
+        return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
+      }
+      const foundation = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] })
+      if (foundation.length > 0) return foundation
+      return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
+    }
+
     if (source === 'auto' || !source) {
       const resolvedKind = kind === 'packaged' ? 'packaged' : 'single'
       const usdaDataType = resolvedKind === 'packaged' ? 'all' : 'generic'
@@ -242,30 +252,34 @@ export async function GET(request: NextRequest) {
         return false
       }
 
-    const scoreItem = (it: any) => {
-      let score = 0
-      score += scoreItemName(it)
-      if (it?.source === 'usda') score += 4
-      if (it?.source === 'fatsecret') score += isMealQuery ? 6 : 2
-      if (it?.source === 'openfoodfacts') score += 1
-      if (it?.brand) score += 2
-      if (Number.isFinite(Number(it?.calories)) && Number(it.calories) > 0) score += 1
-      score += scoredServing(it?.serving_size, it?.calories)
-      if (isMealQuery) {
-        const grams = parseServingGrams(it?.serving_size)
-        if (typeof grams === 'number' && Number.isFinite(grams)) {
-          if (grams >= 150 && grams <= 600) score += 6
-          if (grams >= 90 && grams < 150) score += 2
-          if (grams > 0 && grams < 80) score -= 6
+      const scoreItem = (it: any) => {
+        let score = 0
+        score += scoreItemName(it)
+        if (it?.source === 'usda') score += 4
+        if (it?.source === 'fatsecret') score += isMealQuery ? 6 : 2
+        if (it?.source === 'openfoodfacts') score += 1
+        if (it?.brand) score += 2
+        if (Number.isFinite(Number(it?.calories)) && Number(it.calories) > 0) score += 1
+        score += scoredServing(it?.serving_size, it?.calories)
+        if (isMealQuery) {
+          const grams = parseServingGrams(it?.serving_size)
+          if (typeof grams === 'number' && Number.isFinite(grams)) {
+            if (grams >= 150 && grams <= 600) score += 6
+            if (grams >= 90 && grams < 150) score += 2
+            if (grams > 0 && grams < 80) score -= 6
+          }
+          if (it?.source === 'openfoodfacts' && typeof grams === 'number' && grams < 80) score -= 4
+          if (it?.source === 'usda' && it?.brand) score += 2
+          if (Number.isFinite(Number(it?.calories)) && Number(it.calories) < 150) score -= 4
         }
-        if (it?.source === 'openfoodfacts' && typeof grams === 'number' && grams < 80) score -= 4
-        if (it?.source === 'usda' && it?.brand) score += 2
-        if (Number.isFinite(Number(it?.calories)) && Number(it.calories) < 150) score -= 4
+        return score
       }
-      return score
-    }
 
-      if (resolvedKind === 'single') {
+      const localItems = await searchLocalPreferred(query, resolvedKind)
+      if (localItems.length > 0) {
+        items = [...localItems].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+        actualSource = 'auto'
+      } else if (resolvedKind === 'single') {
         items = await searchUsdaSingleFood(query)
         actualSource = 'usda'
         if (items.length === 0) {
@@ -328,12 +342,18 @@ export async function GET(request: NextRequest) {
     } else if (source === 'openfoodfacts') {
       items = await searchOpenFoodFactsByQuery(query, { pageSize: limit })
     } else if (source === 'usda') {
-      const dataType =
-        kind === 'packaged' ? 'all' : kind === 'single' ? 'generic' : 'all'
-      if (kind !== 'packaged') {
-        items = await searchUsdaSingleFood(query)
+      const resolvedKind = kind === 'packaged' ? 'packaged' : 'single'
+      const localItems = await searchLocalPreferred(query, resolvedKind)
+      if (localItems.length > 0) {
+        items = localItems
+        actualSource = 'usda'
       } else {
-        items = await searchUsdaFoods(query, { pageSize: limit, dataType })
+        const dataType = resolvedKind === 'packaged' ? 'all' : 'generic'
+        if (resolvedKind !== 'packaged') {
+          items = await searchUsdaSingleFood(query)
+        } else {
+          items = await searchUsdaFoods(query, { pageSize: limit, dataType })
+        }
       }
     } else if (source === 'fatsecret') {
       items = await searchFatSecretFoods(query, { pageSize: limit })
