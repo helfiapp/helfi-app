@@ -1611,20 +1611,26 @@ export default function VoiceChat({
           </div>
           <span className="material-symbols-outlined text-gray-300" style={{ fontSize: 18 }}>edit_square</span>
         </button>
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={toggleSelectMode}
-            className="text-[13px] md:text-[11px] font-semibold text-gray-600 hover:text-gray-900"
+            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[13px] md:text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
           >
-            {selectionMode ? 'Done' : 'Select'}
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+              {selectionMode ? 'check_circle' : 'checklist'}
+            </span>
+            {selectionMode ? 'Done selecting' : 'Select chats'}
           </button>
           {selectionMode && (
             <button
               type="button"
               onClick={toggleSelectAllThreads}
-              className="text-[13px] md:text-[11px] font-semibold text-gray-600 hover:text-gray-900"
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[13px] md:text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
             >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                {allSelected ? 'remove_done' : 'select_all'}
+              </span>
               {allSelected ? 'Clear all' : 'Select all'}
             </button>
           )}
