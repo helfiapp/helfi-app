@@ -72,7 +72,10 @@ function DesktopSidebar({
       data-helfi-sidebar="true"
       className="hidden md:fixed md:inset-y-0 md:left-0 md:z-[9999] md:w-64 md:flex md:flex-col pointer-events-auto"
     >
-      <div className="flex flex-col flex-grow bg-[#1f2937] text-white border-r border-gray-800 pt-5 pb-4 overflow-y-auto">
+      <div
+        className="flex flex-col flex-grow bg-[#1f2937] text-white border-r border-gray-800 pt-5 pb-4 overflow-y-auto"
+        data-scroll-zone="sidebar"
+      >
         {/* Logo */}
         <div className="flex items-center flex-shrink-0 px-4">
           <img
@@ -492,6 +495,49 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       document.removeEventListener('touchend', handleTouchEnd)
       document.removeEventListener('touchcancel', handleTouchEnd)
       document.removeEventListener('click', handleClickCapture, true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const getScrollableChild = (start: Element | null, stopAt: Element | null) => {
+      let el = start
+      while (el && el !== stopAt) {
+        const style = window.getComputedStyle(el)
+        const overflowY = style?.overflowY
+        if (
+          (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') &&
+          el.scrollHeight > el.clientHeight + 1
+        ) {
+          return el as HTMLElement
+        }
+        el = el.parentElement
+      }
+      return null
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
+      const pointerTarget =
+        document.elementFromPoint(event.clientX, event.clientY) ||
+        (event.target instanceof Element ? event.target : null)
+      if (!pointerTarget) return
+      const zone = pointerTarget.closest('[data-scroll-zone]')
+      if (!zone) return
+
+      const innerScrollable = getScrollableChild(pointerTarget, zone)
+      if (innerScrollable && innerScrollable !== zone) return
+
+      const zoneEl = zone as HTMLElement
+      if (zoneEl.scrollHeight <= zoneEl.clientHeight + 1) return
+
+      zoneEl.scrollTop += event.deltaY
+      event.preventDefault()
+    }
+
+    document.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      document.removeEventListener('wheel', handleWheel)
     }
   }, [])
 
@@ -1111,6 +1157,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           onTouchMove={handlePullMove}
           onTouchEnd={handlePullEnd}
           onTouchCancel={handlePullEnd}
+          data-scroll-zone="content"
           className={`md:pl-64 flex flex-col flex-1 relative overflow-x-hidden ${
             isChatPage ? 'overflow-hidden h-[100dvh]' : 'overflow-y-auto'
           }`}
