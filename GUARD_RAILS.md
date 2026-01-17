@@ -1099,7 +1099,7 @@ Food diary photos now live in **Vercel Blob** and must not be stored in Neon.
 - `imageUrl` stored in `FoodLog` is always a **remote Blob URL** (no base64 stored long-term).
 - When a diary entry is deleted, its photo is deleted **immediately** if no other entry still uses it.
 - A daily cleanup job removes photos older than the retention window and clears `imageUrl`.
-- Retention is controlled by `FOOD_PHOTO_RETENTION_DAYS` (default 90). Do not change the default without approval.
+- Retention is controlled by `FOOD_PHOTO_RETENTION_DAYS` (default 7). Do not change the default without approval.
 - If Blob storage is not configured, the system must fail softly (do not break saving entries).
 
 **Why locked:**

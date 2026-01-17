@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic'
 const FOOD_PHOTO_PREFIX = 'food-photos/'
 
 const getRetentionDays = () => {
-  const raw = Number(process.env.FOOD_PHOTO_RETENTION_DAYS || 90)
-  if (!Number.isFinite(raw) || raw < 1) return 90
+  const raw = Number(process.env.FOOD_PHOTO_RETENTION_DAYS || 7)
+  if (!Number.isFinite(raw) || raw < 1) return 7
   return Math.min(Math.round(raw), 3650)
 }
 
