@@ -1214,12 +1214,32 @@ export default function MealBuilderClient() {
           setError('Could not find that saved meal to edit. Please reopen from Favorites → Custom.')
           return
         }
+        const existingOrigin = (() => {
+          const fromNutrition = (existing as any)?.nutrition?.__origin
+          if (typeof fromNutrition === 'string' && fromNutrition.trim().length > 0) return fromNutrition
+          const fromTotal = (existing as any)?.total?.__origin
+          if (typeof fromTotal === 'string' && fromTotal.trim().length > 0) return fromTotal
+          return ''
+        })()
+        const keepMealBuilderOrigin = isCustomMealFavorite(existing)
+        const normalizedNutrition = (() => {
+          const base = payload.nutrition ? { ...payload.nutrition } : null
+          if (!base) return base
+          if (keepMealBuilderOrigin) return base
+          if (Object.prototype.hasOwnProperty.call(base, '__origin')) {
+            delete (base as any).__origin
+          }
+          if (existingOrigin) {
+            return { ...base, __origin: existingOrigin }
+          }
+          return base
+        })()
         const updatedFavorite = {
           ...existing,
           label: title,
           description,
-          nutrition: payload.nutrition,
-          total: payload.nutrition,
+          nutrition: normalizedNutrition,
+          total: normalizedNutrition,
           items: cleanedItems,
           method: existing?.method || (existing?.customMeal ? 'meal-builder' : 'text'),
           meal: existing?.meal || category,
@@ -1239,7 +1259,7 @@ export default function MealBuilderClient() {
               body: JSON.stringify({
                 id: targetLogId,
                 description,
-                nutrition: payload.nutrition,
+                nutrition: normalizedNutrition || payload.nutrition,
                 items: cleanedItems,
                 meal: existing?.meal || category,
                 category: existing?.meal || category,
