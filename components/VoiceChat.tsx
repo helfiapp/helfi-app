@@ -82,6 +82,9 @@ export default function VoiceChat({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deletePending, setDeletePending] = useState(false)
   const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedThreadIds, setSelectedThreadIds] = useState<string[]>([])
+  const [bulkActionPending, setBulkActionPending] = useState(false)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const barcodeVideoRef = useRef<HTMLVideoElement | null>(null)
   const barcodeScannerRef = useRef<{ reader: any; controls: any } | null>(null)
@@ -195,9 +198,14 @@ export default function VoiceChat({
     setLastChargedCost(null)
     setLastChargedAt(null)
     setThreadsOpen(false)
+    setSelectionMode(false)
+    setSelectedThreadIds([])
   }, [entryContext])
 
   const showExitButton = Boolean(onExit)
+  const selectedCount = selectedThreadIds.length
+  const allThreadIds = useMemo(() => threads.map((thread) => thread.id), [threads])
+  const allSelected = selectedCount > 0 && selectedCount === allThreadIds.length
 
   const handleExit = useCallback(() => {
     if (onExit) {
@@ -210,6 +218,75 @@ export default function VoiceChat({
     }
     router.push('/dashboard')
   }, [onExit, router])
+
+  const toggleSelectMode = () => {
+    setSelectionMode((prev) => {
+      if (prev) {
+        setSelectedThreadIds([])
+      }
+      return !prev
+    })
+  }
+
+  const toggleThreadSelection = (threadId: string) => {
+    setSelectedThreadIds((prev) =>
+      prev.includes(threadId) ? prev.filter((id) => id !== threadId) : [...prev, threadId]
+    )
+  }
+
+  const toggleSelectAllThreads = () => {
+    if (allSelected) {
+      setSelectedThreadIds([])
+      return
+    }
+    setSelectedThreadIds(allThreadIds)
+  }
+
+  const archiveSelectedThreads = () => {
+    if (selectedThreadIds.length === 0) return
+    setArchivedThreadIds((prev) => Array.from(new Set([...prev, ...selectedThreadIds])))
+    setSelectedThreadIds([])
+    setSelectionMode(false)
+  }
+
+  const deleteSelectedThreads = async () => {
+    if (selectedThreadIds.length === 0) return
+    const confirmed = window.confirm(`Delete ${selectedThreadIds.length} chat${selectedThreadIds.length > 1 ? 's' : ''}?`)
+    if (!confirmed) return
+    setBulkActionPending(true)
+    try {
+      await Promise.all(
+        selectedThreadIds.map((threadId) =>
+          fetch('/api/chat/threads', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ threadId }),
+          })
+        )
+      )
+      const threadsRes = await fetch(threadsUrl)
+      if (threadsRes.ok) {
+        const threadsData = await threadsRes.json()
+        if (threadsData.threads) {
+          setThreads(threadsData.threads)
+          if (currentThreadId && selectedThreadIds.includes(currentThreadId)) {
+            setCurrentThreadId(null)
+            setCurrentThreadCharged(false)
+            setMessages([])
+            setLastChargedCost(null)
+            setLastChargedAt(null)
+          }
+        }
+      }
+      setArchivedThreadIds((prev) => prev.filter((id) => !selectedThreadIds.includes(id)))
+      setSelectedThreadIds([])
+      setSelectionMode(false)
+    } catch (err) {
+      console.error('Failed to delete chats:', err)
+    } finally {
+      setBulkActionPending(false)
+    }
+  }
   
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -747,6 +824,12 @@ export default function VoiceChat({
       handleNewChat()
     }
   }, [archivedThreadIds, currentThreadId, threads])
+
+  useEffect(() => {
+    if (selectedThreadIds.length === 0) return
+    const threadIds = new Set(threads.map((thread) => thread.id))
+    setSelectedThreadIds((prev) => prev.filter((id) => threadIds.has(id)))
+  }, [threads, selectedThreadIds.length])
 
   // Auto-scroll
   useEffect(() => {
@@ -1528,6 +1611,24 @@ export default function VoiceChat({
           </div>
           <span className="material-symbols-outlined text-gray-300" style={{ fontSize: 18 }}>edit_square</span>
         </button>
+        <div className="mt-3 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={toggleSelectMode}
+            className="text-[13px] md:text-[11px] font-semibold text-gray-600 hover:text-gray-900"
+          >
+            {selectionMode ? 'Done' : 'Select'}
+          </button>
+          {selectionMode && (
+            <button
+              type="button"
+              onClick={toggleSelectAllThreads}
+              className="text-[13px] md:text-[11px] font-semibold text-gray-600 hover:text-gray-900"
+            >
+              {allSelected ? 'Clear all' : 'Select all'}
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-5">
         {threadGroups.map((group) => (
@@ -1536,39 +1637,72 @@ export default function VoiceChat({
               <h3 className="text-[12px] md:text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
                 {group.label}
               </h3>
-                  {group.items.map((thread) => (
-                    <div key={thread.id} className="flex items-center gap-2 group">
+              {group.items.map((thread) => {
+                const isSelected = selectedThreadIds.includes(thread.id)
+                return (
+                  <div key={thread.id} className="flex items-center gap-2 group">
+                    {selectionMode && (
                       <button
                         type="button"
-                        onClick={() => {
-                          if (longPressTriggeredRef.current) {
-                            longPressTriggeredRef.current = false
-                            return
-                          }
-                          handleSelectThread(thread.id)
-                        }}
-                        onPointerDown={(event) => startLongPress(event, thread.id)}
-                        onPointerUp={endLongPress}
-                        onPointerCancel={endLongPress}
-                        onContextMenu={(event) => {
-                          event.preventDefault()
-                          openThreadActions(thread.id)
-                        }}
-                        className={`flex-1 min-w-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
-                          currentThreadId === thread.id
-                            ? 'bg-white shadow-sm border border-gray-100'
-                            : 'hover:bg-gray-100/80'
+                        onClick={() => toggleThreadSelection(thread.id)}
+                        className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                          isSelected ? 'border-[#10a27e] bg-[#10a27e]' : 'border-gray-300 bg-white'
                         }`}
-                        style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
+                        aria-label={isSelected ? 'Deselect chat' : 'Select chat'}
                       >
-                        <span className={`flex-1 min-w-0 truncate text-[15px] md:text-[13px] font-medium ${
-                          currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
-                        }`}>
-                          {thread.title || 'New chat'}
-                        </span>
+                        {isSelected && (
+                          <span className="material-symbols-outlined text-white" style={{ fontSize: 16 }}>
+                            check
+                          </span>
+                        )}
                       </button>
-                    </div>
-                  ))}
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectionMode) {
+                          toggleThreadSelection(thread.id)
+                          return
+                        }
+                        if (longPressTriggeredRef.current) {
+                          longPressTriggeredRef.current = false
+                          return
+                        }
+                        handleSelectThread(thread.id)
+                      }}
+                      onPointerDown={(event) => {
+                        if (selectionMode) return
+                        startLongPress(event, thread.id)
+                      }}
+                      onPointerUp={() => {
+                        if (selectionMode) return
+                        endLongPress()
+                      }}
+                      onPointerCancel={() => {
+                        if (selectionMode) return
+                        endLongPress()
+                      }}
+                      onContextMenu={(event) => {
+                        if (selectionMode) return
+                        event.preventDefault()
+                        openThreadActions(thread.id)
+                      }}
+                      className={`flex-1 min-w-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                        currentThreadId === thread.id
+                          ? 'bg-white shadow-sm border border-gray-100'
+                          : 'hover:bg-gray-100/80'
+                      }`}
+                      style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
+                    >
+                      <span className={`flex-1 min-w-0 truncate text-[15px] md:text-[13px] font-medium ${
+                        currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
+                      }`}>
+                        {thread.title || 'New chat'}
+                      </span>
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           ) : null
         ))}
@@ -1577,45 +1711,103 @@ export default function VoiceChat({
             <h3 className="text-[12px] md:text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-2">
               Archived
             </h3>
-            {archivedThreads.map((thread) => (
-              <div key={thread.id} className="flex items-center gap-2 group">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (longPressTriggeredRef.current) {
-                      longPressTriggeredRef.current = false
-                      return
-                    }
-                    handleSelectThread(thread.id)
-                  }}
-                  onPointerDown={(event) => startLongPress(event, thread.id)}
-                  onPointerUp={endLongPress}
-                  onPointerCancel={endLongPress}
-                  onContextMenu={(event) => {
-                    event.preventDefault()
-                    openThreadActions(thread.id)
-                  }}
-                  className={`flex-1 min-w-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
-                    currentThreadId === thread.id
-                      ? 'bg-white shadow-sm border border-gray-100'
-                      : 'hover:bg-gray-100/80'
-                  }`}
-                  style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
-                >
-                  <span className={`flex-1 min-w-0 truncate text-[15px] md:text-[13px] font-medium ${
-                    currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
-                  }`}>
-                    {thread.title || 'New chat'}
-                  </span>
-                </button>
-              </div>
-            ))}
+            {archivedThreads.map((thread) => {
+              const isSelected = selectedThreadIds.includes(thread.id)
+              return (
+                <div key={thread.id} className="flex items-center gap-2 group">
+                  {selectionMode && (
+                    <button
+                      type="button"
+                      onClick={() => toggleThreadSelection(thread.id)}
+                      className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                        isSelected ? 'border-[#10a27e] bg-[#10a27e]' : 'border-gray-300 bg-white'
+                      }`}
+                      aria-label={isSelected ? 'Deselect chat' : 'Select chat'}
+                    >
+                      {isSelected && (
+                        <span className="material-symbols-outlined text-white" style={{ fontSize: 16 }}>
+                          check
+                        </span>
+                      )}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectionMode) {
+                        toggleThreadSelection(thread.id)
+                        return
+                      }
+                      if (longPressTriggeredRef.current) {
+                        longPressTriggeredRef.current = false
+                        return
+                      }
+                      handleSelectThread(thread.id)
+                    }}
+                    onPointerDown={(event) => {
+                      if (selectionMode) return
+                      startLongPress(event, thread.id)
+                    }}
+                    onPointerUp={() => {
+                      if (selectionMode) return
+                      endLongPress()
+                    }}
+                    onPointerCancel={() => {
+                      if (selectionMode) return
+                      endLongPress()
+                    }}
+                    onContextMenu={(event) => {
+                      if (selectionMode) return
+                      event.preventDefault()
+                      openThreadActions(thread.id)
+                    }}
+                    className={`flex-1 min-w-0 flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                      currentThreadId === thread.id
+                        ? 'bg-white shadow-sm border border-gray-100'
+                        : 'hover:bg-gray-100/80'
+                    }`}
+                    style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
+                  >
+                    <span className={`flex-1 min-w-0 truncate text-[15px] md:text-[13px] font-medium ${
+                      currentThreadId === thread.id ? 'text-gray-900' : 'text-gray-500'
+                    }`}>
+                      {thread.title || 'New chat'}
+                    </span>
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
         {!hasVisibleThreads && archivedThreads.length === 0 && (
           <div className="px-3 text-[13px] md:text-xs text-gray-400">No chats yet.</div>
         )}
       </div>
+      {selectionMode && (
+        <div className="border-t border-gray-200 p-3">
+          <div className="flex items-center justify-between text-[13px] md:text-[11px] text-gray-500">
+            <span>{selectedCount} selected</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={archiveSelectedThreads}
+                disabled={selectedCount === 0 || bulkActionPending}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Archive
+              </button>
+              <button
+                type="button"
+                onClick={deleteSelectedThreads}
+                disabled={selectedCount === 0 || bulkActionPending}
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-red-700 hover:bg-red-100 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 
