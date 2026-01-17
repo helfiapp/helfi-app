@@ -20397,6 +20397,20 @@ Please add nutritional information manually if needed.`);
                   bad: fatDetailList(fatDetails.bad),
                   unclear: fatDetailList(fatDetails.unclear),
                 }
+                const formatFatDetailLabel = (value: any) => {
+                  const raw = String(value || '').trim()
+                  if (!raw) return 'Unknown item'
+                  const isAllCaps = raw === raw.toUpperCase()
+                  if (isAllCaps) {
+                    const lower = raw.toLowerCase()
+                    return lower.charAt(0).toUpperCase() + lower.slice(1)
+                  }
+                  const first = raw.charAt(0)
+                  if (first && first === first.toLowerCase()) {
+                    return first.toUpperCase() + raw.slice(1)
+                  }
+                  return raw
+                }
 
                 const macroTargets = {
                   protein: dailyTargets.protein ?? null,
@@ -20685,7 +20699,7 @@ Please add nutritional information manually if needed.`);
                                               <ul className="space-y-1 text-xs text-gray-700">
                                                 {fatDetailItems[fatDetailState.type].map((item) => (
                                                   <li key={item.label} className="flex items-center justify-between gap-3">
-                                                    <span className="truncate">{item.label}</span>
+                                                    <span className="truncate">{formatFatDetailLabel(item.label)}</span>
                                                     <span className="font-semibold text-gray-900">
                                                       {formatMacroValue(item.grams, 'g')}
                                                     </span>
@@ -20722,7 +20736,7 @@ Please add nutritional information manually if needed.`);
                                       <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
                                         {fatDetailItems[fatDetailState.type].map((item) => (
                                           <li key={item.label} className="flex items-center justify-between gap-3">
-                                            <span className="truncate">{item.label}</span>
+                                            <span className="truncate">{formatFatDetailLabel(item.label)}</span>
                                             <span className="font-semibold text-gray-900">
                                               {formatMacroValue(item.grams, 'g')}
                                             </span>
@@ -20793,7 +20807,7 @@ Please add nutritional information manually if needed.`);
                                       <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
                                         {fatDetailItems[fatDetailState.type].map((item) => (
                                           <li key={item.label} className="flex items-center justify-between gap-3">
-                                            <span className="truncate">{item.label}</span>
+                                            <span className="truncate">{formatFatDetailLabel(item.label)}</span>
                                             <span className="font-semibold text-gray-900">
                                               {formatMacroValue(item.grams, 'g')}
                                             </span>
@@ -20820,7 +20834,7 @@ Please add nutritional information manually if needed.`);
                                       <ul className="space-y-1 text-xs text-gray-700">
                                         {fatDetailItems[fatDetailState.type].map((item) => (
                                           <li key={item.label} className="flex items-center justify-between gap-3">
-                                            <span className="truncate">{item.label}</span>
+                                            <span className="truncate">{formatFatDetailLabel(item.label)}</span>
                                             <span className="font-semibold text-gray-900">
                                               {formatMacroValue(item.grams, 'g')}
                                             </span>
