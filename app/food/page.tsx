@@ -2875,7 +2875,6 @@ export default function FoodDiary() {
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
   const [summaryRenderNonce, setSummaryRenderNonce] = useState(0)
-  const [summarySlideHeight, setSummarySlideHeight] = useState<number | null>(null)
   const [resumeTick, setResumeTick] = useState(0)
   
   // Manual food entry states
@@ -2928,8 +2927,7 @@ export default function FoodDiary() {
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const editPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const selectPhotoInputRef = useRef<HTMLInputElement | null>(null)
-  const summaryCarouselRef = useRef<HTMLDivElement | null>(null)
-  const summarySlideRefs = useRef<Array<HTMLDivElement | null>>([])
+  const summarySwipeStartRef = useRef<{ x: number; y: number } | null>(null)
   const pageTopRef = useRef<HTMLDivElement | null>(null)
   const desktopAddMenuRef = useRef<HTMLDivElement | null>(null)
   const barcodeLabelTimeoutRef = useRef<number | null>(null)
@@ -3432,26 +3430,7 @@ export default function FoodDiary() {
   useEffect(() => {
     setSummarySlideIndex(0)
     setSummaryRenderNonce((prev) => prev + 1)
-    if (!summaryCarouselRef.current) return
-    summaryCarouselRef.current.scrollTo({ left: 0, behavior: 'auto' })
   }, [selectedDate, isMobile])
-
-  useEffect(() => {
-    if (!isMobile) {
-      setSummarySlideHeight(null)
-      return
-    }
-    const node = summarySlideRefs.current[summarySlideIndex]
-    if (!node || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (!entry) return
-      const nextHeight = Math.round(entry.contentRect.height)
-      setSummarySlideHeight(nextHeight > 0 ? nextHeight : null)
-    })
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [isMobile, summarySlideIndex, summaryRenderNonce])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -20366,41 +20345,52 @@ Please add nutritional information manually if needed.`);
                             )
                           }
 
-                          const handleSummaryScroll = () => {
-                            if (!isMobile || !summaryCarouselRef.current || slides.length <= 1) return
-                            const { scrollLeft, clientWidth } = summaryCarouselRef.current
-                            if (!clientWidth) return
-                            const idx = Math.round(scrollLeft / clientWidth)
-                            const clamped = Math.max(0, Math.min(slides.length - 1, idx))
-                            setSummarySlideIndex(clamped)
+                          const totalSlides = slides.length
+                          const activeSlideIndex = Math.max(0, Math.min(summarySlideIndex, totalSlides - 1))
+                          const handleSummaryTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+                            if (!isMobile || e.touches.length === 0) return
+                            const touch = e.touches[0]
+                            summarySwipeStartRef.current = { x: touch.clientX, y: touch.clientY }
+                          }
+                          const handleSummaryTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+                            if (!isMobile || e.changedTouches.length === 0) return
+                            const start = summarySwipeStartRef.current
+                            summarySwipeStartRef.current = null
+                            if (!start) return
+                            const touch = e.changedTouches[0]
+                            const dx = touch.clientX - start.x
+                            const dy = touch.clientY - start.y
+                            if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+                            const direction = dx < 0 ? 1 : -1
+                            setSummarySlideIndex((prev) => Math.max(0, Math.min(totalSlides - 1, prev + direction)))
                           }
 
                           return (
                             <>
-                              <div
-                                ref={summaryCarouselRef}
-                                onScroll={handleSummaryScroll}
-                                style={isMobile && summarySlideHeight ? { height: summarySlideHeight } : undefined}
-                                className="flex gap-4 overflow-x-auto overflow-y-hidden snap-x snap-mandatory pb-2 scrollbar-hide md:grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0 transition-[height] duration-200"
-                              >
-                                {slides.map((slide, idx) => (
-                                  <div
-                                    key={idx}
-                                    ref={(node) => {
-                                      summarySlideRefs.current[idx] = node
-                                    }}
-                                    className="flex-shrink-0 w-full snap-center md:w-auto px-2 md:px-0"
-                                  >
-                                    {slide}
+                              {isMobile ? (
+                                <div onTouchStart={handleSummaryTouchStart} onTouchEnd={handleSummaryTouchEnd} className="w-full">
+                                  <div className="px-2">
+                                    {slides[activeSlideIndex]}
                                   </div>
-                                ))}
-                              </div>
-                              {isMobile && slides.length > 1 && (
+                                </div>
+                              ) : (
+                                <div className="grid md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px_300px] items-start gap-4">
+                                  {slides.map((slide, idx) => (
+                                    <div key={idx} className="w-full">
+                                      {slide}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {isMobile && totalSlides > 1 && (
                                 <div className="flex justify-center gap-2 mt-2">
                                   {slides.map((_, idx) => (
-                                    <span
+                                    <button
                                       key={idx}
-                                      className={`w-2 h-2 rounded-full ${summarySlideIndex === idx ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                      type="button"
+                                      onClick={() => setSummarySlideIndex(idx)}
+                                      className={`w-2 h-2 rounded-full ${activeSlideIndex === idx ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                      aria-label={`Show panel ${idx + 1}`}
                                     />
                                   ))}
                                 </div>
