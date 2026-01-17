@@ -33,6 +33,7 @@ interface VoiceChatProps {
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 type ChatThread = { id: string; title: string | null; chargedOnce: boolean; createdAt: string; updatedAt: string }
+type PhotoMode = 'inventory' | 'menu' | 'meal' | 'label'
 
 export default function VoiceChat({
   context,
@@ -52,6 +53,14 @@ export default function VoiceChat({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([])
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
+  const [photoMode, setPhotoMode] = useState<PhotoMode>('inventory')
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
+  const [barcodeStatus, setBarcodeStatus] = useState<'idle' | 'scanning' | 'loading'>('idle')
+  const [barcodeStatusHint, setBarcodeStatusHint] = useState('Ready')
+  const [barcodeError, setBarcodeError] = useState<string | null>(null)
+  const [barcodeValue, setBarcodeValue] = useState('')
+  const [showManualBarcodeInput, setShowManualBarcodeInput] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [currentThreadCharged, setCurrentThreadCharged] = useState(false)
   const [lastChargedCost, setLastChargedCost] = useState<number | null>(null)
@@ -70,6 +79,8 @@ export default function VoiceChat({
   const [deletePending, setDeletePending] = useState(false)
   const [archivedThreadIds, setArchivedThreadIds] = useState<string[]>([])
   const photoInputRef = useRef<HTMLInputElement | null>(null)
+  const barcodeVideoRef = useRef<HTMLVideoElement | null>(null)
+  const barcodeScannerRef = useRef<{ reader: any; controls: any } | null>(null)
   const [dynamicExampleQuestions, setDynamicExampleQuestions] = useState<string[] | null>(null)
   const storageKey = useMemo(() => `helfi:chat:talk:${entryContext}`, [entryContext])
   const archivedKey = useMemo(() => `helfi:chat:talk:${entryContext}:archived`, [entryContext])
@@ -257,6 +268,208 @@ export default function VoiceChat({
       console.error('Failed to load thread messages:', err)
     }
   }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await sendChatMessage(input)
+  }
+
+  const resetBarcodeState = useCallback(() => {
+    setBarcodeStatus('idle')
+    setBarcodeStatusHint('Ready')
+    setBarcodeError(null)
+    setBarcodeValue('')
+    setShowManualBarcodeInput(false)
+  }, [])
+
+  const stopBarcodeScanner = useCallback(() => {
+    const current = barcodeScannerRef.current
+    if (current?.controls?.stop) {
+      try {
+        current.controls.stop()
+      } catch {}
+    }
+    if (current?.reader?.reset) {
+      try {
+        current.reader.reset()
+      } catch {}
+    }
+    barcodeScannerRef.current = null
+    if (barcodeVideoRef.current) {
+      barcodeVideoRef.current.srcObject = null
+    }
+  }, [])
+
+  const lookupBarcodeAndAsk = useCallback(
+    async (codeRaw: string) => {
+      const normalized = String(codeRaw || '').replace(/[^0-9A-Za-z]/g, '')
+      if (!normalized) {
+        setBarcodeError('Enter a valid barcode to search.')
+        return
+      }
+      setBarcodeStatus('loading')
+      setBarcodeStatusHint('Looking up barcode…')
+      setBarcodeError(null)
+
+      try {
+        const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(normalized)}`)
+        const data = await res.json().catch(() => null)
+        if (!res.ok || !data?.found) {
+          const fallbackMessage =
+            (typeof data?.message === 'string' && data.message.trim()) ||
+            'No product found for that barcode.'
+          setBarcodeError(fallbackMessage)
+          setBarcodeStatus('scanning')
+          setBarcodeStatusHint('Scanning…')
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: `${fallbackMessage} Would you like to scan the nutrition label instead?`,
+            },
+          ])
+          return
+        }
+
+        const food = data.food || {}
+        const formatValue = (value: any) => {
+          const num = Number(value)
+          if (!Number.isFinite(num)) return null
+          return Math.round(num * 10) / 10
+        }
+        const macros = {
+          calories: formatValue(food.calories),
+          protein: formatValue(food.protein_g),
+          carbs: formatValue(food.carbs_g),
+          fat: formatValue(food.fat_g),
+          fiber: formatValue(food.fiber_g),
+          sugar: formatValue(food.sugar_g),
+        }
+        const macroLine = [
+          macros.calories != null ? `${macros.calories} kcal` : 'unknown kcal',
+          macros.protein != null ? `${macros.protein} g protein` : 'unknown protein',
+          macros.carbs != null ? `${macros.carbs} g carbs` : 'unknown carbs',
+          macros.fat != null ? `${macros.fat} g fat` : 'unknown fat',
+          macros.fiber != null ? `${macros.fiber} g fiber` : 'unknown fiber',
+          macros.sugar != null ? `${macros.sugar} g sugar` : 'unknown sugar',
+        ].join(' - ')
+
+        const itemName =
+          typeof food.name === 'string' && food.name.trim().length > 0 ? food.name.trim() : 'this item'
+        const brand =
+          typeof food.brand === 'string' && food.brand.trim().length > 0 ? food.brand.trim() : null
+        const serving =
+          typeof food.serving_size === 'string' && food.serving_size.trim().length > 0
+            ? food.serving_size.trim()
+            : null
+
+        const foodContextOverride = [
+          `Barcode item: ${brand ? `${itemName} (${brand})` : itemName}`,
+          serving ? `Serving: ${serving}` : null,
+          `Macros: ${macroLine}`,
+        ]
+          .filter(Boolean)
+          .join('\n')
+
+        const question =
+          input.trim() || `I scanned a barcode for ${itemName}. How does it fit my macros today?`
+
+        setShowBarcodeScanner(false)
+        resetBarcodeState()
+        await sendChatMessage(question, { foodContextOverride })
+      } catch (err) {
+        setBarcodeError('Barcode lookup failed. Please try again.')
+        setBarcodeStatus('idle')
+      }
+    },
+    [input, resetBarcodeState, sendChatMessage]
+  )
+
+  const handleBarcodeDetected = useCallback(
+    (rawCode: string) => {
+      const cleaned = String(rawCode || '').trim()
+      if (!cleaned) return
+      stopBarcodeScanner()
+      setBarcodeValue(cleaned)
+      lookupBarcodeAndAsk(cleaned)
+    },
+    [lookupBarcodeAndAsk, stopBarcodeScanner]
+  )
+
+  const startBarcodeScanner = useCallback(async () => {
+    setBarcodeError(null)
+    setBarcodeStatus('loading')
+    setBarcodeStatusHint('Starting camera…')
+    try {
+      stopBarcodeScanner()
+      const videoEl = barcodeVideoRef.current
+      if (!videoEl) {
+        setBarcodeError('Camera area missing. Close and reopen the scanner.')
+        setBarcodeStatusHint('Camera area missing')
+        setBarcodeStatus('idle')
+        return
+      }
+
+      videoEl.setAttribute('playsinline', 'true')
+      videoEl.muted = true
+      videoEl.autoplay = true
+      videoEl.playsInline = true
+
+      const { BrowserMultiFormatReader, BarcodeFormat } = await import('@zxing/browser')
+      const { DecodeHintType } = await import('@zxing/library')
+
+      const hints = new Map()
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.CODE_93,
+        BarcodeFormat.ITF,
+      ])
+      hints.set(DecodeHintType.TRY_HARDER, true)
+
+      const reader = new BrowserMultiFormatReader()
+      reader.setHints(hints)
+
+      const constraints: any = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      }
+
+      const controls = await reader.decodeFromConstraints(constraints, videoEl, (result: any) => {
+        const text = result?.getText ? result.getText() : result?.text
+        if (text) handleBarcodeDetected(text)
+      })
+
+      barcodeScannerRef.current = { reader, controls }
+      setBarcodeStatus('scanning')
+      setBarcodeStatusHint('Scanning…')
+    } catch (err) {
+      console.error('Barcode scanner start error', err)
+      setBarcodeError('Could not start the camera. Please allow camera access and retry.')
+      setBarcodeStatusHint('Camera start failed')
+      setBarcodeStatus('idle')
+      stopBarcodeScanner()
+    }
+  }, [handleBarcodeDetected, stopBarcodeScanner])
+
+  useEffect(() => {
+    if (showBarcodeScanner) {
+      startBarcodeScanner()
+    } else {
+      stopBarcodeScanner()
+      resetBarcodeState()
+    }
+    return () => {
+      stopBarcodeScanner()
+    }
+  }, [resetBarcodeState, showBarcodeScanner, startBarcodeScanner, stopBarcodeScanner])
 
   function handleSelectThread(threadId: string) {
     const thread = threads.find((item) => item.id === threadId)
@@ -581,6 +794,19 @@ export default function VoiceChat({
 
   const exampleDatePayload = useMemo(() => buildLocalDatePayload(), [selectedDate])
 
+  const photoModeLabel = useMemo(() => {
+    switch (photoMode) {
+      case 'menu':
+        return 'Menu photo'
+      case 'meal':
+        return 'Meal photo'
+      case 'label':
+        return 'Nutrition label photo'
+      default:
+        return 'Fridge/pantry photo'
+    }
+  }, [photoMode])
+
   useEffect(() => {
     if (!isFoodEntry) {
       setDynamicExampleQuestions(null)
@@ -613,6 +839,30 @@ export default function VoiceChat({
     photoInputRef.current?.click()
   }
 
+  const openPhotoMenu = () => {
+    if (loading || isListening) return
+    if (!isFoodEntry) {
+      openPhotoPicker()
+      return
+    }
+    setPhotoMenuOpen(true)
+  }
+
+  const selectPhotoMode = (mode: PhotoMode) => {
+    if (pendingPhotos.length > 0 && mode !== photoMode) {
+      clearPendingPhotos()
+    }
+    setPhotoMode(mode)
+    setPhotoMenuOpen(false)
+    openPhotoPicker()
+  }
+
+  const openBarcodeMenu = () => {
+    setPhotoMenuOpen(false)
+    clearPendingPhotos()
+    setShowBarcodeScanner(true)
+  }
+
   const clearPendingPhotos = () => {
     setPendingPhotos([])
     if (photoInputRef.current) {
@@ -641,7 +891,9 @@ export default function VoiceChat({
     setLastChargedCost(null)
     setLastChargedAt(null)
 
-    const photoLabel = pendingPhotos.length > 1 ? `Photo set (${pendingPhotos.length})` : 'Photo'
+    const photoLabel = pendingPhotos.length > 1
+      ? `${photoModeLabel} set (${pendingPhotos.length})`
+      : photoModeLabel
     const userMessage = note ? `${photoLabel}: ${note}` : photoLabel
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
     setInput('')
@@ -656,6 +908,7 @@ export default function VoiceChat({
     formData.append('threadId', currentThreadId || '')
     formData.append('newThread', forceNewThread ? 'true' : 'false')
     formData.append('entryContext', entryContext)
+    formData.append('photoMode', photoMode)
     formData.append('localDate', localDate)
     formData.append('tzOffsetMin', String(tzOffsetMin))
 
@@ -715,9 +968,8 @@ export default function VoiceChat({
   }
 
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const text = input.trim()
+  const sendChatMessage = async (messageText: string, options?: { foodContextOverride?: string }) => {
+    const text = messageText.trim()
     if (!text && pendingPhotos.length === 0) {
       setError('Enter a question or use voice input.')
       return
@@ -738,6 +990,7 @@ export default function VoiceChat({
       const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }]
       setMessages(nextMessages)
       setInput('')
+      const foodContextOverride = options?.foodContextOverride?.trim()
 
       if (onCostEstimate) onCostEstimate(estimatedCost)
 
@@ -757,6 +1010,7 @@ export default function VoiceChat({
           entryContext,
           localDate,
           tzOffsetMin,
+          ...(foodContextOverride ? { foodContextOverride } : {}),
           ...context,
         }),
       })
@@ -1421,8 +1675,8 @@ export default function VoiceChat({
                           <ul className="mt-3 space-y-2 text-[15px] md:text-[13px] text-gray-600">
                             <li>Uses your current Food Diary totals to spot macro gaps.</li>
                             <li>Suggests what to eat right now based on what you are missing.</li>
-                            <li>Upload a menu, fridge, or pantry photo to get ideas from what you have.</li>
-                            <li>Photo analysis costs an extra 10 credits per image.</li>
+                            <li>Upload a menu, meal, fridge, pantry, or nutrition label photo.</li>
+                            <li>Photo analysis costs an extra 10 credits per image. Barcode scans cost 3 credits.</li>
                           </ul>
                         ) : (
                           <ul className="mt-3 space-y-2 text-[15px] md:text-[13px] text-gray-600">
@@ -1554,8 +1808,9 @@ export default function VoiceChat({
                   <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[14px] md:text-[12px] text-amber-800">
                     <div className="flex items-center justify-between gap-2">
                       <span>
-                        {pendingPhotos.length} photo{pendingPhotos.length > 1 ? 's' : ''} selected
-                        {' '} (adds {PHOTO_ANALYSIS_COST_CREDITS * pendingPhotos.length} credits)
+                        {pendingPhotos.length} {photoModeLabel}
+                        {pendingPhotos.length > 1 ? 's' : ''} selected (adds{' '}
+                        {PHOTO_ANALYSIS_COST_CREDITS * pendingPhotos.length} credits)
                       </span>
                       <button
                         type="button"
@@ -1592,10 +1847,10 @@ export default function VoiceChat({
                 <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={openPhotoPicker}
+                    onClick={openPhotoMenu}
                     disabled={loading || isListening}
                     className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
-                    aria-label="Add menu, fridge, or pantry photo"
+                    aria-label="Add photo or scan barcode"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 20 }}>photo_camera</span>
                   </button>
@@ -1632,6 +1887,128 @@ export default function VoiceChat({
           </div>
         </section>
       </div>
+
+      {photoMenuOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setPhotoMenuOpen(false)}
+            aria-label="Close photo menu"
+          />
+          <div className="relative w-full max-w-none sm:max-w-md bg-white rounded-t-3xl shadow-2xl pb-3">
+            <div className="px-4 py-3 border-b border-gray-200">
+              <div className="text-base font-semibold text-gray-900">Add a photo</div>
+              <div className="text-xs text-gray-500 mt-1">Choose what you want the photo to represent.</div>
+            </div>
+            <div className="px-3 py-4">
+              <button
+                type="button"
+                onClick={() => selectPhotoMode('menu')}
+                className="w-full flex items-center justify-between px-6 py-4 text-left text-base text-gray-900 hover:bg-gray-50 rounded-xl"
+              >
+                Menu photo
+                <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 24 }}>restaurant</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => selectPhotoMode('meal')}
+                className="w-full flex items-center justify-between px-6 py-4 text-left text-base text-gray-900 hover:bg-gray-50 rounded-xl"
+              >
+                Meal photo
+                <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 24 }}>lunch_dining</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => selectPhotoMode('inventory')}
+                className="w-full flex items-center justify-between px-6 py-4 text-left text-base text-gray-900 hover:bg-gray-50 rounded-xl"
+              >
+                Fridge or pantry photo
+                <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 24 }}>kitchen</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => selectPhotoMode('label')}
+                className="w-full flex items-center justify-between px-6 py-4 text-left text-base text-gray-900 hover:bg-gray-50 rounded-xl"
+              >
+                Nutrition label photo
+                <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 24 }}>fact_check</span>
+              </button>
+              <button
+                type="button"
+                onClick={openBarcodeMenu}
+                className="w-full flex items-center justify-between px-6 py-4 text-left text-base text-gray-900 hover:bg-gray-50 rounded-xl"
+              >
+                Scan barcode
+                <span className="material-symbols-outlined text-gray-500" style={{ fontSize: 24 }}>qr_code_scanner</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBarcodeScanner && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setShowBarcodeScanner(false)}
+            aria-label="Close barcode scanner"
+          />
+          <div className="relative w-full max-w-none sm:max-w-md bg-white rounded-t-3xl shadow-2xl pb-4">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <div className="text-base font-semibold text-gray-900">Scan barcode</div>
+              <button
+                type="button"
+                onClick={() => setShowBarcodeScanner(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-gray-100"
+                aria-label="Close barcode scanner"
+              >
+                <span className="material-symbols-outlined text-xl text-gray-700">close</span>
+              </button>
+            </div>
+            <div className="px-4 py-4 space-y-4">
+              <div className="rounded-2xl overflow-hidden bg-black">
+                <video ref={barcodeVideoRef} className="h-[320px] w-full object-cover" />
+              </div>
+              <div className="text-sm text-gray-600">{barcodeStatusHint}</div>
+              {barcodeError && <div className="text-sm text-red-600">{barcodeError}</div>}
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowManualBarcodeInput((prev) => !prev)}
+                  className="self-start rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  {showManualBarcodeInput ? 'Hide barcode input' : 'Type barcode instead'}
+                </button>
+                {showManualBarcodeInput && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={barcodeValue}
+                      onChange={(event) => setBarcodeValue(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          lookupBarcodeAndAsk(barcodeValue)
+                        }
+                      }}
+                      placeholder="Enter barcode"
+                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#10a27e]/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => lookupBarcodeAndAsk(barcodeValue)}
+                      className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+                    >
+                      Search
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {threadsOpen && (
         <div className="fixed inset-0 z-[9999] lg:hidden">

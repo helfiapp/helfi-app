@@ -26,6 +26,7 @@ const VOICE_CHAT_COST_CENTS = 10
 const FRIDGE_PHOTO_COST_CENTS = 10
 const MAX_DETECTED_ITEMS = 20
 const MAX_LOOKUP_ITEMS = 12
+const PHOTO_MODES = new Set(['menu', 'inventory', 'meal', 'label'])
 
 const isValidDateString = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
 
@@ -54,6 +55,19 @@ const parseJsonRelaxed = (raw: string): any | null => {
       return null
     }
   }
+}
+
+const normalizePhotoMode = (value: string) => {
+  const mode = String(value || '').trim().toLowerCase()
+  return PHOTO_MODES.has(mode) ? mode : 'inventory'
+}
+
+const toNumber = (value: any) => {
+  if (value === null || value === undefined) return null
+  const raw = String(value).trim()
+  if (!raw) return null
+  const numeric = Number(raw.replace(/[^0-9.+-]/g, ''))
+  return Number.isFinite(numeric) ? numeric : null
 }
 
 const describeMacro = (value: number | null) =>
@@ -102,6 +116,7 @@ export async function POST(req: NextRequest) {
     }
 
     const note = readFormString(form, 'message')
+    const photoMode = normalizePhotoMode(readFormString(form, 'photoMode'))
     const incomingThreadId = readFormString(form, 'threadId')
     const forceNewThread = readFormString(form, 'newThread') === 'true'
     const chatContext = normalizeChatContext(readFormString(form, 'entryContext') || readFormString(form, 'context'))
@@ -212,15 +227,248 @@ export async function POST(req: NextRequest) {
       image_url: { url: `data:${file.type};base64,${imageBase64List[idx]}`, detail: 'high' },
     }))
 
+    if (photoMode === 'label') {
+      const labelVision = await chatCompletionWithCost(openai, {
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a nutrition label extractor. Read the nutrition label in the photo(s) and return JSON only. ' +
+              'If the label is unclear or missing, return {"status":"unclear","reason":"short reason"}. ' +
+              'Otherwise return {"status":"ok","name":"string","brand":"string|null","serving_size":"string|null",' +
+              '"per_serving":{"calories":number|null,"protein_g":number|null,"carbs_g":number|null,' +
+              '"fat_g":number|null,"fiber_g":number|null,"sugar_g":number|null}}. ' +
+              'Use numbers only (no units).',
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Extract nutrition label data from these images.' },
+              ...imageParts,
+            ],
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.1,
+      } as any)
+
+      const labelText = labelVision.completion.choices?.[0]?.message?.content || ''
+      const labelParsed = parseJsonRelaxed(labelText)
+      const labelStatus =
+        typeof labelParsed?.status === 'string' ? labelParsed.status.trim().toLowerCase() : ''
+      const labelName = typeof labelParsed?.name === 'string' ? labelParsed.name.trim() : 'Nutrition label'
+      const labelBrand = typeof labelParsed?.brand === 'string' ? labelParsed.brand.trim() : null
+      const labelServingSize =
+        typeof labelParsed?.serving_size === 'string' ? labelParsed.serving_size.trim() : null
+      const perServing =
+        (labelParsed?.per_serving && typeof labelParsed.per_serving === 'object'
+          ? labelParsed.per_serving
+          : null) || {}
+
+      const labelMacros = {
+        calories: describeMacro(toNumber(perServing?.calories ?? perServing?.kcal ?? perServing?.energy_kcal)),
+        protein_g: describeMacro(toNumber(perServing?.protein_g ?? perServing?.protein)),
+        carbs_g: describeMacro(toNumber(perServing?.carbs_g ?? perServing?.carbs ?? perServing?.carbohydrates)),
+        fat_g: describeMacro(toNumber(perServing?.fat_g ?? perServing?.fat ?? perServing?.total_fat)),
+        fiber_g: describeMacro(toNumber(perServing?.fiber_g ?? perServing?.fibre_g ?? perServing?.fiber)),
+        sugar_g: describeMacro(toNumber(perServing?.sugar_g ?? perServing?.sugars ?? perServing?.sugar)),
+      }
+
+      const hasLabelMacros = Object.values(labelMacros).some(
+        (value) => typeof value === 'number' && Number.isFinite(value) && value > 0
+      )
+
+      if (labelStatus === 'unclear' || !hasLabelMacros) {
+        const assistantMessage =
+          'I could not read the nutrition label clearly. Please upload a clearer label photo ' +
+          '(straight on, good light), or use the barcode scan option.'
+        const userMessage = note ? `Nutrition label photo: ${note}` : 'Nutrition label photo'
+
+        await appendMessage(threadId, 'user', userMessage)
+        await appendMessage(threadId, 'assistant', assistantMessage)
+
+        const threads = await listThreads(session.user.id, chatContext)
+        const currentThread = threads.find((thread) => thread.id === threadId)
+        if (currentThread && !currentThread.title) {
+          await updateThreadTitle(threadId, 'Nutrition label photo')
+        }
+
+        try {
+          await logAIUsage({
+            context: { feature: 'voice:label-photo:vision', userId: user.id },
+            model: 'gpt-4o',
+            promptTokens: labelVision.promptTokens,
+            completionTokens: labelVision.completionTokens,
+            costCents: labelVision.costCents,
+          })
+        } catch {}
+
+        return NextResponse.json({
+          assistant: assistantMessage,
+          threadId,
+          chargedCents: totalChargeCents,
+          chargedChat: shouldChargeChat,
+          chargedPhoto: FRIDGE_PHOTO_COST_CENTS * imageFiles.length,
+        })
+      }
+
+      const labelPrompt = [
+        'You are Helfi, a food and macro coach.',
+        'Use the FOOD DIARY SNAPSHOT and LABEL DATA to answer the user.',
+        'If the user asked a question, answer it directly. If they did not, explain how this item fits today.',
+        'Always include the macros for one serving and the updated daily totals after eating one serving.',
+        'If something is unknown, say "unknown". If estimated, say "approximate".',
+        'Keep the response concise and easy to scan.',
+        '',
+        'Use this exact format:',
+        'Label item: ...',
+        'Macros: kcal - protein g - carbs g - fat g - fiber g - sugar g',
+        'After eating: ...',
+      ].join('\n')
+
+      const assistantModel = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
+      const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o'
+
+      let assistantResult = await chatCompletionWithCost(openai, {
+        model: assistantModel,
+        messages: [
+          { role: 'system', content: labelPrompt },
+          {
+            role: 'user',
+            content: [
+              'FOOD DIARY SNAPSHOT (JSON):',
+              JSON.stringify(foodDiarySnapshot || null),
+              '',
+              'LABEL DATA (JSON):',
+              JSON.stringify(
+                {
+                  name: labelName,
+                  brand: labelBrand,
+                  serving_size: labelServingSize,
+                  per_serving: labelMacros,
+                },
+                null,
+                2
+              ),
+              '',
+              note ? `User question: ${note}` : 'User question: (none)',
+            ].join('\n'),
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.2,
+      } as any)
+
+      let assistantMessage = extractAssistantContent(assistantResult.completion.choices?.[0]?.message)
+      let usedModel = assistantModel
+      if (!assistantMessage) {
+        const retry = await chatCompletionWithCost(openai, {
+          model: fallbackModel,
+          messages: [
+            { role: 'system', content: labelPrompt },
+            {
+              role: 'user',
+              content: [
+                'FOOD DIARY SNAPSHOT (JSON):',
+                JSON.stringify(foodDiarySnapshot || null),
+                '',
+                'LABEL DATA (JSON):',
+                JSON.stringify(
+                  {
+                    name: labelName,
+                    brand: labelBrand,
+                    serving_size: labelServingSize,
+                    per_serving: labelMacros,
+                  },
+                  null,
+                  2
+                ),
+                '',
+                note ? `User question: ${note}` : 'User question: (none)',
+              ].join('\n'),
+            },
+          ],
+          max_tokens: 500,
+          temperature: 0.2,
+        } as any)
+        const retryMessage = extractAssistantContent(retry.completion.choices?.[0]?.message)
+        if (retryMessage) {
+          assistantResult = retry
+          assistantMessage = retryMessage
+          usedModel = fallbackModel
+        }
+      }
+      if (!assistantMessage) {
+        assistantMessage = 'I could not generate a response from the label.'
+      }
+
+      const userMessage = note ? `Nutrition label photo: ${note}` : 'Nutrition label photo'
+
+      await appendMessage(threadId, 'user', userMessage)
+      await appendMessage(threadId, 'assistant', assistantMessage)
+
+      const labelSummaryParts = [
+        `Label item: ${labelName}`,
+        labelBrand ? `Brand: ${labelBrand}` : null,
+        labelServingSize ? `Serving: ${labelServingSize}` : null,
+        `Macros: ${[
+          labelMacros.calories != null ? `${labelMacros.calories} kcal` : 'unknown kcal',
+          labelMacros.protein_g != null ? `${labelMacros.protein_g} g protein` : 'unknown protein',
+          labelMacros.carbs_g != null ? `${labelMacros.carbs_g} g carbs` : 'unknown carbs',
+          labelMacros.fat_g != null ? `${labelMacros.fat_g} g fat` : 'unknown fat',
+          labelMacros.fiber_g != null ? `${labelMacros.fiber_g} g fiber` : 'unknown fiber',
+          labelMacros.sugar_g != null ? `${labelMacros.sugar_g} g sugar` : 'unknown sugar',
+        ].join(' - ')}`,
+      ].filter(Boolean)
+      await updateThreadFoodContext(threadId, labelSummaryParts.join('\n').slice(0, 1200))
+
+      const threads = await listThreads(session.user.id, chatContext)
+      const currentThread = threads.find((thread) => thread.id === threadId)
+      if (currentThread && !currentThread.title) {
+        await updateThreadTitle(threadId, 'Nutrition label photo')
+      }
+
+      try {
+        await logAIUsage({
+          context: { feature: 'voice:label-photo:vision', userId: user.id },
+          model: 'gpt-4o',
+          promptTokens: labelVision.promptTokens,
+          completionTokens: labelVision.completionTokens,
+          costCents: labelVision.costCents,
+        })
+      } catch {}
+
+      try {
+        await logAIUsage({
+          context: { feature: 'voice:label-photo:suggestions', userId: user.id },
+          model: usedModel,
+          promptTokens: assistantResult.promptTokens,
+          completionTokens: assistantResult.completionTokens,
+          costCents: assistantResult.costCents,
+        })
+      } catch {}
+
+      return NextResponse.json({
+        assistant: assistantMessage,
+        threadId,
+        chargedCents: totalChargeCents,
+        chargedChat: shouldChargeChat,
+        chargedPhoto: FRIDGE_PHOTO_COST_CENTS * imageFiles.length,
+      })
+    }
+
     const vision = await chatCompletionWithCost(openai, {
       model: 'gpt-4o',
       messages: [
         {
           role: 'system',
           content:
-            'You are a food photo extractor. If the photo is a cafe menu, read the menu and list the menu items. ' +
-            'If the photo is a fridge/pantry/cupboard, list the foods you can clearly see. ' +
-            `Return JSON only with this exact shape: {"type":"menu|inventory","items":[{"name":"string"}]}. ` +
+            `You are a food photo extractor. The photo mode is "${photoMode}". ` +
+            'If the mode is "menu", read the menu and list the menu items. ' +
+            'If the mode is "meal", list the meal items you can clearly see. ' +
+            'If the mode is "inventory", list the foods you can clearly see in a fridge/pantry/cupboard. ' +
+            `Return JSON only with this exact shape: {"type":"menu|inventory|meal","items":[{"name":"string"}]}. ` +
             'List clear, human-friendly item names (e.g., "croissant", "eggs", "chicken breast", "Greek yogurt"). ' +
             `Include as many obvious items as possible, up to ${MAX_DETECTED_ITEMS}. If nothing edible is visible, return {"type":"inventory","items": []}.`,
         },
@@ -239,7 +487,8 @@ export async function POST(req: NextRequest) {
     const visionText = vision.completion.choices?.[0]?.message?.content || ''
     const parsed = parseJsonRelaxed(visionText)
     const parsedTypeRaw = typeof parsed?.type === 'string' ? parsed.type.trim().toLowerCase() : ''
-    const parsedType = parsedTypeRaw === 'menu' ? 'menu' : 'inventory'
+    const defaultType = photoMode === 'menu' ? 'menu' : photoMode === 'meal' ? 'meal' : 'inventory'
+    const parsedType = parsedTypeRaw === 'menu' || parsedTypeRaw === 'meal' ? parsedTypeRaw : defaultType
     const rawItems = Array.isArray(parsed?.items) ? parsed.items : []
     const items = rawItems
       .map((item: any) => String(item?.name || '').trim())
@@ -354,20 +603,28 @@ export async function POST(req: NextRequest) {
       assistantMessage = 'I could not generate suggestions from the photo.'
     }
 
-    const photoLabel = imageFiles.length > 1 ? `Photo set (${imageFiles.length})` : 'Photo'
+    const baseLabel =
+      photoMode === 'menu'
+        ? 'Menu photo'
+        : photoMode === 'meal'
+        ? 'Meal photo'
+        : photoMode === 'label'
+        ? 'Nutrition label photo'
+        : 'Fridge/pantry photo'
+    const photoLabel = imageFiles.length > 1 ? `${baseLabel} set (${imageFiles.length})` : baseLabel
     const userMessage = note ? `${photoLabel}: ${note}` : photoLabel
 
     await appendMessage(threadId, 'user', userMessage)
     await appendMessage(threadId, 'assistant', assistantMessage)
-    const contextSummary = items.length > 0
-      ? `${parsedType === 'menu' ? 'Menu items' : 'Photo items'}: ${items.join(', ')}`
-      : null
+    const contextLabel = parsedType === 'menu' ? 'Menu items' : parsedType === 'meal' ? 'Meal items' : 'Photo items'
+    const contextSummary = items.length > 0 ? `${contextLabel}: ${items.join(', ')}` : null
     await updateThreadFoodContext(threadId, contextSummary ? contextSummary.slice(0, 1200) : null)
 
     const threads = await listThreads(session.user.id, chatContext)
     const currentThread = threads.find((thread) => thread.id === threadId)
     if (currentThread && !currentThread.title) {
-      await updateThreadTitle(threadId, parsedType === 'menu' ? 'Menu photo' : 'Food photo')
+      const nextTitle = parsedType === 'menu' ? 'Menu photo' : parsedType === 'meal' ? 'Meal photo' : 'Food photo'
+      await updateThreadTitle(threadId, nextTitle)
     }
 
     try {
