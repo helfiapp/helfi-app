@@ -20313,6 +20313,20 @@ Please add nutritional information manually if needed.`);
                   'takeout',
                 ]
 
+                const expandFatKeywords = (keywords: string[]) => {
+                  const expanded = new Set<string>()
+                  keywords.forEach((value) => {
+                    const raw = String(value || '').trim()
+                    if (!raw) return
+                    expanded.add(raw)
+                    const withoutParens = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
+                    if (withoutParens && withoutParens !== raw) {
+                      expanded.add(withoutParens)
+                    }
+                  })
+                  return Array.from(expanded)
+                }
+
                 const hasCsvFatList =
                   Boolean(fatFoodList?.good?.length) ||
                   Boolean(fatFoodList?.bad?.length) ||
@@ -20407,20 +20421,6 @@ Please add nutritional information manually if needed.`);
                   }
                   if (token === 'yoghurt') return 'yogurt'
                   return token
-                }
-
-                const expandFatKeywords = (keywords: string[]) => {
-                  const expanded = new Set<string>()
-                  keywords.forEach((value) => {
-                    const raw = String(value || '').trim()
-                    if (!raw) return
-                    expanded.add(raw)
-                    const withoutParens = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
-                    if (withoutParens && withoutParens !== raw) {
-                      expanded.add(withoutParens)
-                    }
-                  })
-                  return Array.from(expanded)
                 }
 
                 const matchesFatKeywords = (label: any, keywords: string[]) => {
