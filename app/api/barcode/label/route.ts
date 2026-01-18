@@ -9,6 +9,17 @@ const toNumber = (value: any): number | null => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const convertKjToKcal = (kj: number | null): number | null => {
+  if (!Number.isFinite(Number(kj)) || Number(kj) <= 0) return null
+  return Number(kj) / 4.184
+}
+
+const deriveCaloriesFromMacros = (protein: number | null, carbs: number | null, fat: number | null): number | null => {
+  const safe = (value: number | null) => (Number.isFinite(Number(value)) ? Number(value) : 0)
+  const computed = safe(protein) * 4 + safe(carbs) * 4 + safe(fat) * 9
+  return computed > 0 ? computed : null
+}
+
 const normalizeText = (value: any): string | null => {
   if (value === null || value === undefined) return null
   const trimmed = String(value).trim()
@@ -92,12 +103,19 @@ export async function POST(req: NextRequest) {
     const rawServingSize = normalizeText(item?.serving_size || item?.servingSize)
     const servingSize = rawServingSize ? stripNutritionFromServingSize(rawServingSize) : null
 
-    const calories = toNumber(item?.calories)
+    const caloriesRaw = toNumber(item?.calories)
     const proteinG = toNumber(item?.protein_g ?? item?.proteinG)
     const carbsG = toNumber(item?.carbs_g ?? item?.carbsG)
     const fatG = toNumber(item?.fat_g ?? item?.fatG)
     const fiberG = toNumber(item?.fiber_g ?? item?.fiberG)
     const sugarG = toNumber(item?.sugar_g ?? item?.sugarG)
+    const energyKj = toNumber(item?.energy_kj ?? item?.energyKj ?? item?.kilojoules ?? item?.kj)
+    const caloriesFromKj = convertKjToKcal(energyKj)
+    const caloriesFromMacros = deriveCaloriesFromMacros(proteinG, carbsG, fatG)
+    const calories =
+      (Number.isFinite(Number(caloriesRaw)) && Number(caloriesRaw) > 0 ? caloriesRaw : null) ||
+      caloriesFromKj ||
+      caloriesFromMacros
     const quantityG = toNumber(item?.quantity_g ?? item?.quantityG)
     const piecesPerServing = toNumber(item?.piecesPerServing ?? item?.pieces_per_serving)
 

@@ -78,6 +78,17 @@ const toNumber = (value: any) => {
   return Number.isFinite(numeric) ? numeric : null
 }
 
+const convertKjToKcal = (kj: number | null) => {
+  if (!Number.isFinite(Number(kj)) || Number(kj) <= 0) return null
+  return (Number(kj) / 4.184)
+}
+
+const deriveCaloriesFromMacros = (protein: number | null, carbs: number | null, fat: number | null) => {
+  const safe = (value: number | null) => (Number.isFinite(Number(value)) ? Number(value) : 0)
+  const computed = safe(protein) * 4 + safe(carbs) * 4 + safe(fat) * 9
+  return computed > 0 ? computed : null
+}
+
 const describeMacro = (value: number | null) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.round(value * 10) / 10 : null
 
@@ -277,13 +288,29 @@ export async function POST(req: NextRequest) {
           ? labelParsed.per_serving
           : null) || {}
 
+      const proteinValue = toNumber(perServing?.protein_g ?? perServing?.protein)
+      const carbsValue = toNumber(perServing?.carbs_g ?? perServing?.carbs ?? perServing?.carbohydrates)
+      const fatValue = toNumber(perServing?.fat_g ?? perServing?.fat ?? perServing?.total_fat)
+      const fiberValue = toNumber(perServing?.fiber_g ?? perServing?.fibre_g ?? perServing?.fiber)
+      const sugarValue = toNumber(perServing?.sugar_g ?? perServing?.sugars ?? perServing?.sugar)
+      const energyKjValue = toNumber(perServing?.energy_kj ?? perServing?.kj ?? perServing?.kilojoules)
+      const caloriesValue = toNumber(perServing?.calories ?? perServing?.kcal ?? perServing?.energy_kcal)
+      const caloriesFromKj = convertKjToKcal(energyKjValue)
+      const caloriesFromMacros = deriveCaloriesFromMacros(proteinValue, carbsValue, fatValue)
+      const resolvedCalories =
+        (Number.isFinite(Number(caloriesValue)) && Number(caloriesValue) > 0
+          ? caloriesValue
+          : null) ||
+        caloriesFromKj ||
+        caloriesFromMacros
+
       const labelMacros = {
-        calories: describeMacro(toNumber(perServing?.calories ?? perServing?.kcal ?? perServing?.energy_kcal)),
-        protein_g: describeMacro(toNumber(perServing?.protein_g ?? perServing?.protein)),
-        carbs_g: describeMacro(toNumber(perServing?.carbs_g ?? perServing?.carbs ?? perServing?.carbohydrates)),
-        fat_g: describeMacro(toNumber(perServing?.fat_g ?? perServing?.fat ?? perServing?.total_fat)),
-        fiber_g: describeMacro(toNumber(perServing?.fiber_g ?? perServing?.fibre_g ?? perServing?.fiber)),
-        sugar_g: describeMacro(toNumber(perServing?.sugar_g ?? perServing?.sugars ?? perServing?.sugar)),
+        calories: describeMacro(resolvedCalories),
+        protein_g: describeMacro(proteinValue),
+        carbs_g: describeMacro(carbsValue),
+        fat_g: describeMacro(fatValue),
+        fiber_g: describeMacro(fiberValue),
+        sugar_g: describeMacro(sugarValue),
       }
 
       const hasLabelMacros = Object.values(labelMacros).some(
