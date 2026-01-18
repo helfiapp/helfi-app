@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import type { WeeklyReportRecord } from '@/lib/weekly-health-report'
 
@@ -58,6 +59,9 @@ function formatMl(value: number | null | undefined) {
 
 export default function WeeklyReportClient({ report, reports, nextReportDueAt }: WeeklyReportClientProps) {
   const [activeTab, setActiveTab] = useState<SectionKey>('overview')
+  const router = useRouter()
+  const [manualStatus, setManualStatus] = useState<'idle' | 'running' | 'error'>('idle')
+  const [manualMessage, setManualMessage] = useState<string | null>(null)
 
   const payload = useMemo(() => {
     if (!report || !report.report) return null
@@ -134,10 +138,49 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
         previousDate?: string
       }>
     | undefined
+  const llmUsage = (parsedSummary as any)?.llmUsage as
+    | { costCents?: number; model?: string }
+    | undefined
+  const estimatedCost =
+    llmUsage?.costCents != null && Number.isFinite(Number(llmUsage.costCents))
+      ? (Number(llmUsage.costCents) / 100).toFixed(2)
+      : null
   const pdfHref = useMemo(() => {
     if (!report?.id) return null
     return `/api/reports/weekly/pdf?reportId=${encodeURIComponent(report.id)}`
   }, [report])
+
+  const runManualReport = async () => {
+    if (manualStatus === 'running') return
+    setManualStatus('running')
+    setManualMessage(null)
+    let navigated = false
+    try {
+      const res = await fetch('/api/reports/weekly/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triggerSource: 'manual' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to start report')
+      }
+      if (data?.reportId) {
+        navigated = true
+        window.location.href = `/insights/weekly-report?id=${encodeURIComponent(data.reportId)}`
+        return
+      }
+      router.refresh()
+    } catch {
+      setManualStatus('error')
+      setManualMessage('Could not start the report. Please try again in a moment.')
+      return
+    } finally {
+      if (!navigated) {
+        setManualStatus('idle')
+      }
+    }
+  }
 
   if (!report) {
     return (
@@ -160,6 +203,16 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
           >
             Download PDF (current data)
           </a>
+          <button
+            onClick={runManualReport}
+            disabled={manualStatus === 'running'}
+            className="inline-flex mt-4 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
+          >
+            {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
+          </button>
+          {manualMessage && (
+            <p className="text-sm text-red-600 mt-3">{manualMessage}</p>
+          )}
           <Link
             href="/insights"
             className="inline-flex mt-6 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
@@ -228,6 +281,16 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
           <p className="text-sm text-gray-600 mt-2">
             We could not generate this report. Please try again later.
           </p>
+          <button
+            onClick={runManualReport}
+            disabled={manualStatus === 'running'}
+            className="inline-flex mt-4 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
+          >
+            {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
+          </button>
+          {manualMessage && (
+            <p className="text-sm text-red-600 mt-3">{manualMessage}</p>
+          )}
           <Link
             href="/insights"
             className="inline-flex mt-6 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
@@ -269,11 +332,18 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            {pdfHref && (
-              <a
-                href={pdfHref}
-                target="_blank"
-                rel="noreferrer"
+            <button
+              onClick={runManualReport}
+              disabled={manualStatus === 'running'}
+              className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
+            >
+              {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
+            </button>
+          {pdfHref && (
+            <a
+              href={pdfHref}
+              target="_blank"
+              rel="noreferrer"
                 className="inline-flex items-center rounded-lg border border-helfi-green px-4 py-2 text-sm font-medium text-helfi-green hover:bg-helfi-green/10"
               >
                 Download PDF
@@ -287,6 +357,12 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
             </Link>
           </div>
         </div>
+
+        {manualMessage && (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {manualMessage}
+          </div>
+        )}
 
         {dataWarning && (
           <div className="mt-6 rounded-2xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
@@ -358,6 +434,11 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Weekly summary</h2>
           <p className="text-sm text-gray-600 mt-2">{report.summary || payload?.summary || 'Summary coming soon.'}</p>
+          {estimatedCost && (
+            <p className="text-xs text-gray-500 mt-2">
+              Estimated AI cost for this report: ${estimatedCost}
+            </p>
+          )}
         </div>
 
         {talkToAiSummary?.userMessageCount ? (

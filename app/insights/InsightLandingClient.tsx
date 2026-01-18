@@ -295,77 +295,74 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   </p>
                 )}
               </div>
-              {!weeklyStatus?.reportReady &&
-                !weeklyStatus?.reportLocked &&
-                weeklyStatus?.nextReportDueAt &&
-                countdown && (
-                  <div className="space-y-4">
-                    <div className="flex items-end justify-between">
-                      <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                        Current cycle progress
+              {weeklyStatus?.nextReportDueAt && countdown && (
+                <div className="space-y-4">
+                  <div className="flex items-end justify-between">
+                    <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                      Current cycle progress
+                    </span>
+                    <span className="text-sm font-bold text-emerald-600">{countdown.percent}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full shadow-[0_0_12px_rgba(77,175,80,0.6)] transition-all duration-500"
+                      style={{ width: `${countdown.percent}%`, backgroundColor: '#4DAF50' }}
+                    ></div>
+                  </div>
+                  {(isReportRunning || countdown.dueNow) && (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                      Your report is being prepared now. Check back soon.
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <span className="flex h-2 w-2 relative">
+                        <span
+                          className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                          style={{ backgroundColor: '#4DAF50' }}
+                        ></span>
+                        <span
+                          className="relative inline-flex rounded-full h-2 w-2"
+                          style={{ backgroundColor: '#4DAF50' }}
+                        ></span>
                       </span>
-                      <span className="text-sm font-bold text-emerald-600">{countdown.percent}%</span>
+                      <span>
+                        Next report due{' '}
+                        <span className="text-gray-900 font-semibold ml-1">{dueDateLabel}</span>
+                      </span>
                     </div>
-                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full shadow-[0_0_12px_rgba(77,175,80,0.6)] transition-all duration-500"
-                        style={{ width: `${countdown.percent}%`, backgroundColor: '#4DAF50' }}
-                      ></div>
-                    </div>
-                    {(isReportRunning || countdown.dueNow) && (
-                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                        Your report is being prepared now. Check back soon.
-                      </div>
-                    )}
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <span className="flex h-2 w-2 relative">
-                          <span
-                            className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                            style={{ backgroundColor: '#4DAF50' }}
-                          ></span>
-                          <span
-                            className="relative inline-flex rounded-full h-2 w-2"
-                            style={{ backgroundColor: '#4DAF50' }}
-                          ></span>
+                    <div className="flex items-center gap-4 bg-gray-50 rounded-xl px-4 py-2 border border-gray-100">
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold text-gray-900 tabular-nums leading-none">
+                          {padTime(countdown.days)}
                         </span>
-                        <span>
-                          Next report due{' '}
-                          <span className="text-gray-900 font-semibold ml-1">{dueDateLabel}</span>
-                        </span>
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Days</span>
                       </div>
-                      <div className="flex items-center gap-4 bg-gray-50 rounded-xl px-4 py-2 border border-gray-100">
-                        <div className="flex flex-col items-center">
-                          <span className="text-xl font-bold text-gray-900 tabular-nums leading-none">
-                            {padTime(countdown.days)}
-                          </span>
-                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Days</span>
-                        </div>
-                        <div className="w-px h-6 bg-gray-200"></div>
-                        <div className="flex flex-col items-center">
-                          <span className="text-xl font-bold text-gray-900 tabular-nums leading-none">
-                            {padTime(countdown.hours)}
-                          </span>
-                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Hours</span>
-                        </div>
-                        <div className="w-px h-6 bg-gray-200"></div>
-                        <div className="flex flex-col items-center">
-                          <span className="text-xl font-bold text-gray-900 tabular-nums leading-none">
-                            {padTime(countdown.minutes)}
-                          </span>
-                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Mins</span>
-                        </div>
-                        <div className="w-px h-6 bg-gray-200"></div>
-                        <div className="flex flex-col items-center">
-                          <span className="text-xl font-bold text-gray-900 tabular-nums leading-none">
-                            {padTime(countdown.seconds)}
-                          </span>
-                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Secs</span>
-                        </div>
+                      <div className="w-px h-6 bg-gray-200"></div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold text-gray-900 tabular-nums leading-none">
+                          {padTime(countdown.hours)}
+                        </span>
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Hours</span>
+                      </div>
+                      <div className="w-px h-6 bg-gray-200"></div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold text-gray-900 tabular-nums leading-none">
+                          {padTime(countdown.minutes)}
+                        </span>
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Mins</span>
+                      </div>
+                      <div className="w-px h-6 bg-gray-200"></div>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl font-bold text-gray-900 tabular-nums leading-none">
+                          {padTime(countdown.seconds)}
+                        </span>
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">Secs</span>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
             </div>
             <div className="flex gap-3">
               {weeklyStatus?.reportReady ? (
@@ -390,7 +387,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   Edit Health Setup (optional)
                 </Link>
               )}
-              {!weeklyStatus?.reportReady && (
+              <div className="flex flex-col items-end gap-2">
                 <button
                   type="button"
                   onClick={handleCreateReportNow}
@@ -399,7 +396,8 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                 >
                   {isCreatingReport || isReportRunning ? 'Creating report...' : 'Create report now'}
                 </button>
-              )}
+                <span className="text-xs text-gray-400">Makes a fresh report from your last 7 days.</span>
+              </div>
             </div>
           </div>
           {createReportMessage && (
