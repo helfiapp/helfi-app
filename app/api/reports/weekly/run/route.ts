@@ -1942,13 +1942,18 @@ JSON data:
 ${JSON.stringify(reportContext)}
 `
 
-      const { completion, costCents, promptTokens, completionTokens } = await chatCompletionWithCost(openai, {
+      const isGpt5 = model.toLowerCase().includes('gpt-5')
+      const request: any = {
         model,
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
         max_tokens: 2200,
         response_format: { type: 'json_object' },
-      } as any)
+      }
+      if (!isGpt5) {
+        request.temperature = 0.2
+      }
+
+      const { completion, costCents, promptTokens, completionTokens } = await chatCompletionWithCost(openai, request)
 
       llmUsage = {
         promptTokens,
