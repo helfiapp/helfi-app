@@ -20317,9 +20317,9 @@ Please add nutritional information manually if needed.`);
                   Boolean(fatFoodList?.good?.length) ||
                   Boolean(fatFoodList?.bad?.length) ||
                   Boolean(fatFoodList?.none?.length)
-                const fatGoodKeywords = hasCsvFatList ? fatFoodList!.good : fallbackFatGoodKeywords
-                const fatBadKeywords = hasCsvFatList ? fatFoodList!.bad : fallbackFatBadKeywords
-                const fatZeroKeywords = hasCsvFatList ? fatFoodList!.none : fallbackFatZeroKeywords
+                const fatGoodKeywords = hasCsvFatList ? expandFatKeywords(fatFoodList!.good) : fallbackFatGoodKeywords
+                const fatBadKeywords = hasCsvFatList ? expandFatKeywords(fatFoodList!.bad) : fallbackFatBadKeywords
+                const fatZeroKeywords = hasCsvFatList ? expandFatKeywords(fatFoodList!.none) : fallbackFatZeroKeywords
                 const allowFallbackHeuristics = !hasCsvFatList
 
                 const fatChainKeywords = [
@@ -20388,7 +20388,7 @@ Please add nutritional information manually if needed.`);
                 ]
 
                 const normalizeFatLabel = (value: any) =>
-                  String(value || '').toLowerCase()
+                  String(value || '').toLowerCase().replace(/yoghurt/g, 'yogurt')
 
                 const scrubFatLabel = (value: any) =>
                   normalizeFatLabel(value).replace(/[^a-z0-9]+/g, ' ').trim()
@@ -20397,15 +20397,30 @@ Please add nutritional information manually if needed.`);
                   const token = value.toLowerCase().trim()
                   if (!token) return ''
                   if (token.endsWith('ies') && token.length > 4) {
-                    return `${token.slice(0, -3)}y`
+                    return normalizeFatToken(`${token.slice(0, -3)}y`)
                   }
                   if (token.endsWith('es') && token.length > 3) {
-                    return token.slice(0, -2)
+                    return normalizeFatToken(token.slice(0, -2))
                   }
                   if (token.endsWith('s') && token.length > 3 && !token.endsWith('ss')) {
-                    return token.slice(0, -1)
+                    return normalizeFatToken(token.slice(0, -1))
                   }
+                  if (token === 'yoghurt') return 'yogurt'
                   return token
+                }
+
+                const expandFatKeywords = (keywords: string[]) => {
+                  const expanded = new Set<string>()
+                  keywords.forEach((value) => {
+                    const raw = String(value || '').trim()
+                    if (!raw) return
+                    expanded.add(raw)
+                    const withoutParens = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
+                    if (withoutParens && withoutParens !== raw) {
+                      expanded.add(withoutParens)
+                    }
+                  })
+                  return Array.from(expanded)
                 }
 
                 const matchesFatKeywords = (label: any, keywords: string[]) => {
@@ -20414,19 +20429,33 @@ Please add nutritional information manually if needed.`);
                   const clean = scrubFatLabel(label)
                   const tokens = clean.split(' ').filter(Boolean)
                   const normalizedTokens = tokens.map(normalizeFatToken)
+                  const matchesToken = (token: string) => {
+                    if (!token) return false
+                    if (normalizedTokens.includes(token)) return true
+                    if (token.length >= 4) {
+                      return normalizedTokens.some(
+                        (labelToken) =>
+                          labelToken.length >= 4 &&
+                          (labelToken.startsWith(token) || token.startsWith(labelToken))
+                      )
+                    }
+                    return false
+                  }
                   return keywords.some((keyword) => {
                     const needle = keyword.toLowerCase().trim()
                     const cleanNeedle = scrubFatLabel(keyword)
                     if (!needle) return false
-                    if (needle.includes(' ')) {
-                      const cleanMatch = cleanNeedle ? clean.includes(cleanNeedle) : clean.includes(needle)
-                      return raw.includes(needle) || cleanMatch
+                    const keywordTokens = cleanNeedle
+                      ? cleanNeedle.split(' ').filter(Boolean).map(normalizeFatToken)
+                      : []
+                    if (keywordTokens.length > 1) {
+                      return keywordTokens.every((token) => matchesToken(token))
                     }
                     const normalizedNeedle = normalizeFatToken(needle)
-                    if (normalizedTokens.includes(normalizedNeedle)) return true
+                    if (matchesToken(normalizedNeedle)) return true
                     if (cleanNeedle) {
                       const normalizedCleanNeedle = normalizeFatToken(cleanNeedle)
-                      return normalizedTokens.includes(normalizedCleanNeedle)
+                      return matchesToken(normalizedCleanNeedle)
                     }
                     return false
                   })
