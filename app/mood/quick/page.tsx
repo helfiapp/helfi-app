@@ -19,6 +19,7 @@ export default function QuickMoodCheckInPage() {
   const [mood, setMood] = useState<number | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [feelings, setFeelings] = useState<string[]>([])
+  const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const pendingIdRef = useRef<string | null>(
@@ -50,6 +51,7 @@ export default function QuickMoodCheckInPage() {
         body: JSON.stringify({
           mood,
           tags,
+          note,
           localDate,
           notificationId: pendingId || undefined,
           context: {
@@ -78,7 +80,7 @@ export default function QuickMoodCheckInPage() {
     <div className="min-h-screen bg-[#f8f9fa] dark:bg-gray-900 pb-40">
       <PageHeader title="Quick Check‑In" backHref="/dashboard" />
 
-      <main className="max-w-3xl mx-auto px-4 pt-6 pb-32 md:pb-6">
+      <main className="max-w-3xl mx-auto px-4 pt-6 pb-56 md:pb-6">
         {banner && (
           <div
             className={[
@@ -110,6 +112,34 @@ export default function QuickMoodCheckInPage() {
 
           <div className="mt-8">
             <InfluenceChips value={tags} onChange={setTags} />
+          </div>
+
+          <div className="mt-8">
+            <details className="mt-2">
+              <summary className="cursor-pointer select-none text-base font-bold text-slate-800 dark:text-white px-1">
+                Optional details
+              </summary>
+              <div className="mt-4 space-y-3">
+                <div className="px-1">
+                  <div className="text-sm font-bold text-slate-800 dark:text-white">Note (optional)</div>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={3}
+                    maxLength={600}
+                    placeholder="Write a quick note…"
+                    className="mt-3 w-full rounded-2xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-helfi-green/10"
+                  />
+                  <div className="mt-1 text-xs text-slate-400 dark:text-gray-400">
+                    {note.length}/600
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <div className="mt-4 text-xs text-slate-500 dark:text-gray-400 px-1">
+              Mood is required. Everything else is optional.
+            </div>
           </div>
 
           <div className="hidden md:grid grid-cols-2 gap-3 mt-6">
