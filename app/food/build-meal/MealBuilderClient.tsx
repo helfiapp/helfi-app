@@ -154,15 +154,24 @@ const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: strin
   { name: 'Avocado, raw', serving_size: '100 g' },
 ]
 
-const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
+const nameHasWordPrefix = (name: string, prefix: string) => {
+  if (!prefix) return false
+  const normalized = normalizeSearchToken(name)
+  if (!normalized) return false
+  return normalized.split(' ').some((word) => word.startsWith(prefix))
+}
+
+const extractSearchPrefix = (searchQuery: string) => {
   const normalized = normalizeSearchToken(searchQuery)
-  if (!normalized) return []
+  if (!normalized) return ''
   const tokens = normalized.split(' ').filter(Boolean)
-  const prefix = tokens.length > 1 ? tokens[tokens.length - 1] : normalized
+  return tokens.length > 1 ? tokens[tokens.length - 1] : normalized
+}
+
+const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
+  const prefix = extractSearchPrefix(searchQuery)
   if (prefix.length < 2) return []
-  const matches = COMMON_SINGLE_FOOD_SUGGESTIONS.filter((item) =>
-    normalizeSearchToken(item.name).startsWith(prefix),
-  )
+  const matches = COMMON_SINGLE_FOOD_SUGGESTIONS.filter((item) => nameHasWordPrefix(item.name, prefix))
   return matches.slice(0, 8).map((item) => ({
     source: 'usda',
     id: `suggest:${normalizeSearchToken(item.name)}`,
@@ -737,17 +746,18 @@ export default function MealBuilderClient() {
     try {
       let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
+      const prefix = extractSearchPrefix(q)
+      if (kind === 'single' && prefix.length >= 2) {
+        nextItems = nextItems.filter((item) => nameHasWordPrefix(item.name || '', prefix))
+      }
       if (nextItems.length === 0 && kind === 'single') {
         try {
-          const words = q.split(/\s+/).filter(Boolean)
-          const lastWord = words.length > 1 ? words[words.length - 1] : ''
+          const lastWord = extractSearchPrefix(q)
           if (lastWord && lastWord !== q && lastWord.length >= 3) {
             const fallbackItems = await fetchSearchItems(lastWord)
-            if (seqRef.current === seq) nextItems = fallbackItems
-          }
-          if (nextItems.length === 0) {
-            const packagedItems = await fetchSearchItems(q, { kindOverride: 'packaged', sourceOverride: 'openfoodfacts' })
-            if (seqRef.current === seq) nextItems = packagedItems
+            if (seqRef.current === seq) {
+              nextItems = fallbackItems.filter((item) => nameHasWordPrefix(item.name || '', lastWord))
+            }
           }
         } catch {}
       }

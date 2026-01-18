@@ -290,14 +290,6 @@ export async function GET(request: NextRequest) {
       } else if (resolvedKind === 'single') {
         items = await searchUsdaSingleFood(query)
         actualSource = 'usda'
-        if (items.length === 0) {
-          const perSource = Math.min(Math.max(limit, 10), 25)
-          const pooled = await searchOpenFoodFactsByQuery(query, { pageSize: perSource })
-          if (pooled.length > 0) {
-            items = pooled.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
-            actualSource = 'auto'
-          }
-        }
       } else {
         const perSource = Math.min(Math.max(limit, 10), 25)
 
