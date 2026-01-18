@@ -89,6 +89,132 @@ export const normalizeMealCategory = (raw: any): string | null => {
   return null
 }
 
+const stripNutritionFromServingSize = (raw: string) => {
+  return String(raw || '')
+    .replace(/\([^)]*(calories?|kcal|kilojoules?|kj|protein|carbs?|fat|fibre|fiber|sugar)[^)]*\)/gi, '')
+    .replace(/\b\d+(?:\.\d+)?\s*(kcal|cal|kj)\b[^,)]*(?:protein|carb|fat|fiber|fibre|sugar)[^,)]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const parseServingWeight = (servingSize?: string | null): number | null => {
+  if (!servingSize) return null
+  const normalized = String(servingSize).toLowerCase()
+  const g = normalized.match(/(\d+(?:\.\d+)?)\s*(g|gram|grams)\b/i)
+  if (g) return parseFloat(g[1])
+  const ml = normalized.match(/(\d+(?:\.\d+)?)\s*(ml|milliliter|millilitre)\b/i)
+  if (ml) return parseFloat(ml[1])
+  const oz = normalized.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
+  if (oz) return parseFloat(oz[1]) * 28.3495
+  return null
+}
+
+const isServingNutritionPlausible = (data: {
+  servingSize?: string | null
+  calories?: number | null
+  protein?: number | null
+  carbs?: number | null
+  fat?: number | null
+  fiber?: number | null
+}) => {
+  const weight = parseServingWeight(data.servingSize || null)
+  if (!weight || weight <= 0) return true
+  const safe = (v?: number | null) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0)
+  const macroSum = safe(data.protein) + safe(data.carbs) + safe(data.fat) + safe(data.fiber)
+  const macroLimit = weight * 1.3 + 2
+  if (macroSum > macroLimit) return false
+  const calories = safe(data.calories)
+  const calorieLimit = weight * 9.5 + 10
+  if (calories > calorieLimit) return false
+  return true
+}
+
+const maybeUpsertBarcodeFromItems = async (
+  userId: string,
+  rawItems: any,
+) => {
+  const items = Array.isArray(rawItems) ? rawItems : []
+  if (items.length === 0) return
+  const candidate = items.find((item: any) => item?.barcode)
+  if (!candidate) return
+  const barcodeRaw = String(candidate?.barcode || '').trim()
+  const barcode = barcodeRaw.replace(/[^0-9A-Za-z]/g, '')
+  if (!barcode) return
+
+  const calories = Number(candidate?.calories)
+  const proteinG = Number(candidate?.protein_g)
+  const carbsG = Number(candidate?.carbs_g)
+  const fatG = Number(candidate?.fat_g)
+  const fiberG = Number(candidate?.fiber_g)
+  const sugarG = Number(candidate?.sugar_g)
+  const hasNutrition = [calories, proteinG, carbsG, fatG, fiberG, sugarG].some(
+    (v) => Number.isFinite(v) && v > 0,
+  )
+  if (!hasNutrition) return
+
+  const servingSize = stripNutritionFromServingSize(candidate?.serving_size || '')
+  const plausible = isServingNutritionPlausible({
+    servingSize,
+    calories,
+    protein: proteinG,
+    carbs: carbsG,
+    fat: fatG,
+    fiber: fiberG,
+  })
+  if (!plausible) return
+
+  const quantityG = Number.isFinite(Number(candidate?.customGramsPerServing))
+    ? Number(candidate.customGramsPerServing)
+    : parseServingWeight(servingSize || null)
+  const piecesPerServing = Number.isFinite(Number(candidate?.piecesPerServing))
+    ? Number(candidate.piecesPerServing)
+    : null
+
+  const name = String(candidate?.name || '').trim() || 'Packaged item'
+  const brand = candidate?.brand ? String(candidate.brand).trim() : null
+  const source = candidate?.barcodeSource || candidate?.source || 'label-photo'
+
+  try {
+    await prisma.barcodeProduct.upsert({
+      where: { barcode },
+      update: {
+        name,
+        brand,
+        servingSize: servingSize || null,
+        calories: Number.isFinite(calories) ? calories : null,
+        proteinG: Number.isFinite(proteinG) ? proteinG : null,
+        carbsG: Number.isFinite(carbsG) ? carbsG : null,
+        fatG: Number.isFinite(fatG) ? fatG : null,
+        fiberG: Number.isFinite(fiberG) ? fiberG : null,
+        sugarG: Number.isFinite(sugarG) ? sugarG : null,
+        quantityG: Number.isFinite(quantityG) ? quantityG : null,
+        piecesPerServing,
+        source,
+        updatedById: userId,
+      },
+      create: {
+        barcode,
+        name,
+        brand,
+        servingSize: servingSize || null,
+        calories: Number.isFinite(calories) ? calories : null,
+        proteinG: Number.isFinite(proteinG) ? proteinG : null,
+        carbsG: Number.isFinite(carbsG) ? carbsG : null,
+        fatG: Number.isFinite(fatG) ? fatG : null,
+        fiberG: Number.isFinite(fiberG) ? fiberG : null,
+        sugarG: Number.isFinite(sugarG) ? sugarG : null,
+        quantityG: Number.isFinite(quantityG) ? quantityG : null,
+        piecesPerServing,
+        source,
+        createdById: userId,
+        updatedById: userId,
+      },
+    })
+  } catch (err) {
+    console.warn('Barcode cache save failed (non-blocking)', err)
+  }
+}
+
 // Fetch logs for a specific date (YYYY-MM-DD)
 export async function GET(request: NextRequest) {
   let dateStr: string | null = null;
@@ -635,6 +761,8 @@ export async function POST(request: NextRequest) {
       durationMs: duration,
     })
 
+    await maybeUpsertBarcodeFromItems(user.id, items || created.items)
+
     // Trigger background regeneration of nutrition insights
     // This happens asynchronously - user doesn't wait
     triggerBackgroundRegeneration({
@@ -790,6 +918,8 @@ export async function PUT(request: NextRequest) {
         createdAt: normalizedCreatedAt,
       },
     })
+
+    await maybeUpsertBarcodeFromItems(user.id, items || updated.items)
 
     triggerBackgroundRegeneration({
       userId: user.id,
