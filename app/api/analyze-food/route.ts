@@ -2391,10 +2391,9 @@ export async function POST(req: NextRequest) {
     let analysisMode: 'auto' | 'packaged' | 'meal' = 'auto';
     let packagedMode = false;
     let labelScan = false;
-    const barcodeRaw = String(formData.get('barcode') || '').trim();
-    const barcode = barcodeRaw ? barcodeRaw.replace(/[^0-9A-Za-z]/g, '') : '';
-    const barcodeName = String(formData.get('barcodeName') || '').trim();
-    const barcodeBrand = String(formData.get('barcodeBrand') || '').trim();
+    let barcode = '';
+    let barcodeName = '';
+    let barcodeBrand = '';
     let forceFresh = false;
     let packagedEmphasisBlock = '';
     let analysisHint = '';
@@ -2578,6 +2577,10 @@ CRITICAL REQUIREMENTS:
       const imageFile = formData.get('image') as File;
       setAnalysisMode(formData.get('analysisMode'));
       labelScan = String(formData.get('labelScan') || '') === '1';
+      const barcodeRaw = String(formData.get('barcode') || '').trim();
+      barcode = barcodeRaw ? barcodeRaw.replace(/[^0-9A-Za-z]/g, '') : '';
+      barcodeName = String(formData.get('barcodeName') || '').trim();
+      barcodeBrand = String(formData.get('barcodeBrand') || '').trim();
       forceFresh = String(formData.get('forceFresh') || '') === '1';
       analysisHint = String(formData.get('analysisHint') || '');
       feedbackReasons = parseFeedbackList(formData.get('feedbackReasons'));
