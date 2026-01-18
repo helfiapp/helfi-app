@@ -637,7 +637,6 @@ export default function MealBuilderClient() {
 
     setError(null)
     setSearchLoading(true)
-    setResults([])
 
     try {
       abortRef.current?.abort()
@@ -667,20 +666,42 @@ export default function MealBuilderClient() {
       let nextItems = Array.isArray(data?.items) ? data.items : []
       if (nextItems.length === 0 && kind === 'single') {
         try {
-          const fallbackParams = new URLSearchParams({
-            source: 'openfoodfacts',
-            q: q,
-            kind: 'packaged',
-            limit: '20',
-          })
-          const fallbackRes = await fetch(`/api/food-data?${fallbackParams.toString()}`, {
-            method: 'GET',
-            signal: controller.signal,
-          })
-          if (fallbackRes.ok) {
-            const fallbackData = await fallbackRes.json()
-            if (seqRef.current === seq) {
-              nextItems = Array.isArray(fallbackData?.items) ? fallbackData.items : []
+          const words = q.split(/\s+/).filter(Boolean)
+          const lastWord = words.length > 1 ? words[words.length - 1] : ''
+          if (lastWord && lastWord !== q && lastWord.length >= 3) {
+            const fallbackParams = new URLSearchParams({
+              source: 'auto',
+              q: lastWord,
+              kind,
+              limit: '20',
+            })
+            const fallbackRes = await fetch(`/api/food-data?${fallbackParams.toString()}`, {
+              method: 'GET',
+              signal: controller.signal,
+            })
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json()
+              if (seqRef.current === seq) {
+                nextItems = Array.isArray(fallbackData?.items) ? fallbackData.items : []
+              }
+            }
+          }
+          if (nextItems.length === 0) {
+            const fallbackParams = new URLSearchParams({
+              source: 'openfoodfacts',
+              q: q,
+              kind: 'packaged',
+              limit: '20',
+            })
+            const fallbackRes = await fetch(`/api/food-data?${fallbackParams.toString()}`, {
+              method: 'GET',
+              signal: controller.signal,
+            })
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json()
+              if (seqRef.current === seq) {
+                nextItems = Array.isArray(fallbackData?.items) ? fallbackData.items : []
+              }
             }
           }
         } catch {}
