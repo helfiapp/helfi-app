@@ -61,6 +61,7 @@ export default function VoiceChat({
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const [barcodeValue, setBarcodeValue] = useState('')
   const [showManualBarcodeInput, setShowManualBarcodeInput] = useState(false)
+  const [pendingLabelBarcode, setPendingLabelBarcode] = useState<string | null>(null)
   const [pendingBarcodeContext, setPendingBarcodeContext] = useState<{
     label: string
     foodContext: string
@@ -411,11 +412,12 @@ export default function VoiceChat({
         setBarcodeError(fallbackMessage)
         setBarcodeStatus('scanning')
         setBarcodeStatusHint('Scanning…')
+        setPendingLabelBarcode(normalized)
         setMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: `${fallbackMessage} Would you like to scan the nutrition label instead?`,
+            content: `${fallbackMessage} Would you like to scan the nutrition label instead? We can save it for this barcode.`,
           },
         ])
         return
@@ -1090,6 +1092,9 @@ export default function VoiceChat({
     formData.append('newThread', forceNewThread ? 'true' : 'false')
     formData.append('entryContext', entryContext)
     formData.append('photoMode', photoMode)
+    if (photoMode === 'label' && pendingLabelBarcode) {
+      formData.append('barcode', pendingLabelBarcode)
+    }
     formData.append('localDate', localDate)
     formData.append('tzOffsetMin', String(tzOffsetMin))
 
@@ -1121,6 +1126,9 @@ export default function VoiceChat({
         setCurrentThreadId(data.threadId)
       }
 
+      if (data?.labelSaved) {
+        setPendingLabelBarcode(null)
+      }
       if (typeof data?.chargedCents === 'number') {
         setLastChargedCost(data.chargedCents)
         setLastChargedAt(new Date().toISOString())

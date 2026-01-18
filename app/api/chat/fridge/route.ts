@@ -62,6 +62,14 @@ const normalizePhotoMode = (value: string) => {
   return PHOTO_MODES.has(mode) ? mode : 'inventory'
 }
 
+const stripNutritionFromServingSize = (raw: string) => {
+  return String(raw || '')
+    .replace(/\([^)]*(calories?|kcal|kilojoules?|kj|protein|carbs?|fat|fibre|fiber|sugar)[^)]*\)/gi, '')
+    .replace(/\b\d+(?:\.\d+)?\s*(kcal|cal|kj)\b[^,)]*(?:protein|carb|fat|fiber|fibre|sugar)[^,)]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 const toNumber = (value: any) => {
   if (value === null || value === undefined) return null
   const raw = String(value).trim()
@@ -117,6 +125,8 @@ export async function POST(req: NextRequest) {
 
     const note = readFormString(form, 'message')
     const photoMode = normalizePhotoMode(readFormString(form, 'photoMode'))
+    const rawBarcode = readFormString(form, 'barcode')
+    const labelBarcode = rawBarcode ? rawBarcode.replace(/[^0-9A-Za-z]/g, '') : ''
     const incomingThreadId = readFormString(form, 'threadId')
     const forceNewThread = readFormString(form, 'newThread') === 'true'
     const chatContext = normalizeChatContext(readFormString(form, 'entryContext') || readFormString(form, 'context'))
@@ -261,6 +271,7 @@ export async function POST(req: NextRequest) {
       const labelBrand = typeof labelParsed?.brand === 'string' ? labelParsed.brand.trim() : null
       const labelServingSize =
         typeof labelParsed?.serving_size === 'string' ? labelParsed.serving_size.trim() : null
+      const cleanedServingSize = labelServingSize ? stripNutritionFromServingSize(labelServingSize) : null
       const perServing =
         (labelParsed?.per_serving && typeof labelParsed.per_serving === 'object'
           ? labelParsed.per_serving
@@ -327,6 +338,52 @@ export async function POST(req: NextRequest) {
         'After eating: ...',
       ].join('\n')
 
+      let labelSaved = false
+      if (labelBarcode) {
+        try {
+          const now = new Date()
+          await prisma.barcodeProduct.upsert({
+            where: { barcode: labelBarcode },
+            update: {
+              name: labelName,
+              brand: labelBrand,
+              servingSize: cleanedServingSize,
+              calories: labelMacros.calories,
+              proteinG: labelMacros.protein_g,
+              carbsG: labelMacros.carbs_g,
+              fatG: labelMacros.fat_g,
+              fiberG: labelMacros.fiber_g,
+              sugarG: labelMacros.sugar_g,
+              source: 'label-photo',
+              updatedById: user.id,
+              updatedAt: now,
+            },
+            create: {
+              barcode: labelBarcode,
+              name: labelName,
+              brand: labelBrand,
+              servingSize: cleanedServingSize,
+              calories: labelMacros.calories,
+              proteinG: labelMacros.protein_g,
+              carbsG: labelMacros.carbs_g,
+              fatG: labelMacros.fat_g,
+              fiberG: labelMacros.fiber_g,
+              sugarG: labelMacros.sugar_g,
+              source: 'label-photo',
+              reportCount: 0,
+              lastReportedAt: null,
+              createdById: user.id,
+              updatedById: user.id,
+              createdAt: now,
+              updatedAt: now,
+            },
+          })
+          labelSaved = true
+        } catch (err) {
+          console.warn('Failed to save label nutrition for barcode', err)
+        }
+      }
+
       const assistantModel = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
       const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o'
 
@@ -345,12 +402,12 @@ export async function POST(req: NextRequest) {
                 {
                   name: labelName,
                   brand: labelBrand,
-                  serving_size: labelServingSize,
-                  per_serving: labelMacros,
-                },
-                null,
-                2
-              ),
+          serving_size: cleanedServingSize,
+          per_serving: labelMacros,
+        },
+        null,
+        2
+      ),
               '',
               note ? `User question: ${note}` : 'User question: (none)',
             ].join('\n'),
@@ -378,7 +435,7 @@ export async function POST(req: NextRequest) {
                   {
                     name: labelName,
                     brand: labelBrand,
-                    serving_size: labelServingSize,
+                    serving_size: cleanedServingSize,
                     per_serving: labelMacros,
                   },
                   null,
@@ -411,7 +468,7 @@ export async function POST(req: NextRequest) {
       const labelSummaryParts = [
         `Label item: ${labelName}`,
         labelBrand ? `Brand: ${labelBrand}` : null,
-        labelServingSize ? `Serving: ${labelServingSize}` : null,
+        cleanedServingSize ? `Serving: ${cleanedServingSize}` : null,
         `Macros: ${[
           labelMacros.calories != null ? `${labelMacros.calories} kcal` : 'unknown kcal',
           labelMacros.protein_g != null ? `${labelMacros.protein_g} g protein` : 'unknown protein',
@@ -452,6 +509,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         assistant: assistantMessage,
         threadId,
+        labelSaved,
         chargedCents: totalChargeCents,
         chargedChat: shouldChargeChat,
         chargedPhoto: FRIDGE_PHOTO_COST_CENTS * imageFiles.length,
