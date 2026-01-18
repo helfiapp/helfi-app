@@ -559,7 +559,9 @@ function buildRiskFlags(params: {
     })
   }
 
-  const moodValues = params.dailyStats.map((row) => row.moodAvg).filter((v) => Number.isFinite(v))
+  const moodValues = params.dailyStats
+    .map((row) => row.moodAvg)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
   if (moodValues.length >= 3) {
     const min = Math.min(...moodValues)
     const max = Math.max(...moodValues)
@@ -2083,7 +2085,9 @@ export async function POST(request: NextRequest) {
   }
   const lateMealImpact = buildLateMealImpact(dailyStats, mealTimingSummary.lateMealDays || [])
   const trendSignals = buildTrendSignals(dailyStats)
-  const moodValues = dailyStats.map((row) => row.moodAvg).filter((v) => Number.isFinite(v))
+  const moodValues = dailyStats
+    .map((row) => row.moodAvg)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
   const moodRange =
     moodValues.length >= 3 ? Math.round((Math.max(...moodValues) - Math.min(...moodValues)) * 10) / 10 : null
   const symptomLateMealOverlap = intersectDays(
