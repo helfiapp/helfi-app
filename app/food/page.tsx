@@ -21178,7 +21178,7 @@ Please add nutritional information manually if needed.`);
                                 <div className="text-sm font-semibold text-gray-800">Fat quality</div>
                                 <div className="grid grid-cols-3 gap-2 sm:gap-4">
                                   {fatRingItems.map((item) => {
-                                    const percent = item.value > 0 ? 1 : 0.0001
+                                    const percent = item.value > 0 ? 1 : 0
                                     return (
                                       <div key={item.type} className="flex justify-center">
                                         <button
