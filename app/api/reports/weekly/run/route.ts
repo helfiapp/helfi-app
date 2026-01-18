@@ -2085,9 +2085,10 @@ export async function POST(request: NextRequest) {
   }
   const lateMealImpact = buildLateMealImpact(dailyStats, mealTimingSummary.lateMealDays || [])
   const trendSignals = buildTrendSignals(dailyStats)
-  const moodValues = dailyStats
-    .map((row) => row.moodAvg)
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+  const moodValues = dailyStats.flatMap((row) => {
+    const value = row.moodAvg
+    return typeof value === 'number' && Number.isFinite(value) ? [value] : []
+  })
   const moodRange =
     moodValues.length >= 3 ? Math.round((Math.max(...moodValues) - Math.min(...moodValues)) * 10) / 10 : null
   const symptomLateMealOverlap = intersectDays(
