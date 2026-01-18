@@ -170,6 +170,12 @@ const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
   return queryTokens.every((token) => nameTokens.some((word) => word.startsWith(token)))
 }
 
+const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, kind: 'packaged' | 'single') => {
+  if (kind === 'single') return nameMatchesSearchQuery(item?.name || '', searchQuery)
+  const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+  return nameMatchesSearchQuery(combined || item?.name || '', searchQuery)
+}
+
 const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
   const tokens = getSearchTokens(searchQuery)
   if (!tokens.some((token) => token.length >= 2)) return []
@@ -764,11 +770,9 @@ export default function MealBuilderClient() {
     try {
       let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
-      if (kind === 'single') {
-        const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
-        if (hasToken) {
-          nextItems = nextItems.filter((item: NormalizedFoodItem) => nameMatchesSearchQuery(item.name || '', q))
-        }
+      const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+      if (hasToken) {
+        nextItems = nextItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind))
       }
       if (nextItems.length === 0 && kind === 'single') {
         try {

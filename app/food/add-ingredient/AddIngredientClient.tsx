@@ -195,6 +195,30 @@ const normalizeBrandToken = (value: string) =>
     .replace(/[^a-z0-9]+/g, '')
     .trim()
 
+const normalizeSearchToken = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+
+const getSearchTokens = (value: string) => normalizeSearchToken(value).split(' ').filter(Boolean)
+
+const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
+  const queryTokens = getSearchTokens(searchQuery)
+  const nameTokens = getSearchTokens(name)
+  if (queryTokens.length === 0 || nameTokens.length === 0) return false
+  if (queryTokens.length === 1) return nameTokens[0].startsWith(queryTokens[0])
+  if (!queryTokens.some((token) => nameTokens[0].startsWith(token))) return false
+  return queryTokens.every((token) => nameTokens.some((word) => word.startsWith(token)))
+}
+
+const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, kind: SearchKind) => {
+  if (kind === 'single') return nameMatchesSearchQuery(item?.name || '', searchQuery)
+  const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+  return nameMatchesSearchQuery(combined || item?.name || '', searchQuery)
+}
+
 const parseServingGrams = (label?: string | null) => {
   const raw = String(label || '').toLowerCase()
   const match = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
@@ -496,6 +520,10 @@ export default function AddIngredientClient() {
             }
           }
         }
+      }
+      const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+      if (hasToken) {
+        nextResults = nextResults.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k))
       }
       setResults(nextResults)
     } catch (e: any) {

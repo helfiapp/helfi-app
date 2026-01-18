@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
         const brand = normalizeForMatch(it?.brand)
         const name = normalizeForMatch(it?.name)
         if (brand && brand === brandToken) score += 220
+        if (brand && brand.startsWith(brandToken)) score += 180
         if (name && name.startsWith(brandToken)) score += 160
         if (brand && name && name.startsWith(brand)) score += 120
       }
@@ -297,6 +298,7 @@ export async function GET(request: NextRequest) {
           resolvedKind === 'packaged'
             ? [
                 searchOpenFoodFactsByQuery(query, { pageSize: perSource }),
+                searchFatSecretFoods(query, { pageSize: perSource }),
               ]
             : [
                 searchUsdaFoods(query, { pageSize: perSource, dataType: usdaDataType }),
