@@ -4118,7 +4118,7 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    if (packagedMode && labelScan && imageDataUrl && resp.items && resp.items.length > 0) {
+    if (packagedMode && labelScan && imageDataUrl) {
       try {
         const labelModel = model === 'gpt-5.2' ? model : 'gpt-5.2'
         const labelResult = await extractLabelPerServingFromImage(openai, imageDataUrl, labelModel)
@@ -4133,10 +4133,18 @@ CRITICAL REQUIREMENTS:
           perServing &&
           typeof perServing === 'object' &&
           Object.values(perServing).some((value) => value !== null && value !== undefined && value !== '');
+        const hasItems = Array.isArray(resp.items) && resp.items.length > 0
         if (hasPerServingValues) {
-          const nextItems = [...resp.items]
+          const nextItems = hasItems ? [...resp.items] : []
           const targetIndex = 0
-          const next = { ...nextItems[targetIndex] }
+          const next = hasItems
+            ? { ...nextItems[targetIndex] }
+            : {
+                name: (resp.items?.[0]?.name as string) || 'Packaged item',
+                brand: (resp.items?.[0]?.brand as string) || null,
+                serving_size: '1 serving',
+                servings: 1,
+              }
           if (parsed?.serving_size || parsed?.servingSize) {
             next.serving_size = String(parsed.serving_size || parsed.servingSize || '').trim()
           }
@@ -4159,11 +4167,15 @@ CRITICAL REQUIREMENTS:
           next.fat_g = fat
           next.fiber_g = fiber
           next.sugar_g = sugar
-          nextItems[targetIndex] = next
+          if (hasItems) {
+            nextItems[targetIndex] = next
+          } else {
+            nextItems.push(next)
+          }
           resp.items = nextItems
           resp.total = computeTotalsFromItems(resp.items) || resp.total
         } else {
-          const nextItems = resp.items.map((item: any, index: number) =>
+          const nextItems = (hasItems ? resp.items : []).map((item: any, index: number) =>
             index === 0
               ? {
                   ...item,
@@ -4179,6 +4191,23 @@ CRITICAL REQUIREMENTS:
                 }
               : item,
           )
+          if (!hasItems) {
+            nextItems.push({
+              name: 'Packaged item',
+              brand: null,
+              serving_size: String(parsed?.serving_size || parsed?.servingSize || '1 serving').trim(),
+              servings: 1,
+              labelNeedsReview: true,
+              labelNeedsReviewMessage:
+                'We could not read the per serve column clearly. Please retake the label photo.',
+              calories: null,
+              protein_g: null,
+              carbs_g: null,
+              fat_g: null,
+              fiber_g: null,
+              sugar_g: null,
+            })
+          }
           resp.items = nextItems
           resp.total = computeTotalsFromItems(resp.items) || resp.total
         }
