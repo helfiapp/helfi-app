@@ -309,6 +309,7 @@ export default function MealBuilderClient() {
   const undoRemoveTimeoutRef = useRef<any>(null)
   const [portionAmountInput, setPortionAmountInput] = useState('')
   const [portionUnit, setPortionUnit] = useState<'g' | 'oz'>('g')
+  const searchDebounceRef = useRef<number | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
   const seqRef = useRef(0)
@@ -414,7 +415,7 @@ export default function MealBuilderClient() {
     if (favItems && favItems.length > 0) {
       const converted = convertToBuilderItems(favItems)
       setItems(converted)
-      setExpandedId(converted[0]?.id || null)
+      setExpandedId(null)
     } else {
       const total = (fav as any)?.total || (fav as any)?.nutrition || null
       const fallbackItem = {
@@ -430,7 +431,7 @@ export default function MealBuilderClient() {
       }
       const converted = convertToBuilderItems([fallbackItem])
       setItems(converted)
-      setExpandedId(converted[0]?.id || null)
+      setExpandedId(null)
     }
 
     setLoadedFavoriteId(editFavoriteId)
@@ -469,7 +470,7 @@ export default function MealBuilderClient() {
         if (!cancelled && rawItems && rawItems.length > 0) {
           const converted = convertToBuilderItems(rawItems)
           setItems(converted)
-          setExpandedId(converted[0]?.id || null)
+          setExpandedId(null)
         }
 
         if (!cancelled) setLoadedFavoriteId(`log:${sourceLogId}`)
@@ -631,6 +632,29 @@ export default function MealBuilderClient() {
     }
   }
 
+  useEffect(() => {
+    const q = String(query || '').trim()
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current)
+      searchDebounceRef.current = null
+    }
+    if (q.length < 2) {
+      setResults([])
+      setSearchLoading(false)
+      if (q.length === 0) setError(null)
+      return
+    }
+    searchDebounceRef.current = window.setTimeout(() => {
+      runSearch(q)
+    }, 250)
+    return () => {
+      if (searchDebounceRef.current) {
+        window.clearTimeout(searchDebounceRef.current)
+        searchDebounceRef.current = null
+      }
+    }
+  }, [query, kind])
+
   const triggerSearchFromButton = () => {
     const now = Date.now()
     if (now - searchPressRef.current < 300) return
@@ -642,8 +666,14 @@ export default function MealBuilderClient() {
   const addItem = (r: NormalizedFoodItem) => {
     triggerHaptic(10)
     const base = parseServingBase(r?.serving_size)
-    const baseAmount = base.amount
-    const baseUnit = base.unit
+    let baseAmount = base.amount
+    let baseUnit = base.unit
+    const liquidItem = isLikelyLiquidItem(r?.name || '', r?.serving_size)
+    if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
+      const converted = convertAmount(baseAmount, baseUnit, 'g')
+      baseAmount = Number.isFinite(converted) ? converted : baseAmount
+      baseUnit = 'g'
+    }
 
     const defaultAmount =
       baseAmount && baseUnit
@@ -689,8 +719,14 @@ export default function MealBuilderClient() {
       const servings = toNumber(ai?.servings) ?? 1
 
       const base = parseServingBase(serving_size)
-      const baseAmount = base.amount
-      const baseUnit = base.unit
+      let baseAmount = base.amount
+      let baseUnit = base.unit
+      const liquidItem = isLikelyLiquidItem(name, serving_size)
+      if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
+        const converted = convertAmount(baseAmount, baseUnit, 'g')
+        baseAmount = Number.isFinite(converted) ? converted : baseAmount
+        baseUnit = 'g'
+      }
 
       const id = `ai:${Date.now()}:${Math.random().toString(16).slice(2)}`
       const next: BuilderItem = {
@@ -1334,21 +1370,21 @@ export default function MealBuilderClient() {
     setSavingMeal(true)
     try {
       // Editing a diary entry directly (no favorites template involved).
-      if (!editFavoriteId && sourceLogId) {
-        try {
-          await fetch('/api/food-log', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: sourceLogId,
-              description,
-              nutrition: payload.nutrition,
-              items: cleanedItems,
-              meal: category,
-              category,
-            }),
-          })
-        } catch {}
+        if (!editFavoriteId && sourceLogId) {
+          try {
+            await fetch('/api/food-log', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: sourceLogId,
+                description,
+                nutrition: payload.nutrition,
+                items: scaledItems,
+                meal: category,
+                category,
+              }),
+            })
+          } catch {}
 
         // Keep the linked saved meal in sync (if one exists, or create one for future use).
         try {
@@ -1360,7 +1396,7 @@ export default function MealBuilderClient() {
               description,
               nutrition: payload.nutrition,
               total: payload.nutrition,
-              items: cleanedItems,
+              items: scaledItems,
               photo: null,
               method: 'meal-builder',
               customMeal: true,
@@ -1420,7 +1456,7 @@ export default function MealBuilderClient() {
           description,
           nutrition: normalizedNutrition,
           total: normalizedNutrition,
-          items: cleanedItems,
+          items: scaledItems,
           method: existing?.method || (existing?.customMeal ? 'meal-builder' : 'text'),
           meal: existing?.meal || category,
           createdAt: existing?.createdAt || Date.now(),
@@ -1440,7 +1476,7 @@ export default function MealBuilderClient() {
                 id: targetLogId,
                 description,
                 nutrition: normalizedNutrition || payload.nutrition,
-                items: cleanedItems,
+                items: scaledItems,
                 meal: existing?.meal || category,
                 category: existing?.meal || category,
               }),
@@ -1479,7 +1515,7 @@ export default function MealBuilderClient() {
           description,
           nutrition: payload.nutrition,
           total: payload.nutrition,
-          items: cleanedItems,
+          items: scaledItems,
           photo: null,
           method: 'meal-builder',
           customMeal: true,
@@ -1900,6 +1936,7 @@ export default function MealBuilderClient() {
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value)
+                setError(null)
               }}
               placeholder="e.g. chicken breast"
               autoComplete="off"
@@ -1934,6 +1971,41 @@ export default function MealBuilderClient() {
               )}
             </button>
           </form>
+          {(results.length > 0 || searchLoading || error) && (
+            <div className="pt-2">
+              {searchLoading && (
+                <div className="text-xs text-gray-500">Searching…</div>
+              )}
+              {error && <div className="text-xs text-red-600">{error}</div>}
+              {results.length > 0 && (
+                <div className="max-h-72 overflow-y-auto space-y-2 pt-2">
+                  {results.map((r) => {
+                    const display = buildSearchDisplay(r, query)
+                    return (
+                      <div key={`${r.source}:${r.id}`} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-gray-900 truncate">
+                            {display.title}
+                            {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
+                          </div>
+                          <div className="text-[11px] text-gray-500">
+                            {r.serving_size ? `Serving: ${r.serving_size}` : 'Serving: (unknown)'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => addItem(r)}
+                          className="ml-3 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               type="button"
@@ -2002,6 +2074,44 @@ export default function MealBuilderClient() {
 
           <UsageMeter inline className="mt-1" feature="foodAnalysis" />
 
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+            <div className="text-xs font-semibold text-gray-700">Portion size</div>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                value={portionAmountInput}
+                onFocus={() => setPortionAmountInput('')}
+                onChange={(e) => setPortionAmountInput(e.target.value)}
+                placeholder="e.g., 300"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+              <select
+                value={portionUnit}
+                onChange={(e) => setPortionUnit(e.target.value as 'g' | 'oz')}
+                className="w-20 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                <option value="g">g</option>
+                <option value="oz">oz</option>
+              </select>
+            </div>
+            {totalRecipeWeightG > 0 ? (
+              <div className="mt-2 text-[11px] text-gray-600">
+                Full recipe ≈ {Math.round(totalRecipeWeightG)} g
+              </div>
+            ) : (
+              <div className="mt-2 text-[11px] text-gray-600">
+                Add weights to ingredients to use portions.
+              </div>
+            )}
+            {portionScale < 1 && (
+              <div className="mt-1 text-[11px] text-emerald-700">
+                Saving about {Math.round(portionScale * 100)}% of the recipe.
+              </div>
+            )}
+          </div>
+
           {photoPreviewUrl && (
             <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
               <div className="relative w-full max-w-sm mx-auto">
@@ -2038,46 +2148,15 @@ export default function MealBuilderClient() {
             </div>
           )}
 
-          {error && <div className="text-xs text-red-600">{error}</div>}
-          {(searchLoading || savingMeal || photoLoading || barcodeLoading) && (
+          {(savingMeal || photoLoading || barcodeLoading) && (
             <div className="text-xs text-gray-500">
-              {searchLoading
-                ? 'Searching…'
-                : savingMeal
+              {savingMeal
                 ? 'Saving…'
                 : photoLoading
                 ? 'Analyzing photo…'
                 : barcodeLoading
                 ? 'Looking up barcode…'
                 : 'Working…'}
-            </div>
-          )}
-
-          {results.length > 0 && (
-            <div className="max-h-72 overflow-y-auto space-y-2 pt-1">
-              {results.map((r) => {
-                const display = buildSearchDisplay(r, query)
-                return (
-                  <div key={`${r.source}:${r.id}`} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-gray-900 truncate">
-                        {display.title}
-                        {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
-                      </div>
-                      <div className="text-[11px] text-gray-500">
-                        {r.serving_size ? `Serving: ${r.serving_size}` : 'Serving: (unknown)'}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => addItem(r)}
-                      className="ml-3 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
-                    >
-                      Add
-                    </button>
-                  </div>
-                )
-              })}
             </div>
           )}
         </div>
@@ -2226,43 +2305,6 @@ export default function MealBuilderClient() {
               <span className="text-gray-700">Sugar</span>
               <span className="font-semibold text-gray-900">{round3(mealTotals.sugar)} g</span>
             </div>
-          </div>
-          <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-            <div className="text-xs font-semibold text-gray-700">Portion size</div>
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                value={portionAmountInput}
-                onFocus={() => setPortionAmountInput('')}
-                onChange={(e) => setPortionAmountInput(e.target.value)}
-                placeholder="e.g., 300"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              />
-              <select
-                value={portionUnit}
-                onChange={(e) => setPortionUnit(e.target.value as 'g' | 'oz')}
-                className="w-20 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                <option value="g">g</option>
-                <option value="oz">oz</option>
-              </select>
-            </div>
-            {totalRecipeWeightG > 0 ? (
-              <div className="mt-2 text-[11px] text-gray-600">
-                Full recipe ≈ {Math.round(totalRecipeWeightG)} g
-              </div>
-            ) : (
-              <div className="mt-2 text-[11px] text-gray-600">
-                Add weights to ingredients to use portions.
-              </div>
-            )}
-            {portionScale < 1 && (
-              <div className="mt-1 text-[11px] text-emerald-700">
-                Saving about {Math.round(portionScale * 100)}% of the recipe.
-              </div>
-            )}
           </div>
         </div>
 
