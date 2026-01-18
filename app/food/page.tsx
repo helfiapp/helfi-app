@@ -2948,6 +2948,7 @@ export default function FoodDiary() {
   const pageTopRef = useRef<HTMLDivElement | null>(null)
   const desktopAddMenuRef = useRef<HTMLDivElement | null>(null)
   const barcodeLabelTimeoutRef = useRef<number | null>(null)
+  const barcodeLabelAutoSavedRef = useRef<Record<string, boolean>>({})
   const photoPreviewRef = useRef<string | null>(null)
   const photoRefreshAttemptedRef = useRef<Record<string, boolean>>({})
   const healthCheckPromptedRef = useRef<Set<string>>(new Set())
@@ -12087,10 +12088,13 @@ Please add nutritional information manually if needed.`);
     }
   }
 
-  const saveBarcodeLabelIfNeeded = async (items: any[] | null | undefined) => {
-    if (!barcodeLabelFlow?.barcode) return
+  const saveBarcodeLabelIfNeeded = async (
+    items: any[] | null | undefined,
+    options?: { preserveFlow?: boolean; quiet?: boolean },
+  ) => {
+    if (!barcodeLabelFlow?.barcode) return false
     const primary = Array.isArray(items) && items.length > 0 ? items[0] : null
-    if (!primary) return
+    if (!primary) return false
 
     const servingSize = stripNutritionFromServingSize(primary?.serving_size || '')
     const servingInfo = parseServingSizeInfo({ serving_size: servingSize })
@@ -12124,19 +12128,30 @@ Please add nutritional information manually if needed.`);
         }),
       })
       if (res.ok) {
-        showQuickToast('Saved for future barcode scans')
-      } else {
+        barcodeLabelAutoSavedRef.current[barcodeLabelFlow.barcode] = true
+        if (!options?.quiet) {
+          showQuickToast('Saved for future barcode scans')
+        }
+        return true
+      }
+      if (!options?.quiet) {
         showQuickToast('Saved to your diary, but the barcode label did not save')
       }
+      return false
     } catch (err) {
       console.warn('Barcode label save failed', err)
-      showQuickToast('Saved to your diary, but the barcode label did not save')
+      if (!options?.quiet) {
+        showQuickToast('Saved to your diary, but the barcode label did not save')
+      }
+      return false
     } finally {
-      setBarcodeLabelFlow(null)
-      setShowBarcodeLabelPrompt(false)
-      if (barcodeLabelTimeoutRef.current) {
-        clearTimeout(barcodeLabelTimeoutRef.current)
-        barcodeLabelTimeoutRef.current = null
+      if (!options?.preserveFlow) {
+        setBarcodeLabelFlow(null)
+        setShowBarcodeLabelPrompt(false)
+        if (barcodeLabelTimeoutRef.current) {
+          clearTimeout(barcodeLabelTimeoutRef.current)
+          barcodeLabelTimeoutRef.current = null
+        }
       }
     }
   }
@@ -12220,6 +12235,16 @@ Please add nutritional information manually if needed.`);
     setEditingItemIndex(index)
     setShowItemEditModal(true)
   }
+
+  useEffect(() => {
+    const barcode = barcodeLabelFlow?.barcode
+    if (!barcode) return
+    if (barcodeLabelAutoSavedRef.current[barcode]) return
+    if (!labelValidation.ok) return
+    if (!photoPreview) return
+    if (!Array.isArray(analyzedItems) || analyzedItems.length === 0) return
+    void saveBarcodeLabelIfNeeded(analyzedItems, { preserveFlow: true, quiet: true })
+  }, [barcodeLabelFlow?.barcode, labelValidation.ok, analyzedItems, photoPreview])
 
   const lookupBarcodeAndAdd = async (code: string) => {
     const normalized = (code || '').replace(/[^0-9A-Za-z]/g, '')
