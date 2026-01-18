@@ -4118,7 +4118,7 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    if (packagedMode && labelScan && imageDataUrl) {
+    if (labelScan && imageDataUrl) {
       try {
         const labelModel = model === 'gpt-5.2' ? model : 'gpt-5.2'
         const labelResult = await extractLabelPerServingFromImage(openai, imageDataUrl, labelModel)
