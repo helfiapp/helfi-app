@@ -523,18 +523,27 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
 
   const summaryParts = items.map((item) => {
     const pieces: string[] = []
+    const brand = item?.brand ? String(item.brand).trim() : ''
     const servings = Number(item?.servings)
     const piecesCount = Number((item as any)?.piecesPerServing) || Number((item as any)?.pieces)
-    if (Number.isFinite(piecesCount) && piecesCount > 1) {
-      pieces.push(`${Math.round(piecesCount)}`)
-    } else if (Number.isFinite(servings) && Math.abs(servings - 1) > 0.001) {
-      pieces.push(`${formatServingsDisplay(servings)}×`)
-    }
-    if (item?.brand) {
-      pieces.push(String(item.brand))
-    }
     const cleanName = stripNutritionFromName(item?.name ? String(item.name) : 'Food item')
-    pieces.push(cleanName || 'Food item')
+    const nameHasBrand = brand && cleanName.toLowerCase().startsWith(brand.toLowerCase())
+    if (brand) {
+      if (!nameHasBrand) pieces.push(brand)
+      pieces.push(cleanName || 'Food item')
+      if (Number.isFinite(piecesCount) && piecesCount > 1) {
+        pieces.push(`${Math.round(piecesCount)}`)
+      } else if (Number.isFinite(servings) && Math.abs(servings - 1) > 0.001) {
+        pieces.push(`${formatServingsDisplay(servings)}×`)
+      }
+    } else {
+      if (Number.isFinite(piecesCount) && piecesCount > 1) {
+        pieces.push(`${Math.round(piecesCount)}`)
+      } else if (Number.isFinite(servings) && Math.abs(servings - 1) > 0.001) {
+        pieces.push(`${formatServingsDisplay(servings)}×`)
+      }
+      pieces.push(cleanName || 'Food item')
+    }
     if (item?.serving_size) {
       pieces.push(`(${item.serving_size})`)
     }
@@ -20313,6 +20322,86 @@ Please add nutritional information manually if needed.`);
                   'takeout',
                 ]
 
+                const fruitIndicatorTokens = [
+                  'berry',
+                  'apple',
+                  'pear',
+                  'banana',
+                  'orange',
+                  'mandarin',
+                  'clementine',
+                  'tangerine',
+                  'grapefruit',
+                  'lemon',
+                  'lime',
+                  'mango',
+                  'papaya',
+                  'pineapple',
+                  'melon',
+                  'kiwi',
+                  'passionfruit',
+                  'dragon',
+                  'pitaya',
+                  'starfruit',
+                  'lychee',
+                  'longan',
+                  'rambutan',
+                  'mangosteen',
+                  'jackfruit',
+                  'durian',
+                  'guava',
+                  'feijoa',
+                  'persimmon',
+                  'pomegranate',
+                  'quince',
+                  'tamarillo',
+                  'loquat',
+                  'sapodilla',
+                  'custard',
+                  'soursop',
+                  'breadfruit',
+                  'ackee',
+                  'fig',
+                  'apricot',
+                  'peach',
+                  'nectarine',
+                  'plum',
+                  'cherry',
+                  'grape',
+                  'currant',
+                  'date',
+                  'raisin',
+                  'sultana',
+                  'cranberry',
+                ]
+
+                const fruitQualifierTokens = new Set([
+                  'fresh',
+                  'frozen',
+                  'raw',
+                  'organic',
+                  'mixed',
+                  'assorted',
+                  'fruit',
+                  'berries',
+                  'berry',
+                  'sliced',
+                  'diced',
+                  'cut',
+                ])
+
+                const buildFruitKeywords = (keywords: string[]) => {
+                  const result = new Set<string>()
+                  keywords.forEach((value) => {
+                    const raw = String(value || '').trim().toLowerCase()
+                    if (!raw) return
+                    if (fruitIndicatorTokens.some((token) => raw.includes(token))) {
+                      result.add(value)
+                    }
+                  })
+                  return Array.from(result)
+                }
+
                 const expandFatKeywords = (keywords: string[]) => {
                   const expanded = new Set<string>()
                   keywords.forEach((value) => {
@@ -20334,6 +20423,7 @@ Please add nutritional information manually if needed.`);
                 const fatGoodKeywords = hasCsvFatList ? expandFatKeywords(fatFoodList!.good) : fallbackFatGoodKeywords
                 const fatBadKeywords = hasCsvFatList ? expandFatKeywords(fatFoodList!.bad) : fallbackFatBadKeywords
                 const fatZeroKeywords = hasCsvFatList ? expandFatKeywords(fatFoodList!.none) : fallbackFatZeroKeywords
+                const fruitKeywords = buildFruitKeywords(fatZeroKeywords)
                 const allowFallbackHeuristics = !hasCsvFatList
 
                 const fatChainKeywords = [
@@ -20401,6 +20491,19 @@ Please add nutritional information manually if needed.`);
                   'flavored seed',
                 ]
 
+                const fatProcessedKeywords = [
+                  'muesli',
+                  'granola',
+                  'cereal',
+                  'cereal bar',
+                  'muesli bar',
+                  'snack bar',
+                  'protein bar',
+                  'breakfast bar',
+                  'trail mix',
+                  'clusters',
+                ]
+
                 const normalizeFatLabel = (value: any) =>
                   String(value || '').toLowerCase().replace(/yoghurt/g, 'yogurt')
 
@@ -20461,14 +20564,64 @@ Please add nutritional information manually if needed.`);
                   })
                 }
 
-                const isZeroFatItem = (label: any, grams: number) => {
-                  const fatValue = Number(grams || 0)
-                  if (!Number.isFinite(fatValue) || fatValue <= 0) return true
-                  if (matchesFatKeywords(label, fatZeroKeywords)) return true
+                const fruitTokenList = (() => {
+                  const tokens = new Set<string>()
+                  fruitKeywords.forEach((keyword) => {
+                    const clean = scrubFatLabel(keyword)
+                    if (!clean) return
+                    clean
+                      .split(' ')
+                      .map((value) => normalizeFatToken(value))
+                      .filter(Boolean)
+                      .forEach((token) => tokens.add(token))
+                  })
+                  return Array.from(tokens)
+                })()
+
+                const isFruitToken = (token: string) => {
+                  if (!token) return false
+                  if (fruitTokenList.includes(token)) return true
+                  if (token.length >= 4) {
+                    return fruitTokenList.some(
+                      (known) =>
+                        known.length >= 4 && (known.startsWith(token) || token.startsWith(known))
+                    )
+                  }
                   return false
                 }
 
-                const classifyFatLabel = (label: any) => {
+                const isPureFruitLabel = (label: any) => {
+                  if (!label) return false
+                  const clean = scrubFatLabel(label)
+                  const tokens = clean.split(' ').filter(Boolean).map(normalizeFatToken)
+                  if (!tokens.length) return false
+                  return tokens.every((token) => fruitQualifierTokens.has(token) || isFruitToken(token))
+                }
+
+                const isProcessedLabel = (label: any) => {
+                  if (!label) return false
+                  if (matchesFatKeywords(label, fatProcessedKeywords)) return true
+                  if (matchesFatKeywords(label, fatBadKeywords)) return true
+                  if (allowFallbackHeuristics && matchesFatKeywords(label, fatBadOverrides)) return true
+                  if (allowFallbackHeuristics && matchesFatKeywords(label, fatFastFoodKeywords)) return true
+                  if (allowFallbackHeuristics && matchesFatKeywords(label, fatChainKeywords)) return true
+                  return false
+                }
+
+                const isZeroFatItem = (label: any, grams: number) => {
+                  const fatValue = Number(grams || 0)
+                  if (!Number.isFinite(fatValue) || fatValue <= 0) return true
+                  if (matchesFatKeywords(label, fatZeroKeywords)) {
+                    if (isPureFruitLabel(label)) return false
+                    if (fatValue < 0.5) return true
+                  }
+                  return false
+                }
+
+                const classifyFatLabel = (label: any, fatValue: number) => {
+                  if (Number.isFinite(fatValue) && fatValue > 0) {
+                    if (isPureFruitLabel(label) && !isProcessedLabel(label)) return 'good'
+                  }
                   if (allowFallbackHeuristics && matchesFatKeywords(label, fatBadOverrides)) return 'bad'
                   if (allowFallbackHeuristics && matchesFatKeywords(label, fatChainKeywords)) return 'bad'
                   const hasBad = matchesFatKeywords(label, fatBadKeywords)
@@ -20516,7 +20669,7 @@ Please add nutritional information manually if needed.`);
                     if (!Number.isFinite(fat) || fat <= 0) return
                     const label = entry?.name || entry?.label || entry?.description || ''
                     if (isZeroFatItem(label, fat)) return
-                    const bucket = classifyFatLabel(label)
+                    const bucket = classifyFatLabel(label, fat)
                     if (bucket === 'good') {
                       split.good += fat
                       addFatDetail('good', label, fat)
@@ -20576,7 +20729,7 @@ Please add nutritional information manually if needed.`);
                   } else {
                     const entryLabel = item?.label || item?.name || item?.description || ''
                     if (isZeroFatItem(entryLabel, storedTotals.fat)) return acc
-                    const bucket = classifyFatLabel(entryLabel)
+                    const bucket = classifyFatLabel(entryLabel, storedTotals.fat)
                     if (bucket === 'good') {
                       fatSplit.good += storedTotals.fat
                       addFatDetail('good', entryLabel, storedTotals.fat)
