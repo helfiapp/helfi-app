@@ -17,6 +17,22 @@ const safeNumber = (value: any) => {
 }
 
 const kcalToKj = (kcal: number) => kcal * 4.184
+const normalizeNearZero = (value: number) => (Math.abs(value) < 0.0001 ? 0 : value)
+const formatMacroAmount = (value: number, unit?: string) => {
+  const numeric = normalizeNearZero(value)
+  const abs = Math.abs(numeric)
+  let display = '0'
+  if (abs > 0 && abs < 0.1) {
+    display = (Math.round(numeric * 100) / 100).toFixed(2)
+  } else if (abs >= 0.1 && abs < 1) {
+    display = (Math.round(numeric * 10) / 10).toFixed(1)
+  } else if (abs >= 1 && abs < 10) {
+    display = String(Math.round(numeric * 10) / 10)
+  } else if (abs >= 10) {
+    display = String(Math.round(numeric))
+  }
+  return unit ? `${display} ${unit}` : display
+}
 
 export default function DailyMacroSummary({ targets, used }: { targets: MacroTotals; used: MacroTotals }) {
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
@@ -41,14 +57,15 @@ export default function DailyMacroSummary({ targets, used }: { targets: MacroTot
     const target = energyUnit === 'kJ' ? kcalToKj(targetKcal) : targetKcal
     const remaining = Math.max(0, target - consumed)
     const pctRaw = target > 0 ? consumed / target : 0
-    const percentDisplay = target > 0 ? Math.round(pctRaw * 100) : 0
+    const percentDisplay = target > 0 ? pctRaw * 100 : 0
     const over = percentDisplay > 100
     return {
       label: 'Calories',
       consumed,
       target,
       remaining,
-      percentDisplay,
+      percentDisplay: Math.round(percentDisplay),
+      percentExact: percentDisplay,
       over,
       unit: energyUnit,
       color: '#10b981',
@@ -84,14 +101,14 @@ export default function DailyMacroSummary({ targets, used }: { targets: MacroTot
               <div className="text-gray-900 font-semibold flex items-center gap-2">
                 <span>{energy.label}</span>
                 <span className="text-gray-700 font-normal">
-                  {Math.round(energy.consumed)} / {Math.round(energy.target)} {energy.unit}
+                  {formatMacroAmount(energy.consumed)} / {formatMacroAmount(energy.target)} {energy.unit}
                 </span>
                 <span className="font-semibold" style={{ color: energy.over ? '#ef4444' : energy.color }}>
-                  {Math.round(energy.remaining)} {energy.unit} left
+                  {formatMacroAmount(energy.remaining)} {energy.unit} left
                 </span>
               </div>
               <div className={`text-xs font-semibold ${energy.over ? 'text-red-600' : 'text-gray-900'}`}>
-                {energy.percentDisplay > 0 ? `${energy.percentDisplay}%` : '0%'}
+                {energy.percentExact > 0 && energy.percentExact < 1 ? '<1%' : energy.percentDisplay > 0 ? `${energy.percentDisplay}%` : '0%'}
               </div>
             </div>
             <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
@@ -107,7 +124,7 @@ export default function DailyMacroSummary({ targets, used }: { targets: MacroTot
           const pctRaw = row.target > 0 ? row.consumed / row.target : 0
           const pct = Math.max(0, pctRaw)
           const percentDisplay = row.target > 0 ? Math.round(pctRaw * 100) : 0
-          const over = percentDisplay > 100
+          const over = pctRaw * 100 > 100
           const remaining = Math.max(0, row.target - row.consumed)
           return (
             <div key={row.key} className="space-y-1">
@@ -115,15 +132,15 @@ export default function DailyMacroSummary({ targets, used }: { targets: MacroTot
                 <div className="text-gray-900 font-semibold flex items-center gap-2">
                   <span>{row.label}</span>
                   <span className="text-gray-700 font-normal">
-                    {Math.round(row.consumed)} / {Math.round(row.target)} {row.unit}
+                    {formatMacroAmount(row.consumed)} / {formatMacroAmount(row.target)} {row.unit}
                     {row.cap ? ' cap' : ''}
                   </span>
                   <span className="font-semibold" style={{ color: over ? '#ef4444' : row.color }}>
-                    {Math.round(remaining)} {row.unit} left
+                    {formatMacroAmount(remaining)} {row.unit} left
                   </span>
                 </div>
                 <div className={`text-xs font-semibold ${over ? 'text-red-600' : 'text-gray-900'}`}>
-                  {percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
+                  {pctRaw > 0 && pctRaw < 0.01 ? '<1%' : percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
                 </div>
               </div>
               <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
@@ -143,4 +160,3 @@ export default function DailyMacroSummary({ targets, used }: { targets: MacroTot
     </div>
   )
 }
-
