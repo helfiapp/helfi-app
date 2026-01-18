@@ -934,6 +934,17 @@ const formatMacroValue = (value: number | null | undefined, unit: string) => {
 const KCAL_TO_KJ = 4.184
 const OZ_TO_ML = 29.57
 
+const formatMacroAmount = (value: number) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || Math.abs(numeric) < 0.0001) return '0'
+  const abs = Math.abs(numeric)
+  const decimals = abs < 0.1 ? 2 : abs < 1 ? 1 : abs < 10 ? 1 : 0
+  const fixed = numeric.toFixed(decimals)
+  return fixed.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1')
+}
+
+const formatMacroAmountWithUnit = (value: number, unit: string) => `${formatMacroAmount(value)}${unit}`
+
 const formatEnergyValue = (value: number | null | undefined, unit: 'kcal' | 'kJ') => {
   if (value === null || value === undefined) return '—'
   const numeric = Number(value)
@@ -1205,7 +1216,7 @@ function MacroRing({
                 />
                 <span>
                   {m.label}{' '}
-                  {m.grams > 0 ? `${Math.round(m.grams)}g` : '0g'}
+                  {formatMacroAmountWithUnit(m.grams, 'g')}
                 </span>
               </div>
             ))}
@@ -20618,12 +20629,18 @@ Please add nutritional information manually if needed.`);
                             macroPanel = (
                               <div className="order-2 md:order-1 space-y-2 mt-4 md:mt-0">
                                 {macroRowsFiltered.map((row) => {
-                                  const pctRaw = row.target > 0 ? row.consumed / row.target : 0
-                                  const pct = Math.max(0, pctRaw)
-                                  const percentDisplay = row.target > 0 ? Math.round(pctRaw * 100) : 0
-                                  const over = percentDisplay > 100
-                                  const percentColor = over ? 'text-red-600' : 'text-gray-900'
-                                  const remaining = Math.max(0, row.target - row.consumed)
+                  const pctRaw = row.target > 0 ? row.consumed / row.target : 0
+                  const pct = Math.max(0, pctRaw)
+                  const percentValue = row.target > 0 ? Math.round(pctRaw * 100) : 0
+                  const percentLabel =
+                    row.target > 0
+                      ? pctRaw > 0 && pctRaw < 0.01
+                        ? '<1%'
+                        : `${percentValue}%`
+                      : '0%'
+                  const over = percentValue > 100
+                  const percentColor = over ? 'text-red-600' : 'text-gray-900'
+                  const remaining = Math.max(0, row.target - row.consumed)
                                   const fatSplitValues = row.key === 'fat' ? row.fatSplit : null
                                   const fatSplitTotal = fatSplitValues
                                     ? fatSplitValues.good + fatSplitValues.bad + fatSplitValues.unclear
@@ -20647,14 +20664,14 @@ Please add nutritional information manually if needed.`);
                                         <div className="text-gray-900 font-semibold flex items-center gap-2">
                                           <span>{row.label}</span>
                                           <span className="text-gray-700 font-normal">
-                                            {Math.round(row.consumed)} / {Math.round(row.target)} {row.unit}{row.key === 'sugar' ? ' cap' : ''}
+                                            {formatMacroAmount(row.consumed)} / {formatMacroAmount(row.target)} {row.unit}{row.key === 'sugar' ? ' cap' : ''}
                                           </span>
                                           <span className="font-semibold" style={{ color: over ? '#ef4444' : row.color }}>
-                                            {Math.round(remaining)} {row.unit} left
+                                            {formatMacroAmount(remaining)} {row.unit} left
                                           </span>
                                         </div>
                                         <div className={`text-xs font-semibold ${percentColor}`}>
-                                          {percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
+                                          {percentLabel}
                                         </div>
                                       </div>
                                       <div
