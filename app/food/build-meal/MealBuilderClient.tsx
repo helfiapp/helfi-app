@@ -154,24 +154,26 @@ const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: strin
   { name: 'Avocado, raw', serving_size: '100 g' },
 ]
 
-const nameHasWordPrefix = (name: string, prefix: string) => {
-  if (!prefix) return false
-  const normalized = normalizeSearchToken(name)
-  if (!normalized) return false
-  return normalized.split(' ').some((word) => word.startsWith(prefix))
+const getSearchTokens = (value: string) => normalizeSearchToken(value).split(' ').filter(Boolean)
+
+const getLastSearchToken = (searchQuery: string) => {
+  const tokens = getSearchTokens(searchQuery)
+  return tokens.length > 0 ? tokens[tokens.length - 1] : ''
 }
 
-const extractSearchPrefix = (searchQuery: string) => {
-  const normalized = normalizeSearchToken(searchQuery)
-  if (!normalized) return ''
-  const tokens = normalized.split(' ').filter(Boolean)
-  return tokens.length > 1 ? tokens[tokens.length - 1] : normalized
+const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
+  const queryTokens = getSearchTokens(searchQuery)
+  const nameTokens = getSearchTokens(name)
+  if (queryTokens.length === 0 || nameTokens.length === 0) return false
+  if (queryTokens.length === 1) return nameTokens[0].startsWith(queryTokens[0])
+  if (!queryTokens.some((token) => nameTokens[0].startsWith(token))) return false
+  return queryTokens.every((token) => nameTokens.some((word) => word.startsWith(token)))
 }
 
 const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
-  const prefix = extractSearchPrefix(searchQuery)
-  if (prefix.length < 2) return []
-  const matches = COMMON_SINGLE_FOOD_SUGGESTIONS.filter((item) => nameHasWordPrefix(item.name, prefix))
+  const tokens = getSearchTokens(searchQuery)
+  if (!tokens.some((token) => token.length >= 2)) return []
+  const matches = COMMON_SINGLE_FOOD_SUGGESTIONS.filter((item) => nameMatchesSearchQuery(item.name, searchQuery))
   return matches.slice(0, 8).map((item) => ({
     source: 'usda',
     id: `suggest:${normalizeSearchToken(item.name)}`,
@@ -180,6 +182,22 @@ const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
     __suggestion: true,
     __searchQuery: item.name,
   }))
+}
+
+const mergeSearchSuggestions = (items: NormalizedFoodItem[], searchQuery: string) => {
+  const suggestions = buildInstantSuggestions(searchQuery)
+  if (suggestions.length === 0) return items
+  const merged: NormalizedFoodItem[] = []
+  const seen = new Set<string>()
+  const add = (item: NormalizedFoodItem) => {
+    const key = normalizeSearchToken(item?.name || '')
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    merged.push(item)
+  }
+  suggestions.forEach(add)
+  items.forEach(add)
+  return merged
 }
 
 const triggerHaptic = (duration = 10) => {
@@ -746,29 +764,26 @@ export default function MealBuilderClient() {
     try {
       let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
-      const prefix = extractSearchPrefix(q)
-      if (kind === 'single' && prefix.length >= 2) {
-        nextItems = nextItems.filter((item) => nameHasWordPrefix(item.name || '', prefix))
+      if (kind === 'single') {
+        const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+        if (hasToken) {
+          nextItems = nextItems.filter((item: NormalizedFoodItem) => nameMatchesSearchQuery(item.name || '', q))
+        }
       }
       if (nextItems.length === 0 && kind === 'single') {
         try {
-          const lastWord = extractSearchPrefix(q)
-          if (lastWord && lastWord !== q && lastWord.length >= 3) {
+          const lastWord = getLastSearchToken(q)
+          if (lastWord && lastWord !== q && lastWord.length >= 2) {
             const fallbackItems = await fetchSearchItems(lastWord)
             if (seqRef.current === seq) {
-              nextItems = fallbackItems.filter((item) => nameHasWordPrefix(item.name || '', lastWord))
+              nextItems = fallbackItems.filter((item: NormalizedFoodItem) => nameMatchesSearchQuery(item.name || '', lastWord))
             }
           }
         } catch {}
       }
-      if (nextItems.length === 0) {
-        const instant = buildInstantSuggestions(q)
-        if (instant.length > 0) {
-          nextItems = instant
-        }
-      }
-      setResults(nextItems)
-      return nextItems
+      const merged = kind === 'single' ? mergeSearchSuggestions(nextItems, q) : nextItems
+      setResults(merged)
+      return merged
     } catch (e: any) {
       setError('Search failed. Please try again.')
     } finally {
@@ -788,8 +803,10 @@ export default function MealBuilderClient() {
       if (q.length === 0) setError(null)
       return
     }
-    const instant = buildInstantSuggestions(q)
-    if (instant.length > 0) setResults(instant)
+    if (kind === 'single') {
+      const instant = buildInstantSuggestions(q)
+      if (instant.length > 0) setResults(instant)
+    }
     setSearchLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {
       runSearch(q)
