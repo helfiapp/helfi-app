@@ -1155,6 +1155,14 @@ for a change.
   - If the per-serve values are unclear or do not fit the serving size, block saving and show the red warning. Do not allow silent saves.
   - The warning must include the **Edit label numbers** action so users can correct values.
   - For label scans, do not use FatSecret/USDA fallbacks. Use label values or user edits only.
+- **kJ-only label handling (Jan 2026 – locked):**
+  - If a label provides **kJ but no calories**, convert kJ to kcal using `kJ / 4.184` and set calories.
+  - If calories are still missing, derive calories from macros: `protein*4 + carbs*4 + fat*9`.
+  - Do not allow **0 calories** when any of protein/carbs/fat is non-zero.
+  - **Rollback (if this ever causes bad numbers):**
+    - Revert the kJ/macros-to-calories fallback in `app/api/analyze-food/route.ts` (label-scan path).
+    - Revert the same fallback in `app/api/chat/fridge/route.ts` and `app/api/barcode/label/route.ts`.
+    - Re-run a label scan to confirm calories revert to the label-only values.
 - **Product nutrition images use the same strict block (Dec 2025 – locked):**
   - When the user selects “Product nutrition image,” apply the same label checks and block saving if numbers do not fit the serving size.
 - **Serving step snapping (Nov 24, 2025 – locked):**
