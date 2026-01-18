@@ -44,6 +44,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     dueNow: boolean
   } | null>(null)
   const lastLoaded = generatedAt
+  const isReportRunning = weeklyStatus?.status === 'RUNNING'
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
@@ -517,4 +518,3 @@ function resolveNeedHref(need: InsightDataNeed, firstIssueSlug?: string) {
   if (need.key === 'supplements-backup' || need.key === 'supplements-emergency') return '/onboarding?step=1'
   return need.href
 }
-  const isReportRunning = weeklyStatus?.status === 'RUNNING'
