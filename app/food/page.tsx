@@ -20261,18 +20261,35 @@ Please add nutritional information manually if needed.`);
                 const scrubFatLabel = (value: any) =>
                   normalizeFatLabel(value).replace(/[^a-z0-9]+/g, ' ').trim()
 
+                const normalizeFatToken = (value: string) => {
+                  const token = value.toLowerCase().trim()
+                  if (!token) return ''
+                  if (token.endsWith('ies') && token.length > 4) {
+                    return `${token.slice(0, -3)}y`
+                  }
+                  if (token.endsWith('es') && token.length > 3) {
+                    return token.slice(0, -2)
+                  }
+                  if (token.endsWith('s') && token.length > 3 && !token.endsWith('ss')) {
+                    return token.slice(0, -1)
+                  }
+                  return token
+                }
+
                 const matchesFatKeywords = (label: any, keywords: string[]) => {
                   if (!label) return false
                   const raw = normalizeFatLabel(label)
                   const clean = scrubFatLabel(label)
                   const tokens = clean.split(' ').filter(Boolean)
+                  const normalizedTokens = tokens.map(normalizeFatToken)
                   return keywords.some((keyword) => {
                     const needle = keyword.toLowerCase().trim()
                     if (!needle) return false
                     if (needle.includes(' ')) {
                       return raw.includes(needle) || clean.includes(needle)
                     }
-                    return tokens.includes(needle)
+                    const normalizedNeedle = normalizeFatToken(needle)
+                    return normalizedTokens.includes(normalizedNeedle)
                   })
                 }
 
@@ -20289,9 +20306,12 @@ Please add nutritional information manually if needed.`);
                   const hasBad = matchesFatKeywords(label, fatBadKeywords)
                   const hasGood = matchesFatKeywords(label, fatGoodKeywords)
                   const raw = normalizeFatLabel(label)
+                  const hasGreek = raw.includes('greek')
+                  const hasYogurt = raw.includes('yogurt') || raw.includes('yoghurt')
                   const hasCheese = raw.includes('cheese')
                   const hasBurger = raw.includes('burger')
                   const hasFastFood = matchesFatKeywords(label, fatFastFoodKeywords)
+                  if (hasGreek && hasYogurt) return 'good'
                   if (hasCheese && (hasBurger || hasFastFood) && !matchesFatKeywords(label, fatChainKeywords)) {
                     return 'unclear'
                   }
