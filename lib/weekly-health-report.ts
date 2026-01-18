@@ -253,7 +253,7 @@ export async function createWeeklyReportRecord(params: {
   try {
     await prisma.$executeRawUnsafe(
       `INSERT INTO WeeklyHealthReports (id, userId, periodStart, periodEnd, status, summary, dataSummary, report, model, creditsCharged, error, readyAt)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12)`,
+       VALUES ($1,$2,$3::date,$4::date,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12)`,
       reportId,
       params.userId,
       params.periodStart,
