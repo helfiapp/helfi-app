@@ -1078,6 +1078,7 @@ function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal', 
   const usedLength = usedFraction * circumference
 
   const showFullPrimary = !isTarget && clamped >= 0.999
+  const showEmptyPrimary = !isTarget && clamped <= 0
 
   return (
     <div className="flex flex-col items-center">
@@ -1115,7 +1116,7 @@ function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal', 
               )}
             </>
           ) : (
-            // Primary/consumed ring – single green circle showing `percent`
+            // Primary/consumed ring – single colored circle showing `percent`
             <circle
               cx={svgSize / 2}
               cy={svgSize / 2}
@@ -1123,7 +1124,12 @@ function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal', 
               strokeWidth={strokeWidth}
               stroke={color || '#22c55e'}
               fill="none"
-              strokeDasharray={showFullPrimary ? `${circumference}` : `${clamped * circumference} ${circumference}`}
+              strokeOpacity={showEmptyPrimary ? 0.6 : 1}
+              strokeDasharray={
+                showFullPrimary || showEmptyPrimary
+                  ? `${circumference}`
+                  : `${clamped * circumference} ${circumference}`
+              }
               strokeDashoffset={0}
               strokeLinecap="butt"
               transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
