@@ -13,7 +13,7 @@ type WeeklyStatus = {
   dataSummary: any
 }
 
-const DISABLED_PREFIXES = ['/onboarding', '/auth', '/privacy', '/terms', '/help', '/faq']
+const DISABLED_PREFIXES = ['/onboarding', '/auth', '/privacy', '/terms', '/help', '/faq', '/insights/weekly-report']
 
 export default function WeeklyReportReadyModal() {
   const pathname = usePathname()

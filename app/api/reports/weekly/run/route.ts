@@ -421,6 +421,420 @@ function intersectDays(listA: string[], listB: string[]) {
   return listB.filter((day) => setA.has(day))
 }
 
+function averageValue(rows: Array<any>, key: string) {
+  if (!rows.length) return 0
+  const total = rows.reduce((sum, row) => sum + Number(row?.[key] ?? 0), 0)
+  return total / rows.length
+}
+
+function buildCorrelation(
+  dailyStats: Array<any>,
+  metricKey: string,
+  outcomeKey: string,
+  options?: { minDays?: number; minDiff?: number }
+) {
+  const rows = dailyStats.filter((row) => {
+    const metric = Number(row?.[metricKey] ?? 0)
+    const outcome = row?.[outcomeKey]
+    return Number.isFinite(metric) && metric > 0 && outcome != null
+  })
+  const minDays = options?.minDays ?? 4
+  if (rows.length < minDays) return null
+  const metricAvg = averageValue(rows, metricKey)
+  const high = rows.filter((row) => Number(row?.[metricKey] ?? 0) >= metricAvg)
+  const low = rows.filter((row) => Number(row?.[metricKey] ?? 0) < metricAvg)
+  if (high.length < 2 || low.length < 2) return null
+  const highAvg = averageValue(high, outcomeKey)
+  const lowAvg = averageValue(low, outcomeKey)
+  const diff = +(highAvg - lowAvg).toFixed(2)
+  const minDiff = options?.minDiff ?? 0.3
+  if (Math.abs(diff) < minDiff) return null
+  return {
+    metricAvg: Math.round(metricAvg * 10) / 10,
+    highAvg: Math.round(highAvg * 10) / 10,
+    lowAvg: Math.round(lowAvg * 10) / 10,
+    diff,
+    highDays: high.map((row) => row.date).filter(Boolean),
+    lowDays: low.map((row) => row.date).filter(Boolean),
+  }
+}
+
+function buildLateMealImpact(dailyStats: Array<any>, lateMealDays: string[]) {
+  if (!lateMealDays?.length) return null
+  const dayMap = new Map(dailyStats.map((row) => [row.date, row]))
+  const lateRows = lateMealDays.map((day) => dayMap.get(day)).filter(Boolean)
+  const otherRows = dailyStats.filter((row) => row.date && !lateMealDays.includes(row.date))
+  if (lateRows.length < 2 || otherRows.length < 2) return null
+  const lateMoodAvg = averageValue(lateRows, 'moodAvg')
+  const otherMoodAvg = averageValue(otherRows, 'moodAvg')
+  const lateSymptomAvg = averageValue(lateRows, 'symptomCount')
+  const otherSymptomAvg = averageValue(otherRows, 'symptomCount')
+  return {
+    lateMoodAvg: Math.round(lateMoodAvg * 10) / 10,
+    otherMoodAvg: Math.round(otherMoodAvg * 10) / 10,
+    lateSymptomAvg: Math.round(lateSymptomAvg * 10) / 10,
+    otherSymptomAvg: Math.round(otherSymptomAvg * 10) / 10,
+  }
+}
+
+function buildTrendSignals(dailyStats: Array<any>) {
+  const sorted = [...dailyStats].sort((a, b) => a.date.localeCompare(b.date))
+  if (sorted.length < 4) return []
+  const mid = Math.floor(sorted.length / 2)
+  const first = sorted.slice(0, mid)
+  const second = sorted.slice(mid)
+  const signals: Array<{
+    metric: string
+    firstAvg: number
+    secondAvg: number
+    diff: number
+    direction: 'up' | 'down' | 'flat'
+    unit: string
+    improvesWhenUp: boolean | null
+  }> = []
+
+  const pushSignal = (key: string, metric: string, minDiff: number, unit: string, improvesWhenUp: boolean | null) => {
+    const firstAvg = averageValue(first, key)
+    const secondAvg = averageValue(second, key)
+    if (!Number.isFinite(firstAvg) || !Number.isFinite(secondAvg)) return
+    const diff = +(secondAvg - firstAvg).toFixed(1)
+    if (Math.abs(diff) < minDiff) return
+    const direction = diff === 0 ? 'flat' : diff > 0 ? 'up' : 'down'
+    signals.push({
+      metric,
+      firstAvg: Math.round(firstAvg * 10) / 10,
+      secondAvg: Math.round(secondAvg * 10) / 10,
+      diff,
+      direction,
+      unit,
+      improvesWhenUp,
+    })
+  }
+
+  pushSignal('waterMl', 'Hydration', 350, 'ml', true)
+  pushSignal('exerciseMinutes', 'Exercise', 8, 'min', true)
+  pushSignal('moodAvg', 'Mood', 0.4, '', true)
+  pushSignal('symptomCount', 'Symptoms', 1, '', false)
+  pushSignal('calories', 'Calories', 200, 'kcal', null)
+  pushSignal('protein_g', 'Protein', 12, 'g', true)
+
+  return signals
+}
+
+function buildRiskFlags(params: {
+  dailyStats: Array<any>
+  dataFlags: any
+  mealTimingSummary: any
+}) {
+  const flags: Array<{ name: string; reason: string }> = []
+  const dataFlags = params.dataFlags || {}
+  const mealTimingSummary = params.mealTimingSummary || {}
+
+  if ((dataFlags.lowHydrationDays || []).length >= 3) {
+    const days = dataFlags.lowHydrationDays.map((d: any) => d.date).slice(0, 3).join(', ')
+    flags.push({
+      name: 'Repeated low hydration days',
+      reason: `Lower water intake shows up on ${days}. This can affect energy and focus.`,
+    })
+  }
+  if ((dataFlags.lowActivityDays || []).length >= 3) {
+    const days = dataFlags.lowActivityDays.map((d: any) => d.date).slice(0, 3).join(', ')
+    flags.push({
+      name: 'Low movement streak',
+      reason: `Very little movement shows up on ${days}. This can slow recovery and mood.`,
+    })
+  }
+  if ((mealTimingSummary.lateMealDays || []).length >= 3) {
+    const days = mealTimingSummary.lateMealDays.slice(0, 3).join(', ')
+    flags.push({
+      name: 'Late meals pattern',
+      reason: `Late dinners show up on ${days}. This can affect sleep quality.`,
+    })
+  }
+  if ((dataFlags.symptomHeavyDays || []).length >= 2) {
+    const days = dataFlags.symptomHeavyDays.map((d: any) => d.date).slice(0, 3).join(', ')
+    flags.push({
+      name: 'Symptom flare days',
+      reason: `Symptoms spiked on ${days}. These are good days to review triggers.`,
+    })
+  }
+
+  const moodValues = params.dailyStats.map((row) => row.moodAvg).filter((v) => Number.isFinite(v))
+  if (moodValues.length >= 3) {
+    const min = Math.min(...moodValues)
+    const max = Math.max(...moodValues)
+    const range = Math.round((max - min) * 10) / 10
+    if (range >= 1.5) {
+      flags.push({
+        name: 'Mood swings',
+        reason: `Mood ranged by about ${range} points across the week.`,
+      })
+    }
+  }
+
+  return flags
+}
+
+function buildInsightCandidates(params: {
+  nutritionSignals: any
+  mealTimingSummary: any
+  timeOfDayNutrition: Array<any>
+  dataFlags: any
+  correlationSignals: any
+  lateMealImpact: any
+  checkinSummary: any
+  labHighlights: Array<any>
+  labTrends: Array<any>
+  moodRange: number | null
+}) {
+  const candidates: Array<{
+    section: ReportSectionKey
+    bucket: 'working' | 'suggested' | 'avoid'
+    title: string
+    evidence: string
+    action: string
+  }> = []
+  const seen = new Set<string>()
+  const add = (candidate: {
+    section: ReportSectionKey
+    bucket: 'working' | 'suggested' | 'avoid'
+    title: string
+    evidence: string
+    action: string
+  }) => {
+    const key = `${candidate.section}:${candidate.title}`
+    if (seen.has(key)) return
+    seen.add(key)
+    candidates.push(candidate)
+  }
+
+  const nutritionSignals = params.nutritionSignals || {}
+  const mealTimingSummary = params.mealTimingSummary || {}
+  const timeOfDayNutrition = Array.isArray(params.timeOfDayNutrition) ? params.timeOfDayNutrition : []
+  const dataFlags = params.dataFlags || {}
+  const correlationSignals = params.correlationSignals || {}
+  const lateMealImpact = params.lateMealImpact || null
+
+  if (nutritionSignals.avgProtein && nutritionSignals.avgProtein < 70) {
+    add({
+      section: 'nutrition',
+      bucket: 'suggested',
+      title: 'Protein looks light',
+      evidence: `Average protein was about ${nutritionSignals.avgProtein}g per day.`,
+      action: 'Add a clear protein source at breakfast or lunch and watch energy and hunger.',
+    })
+  }
+  if (nutritionSignals.avgFiber && nutritionSignals.avgFiber < 20) {
+    add({
+      section: 'nutrition',
+      bucket: 'suggested',
+      title: 'Fiber is low',
+      evidence: `Average fiber was about ${nutritionSignals.avgFiber}g per day.`,
+      action: 'Add beans, oats, berries, or vegetables to steady digestion.',
+    })
+  }
+  if ((dataFlags.sugarSpikes || []).length) {
+    const days = dataFlags.sugarSpikes.map((d: any) => d.date).slice(0, 3).join(', ')
+    add({
+      section: 'nutrition',
+      bucket: 'avoid',
+      title: 'Sugar spikes',
+      evidence: `Sugar was highest on ${days}.`,
+      action: 'Swap the biggest sweet item for protein + fiber and see if energy stays steadier.',
+    })
+  }
+  if ((dataFlags.sodiumSpikes || []).length) {
+    const days = dataFlags.sodiumSpikes.map((d: any) => d.date).slice(0, 3).join(', ')
+    add({
+      section: 'nutrition',
+      bucket: 'avoid',
+      title: 'High sodium days',
+      evidence: `Sodium was highest on ${days}.`,
+      action: 'Balance salty meals with water and potassium-rich foods.',
+    })
+  }
+
+  if ((dataFlags.lowHydrationDays || []).length) {
+    const days = dataFlags.lowHydrationDays.map((d: any) => d.date).slice(0, 3).join(', ')
+    add({
+      section: 'hydration',
+      bucket: 'suggested',
+      title: 'Low hydration days',
+      evidence: `Lower intake shows on ${days}.`,
+      action: 'Add a bottle earlier in the day and track how you feel.',
+    })
+  }
+  if (correlationSignals.hydrationMood && correlationSignals.hydrationMood.diff > 0) {
+    add({
+      section: 'hydration',
+      bucket: 'working',
+      title: 'Hydration lines up with mood',
+      evidence: `Mood averaged ${correlationSignals.hydrationMood.highAvg} on higher-water days vs ${correlationSignals.hydrationMood.lowAvg} on lower-water days.`,
+      action: 'Aim for water closer to the higher days and see if mood stays steadier.',
+    })
+  }
+
+  if ((dataFlags.lowActivityDays || []).length) {
+    const days = dataFlags.lowActivityDays.map((d: any) => d.date).slice(0, 3).join(', ')
+    add({
+      section: 'exercise',
+      bucket: 'suggested',
+      title: 'Low activity days',
+      evidence: `Movement dropped on ${days}.`,
+      action: 'Add a short walk or quick session on those days.',
+    })
+  }
+  if (correlationSignals.exerciseMood && correlationSignals.exerciseMood.diff > 0) {
+    add({
+      section: 'exercise',
+      bucket: 'working',
+      title: 'Movement lines up with mood',
+      evidence: `Mood averaged ${correlationSignals.exerciseMood.highAvg} on higher-movement days vs ${correlationSignals.exerciseMood.lowAvg} on lower-movement days.`,
+      action: 'Keep a short session on low-energy days to protect mood.',
+    })
+  }
+
+  if ((dataFlags.lowMoodDays || []).length) {
+    const days = dataFlags.lowMoodDays.map((d: any) => d.date).slice(0, 3).join(', ')
+    add({
+      section: 'mood',
+      bucket: 'suggested',
+      title: 'Lower mood days',
+      evidence: `Mood dipped on ${days}.`,
+      action: 'Add a short note on those days so we can link triggers.',
+    })
+  }
+  if (params.moodRange != null && params.moodRange >= 1.5) {
+    add({
+      section: 'mood',
+      bucket: 'suggested',
+      title: 'Mood swings',
+      evidence: `Mood ranged by about ${params.moodRange} points this week.`,
+      action: 'Look at food timing, hydration, and stress on the lowest days.',
+    })
+  }
+
+  if ((dataFlags.symptomHeavyDays || []).length) {
+    const days = dataFlags.symptomHeavyDays.map((d: any) => d.date).slice(0, 3).join(', ')
+    add({
+      section: 'symptoms',
+      bucket: 'suggested',
+      title: 'Symptom flare days',
+      evidence: `Symptoms were heavier on ${days}.`,
+      action: 'Review those days for food timing, sugar, and stress shifts.',
+    })
+  }
+  if (correlationSignals.sugarSymptoms && correlationSignals.sugarSymptoms.diff > 0) {
+    add({
+      section: 'symptoms',
+      bucket: 'avoid',
+      title: 'Sugar days line up with more symptoms',
+      evidence: `Symptoms averaged ${correlationSignals.sugarSymptoms.highAvg} on higher-sugar days vs ${correlationSignals.sugarSymptoms.lowAvg} on lower-sugar days.`,
+      action: 'Reduce added sugar on those days and see if symptoms ease.',
+    })
+  }
+  if (lateMealImpact && lateMealImpact.lateMoodAvg < lateMealImpact.otherMoodAvg - 0.3) {
+    add({
+      section: 'lifestyle',
+      bucket: 'avoid',
+      title: 'Late meals link to lower mood',
+      evidence: `Mood averaged ${lateMealImpact.lateMoodAvg} on late-meal days vs ${lateMealImpact.otherMoodAvg} on other days.`,
+      action: 'Try an earlier dinner for a week and compare.',
+    })
+  }
+  if (lateMealImpact && lateMealImpact.lateSymptomAvg > lateMealImpact.otherSymptomAvg + 1) {
+    add({
+      section: 'lifestyle',
+      bucket: 'avoid',
+      title: 'Late meals link to more symptoms',
+      evidence: `Symptoms averaged ${lateMealImpact.lateSymptomAvg} on late-meal days vs ${lateMealImpact.otherSymptomAvg} on other days.`,
+      action: 'Shift the last meal earlier and watch symptoms.',
+    })
+  }
+
+  if ((mealTimingSummary.lateMealDays || []).length) {
+    const days = mealTimingSummary.lateMealDays.slice(0, 3).join(', ')
+    add({
+      section: 'lifestyle',
+      bucket: 'avoid',
+      title: 'Late meals',
+      evidence: `Late meals showed up on ${days}.`,
+      action: 'Move the last meal earlier to see if sleep feels better.',
+    })
+  }
+  if ((mealTimingSummary.lateSnackDays || []).length) {
+    const days = mealTimingSummary.lateSnackDays.slice(0, 3).join(', ')
+    add({
+      section: 'lifestyle',
+      bucket: 'avoid',
+      title: 'Late snacks',
+      evidence: `Late snacks showed up on ${days}.`,
+      action: 'If you need one, keep it light and protein-based.',
+    })
+  }
+  if (timeOfDayNutrition.length) {
+    const totalCalories = timeOfDayNutrition.reduce((sum: number, bucket: any) => sum + Number(bucket.calories || 0), 0)
+    const lateBucket = timeOfDayNutrition.find((bucket: any) => bucket.label === 'late')
+    if (totalCalories > 0 && lateBucket?.calories && lateBucket.calories / totalCalories >= 0.35) {
+      add({
+        section: 'nutrition',
+        bucket: 'suggested',
+        title: 'Most calories land late',
+        evidence: `Roughly ${Math.round((lateBucket.calories / totalCalories) * 100)}% of calories landed late at night.`,
+        action: 'Shift one meal earlier and see if energy improves.',
+      })
+    }
+  }
+
+  if (params.checkinSummary?.goals?.length) {
+    const improving = params.checkinSummary.goals.filter((g: any) => g.trend != null && g.trend > 0.4)
+    const declining = params.checkinSummary.goals.filter((g: any) => g.trend != null && g.trend < -0.4)
+    if (improving.length) {
+      const names = improving.map((g: any) => g.goal).slice(0, 2).join(', ')
+      add({
+        section: 'overview',
+        bucket: 'working',
+        title: 'Goal scores improved',
+        evidence: `Your check-in scores improved for ${names}.`,
+        action: 'Keep the same habits that showed up on those better days.',
+      })
+    }
+    if (declining.length) {
+      const names = declining.map((g: any) => g.goal).slice(0, 2).join(', ')
+      add({
+        section: 'overview',
+        bucket: 'suggested',
+        title: 'Goal scores dipped',
+        evidence: `Your check-in scores dipped for ${names}.`,
+        action: 'Review those days for food timing, hydration, or stress shifts.',
+      })
+    }
+  }
+
+  const outOfRange = (params.labHighlights || []).filter((h: any) => h?.status === 'above' || h?.status === 'below')
+  if (outOfRange.length) {
+    const names = outOfRange.map((h: any) => h.name).slice(0, 2).join(', ')
+    add({
+      section: 'labs',
+      bucket: 'suggested',
+      title: 'Lab markers outside range',
+      evidence: `Out-of-range markers include ${names}.`,
+      action: 'Discuss these with a clinician before changing supplements or medications.',
+    })
+  } else if ((params.labTrends || []).length) {
+    const first = params.labTrends[0]
+    add({
+      section: 'labs',
+      bucket: 'working',
+      title: 'Lab movement tracked',
+      evidence: `${first.name} moved ${first.direction} vs the prior result.`,
+      action: 'Keep labs updated so trends stay clear.',
+    })
+  }
+
+  return candidates
+}
+
 function clipText(value: string, max = 220) {
   const compact = String(value || '').replace(/\s+/g, ' ').trim()
   if (compact.length <= max) return compact
@@ -650,7 +1064,14 @@ function buildMoodSummary(
 }
 
 function buildCheckinSummary(
-  healthLogs: Array<{ rating: number; createdAt: Date; notes?: string | null; goal?: { name?: string | null } | null }>
+  ratings: Array<{
+    name?: string | null
+    value?: number | null
+    isna?: boolean | null
+    isNa?: boolean | null
+    timestamp: Date
+    note?: string | null
+  }>
 ) {
   const goalMap = new Map<
     string,
@@ -658,43 +1079,51 @@ function buildCheckinSummary(
       goal: string
       total: number
       count: number
-      firstRating: number | null
-      lastRating: number | null
+      firstValue: number | null
+      lastValue: number | null
       firstAt: Date | null
       lastAt: Date | null
     }
   >()
   const notes: Array<{ content: string; createdAt: string; goal: string }> = []
+  let totalValues = 0
+  let valueCount = 0
 
-  const sorted = [...healthLogs].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-  for (const log of sorted) {
-    const goalName = String(log.goal?.name || 'General')
+  const sorted = [...ratings].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  for (const row of sorted) {
+    const goalName = String(row.name || 'General')
     if (goalName.startsWith('__')) continue
-    const rating = Number(log.rating || 0) || 0
+    const isNa = Boolean((row as any).isNa ?? (row as any).isna)
+    const value = Number(row.value ?? 0)
+    const hasValue = Number.isFinite(value) && !isNa
     const existing = goalMap.get(goalName) || {
       goal: goalName,
       total: 0,
       count: 0,
-      firstRating: null,
-      lastRating: null,
+      firstValue: null,
+      lastValue: null,
       firstAt: null,
       lastAt: null,
     }
-    existing.total += rating
-    existing.count += 1
-    if (!existing.firstAt || log.createdAt < existing.firstAt) {
-      existing.firstAt = log.createdAt
-      existing.firstRating = rating
-    }
-    if (!existing.lastAt || log.createdAt > existing.lastAt) {
-      existing.lastAt = log.createdAt
-      existing.lastRating = rating
+    if (hasValue) {
+      existing.total += value
+      existing.count += 1
+      totalValues += value
+      valueCount += 1
+      if (!existing.firstAt || row.timestamp < existing.firstAt) {
+        existing.firstAt = row.timestamp
+        existing.firstValue = value
+      }
+      if (!existing.lastAt || row.timestamp > existing.lastAt) {
+        existing.lastAt = row.timestamp
+        existing.lastValue = value
+      }
     }
     goalMap.set(goalName, existing)
 
-    const note = String(log.notes || '').trim()
+    const note = String(row.note || '').trim()
     if (note) {
-      notes.push({ content: clipText(note, 180), createdAt: log.createdAt.toISOString(), goal: goalName })
+      notes.push({ content: clipText(note, 180), createdAt: row.timestamp.toISOString(), goal: goalName })
     }
   }
 
@@ -703,17 +1132,14 @@ function buildCheckinSummary(
       goal: goal.goal,
       avgRating: goal.count ? +(goal.total / goal.count).toFixed(1) : null,
       entries: goal.count,
-      trend: goal.firstRating != null && goal.lastRating != null ? +(goal.lastRating - goal.firstRating).toFixed(1) : null,
+      trend: goal.firstValue != null && goal.lastValue != null ? +(goal.lastValue - goal.firstValue).toFixed(1) : null,
     }))
     .sort((a, b) => (b.entries || 0) - (a.entries || 0))
 
-  const overallAvg =
-    goals.length > 0
-      ? +(goals.reduce((sum, goal) => sum + Number(goal.avgRating || 0), 0) / goals.length).toFixed(1)
-      : null
+  const overallAvg = valueCount ? +(totalValues / valueCount).toFixed(1) : null
 
   return {
-    totalEntries: healthLogs.length,
+    totalEntries: ratings.length,
     overallAvg,
     goals,
     notes: notes.slice(-4),
@@ -746,7 +1172,7 @@ type DailyStat = {
 function buildDailyStats(params: {
   foodLogs: Array<{ name: string; nutrients: any; createdAt: Date; localDate?: string | null }>
   waterLogs: Array<{ amountMl: number; createdAt: Date; localDate?: string | null }>
-  healthLogs: Array<{ createdAt: Date }>
+  checkinRatings: Array<{ timestamp: Date }>
   exerciseLogs: Array<{ duration: number; createdAt: Date }>
   exerciseEntries: Array<{ durationMinutes: number; createdAt: Date; localDate?: string | null }>
   moodRows: Array<{ mood: number; timestamp: Date; localDate?: string | null }>
@@ -809,8 +1235,8 @@ function buildDailyStats(params: {
     day.waterMl += Number(log.amountMl || 0) || 0
   }
 
-  for (const log of params.healthLogs) {
-    const dayKey = resolveDayKey(null, log.createdAt)
+  for (const log of params.checkinRatings) {
+    const dayKey = resolveDayKey(null, log.timestamp)
     const day = ensureDay(dayKey)
     if (!day) continue
     day.checkinCount += 1
@@ -970,302 +1396,128 @@ function buildFallbackReport(context: any) {
   const sections = buildDefaultSections()
   const wins: Array<{ name: string; reason: string }> = []
   const gaps: Array<{ name: string; reason: string }> = []
-  const coverage = context?.coverage || {}
+  const candidates = Array.isArray(context?.insightCandidates) ? context.insightCandidates : []
+  const riskFlags = Array.isArray(context?.riskFlags) ? context.riskFlags : []
   const nutritionSummary = context?.nutritionSummary || {}
   const hydrationSummary = context?.hydrationSummary || {}
   const exerciseSummary = context?.exerciseSummary || {}
   const moodSummary = context?.moodSummary || {}
   const symptomSummary = context?.symptomSummary || {}
   const checkinSummary = context?.checkinSummary || {}
-  const mealTimingSummary = context?.mealTimingSummary || {}
-  const timeOfDayNutrition = Array.isArray(context?.timeOfDayNutrition) ? context.timeOfDayNutrition : []
-  const nutritionSignals = context?.nutritionSignals || {}
-  const overlapSignals = context?.overlapSignals || {}
-  const dataFlags = context?.dataFlags || {}
-  const talkToAi = context?.talkToAi || {}
-  const issues = Array.isArray(context?.issues) ? context.issues : []
-  const goals = Array.isArray(context?.goals) ? context.goals : []
-  const labTrends = Array.isArray(context?.labTrends) ? context.labTrends : []
   const labHighlights = Array.isArray(context?.labs?.highlights) ? context.labs.highlights : []
-  const dailyNutrition = Array.isArray(nutritionSummary?.dailyTotals) ? nutritionSummary.dailyTotals : []
-  const dailyHydration = Array.isArray(hydrationSummary?.dailyTotals) ? hydrationSummary.dailyTotals : []
-  const highestCalorieDay = dailyNutrition.reduce(
-    (best: any, day: any) => (!best || Number(day.calories || 0) > Number(best.calories || 0) ? day : best),
-    null
-  )
-  const highestHydrationDay = dailyHydration.reduce(
-    (best: any, day: any) => (!best || Number(day.totalMl || 0) > Number(best.totalMl || 0) ? day : best),
-    null
-  )
+  const labTrends = Array.isArray(context?.labTrends) ? context.labTrends : []
+  const supplements = Array.isArray(context?.supplements) ? context.supplements : []
+  const medications = Array.isArray(context?.medications) ? context.medications : []
 
-  if ((coverage.daysActive || 0) >= 4) {
-    wins.push({
-      name: 'Consistent tracking',
-      reason: `You logged data on ${coverage.daysActive} days this week, which makes trends clearer. Keep a short daily log so next week's report is even sharper.`,
-    })
-  }
-  if ((coverage.foodCount || 0) >= 4) {
-    wins.push({
-      name: 'Food logging',
-      reason: `${coverage.foodCount} food entries were captured, giving this report real nutrition detail. Keep logging meals and snacks so we can link food to how you feel.`,
-    })
-  }
-  if ((coverage.checkinCount || 0) >= 3) {
-    wins.push({
-      name: 'Check-ins completed',
-      reason: `${coverage.checkinCount} check-ins were logged, so we can link how you feel to your goals. Add a short note on tough days so the report can explain why.`,
-    })
-  }
-  if ((coverage.daysActive || 0) <= 2) {
-    gaps.push({
-      name: 'Low tracking frequency',
-      reason: 'Only a few active days were logged, so insights will be lighter than usual. Try to log at least one thing each day.',
-    })
-  }
-  if ((coverage.labCount || 0) === 0) {
-    gaps.push({
-      name: 'No lab updates',
-      reason: 'No lab updates were logged this week. Upload lab results when you have them so trends can be tracked over time.',
-    })
-  }
-  if ((coverage.exerciseCount || 0) === 0) {
-    gaps.push({
-      name: 'Exercise not captured',
-      reason: 'No workouts were logged, so activity trends are missing. Add even short walks so we can connect movement to your goals.',
-    })
-  }
-  if ((coverage.waterCount || 0) === 0) {
-    gaps.push({
-      name: 'Hydration not logged',
-      reason: 'No drinks were logged, so hydration patterns are missing. Log water, tea, or coffee so this section is real next week.',
-    })
+  const addItem = (
+    section: ReportSectionKey,
+    bucket: 'working' | 'suggested' | 'avoid',
+    name: string,
+    reason: string
+  ) => {
+    if (!name && !reason) return
+    sections[section][bucket].push({ name: name || 'Insight', reason: reason || '' })
   }
 
-  const issueList = issues.map((item: any) => String(item || '').trim()).filter(Boolean)
-  if (issueList.length) {
-    sections.overview.working.push({
-      name: 'Focus areas logged',
-      reason: `Your selected focus areas include ${issueList.slice(0, 3).join(', ')}. Keep logging so we can link these to what you eat, drink, and do each day.`,
-    })
-  }
-  const goalList = goals.map((g: any) => String(g?.name || '').trim()).filter(Boolean)
-  if (goalList.length) {
-    sections.overview.working.push({
-      name: 'Goals tracked',
-      reason: `Goals logged this week include ${goalList.slice(0, 3).join(', ')}. We use these goals to decide what to highlight each week.`,
-    })
-  }
-  if (talkToAi?.userMessageCount) {
-    const topicLabels = Array.isArray(talkToAi.topics)
-      ? talkToAi.topics.map((t: any) => t.topic).slice(0, 3)
-      : []
-    const topicText = topicLabels.length ? `Recent AI chats focused on ${topicLabels.join(', ')}.` : 'You chatted with the AI this week.'
-    sections.overview.working.push({
-      name: 'AI chat focus',
-      reason: topicText,
-    })
+  for (const candidate of candidates) {
+    const section = candidate.section as ReportSectionKey
+    if (!REPORT_SECTIONS.includes(section)) continue
+    const evidence = String(candidate.evidence || '').trim()
+    const action = String(candidate.action || '').trim()
+    const reason = [evidence, action].filter(Boolean).join(' ')
+    addItem(section, candidate.bucket, candidate.title, reason)
   }
 
-  const supplementItems = Array.isArray(context?.supplements)
-    ? context.supplements.slice(0, 6).map((s: any) => ({
-      name: s.name,
-      reason: 'Logged as part of your current routine.',
-    }))
-    : []
-  const medicationItems = Array.isArray(context?.medications)
-    ? context.medications.slice(0, 6).map((m: any) => ({
-      name: m.name,
-      reason: 'Logged as part of your current routine.',
-    }))
-    : []
+  const working = candidates.filter((c: any) => c.bucket === 'working').slice(0, 3)
+  const focus = candidates.filter((c: any) => c.bucket !== 'working').slice(0, 3)
+  working.forEach((item: any) => wins.push({ name: item.title, reason: [item.evidence, item.action].filter(Boolean).join(' ') }))
+  focus.forEach((item: any) => gaps.push({ name: item.title, reason: [item.evidence, item.action].filter(Boolean).join(' ') }))
+  if (gaps.length < 3 && riskFlags.length) {
+    riskFlags.slice(0, 3 - gaps.length).forEach((flag: any) => gaps.push(flag))
+  }
 
-  if (supplementItems.length) sections.supplements.working = supplementItems
-  if (medicationItems.length) sections.medications.working = medicationItems
-
-  if (nutritionSummary?.entriesWithNutrients) {
+  if (!sections.nutrition.working.length && nutritionSummary?.dailyAverages?.calories) {
     sections.nutrition.working.push({
-      name: 'Nutrition logged',
-      reason: `Food was logged on ${nutritionSummary.daysWithLogs || 0} days. Avg per day: ${nutritionSummary.dailyAverages?.calories || 0} kcal and ${nutritionSummary.dailyAverages?.protein_g || 0}g protein. This gives a clear base for trends.`,
+      name: 'Daily nutrition baseline',
+      reason: `Average intake was about ${nutritionSummary.dailyAverages.calories} kcal and ${nutritionSummary.dailyAverages.protein_g}g protein per day.`,
     })
   }
-  if (Array.isArray(nutritionSummary?.topFoods) && nutritionSummary.topFoods.length) {
-    const topFoodList = nutritionSummary.topFoods.map((f: any) => f.name).filter(Boolean).slice(0, 3)
-    if (topFoodList.length) {
-      sections.nutrition.working.push({
-        name: 'Top foods',
-        reason: `Most logged foods: ${topFoodList.join(', ')}. These are driving your weekly totals.`,
-      })
-    }
-  }
-  if (highestCalorieDay?.calories) {
-    sections.nutrition.suggested.push({
-      name: 'Highest calorie day',
-      reason: `${highestCalorieDay.date} was your highest calorie day (${Math.round(highestCalorieDay.calories)} kcal). Review what made that day higher.`,
-    })
-  }
-  if (nutritionSignals?.avgFiber != null && nutritionSignals.avgFiber > 0 && nutritionSignals.avgFiber < 20) {
-    sections.nutrition.suggested.push({
-      name: 'Fiber looks low',
-      reason: `Your average fiber was ${nutritionSignals.avgFiber}g per day. Adding beans, oats, berries, or vegetables can help digestion and fullness.`,
-    })
-  }
-  if (nutritionSignals?.avgProtein != null && nutritionSignals.avgProtein > 0 && nutritionSignals.avgProtein < 70) {
-    sections.nutrition.suggested.push({
-      name: 'Protein looks light',
-      reason: `Your average protein was ${nutritionSignals.avgProtein}g per day. Add a clear protein source to breakfast or lunch to steady energy.`,
-    })
-  }
-  if (mealTimingSummary?.lateMealDays?.length) {
-    const days = mealTimingSummary.lateMealDays.slice(0, 3).join(', ')
-    sections.lifestyle.avoid.push({
-      name: 'Late meals',
-      reason: `Late meals were logged on ${days}. Try moving the last meal earlier to see if sleep or digestion improves.`,
-    })
-  }
-  if (mealTimingSummary?.lateSnackDays?.length) {
-    const days = mealTimingSummary.lateSnackDays.slice(0, 3).join(', ')
-    sections.lifestyle.avoid.push({
-      name: 'Late snacks',
-      reason: `Late snacks were logged on ${days}. If you need a late snack, keep it light and protein-based.`,
-    })
-  }
-  if (timeOfDayNutrition.length) {
-    const lateBucket = timeOfDayNutrition.find((b: any) => b.label === 'late')
-    if (lateBucket?.entries) {
-      sections.nutrition.suggested.push({
-        name: 'Late day calories',
-        reason: `${lateBucket.entries} food entries were logged late at night. Shifting some of that earlier can smooth energy.`,
-      })
-    }
-  }
-  if (dataFlags?.sugarSpikes?.length) {
-    const days = dataFlags.sugarSpikes.map((d: any) => d.date).join(', ')
-    sections.nutrition.avoid.push({
-      name: 'Sugar spikes',
-      reason: `Sugar was highest on ${days}. Review what was eaten on those days.`,
-    })
-  }
-  if (dataFlags?.sodiumSpikes?.length) {
-    const days = dataFlags.sodiumSpikes.map((d: any) => d.date).join(', ')
-    sections.nutrition.avoid.push({
-      name: 'Sodium spikes',
-      reason: `Sodium was highest on ${days}. Review meals logged on those days.`,
-    })
-  }
-
-  if (hydrationSummary?.entries) {
+  if (!sections.hydration.working.length && hydrationSummary?.dailyAverageMl) {
     sections.hydration.working.push({
-      name: 'Hydration logged',
-      reason: `${hydrationSummary.entries} drinks across ${hydrationSummary.daysWithLogs || 0} days. Avg ${hydrationSummary.dailyAverageMl || 0} ml per day. This shows a clear hydration pattern.`,
+      name: 'Daily hydration baseline',
+      reason: `Average water was about ${hydrationSummary.dailyAverageMl} ml per day.`,
     })
   }
-  if (highestHydrationDay?.totalMl) {
-    sections.hydration.suggested.push({
-      name: 'Best hydration day',
-      reason: `${highestHydrationDay.date} was your highest intake (${Math.round(highestHydrationDay.totalMl)} ml). Try to repeat that on lower days.`,
-    })
-  }
-  if (dataFlags?.lowHydrationDays?.length) {
-    const days = dataFlags.lowHydrationDays.map((d: any) => d.date).join(', ')
-    sections.hydration.suggested.push({
-      name: 'Low hydration days',
-      reason: `Lower intake on ${days}. Add a drink entry on those days.`,
-    })
-  }
-
-  if (exerciseSummary?.sessions) {
-    const topActivities = Array.isArray(exerciseSummary.topActivities)
-      ? exerciseSummary.topActivities.map((a: any) => a.name).filter(Boolean).slice(0, 3)
-      : []
+  if (!sections.exercise.working.length && exerciseSummary?.totalMinutes) {
     sections.exercise.working.push({
-      name: 'Activity logged',
-      reason: `${exerciseSummary.sessions} sessions, ${exerciseSummary.totalMinutes || 0} total minutes across ${exerciseSummary.daysActive || 0} days. ${topActivities.length ? `Top: ${topActivities.join(', ')}.` : ''}`.trim(),
+      name: 'Weekly movement total',
+      reason: `You moved about ${exerciseSummary.totalMinutes} minutes across the week.`,
     })
   }
-  if (dataFlags?.lowActivityDays?.length) {
-    const days = dataFlags.lowActivityDays.map((d: any) => d.date).join(', ')
-    sections.exercise.suggested.push({
-      name: 'Low activity days',
-      reason: `Little activity logged on ${days}. Add a short session on those days.`,
-    })
-  }
-
-  if (moodSummary?.entries) {
-    const trendText = moodSummary?.trend?.direction ? `Trend: ${moodSummary.trend.direction}.` : ''
+  if (!sections.mood.working.length && moodSummary?.averageMood != null) {
     sections.mood.working.push({
-      name: 'Mood check-ins logged',
-      reason: `Avg mood ${moodSummary.averageMood ?? 'n/a'} across ${moodSummary.entries} entries on ${moodSummary.daysWithLogs || 0} days. ${trendText}`.trim(),
+      name: 'Mood baseline',
+      reason: `Average mood was about ${moodSummary.averageMood} this week.`,
     })
   }
-  if (dataFlags?.lowMoodDays?.length) {
-    const days = dataFlags.lowMoodDays.map((d: any) => d.date).join(', ')
-    sections.mood.suggested.push({
-      name: 'Lower mood days',
-      reason: `Mood dipped on ${days}. Add notes to capture what changed.`,
-    })
-  }
-
-  if (symptomSummary?.entries) {
-    const topSymptoms = Array.isArray(symptomSummary.topSymptoms)
-      ? symptomSummary.topSymptoms.map((s: any) => s.name).filter(Boolean).slice(0, 3)
-      : []
+  if (!sections.symptoms.working.length && symptomSummary?.topSymptoms?.length) {
+    const topSymptoms = symptomSummary.topSymptoms.map((s: any) => s.name).filter(Boolean).slice(0, 3)
     sections.symptoms.working.push({
-      name: 'Symptoms logged',
-      reason: `${symptomSummary.entries} symptom entries across ${symptomSummary.daysWithLogs || 0} days. Most common: ${topSymptoms.join(', ') || 'logged symptoms'}.`,
+      name: 'Most common symptoms',
+      reason: `Most common symptoms: ${topSymptoms.join(', ')}.`,
     })
   }
-  if (dataFlags?.symptomHeavyDays?.length) {
-    const days = dataFlags.symptomHeavyDays.map((d: any) => d.date).join(', ')
-    sections.symptoms.suggested.push({
-      name: 'Symptom-heavy days',
-      reason: `More symptoms were logged on ${days}. Check for triggers on those days.`,
-    })
-  }
-  if (overlapSignals?.symptomLateMealDays?.length) {
-    const days = overlapSignals.symptomLateMealDays.slice(0, 3).join(', ')
-    sections.symptoms.suggested.push({
-      name: 'Symptoms + late meals overlap',
-      reason: `Symptoms were heavier on late-meal days (${days}). Try an earlier dinner for a week and compare.`,
-    })
-  }
-  if (overlapSignals?.symptomHighSugarDays?.length) {
-    const days = overlapSignals.symptomHighSugarDays.slice(0, 3).join(', ')
-    sections.symptoms.suggested.push({
-      name: 'Symptoms + high sugar overlap',
-      reason: `Symptoms were heavier on high-sugar days (${days}). Try reducing added sugar on those days and see if symptoms ease.`,
-    })
-  }
-
-  if (labTrends.length || labHighlights.length) {
+  if (!sections.labs.working.length && (labHighlights.length || labTrends.length)) {
     const first = labTrends[0]
-    const label = first ? `${first.name} moved ${first.direction}` : 'Lab results updated'
     sections.labs.working.push({
       name: 'Lab movement',
-      reason: labTrends.length ? label : 'Recent lab values were logged.',
+      reason: first ? `${first.name} moved ${first.direction} vs the prior result.` : 'Recent lab values were updated.',
     })
   }
-
-  if (checkinSummary?.goals?.length) {
+  if (supplements.length && !sections.supplements.working.length) {
+    sections.supplements.working = supplements.slice(0, 6).map((s: any) => ({
+      name: s.name,
+      reason: 'Listed in your current routine.',
+    }))
+  }
+  if (medications.length && !sections.medications.working.length) {
+    sections.medications.working = medications.slice(0, 6).map((m: any) => ({
+      name: m.name,
+      reason: 'Listed in your current routine.',
+    }))
+  }
+  if (!sections.overview.working.length && checkinSummary?.goals?.length) {
     const topGoals = checkinSummary.goals.map((g: any) => g.goal).filter(Boolean).slice(0, 2)
-    sections.lifestyle.working.push({
-      name: 'Goal check-ins',
-      reason: `Check-ins were logged for ${topGoals.join(', ')}.`,
+    sections.overview.working.push({
+      name: 'Check-ins cover key goals',
+      reason: `Recent check-ins focused on ${topGoals.join(', ')}.`,
     })
   }
 
-  const summaryParts: string[] = []
-  if (coverage.daysActive) summaryParts.push(`Active days: ${coverage.daysActive}`)
-  if (coverage.totalEvents) summaryParts.push(`Total entries: ${coverage.totalEvents}`)
-  if (nutritionSummary?.daysWithLogs) summaryParts.push(`Food logged on ${nutritionSummary.daysWithLogs} days`)
-  if (hydrationSummary?.daysWithLogs) summaryParts.push(`Hydration logged on ${hydrationSummary.daysWithLogs} days`)
-  if (exerciseSummary?.sessions) summaryParts.push(`Exercise sessions: ${exerciseSummary.sessions}`)
-  if (moodSummary?.entries) summaryParts.push(`Mood check-ins: ${moodSummary.entries}`)
-  if (symptomSummary?.entries) summaryParts.push(`Symptom entries: ${symptomSummary.entries}`)
+  const summarySentences: string[] = []
+  if (working[0]) {
+    summarySentences.push(`${working[0].title}. ${working[0].evidence}`)
+  }
+  if (focus[0]) {
+    summarySentences.push(`${focus[0].title}. ${focus[0].evidence}`)
+  }
+  if (riskFlags[0]) {
+    summarySentences.push(`${riskFlags[0].name}. ${riskFlags[0].reason}`)
+  }
+  if (nutritionSummary?.dailyAverages?.calories) {
+    summarySentences.push(
+      `Average daily calories were about ${nutritionSummary.dailyAverages.calories} kcal with ${nutritionSummary.dailyAverages.protein_g}g protein.`
+    )
+  }
+  if (hydrationSummary?.dailyAverageMl) {
+    summarySentences.push(`Average water was about ${hydrationSummary.dailyAverageMl} ml per day.`)
+  }
+  if (!summarySentences.length) {
+    summarySentences.push('This report is based on the data available in the last 7 days.')
+  }
 
   return {
-    summary: summaryParts.length
-      ? `This report uses your last 7 days of data. ${summaryParts.join(' • ')}. The sections below explain what changed, why it matters, and what to do next.`
-      : 'This report is based on the data available in the last 7 days. The sections below explain what changed and what to do next.',
+    summary: summarySentences.join(' '),
     wins,
     gaps,
     sections,
@@ -1499,6 +1751,55 @@ export async function POST(request: NextRequest) {
     moodRows = []
   }
 
+  let checkinRatings: Array<{
+    id: string
+    date: string
+    timestamp: Date
+    value: number | null
+    note: string | null
+    isNa: boolean | null
+    name: string
+    polarity: string | null
+  }> = []
+  try {
+    checkinRatings = await prisma.$queryRawUnsafe(
+      `SELECT r.id,
+              r.date,
+              COALESCE(r.timestamp, r.date::date) AS timestamp,
+              r.value,
+              r.note,
+              r.isNa,
+              i.name,
+              i.polarity
+       FROM CheckinRatings r
+       JOIN CheckinIssues i ON i.id = r.issueId
+       WHERE r.userId = $1
+         AND (
+           (r.timestamp >= $2 AND r.timestamp <= $3)
+           OR (r.date BETWEEN $4 AND $5)
+         )
+       ORDER BY COALESCE(r.timestamp, r.date::date) DESC
+       LIMIT 200`,
+      userId,
+      periodStart,
+      periodEnd,
+      periodStartDate,
+      periodEndDate
+    )
+  } catch (error) {
+    console.warn('[weekly-report] Failed to load check-in ratings', error)
+    checkinRatings = []
+  }
+  const legacyCheckins =
+    (user.healthLogs || []).map((log: any) => ({
+      name: log.goal?.name || null,
+      value: Number(log.rating ?? 0),
+      isNa: false,
+      timestamp: log.createdAt,
+      note: log.notes ?? null,
+    })) || []
+  const checkinRows = checkinRatings.length ? checkinRatings : legacyCheckins
+
   let symptomAnalyses: Array<{ summary: string | null; analysisText: string | null; createdAt: Date; symptoms: any }> = []
   try {
     symptomAnalyses = await prisma.symptomAnalysis.findMany({
@@ -1669,7 +1970,7 @@ export async function POST(request: NextRequest) {
     }))
   )
 
-  const checkinSummary = buildCheckinSummary(user.healthLogs || [])
+  const checkinSummary = buildCheckinSummary(checkinRows || [])
   const exerciseSummary = buildExerciseSummary(user.exerciseLogs || [], user.exerciseEntries || [])
   const moodSummary = buildMoodSummary(moodRows || [])
   const symptomSummary = buildSymptomSummary(symptomAnalyses || [])
@@ -1682,7 +1983,7 @@ export async function POST(request: NextRequest) {
 
   user.foodLogs?.forEach((f) => stamp(f.createdAt))
   user.waterLogs?.forEach((w) => stamp(w.createdAt))
-  user.healthLogs?.forEach((h) => stamp(h.createdAt))
+  checkinRows?.forEach((r) => stamp(r.timestamp))
   user.exerciseLogs?.forEach((e) => stamp(e.createdAt))
   user.exerciseEntries?.forEach((e) => stamp(e.createdAt))
   moodRows?.forEach((m) => stamp(m.timestamp))
@@ -1695,7 +1996,7 @@ export async function POST(request: NextRequest) {
     totalEvents:
       (user.foodLogs?.length || 0) +
       (user.waterLogs?.length || 0) +
-      (user.healthLogs?.length || 0) +
+      (checkinRows?.length || 0) +
       (user.exerciseLogs?.length || 0) +
       (user.exerciseEntries?.length || 0) +
       (moodRows?.length || 0) +
@@ -1704,7 +2005,7 @@ export async function POST(request: NextRequest) {
     foodCount: user.foodLogs?.length || 0,
     waterCount: user.waterLogs?.length || 0,
     moodCount: moodRows?.length || 0,
-    checkinCount: user.healthLogs?.length || 0,
+    checkinCount: checkinRows?.length || 0,
     symptomCount: symptomAnalyses?.length || 0,
     exerciseCount: (user.exerciseLogs?.length || 0) + (user.exerciseEntries?.length || 0),
     labCount: labReports?.length || 0,
@@ -1723,22 +2024,7 @@ export async function POST(request: NextRequest) {
     symptomCount: coverage.symptomCount,
   })
 
-  const goalRatings: Array<{ goal: string; avgRating: number | null; entries: number }> = []
-  const ratingMap = new Map<string, { total: number; count: number }>()
-  for (const log of user.healthLogs || []) {
-    const name = log.goal?.name || 'General'
-    const entry = ratingMap.get(name) || { total: 0, count: 0 }
-    entry.total += Number(log.rating || 0)
-    entry.count += 1
-    ratingMap.set(name, entry)
-  }
-  ratingMap.forEach((value, key) => {
-    goalRatings.push({
-      goal: key,
-      avgRating: value.count ? +(value.total / value.count).toFixed(1) : null,
-      entries: value.count,
-    })
-  })
+  const goalRatings = Array.isArray(checkinSummary?.goals) ? checkinSummary.goals : []
   const dailyStats = buildDailyStats({
     foodLogs: (user.foodLogs || []).map((f) => ({
       name: f.name,
@@ -1751,7 +2037,7 @@ export async function POST(request: NextRequest) {
       createdAt: w.createdAt,
       localDate: (w as any).localDate ?? null,
     })),
-    healthLogs: (user.healthLogs || []).map((log) => ({ createdAt: log.createdAt })),
+    checkinRatings: (checkinRows || []).map((log) => ({ timestamp: log.timestamp })),
     exerciseLogs: (user.exerciseLogs || []).map((log) => ({ duration: log.duration, createdAt: log.createdAt })),
     exerciseEntries: (user.exerciseEntries || []).map((entry) => ({
       durationMinutes: entry.durationMinutes,
@@ -1790,6 +2076,16 @@ export async function POST(request: NextRequest) {
     })),
     timezone
   )
+  const correlationSignals = {
+    hydrationMood: buildCorrelation(dailyStats, 'waterMl', 'moodAvg', { minDays: 4, minDiff: 0.3 }),
+    exerciseMood: buildCorrelation(dailyStats, 'exerciseMinutes', 'moodAvg', { minDays: 4, minDiff: 0.3 }),
+    sugarSymptoms: buildCorrelation(dailyStats, 'sugar_g', 'symptomCount', { minDays: 4, minDiff: 0.6 }),
+  }
+  const lateMealImpact = buildLateMealImpact(dailyStats, mealTimingSummary.lateMealDays || [])
+  const trendSignals = buildTrendSignals(dailyStats)
+  const moodValues = dailyStats.map((row) => row.moodAvg).filter((v) => Number.isFinite(v))
+  const moodRange =
+    moodValues.length >= 3 ? Math.round((Math.max(...moodValues) - Math.min(...moodValues)) * 10) / 10 : null
   const symptomLateMealOverlap = intersectDays(
     (dataFlags?.symptomHeavyDays || []).map((d: any) => d.date),
     mealTimingSummary.lateMealDays || []
@@ -1798,6 +2094,19 @@ export async function POST(request: NextRequest) {
     (dataFlags?.symptomHeavyDays || []).map((d: any) => d.date),
     (dataFlags?.sugarSpikes || []).map((d: any) => d.date)
   )
+  const riskFlags = buildRiskFlags({ dailyStats, dataFlags, mealTimingSummary })
+  const insightCandidates = buildInsightCandidates({
+    nutritionSignals,
+    mealTimingSummary,
+    timeOfDayNutrition,
+    dataFlags,
+    correlationSignals,
+    lateMealImpact,
+    checkinSummary,
+    labHighlights,
+    labTrends,
+    moodRange,
+  })
 
   const reportContext = {
     periodStart: periodStartDate,
@@ -1858,6 +2167,12 @@ export async function POST(request: NextRequest) {
     labTrends,
     dailyStats,
     dataFlags,
+    correlationSignals,
+    trendSignals,
+    riskFlags,
+    insightCandidates,
+    lateMealImpact,
+    moodRange,
     exerciseEntries: (user.exerciseEntries || []).slice(0, 20).map((e) => ({
       label: e.label,
       durationMinutes: e.durationMinutes,
@@ -1902,7 +2217,7 @@ export async function POST(request: NextRequest) {
 
 Generate a 7-day health report in plain language with this exact JSON shape:
 {
-  "summary": "4-7 sentences that explain the main patterns, key wins, and the biggest gaps",
+  "summary": "6-9 sentences that explain the main patterns, key wins, and the biggest gaps",
   "wins": [{"name": "", "reason": ""}],
   "gaps": [{"name": "", "reason": ""}],
   "sections": {
@@ -1924,6 +2239,9 @@ Rules:
 - Every sentence must reference a specific data point (numbers, dates, logged items, or named goals/issues).
 - Each item should be 2-3 short sentences: what happened, why it matters, and a clear next step.
 - Use real signals from the JSON data. No generic advice.
+- Use insightCandidates, correlationSignals, trendSignals, and riskFlags as your primary signals when available.
+- Do not list raw log counts or repeat "you logged X entries" unless it directly supports a pattern or gap.
+- Avoid telling the user to "keep logging" unless a section has no usable data.
 - If sectionSignals show data for a section, include 2-3 items in "working" or "suggested" when there is enough data; otherwise include at least 1.
 - Only include "avoid" items when dataFlags show spikes/low days or symptom-heavy days.
 - If a section truly has no data, leave its arrays empty.
@@ -1946,7 +2264,7 @@ ${JSON.stringify(reportContext)}
       const request: any = {
         model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2200,
+        max_tokens: 2600,
         response_format: { type: 'json_object' },
       }
       if (!isGpt5) {
