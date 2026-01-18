@@ -571,12 +571,33 @@ export async function GET(req: NextRequest) {
     )
   }
 
+  const buildBarcodeCandidates = (value: string) => {
+    const normalized = value.replace(/[^0-9A-Za-z]/g, '')
+    const candidates = new Set<string>()
+    if (normalized) candidates.add(normalized)
+    if (/^\d+$/.test(normalized)) {
+      if (normalized.length === 12) candidates.add(`0${normalized}`)
+      if (normalized.length === 13 && normalized.startsWith('0')) candidates.add(normalized.slice(1))
+    }
+    return Array.from(candidates)
+  }
+
+  const barcodeCandidates = buildBarcodeCandidates(code)
+
   console.log('🔍 Looking up barcode:', code)
   let food: NormalizedFood | null = null
   let openFoodFacts: OpenFoodFactsResult | null = null
 
   // Try Helfi cache first (user-labeled nutrition from barcode scans)
-  food = await fetchFoodFromHelfiBarcode(code)
+  for (const candidate of barcodeCandidates) {
+    food = await fetchFoodFromHelfiBarcode(candidate)
+    if (food) {
+      if (candidate !== code) {
+        console.log('✅ Helfi barcode matched via normalized code', candidate)
+      }
+      break
+    }
+  }
 
   // Try local USDA cache next (branded foods with barcodes)
   if (!food) {

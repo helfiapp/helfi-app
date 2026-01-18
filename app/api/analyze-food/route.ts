@@ -2391,6 +2391,10 @@ export async function POST(req: NextRequest) {
     let analysisMode: 'auto' | 'packaged' | 'meal' = 'auto';
     let packagedMode = false;
     let labelScan = false;
+    const barcodeRaw = String(formData.get('barcode') || '').trim();
+    const barcode = barcodeRaw ? barcodeRaw.replace(/[^0-9A-Za-z]/g, '') : '';
+    const barcodeName = String(formData.get('barcodeName') || '').trim();
+    const barcodeBrand = String(formData.get('barcodeBrand') || '').trim();
     let forceFresh = false;
     let packagedEmphasisBlock = '';
     let analysisHint = '';
@@ -4174,6 +4178,61 @@ CRITICAL REQUIREMENTS:
           }
           resp.items = nextItems
           resp.total = computeTotalsFromItems(resp.items) || resp.total
+
+          if (barcode) {
+            try {
+              const servingSize = stripNutritionFromServingSize(String(next.serving_size || '').trim())
+              const weight = parseServingWeight(servingSize || null)
+              const safe = (value: number | null) =>
+                Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0
+              const macroSum = safe(protein) + safe(carbs) + safe(fat) + safe(fiber)
+              const calories = safe(resolvedCalories)
+              const macroLimit = weight ? weight * 1.3 + 2 : null
+              const calorieLimit = weight ? weight * 9.5 + 10 : null
+              const hasNutrition = [calories, protein, carbs, fat, fiber, sugar].some(
+                (v) => Number.isFinite(Number(v)) && Number(v) > 0,
+              )
+              const passesMacro = macroLimit ? macroSum <= macroLimit : true
+              const passesCalories = calorieLimit ? calories <= calorieLimit : true
+              if (hasNutrition && passesMacro && passesCalories) {
+                await prisma.barcodeProduct.upsert({
+                  where: { barcode },
+                  update: {
+                    name: next.name || barcodeName || 'Packaged item',
+                    brand: next.brand || barcodeBrand || null,
+                    servingSize: servingSize || next.serving_size || null,
+                    calories: resolvedCalories,
+                    proteinG: protein,
+                    carbsG: carbs,
+                    fatG: fat,
+                    fiberG: fiber,
+                    sugarG: sugar,
+                    quantityG: weight || null,
+                    source: 'label-photo',
+                    updatedById: currentUser.id,
+                  },
+                  create: {
+                    barcode,
+                    name: next.name || barcodeName || 'Packaged item',
+                    brand: next.brand || barcodeBrand || null,
+                    servingSize: servingSize || next.serving_size || null,
+                    calories: resolvedCalories,
+                    proteinG: protein,
+                    carbsG: carbs,
+                    fatG: fat,
+                    fiberG: fiber,
+                    sugarG: sugar,
+                    quantityG: weight || null,
+                    source: 'label-photo',
+                    createdById: currentUser.id,
+                    updatedById: currentUser.id,
+                  },
+                })
+              }
+            } catch (saveErr) {
+              console.warn('Label barcode save failed (non-fatal):', saveErr)
+            }
+          }
         } else {
           const nextItems = (hasItems ? resp.items : []).map((item: any, index: number) =>
             index === 0

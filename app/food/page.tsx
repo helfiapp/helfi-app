@@ -8881,6 +8881,15 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       if (wantsLabelAccuracy) {
         formData.append('labelScan', '1');
       }
+      if (barcodeLabelFlow?.barcode) {
+        formData.append('barcode', barcodeLabelFlow.barcode)
+        if (barcodeLabelFlow.productName) {
+          formData.append('barcodeName', barcodeLabelFlow.productName)
+        }
+        if (barcodeLabelFlow.brand) {
+          formData.append('barcodeBrand', barcodeLabelFlow.brand)
+        }
+      }
       const feedbackComment = String(options?.feedbackComment || '').trim()
       const combinedHint = buildFeedbackHint(analysisHint, feedbackComment)
       if (combinedHint && analysisMode !== 'packaged') {
