@@ -79,6 +79,35 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
   const sections = payload?.sections || {}
   const wins = Array.isArray(payload?.wins) ? payload.wins : []
   const gaps = Array.isArray(payload?.gaps) ? payload.gaps : []
+  const keyInsights = useMemo(() => {
+    const picks: Array<{ label: string; name?: string; reason?: string }> = []
+    const tryPick = (sectionKey: SectionKey, label: string, bucket: 'suggested' | 'avoid' | 'working') => {
+      const item = sections?.[sectionKey]?.[bucket]?.[0]
+      if (item?.name || item?.reason) {
+        picks.push({ label, name: item.name, reason: item.reason })
+      }
+    }
+    const priority: Array<{ key: SectionKey; label: string }> = [
+      { key: 'nutrition', label: 'Nutrition' },
+      { key: 'hydration', label: 'Hydration' },
+      { key: 'exercise', label: 'Exercise' },
+      { key: 'mood', label: 'Mood' },
+      { key: 'symptoms', label: 'Symptoms' },
+      { key: 'labs', label: 'Labs' },
+      { key: 'lifestyle', label: 'Lifestyle' },
+      { key: 'supplements', label: 'Supplements' },
+      { key: 'medications', label: 'Medications' },
+    ]
+    priority.forEach((section) => {
+      if (picks.length >= 6) return
+      tryPick(section.key, `${section.label} - Suggestion`, 'suggested')
+      if (picks.length >= 6) return
+      tryPick(section.key, `${section.label} - Avoid`, 'avoid')
+      if (picks.length >= 6) return
+      tryPick(section.key, `${section.label} - Working`, 'working')
+    })
+    return picks.slice(0, 6)
+  }, [sections])
   const parsedSummary = useMemo(() => {
     if (!report?.dataSummary) return null
     if (typeof report.dataSummary === 'string') {
@@ -320,35 +349,6 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
   const hydrationTotal = hydrationSummary?.totalMl ?? 0
   const hydrationAverage = hydrationSummary?.dailyAverageMl ?? 0
   const hydrationTop = Array.isArray(hydrationSummary?.topDrinks) ? hydrationSummary?.topDrinks : []
-  const keyInsights = useMemo(() => {
-    const picks: Array<{ label: string; name?: string; reason?: string }> = []
-    const tryPick = (sectionKey: SectionKey, label: string, bucket: 'suggested' | 'avoid' | 'working') => {
-      const item = sections?.[sectionKey]?.[bucket]?.[0]
-      if (item?.name || item?.reason) {
-        picks.push({ label, name: item.name, reason: item.reason })
-      }
-    }
-    const priority: Array<{ key: SectionKey; label: string }> = [
-      { key: 'nutrition', label: 'Nutrition' },
-      { key: 'hydration', label: 'Hydration' },
-      { key: 'exercise', label: 'Exercise' },
-      { key: 'mood', label: 'Mood' },
-      { key: 'symptoms', label: 'Symptoms' },
-      { key: 'labs', label: 'Labs' },
-      { key: 'lifestyle', label: 'Lifestyle' },
-      { key: 'supplements', label: 'Supplements' },
-      { key: 'medications', label: 'Medications' },
-    ]
-    priority.forEach((section) => {
-      if (picks.length >= 6) return
-      tryPick(section.key, `${section.label} - Suggestion`, 'suggested')
-      if (picks.length >= 6) return
-      tryPick(section.key, `${section.label} - Avoid`, 'avoid')
-      if (picks.length >= 6) return
-      tryPick(section.key, `${section.label} - Working`, 'working')
-    })
-    return picks.slice(0, 6)
-  }, [sections])
 
   return (
     <div className="min-h-screen bg-gray-50">
