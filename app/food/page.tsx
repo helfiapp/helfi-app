@@ -20416,12 +20416,19 @@ Please add nutritional information manually if needed.`);
                   const normalizedTokens = tokens.map(normalizeFatToken)
                   return keywords.some((keyword) => {
                     const needle = keyword.toLowerCase().trim()
+                    const cleanNeedle = scrubFatLabel(keyword)
                     if (!needle) return false
                     if (needle.includes(' ')) {
-                      return raw.includes(needle) || clean.includes(needle)
+                      const cleanMatch = cleanNeedle ? clean.includes(cleanNeedle) : clean.includes(needle)
+                      return raw.includes(needle) || cleanMatch
                     }
                     const normalizedNeedle = normalizeFatToken(needle)
-                    return normalizedTokens.includes(normalizedNeedle)
+                    if (normalizedTokens.includes(normalizedNeedle)) return true
+                    if (cleanNeedle) {
+                      const normalizedCleanNeedle = normalizeFatToken(cleanNeedle)
+                      return normalizedTokens.includes(normalizedCleanNeedle)
+                    }
+                    return false
                   })
                 }
 
@@ -20433,19 +20440,18 @@ Please add nutritional information manually if needed.`);
                 }
 
                 const classifyFatLabel = (label: any) => {
-                  if (matchesFatKeywords(label, fatBadOverrides)) return 'bad'
-                  if (matchesFatKeywords(label, fatChainKeywords)) return 'bad'
+                  if (allowFallbackHeuristics && matchesFatKeywords(label, fatBadOverrides)) return 'bad'
+                  if (allowFallbackHeuristics && matchesFatKeywords(label, fatChainKeywords)) return 'bad'
                   const hasBad = matchesFatKeywords(label, fatBadKeywords)
                   const hasGood = matchesFatKeywords(label, fatGoodKeywords)
                   const raw = normalizeFatLabel(label)
-                  const hasGreek = raw.includes('greek')
-                  const hasYogurt = raw.includes('yogurt') || raw.includes('yoghurt')
                   const hasCheese = raw.includes('cheese')
                   const hasBurger = raw.includes('burger')
-                  const hasFastFood = matchesFatKeywords(label, fatFastFoodKeywords)
-                  if (hasGreek && hasYogurt) return 'good'
-                  if (hasCheese && (hasBurger || hasFastFood) && !matchesFatKeywords(label, fatChainKeywords)) {
-                    return 'unclear'
+                  const hasFastFood = allowFallbackHeuristics && matchesFatKeywords(label, fatFastFoodKeywords)
+                  if (allowFallbackHeuristics) {
+                    if (hasCheese && (hasBurger || hasFastFood) && !matchesFatKeywords(label, fatChainKeywords)) {
+                      return 'unclear'
+                    }
                   }
                   if (hasBad && hasGood) return 'unclear'
                   if (hasBad) return 'bad'
