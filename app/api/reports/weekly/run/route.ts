@@ -347,16 +347,25 @@ function buildFallbackReport(context: any) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
-  const userId = typeof body?.userId === 'string' ? body.userId : ''
   const triggerSource = typeof body?.triggerSource === 'string' ? body.triggerSource : ''
   const isManualTrigger = triggerSource === 'manual'
   const hasSchedulerAuth = isAuthorized(request)
   let allowManual = false
-  if (!hasSchedulerAuth && isManualTrigger) {
+  let userId = typeof body?.userId === 'string' ? body.userId : ''
+  if (isManualTrigger) {
     const session = await getServerSession(authOptions)
-    if (session?.user?.id && session.user.id === userId) {
-      allowManual = true
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    if (!userId) {
+      userId = session.user.id
+    }
+    if (userId !== session.user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    allowManual = true
+  } else if (!hasSchedulerAuth) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   if (!hasSchedulerAuth && !allowManual) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
