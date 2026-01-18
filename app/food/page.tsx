@@ -8200,8 +8200,10 @@ const applyStructuredItems = (
       const shouldAutoAnalyze = autoAnalyzeLabelPhoto && Boolean(barcodeLabelFlow?.barcode);
       const preserveLabelDetail = shouldAutoAnalyze || analysisMode === 'packaged';
       try {
-        // Compress the uploaded file to balance quality and cost (higher quality for better detection)
-        const compressedFile = preserveLabelDetail ? file : await compressImage(file, 1024, 0.85);
+        const targetDimension = preserveLabelDetail ? 2000 : 1024;
+        const targetQuality = preserveLabelDetail ? 0.92 : 0.85;
+        const targetMaxBytes = preserveLabelDetail ? 2000 * 1024 : 900 * 1024;
+        const compressedFile = await compressImage(file, targetDimension, targetQuality, targetMaxBytes);
         setPhotoFile(compressedFile);
         setAnalysisHint('');
         resetAnalysisFeedbackState();
@@ -8228,6 +8230,11 @@ const applyStructuredItems = (
         reader.readAsDataURL(compressedFile);
       } catch (error) {
         console.error('Error compressing image:', error);
+        if (!isSupportedImageType(file.type)) {
+          showQuickToast('This photo type is not supported. Please use a JPG or PNG.');
+          setPendingPhotoPicker(false);
+          return;
+        }
         // Fallback to original file if compression fails
         setPhotoFile(file);
         setAnalysisHint('');
@@ -8258,6 +8265,8 @@ const applyStructuredItems = (
   };
 
 
+  const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+  const isSupportedImageType = (type: string) => SUPPORTED_IMAGE_TYPES.has(type);
 
   const compressImage = (
     file: File,
@@ -8265,7 +8274,7 @@ const applyStructuredItems = (
     quality: number = 0.5,
     maxBytes: number = 900 * 1024,
   ): Promise<File> => {
-    if (file.size <= maxBytes) return Promise.resolve(file);
+    if (file.size <= maxBytes && isSupportedImageType(file.type)) return Promise.resolve(file);
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -8828,13 +8837,10 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       let compressedFile;
       const wantsLabelAccuracy = analysisMode === 'packaged' || Boolean(barcodeLabelFlow?.barcode)
       try {
-        if (wantsLabelAccuracy) {
-          compressedFile = fileToAnalyze
-        } else {
-          const targetWidth = 800
-          const targetQuality = 0.8
-          compressedFile = await compressImage(fileToAnalyze, targetWidth, targetQuality); // Less aggressive compression
-        }
+        const targetWidth = wantsLabelAccuracy ? 2000 : 800
+        const targetQuality = wantsLabelAccuracy ? 0.92 : 0.8
+        const targetMaxBytes = wantsLabelAccuracy ? 2000 * 1024 : 900 * 1024
+        compressedFile = await compressImage(fileToAnalyze, targetWidth, targetQuality, targetMaxBytes)
         console.log('✅ Image compression successful:', {
           originalSize: fileToAnalyze.size,
           compressedSize: compressedFile.size,
@@ -8842,6 +8848,13 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         });
       } catch (compressionError) {
         console.warn('⚠️ Image compression failed, using original:', compressionError);
+        if (!isSupportedImageType(fileToAnalyze.type)) {
+          showQuickToast('This photo type is not supported. Please use a JPG or PNG.')
+          setAiDescription('Photo format not supported. Please use a JPG or PNG.')
+          setAnalyzedNutrition(null)
+          setShowAiResult(true)
+          return
+        }
         compressedFile = fileToAnalyze; // Fallback to original file
       }
       

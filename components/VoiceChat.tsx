@@ -995,13 +995,16 @@ export default function VoiceChat({
     }
   }
 
+  const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+  const isSupportedImageType = (type: string) => SUPPORTED_IMAGE_TYPES.has(type)
+
   const compressChatImage = (
     file: File,
     maxDimension: number,
     quality: number,
     maxBytes: number,
   ): Promise<File> => {
-    if (file.size <= maxBytes) return Promise.resolve(file)
+    if (file.size <= maxBytes && isSupportedImageType(file.type)) return Promise.resolve(file)
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
@@ -1064,16 +1067,20 @@ export default function VoiceChat({
     const maxDimension = wantsLabelDetail ? 1600 : 1280
     const quality = wantsLabelDetail ? 0.9 : 0.82
     const maxBytes = wantsLabelDetail ? 1500 * 1024 : 900 * 1024
-    const preparedPhotos = await Promise.all(
-      pendingPhotos.map(async (file) => {
-        try {
-          return await compressChatImage(file, maxDimension, quality, maxBytes)
-        } catch (err) {
-          console.warn('Photo compression failed; using original file.', err)
-          return file
+    const preparedPhotos: File[] = []
+    for (const file of pendingPhotos) {
+      try {
+        preparedPhotos.push(await compressChatImage(file, maxDimension, quality, maxBytes))
+      } catch (err) {
+        console.warn('Photo compression failed; using original file.', err)
+        if (!isSupportedImageType(file.type)) {
+          setError('This photo type is not supported. Please use a JPG or PNG.')
+          setLoading(false)
+          return
         }
-      }),
-    )
+        preparedPhotos.push(file)
+      }
+    }
     preparedPhotos.forEach((file) => {
       formData.append('image', file)
     })
