@@ -12170,10 +12170,10 @@ Please add nutritional information manually if needed.`);
   ) => {
     const primary = Array.isArray(items) && items.length > 0 ? items[0] : null
     if (!primary) return false
-    const detectedBarcode = String(primary?.barcode || '').trim()
     const flowBarcode = String(barcodeLabelFlow?.barcode || '').trim()
-    const flowAllowed = Boolean(flowBarcode && showBarcodeLabelPrompt)
-    const barcodeValue = detectedBarcode || (flowAllowed ? flowBarcode : '')
+    const flowAllowed = Boolean(flowBarcode)
+    if (!flowAllowed) return false
+    const barcodeValue = flowBarcode
     if (!barcodeValue) return false
     const isReport = barcodeLabelFlow?.reason === 'report'
 
