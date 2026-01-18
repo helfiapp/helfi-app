@@ -126,6 +126,19 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
         topDrinks?: Array<{ label?: string; count?: number }>
       }
     | undefined
+  const dailyStats = (parsedSummary as any)?.dailyStats as
+    | Array<{
+        date?: string
+        foodEntries?: number
+        calories?: number
+        waterMl?: number
+        exerciseMinutes?: number
+        moodAvg?: number | null
+        symptomEntries?: number
+        checkinCount?: number
+        topFoods?: Array<{ name?: string; count?: number }>
+      }>
+    | undefined
   const labTrends = (parsedSummary as any)?.labTrends as
     | Array<{
         name?: string
@@ -320,6 +333,16 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
   const hydrationTotal = hydrationSummary?.totalMl ?? 0
   const hydrationAverage = hydrationSummary?.dailyAverageMl ?? 0
   const hydrationTop = Array.isArray(hydrationSummary?.topDrinks) ? hydrationSummary?.topDrinks : []
+  const dailyRows = Array.isArray(dailyStats) ? dailyStats : []
+  const logLinks = [
+    { label: 'Food diary', href: '/food' },
+    { label: 'Water log', href: '/food/water' },
+    { label: 'Exercise log', href: '/health-tracking' },
+    { label: 'Mood history', href: '/mood/history' },
+    { label: 'Symptom history', href: '/symptoms/history' },
+    { label: 'Check-in history', href: '/check-in/history' },
+    { label: 'Lab reports', href: '/lab-reports' },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -441,6 +464,74 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
           )}
         </div>
 
+        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">Open your logs</h2>
+          <p className="text-sm text-gray-600 mt-2">
+            These links open the pages where your last 7 days are stored.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {logLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {dailyRows.length > 0 && (
+          <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">Last 7 days breakdown</h2>
+            <p className="text-sm text-gray-600 mt-2">
+              Each day below shows exactly what was logged.
+            </p>
+            <div className="mt-4 space-y-3">
+              {dailyRows.map((day, idx) => {
+                const topFoods = Array.isArray(day.topFoods) ? day.topFoods : []
+                const topFoodText = topFoods.length
+                  ? `Top foods: ${topFoods
+                      .map((food) => food.name)
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .join(', ')}.`
+                  : ''
+                return (
+                  <div key={`${day.date || idx}`} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-semibold text-gray-900">
+                        {day.date ? new Date(day.date).toLocaleDateString() : 'Day'}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Food {day.foodEntries ?? 0} • Water {formatMl(day.waterMl ?? 0)} • Exercise {day.exerciseMinutes ?? 0} mins
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-600">
+                      Calories {day.calories ?? 0} kcal • Mood {day.moodAvg ?? 'n/a'} • Symptoms {day.symptomEntries ?? 0} • Check-ins {day.checkinCount ?? 0}
+                    </div>
+                    {topFoodText && (
+                      <div className="mt-2 text-xs text-gray-500">{topFoodText}</div>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {logLinks.map((link) => (
+                        <Link
+                          key={`${day.date || idx}-${link.href}`}
+                          href={link.href}
+                          className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-100"
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {talkToAiSummary?.userMessageCount ? (
           <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
@@ -448,6 +539,14 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
               {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
               {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}.
             </p>
+            <div className="mt-3">
+              <Link
+                href="/chat-log"
+                className="inline-flex items-center rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100"
+              >
+                Open chat log
+              </Link>
+            </div>
             {talkToAiSummary.topics && talkToAiSummary.topics.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {talkToAiSummary.topics.map((topic, idx) => (
