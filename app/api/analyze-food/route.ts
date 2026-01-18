@@ -360,6 +360,17 @@ const parseLabelJsonBlock = (raw: string): any | null => {
   return parseItemsJsonRelaxed(block);
 };
 
+const convertKjToKcal = (kj: number | null) => {
+  if (!Number.isFinite(Number(kj)) || Number(kj) <= 0) return null;
+  return Number(kj) / 4.184;
+};
+
+const deriveCaloriesFromMacros = (protein: number | null, carbs: number | null, fat: number | null) => {
+  const safe = (value: number | null) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+  const computed = safe(protein) * 4 + safe(carbs) * 4 + safe(fat) * 9;
+  return computed > 0 ? computed : null;
+};
+
 const extractLabelPerServingFromImage = async (
   openai: OpenAI,
   imageDataUrl: string,
@@ -374,8 +385,9 @@ const extractLabelPerServingFromImage = async (
           text:
             'Read this nutrition label. Use ONLY the first column that says "Quantity per serving" (ignore the per-100g column).\n' +
             'Return JSON between <LABEL_JSON> and </LABEL_JSON> only with this exact shape:\n' +
-            '{"serving_size":"string","per_serving":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+            '{"serving_size":"string","per_serving":{"calories":0,"energy_kj":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
             '- If both kJ and Cal are shown, use the Cal value for calories.\n' +
+            '- If only kJ is shown, set energy_kj and leave calories null.\n' +
             '- If a value is unclear, set it to null (do not guess).\n' +
             '- Do NOT use per-100g numbers.',
         },
@@ -4128,12 +4140,25 @@ CRITICAL REQUIREMENTS:
           if (parsed?.serving_size || parsed?.servingSize) {
             next.serving_size = String(parsed.serving_size || parsed.servingSize || '').trim()
           }
-          next.calories = toNumber(perServing.calories)
-          next.protein_g = toNumber(perServing.protein_g ?? perServing.protein)
-          next.carbs_g = toNumber(perServing.carbs_g ?? perServing.carbs)
-          next.fat_g = toNumber(perServing.fat_g ?? perServing.fat)
-          next.fiber_g = toNumber(perServing.fiber_g ?? perServing.fiber)
-          next.sugar_g = toNumber(perServing.sugar_g ?? perServing.sugar)
+          const protein = toNumber(perServing.protein_g ?? perServing.protein)
+          const carbs = toNumber(perServing.carbs_g ?? perServing.carbs)
+          const fat = toNumber(perServing.fat_g ?? perServing.fat)
+          const fiber = toNumber(perServing.fiber_g ?? perServing.fiber)
+          const sugar = toNumber(perServing.sugar_g ?? perServing.sugar)
+          const caloriesRaw = toNumber(perServing.calories)
+          const energyKj = toNumber(perServing.energy_kj ?? perServing.kj ?? perServing.kilojoules)
+          const caloriesFromKj = convertKjToKcal(energyKj)
+          const caloriesFromMacros = deriveCaloriesFromMacros(protein, carbs, fat)
+          const resolvedCalories =
+            (Number.isFinite(Number(caloriesRaw)) && Number(caloriesRaw) > 0 ? caloriesRaw : null) ||
+            caloriesFromKj ||
+            caloriesFromMacros
+          next.calories = resolvedCalories
+          next.protein_g = protein
+          next.carbs_g = carbs
+          next.fat_g = fat
+          next.fiber_g = fiber
+          next.sugar_g = sugar
           nextItems[targetIndex] = next
           resp.items = nextItems
           resp.total = computeTotalsFromItems(resp.items) || resp.total
