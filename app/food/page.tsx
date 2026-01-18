@@ -12166,7 +12166,8 @@ Please add nutritional information manually if needed.`);
     if (!primary) return false
     const detectedBarcode = String(primary?.barcode || '').trim()
     const flowBarcode = String(barcodeLabelFlow?.barcode || '').trim()
-    const barcodeValue = detectedBarcode || flowBarcode
+    const flowAllowed = Boolean(flowBarcode && showBarcodeLabelPrompt)
+    const barcodeValue = detectedBarcode || (flowAllowed ? flowBarcode : '')
     if (!barcodeValue) return false
     const isReport = barcodeLabelFlow?.reason === 'report'
 
