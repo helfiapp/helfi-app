@@ -12101,9 +12101,13 @@ Please add nutritional information manually if needed.`);
     items: any[] | null | undefined,
     options?: { preserveFlow?: boolean; quiet?: boolean },
   ) => {
-    if (!barcodeLabelFlow?.barcode) return false
     const primary = Array.isArray(items) && items.length > 0 ? items[0] : null
     if (!primary) return false
+    const detectedBarcode = String(primary?.barcode || '').trim()
+    const flowBarcode = String(barcodeLabelFlow?.barcode || '').trim()
+    const barcodeValue = detectedBarcode || flowBarcode
+    if (!barcodeValue) return false
+    const isReport = barcodeLabelFlow?.reason === 'report'
 
     const servingSize = stripNutritionFromServingSize(primary?.serving_size || '')
     const servingInfo = parseServingSizeInfo({ serving_size: servingSize })
@@ -12119,11 +12123,11 @@ Please add nutritional information manually if needed.`);
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          barcode: barcodeLabelFlow.barcode,
-          report: barcodeLabelFlow.reason === 'report',
+          barcode: barcodeValue,
+          report: isReport,
           item: {
-            name: primary?.name || barcodeLabelFlow.productName || 'Packaged item',
-            brand: primary?.brand || barcodeLabelFlow.brand || null,
+            name: primary?.name || barcodeLabelFlow?.productName || 'Packaged item',
+            brand: primary?.brand || barcodeLabelFlow?.brand || null,
             serving_size: servingSize,
             calories: primary?.calories,
             protein_g: primary?.protein_g,
@@ -12137,7 +12141,7 @@ Please add nutritional information manually if needed.`);
         }),
       })
       if (res.ok) {
-        barcodeLabelAutoSavedRef.current[barcodeLabelFlow.barcode] = true
+        barcodeLabelAutoSavedRef.current[barcodeValue] = true
         if (!options?.quiet) {
           showQuickToast('Saved for future barcode scans')
         }
