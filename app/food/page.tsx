@@ -5299,11 +5299,41 @@ export default function FoodDiary() {
   const isDiaryHydrated = (date: string) => Boolean(diaryHydrationRef.current[date]?.hydrated)
   const isDiaryVerified = (date: string) => Boolean(diaryHydrationRef.current[date]?.verified)
 
+  const getEntryPortionScale = (entry: any) => {
+    const raw =
+      (entry?.nutrition && typeof entry.nutrition === 'object' ? (entry.nutrition as any).__portionScale : null) ??
+      (entry?.total && typeof entry.total === 'object' ? (entry.total as any).__portionScale : null)
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed >= 1) return null
+    return parsed
+  }
+
+  const applyPortionScaleToTotals = (totals: any, scale: number) => {
+    if (!totals || typeof totals !== 'object') return totals
+    const round = (value: any, decimals: number) => {
+      if (!Number.isFinite(Number(value))) return null
+      const factor = Math.pow(10, decimals)
+      return Math.round(Number(value) * scale * factor) / factor
+    }
+    return {
+      ...totals,
+      calories: Number.isFinite(Number(totals.calories)) ? Math.round(Number(totals.calories) * scale) : null,
+      protein: round((totals as any).protein, 1),
+      carbs: round((totals as any).carbs, 1),
+      fat: round((totals as any).fat, 1),
+      fiber: round((totals as any).fiber, 1),
+      sugar: round((totals as any).sugar, 1),
+    }
+  }
+
   const getEntryTotals = (entry: any) => {
     try {
+      const portionScale = getEntryPortionScale(entry)
       if (Array.isArray(entry?.items) && entry.items.length > 0) {
         const recalculated = recalculateNutritionFromItems(entry.items)
-        if (recalculated) return recalculated
+        if (recalculated) {
+          return portionScale ? applyPortionScaleToTotals(recalculated, portionScale) : recalculated
+        }
       }
       return (
         sanitizeNutritionTotals((entry as any).total) ||

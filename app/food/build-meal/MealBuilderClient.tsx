@@ -375,6 +375,7 @@ export default function MealBuilderClient() {
   const [favoritesToast, setFavoritesToast] = useState<string | null>(null)
 
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading
+  const showPortionSaveCta = portionAmountInput.trim().length > 0
 
   useEffect(() => {
     itemsRef.current = items
@@ -554,13 +555,6 @@ export default function MealBuilderClient() {
 
   const totalRecipeWeightG = useMemo(() => computeTotalRecipeWeightG(items), [items])
 
-  const portionWeightG = useMemo(() => {
-    const raw = parseNumericInput(portionAmountInput)
-    if (!raw || raw <= 0) return null
-    const grams = unitToGrams(raw, portionUnit === 'oz' ? 'oz' : 'g')
-    return grams && Number.isFinite(grams) ? grams : null
-  }, [portionAmountInput, portionUnit])
-
   const portionScale = useMemo(
     () => computePortionScale(portionAmountInput, portionUnit, totalRecipeWeightG),
     [portionAmountInput, portionUnit, totalRecipeWeightG],
@@ -627,7 +621,7 @@ export default function MealBuilderClient() {
     const seq = ++seqRef.current
 
     try {
-      const sourceParam = kind === 'single' ? 'usda' : 'auto'
+      const sourceParam = 'auto'
       const params = new URLSearchParams({
         source: sourceParam,
         q: q,
@@ -1365,13 +1359,6 @@ export default function MealBuilderClient() {
       return rest
     })
 
-    const scaledItems =
-      portionScaleForSave < 1
-        ? cleanedItems.map((it: any) => {
-            const servings = toNumber(it?.servings) ?? 1
-            return { ...it, servings: round3(Math.max(0, servings * portionScaleForSave)) }
-          })
-        : cleanedItems
     const scaledTotals =
       portionScaleForSave < 1
         ? {
@@ -1383,6 +1370,21 @@ export default function MealBuilderClient() {
             sugar: totalsForSave.sugar * portionScaleForSave,
           }
         : totalsForSave
+    const portionWeightForSave = (() => {
+      const raw = parseNumericInput(portionAmountForSave)
+      if (!raw || raw <= 0) return null
+      const grams = unitToGrams(raw, portionUnit === 'oz' ? 'oz' : 'g')
+      return grams && Number.isFinite(grams) ? grams : null
+    })()
+    const portionMeta =
+      portionScaleForSave < 1 && portionWeightForSave
+        ? {
+            __portionScale: round3(portionScaleForSave),
+            __portionWeightG: Math.round(portionWeightForSave),
+            __portionUnit: portionUnit,
+            __portionTotalWeightG: Math.round(totalRecipeWeightForSave || 0),
+          }
+        : null
 
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
 
@@ -1397,9 +1399,10 @@ export default function MealBuilderClient() {
         sugar: round3(scaledTotals.sugar),
         __origin: 'meal-builder',
         ...(favoriteLinkId ? { __favoriteId: favoriteLinkId } : {}),
+        ...(portionMeta ? portionMeta : {}),
       },
       imageUrl: null,
-      items: scaledItems,
+      items: cleanedItems,
       localDate: selectedDate,
       meal: category,
       category,
@@ -1418,7 +1421,7 @@ export default function MealBuilderClient() {
                 id: sourceLogId,
                 description,
                 nutrition: payload.nutrition,
-                items: scaledItems,
+                items: cleanedItems,
                 meal: category,
                 category,
               }),
@@ -1435,7 +1438,7 @@ export default function MealBuilderClient() {
               description,
               nutrition: payload.nutrition,
               total: payload.nutrition,
-              items: scaledItems,
+              items: cleanedItems,
               photo: null,
               method: 'meal-builder',
               customMeal: true,
@@ -1495,7 +1498,7 @@ export default function MealBuilderClient() {
           description,
           nutrition: normalizedNutrition,
           total: normalizedNutrition,
-          items: scaledItems,
+          items: cleanedItems,
           method: existing?.method || (existing?.customMeal ? 'meal-builder' : 'text'),
           meal: existing?.meal || category,
           createdAt: existing?.createdAt || Date.now(),
@@ -1515,7 +1518,7 @@ export default function MealBuilderClient() {
                 id: targetLogId,
                 description,
                 nutrition: normalizedNutrition || payload.nutrition,
-                items: scaledItems,
+                items: cleanedItems,
                 meal: existing?.meal || category,
                 category: existing?.meal || category,
               }),
@@ -1554,7 +1557,7 @@ export default function MealBuilderClient() {
           description,
           nutrition: payload.nutrition,
           total: payload.nutrition,
-          items: scaledItems,
+          items: cleanedItems,
           photo: null,
           method: 'meal-builder',
           customMeal: true,
@@ -2148,6 +2151,19 @@ export default function MealBuilderClient() {
             {portionScale < 1 && (
               <div className="mt-1 text-[11px] text-emerald-700">
                 Saving about {Math.round(portionScale * 100)}% of the recipe.
+              </div>
+            )}
+            {showPortionSaveCta && (
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2">
+                <div className="text-[11px] text-gray-600">Ready to save this portion.</div>
+                <button
+                  type="button"
+                  onClick={createMeal}
+                  disabled={busy || favoriteSaving}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:opacity-60"
+                >
+                  Save meal
+                </button>
               </div>
             )}
           </div>
