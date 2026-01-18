@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const limitRaw = searchParams.get('limit')
     const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : NaN
     const limit = Number.isFinite(limitParsed) ? Math.min(Math.max(limitParsed, 1), 50) : 20
+    const kindMode = kind === 'packaged' ? 'packaged' : 'single'
 
     if (!query) {
       return NextResponse.json(
@@ -85,6 +86,13 @@ export async function GET(request: NextRequest) {
     const scoreItemName = (it: any) => {
       const combined = [it?.brand, it?.name].filter(Boolean).join(' ').trim()
       let score = scoreNameMatch(combined || it?.name)
+      if (kindMode === 'single') {
+        score += it?.brand ? -40 : 120
+      } else if (it?.brand) {
+        score += 40
+      }
+      const nameNorm = normalizeForMatch(it?.name)
+      if (nameNorm) score += Math.max(0, 80 - Math.min(80, nameNorm.length))
       const brandToken = normalizeForMatch(queryFirstToken)
       if (brandToken) {
         const brand = normalizeForMatch(it?.brand)
@@ -146,7 +154,7 @@ export async function GET(request: NextRequest) {
       }
       const foundation = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] })
       if (foundation.length > 0) return foundation
-      return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
+      return []
     }
 
     if (source === 'auto' || !source) {
@@ -282,14 +290,6 @@ export async function GET(request: NextRequest) {
       } else if (resolvedKind === 'single') {
         items = await searchUsdaSingleFood(query)
         actualSource = 'usda'
-        if (items.length === 0) {
-          const perSource = Math.min(Math.max(limit, 10), 25)
-          const pooled = await searchOpenFoodFactsByQuery(query, { pageSize: perSource })
-          if (pooled.length > 0) {
-            items = pooled.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
-            actualSource = 'auto'
-          }
-        }
       } else {
         const perSource = Math.min(Math.max(limit, 10), 25)
 

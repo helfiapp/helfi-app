@@ -262,6 +262,48 @@ const unitToGrams = (amount: number, unit: BuilderUnit): number | null => {
   return null
 }
 
+const parseNumericInput = (value: any): number | null => {
+  const raw = String(value ?? '').replace(',', '.').trim()
+  if (!raw) return null
+  const cleaned = raw.replace(/[^0-9.]/g, '')
+  if (!cleaned) return null
+  const num = Number(cleaned)
+  return Number.isFinite(num) ? num : null
+}
+
+const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
+  let total = 0
+  for (const it of items) {
+    const servings = Number.isFinite(Number(it?.servings)) ? Number(it.servings) : 0
+    const baseAmount = it?.__baseAmount
+    const baseUnit = it?.__baseUnit
+    if (baseAmount && baseUnit) {
+      const perServing = unitToGrams(baseAmount, baseUnit)
+      if (perServing && Number.isFinite(perServing)) {
+        total += perServing * servings
+        continue
+      }
+    }
+    const unit = (it?.__unit || it?.__baseUnit) as BuilderUnit | null
+    if (!unit) continue
+    if (unit === 'piece') continue
+    const grams = unitToGrams(Number(it.__amount || 0), unit)
+    if (grams && Number.isFinite(grams)) total += grams
+  }
+  return total
+}
+
+const computePortionScale = (amountRaw: any, unit: 'g' | 'oz', totalRecipeWeightG: number | null | undefined) => {
+  const amount = parseNumericInput(amountRaw)
+  if (!amount || amount <= 0) return 1
+  if (!totalRecipeWeightG || !Number.isFinite(totalRecipeWeightG) || totalRecipeWeightG <= 0) return 1
+  const grams = unitToGrams(amount, unit === 'oz' ? 'oz' : 'g')
+  if (!grams || !Number.isFinite(grams) || grams <= 0) return 1
+  const raw = grams / totalRecipeWeightG
+  if (!Number.isFinite(raw) || raw <= 0) return 1
+  return Math.min(1, raw)
+}
+
 const sanitizeMealTitle = (v: string) => v.replace(/\s+/g, ' ').trim()
 
 const buildDefaultMealName = (items: BuilderItem[]) => {
@@ -315,6 +357,7 @@ export default function MealBuilderClient() {
   const seqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const queryInputRef = useRef<HTMLInputElement | null>(null)
+  const portionInputRef = useRef<HTMLInputElement | null>(null)
   const searchPressRef = useRef(0)
 
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
@@ -509,41 +552,19 @@ export default function MealBuilderClient() {
     return total
   }, [items])
 
-  const totalRecipeWeightG = useMemo(() => {
-    let total = 0
-    for (const it of items) {
-      const servings = Number.isFinite(Number(it?.servings)) ? Number(it.servings) : 0
-      const baseAmount = it?.__baseAmount
-      const baseUnit = it?.__baseUnit
-      if (baseAmount && baseUnit) {
-        const perServing = unitToGrams(baseAmount, baseUnit)
-        if (perServing && Number.isFinite(perServing)) {
-          total += perServing * servings
-          continue
-        }
-      }
-      const unit = (it?.__unit || it?.__baseUnit) as BuilderUnit | null
-      if (!unit) continue
-      if (unit === 'piece') continue
-      const grams = unitToGrams(Number(it.__amount || 0), unit)
-      if (grams && Number.isFinite(grams)) total += grams
-    }
-    return total
-  }, [items])
+  const totalRecipeWeightG = useMemo(() => computeTotalRecipeWeightG(items), [items])
 
   const portionWeightG = useMemo(() => {
-    const raw = Number(portionAmountInput)
-    if (!Number.isFinite(raw) || raw <= 0) return null
+    const raw = parseNumericInput(portionAmountInput)
+    if (!raw || raw <= 0) return null
     const grams = unitToGrams(raw, portionUnit === 'oz' ? 'oz' : 'g')
     return grams && Number.isFinite(grams) ? grams : null
   }, [portionAmountInput, portionUnit])
 
-  const portionScale = useMemo(() => {
-    if (!portionWeightG || !totalRecipeWeightG) return 1
-    const raw = portionWeightG / totalRecipeWeightG
-    if (!Number.isFinite(raw) || raw <= 0) return 1
-    return Math.min(1, raw)
-  }, [portionWeightG, totalRecipeWeightG])
+  const portionScale = useMemo(
+    () => computePortionScale(portionAmountInput, portionUnit, totalRecipeWeightG),
+    [portionAmountInput, portionUnit, totalRecipeWeightG],
+  )
 
   const addBuilderItem = (next: BuilderItem) => {
     setItems((prev) => [...prev, next])
@@ -587,7 +608,8 @@ export default function MealBuilderClient() {
   }
 
   const runSearch = async (searchQuery?: string) => {
-    const q = String(searchQuery ?? query).trim()
+    const raw = String(searchQuery ?? query)
+    const q = raw.trim()
     if (!q) {
       setError('Please type a food name to search.')
       return
@@ -596,7 +618,6 @@ export default function MealBuilderClient() {
     setError(null)
     setSearchLoading(true)
     setResults([])
-    if (q !== query) setQuery(q)
 
     try {
       abortRef.current?.abort()
@@ -1321,29 +1342,47 @@ export default function MealBuilderClient() {
       return `fav-${Date.now()}`
     })()
 
-    const cleanedItems = items.map((it) => {
+    const itemsForSave = itemsRef.current?.length ? itemsRef.current : items
+    const totalsForSave = itemsForSave.reduce(
+      (total, it) => {
+        const t = computeItemTotals(it)
+        total.calories += t.calories
+        total.protein += t.protein
+        total.carbs += t.carbs
+        total.fat += t.fat
+        total.fiber += t.fiber
+        total.sugar += t.sugar
+        return total
+      },
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+    )
+    const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
+    const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
+    const portionScaleForSave = computePortionScale(portionAmountForSave, portionUnit, totalRecipeWeightForSave)
+
+    const cleanedItems = itemsForSave.map((it) => {
       const { __baseAmount, __baseUnit, __amount, __amountInput, __unit, ...rest } = it
       return rest
     })
 
     const scaledItems =
-      portionScale < 1
+      portionScaleForSave < 1
         ? cleanedItems.map((it: any) => {
             const servings = toNumber(it?.servings) ?? 1
-            return { ...it, servings: round3(Math.max(0, servings * portionScale)) }
+            return { ...it, servings: round3(Math.max(0, servings * portionScaleForSave)) }
           })
         : cleanedItems
     const scaledTotals =
-      portionScale < 1
+      portionScaleForSave < 1
         ? {
-            calories: mealTotals.calories * portionScale,
-            protein: mealTotals.protein * portionScale,
-            carbs: mealTotals.carbs * portionScale,
-            fat: mealTotals.fat * portionScale,
-            fiber: mealTotals.fiber * portionScale,
-            sugar: mealTotals.sugar * portionScale,
+            calories: totalsForSave.calories * portionScaleForSave,
+            protein: totalsForSave.protein * portionScaleForSave,
+            carbs: totalsForSave.carbs * portionScaleForSave,
+            fat: totalsForSave.fat * portionScaleForSave,
+            fiber: totalsForSave.fiber * portionScaleForSave,
+            sugar: totalsForSave.sugar * portionScaleForSave,
           }
-        : mealTotals
+        : totalsForSave
 
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
 
@@ -2078,6 +2117,7 @@ export default function MealBuilderClient() {
             <div className="text-xs font-semibold text-gray-700">Portion size</div>
             <div className="mt-2 flex items-center gap-2">
               <input
+                ref={portionInputRef}
                 type="number"
                 inputMode="decimal"
                 min={0}
