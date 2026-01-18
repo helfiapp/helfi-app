@@ -1155,6 +1155,12 @@ for a change.
   - If the per-serve values are unclear or do not fit the serving size, block saving and show the red warning. Do not allow silent saves.
   - The warning must include the **Edit label numbers** action so users can correct values.
   - For label scans, do not use FatSecret/USDA fallbacks. Use label values or user edits only.
+  - **Barcode label save must persist and confirm (Jan 2026 – locked):**
+    - Save to the barcode cache when possible; if that fails, fall back to saving by barcode in the local food library so future scans still work.
+    - Show a clear “Barcode saved / Barcode not saved” message with the barcode number and error text. Do not silently fail.
+    - **Rollback (if this ever causes bad data):**
+      - Revert the fallback save in `app/api/barcode/label/route.ts`.
+      - Revert the save confirmation banner in `app/food/page.tsx`.
 - **kJ-only label handling (Jan 2026 – locked):**
   - If a label provides **kJ but no calories**, convert kJ to kcal using `kJ / 4.184` and set calories.
   - If calories are still missing, derive calories from macros: `protein*4 + carbs*4 + fat*9`.

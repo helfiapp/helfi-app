@@ -70,6 +70,17 @@ const validateServingSanity = (data: {
   return { ok: true }
 }
 
+const buildFriendlyError = (error: unknown) => {
+  if (!error) return 'Unknown error'
+  if (typeof error === 'string') return error
+  if (error instanceof Error && error.message) return error.message
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return 'Unknown error'
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -192,23 +203,76 @@ export async function POST(req: NextRequest) {
       updatedAt: now,
     }
 
-    const record = await prisma.barcodeProduct.upsert({
-      where: { barcode },
-      update: updateData,
-      create: createData,
-    })
+    try {
+      const record = await prisma.barcodeProduct.upsert({
+        where: { barcode },
+        update: updateData,
+        create: createData,
+      })
 
-    return NextResponse.json({
-      success: true,
-      product: {
-        barcode: record.barcode,
-        name: record.name,
-        brand: record.brand,
-        servingSize: record.servingSize,
-      },
-    })
+      return NextResponse.json({
+        success: true,
+        product: {
+          barcode: record.barcode,
+          name: record.name,
+          brand: record.brand,
+          servingSize: record.servingSize,
+        },
+      })
+    } catch (saveError) {
+      console.warn('Barcode label save failed, trying fallback storage', saveError)
+      try {
+        const existing = await prisma.foodLibraryItem.findFirst({
+          where: { gtinUpc: barcode },
+        })
+        const fallbackData = {
+          source: 'label-photo',
+          name,
+          brand,
+          gtinUpc: barcode,
+          servingSize,
+          calories,
+          proteinG,
+          carbsG,
+          fatG,
+          fiberG,
+          sugarG,
+        }
+        const fallbackRecord = existing
+          ? await prisma.foodLibraryItem.update({
+              where: { id: existing.id },
+              data: fallbackData,
+            })
+          : await prisma.foodLibraryItem.create({
+              data: fallbackData,
+            })
+
+        return NextResponse.json({
+          success: true,
+          product: {
+            barcode,
+            name: fallbackRecord.name,
+            brand: fallbackRecord.brand,
+            servingSize: fallbackRecord.servingSize,
+          },
+          fallback: 'foodLibraryItem',
+        })
+      } catch (fallbackError) {
+        console.error('Barcode label fallback save failed', fallbackError)
+        return NextResponse.json(
+          {
+            error: 'Failed to save barcode label',
+            message: buildFriendlyError(fallbackError),
+          },
+          { status: 500 },
+        )
+      }
+    }
   } catch (error) {
     console.error('Barcode label save failed', error)
-    return NextResponse.json({ error: 'Failed to save barcode label' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to save barcode label', message: buildFriendlyError(error) },
+      { status: 500 },
+    )
   }
 }
