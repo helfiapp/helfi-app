@@ -1149,6 +1149,12 @@ type MacroSegment = {
   color: string
 }
 
+type FatFoodList = {
+  good: string[]
+  bad: string[]
+  none: string[]
+}
+
 function MacroRing({
   macros,
   showLegend = true,
@@ -3034,6 +3040,12 @@ export default function FoodDiary() {
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
+  const [barcodeSaveNotice, setBarcodeSaveNotice] = useState<{
+    status: 'success' | 'error'
+    message: string
+    barcode?: string | null
+  } | null>(null)
+  const barcodeSaveNoticeTimeoutRef = useRef<number | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
   const midnightTimerRef = useRef<number | null>(null)
   const todayIsoRef = useRef<string>(buildTodayIso())
@@ -3078,6 +3090,23 @@ export default function FoodDiary() {
     setPhotoOptionsAnchor(null)
     setShowAnalysisModeModal(false)
   }, [isAnalysisRoute])
+
+  useEffect(() => {
+    if (!barcodeSaveNotice) return
+    if (barcodeSaveNotice.status === 'error') return
+    if (barcodeSaveNoticeTimeoutRef.current) {
+      clearTimeout(barcodeSaveNoticeTimeoutRef.current)
+    }
+    barcodeSaveNoticeTimeoutRef.current = window.setTimeout(() => {
+      setBarcodeSaveNotice(null)
+    }, 8000)
+    return () => {
+      if (barcodeSaveNoticeTimeoutRef.current) {
+        clearTimeout(barcodeSaveNoticeTimeoutRef.current)
+        barcodeSaveNoticeTimeoutRef.current = null
+      }
+    }
+  }, [barcodeSaveNotice])
   useEffect(() => {
     if (isAnalysisRoute) return
     if (typeof window === 'undefined') return
@@ -3256,6 +3285,28 @@ export default function FoodDiary() {
   useEffect(() => {
     latestHistoryFoodsRef.current = Array.isArray(historyFoods) ? historyFoods : null
   }, [historyFoods])
+  useEffect(() => {
+    let isMounted = true
+    const loadFatFoodList = async () => {
+      try {
+        const response = await fetch('/api/fat-food-list')
+        if (!response.ok) return
+        const data = await response.json()
+        if (!isMounted) return
+        if (data && Array.isArray(data.good) && Array.isArray(data.bad) && Array.isArray(data.none)) {
+          setFatFoodList({
+            good: data.good,
+            bad: data.bad,
+            none: data.none,
+          })
+        }
+      } catch {}
+    }
+    loadFatFoodList()
+    return () => {
+      isMounted = false
+    }
+  }, [])
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
   const [creditInfo, setCreditInfo] = useState<any>({
@@ -3277,6 +3328,7 @@ export default function FoodDiary() {
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
+  const [fatFoodList, setFatFoodList] = useState<FatFoodList | null>(null)
   const [exerciseEntries, setExerciseEntries] = useState<any[]>([])
   const [exerciseCaloriesKcal, setExerciseCaloriesKcal] = useState<number>(0)
   const [exerciseLoading, setExerciseLoading] = useState<boolean>(false)
@@ -12140,21 +12192,51 @@ Please add nutritional information manually if needed.`);
           },
         }),
       })
+      let payload: any = null
+      let errorText = ''
+      try {
+        payload = await res.clone().json()
+      } catch {}
+      if (!payload) {
+        try {
+          errorText = await res.text()
+        } catch {}
+      }
       if (res.ok) {
         barcodeLabelAutoSavedRef.current[barcodeValue] = true
         if (!options?.quiet) {
           showQuickToast('Saved for future barcode scans')
+          setBarcodeSaveNotice({
+            status: 'success',
+            message: 'Saved. You will not be asked for this label again.',
+            barcode: barcodeValue,
+          })
         }
         return true
       }
+      const responseMessage =
+        payload?.message ||
+        payload?.error ||
+        errorText ||
+        'We could not save this barcode. Please try again.'
       if (!options?.quiet) {
         showQuickToast('Saved to your diary, but the barcode label did not save')
+        setBarcodeSaveNotice({
+          status: 'error',
+          message: responseMessage,
+          barcode: barcodeValue,
+        })
       }
       return false
     } catch (err) {
       console.warn('Barcode label save failed', err)
       if (!options?.quiet) {
         showQuickToast('Saved to your diary, but the barcode label did not save')
+        setBarcodeSaveNotice({
+          status: 'error',
+          message: 'We could not save this barcode. Please try again.',
+          barcode: barcodeValue,
+        })
       }
       return false
     } finally {
@@ -14977,6 +15059,34 @@ Please add nutritional information manually if needed.`);
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
           <div className="px-4 py-2 bg-gray-900 text-white rounded-full shadow-lg text-sm">
             {quickToast}
+          </div>
+        </div>
+      )}
+      {barcodeSaveNotice && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[10000] w-[94%] max-w-md">
+          <div
+            className={`rounded-2xl border px-4 py-3 shadow-lg ${
+              barcodeSaveNotice.status === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-sm font-semibold">
+                {barcodeSaveNotice.status === 'success' ? 'Barcode saved' : 'Barcode not saved'}
+              </div>
+              <button
+                type="button"
+                onClick={() => setBarcodeSaveNotice(null)}
+                className="text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-1 text-sm text-gray-700">{barcodeSaveNotice.message}</div>
+            {barcodeSaveNotice.barcode && (
+              <div className="mt-2 text-xs text-gray-500">Barcode: {barcodeSaveNotice.barcode}</div>
+            )}
           </div>
         </div>
       )}
@@ -19474,7 +19584,7 @@ Please add nutritional information manually if needed.`);
                   }
                 }
 
-                const fatGoodKeywords = [
+                const fallbackFatGoodKeywords = [
                   'extra virgin olive oil',
                   'cold pressed olive oil',
                   'cold-pressed olive oil',
@@ -19669,7 +19779,7 @@ Please add nutritional information manually if needed.`);
                   'raw cacao',
                 ]
 
-                const fatZeroKeywords = [
+                const fallbackFatZeroKeywords = [
                   'apple',
                   'green apple',
                   'red apple',
@@ -20006,7 +20116,7 @@ Please add nutritional information manually if needed.`);
                   'fructose',
                 ]
 
-                const fatBadKeywords = [
+                const fallbackFatBadKeywords = [
                   'margarine',
                   'vegetable shortening',
                   'shortening',
@@ -20202,6 +20312,15 @@ Please add nutritional information manually if needed.`);
                   'takeaway',
                   'takeout',
                 ]
+
+                const hasCsvFatList =
+                  Boolean(fatFoodList?.good?.length) ||
+                  Boolean(fatFoodList?.bad?.length) ||
+                  Boolean(fatFoodList?.none?.length)
+                const fatGoodKeywords = hasCsvFatList ? fatFoodList!.good : fallbackFatGoodKeywords
+                const fatBadKeywords = hasCsvFatList ? fatFoodList!.bad : fallbackFatBadKeywords
+                const fatZeroKeywords = hasCsvFatList ? fatFoodList!.none : fallbackFatZeroKeywords
+                const allowFallbackHeuristics = !hasCsvFatList
 
                 const fatChainKeywords = [
                   'mcdonald',
