@@ -11022,6 +11022,34 @@ Please add nutritional information manually if needed.`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    // Apply an immediate totals override after returning from Build a meal.
+    try {
+      const raw = sessionStorage.getItem('foodDiary:entryOverride')
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (!parsed || typeof parsed !== 'object') return
+      const targetId = String(parsed.dbId || '')
+      if (!targetId) return
+      const applyOverride = (list: any[]) =>
+        Array.isArray(list)
+          ? list.map((entry) =>
+              String(entry?.dbId || '') === targetId
+                ? {
+                    ...entry,
+                    nutrition: parsed.nutrition ?? entry.nutrition,
+                    total: parsed.total ?? entry.total,
+                    items: Array.isArray(parsed.items) ? parsed.items : entry.items,
+                  }
+                : entry,
+            )
+          : list
+      setTodaysFoods((prev) => applyOverride(prev as any[]))
+      setHistoryFoods((prev) => applyOverride(prev as any[]))
+      sessionStorage.removeItem('foodDiary:entryOverride')
+    } catch {}
+  }, [])
+
   const showCameraSettingsHelp = () => {
     if (typeof window === 'undefined') return
     const ua = navigator.userAgent || ''

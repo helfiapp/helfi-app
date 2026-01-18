@@ -377,6 +377,30 @@ export default function MealBuilderClient() {
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading
   const showPortionSaveCta = portionAmountInput.trim().length > 0
 
+  const applySavedPortion = (source: any) => {
+    if (!source || typeof source !== 'object') return
+    const amountRaw = (source as any).__portionAmount
+    const unitRaw = (source as any).__portionUnit
+    const weightRaw = (source as any).__portionWeightG
+    const unit = unitRaw === 'oz' ? 'oz' : 'g'
+    if (amountRaw !== null && amountRaw !== undefined && Number.isFinite(Number(amountRaw))) {
+      setPortionUnit(unit)
+      setPortionAmountInput(String(amountRaw))
+      return
+    }
+    if (weightRaw !== null && weightRaw !== undefined && Number.isFinite(Number(weightRaw))) {
+      const grams = Number(weightRaw)
+      if (unit === 'oz') {
+        const oz = convertAmount(grams, 'g', 'oz')
+        setPortionUnit('oz')
+        setPortionAmountInput(Number.isFinite(oz) ? String(round3(oz)) : '')
+      } else {
+        setPortionUnit('g')
+        setPortionAmountInput(String(Math.round(grams)))
+      }
+    }
+  }
+
   useEffect(() => {
     itemsRef.current = items
   }, [items])
@@ -454,6 +478,7 @@ export default function MealBuilderClient() {
 
     const label = normalizeMealLabel(fav?.label || fav?.description || '').trim()
     if (label) setMealName(label)
+    applySavedPortion((fav as any)?.nutrition || (fav as any)?.total || null)
 
     const favItems = parseFavoriteItems(fav)
     if (favItems && favItems.length > 0) {
@@ -509,6 +534,7 @@ export default function MealBuilderClient() {
 
         const label = normalizeMealLabel(log?.description || log?.name || '').trim()
         if (!cancelled && label) setMealName(label)
+        if (!cancelled) applySavedPortion((log as any)?.nutrients || null)
 
         const rawItems = Array.isArray(log?.items) ? log.items : null
         if (!cancelled && rawItems && rawItems.length > 0) {
@@ -638,7 +664,28 @@ export default function MealBuilderClient() {
       }
       const data = await res.json()
       if (seqRef.current !== seq) return
-      setResults(Array.isArray(data?.items) ? data.items : [])
+      let nextItems = Array.isArray(data?.items) ? data.items : []
+      if (nextItems.length === 0 && kind === 'single') {
+        try {
+          const fallbackParams = new URLSearchParams({
+            source: 'openfoodfacts',
+            q: q,
+            kind: 'packaged',
+            limit: '20',
+          })
+          const fallbackRes = await fetch(`/api/food-data?${fallbackParams.toString()}`, {
+            method: 'GET',
+            signal: controller.signal,
+          })
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json()
+            if (seqRef.current === seq) {
+              nextItems = Array.isArray(fallbackData?.items) ? fallbackData.items : []
+            }
+          }
+        } catch {}
+      }
+      setResults(nextItems)
     } catch (e: any) {
       if (e?.name === 'AbortError') return
       setError('Search failed. Please try again.')
@@ -659,9 +706,10 @@ export default function MealBuilderClient() {
       if (q.length === 0) setError(null)
       return
     }
+    setSearchLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {
       runSearch(q)
-    }, 250)
+    }, 200)
     return () => {
       if (searchDebounceRef.current) {
         window.clearTimeout(searchDebounceRef.current)
@@ -1377,11 +1425,12 @@ export default function MealBuilderClient() {
       return grams && Number.isFinite(grams) ? grams : null
     })()
     const portionMeta =
-      portionScaleForSave < 1 && portionWeightForSave
+      portionWeightForSave
         ? {
             __portionScale: round3(portionScaleForSave),
             __portionWeightG: Math.round(portionWeightForSave),
             __portionUnit: portionUnit,
+            __portionAmount: parseNumericInput(portionAmountForSave),
             __portionTotalWeightG: Math.round(totalRecipeWeightForSave || 0),
           }
         : null
@@ -1426,6 +1475,19 @@ export default function MealBuilderClient() {
                 category,
               }),
             })
+          } catch {}
+          try {
+            sessionStorage.setItem(
+              'foodDiary:entryOverride',
+              JSON.stringify({
+                dbId: sourceLogId,
+                localDate: selectedDate,
+                category,
+                nutrition: payload.nutrition,
+                total: payload.nutrition,
+                items: cleanedItems,
+              }),
+            )
           } catch {}
 
         // Keep the linked saved meal in sync (if one exists, or create one for future use).
@@ -1546,6 +1608,22 @@ export default function MealBuilderClient() {
         setError('Saving failed. Please try again.')
         return
       }
+      try {
+        const createdId = typeof data?.id === 'string' ? data.id : null
+        if (createdId) {
+          sessionStorage.setItem(
+            'foodDiary:entryOverride',
+            JSON.stringify({
+              dbId: createdId,
+              localDate: selectedDate,
+              category,
+              nutrition: payload.nutrition,
+              total: payload.nutrition,
+              items: cleanedItems,
+            }),
+          )
+        }
+      } catch {}
 
       // Auto-save newly created meals into Favorites so they appear under Favorites → Custom.
       try {
