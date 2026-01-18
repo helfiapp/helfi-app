@@ -164,7 +164,12 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ triggerSource: 'manual' }),
       })
-      const data = await response.json()
+      let data: any = null
+      try {
+        data = await response.json()
+      } catch {
+        data = null
+      }
       if (response.ok) {
         setCreateReportMessage('Your report is being created. Refresh this page or open the report in a minute.')
         setTimeout(() => {
@@ -172,7 +177,12 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         }, 2000)
       } else {
         setCreateReportError(true)
-        setCreateReportMessage(data?.error || 'Sorry, we could not create the report right now.')
+        const raw = String(data?.error || data?.reason || data?.status || '').toLowerCase()
+        const friendly =
+          raw.includes('unauthorized') || raw.includes('auth')
+            ? 'Please sign in again and try.'
+            : 'Sorry, we could not create the report right now. Please try again in a minute.'
+        setCreateReportMessage(friendly)
       }
     } catch (error) {
       setCreateReportError(true)

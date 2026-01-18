@@ -482,25 +482,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'failed', reason: 'user_missing' }, { status: 404 })
   }
 
-  await ensureMoodTables()
-  const moodRows: Array<{ mood: number; timestamp: Date }> = await prisma.$queryRawUnsafe(
-    'SELECT mood, timestamp FROM MoodEntries WHERE userId = $1 AND timestamp >= $2 ORDER BY timestamp DESC LIMIT 50',
-    userId,
-    periodStart
-  )
+  let moodRows: Array<{ mood: number; timestamp: Date }> = []
+  try {
+    await ensureMoodTables()
+    moodRows = await prisma.$queryRawUnsafe(
+      'SELECT mood, timestamp FROM MoodEntries WHERE userId = $1 AND timestamp >= $2 ORDER BY timestamp DESC LIMIT 50',
+      userId,
+      periodStart
+    )
+  } catch (error) {
+    console.warn('[weekly-report] Failed to load mood entries', error)
+    moodRows = []
+  }
 
-  const symptomAnalyses = await prisma.symptomAnalysis.findMany({
-    where: { userId, createdAt: { gte: periodStart } },
-    orderBy: { createdAt: 'desc' },
-    take: 12,
-    select: { summary: true, analysisText: true, createdAt: true, symptoms: true },
-  })
+  let symptomAnalyses: Array<{ summary: string | null; analysisText: string | null; createdAt: Date; symptoms: any }> = []
+  try {
+    symptomAnalyses = await prisma.symptomAnalysis.findMany({
+      where: { userId, createdAt: { gte: periodStart } },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      select: { summary: true, analysisText: true, createdAt: true, symptoms: true },
+    })
+  } catch (error) {
+    console.warn('[weekly-report] Failed to load symptom analyses', error)
+    symptomAnalyses = []
+  }
 
-  const labReports = await prisma.report.findMany({
-    where: { userId, createdAt: { gte: periodStart } },
-    select: { id: true, createdAt: true },
-    take: 20,
-  })
+  let labReports: Array<{ id: string; createdAt: Date }> = []
+  try {
+    labReports = await prisma.report.findMany({
+      where: { userId, createdAt: { gte: periodStart } },
+      select: { id: true, createdAt: true },
+      take: 20,
+    })
+  } catch (error) {
+    console.warn('[weekly-report] Failed to load lab reports', error)
+    labReports = []
+  }
 
   let labTrends: Array<{
     name: string
@@ -567,20 +585,26 @@ export async function POST(request: NextRequest) {
     console.warn('[weekly-report] Failed to build lab trends', error)
   }
 
-  await ensureTalkToAITables()
-  const talkToAiMessages = await prisma.$queryRawUnsafe<
-    Array<{ role: string; content: string; createdAt: Date }>
-  >(
-      `SELECT m."role", m."content", m."createdAt"
-       FROM "TalkToAIChatMessage" m
-       JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
-       WHERE t."userId" = $1 AND m."createdAt" >= $2 AND m."createdAt" <= $3
-       ORDER BY m."createdAt" DESC
-       LIMIT 120`,
-      userId,
-      periodStart,
-      periodEnd
-    ).catch(() => [])
+  let talkToAiMessages: Array<{ role: string; content: string; createdAt: Date }> = []
+  try {
+    await ensureTalkToAITables()
+    talkToAiMessages = await prisma.$queryRawUnsafe<
+      Array<{ role: string; content: string; createdAt: Date }>
+    >(
+        `SELECT m."role", m."content", m."createdAt"
+         FROM "TalkToAIChatMessage" m
+         JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
+         WHERE t."userId" = $1 AND m."createdAt" >= $2 AND m."createdAt" <= $3
+         ORDER BY m."createdAt" DESC
+         LIMIT 120`,
+        userId,
+        periodStart,
+        periodEnd
+      )
+  } catch (error) {
+    console.warn('[weekly-report] Failed to load AI chat history', error)
+    talkToAiMessages = []
+  }
   const talkToAiSummary = buildTalkToAiSummary(talkToAiMessages)
 
   const dataDays = new Set<string>()
@@ -818,8 +842,15 @@ ${JSON.stringify(reportContext)}
   reportPayload.wins = wins
   reportPayload.gaps = gaps
 
-  const charged = await cm.chargeCents(costCredits)
-  if (!charged) {
+  let charged = false
+  let chargeFailed = false
+  try {
+    charged = await cm.chargeCents(costCredits)
+  } catch (error) {
+    chargeFailed = true
+    console.warn('[weekly-report] Credit charge failed', error)
+  }
+  if (!charged && !chargeFailed) {
     const lockedReport = await updateWeeklyReportRecord(userId, report.id, {
       status: 'LOCKED',
       summary: 'Your weekly report is ready to unlock with a subscription or top-up credits.',
@@ -852,10 +883,11 @@ ${JSON.stringify(reportContext)}
       talkToAiSummary,
       hydrationSummary,
       labTrends,
+      ...(chargeFailed ? { chargeSkipped: true } : {}),
     },
     report: reportPayload,
     model,
-    creditsCharged: costCredits,
+    creditsCharged: charged ? costCredits : 0,
     readyAt: now.toISOString(),
   })
 
