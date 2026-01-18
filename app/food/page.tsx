@@ -1919,16 +1919,18 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
   if (!Array.isArray(items)) return []
   return items.map((item) => {
     const next = { ...item }
-    const labelSource = `${item?.name || ''} ${item?.serving_size || ''}`.toLowerCase()
+    const cleanedServingSize = stripNutritionFromServingSize(String(item?.serving_size || '').trim())
+    if (cleanedServingSize && cleanedServingSize !== String(item?.serving_size || '').trim()) {
+      next.serving_size = cleanedServingSize
+    }
+    const labelSource = `${item?.name || ''} ${cleanedServingSize || item?.serving_size || ''}`.toLowerCase()
     if (!labelSource.trim()) return next
     if (!hasExplicitPieceCountInLabel(labelSource)) return next
 
-    const rule = DISCRETE_SERVING_RULES.find((r) =>
-      r.keywords.some((kw) => labelSource.includes(kw)),
-    )
+    const rule = DISCRETE_SERVING_RULES.find((r) => r.keywords.some((kw) => labelSource.includes(kw)))
     if (!rule) return next
 
-    const meta = parseServingUnitMetadata(item?.serving_size || item?.name || '')
+    const meta = parseServingUnitMetadata(cleanedServingSize || item?.name || '')
     const qty = meta?.quantity
     const unitLabel = meta?.unitLabel || meta?.unitLabelSingular || ''
     const unitIsDiscrete =

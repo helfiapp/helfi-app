@@ -789,6 +789,29 @@ const extractComponentsFromAnalysis = (analysis: string | null | undefined): str
   const cleaned = analysis.replace(/\s+/g, ' ').trim();
   if (!cleaned) return [];
 
+  const extractExtraComponentsFromText = (text: string): string[] => {
+    const results: string[] = [];
+    const pushParts = (raw: string) => {
+      raw
+        .split(/,|;| and | & /i)
+        .map((part) => part.trim())
+        .filter((part) => part.length >= 3)
+        .forEach((part) => results.push(part));
+    };
+    const servingPattern =
+      /\b(?:a|an)\s+(?:serving|portion|side|order|cup|glass|bowl|scoop)\s+of\s+([^.;\n]+)/gi;
+    let match: RegExpExecArray | null = null;
+    while ((match = servingPattern.exec(text))) {
+      if (match[1]) pushParts(match[1]);
+    }
+    const itemPattern =
+      /\b(?:a|an)\s+(soft drink|soda|cola|drink|juice|milkshake|shake|water|ice cream|dessert(?:\s+\w+)?|fries|chips|nuggets|cookie|cookies|brownie|cake|cone)\b/gi;
+    while ((match = itemPattern.exec(text))) {
+      if (match[1]) pushParts(match[1]);
+    }
+    return results;
+  };
+
   let listText = '';
   const componentsMatch = cleaned.match(
     /\b(?:components?|ingredients?)(?:\s+list)?\s*[:\-]\s*([^\n.]+)/i,
@@ -819,6 +842,8 @@ const extractComponentsFromAnalysis = (analysis: string | null | undefined): str
         .trim(),
     )
     .filter((part) => part.length >= 3);
+
+  const extraParts = extractExtraComponentsFromText(cleaned);
 
   const mergeSaladComponents = (items: string[]) => {
     const merged: string[] = [];
@@ -853,7 +878,7 @@ const extractComponentsFromAnalysis = (analysis: string | null | undefined): str
     return merged;
   };
 
-  const mergedParts = mergeSaladComponents(parts);
+  const mergedParts = mergeSaladComponents([...parts, ...extraParts]);
 
   const filtered = mergedParts.filter((part) => {
     if (/^component\s*\d+$/i.test(part)) return false;
