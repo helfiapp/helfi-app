@@ -14,6 +14,7 @@ import {
   getWeeklyReportState,
   markWeeklyReportOnboardingComplete,
   queueWeeklyReportNotification,
+  resolveWeeklyReportTimezone,
   summarizeCoverage,
   updateWeeklyReportRecord,
   upsertWeeklyReportState,
@@ -105,6 +106,33 @@ function normalizeMealLabel(input?: string | null) {
   if (raw.includes('dinner')) return 'dinner'
   if (raw.includes('snack')) return 'snacks'
   return raw
+}
+
+function formatLocalDate(date: Date, timezone: string) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date)
+  } catch {
+    return date.toISOString().slice(0, 10)
+  }
+}
+
+function formatLocalHour(date: Date, timezone: string) {
+  try {
+    const hourText = new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      hour: '2-digit',
+      hour12: false,
+    }).format(date)
+    const hour = Number(hourText)
+    return Number.isFinite(hour) ? hour : date.getUTCHours()
+  } catch {
+    return date.getUTCHours()
+  }
 }
 
 function buildNutritionSummary(
@@ -256,6 +284,141 @@ function buildHydrationSummary(
     topDrinks,
     dailyTotals: Array.from(dayTotals.values()).sort((a, b) => a.date.localeCompare(b.date)),
   }
+}
+
+function buildMealTimingSummary(
+  foodLogs: Array<{ createdAt: Date; localDate?: string | null; meal?: string | null }>,
+  timezone: string
+) {
+  const dayMap = new Map<
+    string,
+    { date: string; firstHour: number | null; lastHour: number | null; lateSnacks: number; total: number }
+  >()
+  const lateMealDays: string[] = []
+  const lateSnackDays: string[] = []
+  const lateMealLogs: Array<{ date: string; hour: number }> = []
+  const earlyMealDays: string[] = []
+
+  for (const log of foodLogs) {
+    const dateKey = log.localDate || formatLocalDate(log.createdAt, timezone)
+    const hour = formatLocalHour(log.createdAt, timezone)
+    const entry = dayMap.get(dateKey) || {
+      date: dateKey,
+      firstHour: null,
+      lastHour: null,
+      lateSnacks: 0,
+      total: 0,
+    }
+    entry.total += 1
+    if (entry.firstHour == null || hour < entry.firstHour) entry.firstHour = hour
+    if (entry.lastHour == null || hour > entry.lastHour) entry.lastHour = hour
+    const mealLabel = normalizeMealLabel(log.meal ?? null)
+    if (mealLabel === 'snacks' && hour >= 20) entry.lateSnacks += 1
+    dayMap.set(dateKey, entry)
+  }
+
+  const days = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+  for (const day of days) {
+    if (day.lastHour != null && day.lastHour >= 21) {
+      lateMealDays.push(day.date)
+      lateMealLogs.push({ date: day.date, hour: day.lastHour })
+    }
+    if (day.lateSnacks > 0) lateSnackDays.push(day.date)
+    if (day.firstHour != null && day.firstHour >= 10) earlyMealDays.push(day.date)
+  }
+
+  const firstHours = days.map((d) => d.firstHour ?? 0).filter((v) => v > 0)
+  const lastHours = days.map((d) => d.lastHour ?? 0).filter((v) => v > 0)
+  const avgFirstHour = firstHours.length ? Math.round(firstHours.reduce((a, b) => a + b, 0) / firstHours.length) : null
+  const avgLastHour = lastHours.length ? Math.round(lastHours.reduce((a, b) => a + b, 0) / lastHours.length) : null
+  const eatingWindows = days
+    .map((d) => (d.firstHour != null && d.lastHour != null ? d.lastHour - d.firstHour : null))
+    .filter((v): v is number => v != null && v >= 0)
+  const avgWindowHours = eatingWindows.length
+    ? Math.round((eatingWindows.reduce((a, b) => a + b, 0) / eatingWindows.length) * 10) / 10
+    : null
+
+  return {
+    daysLogged: days.length,
+    avgFirstHour,
+    avgLastHour,
+    avgWindowHours,
+    lateMealDays,
+    lateSnackDays,
+    lateMealLogs,
+    lateStartDays: earlyMealDays,
+  }
+}
+
+function buildTimeOfDayNutritionSummary(
+  foodLogs: Array<{ createdAt: Date; nutrients: any }>,
+  timezone: string
+) {
+  const buckets = {
+    morning: { label: 'morning', calories: 0, entries: 0 },
+    afternoon: { label: 'afternoon', calories: 0, entries: 0 },
+    evening: { label: 'evening', calories: 0, entries: 0 },
+    late: { label: 'late', calories: 0, entries: 0 },
+  }
+
+  for (const log of foodLogs) {
+    const hour = formatLocalHour(log.createdAt, timezone)
+    const n = (log && log.nutrients) || {}
+    const calories = Number(n.calories ?? n.kcal ?? 0) || 0
+    let key: keyof typeof buckets = 'afternoon'
+    if (hour >= 5 && hour < 11) key = 'morning'
+    else if (hour >= 11 && hour < 17) key = 'afternoon'
+    else if (hour >= 17 && hour < 21) key = 'evening'
+    else key = 'late'
+    buckets[key].calories += calories
+    buckets[key].entries += 1
+  }
+
+  return Object.values(buckets)
+}
+
+function buildNutritionSignals(dailyStats: Array<any>) {
+  const calorieDays = dailyStats.filter((d) => Number(d.calories || 0) > 0)
+  const proteinDays = dailyStats.filter((d) => Number(d.protein_g || 0) > 0)
+  const fiberDays = dailyStats.filter((d) => Number(d.fiber_g || 0) > 0)
+  const sugarDays = dailyStats.filter((d) => Number(d.sugar_g || 0) > 0)
+  const sodiumDays = dailyStats.filter((d) => Number(d.sodium_mg || 0) > 0)
+
+  const avg = (rows: Array<any>, key: string) => {
+    if (!rows.length) return 0
+    const total = rows.reduce((sum, row) => sum + Number(row[key] || 0), 0)
+    return total / rows.length
+  }
+
+  const avgCalories = Math.round(avg(calorieDays, 'calories'))
+  const avgProtein = Math.round(avg(proteinDays, 'protein_g') * 10) / 10
+  const avgFiber = Math.round(avg(fiberDays, 'fiber_g') * 10) / 10
+  const avgSugar = Math.round(avg(sugarDays, 'sugar_g') * 10) / 10
+  const avgSodium = Math.round(avg(sodiumDays, 'sodium_mg'))
+
+  const highestCalorieDay = calorieDays.reduce(
+    (best: any, day: any) => (!best || Number(day.calories || 0) > Number(best.calories || 0) ? day : best),
+    null
+  )
+  const lowestCalorieDay = calorieDays.reduce(
+    (best: any, day: any) => (!best || Number(day.calories || 0) < Number(best.calories || 0) ? day : best),
+    null
+  )
+
+  return {
+    avgCalories,
+    avgProtein,
+    avgFiber,
+    avgSugar,
+    avgSodium,
+    highestCalorieDay,
+    lowestCalorieDay,
+  }
+}
+
+function intersectDays(listA: string[], listB: string[]) {
+  const setA = new Set(listA)
+  return listB.filter((day) => setA.has(day))
 }
 
 function clipText(value: string, max = 220) {
@@ -814,6 +977,10 @@ function buildFallbackReport(context: any) {
   const moodSummary = context?.moodSummary || {}
   const symptomSummary = context?.symptomSummary || {}
   const checkinSummary = context?.checkinSummary || {}
+  const mealTimingSummary = context?.mealTimingSummary || {}
+  const timeOfDayNutrition = Array.isArray(context?.timeOfDayNutrition) ? context.timeOfDayNutrition : []
+  const nutritionSignals = context?.nutritionSignals || {}
+  const overlapSignals = context?.overlapSignals || {}
   const dataFlags = context?.dataFlags || {}
   const talkToAi = context?.talkToAi || {}
   const issues = Array.isArray(context?.issues) ? context.issues : []
@@ -936,6 +1103,41 @@ function buildFallbackReport(context: any) {
       reason: `${highestCalorieDay.date} was your highest calorie day (${Math.round(highestCalorieDay.calories)} kcal). Review what made that day higher.`,
     })
   }
+  if (nutritionSignals?.avgFiber != null && nutritionSignals.avgFiber > 0 && nutritionSignals.avgFiber < 20) {
+    sections.nutrition.suggested.push({
+      name: 'Fiber looks low',
+      reason: `Your average fiber was ${nutritionSignals.avgFiber}g per day. Adding beans, oats, berries, or vegetables can help digestion and fullness.`,
+    })
+  }
+  if (nutritionSignals?.avgProtein != null && nutritionSignals.avgProtein > 0 && nutritionSignals.avgProtein < 70) {
+    sections.nutrition.suggested.push({
+      name: 'Protein looks light',
+      reason: `Your average protein was ${nutritionSignals.avgProtein}g per day. Add a clear protein source to breakfast or lunch to steady energy.`,
+    })
+  }
+  if (mealTimingSummary?.lateMealDays?.length) {
+    const days = mealTimingSummary.lateMealDays.slice(0, 3).join(', ')
+    sections.lifestyle.avoid.push({
+      name: 'Late meals',
+      reason: `Late meals were logged on ${days}. Try moving the last meal earlier to see if sleep or digestion improves.`,
+    })
+  }
+  if (mealTimingSummary?.lateSnackDays?.length) {
+    const days = mealTimingSummary.lateSnackDays.slice(0, 3).join(', ')
+    sections.lifestyle.avoid.push({
+      name: 'Late snacks',
+      reason: `Late snacks were logged on ${days}. If you need a late snack, keep it light and protein-based.`,
+    })
+  }
+  if (timeOfDayNutrition.length) {
+    const lateBucket = timeOfDayNutrition.find((b: any) => b.label === 'late')
+    if (lateBucket?.entries) {
+      sections.nutrition.suggested.push({
+        name: 'Late day calories',
+        reason: `${lateBucket.entries} food entries were logged late at night. Shifting some of that earlier can smooth energy.`,
+      })
+    }
+  }
   if (dataFlags?.sugarSpikes?.length) {
     const days = dataFlags.sugarSpikes.map((d: any) => d.date).join(', ')
     sections.nutrition.avoid.push({
@@ -1017,6 +1219,20 @@ function buildFallbackReport(context: any) {
     sections.symptoms.suggested.push({
       name: 'Symptom-heavy days',
       reason: `More symptoms were logged on ${days}. Check for triggers on those days.`,
+    })
+  }
+  if (overlapSignals?.symptomLateMealDays?.length) {
+    const days = overlapSignals.symptomLateMealDays.slice(0, 3).join(', ')
+    sections.symptoms.suggested.push({
+      name: 'Symptoms + late meals overlap',
+      reason: `Symptoms were heavier on late-meal days (${days}). Try an earlier dinner for a week and compare.`,
+    })
+  }
+  if (overlapSignals?.symptomHighSugarDays?.length) {
+    const days = overlapSignals.symptomHighSugarDays.slice(0, 3).join(', ')
+    sections.symptoms.suggested.push({
+      name: 'Symptoms + high sugar overlap',
+      reason: `Symptoms were heavier on high-sugar days (${days}). Try reducing added sugar on those days and see if symptoms ease.`,
     })
   }
 
@@ -1432,6 +1648,8 @@ export async function POST(request: NextRequest) {
   }
   const talkToAiSummary = buildTalkToAiSummary(talkToAiMessages)
 
+  const timezone = await resolveWeeklyReportTimezone(userId)
+
   const nutritionSummary = buildNutritionSummary(
     (user.foodLogs || []).map((f) => ({
       name: f.name,
@@ -1556,6 +1774,30 @@ export async function POST(request: NextRequest) {
   })
 
   const dataFlags = buildDataFlags(dailyStats)
+  const nutritionSignals = buildNutritionSignals(dailyStats)
+  const mealTimingSummary = buildMealTimingSummary(
+    (user.foodLogs || []).map((f) => ({
+      createdAt: f.createdAt,
+      localDate: (f as any).localDate ?? null,
+      meal: (f as any).meal ?? null,
+    })),
+    timezone
+  )
+  const timeOfDayNutrition = buildTimeOfDayNutritionSummary(
+    (user.foodLogs || []).map((f) => ({
+      createdAt: f.createdAt,
+      nutrients: (f as any).nutrients || null,
+    })),
+    timezone
+  )
+  const symptomLateMealOverlap = intersectDays(
+    (dataFlags?.symptomHeavyDays || []).map((d: any) => d.date),
+    mealTimingSummary.lateMealDays || []
+  )
+  const symptomHighSugarOverlap = intersectDays(
+    (dataFlags?.symptomHeavyDays || []).map((d: any) => d.date),
+    (dataFlags?.sugarSpikes || []).map((d: any) => d.date)
+  )
 
   const reportContext = {
     periodStart: periodStartDate,
@@ -1624,6 +1866,14 @@ export async function POST(request: NextRequest) {
     exerciseSummary,
     coverage,
     talkToAi: talkToAiSummary,
+    timezone,
+    nutritionSignals,
+    mealTimingSummary,
+    timeOfDayNutrition,
+    overlapSignals: {
+      symptomLateMealDays: symptomLateMealOverlap,
+      symptomHighSugarDays: symptomHighSugarOverlap,
+    },
     sectionSignals: {
       supplements: (user.supplements || []).length,
       medications: (user.medications || []).length,
@@ -1686,6 +1936,7 @@ Rules:
 - Avoid filler phrases. Every sentence must reference a data point or a clear pattern.
 - If labTrends or lab highlights are present, describe movement (up/down/flat) without labeling good or bad.
 - If you suggest supplements, diet changes, or possible medications based on labs, check against current medications and allergies. If unsure, say to check with a clinician.
+- Do not tell the user how to navigate the app or where to find logs.
 
 JSON data:
 ${JSON.stringify(reportContext)}
@@ -1695,7 +1946,7 @@ ${JSON.stringify(reportContext)}
         model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
-        max_tokens: 1800,
+        max_tokens: 2200,
         response_format: { type: 'json_object' },
       } as any)
 

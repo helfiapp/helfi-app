@@ -126,19 +126,6 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
         topDrinks?: Array<{ label?: string; count?: number }>
       }
     | undefined
-  const dailyStats = (parsedSummary as any)?.dailyStats as
-    | Array<{
-        date?: string
-        foodEntries?: number
-        calories?: number
-        waterMl?: number
-        exerciseMinutes?: number
-        moodAvg?: number | null
-        symptomEntries?: number
-        checkinCount?: number
-        topFoods?: Array<{ name?: string; count?: number }>
-      }>
-    | undefined
   const labTrends = (parsedSummary as any)?.labTrends as
     | Array<{
         name?: string
@@ -333,16 +320,35 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
   const hydrationTotal = hydrationSummary?.totalMl ?? 0
   const hydrationAverage = hydrationSummary?.dailyAverageMl ?? 0
   const hydrationTop = Array.isArray(hydrationSummary?.topDrinks) ? hydrationSummary?.topDrinks : []
-  const dailyRows = Array.isArray(dailyStats) ? dailyStats : []
-  const logLinks = [
-    { label: 'Food diary', href: '/food' },
-    { label: 'Water log', href: '/food/water' },
-    { label: 'Exercise log', href: '/health-tracking' },
-    { label: 'Mood history', href: '/mood/history' },
-    { label: 'Symptom history', href: '/symptoms/history' },
-    { label: 'Check-in history', href: '/check-in/history' },
-    { label: 'Lab reports', href: '/lab-reports' },
-  ]
+  const keyInsights = useMemo(() => {
+    const picks: Array<{ label: string; name?: string; reason?: string }> = []
+    const tryPick = (sectionKey: SectionKey, label: string, bucket: 'suggested' | 'avoid' | 'working') => {
+      const item = sections?.[sectionKey]?.[bucket]?.[0]
+      if (item?.name || item?.reason) {
+        picks.push({ label, name: item.name, reason: item.reason })
+      }
+    }
+    const priority: Array<{ key: SectionKey; label: string }> = [
+      { key: 'nutrition', label: 'Nutrition' },
+      { key: 'hydration', label: 'Hydration' },
+      { key: 'exercise', label: 'Exercise' },
+      { key: 'mood', label: 'Mood' },
+      { key: 'symptoms', label: 'Symptoms' },
+      { key: 'labs', label: 'Labs' },
+      { key: 'lifestyle', label: 'Lifestyle' },
+      { key: 'supplements', label: 'Supplements' },
+      { key: 'medications', label: 'Medications' },
+    ]
+    priority.forEach((section) => {
+      if (picks.length >= 6) return
+      tryPick(section.key, `${section.label} - Suggestion`, 'suggested')
+      if (picks.length >= 6) return
+      tryPick(section.key, `${section.label} - Avoid`, 'avoid')
+      if (picks.length >= 6) return
+      tryPick(section.key, `${section.label} - Working`, 'working')
+    })
+    return picks.slice(0, 6)
+  }, [sections])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -464,70 +470,22 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
           )}
         </div>
 
-        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Open your logs</h2>
-          <p className="text-sm text-gray-600 mt-2">
-            These links open the pages where your last 7 days are stored.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {logLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {dailyRows.length > 0 && (
+        {keyInsights.length > 0 && (
           <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">Last 7 days breakdown</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Key insights this week</h2>
             <p className="text-sm text-gray-600 mt-2">
-              Each day below shows exactly what was logged.
+              These are the most important signals from your last 7 days.
             </p>
-            <div className="mt-4 space-y-3">
-              {dailyRows.map((day, idx) => {
-                const topFoods = Array.isArray(day.topFoods) ? day.topFoods : []
-                const topFoodText = topFoods.length
-                  ? `Top foods: ${topFoods
-                      .map((food) => food.name)
-                      .filter(Boolean)
-                      .slice(0, 3)
-                      .join(', ')}.`
-                  : ''
-                return (
-                  <div key={`${day.date || idx}`} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-semibold text-gray-900">
-                        {day.date ? new Date(day.date).toLocaleDateString() : 'Day'}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Food {day.foodEntries ?? 0} • Water {formatMl(day.waterMl ?? 0)} • Exercise {day.exerciseMinutes ?? 0} mins
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-gray-600">
-                      Calories {day.calories ?? 0} kcal • Mood {day.moodAvg ?? 'n/a'} • Symptoms {day.symptomEntries ?? 0} • Check-ins {day.checkinCount ?? 0}
-                    </div>
-                    {topFoodText && (
-                      <div className="mt-2 text-xs text-gray-500">{topFoodText}</div>
-                    )}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {logLinks.map((link) => (
-                        <Link
-                          key={`${day.date || idx}-${link.href}`}
-                          href={link.href}
-                          className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-100"
-                        >
-                          {link.label}
-                        </Link>
-                      ))}
-                    </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {keyInsights.map((insight, idx) => (
+                <div key={`${insight.label}-${idx}`} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    {insight.label}
                   </div>
-                )
-              })}
+                  <div className="mt-2 font-semibold text-gray-900">{insight.name || 'Insight'}</div>
+                  <p className="mt-1 text-sm text-gray-600">{insight.reason || ''}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
