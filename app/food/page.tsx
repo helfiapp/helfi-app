@@ -13366,6 +13366,30 @@ Please add nutritional information manually if needed.`);
         return dedupeEntries([{ ...pendingEntry, dbId: undefined }, ...base], { fallbackDate: selectedDate })
       })
     }
+    const ensureFavoriteVisible = () => {
+      const current = isViewingToday
+        ? (Array.isArray(latestTodaysFoodsRef.current) ? latestTodaysFoodsRef.current : [])
+        : (Array.isArray(latestHistoryFoodsRef.current) ? (latestHistoryFoodsRef.current as any[]) : [])
+      const exists = current.some((entry) => String(entry?.id) === String(pendingEntry.id))
+      if (exists) return
+      const pendingKeyCheck = buildPendingSaveKey(pendingEntry, selectedDate)
+      const pendingExists = pendingKeyCheck
+        ? current.some((entry) => buildPendingSaveKey(entry, selectedDate) === pendingKeyCheck)
+        : false
+      if (pendingExists) return
+      const merged = dedupeEntries([pendingEntry, ...current], { fallbackDate: selectedDate })
+      if (isViewingToday) {
+        updateTodaysFoodsForDate(merged, selectedDate)
+        updateUserSnapshotForDate(merged, selectedDate)
+      } else {
+        setHistoryFoods(merged)
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.setTimeout(ensureFavoriteVisible, 400)
+    } else {
+      ensureFavoriteVisible()
+    }
     let entryForSave = pendingEntry
     const drinkMetaForEntry = getDrinkMetaFromEntry(pendingEntry)
     if (drinkMetaForEntry?.type && !drinkMetaForEntry.waterLogId) {
