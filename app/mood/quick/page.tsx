@@ -78,7 +78,7 @@ export default function QuickMoodCheckInPage() {
     <div className="min-h-screen bg-[#f8f9fa] dark:bg-gray-900 pb-40">
       <PageHeader title="Quick Check‑In" backHref="/dashboard" />
 
-      <main className="max-w-3xl mx-auto px-4 py-6">
+      <main className="max-w-3xl mx-auto px-4 pt-6 pb-32 md:pb-6">
         {banner && (
           <div
             className={[

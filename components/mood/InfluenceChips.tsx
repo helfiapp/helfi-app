@@ -236,6 +236,7 @@ export default function InfluenceChips({
       { id: 'food', label: 'Food & Drink', imageUrl: ICON_URLS.food, fallbackIcon: 'restaurant' },
       { id: 'weather', label: 'Weather', imageUrl: ICON_URLS.weather, fallbackIcon: 'sunny' },
       { id: 'exercise', label: 'Exercise', imageUrl: ICON_URLS.exercise, fallbackIcon: 'fitness_center' },
+      { id: 'achievement', label: 'Achievement', imageUrl: ICON_URLS.achievement, fallbackIcon: 'emoji_events' },
     ]
 
     const more: Tile[] = [
@@ -265,7 +266,6 @@ export default function InfluenceChips({
       { id: 'chores', label: 'Chores', imageUrl: ICON_URLS.chores },
       { id: 'rainy', label: 'Rainy day', imageUrl: ICON_URLS.rainy },
       { id: 'audio', label: 'Podcasts', imageUrl: ICON_URLS.audio },
-      { id: 'achievement', label: 'Achievement', imageUrl: ICON_URLS.achievement },
       { id: 'motivation', label: 'Motivation', imageUrl: ICON_URLS.motivation },
       { id: 'time', label: 'Time', imageUrl: ICON_URLS.time },
     ]

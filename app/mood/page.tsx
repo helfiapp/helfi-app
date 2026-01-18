@@ -174,7 +174,7 @@ export default function MoodCheckInPage() {
       <PageHeader title="Daily Check‑In" backHref="/more" />
       <MoodTabs />
 
-      <main className="max-w-3xl mx-auto px-4 py-6">
+      <main className="max-w-3xl mx-auto px-4 pt-6 pb-32 md:pb-6">
         {banner && (
           <div
             className={[
