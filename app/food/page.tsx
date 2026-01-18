@@ -20418,6 +20418,9 @@ Please add nutritional information manually if needed.`);
                   'fruit',
                   'berries',
                   'berry',
+                  'super',
+                  'mix',
+                  'blend',
                   'sliced',
                   'diced',
                   'cut',
@@ -20623,6 +20626,15 @@ Please add nutritional information manually if needed.`);
                   return false
                 }
 
+                const eggTokens = new Set(['egg', 'omelet', 'omelette'])
+
+                const isEggLabel = (label: any) => {
+                  if (!label) return false
+                  const clean = scrubFatLabel(label)
+                  const tokens = clean.split(' ').filter(Boolean).map(normalizeFatToken)
+                  return tokens.some((token) => eggTokens.has(token))
+                }
+
                 const isPureFruitLabel = (label: any) => {
                   if (!label) return false
                   const clean = scrubFatLabel(label)
@@ -20641,6 +20653,15 @@ Please add nutritional information manually if needed.`);
                   return false
                 }
 
+                const buildFatDisplayLabel = (name: any, brand: any) => {
+                  const safeName = String(name || '').trim()
+                  if (!safeName) return normalizeFatItemLabel(name)
+                  const safeBrand = String(brand || '').trim()
+                  if (!safeBrand) return safeName
+                  if (safeName.toLowerCase().startsWith(safeBrand.toLowerCase())) return safeName
+                  return `${safeBrand} ${safeName}`.trim()
+                }
+
                 const isZeroFatItem = (label: any, grams: number) => {
                   const fatValue = Number(grams || 0)
                   if (!Number.isFinite(fatValue) || fatValue <= 0) return true
@@ -20655,6 +20676,7 @@ Please add nutritional information manually if needed.`);
                   if (Number.isFinite(fatValue) && fatValue > 0) {
                     if (isPureFruitLabel(label) && !isProcessedLabel(label)) return 'good'
                   }
+                  if (isEggLabel(label)) return 'good'
                   if (allowFallbackHeuristics && matchesFatKeywords(label, fatBadOverrides)) return 'bad'
                   if (allowFallbackHeuristics && matchesFatKeywords(label, fatChainKeywords)) return 'bad'
                   const hasBad = matchesFatKeywords(label, fatBadKeywords)
@@ -20701,17 +20723,18 @@ Please add nutritional information manually if needed.`);
                     const fat = Number(entry?.fat_g || 0) * servings * multiplier
                     if (!Number.isFinite(fat) || fat <= 0) return
                     const label = entry?.name || entry?.label || entry?.description || ''
+                    const displayLabel = buildFatDisplayLabel(label, entry?.brand)
                     if (isZeroFatItem(label, fat)) return
                     const bucket = classifyFatLabel(label, fat)
                     if (bucket === 'good') {
                       split.good += fat
-                      addFatDetail('good', label, fat)
+                      addFatDetail('good', displayLabel, fat)
                     } else if (bucket === 'bad') {
                       split.bad += fat
-                      addFatDetail('bad', label, fat)
+                      addFatDetail('bad', displayLabel, fat)
                     } else {
                       split.unclear += fat
-                      addFatDetail('unclear', label, fat)
+                      addFatDetail('unclear', displayLabel, fat)
                     }
                   })
                   return split
@@ -20761,17 +20784,18 @@ Please add nutritional information manually if needed.`);
                     fatSplit.unclear += splitFromItems.unclear
                   } else {
                     const entryLabel = item?.label || item?.name || item?.description || ''
+                    const entryDisplayLabel = buildFatDisplayLabel(entryLabel, item?.brand)
                     if (isZeroFatItem(entryLabel, storedTotals.fat)) return acc
                     const bucket = classifyFatLabel(entryLabel, storedTotals.fat)
                     if (bucket === 'good') {
                       fatSplit.good += storedTotals.fat
-                      addFatDetail('good', entryLabel, storedTotals.fat)
+                      addFatDetail('good', entryDisplayLabel, storedTotals.fat)
                     } else if (bucket === 'bad') {
                       fatSplit.bad += storedTotals.fat
-                      addFatDetail('bad', entryLabel, storedTotals.fat)
+                      addFatDetail('bad', entryDisplayLabel, storedTotals.fat)
                     } else {
                       fatSplit.unclear += storedTotals.fat
-                      addFatDetail('unclear', entryLabel, storedTotals.fat)
+                      addFatDetail('unclear', entryDisplayLabel, storedTotals.fat)
                     }
                   }
                   return acc
