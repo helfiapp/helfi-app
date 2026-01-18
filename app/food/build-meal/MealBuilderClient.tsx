@@ -19,6 +19,8 @@ type NormalizedFoodItem = {
   fat_g?: number | null
   fiber_g?: number | null
   sugar_g?: number | null
+  __suggestion?: boolean
+  __searchQuery?: string
 }
 
 type BuilderUnit = 'g' | 'oz' | 'ml' | 'tsp' | 'tbsp' | 'cup' | 'piece'
@@ -94,6 +96,82 @@ const normalizeBrandToken = (value: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '')
     .trim()
+
+const normalizeSearchToken = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+
+const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: string }> = [
+  { name: 'Apple, raw', serving_size: '100 g' },
+  { name: 'Banana, raw', serving_size: '100 g' },
+  { name: 'Raspberries, raw', serving_size: '100 g' },
+  { name: 'Strawberries, raw', serving_size: '100 g' },
+  { name: 'Blueberries, raw', serving_size: '100 g' },
+  { name: 'Grapes, raw', serving_size: '100 g' },
+  { name: 'Orange, raw', serving_size: '100 g' },
+  { name: 'Pear, raw', serving_size: '100 g' },
+  { name: 'Pineapple, raw', serving_size: '100 g' },
+  { name: 'Mango, raw', serving_size: '100 g' },
+  { name: 'Kiwi, raw', serving_size: '100 g' },
+  { name: 'Watermelon, raw', serving_size: '100 g' },
+  { name: 'Carrots, raw', serving_size: '100 g' },
+  { name: 'Zucchini, raw', serving_size: '100 g' },
+  { name: 'Tomato, raw', serving_size: '100 g' },
+  { name: 'Potato, raw', serving_size: '100 g' },
+  { name: 'Onion, raw', serving_size: '100 g' },
+  { name: 'Garlic, raw', serving_size: '100 g' },
+  { name: 'Broccoli, raw', serving_size: '100 g' },
+  { name: 'Cauliflower, raw', serving_size: '100 g' },
+  { name: 'Spinach, raw', serving_size: '100 g' },
+  { name: 'Lettuce, raw', serving_size: '100 g' },
+  { name: 'Cucumber, raw', serving_size: '100 g' },
+  { name: 'Capsicum, raw', serving_size: '100 g' },
+  { name: 'Mushrooms, raw', serving_size: '100 g' },
+  { name: 'Egg, whole, raw', serving_size: '100 g' },
+  { name: 'Eggs, whole, raw', serving_size: '100 g' },
+  { name: 'Chicken breast, raw', serving_size: '100 g' },
+  { name: 'Chicken thigh, raw', serving_size: '100 g' },
+  { name: 'Beef, ground, raw', serving_size: '100 g' },
+  { name: 'Pork, raw', serving_size: '100 g' },
+  { name: 'Salmon, raw', serving_size: '100 g' },
+  { name: 'Tuna, raw', serving_size: '100 g' },
+  { name: 'Rice, cooked', serving_size: '100 g' },
+  { name: 'Pasta, cooked', serving_size: '100 g' },
+  { name: 'Bread, white', serving_size: '100 g' },
+  { name: 'Milk, whole', serving_size: '100 g' },
+  { name: 'Yogurt, plain', serving_size: '100 g' },
+  { name: 'Cheese, cheddar', serving_size: '100 g' },
+  { name: 'Olive oil', serving_size: '100 g' },
+  { name: 'Butter', serving_size: '100 g' },
+  { name: 'Sugar', serving_size: '100 g' },
+  { name: 'Salt', serving_size: '100 g' },
+  { name: 'Oats, raw', serving_size: '100 g' },
+  { name: 'Almonds', serving_size: '100 g' },
+  { name: 'Peanut butter', serving_size: '100 g' },
+  { name: 'Avocado, raw', serving_size: '100 g' },
+]
+
+const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
+  const normalized = normalizeSearchToken(searchQuery)
+  if (!normalized) return []
+  const tokens = normalized.split(' ').filter(Boolean)
+  const prefix = tokens.length > 1 ? tokens[tokens.length - 1] : normalized
+  if (prefix.length < 2) return []
+  const matches = COMMON_SINGLE_FOOD_SUGGESTIONS.filter((item) =>
+    normalizeSearchToken(item.name).startsWith(prefix),
+  )
+  return matches.slice(0, 8).map((item) => ({
+    source: 'usda',
+    id: `suggest:${normalizeSearchToken(item.name)}`,
+    name: item.name,
+    serving_size: item.serving_size || '100 g',
+    __suggestion: true,
+    __searchQuery: item.name,
+  }))
+}
 
 const triggerHaptic = (duration = 10) => {
   try {
@@ -353,7 +431,6 @@ export default function MealBuilderClient() {
   const [portionUnit, setPortionUnit] = useState<'g' | 'oz'>('g')
   const searchDebounceRef = useRef<number | null>(null)
 
-  const abortRef = useRef<AbortController | null>(null)
   const seqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const queryInputRef = useRef<HTMLInputElement | null>(null)
@@ -627,6 +704,23 @@ export default function MealBuilderClient() {
     return { title: name, showBrandSuffix: true }
   }
 
+  const fetchSearchItems = async (searchQuery: string, options?: { kindOverride?: 'packaged' | 'single'; sourceOverride?: string }) => {
+    const q = String(searchQuery || '').trim()
+    if (!q) return []
+    const kindToUse = options?.kindOverride || kind
+    const sourceParam = options?.sourceOverride || 'auto'
+    const params = new URLSearchParams({
+      source: sourceParam,
+      q: q,
+      kind: kindToUse,
+      limit: '20',
+    })
+    const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
+    if (!res.ok) return []
+    const data = await res.json().catch(() => ({} as any))
+    return Array.isArray(data?.items) ? data.items : []
+  }
+
   const runSearch = async (searchQuery?: string) => {
     const raw = String(searchQuery ?? query)
     const q = raw.trim()
@@ -638,77 +732,34 @@ export default function MealBuilderClient() {
     setError(null)
     setSearchLoading(true)
 
-    try {
-      abortRef.current?.abort()
-    } catch {}
-    const controller = new AbortController()
-    abortRef.current = controller
     const seq = ++seqRef.current
 
     try {
-      const sourceParam = 'auto'
-      const params = new URLSearchParams({
-        source: sourceParam,
-        q: q,
-        kind,
-        limit: '20',
-      })
-      const res = await fetch(`/api/food-data?${params.toString()}`, {
-        method: 'GET',
-        signal: controller.signal,
-      })
-      if (!res.ok) {
-        setError('Search failed. Please try again.')
-        return
-      }
-      const data = await res.json()
+      let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
-      let nextItems = Array.isArray(data?.items) ? data.items : []
       if (nextItems.length === 0 && kind === 'single') {
         try {
           const words = q.split(/\s+/).filter(Boolean)
           const lastWord = words.length > 1 ? words[words.length - 1] : ''
           if (lastWord && lastWord !== q && lastWord.length >= 3) {
-            const fallbackParams = new URLSearchParams({
-              source: 'auto',
-              q: lastWord,
-              kind,
-              limit: '20',
-            })
-            const fallbackRes = await fetch(`/api/food-data?${fallbackParams.toString()}`, {
-              method: 'GET',
-              signal: controller.signal,
-            })
-            if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json()
-              if (seqRef.current === seq) {
-                nextItems = Array.isArray(fallbackData?.items) ? fallbackData.items : []
-              }
-            }
+            const fallbackItems = await fetchSearchItems(lastWord)
+            if (seqRef.current === seq) nextItems = fallbackItems
           }
           if (nextItems.length === 0) {
-            const fallbackParams = new URLSearchParams({
-              source: 'openfoodfacts',
-              q: q,
-              kind: 'packaged',
-              limit: '20',
-            })
-            const fallbackRes = await fetch(`/api/food-data?${fallbackParams.toString()}`, {
-              method: 'GET',
-              signal: controller.signal,
-            })
-            if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json()
-              if (seqRef.current === seq) {
-                nextItems = Array.isArray(fallbackData?.items) ? fallbackData.items : []
-              }
-            }
+            const packagedItems = await fetchSearchItems(q, { kindOverride: 'packaged', sourceOverride: 'openfoodfacts' })
+            if (seqRef.current === seq) nextItems = packagedItems
           }
         } catch {}
       }
+      if (nextItems.length === 0) {
+        const instant = buildInstantSuggestions(q)
+        if (instant.length > 0) {
+          nextItems = instant
+        }
+      }
       setResults(nextItems)
+      return nextItems
     } catch (e: any) {
-      if (e?.name === 'AbortError') return
       setError('Search failed. Please try again.')
     } finally {
       if (seqRef.current === seq) setSearchLoading(false)
@@ -727,6 +778,8 @@ export default function MealBuilderClient() {
       if (q.length === 0) setError(null)
       return
     }
+    const instant = buildInstantSuggestions(q)
+    if (instant.length > 0) setResults(instant)
     setSearchLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {
       runSearch(q)
@@ -791,6 +844,24 @@ export default function MealBuilderClient() {
     }
 
     addBuilderItem(next)
+  }
+
+  const addSuggestionItem = async (item: NormalizedFoodItem) => {
+    const lookup = item.__searchQuery || item.name
+    setSearchLoading(true)
+    try {
+      const matches = await runSearch(lookup)
+      const best = Array.isArray(matches) && matches.length > 0 ? matches[0] : null
+      if (best) {
+        addItem(best)
+      } else {
+        setError('No match found. Try a longer search.')
+      }
+    } catch {
+      setError('Search failed. Please try again.')
+    } finally {
+      setSearchLoading(false)
+    }
   }
 
   const addItemsFromAi = (aiItems: any[]) => {
@@ -2121,6 +2192,7 @@ export default function MealBuilderClient() {
               {results.length > 0 && (
                 <div className="max-h-72 overflow-y-auto space-y-2 pt-2">
                   {results.map((r) => {
+                    const isSuggestion = Boolean((r as any).__suggestion)
                     const display = buildSearchDisplay(r, query)
                     return (
                       <div key={`${r.source}:${r.id}`} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
@@ -2135,7 +2207,7 @@ export default function MealBuilderClient() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => addItem(r)}
+                          onClick={() => (isSuggestion ? addSuggestionItem(r) : addItem(r))}
                           className="ml-3 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
                         >
                           Add
