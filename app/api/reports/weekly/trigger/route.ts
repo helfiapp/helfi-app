@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { upsertWeeklyReportState } from '@/lib/weekly-health-report'
 
 const buildBaseUrl = (request: NextRequest) => {
   const envBase =
@@ -23,24 +22,19 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.user.id
-  const now = new Date()
-  await upsertWeeklyReportState(userId, { nextReportDueAt: now.toISOString() })
-
   const schedulerSecret = process.env.SCHEDULER_SECRET || ''
-  if (!schedulerSecret) {
-    return NextResponse.json({ error: 'Missing scheduler secret' }, { status: 500 })
-  }
-
   const baseUrl = buildBaseUrl(request)
   if (!baseUrl) {
     return NextResponse.json({ error: 'Missing base URL' }, { status: 500 })
   }
 
+  const cookie = request.headers.get('cookie') || ''
   const response = await fetch(`${baseUrl}/api/reports/weekly/run`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${schedulerSecret}`,
+      ...(schedulerSecret ? { Authorization: `Bearer ${schedulerSecret}` } : {}),
+      ...(cookie ? { cookie } : {}),
     },
     body: JSON.stringify({ userId, triggerSource: 'manual' }),
   })

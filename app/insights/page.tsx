@@ -78,6 +78,7 @@ export default async function InsightsPage() {
       initialWeeklyStatus={{
         reportReady,
         reportLocked,
+        status: latestReport?.status ?? null,
         nextReportDueAt: weeklyState?.nextReportDueAt ?? null,
       }}
     />

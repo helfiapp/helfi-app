@@ -4,6 +4,20 @@ import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
 import { generateSectionInsightsFromLLM, generateDegradedSection, generateDegradedSectionQuick, generateDegradedSectionQuickStrict, evaluateFocusItemsForIssue } from './llm'
 
+const LANDING_PAYLOAD_TTL_MS = 30 * 1000
+const landingPayloadCache = new Map<
+  string,
+  {
+    expiresAt: number
+    payload: {
+      issues: IssueSummary[]
+      generatedAt: string
+      onboardingComplete: boolean
+      dataNeeds: InsightDataNeed[]
+    }
+  }
+>()
+
 export type IssueSectionKey =
   | 'overview'
   | 'exercise'
@@ -1091,15 +1105,23 @@ export async function getIssueSection(
 }
 
 export async function getIssueLandingPayload(userId: string) {
+  const now = Date.now()
+  const cached = landingPayloadCache.get(userId)
+  if (cached && cached.expiresAt > now) {
+    return cached.payload
+  }
+
   // Use a lightweight context for landing to reduce DB work and latency.
   const context = await loadUserLandingContext(userId)
   const summaries = context.issues.map((issue) => enrichIssueSummary(issue, context))
-  return {
+  const payload = {
     issues: summaries,
     generatedAt: new Date().toISOString(),
     onboardingComplete: context.onboardingComplete,
     dataNeeds: context.dataNeeds,
   }
+  landingPayloadCache.set(userId, { expiresAt: now + LANDING_PAYLOAD_TTL_MS, payload })
+  return payload
 }
 
 type PrecomputeOptions = {

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
@@ -10,6 +12,7 @@ import {
   createWeeklyReportRecord,
   getNextDueAt,
   getWeeklyReportState,
+  markWeeklyReportOnboardingComplete,
   queueWeeklyReportNotification,
   summarizeCoverage,
   updateWeeklyReportRecord,
@@ -343,25 +346,42 @@ function buildFallbackReport(context: any) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isAuthorized(request)) {
+  const body = await request.json().catch(() => ({}))
+  const userId = typeof body?.userId === 'string' ? body.userId : ''
+  const triggerSource = typeof body?.triggerSource === 'string' ? body.triggerSource : ''
+  const isManualTrigger = triggerSource === 'manual'
+  const hasSchedulerAuth = isAuthorized(request)
+  let allowManual = false
+  if (!hasSchedulerAuth && isManualTrigger) {
+    const session = await getServerSession(authOptions)
+    if (session?.user?.id && session.user.id === userId) {
+      allowManual = true
+    }
+  }
+  if (!hasSchedulerAuth && !allowManual) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json().catch(() => ({}))
-  const userId = typeof body?.userId === 'string' ? body.userId : ''
   if (!userId) {
     return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
   }
 
   const now = new Date()
-  const state = await getWeeklyReportState(userId)
+  let state = await getWeeklyReportState(userId)
   if (!state?.nextReportDueAt) {
-    return NextResponse.json({ status: 'skipped', reason: 'no_schedule' })
+    if (isManualTrigger) {
+      await markWeeklyReportOnboardingComplete(userId)
+      state = await getWeeklyReportState(userId)
+    } else {
+      return NextResponse.json({ status: 'skipped', reason: 'no_schedule' })
+    }
   }
 
-  const dueAt = new Date(state.nextReportDueAt)
-  if (dueAt.getTime() > now.getTime()) {
-    return NextResponse.json({ status: 'skipped', reason: 'not_due' })
+  if (!isManualTrigger && state?.nextReportDueAt) {
+    const dueAt = new Date(state.nextReportDueAt)
+    if (dueAt.getTime() > now.getTime()) {
+      return NextResponse.json({ status: 'skipped', reason: 'not_due' })
+    }
   }
 
   await upsertWeeklyReportState(userId, {

@@ -20,6 +20,7 @@ interface InsightsLandingClientProps {
   initialWeeklyStatus?: {
     reportReady?: boolean
     reportLocked?: boolean
+    status?: string | null
     nextReportDueAt?: string | null
   } | null
 }
@@ -33,6 +34,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const [weeklyStatus, setWeeklyStatus] = useState<any>(initialWeeklyStatus || null)
   const [isCreatingReport, setIsCreatingReport] = useState(false)
   const [createReportMessage, setCreateReportMessage] = useState<string | null>(null)
+  const [createReportError, setCreateReportError] = useState(false)
   const [countdown, setCountdown] = useState<{
     days: number
     hours: number
@@ -147,6 +149,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   async function handleCreateReportNow() {
     if (isCreatingReport) return
     setIsCreatingReport(true)
+    setCreateReportError(false)
     setCreateReportMessage('Creating your report now. This can take a minute.')
     try {
       const response = await fetch('/api/reports/weekly/trigger', {
@@ -160,9 +163,11 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
           router.refresh()
         }, 2000)
       } else {
+        setCreateReportError(true)
         setCreateReportMessage(data?.error || 'Sorry, we could not create the report right now.')
       }
     } catch (error) {
+      setCreateReportError(true)
       setCreateReportMessage('Sorry, we could not create the report right now.')
     } finally {
       setIsCreatingReport(false)
@@ -280,7 +285,11 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                         style={{ width: `${countdown.percent}%`, backgroundColor: '#4DAF50' }}
                       ></div>
                     </div>
-                    {countdown.dueNow ? (
+                    {isReportRunning ? (
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        Your report is being prepared now. Check back soon.
+                      </div>
+                    ) : countdown.dueNow ? (
                       <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                         Your report is being prepared now. Check back soon.
                       </div>
@@ -363,16 +372,22 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                 <button
                   type="button"
                   onClick={handleCreateReportNow}
-                  disabled={isCreatingReport}
+                  disabled={isCreatingReport || isReportRunning}
                   className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isCreatingReport ? 'Creating report...' : 'Create report now'}
+                  {isCreatingReport || isReportRunning ? 'Creating report...' : 'Create report now'}
                 </button>
               )}
             </div>
           </div>
           {createReportMessage && (
-            <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            <div
+              className={`mt-4 rounded-lg px-4 py-3 text-sm ${
+                createReportError
+                  ? 'border border-red-200 bg-red-50 text-red-700'
+                  : 'border border-emerald-100 bg-emerald-50 text-emerald-800'
+              }`}
+            >
               {createReportMessage}
             </div>
           )}
@@ -502,3 +517,4 @@ function resolveNeedHref(need: InsightDataNeed, firstIssueSlug?: string) {
   if (need.key === 'supplements-backup' || need.key === 'supplements-emergency') return '/onboarding?step=1'
   return need.href
 }
+  const isReportRunning = weeklyStatus?.status === 'RUNNING'
