@@ -171,7 +171,14 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         data = null
       }
       if (response.ok) {
-        setCreateReportMessage('Your report is being created. Refresh this page or open the report in a minute.')
+        const status = String(data?.status || '').toLowerCase()
+        if (status === 'locked') {
+          setCreateReportMessage('Your report is ready, but it needs a subscription or credits to open.')
+        } else if (status === 'ready') {
+          setCreateReportMessage('Your report is ready. Refresh the page to view it.')
+        } else {
+          setCreateReportMessage('Your report is being created. Refresh this page or open the report in a minute.')
+        }
         setTimeout(() => {
           router.refresh()
         }, 2000)

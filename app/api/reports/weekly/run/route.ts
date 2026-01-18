@@ -346,6 +346,7 @@ function buildFallbackReport(context: any) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
   const body = await request.json().catch(() => ({}))
   const triggerSource = typeof body?.triggerSource === 'string' ? body.triggerSource : ''
   const isManualTrigger = triggerSource === 'manual'
@@ -438,48 +439,114 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'locked' })
   }
 
-  const user = await prisma.user.findUnique({
+  const userBase = await prisma.user.findUnique({
     where: { id: userId },
-    include: {
-      healthGoals: { orderBy: { updatedAt: 'desc' } },
-      supplements: true,
-      medications: true,
-      foodLogs: {
-        where: { createdAt: { gte: periodStart } },
-        orderBy: { createdAt: 'desc' },
-        take: 75,
-      },
-      waterLogs: {
-        where: { createdAt: { gte: periodStart } },
-        orderBy: { createdAt: 'desc' },
-        take: 120,
-      },
-      healthLogs: {
-        where: { createdAt: { gte: periodStart } },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        include: { goal: true },
-      },
-      exerciseLogs: {
-        where: { createdAt: { gte: periodStart } },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-      },
-      exerciseEntries: {
-        where: { createdAt: { gte: periodStart } },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-      },
+    select: {
+      gender: true,
+      weight: true,
+      height: true,
+      bodyType: true,
+      exerciseFrequency: true,
+      exerciseTypes: true,
     },
   })
 
-  if (!user) {
+  if (!userBase) {
     await updateWeeklyReportRecord(userId, report.id, {
       status: 'FAILED',
       error: 'User not found',
     })
     await upsertWeeklyReportState(userId, { lastStatus: 'FAILED' })
     return NextResponse.json({ status: 'failed', reason: 'user_missing' }, { status: 404 })
+  }
+
+  const [
+    healthGoals,
+    supplements,
+    medications,
+    foodLogs,
+    waterLogs,
+    healthLogs,
+    exerciseLogs,
+    exerciseEntries,
+  ] = await Promise.all([
+    prisma.healthGoal
+      .findMany({ where: { userId }, orderBy: { updatedAt: 'desc' } })
+      .catch((error) => {
+        console.warn('[weekly-report] Failed to load health goals', error)
+        return []
+      }),
+    prisma.supplement.findMany({ where: { userId } }).catch((error) => {
+      console.warn('[weekly-report] Failed to load supplements', error)
+      return []
+    }),
+    prisma.medication.findMany({ where: { userId } }).catch((error) => {
+      console.warn('[weekly-report] Failed to load medications', error)
+      return []
+    }),
+    prisma.foodLog
+      .findMany({
+        where: { userId, createdAt: { gte: periodStart } },
+        orderBy: { createdAt: 'desc' },
+        take: 75,
+      })
+      .catch((error) => {
+        console.warn('[weekly-report] Failed to load food logs', error)
+        return []
+      }),
+    prisma.waterLog
+      .findMany({
+        where: { userId, createdAt: { gte: periodStart } },
+        orderBy: { createdAt: 'desc' },
+        take: 120,
+      })
+      .catch((error) => {
+        console.warn('[weekly-report] Failed to load water logs', error)
+        return []
+      }),
+    prisma.healthLog
+      .findMany({
+        where: { userId, createdAt: { gte: periodStart } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        include: { goal: { select: { name: true } } },
+      })
+      .catch((error) => {
+        console.warn('[weekly-report] Failed to load health logs', error)
+        return []
+      }),
+    prisma.exerciseLog
+      .findMany({
+        where: { userId, createdAt: { gte: periodStart } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      })
+      .catch((error) => {
+        console.warn('[weekly-report] Failed to load exercise logs', error)
+        return []
+      }),
+    prisma.exerciseEntry
+      .findMany({
+        where: { userId, createdAt: { gte: periodStart } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      })
+      .catch((error) => {
+        console.warn('[weekly-report] Failed to load exercise entries', error)
+        return []
+      }),
+  ])
+
+  const user = {
+    ...userBase,
+    healthGoals,
+    supplements,
+    medications,
+    foodLogs,
+    waterLogs,
+    healthLogs,
+    exerciseLogs,
+    exerciseEntries,
   }
 
   let moodRows: Array<{ mood: number; timestamp: Date }> = []
@@ -904,4 +971,8 @@ ${JSON.stringify(reportContext)}
   await queueWeeklyReportNotification(updated).catch(() => {})
 
   return NextResponse.json({ status: 'ready', reportId: report.id })
+  } catch (error: any) {
+    console.error('[weekly-report] Failed to generate report', error)
+    return NextResponse.json({ error: 'report_failed' }, { status: 500 })
+  }
 }
