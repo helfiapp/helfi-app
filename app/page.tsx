@@ -420,7 +420,7 @@ export default function SplashPage() {
             </Link>
 
             <Link
-              href="/features/voice-ai"
+              href="/features/talk-to-helfi"
               className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
             >
               <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-6">

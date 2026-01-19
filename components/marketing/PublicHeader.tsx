@@ -163,7 +163,7 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
       items: [
         {
           label: 'Talk to Helfi',
-          href: '/features/voice-ai',
+          href: '/features/talk-to-helfi',
           description: 'Chat with your health data.',
           icon: (
             <svg className={iconClassName} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">

@@ -1695,7 +1695,7 @@ export const featurePages: FeaturePageContent[] = [
     },
   },
   {
-    slug: 'voice-ai',
+    slug: 'talk-to-helfi',
     title: 'Talk to Helfi',
     subtitle: 'Chat with your health data and get clear answers.',
     intro:
@@ -1710,6 +1710,13 @@ export const featurePages: FeaturePageContent[] = [
     heroImage: {
       src: '/screenshots/hero/ASK AI.png',
       alt: 'Talk to Helfi chat on a phone',
+    },
+    bannerImage: {
+      src: '/WEBSITE IMAGES/TALK TO HELFI/WOMAN ON COUCH.jpg',
+      alt: 'Woman using Talk to Helfi on a couch',
+      width: 1557,
+      height: 660,
+      kind: 'photo',
     },
     primaryCta,
     secondaryCta,
