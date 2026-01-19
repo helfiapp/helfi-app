@@ -326,7 +326,7 @@ export default function HealthJournalPage() {
                   onClick={() => shiftSelectedDateByDays(-1)}
                   className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm"
                 >
-                  {\`\u2039 Previous\`}
+                  {'Previous'}
                 </button>
                 <div className="relative">
                   <input
@@ -344,7 +344,7 @@ export default function HealthJournalPage() {
                   onClick={() => shiftSelectedDateByDays(1)}
                   className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm"
                 >
-                  {\`Next \u203A\`}
+                  {'Next'}
                 </button>
                 <button
                   type="button"
