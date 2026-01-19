@@ -5935,12 +5935,16 @@ export default function FoodDiary() {
     const queryTokens = getSearchTokens(searchQuery)
     const nameTokens = getSearchTokens(name)
     if (queryTokens.length === 0 || nameTokens.length === 0) return false
+    const shortQuery = queryTokens.every((token) => token.length < 4)
+    const tokenMatches = (token: string, word: string) =>
+      shortQuery ? word.includes(token) : word.startsWith(token)
     const requireFirstWord = options?.requireFirstWord ?? false
     if (requireFirstWord) {
-      if (!queryTokens.some((token) => nameTokens[0].startsWith(token))) return false
+      if (!queryTokens.some((token) => tokenMatches(token, nameTokens[0]))) return false
     }
-    if (queryTokens.length === 1) return nameTokens.some((word) => word.startsWith(queryTokens[0]))
-    return queryTokens.every((token) => nameTokens.some((word) => word.startsWith(token)))
+    if (queryTokens.length === 1) return nameTokens.some((word) => tokenMatches(queryTokens[0], word))
+    if (shortQuery) return queryTokens.some((token) => nameTokens.some((word) => tokenMatches(token, word)))
+    return queryTokens.every((token) => nameTokens.some((word) => tokenMatches(token, word)))
   }
 
   const itemMatchesSearchQuery = (item: any, searchQuery: string, kind: 'packaged' | 'single') => {
