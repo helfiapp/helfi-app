@@ -18,11 +18,13 @@
     overscroll-behavior-x: none;
   }
 
+  /* ⚠️ GUARD RAIL: Keep scrollbars hidden everywhere (desktop + mobile). */
   * {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
 
+  /* ⚠️ GUARD RAIL: Do not re-enable visible scrollbars. */
   *::-webkit-scrollbar {
     width: 0;
     height: 0;

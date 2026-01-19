@@ -21113,6 +21113,7 @@ Please add nutritional information manually if needed.`);
                 const carbNonSugar = Math.max(0, carbGrams - sugarGrams)
                 const fibreGrams = totals.fiber || 0
                 const fatConsumed = Math.max(0, totals.fat || 0)
+                // ⚠️ GUARD RAIL: Fat split must stay as green (good), red (bad), blue (unclear).
                 const fatSplitTotal = fatSplit.good + fatSplit.bad + fatSplit.unclear
                 const normalizedFatSplit = (() => {
                   if (!Number.isFinite(fatSplitTotal) || fatSplitTotal <= 0 || fatConsumed <= 0) {
@@ -21133,7 +21134,7 @@ Please add nutritional information manually if needed.`);
                   bad: fatDetailList(fatDetails.bad),
                   unclear: fatDetailList(fatDetails.unclear),
                 }
-                // Guard rail: keep fat item labels in normal sentence case (no all-caps lists).
+                // ⚠️ GUARD RAIL: Keep fat item labels in normal sentence case (no all-caps lists).
                 const formatFatDetailLabel = (value: any) => {
                   const raw = String(value || '').trim()
                   if (!raw) return 'Unknown item'
@@ -21344,6 +21345,7 @@ Please add nutritional information manually if needed.`);
                   const over = percentValue > 100
                   const percentColor = over ? 'text-red-600' : 'text-gray-900'
                   const remaining = Math.max(0, row.target - row.consumed)
+                                  // ⚠️ GUARD RAIL: Fat bar must stay split by good/bad/unclear colors.
                                   const fatSplitValues = row.key === 'fat' ? row.fatSplit : null
                                   const fatSplitTotal = fatSplitValues
                                     ? fatSplitValues.good + fatSplitValues.bad + fatSplitValues.unclear
@@ -21497,6 +21499,7 @@ Please add nutritional information manually if needed.`);
 
                           let fatPanel: JSX.Element | null = null
                           if (fatConsumed > 0) {
+                            // ⚠️ GUARD RAIL: Fat circles must keep the three-color split (good/bad/unclear).
                             const fatRingItems = [
                               { type: 'good' as const, label: 'Good fat', value: normalizedFatSplit.good, color: fatDetailColors.good },
                               { type: 'bad' as const, label: 'Bad fat', value: normalizedFatSplit.bad, color: fatDetailColors.bad },

@@ -408,6 +408,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     }
   }, [router])
 
+  // ⚠️ GUARD RAIL: Allow pinch zoom, but always snap back to normal size after the gesture ends.
   useEffect(() => {
     if (typeof document === 'undefined') return
     const meta = document.querySelector('meta[name="viewport"]')
@@ -456,6 +457,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     }
   }, [])
 
+  // ⚠️ GUARD RAIL: Scroll guard prevents accidental taps when a user is just scrolling.
   useEffect(() => {
     if (typeof document === 'undefined') return
     let startX = 0
