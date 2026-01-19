@@ -5896,6 +5896,80 @@ export default function FoodDiary() {
       .replace(/[^a-z0-9]+/g, '')
       .trim()
 
+  const normalizeSearchToken = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .replace(/\s+/g, ' ')
+
+  const getSearchTokens = (value: string) => normalizeSearchToken(value).split(' ').filter(Boolean)
+
+  const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
+    const queryTokens = getSearchTokens(searchQuery)
+    const nameTokens = getSearchTokens(name)
+    if (queryTokens.length === 0 || nameTokens.length === 0) return false
+    if (queryTokens.length === 1) return nameTokens[0].startsWith(queryTokens[0])
+    if (!queryTokens.some((token) => nameTokens[0].startsWith(token))) return false
+    return queryTokens.every((token) => nameTokens.some((word) => word.startsWith(token)))
+  }
+
+  const itemMatchesSearchQuery = (item: any, searchQuery: string, kind: 'packaged' | 'single') => {
+    if (kind === 'single') return nameMatchesSearchQuery(item?.name || '', searchQuery)
+    const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+    return nameMatchesSearchQuery(combined || item?.name || '', searchQuery)
+  }
+
+  const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
+    'McDonald\'s',
+    'KFC',
+    'Subway',
+    'Burger King',
+    'Hungry Jack\'s',
+    'Domino\'s',
+    'Pizza Hut',
+    'Starbucks',
+    'Taco Bell',
+    'Wendy\'s',
+    'Nando\'s',
+    'Oporto',
+    'Guzman y Gomez',
+    'Grill\'d',
+    'Red Rooster',
+    'Sushi Hub',
+  ]
+
+  const buildBrandSuggestions = (names: string[], searchQuery: string) => {
+    const prefix = getSearchTokens(searchQuery)[0] || ''
+    if (prefix.length < 2) return []
+    const normalizedPrefix = normalizeSearchToken(prefix)
+    if (!normalizedPrefix) return []
+    const matches = names.filter((name) => normalizeSearchToken(name).startsWith(normalizedPrefix))
+    return matches.slice(0, 8).map((name) => ({
+      source: 'fatsecret',
+      id: `brand:${normalizeSearchToken(name)}`,
+      name,
+      serving_size: null,
+      __brandSuggestion: true,
+      __searchQuery: name,
+    }))
+  }
+
+  const mergeBrandSuggestions = (items: any[], suggestions: any[]) => {
+    if (!suggestions || suggestions.length === 0) return items
+    const merged: any[] = []
+    const seen = new Set<string>()
+    const add = (item: any) => {
+      const key = normalizeSearchToken(item?.name || '')
+      if (!key || seen.has(key)) return
+      seen.add(key)
+      merged.push(item)
+    }
+    suggestions.forEach(add)
+    items.forEach(add)
+    return merged
+  }
+
   const buildOfficialSearchDisplay = (item: any, searchQuery: string) => {
     const name = String(item?.name || 'Food').trim()
     const brand = String(item?.brand || '').trim()
@@ -5957,6 +6031,21 @@ export default function FoodDiary() {
     return `${fatPercent}% fat`
   }
 
+  const fetchOfficialBrandSuggestions = async (searchQuery: string) => {
+    const prefix = getSearchTokens(searchQuery)[0] || ''
+    if (prefix.length < 2) return []
+    try {
+      const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
+      if (!res.ok) return []
+      const data = await res.json().catch(() => ({} as any))
+      const items = Array.isArray(data?.items) ? data.items : []
+      const combined = items.length > 0 ? items : COMMON_PACKAGED_BRAND_SUGGESTIONS
+      return buildBrandSuggestions(combined, searchQuery)
+    } catch {
+      return buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, searchQuery)
+    }
+  }
+
   const handleOfficialSearch = async (mode: 'packaged' | 'single', queryOverride?: string) => {
     const query = (queryOverride ?? officialSearchQuery).trim()
     if (!query) {
@@ -5974,8 +6063,16 @@ export default function FoodDiary() {
 
     setOfficialError(null)
     setOfficialLoading(true)
-    setOfficialResults([])
     setOfficialSource(mode)
+    const hasToken = getSearchTokens(query).some((token) => token.length >= 2)
+    if (mode === 'packaged' && hasToken) {
+      const immediateBrands = buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, query)
+      if (immediateBrands.length > 0) {
+        setOfficialResults(immediateBrands)
+      }
+    } else {
+      setOfficialResults([])
+    }
 
     try {
       const sourceParam = mode === 'single' ? 'usda' : 'auto'
@@ -6044,7 +6141,18 @@ export default function FoodDiary() {
         }
       }
 
-      setOfficialResults(nextItems)
+      if (hasToken) {
+        nextItems = nextItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode))
+      }
+
+      const brandMatches =
+        mode === 'packaged' && hasToken
+          ? await fetchOfficialBrandSuggestions(query)
+          : []
+
+      const merged = mode === 'packaged' ? mergeBrandSuggestions(nextItems, brandMatches) : nextItems
+
+      setOfficialResults(merged)
       setOfficialResultsSource(data?.source || 'auto')
       setOfficialLastRequest((prev) =>
         prev
@@ -16022,6 +16130,7 @@ Please add nutritional information manually if needed.`);
                   <div className="mt-3 max-h-80 overflow-y-auto space-y-2">
                     {officialResults.map((r, idx) => {
                       const display = buildOfficialSearchDisplay(r, officialSearchQuery)
+                      const isBrandSuggestion = Boolean((r as any).__brandSuggestion)
                       return (
                       <div
                         key={`${r.source}-${r.id}-${idx}`}
@@ -16033,37 +16142,56 @@ Please add nutritional information manually if needed.`);
                             {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                           </div>
                           <div className="mt-0.5 text-xs text-gray-600">
-                            {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
-                            {r.calories != null && !Number.isNaN(Number(r.calories)) && (
-                              <span>{Math.round(Number(r.calories))} kcal</span>
+                            {isBrandSuggestion ? (
+                              <span>Brand match</span>
+                            ) : (
+                              <>
+                                {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
+                                {r.calories != null && !Number.isNaN(Number(r.calories)) && (
+                                  <span>{Math.round(Number(r.calories))} kcal</span>
+                                )}
+                                {(() => {
+                                  const fatLabel = buildMeatFatLabel(r, officialSearchQuery)
+                                  return fatLabel ? <span className="ml-2">{fatLabel}</span> : null
+                                })()}
+                                {r.protein_g != null && (
+                                  <span className="ml-2">{`${r.protein_g} g protein`}</span>
+                                )}
+                                {r.carbs_g != null && (
+                                  <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
+                                )}
+                                {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
+                              </>
                             )}
-                            {(() => {
-                              const fatLabel = buildMeatFatLabel(r, officialSearchQuery)
-                              return fatLabel ? <span className="ml-2">{fatLabel}</span> : null
-                            })()}
-                            {r.protein_g != null && (
-                              <span className="ml-2">{`${r.protein_g} g protein`}</span>
-                            )}
-                            {r.carbs_g != null && (
-                              <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
-                            )}
-                            {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
                           </div>
                           <div className="mt-1 text-[11px] text-gray-400">
-                            Source:{' '}
-                            {r.source === 'usda'
-                              ? 'USDA FoodData Central'
-                              : r.source === 'openfoodfacts'
-                              ? 'OpenFoodFacts'
-                              : officialResultsSource || 'Unknown'}
+                            {isBrandSuggestion
+                              ? 'Brand list'
+                              : `Source: ${
+                                  r.source === 'usda'
+                                    ? 'USDA FoodData Central'
+                                    : r.source === 'openfoodfacts'
+                                    ? 'OpenFoodFacts'
+                                    : r.source === 'fatsecret'
+                                    ? 'FatSecret'
+                                    : officialResultsSource || 'Unknown'
+                                }`}
                           </div>
                         </div>
                         <button
                           type="button"
-                          onClick={() => addIngredientFromOfficial(r)}
+                          onClick={() => {
+                            if (isBrandSuggestion) {
+                              const nextQuery = (r as any).__searchQuery || r.name
+                              setOfficialSearchQuery(nextQuery)
+                              handleOfficialSearch('packaged', nextQuery)
+                              return
+                            }
+                            addIngredientFromOfficial(r)
+                          }}
                           className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
                         >
-                          Add
+                          {isBrandSuggestion ? 'Show' : 'Add'}
                         </button>
                       </div>
                     )})}
@@ -18985,6 +19113,7 @@ Please add nutritional information manually if needed.`);
                           <div className="mt-3 max-h-64 overflow-y-auto space-y-2">
                             {officialResults.map((r, idx) => {
                               const display = buildOfficialSearchDisplay(r, officialSearchQuery)
+                              const isBrandSuggestion = Boolean((r as any).__brandSuggestion)
                               return (
                                 <div
                                   key={`${r.source}-${r.id}-${idx}`}
@@ -18996,37 +19125,56 @@ Please add nutritional information manually if needed.`);
                                       {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                                     </div>
                                     <div className="mt-0.5 text-xs text-gray-600">
-                                      {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
-                                      {r.calories != null && !Number.isNaN(Number(r.calories)) && (
-                                        <span>{Math.round(Number(r.calories))} kcal</span>
+                                      {isBrandSuggestion ? (
+                                        <span>Brand match</span>
+                                      ) : (
+                                        <>
+                                          {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
+                                          {r.calories != null && !Number.isNaN(Number(r.calories)) && (
+                                            <span>{Math.round(Number(r.calories))} kcal</span>
+                                          )}
+                                          {(() => {
+                                            const fatLabel = buildMeatFatLabel(r, officialSearchQuery)
+                                            return fatLabel ? <span className="ml-2">{fatLabel}</span> : null
+                                          })()}
+                                          {r.protein_g != null && (
+                                            <span className="ml-2">{`${r.protein_g} g protein`}</span>
+                                          )}
+                                          {r.carbs_g != null && (
+                                            <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
+                                          )}
+                                          {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
+                                        </>
                                       )}
-                                      {(() => {
-                                        const fatLabel = buildMeatFatLabel(r, officialSearchQuery)
-                                        return fatLabel ? <span className="ml-2">{fatLabel}</span> : null
-                                      })()}
-                                      {r.protein_g != null && (
-                                        <span className="ml-2">{`${r.protein_g} g protein`}</span>
-                                      )}
-                                      {r.carbs_g != null && (
-                                        <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
-                                      )}
-                                      {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
                                     </div>
                                     <div className="mt-1 text-[11px] text-gray-400">
-                                      Source:{' '}
-                                      {r.source === 'usda'
-                                        ? 'USDA FoodData Central'
-                                        : r.source === 'openfoodfacts'
-                                        ? 'OpenFoodFacts'
-                                        : officialResultsSource || 'Unknown'}
+                                      {isBrandSuggestion
+                                        ? 'Brand list'
+                                        : `Source: ${
+                                            r.source === 'usda'
+                                              ? 'USDA FoodData Central'
+                                              : r.source === 'openfoodfacts'
+                                              ? 'OpenFoodFacts'
+                                              : r.source === 'fatsecret'
+                                              ? 'FatSecret'
+                                              : officialResultsSource || 'Unknown'
+                                          }`}
                                     </div>
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => replaceIngredientFromOfficial(r, editingItemIndex)}
+                                    onClick={() => {
+                                      if (isBrandSuggestion) {
+                                        const nextQuery = (r as any).__searchQuery || r.name
+                                        setOfficialSearchQuery(nextQuery)
+                                        handleOfficialSearch('packaged', nextQuery)
+                                        return
+                                      }
+                                      replaceIngredientFromOfficial(r, editingItemIndex)
+                                    }}
                                     className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
                                   >
-                                    Use match
+                                    {isBrandSuggestion ? 'Show' : 'Use match'}
                                   </button>
                                 </div>
                               )

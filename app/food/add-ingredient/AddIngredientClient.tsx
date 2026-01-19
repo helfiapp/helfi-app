@@ -355,6 +355,7 @@ export default function AddIngredientClient() {
   const servingPendingRef = useRef<Set<string>>(new Set())
   const seqRef = useRef(0)
   const brandSeqRef = useRef(0)
+  const searchDebounceRef = useRef<number | null>(null)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const queryInputRef = useRef<HTMLInputElement | null>(null)
   const searchPressRef = useRef(0)
@@ -435,6 +436,59 @@ export default function AddIngredientClient() {
       runSearch(next, kind)
     }
   }, [prefillQuery, kind])
+
+  useEffect(() => {
+    const q = String(query || '').trim()
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current)
+      searchDebounceRef.current = null
+    }
+    if (q.length < 2) {
+      setResults([])
+      setLoading(false)
+      if (q.length === 0) setError(null)
+      return
+    }
+    searchDebounceRef.current = window.setTimeout(() => {
+      runSearch(q, kind, sourceChoice, { preserveResults: true })
+    }, 200)
+    return () => {
+      if (searchDebounceRef.current) {
+        window.clearTimeout(searchDebounceRef.current)
+        searchDebounceRef.current = null
+      }
+    }
+  }, [query, kind, sourceChoice])
+
+  useEffect(() => {
+    const q = String(query || '').trim()
+    if (brandSearchDebounceRef.current) {
+      window.clearTimeout(brandSearchDebounceRef.current)
+      brandSearchDebounceRef.current = null
+    }
+    if (kind !== 'packaged' || q.length < 2) {
+      setBrandSuggestions([])
+      return
+    }
+    const fallback = buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, q)
+    if (fallback.length > 0) {
+      setBrandSuggestions(fallback)
+      setResults((prev) => mergeBrandSuggestions(prev, fallback))
+    }
+    const seq = ++brandSeqRef.current
+    brandSearchDebounceRef.current = window.setTimeout(async () => {
+      const list = await fetchBrandSuggestions(q)
+      if (brandSeqRef.current !== seq) return
+      setBrandSuggestions(list)
+      setResults((prev) => mergeBrandSuggestions(prev, list))
+    }, 150)
+    return () => {
+      if (brandSearchDebounceRef.current) {
+        window.clearTimeout(brandSearchDebounceRef.current)
+        brandSearchDebounceRef.current = null
+      }
+    }
+  }, [query, kind])
 
   useEffect(() => {
     // Keep /food on the same date when the user returns.
@@ -519,7 +573,27 @@ export default function AddIngredientClient() {
     }
   }
 
-  const runSearch = async (qOverride?: string, kindOverride?: SearchKind, sourceOverride?: SearchSource) => {
+  const fetchBrandSuggestions = async (searchQuery: string) => {
+    const prefix = getSearchTokens(searchQuery)[0] || ''
+    if (prefix.length < 2) return []
+    try {
+      const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
+      if (!res.ok) return []
+      const data = await res.json().catch(() => ({} as any))
+      const items = Array.isArray(data?.items) ? data.items : []
+      const combined = items.length > 0 ? items : COMMON_PACKAGED_BRAND_SUGGESTIONS
+      return buildBrandSuggestions(combined, searchQuery)
+    } catch {
+      return buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, searchQuery)
+    }
+  }
+
+  const runSearch = async (
+    qOverride?: string,
+    kindOverride?: SearchKind,
+    sourceOverride?: SearchSource,
+    options?: { preserveResults?: boolean },
+  ) => {
     const q = String(qOverride ?? query).trim()
     const source = sourceOverride ?? sourceChoice
     const k = kindOverride ?? kind
@@ -530,7 +604,7 @@ export default function AddIngredientClient() {
 
     setError(null)
     setLoading(true)
-    setResults([])
+    if (!options?.preserveResults) setResults([])
 
     try {
       abortRef.current?.abort()
@@ -551,21 +625,6 @@ export default function AddIngredientClient() {
         const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET', signal: controller.signal })
         const data = await res.json().catch(() => ({}))
         return { res, data }
-      }
-
-      const fetchBrandSuggestions = async (searchQuery: string) => {
-        const prefix = getSearchTokens(searchQuery)[0] || ''
-        if (prefix.length < 2) return []
-        try {
-          const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
-          if (!res.ok) return []
-          const data = await res.json().catch(() => ({} as any))
-          const items = Array.isArray(data?.items) ? data.items : []
-          const combined = items.length > 0 ? items : COMMON_PACKAGED_BRAND_SUGGESTIONS
-          return buildBrandSuggestions(combined, searchQuery)
-        } catch {
-          return buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, searchQuery)
-        }
       }
 
       let { res, data } = await fetchItems(q)
@@ -872,10 +931,13 @@ export default function AddIngredientClient() {
                 runSearch(raw)
               }}
             >
-              <input
-                ref={queryInputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                <input
+                  ref={queryInputRef}
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value)
+                    setError(null)
+                  }}
                 placeholder="e.g. pizza"
                 autoComplete="off"
                 autoCorrect="off"
