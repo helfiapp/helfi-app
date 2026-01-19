@@ -21462,7 +21462,7 @@ Please add nutritional information manually if needed.`);
                                     Hover or tap any colored bar or circle to see which foods were counted.
                                   </p>
                                 )}
-                                {/* Guard rail: fat detail lists must expand fully (no internal scrolling). */}
+                                {/* ⚠️ GUARD RAIL: FAT DETAIL LISTS MUST EXPAND FULLY (NO INTERNAL SCROLLING). */}
                                 {isMobile && fatDetailState?.source === 'bar' && (
                                   <div className="mt-2 rounded-lg border border-gray-200 bg-white shadow-sm p-3">
                                     <div className="flex items-center gap-2 mb-2">
@@ -21534,7 +21534,7 @@ Please add nutritional information manually if needed.`);
                                     )
                                   })}
                                 </div>
-                                {/* Guard rail: fat detail lists must expand fully (no internal scrolling). */}
+                                {/* ⚠️ GUARD RAIL: FAT DETAIL LISTS MUST EXPAND FULLY (NO INTERNAL SCROLLING). */}
                                 {isMobile && fatDetailState?.source === 'ring' && (
                                   <div className="rounded-lg border border-gray-200 bg-white shadow-sm p-3">
                                     <div className="flex items-center gap-2 mb-2">
