@@ -219,7 +219,7 @@ const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { r
 const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, kind: SearchKind) => {
   if (kind === 'single') return nameMatchesSearchQuery(item?.name || '', searchQuery, { requireFirstWord: false })
   const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-  return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: true })
+  return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false })
 }
 
 const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
@@ -227,7 +227,10 @@ const buildBrandSuggestions = (names: string[], searchQuery: string): Normalized
   if (prefix.length < 2) return []
   const normalizedPrefix = normalizeSearchToken(prefix)
   if (!normalizedPrefix) return []
-  const matches = names.filter((name) => normalizeSearchToken(name).startsWith(normalizedPrefix))
+  const matches = names.filter((name) => {
+    const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
+    return tokens.some((token) => token.startsWith(normalizedPrefix))
+  })
   return matches.slice(0, 8).map((name) => ({
     source: 'fatsecret',
     id: `brand:${normalizeSearchToken(name)}`,
@@ -236,6 +239,38 @@ const buildBrandSuggestions = (names: string[], searchQuery: string): Normalized
     __brandSuggestion: true,
     __searchQuery: name,
   }))
+}
+
+const buildSingleFoodSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
+  const tokens = getSearchTokens(searchQuery)
+  if (!tokens.some((token) => token.length >= 2)) return []
+  const matches = COMMON_SINGLE_FOOD_SUGGESTIONS.filter((item) =>
+    nameMatchesSearchQuery(item.name, searchQuery, { requireFirstWord: false }),
+  )
+  return matches.slice(0, 8).map((item) => ({
+    source: 'usda',
+    id: `suggest:${normalizeSearchToken(item.name)}`,
+    name: item.name,
+    serving_size: item.serving_size || '100 g',
+    __suggestion: true,
+    __searchQuery: item.name,
+  }))
+}
+
+const mergeSearchSuggestions = (items: NormalizedFoodItem[], searchQuery: string) => {
+  const suggestions = buildSingleFoodSuggestions(searchQuery)
+  if (suggestions.length === 0) return items
+  const merged: NormalizedFoodItem[] = []
+  const seen = new Set<string>()
+  const add = (item: NormalizedFoodItem) => {
+    const key = normalizeSearchToken(item?.name || '')
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    merged.push(item)
+  }
+  suggestions.forEach(add)
+  items.forEach(add)
+  return merged
 }
 
 const mergeBrandSuggestions = (items: NormalizedFoodItem[], suggestions: NormalizedFoodItem[]) => {
@@ -288,6 +323,7 @@ const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
   'Domino\'s',
   'Pizza Hut',
   'Starbucks',
+  'Dunkin\' Donuts',
   'Taco Bell',
   'Wendy\'s',
   'Nando\'s',
@@ -296,6 +332,57 @@ const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
   'Grill\'d',
   'Red Rooster',
   'Sushi Hub',
+]
+
+const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: string }> = [
+  { name: 'Apple, raw', serving_size: '100 g' },
+  { name: 'Banana, raw', serving_size: '100 g' },
+  { name: 'Raspberries, raw', serving_size: '100 g' },
+  { name: 'Strawberries, raw', serving_size: '100 g' },
+  { name: 'Blueberries, raw', serving_size: '100 g' },
+  { name: 'Grapes, raw', serving_size: '100 g' },
+  { name: 'Orange, raw', serving_size: '100 g' },
+  { name: 'Pear, raw', serving_size: '100 g' },
+  { name: 'Pineapple, raw', serving_size: '100 g' },
+  { name: 'Mango, raw', serving_size: '100 g' },
+  { name: 'Kiwi, raw', serving_size: '100 g' },
+  { name: 'Watermelon, raw', serving_size: '100 g' },
+  { name: 'Pumpkin, raw', serving_size: '100 g' },
+  { name: 'Carrots, raw', serving_size: '100 g' },
+  { name: 'Zucchini, raw', serving_size: '100 g' },
+  { name: 'Tomato, raw', serving_size: '100 g' },
+  { name: 'Potato, raw', serving_size: '100 g' },
+  { name: 'Onion, raw', serving_size: '100 g' },
+  { name: 'Garlic, raw', serving_size: '100 g' },
+  { name: 'Broccoli, raw', serving_size: '100 g' },
+  { name: 'Cauliflower, raw', serving_size: '100 g' },
+  { name: 'Spinach, raw', serving_size: '100 g' },
+  { name: 'Lettuce, raw', serving_size: '100 g' },
+  { name: 'Cucumber, raw', serving_size: '100 g' },
+  { name: 'Capsicum, raw', serving_size: '100 g' },
+  { name: 'Mushrooms, raw', serving_size: '100 g' },
+  { name: 'Egg, whole, raw', serving_size: '100 g' },
+  { name: 'Eggs, whole, raw', serving_size: '100 g' },
+  { name: 'Chicken breast, raw', serving_size: '100 g' },
+  { name: 'Chicken thigh, raw', serving_size: '100 g' },
+  { name: 'Beef, ground, raw', serving_size: '100 g' },
+  { name: 'Pork, raw', serving_size: '100 g' },
+  { name: 'Salmon, raw', serving_size: '100 g' },
+  { name: 'Tuna, raw', serving_size: '100 g' },
+  { name: 'Rice, cooked', serving_size: '100 g' },
+  { name: 'Pasta, cooked', serving_size: '100 g' },
+  { name: 'Bread, white', serving_size: '100 g' },
+  { name: 'Milk, whole', serving_size: '100 g' },
+  { name: 'Yogurt, plain', serving_size: '100 g' },
+  { name: 'Cheese, cheddar', serving_size: '100 g' },
+  { name: 'Olive oil', serving_size: '100 g' },
+  { name: 'Butter', serving_size: '100 g' },
+  { name: 'Sugar', serving_size: '100 g' },
+  { name: 'Salt', serving_size: '100 g' },
+  { name: 'Oats, raw', serving_size: '100 g' },
+  { name: 'Almonds', serving_size: '100 g' },
+  { name: 'Peanut butter', serving_size: '100 g' },
+  { name: 'Avocado, raw', serving_size: '100 g' },
 ]
 
 const shouldShowMeatFat = (item: NormalizedFoodItem, queryText: string) => {
@@ -449,9 +536,14 @@ export default function AddIngredientClient() {
     if (q.length < 2) {
       setResults([])
       setLoading(false)
-      if (q.length === 0) setError(null)
+      setError(null)
       return
     }
+    if (kind === 'single') {
+      const instant = buildSingleFoodSuggestions(q)
+      if (instant.length > 0) setResults(instant)
+    }
+    setLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {
       runSearch(q, kind, sourceChoice, { preserveResults: true })
     }, 200)
@@ -664,7 +756,10 @@ export default function AddIngredientClient() {
         k === 'packaged' && hasToken
           ? await fetchBrandSuggestions(q)
           : []
-      const merged = k === 'packaged' ? mergeBrandSuggestions(nextResults, brandMatches) : nextResults
+      const merged =
+        k === 'packaged'
+          ? mergeBrandSuggestions(nextResults, brandMatches)
+          : mergeSearchSuggestions(nextResults, q)
       setResults(merged)
     } catch (e: any) {
       if (e?.name === 'AbortError') return

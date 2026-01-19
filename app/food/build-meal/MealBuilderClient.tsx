@@ -117,6 +117,7 @@ const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: strin
   { name: 'Mango, raw', serving_size: '100 g' },
   { name: 'Kiwi, raw', serving_size: '100 g' },
   { name: 'Watermelon, raw', serving_size: '100 g' },
+  { name: 'Pumpkin, raw', serving_size: '100 g' },
   { name: 'Carrots, raw', serving_size: '100 g' },
   { name: 'Zucchini, raw', serving_size: '100 g' },
   { name: 'Tomato, raw', serving_size: '100 g' },
@@ -163,6 +164,7 @@ const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
   'Domino\'s',
   'Pizza Hut',
   'Starbucks',
+  'Dunkin\' Donuts',
   'Taco Bell',
   'Wendy\'s',
   'Nando\'s',
@@ -195,7 +197,7 @@ const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { r
 const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, kind: 'packaged' | 'single') => {
   if (kind === 'single') return nameMatchesSearchQuery(item?.name || '', searchQuery, { requireFirstWord: false })
   const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-  return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: true })
+  return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false })
 }
 
 const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
@@ -203,7 +205,10 @@ const buildBrandSuggestions = (names: string[], searchQuery: string): Normalized
   if (prefix.length < 2) return []
   const normalizedPrefix = normalizeSearchToken(prefix)
   if (!normalizedPrefix) return []
-  const matches = names.filter((name) => normalizeSearchToken(name).startsWith(normalizedPrefix))
+  const matches = names.filter((name) => {
+    const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
+    return tokens.some((token) => token.startsWith(normalizedPrefix))
+  })
   return matches.slice(0, 8).map((name) => ({
     source: 'fatsecret',
     id: `brand:${normalizeSearchToken(name)}`,

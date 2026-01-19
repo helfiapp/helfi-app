@@ -2913,6 +2913,32 @@ export default function FoodDiary() {
   const [summaryRenderNonce, setSummaryRenderNonce] = useState(0)
   const [summaryMinHeight, setSummaryMinHeight] = useState<number | null>(null)
   const [resumeTick, setResumeTick] = useState(0)
+
+  useEffect(() => {
+    const q = officialSearchQuery.trim()
+    if (q.length < 2) {
+      try {
+        officialSearchAbortRef.current?.abort()
+      } catch {}
+      try {
+        if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+      } catch {}
+      officialSearchDebounceRef.current = null
+      officialSearchAbortRef.current = null
+      officialSearchSeqRef.current += 1
+      setOfficialResults([])
+      setOfficialLoading(false)
+      setOfficialError(null)
+      return
+    }
+    if (officialSource === 'single') {
+      const instant = buildSingleFoodSuggestions(q)
+      if (instant.length > 0) setOfficialResults(instant)
+      return
+    }
+    const immediateBrands = buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, q)
+    if (immediateBrands.length > 0) setOfficialResults(immediateBrands)
+  }, [officialSearchQuery, officialSource])
   
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
@@ -5920,7 +5946,7 @@ export default function FoodDiary() {
   const itemMatchesSearchQuery = (item: any, searchQuery: string, kind: 'packaged' | 'single') => {
     if (kind === 'single') return nameMatchesSearchQuery(item?.name || '', searchQuery, { requireFirstWord: false })
     const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-    return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: true })
+    return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false })
   }
 
   const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
@@ -5932,6 +5958,7 @@ export default function FoodDiary() {
     'Domino\'s',
     'Pizza Hut',
     'Starbucks',
+    'Dunkin\' Donuts',
     'Taco Bell',
     'Wendy\'s',
     'Nando\'s',
@@ -5942,12 +5969,66 @@ export default function FoodDiary() {
     'Sushi Hub',
   ]
 
+  const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: string }> = [
+    { name: 'Apple, raw', serving_size: '100 g' },
+    { name: 'Banana, raw', serving_size: '100 g' },
+    { name: 'Raspberries, raw', serving_size: '100 g' },
+    { name: 'Strawberries, raw', serving_size: '100 g' },
+    { name: 'Blueberries, raw', serving_size: '100 g' },
+    { name: 'Grapes, raw', serving_size: '100 g' },
+    { name: 'Orange, raw', serving_size: '100 g' },
+    { name: 'Pear, raw', serving_size: '100 g' },
+    { name: 'Pineapple, raw', serving_size: '100 g' },
+    { name: 'Mango, raw', serving_size: '100 g' },
+    { name: 'Kiwi, raw', serving_size: '100 g' },
+    { name: 'Watermelon, raw', serving_size: '100 g' },
+    { name: 'Pumpkin, raw', serving_size: '100 g' },
+    { name: 'Carrots, raw', serving_size: '100 g' },
+    { name: 'Zucchini, raw', serving_size: '100 g' },
+    { name: 'Tomato, raw', serving_size: '100 g' },
+    { name: 'Potato, raw', serving_size: '100 g' },
+    { name: 'Onion, raw', serving_size: '100 g' },
+    { name: 'Garlic, raw', serving_size: '100 g' },
+    { name: 'Broccoli, raw', serving_size: '100 g' },
+    { name: 'Cauliflower, raw', serving_size: '100 g' },
+    { name: 'Spinach, raw', serving_size: '100 g' },
+    { name: 'Lettuce, raw', serving_size: '100 g' },
+    { name: 'Cucumber, raw', serving_size: '100 g' },
+    { name: 'Capsicum, raw', serving_size: '100 g' },
+    { name: 'Mushrooms, raw', serving_size: '100 g' },
+    { name: 'Egg, whole, raw', serving_size: '100 g' },
+    { name: 'Eggs, whole, raw', serving_size: '100 g' },
+    { name: 'Chicken breast, raw', serving_size: '100 g' },
+    { name: 'Chicken thigh, raw', serving_size: '100 g' },
+    { name: 'Beef, ground, raw', serving_size: '100 g' },
+    { name: 'Pork, raw', serving_size: '100 g' },
+    { name: 'Salmon, raw', serving_size: '100 g' },
+    { name: 'Tuna, raw', serving_size: '100 g' },
+    { name: 'Rice, cooked', serving_size: '100 g' },
+    { name: 'Pasta, cooked', serving_size: '100 g' },
+    { name: 'Bread, white', serving_size: '100 g' },
+    { name: 'Milk, whole', serving_size: '100 g' },
+    { name: 'Yogurt, plain', serving_size: '100 g' },
+    { name: 'Cheese, cheddar', serving_size: '100 g' },
+    { name: 'Olive oil', serving_size: '100 g' },
+    { name: 'Butter', serving_size: '100 g' },
+    { name: 'Sugar', serving_size: '100 g' },
+    { name: 'Salt', serving_size: '100 g' },
+    { name: 'Oats, raw', serving_size: '100 g' },
+    { name: 'Almonds', serving_size: '100 g' },
+    { name: 'Peanut butter', serving_size: '100 g' },
+    { name: 'Avocado, raw', serving_size: '100 g' },
+  ]
+
   const buildBrandSuggestions = (names: string[], searchQuery: string) => {
     const prefix = getSearchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
     const normalizedPrefix = normalizeSearchToken(prefix)
     if (!normalizedPrefix) return []
-    const matches = names.filter((name) => normalizeSearchToken(name).startsWith(normalizedPrefix))
+    const matches = names.filter((name) => {
+      const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
+      return tokens.some((token) => token.startsWith(normalizedPrefix))
+    })
     return matches.slice(0, 8).map((name) => ({
       source: 'fatsecret',
       id: `brand:${normalizeSearchToken(name)}`,
@@ -5956,6 +6037,38 @@ export default function FoodDiary() {
       __brandSuggestion: true,
       __searchQuery: name,
     }))
+  }
+
+  const buildSingleFoodSuggestions = (searchQuery: string) => {
+    const tokens = getSearchTokens(searchQuery)
+    if (!tokens.some((token) => token.length >= 2)) return []
+    const matches = COMMON_SINGLE_FOOD_SUGGESTIONS.filter((item) =>
+      nameMatchesSearchQuery(item.name, searchQuery, { requireFirstWord: false }),
+    )
+    return matches.slice(0, 8).map((item) => ({
+      source: 'usda',
+      id: `suggest:${normalizeSearchToken(item.name)}`,
+      name: item.name,
+      serving_size: item.serving_size || '100 g',
+      __suggestion: true,
+      __searchQuery: item.name,
+    }))
+  }
+
+  const mergeSearchSuggestions = (items: any[], searchQuery: string) => {
+    const suggestions = buildSingleFoodSuggestions(searchQuery)
+    if (suggestions.length === 0) return items
+    const merged: any[] = []
+    const seen = new Set<string>()
+    const add = (item: any) => {
+      const key = normalizeSearchToken(item?.name || '')
+      if (!key || seen.has(key)) return
+      seen.add(key)
+      merged.push(item)
+    }
+    suggestions.forEach(add)
+    items.forEach(add)
+    return merged
   }
 
   const mergeBrandSuggestions = (items: any[], suggestions: any[]) => {
@@ -6073,6 +6186,11 @@ export default function FoodDiary() {
       if (immediateBrands.length > 0) {
         setOfficialResults(immediateBrands)
       }
+    } else if (mode === 'single' && hasToken) {
+      const instant = buildSingleFoodSuggestions(query)
+      if (instant.length > 0) {
+        setOfficialResults(instant)
+      }
     } else {
       setOfficialResults([])
     }
@@ -6155,7 +6273,8 @@ export default function FoodDiary() {
 
       const merged = mode === 'packaged' ? mergeBrandSuggestions(nextItems, brandMatches) : nextItems
 
-      setOfficialResults(merged)
+      const finalResults = mode === 'single' ? mergeSearchSuggestions(merged, query) : merged
+      setOfficialResults(finalResults)
       setOfficialResultsSource(data?.source || 'auto')
       setOfficialLastRequest((prev) =>
         prev
