@@ -51,6 +51,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
   const primaryIssueSlug = issues[0]?.slug
   const pendingIssueName = useMemo(() => issues.find((issue) => issue.slug === pendingSlug)?.name ?? null, [issues, pendingSlug])
+  const canManualReport = String(sessionUser?.email || '').toLowerCase() === 'info@sonicweb.com.au'
 
   useEffect(() => {
     if (issues.length === 0) return
@@ -387,17 +388,19 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   Edit Health Setup (optional)
                 </Link>
               )}
-              <div className="flex flex-col items-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCreateReportNow}
-                  disabled={isCreatingReport || isReportRunning}
-                  className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {isCreatingReport || isReportRunning ? 'Creating report...' : 'Create report now'}
-                </button>
-                <span className="text-xs text-gray-400">Makes a fresh report from your last 7 days.</span>
-              </div>
+              {canManualReport && (
+                <div className="flex flex-col items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCreateReportNow}
+                    disabled={isCreatingReport || isReportRunning}
+                    className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isCreatingReport || isReportRunning ? 'Creating report...' : 'Create report now'}
+                  </button>
+                  <span className="text-xs text-gray-400">Makes a fresh report from your last 7 days.</span>
+                </div>
+              )}
             </div>
           </div>
           {createReportMessage && (

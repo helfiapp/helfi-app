@@ -24,6 +24,7 @@ type WeeklyReportClientProps = {
   report: WeeklyReportRecord | null
   reports: WeeklyReportRecord[]
   nextReportDueAt: string | null
+  canManualReport: boolean
 }
 
 function SectionBucket({ title, items }: { title: string; items: Array<{ name?: string; reason?: string }> }) {
@@ -57,7 +58,7 @@ function formatMl(value: number | null | undefined) {
   return `${Math.round(ml)} ml`
 }
 
-export default function WeeklyReportClient({ report, reports, nextReportDueAt }: WeeklyReportClientProps) {
+export default function WeeklyReportClient({ report, reports, nextReportDueAt, canManualReport }: WeeklyReportClientProps) {
   const [activeTab, setActiveTab] = useState<SectionKey>('overview')
   const router = useRouter()
   const [manualStatus, setManualStatus] = useState<'idle' | 'running' | 'error'>('idle')
@@ -232,13 +233,15 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
           >
             Download PDF (current data)
           </a>
-          <button
-            onClick={runManualReport}
-            disabled={manualStatus === 'running'}
-            className="inline-flex mt-4 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
-          >
-            {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
-          </button>
+          {canManualReport && (
+            <button
+              onClick={runManualReport}
+              disabled={manualStatus === 'running'}
+              className="inline-flex mt-4 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
+            >
+              {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
+            </button>
+          )}
           {manualMessage && (
             <p className="text-sm text-red-600 mt-3">{manualMessage}</p>
           )}
@@ -310,13 +313,15 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
           <p className="text-sm text-gray-600 mt-2">
             We could not generate this report. Please try again later.
           </p>
-          <button
-            onClick={runManualReport}
-            disabled={manualStatus === 'running'}
-            className="inline-flex mt-4 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
-          >
-            {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
-          </button>
+          {canManualReport && (
+            <button
+              onClick={runManualReport}
+              disabled={manualStatus === 'running'}
+              className="inline-flex mt-4 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
+            >
+              {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
+            </button>
+          )}
           {manualMessage && (
             <p className="text-sm text-red-600 mt-3">{manualMessage}</p>
           )}
@@ -361,13 +366,15 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt }:
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={runManualReport}
-              disabled={manualStatus === 'running'}
-              className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
-            >
-              {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
-            </button>
+            {canManualReport && (
+              <button
+                onClick={runManualReport}
+                disabled={manualStatus === 'running'}
+                className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
+              >
+                {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
+              </button>
+            )}
           {pdfHref && (
             <a
               href={pdfHref}

@@ -69,6 +69,7 @@ model User {
   supplements         Supplement[]
   medications         Medication[]
   healthLogs          HealthLog[]
+  healthJournalEntries HealthJournalEntry[]
   foodLogs            FoodLog[]
   waterLogs           WaterLog[]
   exerciseLogs        ExerciseLog[]
@@ -193,6 +194,19 @@ model HealthLog {
   createdAt DateTime   @default(now())
   goal      HealthGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model HealthJournalEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String
+  localDate String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, localDate])
+  @@index([userId, createdAt])
 }
 
 model FoodLog {

@@ -124,6 +124,17 @@ function DesktopSidebar({
             </svg>
             Talk to Helfi
           </a>
+
+          <a
+            href="/health-journal"
+            onClick={(e) => onNavigate('/health-journal', e)}
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+            <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6M7 20h10a2 2 0 002-2v-5a2 2 0 00-2-2h-3.586a1 1 0 01-.707-.293l-1.414-1.414A2 2 0 0010.586 8H7a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            Health Journal
+          </a>
           
           <a
             href="/health-tips"

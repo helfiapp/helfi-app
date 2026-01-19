@@ -37,6 +37,8 @@ const REPORT_SECTIONS = [
   'symptoms',
 ] as const
 
+const MANUAL_REPORT_EMAIL = String(process.env.WEEKLY_REPORT_MANUAL_EMAIL || 'info@sonicweb.com.au').toLowerCase()
+
 type ReportSectionKey = (typeof REPORT_SECTIONS)[number]
 type ReportItem = { name?: string; reason?: string }
 type ReportSectionBucket = { working: ReportItem[]; suggested: ReportItem[]; avoid: ReportItem[] }
@@ -132,6 +134,19 @@ function formatLocalHour(date: Date, timezone: string) {
     return Number.isFinite(hour) ? hour : date.getUTCHours()
   } catch {
     return date.getUTCHours()
+  }
+}
+
+function formatLocalTime(date: Date, timezone: string) {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(date)
+  } catch {
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   }
 }
 
@@ -283,6 +298,27 @@ function buildHydrationSummary(
     daysWithLogs: daySet.size,
     topDrinks,
     dailyTotals: Array.from(dayTotals.values()).sort((a, b) => a.date.localeCompare(b.date)),
+  }
+}
+
+function buildJournalSummary(
+  entries: Array<{ content: string; createdAt: Date; localDate?: string | null }>,
+  timezone: string
+) {
+  const daySet = new Set<string>()
+  const highlights = entries.slice(0, 4).map((entry) => {
+    const date = entry.localDate || formatLocalDate(entry.createdAt, timezone)
+    daySet.add(date)
+    return {
+      date,
+      time: formatLocalTime(entry.createdAt, timezone),
+      note: clipText(entry.content || '', 180),
+    }
+  })
+  return {
+    entries: entries.length,
+    daysWithNotes: daySet.size,
+    highlights,
   }
 }
 
@@ -588,6 +624,9 @@ function buildInsightCandidates(params: {
   labHighlights: Array<any>
   labTrends: Array<any>
   moodRange: number | null
+  dailyStats: Array<any>
+  journalEntries: Array<{ content: string; createdAt: Date; localDate?: string | null }>
+  timezone: string
 }) {
   const candidates: Array<{
     section: ReportSectionKey
@@ -616,6 +655,10 @@ function buildInsightCandidates(params: {
   const dataFlags = params.dataFlags || {}
   const correlationSignals = params.correlationSignals || {}
   const lateMealImpact = params.lateMealImpact || null
+  const journalEntries = Array.isArray(params.journalEntries) ? params.journalEntries : []
+  const timezone = params.timezone || 'UTC'
+  const dailyStats = Array.isArray(params.dailyStats) ? params.dailyStats : []
+  const dailyMap = new Map(dailyStats.map((row) => [row.date, row]))
 
   if (nutritionSignals.avgProtein && nutritionSignals.avgProtein < 70) {
     add({
@@ -811,6 +854,31 @@ function buildInsightCandidates(params: {
         action: 'Review those days for food timing, hydration, or stress shifts.',
       })
     }
+  }
+
+  if (journalEntries.length) {
+    const highlights = [...journalEntries]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 2)
+    highlights.forEach((entry) => {
+      const date = entry.localDate || formatLocalDate(entry.createdAt, timezone)
+      const time = formatLocalTime(entry.createdAt, timezone)
+      const dayStats = dailyMap.get(date)
+      const dayDetails: string[] = []
+      if (dayStats?.foodEntries) dayDetails.push(`${dayStats.foodEntries} food entries`)
+      if (dayStats?.waterMl) dayDetails.push(`${Math.round(dayStats.waterMl)} ml fluids`)
+      if (dayStats?.exerciseMinutes) dayDetails.push(`${dayStats.exerciseMinutes} minutes of movement`)
+      if (dayStats?.moodAvg != null) dayDetails.push(`mood ${dayStats.moodAvg}`)
+      if (dayStats?.symptomCount) dayDetails.push(`${dayStats.symptomCount} symptoms`)
+      const detailText = dayDetails.length ? `That day included ${dayDetails.join(', ')}.` : 'That day has logged data we can compare.'
+      add({
+        section: 'overview',
+        bucket: 'suggested',
+        title: `Journal note on ${date}`,
+        evidence: `At ${time} you wrote: \"${clipText(entry.content || '', 140)}\". ${detailText}`,
+        action: 'If this happens again, note the last meal, drink, or supplement so we can spot triggers.',
+      })
+    })
   }
 
   const outOfRange = (params.labHighlights || []).filter((h: any) => h?.status === 'above' || h?.status === 'below')
@@ -1410,6 +1478,7 @@ function buildFallbackReport(context: any) {
   const labTrends = Array.isArray(context?.labTrends) ? context.labTrends : []
   const supplements = Array.isArray(context?.supplements) ? context.supplements : []
   const medications = Array.isArray(context?.medications) ? context.medications : []
+  const journalSummary = context?.journalSummary || {}
 
   const addItem = (
     section: ReportSectionKey,
@@ -1495,6 +1564,15 @@ function buildFallbackReport(context: any) {
       reason: `Recent check-ins focused on ${topGoals.join(', ')}.`,
     })
   }
+  if (Array.isArray(journalSummary?.highlights) && journalSummary.highlights.length) {
+    const highlight = journalSummary.highlights[0]
+    if (highlight?.date && highlight?.time && highlight?.note) {
+      sections.overview.working.push({
+        name: 'Health journal note',
+        reason: `On ${highlight.date} at ${highlight.time} you wrote: \"${highlight.note}\". This gets compared with that day's food, fluids, and activity.`,
+      })
+    }
+  }
 
   const summarySentences: string[] = []
   if (working[0]) {
@@ -1505,6 +1583,12 @@ function buildFallbackReport(context: any) {
   }
   if (riskFlags[0]) {
     summarySentences.push(`${riskFlags[0].name}. ${riskFlags[0].reason}`)
+  }
+  if (Array.isArray(journalSummary?.highlights) && journalSummary.highlights.length) {
+    const highlight = journalSummary.highlights[0]
+    if (highlight?.date && highlight?.time && highlight?.note) {
+      summarySentences.push(`Journal note on ${highlight.date} at ${highlight.time}: \"${highlight.note}\".`)
+    }
   }
   if (nutritionSummary?.dailyAverages?.calories) {
     summarySentences.push(
@@ -1538,6 +1622,10 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const sessionEmail = String(session.user.email || '').toLowerCase()
+    if (!sessionEmail || sessionEmail !== MANUAL_REPORT_EMAIL) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
     if (!userId) {
       userId = session.user.id
@@ -1648,6 +1736,7 @@ export async function POST(request: NextRequest) {
     foodLogs,
     waterLogs,
     healthLogs,
+    healthJournalEntries,
     exerciseLogs,
     exerciseEntries,
   ] = await Promise.all([
@@ -1696,6 +1785,16 @@ export async function POST(request: NextRequest) {
         console.warn('[weekly-report] Failed to load health logs', error)
         return []
       }),
+    prisma.healthJournalEntry
+      .findMany({
+        where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
+        orderBy: { createdAt: 'desc' },
+        take: 120,
+      })
+      .catch((error) => {
+        console.warn('[weekly-report] Failed to load health journal entries', error)
+        return []
+      }),
     prisma.exerciseLog
       .findMany({
         where: { userId, createdAt: { gte: periodStart } },
@@ -1726,6 +1825,7 @@ export async function POST(request: NextRequest) {
     foodLogs,
     waterLogs,
     healthLogs,
+    healthJournalEntries,
     exerciseLogs,
     exerciseEntries,
   }
@@ -1971,6 +2071,14 @@ export async function POST(request: NextRequest) {
       createdAt: w.createdAt,
     }))
   )
+  const journalSummary = buildJournalSummary(
+    (user.healthJournalEntries || []).map((entry: any) => ({
+      content: entry.content || '',
+      createdAt: entry.createdAt,
+      localDate: entry.localDate || null,
+    })),
+    timezone
+  )
 
   const checkinSummary = buildCheckinSummary(checkinRows || [])
   const exerciseSummary = buildExerciseSummary(user.exerciseLogs || [], user.exerciseEntries || [])
@@ -1986,6 +2094,7 @@ export async function POST(request: NextRequest) {
   user.foodLogs?.forEach((f) => stamp(f.createdAt))
   user.waterLogs?.forEach((w) => stamp(w.createdAt))
   checkinRows?.forEach((r) => stamp(r.timestamp))
+  user.healthJournalEntries?.forEach((entry) => stamp(entry.createdAt))
   user.exerciseLogs?.forEach((e) => stamp(e.createdAt))
   user.exerciseEntries?.forEach((e) => stamp(e.createdAt))
   moodRows?.forEach((m) => stamp(m.timestamp))
@@ -1999,6 +2108,7 @@ export async function POST(request: NextRequest) {
       (user.foodLogs?.length || 0) +
       (user.waterLogs?.length || 0) +
       (checkinRows?.length || 0) +
+      (user.healthJournalEntries?.length || 0) +
       (user.exerciseLogs?.length || 0) +
       (user.exerciseEntries?.length || 0) +
       (moodRows?.length || 0) +
@@ -2008,6 +2118,7 @@ export async function POST(request: NextRequest) {
     waterCount: user.waterLogs?.length || 0,
     moodCount: moodRows?.length || 0,
     checkinCount: checkinRows?.length || 0,
+    journalCount: user.healthJournalEntries?.length || 0,
     symptomCount: symptomAnalyses?.length || 0,
     exerciseCount: (user.exerciseLogs?.length || 0) + (user.exerciseEntries?.length || 0),
     labCount: labReports?.length || 0,
@@ -2111,6 +2222,9 @@ export async function POST(request: NextRequest) {
     labHighlights,
     labTrends,
     moodRange,
+    dailyStats,
+    journalEntries: user.healthJournalEntries || [],
+    timezone,
   })
 
   const reportContext = {
@@ -2186,6 +2300,12 @@ export async function POST(request: NextRequest) {
     exerciseSummary,
     coverage,
     talkToAi: talkToAiSummary,
+    journalSummary,
+    journalEntries: (user.healthJournalEntries || []).slice(0, 80).map((entry) => ({
+      content: entry.content,
+      createdAt: entry.createdAt,
+      localDate: entry.localDate,
+    })),
     timezone,
     nutritionSignals,
     mealTimingSummary,
@@ -2204,6 +2324,7 @@ export async function POST(request: NextRequest) {
       symptoms: { entries: symptomSummary.entries, unique: symptomSummary.uniqueSymptoms },
       labs: { reports: coverage.labCount, trends: labTrends.length, highlights: labHighlights.length },
       talkToAi: { userMessages: talkToAiSummary.userMessageCount, days: talkToAiSummary.activeDays },
+      journal: { entries: journalSummary.entries, days: journalSummary.daysWithNotes },
     },
   }
 
@@ -2245,6 +2366,7 @@ Rules:
 - Each item should be 2-3 short sentences: what happened, why it matters, and a clear next step.
 - Use real signals from the JSON data. No generic advice.
 - Use insightCandidates, correlationSignals, trendSignals, and riskFlags as your primary signals when available.
+- If journalEntries exist, include at least 2 items that quote the note with date/time and link it to the same day's food, fluids, supplements, exercise, mood, symptoms, or check-ins.
 - Do not list raw log counts or repeat "you logged X entries" unless it directly supports a pattern or gap.
 - Avoid telling the user to "keep logging" unless a section has no usable data.
 - If sectionSignals show data for a section, include 2-3 items in "working" or "suggested" when there is enough data; otherwise include at least 1.
@@ -2351,22 +2473,23 @@ ${JSON.stringify(reportContext)}
     const lockedReport = await updateWeeklyReportRecord(userId, report.id, {
       status: 'LOCKED',
       summary: 'Your weekly report is ready to unlock with a subscription or top-up credits.',
-    dataSummary: {
-      coverage,
-      dataWarning,
-      talkToAiSummary,
-      hydrationSummary,
-      nutritionSummary,
-      moodSummary,
-      symptomSummary,
-      exerciseSummary,
-      checkinSummary,
-      dailyStats,
-      labTrends,
-      labHighlights,
-      llmUsage,
-      lockedReason: 'insufficient_credits',
-    },
+      dataSummary: {
+        coverage,
+        dataWarning,
+        talkToAiSummary,
+        hydrationSummary,
+        nutritionSummary,
+        journalSummary,
+        moodSummary,
+        symptomSummary,
+        exerciseSummary,
+        checkinSummary,
+        dailyStats,
+        labTrends,
+        labHighlights,
+        llmUsage,
+        lockedReason: 'insufficient_credits',
+      },
       report: null,
       readyAt: now.toISOString(),
     })
@@ -2388,6 +2511,7 @@ ${JSON.stringify(reportContext)}
       talkToAiSummary,
       hydrationSummary,
       nutritionSummary,
+      journalSummary,
       moodSummary,
       symptomSummary,
       exerciseSummary,
