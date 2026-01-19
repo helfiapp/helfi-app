@@ -534,8 +534,8 @@ export async function searchUsdaFoods(
     dataType === 'branded'
       ? 'Branded'
       : dataType === 'generic'
-      ? ['Survey (FNDDS)', 'SR Legacy'].join(',')
-      : ['Branded', 'Survey (FNDDS)', 'SR Legacy'].join(',')
+      ? ['Foundation', 'Survey (FNDDS)', 'SR Legacy'].join(',')
+      : ['Foundation', 'Branded', 'Survey (FNDDS)', 'SR Legacy'].join(',')
 
   if (!query.trim()) return []
 
