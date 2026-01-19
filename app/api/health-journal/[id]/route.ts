@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ensureHealthJournalSchema } from '@/lib/health-journal-db'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  await ensureHealthJournalSchema()
 
   const entryId = String(params?.id || '').trim()
   if (!entryId) {
@@ -42,6 +45,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  await ensureHealthJournalSchema()
 
   const entryId = String(params?.id || '').trim()
   if (!entryId) {
