@@ -204,19 +204,22 @@ const normalizeSearchToken = (value: string) =>
 
 const getSearchTokens = (value: string) => normalizeSearchToken(value).split(' ').filter(Boolean)
 
-const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
+const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { requireFirstWord?: boolean }) => {
   const queryTokens = getSearchTokens(searchQuery)
   const nameTokens = getSearchTokens(name)
   if (queryTokens.length === 0 || nameTokens.length === 0) return false
-  if (queryTokens.length === 1) return nameTokens[0].startsWith(queryTokens[0])
-  if (!queryTokens.some((token) => nameTokens[0].startsWith(token))) return false
+  const requireFirstWord = options?.requireFirstWord ?? false
+  if (requireFirstWord) {
+    if (!queryTokens.some((token) => nameTokens[0].startsWith(token))) return false
+  }
+  if (queryTokens.length === 1) return nameTokens.some((word) => word.startsWith(queryTokens[0]))
   return queryTokens.every((token) => nameTokens.some((word) => word.startsWith(token)))
 }
 
 const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, kind: SearchKind) => {
-  if (kind === 'single') return nameMatchesSearchQuery(item?.name || '', searchQuery)
+  if (kind === 'single') return nameMatchesSearchQuery(item?.name || '', searchQuery, { requireFirstWord: false })
   const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-  return nameMatchesSearchQuery(combined || item?.name || '', searchQuery)
+  return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: true })
 }
 
 const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
