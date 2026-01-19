@@ -151,6 +151,7 @@ const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: strin
   { name: 'Salt', serving_size: '100 g' },
   { name: 'Oats, raw', serving_size: '100 g' },
   { name: 'Almonds', serving_size: '100 g' },
+  { name: 'Walnuts, raw', serving_size: '100 g' },
   { name: 'Peanut butter', serving_size: '100 g' },
   { name: 'Avocado, raw', serving_size: '100 g' },
 ]
@@ -186,15 +187,12 @@ const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { r
   const queryTokens = getSearchTokens(searchQuery)
   const nameTokens = getSearchTokens(name)
   if (queryTokens.length === 0 || nameTokens.length === 0) return false
-  const shortQuery = queryTokens.every((token) => token.length < 4)
-  const tokenMatches = (token: string, word: string) =>
-    shortQuery ? word.includes(token) : word.startsWith(token)
+  const tokenMatches = (token: string, word: string) => word.startsWith(token)
   const requireFirstWord = options?.requireFirstWord ?? false
   if (requireFirstWord) {
     if (!queryTokens.some((token) => tokenMatches(token, nameTokens[0]))) return false
   }
   if (queryTokens.length === 1) return nameTokens.some((word) => tokenMatches(queryTokens[0], word))
-  if (shortQuery) return queryTokens.some((token) => nameTokens.some((word) => tokenMatches(token, word)))
   return queryTokens.every((token) => nameTokens.some((word) => tokenMatches(token, word)))
 }
 
@@ -892,6 +890,7 @@ export default function MealBuilderClient() {
       searchDebounceRef.current = null
     }
     if (q.length < 2) {
+      seqRef.current += 1
       setResults([])
       setSearchLoading(false)
       if (q.length === 0) setError(null)
@@ -920,10 +919,12 @@ export default function MealBuilderClient() {
       brandSearchDebounceRef.current = null
     }
     if (kind !== 'packaged') {
+      brandSeqRef.current += 1
       setBrandSuggestions([])
       return
     }
     if (q.length < 2) {
+      brandSeqRef.current += 1
       setBrandSuggestions([])
       return
     }

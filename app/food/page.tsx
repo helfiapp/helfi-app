@@ -5935,15 +5935,12 @@ export default function FoodDiary() {
     const queryTokens = getSearchTokens(searchQuery)
     const nameTokens = getSearchTokens(name)
     if (queryTokens.length === 0 || nameTokens.length === 0) return false
-    const shortQuery = queryTokens.every((token) => token.length < 4)
-    const tokenMatches = (token: string, word: string) =>
-      shortQuery ? word.includes(token) : word.startsWith(token)
+    const tokenMatches = (token: string, word: string) => word.startsWith(token)
     const requireFirstWord = options?.requireFirstWord ?? false
     if (requireFirstWord) {
       if (!queryTokens.some((token) => tokenMatches(token, nameTokens[0]))) return false
     }
     if (queryTokens.length === 1) return nameTokens.some((word) => tokenMatches(queryTokens[0], word))
-    if (shortQuery) return queryTokens.some((token) => nameTokens.some((word) => tokenMatches(token, word)))
     return queryTokens.every((token) => nameTokens.some((word) => tokenMatches(token, word)))
   }
 
@@ -6020,6 +6017,7 @@ export default function FoodDiary() {
     { name: 'Salt', serving_size: '100 g' },
     { name: 'Oats, raw', serving_size: '100 g' },
     { name: 'Almonds', serving_size: '100 g' },
+    { name: 'Walnuts, raw', serving_size: '100 g' },
     { name: 'Peanut butter', serving_size: '100 g' },
     { name: 'Avocado, raw', serving_size: '100 g' },
   ]
