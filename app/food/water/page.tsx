@@ -182,6 +182,7 @@ export default function WaterIntakePage() {
 
   const customUnitRef = useRef<HTMLDivElement | null>(null)
   const goalInputRef = useRef<HTMLInputElement | null>(null)
+  const entriesRequestIdRef = useRef(0)
 
   const userImage = (profileImage || session?.user?.image || '') as string
   const hasProfileImage = !!userImage
@@ -213,6 +214,7 @@ export default function WaterIntakePage() {
   }, [refreshData, status])
 
   const loadEntries = async (localDate: string) => {
+    const requestId = ++entriesRequestIdRef.current
     setLoading(true)
     setBanner(null)
     try {
@@ -220,6 +222,7 @@ export default function WaterIntakePage() {
         cache: 'no-store' as any,
         credentials: 'include',
       })
+      if (requestId !== entriesRequestIdRef.current) return
       if (res.status === 401) {
         setEntries([])
         return
@@ -229,10 +232,11 @@ export default function WaterIntakePage() {
       setEntries(Array.isArray(data?.entries) ? data.entries : [])
       setLoadError(false)
     } catch {
+      if (requestId !== entriesRequestIdRef.current) return
       setEntries([])
       setLoadError(true)
     } finally {
-      setLoading(false)
+      if (requestId === entriesRequestIdRef.current) setLoading(false)
     }
   }
 
