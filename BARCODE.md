@@ -25,3 +25,13 @@ What not to do:
 - Don’t touch the scanner implementation or decoder choice.
 - Don’t remove credit charging (3 credits, only when product found).
 - Don’t reintroduce photo upload for scanning.
+
+## Critical warning + restore steps (Jan 2026 fix)
+- Symptom: Users see **“Barcode not saved”** and the message mentions the `FoodLibraryItem` table missing. The barcode never gets learned and the prompt repeats forever.
+- Root cause: The live database is missing one or both barcode tables (`FoodLibraryItem`, `BarcodeProduct`).
+
+Restore steps:
+1) Apply all migrations against the live database (standard deploy migration).
+2) If `BarcodeProduct` is still missing due to migration history drift, run the SQL in:
+   - `prisma/migrations/20251223120000_add_barcode_product/migration.sql`
+3) Verify both tables exist before declaring the fix done.

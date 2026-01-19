@@ -1158,6 +1158,13 @@ for a change.
   - **Barcode label save must persist and confirm (Jan 2026 – locked):**
     - Save to the barcode cache when possible; if that fails, fall back to saving by barcode in the local food library so future scans still work.
     - Show a clear “Barcode saved / Barcode not saved” message with the barcode number and error text. Do not silently fail.
+    - **Live database tables must exist (Jan 2026 – locked):**
+      - Required tables: `BarcodeProduct` and `FoodLibraryItem`. If either is missing, barcode saves will fail and users will see “Barcode not saved.”
+      - **Restore steps (if broken):**
+        1) Run standard migrations against the live database.
+        2) If `BarcodeProduct` is still missing due to migration history drift, run:
+           - `prisma/migrations/20251223120000_add_barcode_product/migration.sql`
+        3) Verify both tables exist before declaring the fix complete.
     - **Rollback (if this ever causes bad data):**
       - Revert the fallback save in `app/api/barcode/label/route.ts`.
       - Revert the save confirmation banner in `app/food/page.tsx`.
