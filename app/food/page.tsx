@@ -23490,8 +23490,8 @@ Please add nutritional information manually if needed.`);
       )}
 
       {showCombineModal && (
-        <div className="fixed inset-0 z-[60] bg-white sm:bg-black/30 flex flex-col sm:items-center sm:justify-center sm:p-6">
-          <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl bg-white sm:rounded-2xl sm:shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed inset-0 md:left-64 z-[60] bg-white flex flex-col md:items-center md:justify-center md:p-6">
+          <div className="w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl bg-white md:rounded-2xl md:shadow-2xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <button
               type="button"
@@ -23530,7 +23530,7 @@ Please add nutritional information manually if needed.`);
             </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 pb-28 sm:pb-4">
+            <div className="flex-1 overflow-y-auto px-4 pb-28 md:pb-4">
             {combineEntries.length === 0 ? (
               <div className="text-sm text-gray-500 py-6 text-center">No items to combine.</div>
             ) : (
@@ -23580,7 +23580,7 @@ Please add nutritional information manually if needed.`);
             )}
             </div>
 
-            <div className="fixed sm:static inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)] space-y-2 sm:mt-auto">
+            <div className="fixed md:static inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)] space-y-2 md:mt-auto">
             <button
               type="button"
               disabled={combineSelectedCount === 0 || combineSaving}
