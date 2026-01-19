@@ -127,6 +127,15 @@ export async function GET(request: NextRequest) {
           updated[updated.length - 1] = singular
           candidates.add(updated.join(' '))
         }
+        const base = parts.join(' ')
+        const raw = `${base} raw`
+        const rawComma = `${base}, raw`
+        const cooked = `${base} cooked`
+        const cookedComma = `${base}, cooked`
+        candidates.add(raw)
+        candidates.add(rawComma)
+        candidates.add(cooked)
+        candidates.add(cookedComma)
       }
 
       return Array.from(candidates).filter((q) => q.toLowerCase() !== original.toLowerCase())
