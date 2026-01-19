@@ -21133,6 +21133,7 @@ Please add nutritional information manually if needed.`);
                   bad: fatDetailList(fatDetails.bad),
                   unclear: fatDetailList(fatDetails.unclear),
                 }
+                // Guard rail: keep fat item labels in normal sentence case (no all-caps lists).
                 const formatFatDetailLabel = (value: any) => {
                   const raw = String(value || '').trim()
                   if (!raw) return 'Unknown item'
@@ -21461,6 +21462,7 @@ Please add nutritional information manually if needed.`);
                                     Hover or tap any colored bar or circle to see which foods were counted.
                                   </p>
                                 )}
+                                {/* Guard rail: fat detail lists must expand fully (no internal scrolling). */}
                                 {isMobile && fatDetailState?.source === 'bar' && (
                                   <div className="mt-2 rounded-lg border border-gray-200 bg-white shadow-sm p-3">
                                     <div className="flex items-center gap-2 mb-2">
@@ -21475,7 +21477,7 @@ Please add nutritional information manually if needed.`);
                                     {fatDetailItems[fatDetailState.type].length === 0 ? (
                                       <div className="text-xs text-gray-500">No items yet today.</div>
                                     ) : (
-                                      <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
+                                      <ul className="space-y-1 text-xs text-gray-700">
                                         {fatDetailItems[fatDetailState.type].map((item) => (
                                           <li key={item.label} className="flex items-center justify-between gap-3">
                                             <span className="truncate">{formatFatDetailLabel(item.label)}</span>
@@ -21532,6 +21534,7 @@ Please add nutritional information manually if needed.`);
                                     )
                                   })}
                                 </div>
+                                {/* Guard rail: fat detail lists must expand fully (no internal scrolling). */}
                                 {isMobile && fatDetailState?.source === 'ring' && (
                                   <div className="rounded-lg border border-gray-200 bg-white shadow-sm p-3">
                                     <div className="flex items-center gap-2 mb-2">
@@ -21546,7 +21549,7 @@ Please add nutritional information manually if needed.`);
                                     {fatDetailItems[fatDetailState.type].length === 0 ? (
                                       <div className="text-xs text-gray-500">No items yet today.</div>
                                     ) : (
-                                      <ul className="space-y-1 max-h-32 overflow-y-auto text-xs text-gray-700">
+                                      <ul className="space-y-1 text-xs text-gray-700">
                                         {fatDetailItems[fatDetailState.type].map((item) => (
                                           <li key={item.label} className="flex items-center justify-between gap-3">
                                             <span className="truncate">{formatFatDetailLabel(item.label)}</span>
