@@ -20484,6 +20484,18 @@ Please add nutritional information manually if needed.`);
                   'cut',
                 ])
 
+                const plantExtraKeywords = [
+                  'mushroom',
+                  'mushrooms',
+                  'tofu',
+                  'tempeh',
+                  'seitan',
+                  'plant based',
+                  'plant-based',
+                  'vegan',
+                  'vegetarian',
+                ]
+
                 const buildFruitKeywords = (keywords: string[]) => {
                   const result = new Set<string>()
                   keywords.forEach((value) => {
@@ -20518,6 +20530,7 @@ Please add nutritional information manually if needed.`);
                 const fatBadKeywords = hasCsvFatList ? expandFatKeywords(fatFoodList!.bad) : fallbackFatBadKeywords
                 const fatZeroKeywords = hasCsvFatList ? expandFatKeywords(fatFoodList!.none) : fallbackFatZeroKeywords
                 const fruitKeywords = buildFruitKeywords(fatZeroKeywords)
+                const plantKeywords = [...fatZeroKeywords, ...plantExtraKeywords]
                 const allowFallbackHeuristics = !hasCsvFatList
 
                 const fatChainKeywords = [
@@ -20693,6 +20706,11 @@ Please add nutritional information manually if needed.`);
                   return tokens.some((token) => eggTokens.has(token))
                 }
 
+                const isPlantBasedLabel = (label: any) => {
+                  if (!label) return false
+                  return matchesFatKeywords(label, plantKeywords)
+                }
+
                 const isPureFruitLabel = (label: any) => {
                   if (!label) return false
                   const clean = scrubFatLabel(label)
@@ -20725,6 +20743,7 @@ Please add nutritional information manually if needed.`);
                   if (!Number.isFinite(fatValue) || fatValue <= 0) return true
                   if (matchesFatKeywords(label, fatZeroKeywords)) {
                     if (isPureFruitLabel(label)) return false
+                    if (isPlantBasedLabel(label)) return false
                     if (fatValue < 0.5) return true
                   }
                   return false
@@ -20733,6 +20752,7 @@ Please add nutritional information manually if needed.`);
                 const classifyFatLabel = (label: any, fatValue: number) => {
                   if (Number.isFinite(fatValue) && fatValue > 0) {
                     if (isPureFruitLabel(label) && !isProcessedLabel(label)) return 'good'
+                    if (isPlantBasedLabel(label) && !isProcessedLabel(label)) return 'good'
                   }
                   if (isEggLabel(label)) return 'good'
                   if (allowFallbackHeuristics && matchesFatKeywords(label, fatBadOverrides)) return 'bad'
@@ -23470,8 +23490,9 @@ Please add nutritional information manually if needed.`);
       )}
 
       {showCombineModal && (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="fixed inset-0 z-[60] bg-white sm:bg-black/30 flex flex-col sm:items-center sm:justify-center sm:p-6">
+          <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl bg-white sm:rounded-2xl sm:shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <button
               type="button"
               onClick={closeCombinePicker}
@@ -23494,9 +23515,9 @@ Please add nutritional information manually if needed.`);
             >
               <span aria-hidden>✕</span>
             </button>
-          </div>
+            </div>
 
-          <div className="px-4 py-3 border-b border-gray-200 space-y-2">
+            <div className="px-4 py-3 border-b border-gray-200 space-y-2">
             <div className="text-sm text-gray-700">Pick the foods you want to combine.</div>
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-gray-700">New meal name</label>
@@ -23507,9 +23528,9 @@ Please add nutritional information manually if needed.`);
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
-          </div>
+            </div>
 
-          <div className="flex-1 overflow-y-auto px-4 pb-28">
+            <div className="flex-1 overflow-y-auto px-4 pb-28 sm:pb-4">
             {combineEntries.length === 0 ? (
               <div className="text-sm text-gray-500 py-6 text-center">No items to combine.</div>
             ) : (
@@ -23557,9 +23578,9 @@ Please add nutritional information manually if needed.`);
                 })}
               </div>
             )}
-          </div>
+            </div>
 
-          <div className="fixed inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)] space-y-2">
+            <div className="fixed sm:static inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)] space-y-2 sm:mt-auto">
             <button
               type="button"
               disabled={combineSelectedCount === 0 || combineSaving}
@@ -23574,6 +23595,7 @@ Please add nutritional information manually if needed.`);
             </button>
             <div className="text-xs text-gray-500 text-center">
               This will save one combined meal and remove the selected items.
+            </div>
             </div>
           </div>
         </div>
