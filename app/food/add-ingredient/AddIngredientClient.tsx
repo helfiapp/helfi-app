@@ -219,6 +219,37 @@ const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, k
   return nameMatchesSearchQuery(combined || item?.name || '', searchQuery)
 }
 
+const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
+  const prefix = getSearchTokens(searchQuery)[0] || ''
+  if (prefix.length < 2) return []
+  const normalizedPrefix = normalizeSearchToken(prefix)
+  if (!normalizedPrefix) return []
+  const matches = names.filter((name) => normalizeSearchToken(name).startsWith(normalizedPrefix))
+  return matches.slice(0, 8).map((name) => ({
+    source: 'fatsecret',
+    id: `brand:${normalizeSearchToken(name)}`,
+    name,
+    serving_size: null,
+    __brandSuggestion: true,
+    __searchQuery: name,
+  }))
+}
+
+const mergeBrandSuggestions = (items: NormalizedFoodItem[], suggestions: NormalizedFoodItem[]) => {
+  if (suggestions.length === 0) return items
+  const merged: NormalizedFoodItem[] = []
+  const seen = new Set<string>()
+  const add = (item: NormalizedFoodItem) => {
+    const key = normalizeSearchToken(item?.name || '')
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    merged.push(item)
+  }
+  suggestions.forEach(add)
+  items.forEach(add)
+  return merged
+}
+
 const parseServingGrams = (label?: string | null) => {
   const raw = String(label || '').toLowerCase()
   const match = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
@@ -243,6 +274,25 @@ const MEAT_TOKENS = [
   'burger',
   'patty',
   'steak',
+]
+
+const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
+  'McDonald\'s',
+  'KFC',
+  'Subway',
+  'Burger King',
+  'Hungry Jack\'s',
+  'Domino\'s',
+  'Pizza Hut',
+  'Starbucks',
+  'Taco Bell',
+  'Wendy\'s',
+  'Nando\'s',
+  'Oporto',
+  'Guzman y Gomez',
+  'Grill\'d',
+  'Red Rooster',
+  'Sushi Hub',
 ]
 
 const shouldShowMeatFat = (item: NormalizedFoodItem, queryText: string) => {
@@ -295,6 +345,7 @@ export default function AddIngredientClient() {
   const [addingId, setAddingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<NormalizedFoodItem[]>([])
+  const [brandSuggestions, setBrandSuggestions] = useState<NormalizedFoodItem[]>([])
   const [photoLoading, setPhotoLoading] = useState(false)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
   const prefillAppliedRef = useRef(false)
@@ -303,9 +354,12 @@ export default function AddIngredientClient() {
   const servingCacheRef = useRef<Map<string, ServingOption>>(new Map())
   const servingPendingRef = useRef<Set<string>>(new Set())
   const seqRef = useRef(0)
+  const brandSeqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const queryInputRef = useRef<HTMLInputElement | null>(null)
   const searchPressRef = useRef(0)
+  const brandSuggestionsRef = useRef<NormalizedFoodItem[]>([])
+  const brandSearchDebounceRef = useRef<number | null>(null)
 
   const cleanSingleFoodQuery = (value: string) =>
     value
@@ -366,6 +420,10 @@ export default function AddIngredientClient() {
       } catch {}
     }
   }, [photoPreviewUrl])
+
+  useEffect(() => {
+    brandSuggestionsRef.current = brandSuggestions
+  }, [brandSuggestions])
 
   useEffect(() => {
     if (prefillAppliedRef.current) return
@@ -495,6 +553,21 @@ export default function AddIngredientClient() {
         return { res, data }
       }
 
+      const fetchBrandSuggestions = async (searchQuery: string) => {
+        const prefix = getSearchTokens(searchQuery)[0] || ''
+        if (prefix.length < 2) return []
+        try {
+          const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
+          if (!res.ok) return []
+          const data = await res.json().catch(() => ({} as any))
+          const items = Array.isArray(data?.items) ? data.items : []
+          const combined = items.length > 0 ? items : COMMON_PACKAGED_BRAND_SUGGESTIONS
+          return buildBrandSuggestions(combined, searchQuery)
+        } catch {
+          return buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, searchQuery)
+        }
+      }
+
       let { res, data } = await fetchItems(q)
       if (!res.ok) {
         const msg =
@@ -525,7 +598,12 @@ export default function AddIngredientClient() {
       if (hasToken) {
         nextResults = nextResults.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k))
       }
-      setResults(nextResults)
+      const brandMatches =
+        k === 'packaged' && hasToken
+          ? await fetchBrandSuggestions(q)
+          : []
+      const merged = k === 'packaged' ? mergeBrandSuggestions(nextResults, brandMatches) : nextResults
+      setResults(merged)
     } catch (e: any) {
       if (e?.name === 'AbortError') return
       setError('Search failed. Please try again.')
@@ -912,6 +990,7 @@ export default function AddIngredientClient() {
                 {results.map((r, idx) => {
                   const id = `${r.source}:${r.id}:${idx}`
                   const busy = addingId === `${r.source}:${r.id}`
+                  const isBrandSuggestion = Boolean((r as any).__brandSuggestion)
                   const display = buildSearchDisplay(r, query)
                   return (
                     <div key={id} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
@@ -921,24 +1000,40 @@ export default function AddIngredientClient() {
                           {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                         </div>
                           <div className="mt-0.5 text-xs text-gray-600">
-                            {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
-                            {r.calories != null && !Number.isNaN(Number(r.calories)) && <span>{Math.round(Number(r.calories))} kcal</span>}
+                            {isBrandSuggestion ? (
+                              <span>Brand match</span>
+                            ) : (
+                              <>
+                                {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
+                                {r.calories != null && !Number.isNaN(Number(r.calories)) && <span>{Math.round(Number(r.calories))} kcal</span>}
+                              </>
+                            )}
                             {(() => {
                               const fatLabel = buildMeatFatLabel(r, query)
                               return fatLabel ? <span className="ml-2">{fatLabel}</span> : null
                             })()}
                           </div>
                         <div className="mt-1 text-[11px] text-gray-400">
-                          Source: {r.source === 'usda' ? 'USDA' : 'OpenFoodFacts'}
+                          {isBrandSuggestion
+                            ? 'Brand list'
+                            : `Source: ${r.source === 'usda' ? 'USDA' : r.source === 'fatsecret' ? 'FatSecret' : 'Open Food Facts'}`}
                         </div>
                       </div>
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => addFromSearchResult(r)}
+                        onClick={() => {
+                          if (isBrandSuggestion) {
+                            const nextQuery = (r as any).__searchQuery || r.name
+                            setQuery(nextQuery)
+                            runSearch(nextQuery, kind)
+                            return
+                          }
+                          addFromSearchResult(r)
+                        }}
                         className="ml-3 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
                       >
-                        {busy ? 'Adding…' : 'Add'}
+                        {isBrandSuggestion ? 'Show' : busy ? 'Adding…' : 'Add'}
                       </button>
                     </div>
                   )

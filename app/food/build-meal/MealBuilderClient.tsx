@@ -154,6 +154,25 @@ const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: strin
   { name: 'Avocado, raw', serving_size: '100 g' },
 ]
 
+const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
+  'McDonald\'s',
+  'KFC',
+  'Subway',
+  'Burger King',
+  'Hungry Jack\'s',
+  'Domino\'s',
+  'Pizza Hut',
+  'Starbucks',
+  'Taco Bell',
+  'Wendy\'s',
+  'Nando\'s',
+  'Oporto',
+  'Guzman y Gomez',
+  'Grill\'d',
+  'Red Rooster',
+  'Sushi Hub',
+]
+
 const getSearchTokens = (value: string) => normalizeSearchToken(value).split(' ').filter(Boolean)
 
 const getLastSearchToken = (searchQuery: string) => {
@@ -176,6 +195,22 @@ const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, k
   return nameMatchesSearchQuery(combined || item?.name || '', searchQuery)
 }
 
+const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
+  const prefix = getSearchTokens(searchQuery)[0] || ''
+  if (prefix.length < 2) return []
+  const normalizedPrefix = normalizeSearchToken(prefix)
+  if (!normalizedPrefix) return []
+  const matches = names.filter((name) => normalizeSearchToken(name).startsWith(normalizedPrefix))
+  return matches.slice(0, 8).map((name) => ({
+    source: 'fatsecret',
+    id: `brand:${normalizeSearchToken(name)}`,
+    name,
+    serving_size: null,
+    __brandSuggestion: true,
+    __searchQuery: name,
+  }))
+}
+
 const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
   const tokens = getSearchTokens(searchQuery)
   if (!tokens.some((token) => token.length >= 2)) return []
@@ -192,6 +227,21 @@ const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
 
 const mergeSearchSuggestions = (items: NormalizedFoodItem[], searchQuery: string) => {
   const suggestions = buildInstantSuggestions(searchQuery)
+  if (suggestions.length === 0) return items
+  const merged: NormalizedFoodItem[] = []
+  const seen = new Set<string>()
+  const add = (item: NormalizedFoodItem) => {
+    const key = normalizeSearchToken(item?.name || '')
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    merged.push(item)
+  }
+  suggestions.forEach(add)
+  items.forEach(add)
+  return merged
+}
+
+const mergeBrandSuggestions = (items: NormalizedFoodItem[], suggestions: NormalizedFoodItem[]) => {
   if (suggestions.length === 0) return items
   const merged: NormalizedFoodItem[] = []
   const seen = new Set<string>()
@@ -463,8 +513,12 @@ export default function MealBuilderClient() {
   const [portionAmountInput, setPortionAmountInput] = useState('')
   const [portionUnit, setPortionUnit] = useState<'g' | 'oz'>('g')
   const searchDebounceRef = useRef<number | null>(null)
+  const brandSearchDebounceRef = useRef<number | null>(null)
+  const [brandSuggestions, setBrandSuggestions] = useState<NormalizedFoodItem[]>([])
+  const brandSuggestionsRef = useRef<NormalizedFoodItem[]>([])
 
   const seqRef = useRef(0)
+  const brandSeqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const queryInputRef = useRef<HTMLInputElement | null>(null)
   const portionInputRef = useRef<HTMLInputElement | null>(null)
@@ -514,6 +568,10 @@ export default function MealBuilderClient() {
   useEffect(() => {
     itemsRef.current = items
   }, [items])
+
+  useEffect(() => {
+    brandSuggestionsRef.current = brandSuggestions
+  }, [brandSuggestions])
 
   useEffect(() => {
     // Cleanup blob preview URLs.
@@ -754,6 +812,21 @@ export default function MealBuilderClient() {
     return Array.isArray(data?.items) ? data.items : []
   }
 
+  const fetchBrandSuggestions = async (searchQuery: string) => {
+    const prefix = getSearchTokens(searchQuery)[0] || ''
+    if (prefix.length < 2) return []
+    try {
+      const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
+      if (!res.ok) return []
+      const data = await res.json().catch(() => ({} as any))
+      const items = Array.isArray(data?.items) ? data.items : []
+      const combined = items.length > 0 ? items : COMMON_PACKAGED_BRAND_SUGGESTIONS
+      return buildBrandSuggestions(combined, searchQuery)
+    } catch {
+      return buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, searchQuery)
+    }
+  }
+
   const runSearch = async (searchQuery?: string) => {
     const raw = String(searchQuery ?? query)
     const q = raw.trim()
@@ -785,7 +858,10 @@ export default function MealBuilderClient() {
           }
         } catch {}
       }
-      const merged = kind === 'single' ? mergeSearchSuggestions(nextItems, q) : nextItems
+      const merged =
+        kind === 'single'
+          ? mergeSearchSuggestions(nextItems, q)
+          : mergeBrandSuggestions(nextItems, brandSuggestionsRef.current)
       setResults(merged)
       return merged
     } catch (e: any) {
@@ -819,6 +895,37 @@ export default function MealBuilderClient() {
       if (searchDebounceRef.current) {
         window.clearTimeout(searchDebounceRef.current)
         searchDebounceRef.current = null
+      }
+    }
+  }, [query, kind])
+
+  useEffect(() => {
+    const q = String(query || '').trim()
+    if (brandSearchDebounceRef.current) {
+      window.clearTimeout(brandSearchDebounceRef.current)
+      brandSearchDebounceRef.current = null
+    }
+    if (kind !== 'packaged') {
+      setBrandSuggestions([])
+      return
+    }
+    if (q.length < 2) {
+      setBrandSuggestions([])
+      return
+    }
+    const fallback = buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, q)
+    if (fallback.length > 0) setBrandSuggestions(fallback)
+    const seq = ++brandSeqRef.current
+    brandSearchDebounceRef.current = window.setTimeout(async () => {
+      const list = await fetchBrandSuggestions(q)
+      if (brandSeqRef.current !== seq) return
+      setBrandSuggestions(list)
+      setResults((prev) => mergeBrandSuggestions(prev, list))
+    }, 150)
+    return () => {
+      if (brandSearchDebounceRef.current) {
+        window.clearTimeout(brandSearchDebounceRef.current)
+        brandSearchDebounceRef.current = null
       }
     }
   }, [query, kind])
@@ -2224,6 +2331,7 @@ export default function MealBuilderClient() {
                 <div className="max-h-72 overflow-y-auto space-y-2 pt-2">
                   {results.map((r) => {
                     const isSuggestion = Boolean((r as any).__suggestion)
+                    const isBrandSuggestion = Boolean((r as any).__brandSuggestion)
                     const display = buildSearchDisplay(r, query)
                     return (
                       <div key={`${r.source}:${r.id}`} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
@@ -2233,15 +2341,28 @@ export default function MealBuilderClient() {
                             {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                           </div>
                           <div className="text-[11px] text-gray-500">
-                            {r.serving_size ? `Serving: ${r.serving_size}` : 'Serving: (unknown)'}
+                            {isBrandSuggestion ? 'Brand match' : r.serving_size ? `Serving: ${r.serving_size}` : 'Serving: (unknown)'}
                           </div>
                         </div>
                         <button
                           type="button"
-                          onClick={() => (isSuggestion ? addSuggestionItem(r) : addItem(r))}
+                          onClick={() => {
+                            if (isBrandSuggestion) {
+                              const nextQuery = (r as any).__searchQuery || r.name
+                              setQuery(nextQuery)
+                              setError(null)
+                              runSearch(nextQuery)
+                              return
+                            }
+                            if (isSuggestion) {
+                              addSuggestionItem(r)
+                              return
+                            }
+                            addItem(r)
+                          }}
                           className="ml-3 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
                         >
-                          Add
+                          {isBrandSuggestion ? 'Show' : 'Add'}
                         </button>
                       </div>
                     )

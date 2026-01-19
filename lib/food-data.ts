@@ -708,23 +708,25 @@ function normalizeFatSecretFood(food: FatSecretFood): NormalizedFoodItem | null 
   }
 }
 
-let fatSecretTokenCache: { token: string; expiresAtMs: number } | null = null
+let fatSecretTokenCacheByScope: Record<string, { token: string; expiresAtMs: number }> = {}
 
-async function getFatSecretAccessToken(): Promise<string | null> {
+async function getFatSecretAccessToken(scope = 'basic'): Promise<string | null> {
   if (!FATSECRET_CLIENT_ID || !FATSECRET_CLIENT_SECRET) {
     console.warn('FatSecret credentials not configured')
     return null
   }
 
-  if (fatSecretTokenCache && fatSecretTokenCache.token && nowMs() < fatSecretTokenCache.expiresAtMs - 10_000) {
-    return fatSecretTokenCache.token
+  const scopeKey = scope && String(scope).trim().length > 0 ? String(scope).trim() : 'basic'
+  const cached = fatSecretTokenCacheByScope[scopeKey]
+  if (cached && cached.token && nowMs() < cached.expiresAtMs - 10_000) {
+    return cached.token
   }
 
   try {
     // FatSecret uses OAuth 2.0 client credentials flow
     const params = new URLSearchParams({
       grant_type: 'client_credentials',
-      scope: 'basic',
+      scope: scopeKey,
     })
 
     const auth = Buffer.from(`${FATSECRET_CLIENT_ID}:${FATSECRET_CLIENT_SECRET}`).toString('base64')
@@ -760,9 +762,9 @@ async function getFatSecretAccessToken(): Promise<string | null> {
       // Default to 5 minutes if FatSecret doesn't return expires_in for some reason.
       const ttlMs = Number.isFinite(expiresInSec) && expiresInSec > 0 ? expiresInSec * 1000 : 5 * 60 * 1000
       // Keep a little safety margin so we don't reuse an expired token.
-      fatSecretTokenCache = { token, expiresAtMs: nowMs() + Math.max(30_000, ttlMs) }
+      fatSecretTokenCacheByScope[scopeKey] = { token, expiresAtMs: nowMs() + Math.max(30_000, ttlMs) }
     } else {
-      fatSecretTokenCache = null
+      delete fatSecretTokenCacheByScope[scopeKey]
     }
     return token
   } catch (err) {
@@ -908,6 +910,84 @@ export async function searchFatSecretFoods(
     return normalized
   } catch (err) {
     console.warn('FatSecret API error', err)
+    return []
+  }
+}
+
+export async function fetchFatSecretBrandList(
+  startsWith: string,
+  options?: { brandType?: string; region?: string; language?: string; limit?: number },
+): Promise<string[]> {
+  const prefix = String(startsWith || '').trim()
+  if (prefix.length < 2) return []
+
+  const accessToken = await getFatSecretAccessToken('premier')
+  if (!accessToken) return []
+
+  try {
+    const params = new URLSearchParams({
+      starts_with: prefix,
+      format: 'json',
+    })
+    if (options?.brandType) params.set('brand_type', options.brandType)
+    if (options?.region) params.set('region', options.region)
+    if (options?.language) params.set('language', options.language)
+
+    const url = `https://platform.fatsecret.com/rest/brands/v2?${params.toString()}`
+    const res = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+      timeoutMs: 2500,
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      console.warn('FatSecret brands list failed', res.status, text.substring(0, 200))
+      return []
+    }
+
+    const data = await res.json().catch(() => ({} as any))
+    const raw =
+      (data as any)?.food_brands?.food_brand ||
+      (data as any)?.food_brands ||
+      (data as any)?.brands ||
+      []
+
+    const list = Array.isArray(raw) ? raw : [raw]
+    const names: string[] = []
+    const seen = new Set<string>()
+
+    const addName = (value: any) => {
+      const name = String(value || '').trim()
+      if (!name) return
+      const key = name.toLowerCase()
+      if (seen.has(key)) return
+      seen.add(key)
+      names.push(name)
+    }
+
+    list.forEach((item) => {
+      if (!item) return
+      if (typeof item === 'string') {
+        addName(item)
+        return
+      }
+      const candidate =
+        (item as any).food_brand_name ||
+        (item as any).brand_name ||
+        (item as any).food_brand ||
+        (item as any).name
+      addName(candidate)
+    })
+
+    const limit = options?.limit && Number.isFinite(options.limit) ? Math.max(1, Math.min(options.limit, 50)) : 20
+    return names.slice(0, limit)
+  } catch (err) {
+    console.warn('FatSecret brands list error', err)
     return []
   }
 }
