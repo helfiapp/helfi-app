@@ -166,6 +166,25 @@ partial or guessed health data.
 
 ---
 
+## 3. Water Intake daily summary load race (Jan 2026 – Locked)
+
+**Protected file:** `app/food/water/page.tsx`
+
+Issue this prevents:
+- On first open, the Daily Hydration Summary showed 0 ml because an older fetch finished last and overwrote the correct day.
+
+Guard rail:
+- Do **not** remove the requestId guard in `loadEntries` or the `entriesRequestIdRef` that tracks the latest request.
+- Do **not** allow earlier fetches to call `setEntries`, `setLoadError`, or `setLoading` after a newer request started.
+
+Restore steps if broken:
+1. Re-add `entriesRequestIdRef = useRef(0)` near the top of the component.
+2. In `loadEntries`, increment and capture `requestId` at the start.
+3. Before any state updates in `loadEntries`, check `requestId === entriesRequestIdRef.current`.
+4. Only clear `loading` when the requestId still matches.
+
+---
+
 ### 2.5 5‑Minute Global Reminder (“Complete your Health Setup”)
 
 Files:

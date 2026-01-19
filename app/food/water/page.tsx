@@ -182,6 +182,8 @@ export default function WaterIntakePage() {
 
   const customUnitRef = useRef<HTMLDivElement | null>(null)
   const goalInputRef = useRef<HTMLInputElement | null>(null)
+  // Guard rail: keep requestId gating so stale loads cannot overwrite the latest date (shows 0 ml on first open).
+  // Restore by re-adding requestId ref + checks in loadEntries before setState and in finally.
   const entriesRequestIdRef = useRef(0)
 
   const userImage = (profileImage || session?.user?.image || '') as string
