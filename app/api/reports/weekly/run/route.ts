@@ -163,7 +163,7 @@ function buildNutritionSummary(
     sodium_mg: 0,
   }
   let counted = 0
-  const foodCount: Record<string, number> = {}
+  const foodCount = new Map<string, { name: string; count: number }>()
   const dayTotals = new Map<
     string,
     {
@@ -199,8 +199,13 @@ function buildNutritionSummary(
       totals.sodium_mg += sodium
       counted += 1
     }
-    const key = String(f.name || '').trim().toLowerCase()
-    if (key) foodCount[key] = (foodCount[key] || 0) + 1
+    const rawName = String(f.name || '').trim()
+    const key = rawName.toLowerCase()
+    if (key) {
+      const existing = foodCount.get(key) || { name: rawName, count: 0 }
+      existing.count += 1
+      foodCount.set(key, existing)
+    }
 
     const dayKey = resolveDayKey(f.localDate ?? null, f.createdAt)
     if (dayKey) {
@@ -230,10 +235,10 @@ function buildNutritionSummary(
     }
   }
 
-  const topFoods = Object.entries(foodCount)
-    .sort((a, b) => b[1] - a[1])
+  const topFoods = Array.from(foodCount.values())
+    .sort((a, b) => b.count - a.count)
     .slice(0, 5)
-    .map(([name, count]) => ({ name, count }))
+    .map((item) => ({ name: item.name, count: item.count }))
 
   const dailyTotals = Array.from(dayTotals.values()).sort((a, b) => a.date.localeCompare(b.date))
 
@@ -253,6 +258,48 @@ function buildNutritionSummary(
     dailyTotals,
     topFoods,
   }
+}
+
+function buildFoodHighlights(
+  foodLogs: Array<{ name: string | null; createdAt: Date; localDate?: string | null }>
+) {
+  const overallCounts = new Map<string, { name: string; count: number }>()
+  const dayCounts = new Map<string, Map<string, { name: string; count: number }>>()
+
+  for (const log of foodLogs) {
+    const name = String(log?.name || '').trim()
+    if (name) {
+      const key = name.toLowerCase()
+      const existingOverall = overallCounts.get(key) || { name, count: 0 }
+      existingOverall.count += 1
+      overallCounts.set(key, existingOverall)
+      const dayKey = resolveDayKey(log.localDate ?? null, log.createdAt)
+      if (dayKey) {
+        const existing = dayCounts.get(dayKey) || new Map()
+        const existingDay = existing.get(key) || { name, count: 0 }
+        existingDay.count += 1
+        existing.set(key, existingDay)
+        dayCounts.set(dayKey, existing)
+      }
+    }
+  }
+
+  const overallTopFoods = Array.from(overallCounts.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8)
+    .map((item) => ({ name: item.name, count: item.count }))
+
+  const dailyTopFoods = Array.from(dayCounts.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, counts]) => ({
+      date,
+      foods: Array.from(counts.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 3)
+        .map((item) => ({ name: item.name, count: item.count })),
+    }))
+
+  return { overallTopFoods, dailyTopFoods }
 }
 
 function buildHydrationSummary(
@@ -319,6 +366,58 @@ function buildJournalSummary(
     entries: entries.length,
     daysWithNotes: daySet.size,
     highlights,
+  }
+}
+
+function buildJournalDigest(
+  entries: Array<{ content: string; createdAt: Date; localDate?: string | null }>,
+  timezone: string
+) {
+  const dayMap = new Map<string, { notes: Array<{ time: string; note: string }>; total: number }>()
+  const sorted = [...entries].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+
+  for (const entry of sorted) {
+    const date = entry.localDate || formatLocalDate(entry.createdAt, timezone)
+    const time = formatLocalTime(entry.createdAt, timezone)
+    const bucket = dayMap.get(date) || { notes: [], total: 0 }
+    bucket.total += 1
+    if (bucket.notes.length < 3) {
+      bucket.notes.push({ time, note: clipText(entry.content || '', 180) })
+    }
+    dayMap.set(date, bucket)
+  }
+
+  return Array.from(dayMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, data]) => ({ date, notes: data.notes, count: data.total }))
+}
+
+function trimLlmContext(context: any, maxChars = 160000) {
+  try {
+    const raw = JSON.stringify(context)
+    if (raw.length <= maxChars) return context
+    const trimmed = {
+      ...context,
+      journalEntries: Array.isArray(context?.journalEntries) ? context.journalEntries.slice(0, 8) : context?.journalEntries,
+      journalDigest: Array.isArray(context?.journalDigest) ? context.journalDigest.slice(0, 4) : context?.journalDigest,
+      insightCandidates: Array.isArray(context?.insightCandidates) ? context.insightCandidates.slice(0, 8) : context?.insightCandidates,
+      foodLogSample: Array.isArray(context?.foodLogSample) ? context.foodLogSample.slice(0, 8) : context?.foodLogSample,
+      talkToAi: context?.talkToAi
+        ? {
+            ...context.talkToAi,
+            highlights: Array.isArray(context.talkToAi?.highlights) ? context.talkToAi.highlights.slice(0, 3) : context.talkToAi?.highlights,
+            topics: Array.isArray(context.talkToAi?.topics) ? context.talkToAi.topics.slice(0, 4) : context.talkToAi?.topics,
+          }
+        : context?.talkToAi,
+    }
+    const trimmedRaw = JSON.stringify(trimmed)
+    if (trimmedRaw.length <= maxChars) return trimmed
+    return {
+      ...trimmed,
+      dailyStats: Array.isArray(context?.dailyStats) ? context.dailyStats.slice(-7) : context?.dailyStats,
+    }
+  } catch {
+    return context
   }
 }
 
@@ -865,18 +964,27 @@ function buildInsightCandidates(params: {
       const time = formatLocalTime(entry.createdAt, timezone)
       const dayStats = dailyMap.get(date)
       const dayDetails: string[] = []
+      const topFoods = Array.isArray(dayStats?.topFoods)
+        ? dayStats.topFoods
+            .map((item: any) => String(item?.name || '').trim())
+            .filter(Boolean)
+            .map((name: string) => name.replace(/\b\w/g, (match) => match.toUpperCase()))
+        : []
       if (dayStats?.foodEntries) dayDetails.push(`${dayStats.foodEntries} food entries`)
       if (dayStats?.waterMl) dayDetails.push(`${Math.round(dayStats.waterMl)} ml fluids`)
       if (dayStats?.exerciseMinutes) dayDetails.push(`${dayStats.exerciseMinutes} minutes of movement`)
       if (dayStats?.moodAvg != null) dayDetails.push(`mood ${dayStats.moodAvg}`)
       if (dayStats?.symptomCount) dayDetails.push(`${dayStats.symptomCount} symptoms`)
-      const detailText = dayDetails.length ? `That day included ${dayDetails.join(', ')}.` : 'That day has logged data we can compare.'
+      if (topFoods.length) dayDetails.push(`top foods: ${topFoods.slice(0, 3).join(', ')}`)
+      const detailText = dayDetails.length
+        ? `That day included ${dayDetails.join(', ')}.`
+        : 'That day has logged data we can compare.'
       add({
         section: 'overview',
         bucket: 'suggested',
         title: `Journal note on ${date}`,
         evidence: `At ${time} you wrote: \"${clipText(entry.content || '', 140)}\". ${detailText}`,
-        action: 'If this happens again, note the last meal, drink, or supplement so we can spot triggers.',
+        action: "If this happens again, compare it with that day's foods and fluids to spot a repeat pattern.",
       })
     })
   }
@@ -950,11 +1058,11 @@ function buildTalkToAiSummary(
     .map(({ topic, section, count }) => ({ topic, section, count }))
 
   const highlights = userMessages
-    .slice(0, 10)
+    .slice(0, 6)
     .map((m) => ({
       role: 'user',
       createdAt: m.createdAt.toISOString(),
-      content: clipText(m.content, 240),
+      content: clipText(m.content, 160),
     }))
     .reverse()
 
@@ -1236,6 +1344,7 @@ type DailyStat = {
   symptomCount: number
   checkinCount: number
   talkToAiCount: number
+  journalCount: number
   foodNames: Record<string, number>
 }
 
@@ -1248,6 +1357,7 @@ function buildDailyStats(params: {
   moodRows: Array<{ mood: number; timestamp: Date; localDate?: string | null }>
   symptomAnalyses: Array<{ createdAt: Date; symptoms: any }>
   talkToAiMessages: Array<{ createdAt: Date; role: string }>
+  journalEntries: Array<{ createdAt: Date; localDate?: string | null }>
 }) {
   const dayMap = new Map<string, DailyStat>()
   const ensureDay = (dayKey: string) => {
@@ -1274,6 +1384,7 @@ function buildDailyStats(params: {
       symptomCount: 0,
       checkinCount: 0,
       talkToAiCount: 0,
+      journalCount: 0,
       foodNames: {},
     }
     dayMap.set(dayKey, created)
@@ -1353,6 +1464,13 @@ function buildDailyStats(params: {
     day.talkToAiCount += 1
   }
 
+  for (const entry of params.journalEntries) {
+    const dayKey = resolveDayKey(entry.localDate ?? null, entry.createdAt)
+    const day = ensureDay(dayKey)
+    if (!day) continue
+    day.journalCount += 1
+  }
+
   const dailyStats = Array.from(dayMap.values())
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((day) => {
@@ -1380,6 +1498,7 @@ function buildDailyStats(params: {
         symptomCount: day.symptomCount,
         checkinCount: day.checkinCount,
         talkToAiCount: day.talkToAiCount,
+        journalCount: day.journalCount,
         topFoods,
       }
     })
@@ -1495,14 +1614,14 @@ function buildFallbackReport(context: any) {
     if (!REPORT_SECTIONS.includes(section)) continue
     const evidence = String(candidate.evidence || '').trim()
     const action = String(candidate.action || '').trim()
-    const reason = [evidence, action].filter(Boolean).join(' ')
+    const reason = [evidence, action].filter(Boolean).join('\n')
     addItem(section, candidate.bucket, candidate.title, reason)
   }
 
   const working = candidates.filter((c: any) => c.bucket === 'working').slice(0, 3)
   const focus = candidates.filter((c: any) => c.bucket !== 'working').slice(0, 3)
-  working.forEach((item: any) => wins.push({ name: item.title, reason: [item.evidence, item.action].filter(Boolean).join(' ') }))
-  focus.forEach((item: any) => gaps.push({ name: item.title, reason: [item.evidence, item.action].filter(Boolean).join(' ') }))
+  working.forEach((item: any) => wins.push({ name: item.title, reason: [item.evidence, item.action].filter(Boolean).join('\n') }))
+  focus.forEach((item: any) => gaps.push({ name: item.title, reason: [item.evidence, item.action].filter(Boolean).join('\n') }))
   if (gaps.length < 3 && riskFlags.length) {
     riskFlags.slice(0, 3 - gaps.length).forEach((flag: any) => gaps.push(flag))
   }
@@ -1512,6 +1631,15 @@ function buildFallbackReport(context: any) {
       name: 'Daily nutrition baseline',
       reason: `Average intake was about ${nutritionSummary.dailyAverages.calories} kcal and ${nutritionSummary.dailyAverages.protein_g}g protein per day.`,
     })
+  }
+  if (!sections.nutrition.working.length && Array.isArray(nutritionSummary?.topFoods) && nutritionSummary.topFoods.length) {
+    const topFoods = nutritionSummary.topFoods.map((food: any) => food.name).filter(Boolean).slice(0, 4)
+    if (topFoods.length) {
+      sections.nutrition.working.push({
+        name: 'Most logged foods',
+        reason: `Top foods this week: ${topFoods.join(', ')}.`,
+      })
+    }
   }
   if (!sections.hydration.working.length && hydrationSummary?.dailyAverageMl) {
     sections.hydration.working.push({
@@ -2063,6 +2191,14 @@ export async function POST(request: NextRequest) {
     }))
   )
 
+  const foodHighlights = buildFoodHighlights(
+    (user.foodLogs || []).map((f) => ({
+      name: f.name,
+      createdAt: f.createdAt,
+      localDate: (f as any).localDate ?? null,
+    }))
+  )
+
   const hydrationSummary = buildHydrationSummary(
     (user.waterLogs || []).map((w) => ({
       amountMl: (w as any).amountMl ?? null,
@@ -2072,6 +2208,15 @@ export async function POST(request: NextRequest) {
     }))
   )
   const journalSummary = buildJournalSummary(
+    (user.healthJournalEntries || []).map((entry: any) => ({
+      content: entry.content || '',
+      createdAt: entry.createdAt,
+      localDate: entry.localDate || null,
+    })),
+    timezone
+  )
+
+  const journalDigest = buildJournalDigest(
     (user.healthJournalEntries || []).map((entry: any) => ({
       content: entry.content || '',
       createdAt: entry.createdAt,
@@ -2170,7 +2315,32 @@ export async function POST(request: NextRequest) {
       createdAt: msg.createdAt,
       role: msg.role,
     })),
+    journalEntries: (user.healthJournalEntries || []).map((entry) => ({
+      createdAt: entry.createdAt,
+      localDate: entry.localDate ?? null,
+    })),
   })
+
+  const compactDailyStats = dailyStats.map((day) => ({
+    date: day.date,
+    calories: day.calories,
+    protein_g: day.protein_g,
+    carbs_g: day.carbs_g,
+    fat_g: day.fat_g,
+    fiber_g: day.fiber_g,
+    sugar_g: day.sugar_g,
+    sodium_mg: day.sodium_mg,
+    waterMl: day.waterMl,
+    hydrationEntries: day.hydrationEntries,
+    exerciseMinutes: day.exerciseMinutes,
+    exerciseCount: day.exerciseCount,
+    moodAvg: day.moodAvg,
+    moodEntries: day.moodEntries,
+    symptomCount: day.symptomCount,
+    checkinCount: day.checkinCount,
+    journalCount: day.journalCount,
+    topFoods: day.topFoods,
+  }))
 
   const dataFlags = buildDataFlags(dailyStats)
   const nutritionSignals = buildNutritionSignals(dailyStats)
@@ -2257,28 +2427,19 @@ export async function POST(request: NextRequest) {
     })),
     nutritionSummary,
     hydrationSummary,
-    recentFoods: (user.foodLogs || []).slice(0, 20).map((f) => ({
+    foodHighlights,
+    foodLogSample: (user.foodLogs || []).slice(0, 15).map((f) => ({
       name: f.name,
-      createdAt: f.createdAt,
       localDate: (f as any).localDate ?? null,
       meal: (f as any).meal ?? null,
-      description: (f as any).description ?? null,
-      nutrients: (f as any).nutrients || null,
-    })),
-    recentWaterLogs: (user.waterLogs || []).slice(0, 20).map((w) => ({
-      label: (w as any).label ?? null,
-      amountMl: (w as any).amountMl ?? null,
-      amount: (w as any).amount ?? null,
-      unit: (w as any).unit ?? null,
-      createdAt: w.createdAt,
+      time: formatLocalTime(f.createdAt, timezone),
     })),
     checkins: goalRatings,
     checkinSummary,
     moodSummary,
     symptoms: symptomAnalyses.map((s) => ({
       summary: s.summary || null,
-      analysis: s.analysisText || null,
-      symptoms: s.symptoms || null,
+      symptoms: toStringArray(s.symptoms).slice(0, 8),
       createdAt: s.createdAt,
     })),
     symptomSummary,
@@ -2301,10 +2462,12 @@ export async function POST(request: NextRequest) {
     coverage,
     talkToAi: talkToAiSummary,
     journalSummary,
-    journalEntries: (user.healthJournalEntries || []).slice(0, 80).map((entry) => ({
-      content: entry.content,
+    journalDigest,
+    journalEntries: (user.healthJournalEntries || []).slice(0, 20).map((entry) => ({
+      content: clipText(entry.content || '', 200),
       createdAt: entry.createdAt,
       localDate: entry.localDate,
+      time: formatLocalTime(entry.createdAt, timezone),
     })),
     timezone,
     nutritionSignals,
@@ -2328,6 +2491,61 @@ export async function POST(request: NextRequest) {
     },
   }
 
+  const healthSituationsText = healthSituations
+    ? clipText(typeof healthSituations === 'string' ? healthSituations : JSON.stringify(healthSituations), 600)
+    : null
+
+  const llmContext = {
+    periodStart: reportContext.periodStart,
+    periodEnd: reportContext.periodEnd,
+    profile: reportContext.profile,
+    goals: reportContext.goals,
+    issues: reportContext.issues,
+    healthSituations: healthSituationsText,
+    allergies: reportContext.allergies,
+    diabetesType: reportContext.diabetesType,
+    supplements: reportContext.supplements,
+    medications: reportContext.medications,
+    nutritionSummary: {
+      dailyAverages: nutritionSummary.dailyAverages,
+      daysWithLogs: nutritionSummary.daysWithLogs,
+      topFoods: nutritionSummary.topFoods,
+      dailyTotals: (nutritionSummary.dailyTotals || []).slice(0, 7),
+    },
+    hydrationSummary: {
+      dailyAverageMl: hydrationSummary.dailyAverageMl,
+      daysWithLogs: hydrationSummary.daysWithLogs,
+      topDrinks: hydrationSummary.topDrinks,
+      dailyTotals: (hydrationSummary.dailyTotals || []).slice(0, 7),
+    },
+    foodHighlights,
+    foodLogSample: reportContext.foodLogSample,
+    dailyStats: compactDailyStats,
+    mealTimingSummary,
+    timeOfDayNutrition,
+    correlationSignals,
+    trendSignals,
+    riskFlags,
+    overlapSignals: reportContext.overlapSignals,
+    checkinSummary,
+    moodSummary,
+    symptomSummary,
+    exerciseSummary,
+    dataFlags,
+    insightCandidates: insightCandidates.slice(0, 16),
+    talkToAi: {
+      userMessageCount: talkToAiSummary.userMessageCount,
+      activeDays: talkToAiSummary.activeDays,
+      topics: talkToAiSummary.topics,
+      highlights: talkToAiSummary.highlights,
+    },
+    journalSummary,
+    journalDigest,
+    journalEntries: reportContext.journalEntries,
+    timezone,
+  }
+  const trimmedLlmContext = trimLlmContext(llmContext)
+
   const rawModel = String(process.env.OPENAI_WEEKLY_REPORT_MODEL || '').trim()
   const model = rawModel.toLowerCase().includes('gpt-5.2') ? rawModel : 'gpt-5.2-chat-latest'
   const weeklyLlmRaw = (process.env.ENABLE_WEEKLY_REPORT_LLM || '').toLowerCase().trim()
@@ -2343,7 +2561,7 @@ export async function POST(request: NextRequest) {
 
 Generate a 7-day health report in plain language with this exact JSON shape:
 {
-  "summary": "6-9 sentences that explain the main patterns, key wins, and the biggest gaps",
+  "summary": "6-10 short bullet points separated by new lines",
   "wins": [{"name": "", "reason": ""}],
   "gaps": [{"name": "", "reason": ""}],
   "sections": {
@@ -2363,10 +2581,13 @@ Generate a 7-day health report in plain language with this exact JSON shape:
 Rules:
 - Write in simple, everyday English. No medical jargon.
 - Every sentence must reference a specific data point (numbers, dates, logged items, or named goals/issues).
-- Each item should be 2-3 short sentences: what happened, why it matters, and a clear next step.
+- When you mention a day or event, include the date or time from the data.
+- Each item should be two short lines: line 1 = what happened and why it matters, line 2 = clear next step.
 - Use real signals from the JSON data. No generic advice.
 - Use insightCandidates, correlationSignals, trendSignals, and riskFlags as your primary signals when available.
-- If journalEntries exist, include at least 2 items that quote the note with date/time and link it to the same day's food, fluids, supplements, exercise, mood, symptoms, or check-ins.
+- Use nutritionSummary.topFoods, foodHighlights, and dailyStats.topFoods to name actual foods (not just calories).
+- Do not ask the user what they ate or to log meals. Use the foods already in the data.
+- If journalEntries exist, include at least 2 items that quote the note with date/time and link it to the same day's foods, fluids, exercise, mood, symptoms, or check-ins.
 - Do not list raw log counts or repeat "you logged X entries" unless it directly supports a pattern or gap.
 - Avoid telling the user to "keep logging" unless a section has no usable data.
 - If sectionSignals show data for a section, include 2-3 items in "working" or "suggested" when there is enough data; otherwise include at least 1.
@@ -2384,7 +2605,7 @@ Rules:
 - Do not tell the user how to navigate the app or where to find logs.
 
 JSON data:
-${JSON.stringify(reportContext)}
+${JSON.stringify(trimmedLlmContext)}
 `
 
       const isGpt5 = model.toLowerCase().includes('gpt-5')

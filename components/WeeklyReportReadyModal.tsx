@@ -22,6 +22,13 @@ export default function WeeklyReportReadyModal() {
   const [isOpen, setIsOpen] = useState(false)
   const [dismissNote, setDismissNote] = useState<string | null>(null)
 
+  const formatDateForLocale = (value?: string | null) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
+  }
+
   useEffect(() => {
     if (!pathname) return
     if (DISABLED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return
@@ -32,6 +39,15 @@ export default function WeeklyReportReadyModal() {
       .then((data) => {
         if (!mounted || !data) return
         if (data.showPopup && data.reportId) {
+          const viewedKey = `helfi-weekly-report-viewed:${data.reportId}`
+          const dismissedKey = `helfi-weekly-report-dismissed:${data.reportId}`
+          try {
+            if (window.sessionStorage.getItem(viewedKey) || window.sessionStorage.getItem(dismissedKey)) {
+              return
+            }
+          } catch {
+            // ignore storage errors
+          }
           setStatus(data)
           setIsOpen(true)
           fetch('/api/reports/weekly/notify', {
@@ -59,6 +75,11 @@ export default function WeeklyReportReadyModal() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reportId: status.reportId, action: 'viewed' }),
     }).catch(() => {})
+    try {
+      window.sessionStorage.setItem(`helfi-weekly-report-viewed:${status.reportId}`, '1')
+    } catch {
+      // ignore
+    }
     setIsOpen(false)
     router.push(
       isLocked ? '/billing' : `/insights/weekly-report?id=${encodeURIComponent(status.reportId ?? '')}`
@@ -71,7 +92,12 @@ export default function WeeklyReportReadyModal() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reportId: status.reportId, action: 'dont_show' }),
     }).catch(() => {})
-    setDismissNote('All good — this report stays in your Insights section whenever you need it.')
+    try {
+      window.sessionStorage.setItem(`helfi-weekly-report-dismissed:${status.reportId}`, '1')
+    } catch {
+      // ignore
+    }
+    setDismissNote('All good - this report stays in your Insights section whenever you need it.')
   }
 
   return (
@@ -84,7 +110,7 @@ export default function WeeklyReportReadyModal() {
             </h2>
             {status.periodStart && status.periodEnd && (
               <p className="text-xs text-gray-500 mt-1">
-                {status.periodStart} to {status.periodEnd}
+                {formatDateForLocale(status.periodStart)} to {formatDateForLocale(status.periodEnd)}
               </p>
             )}
           </div>

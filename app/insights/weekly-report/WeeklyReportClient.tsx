@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WeeklyReportRecord } from '@/lib/weekly-health-report'
 
 const SECTIONS = [
@@ -40,8 +40,12 @@ function SectionBucket({ title, items }: { title: string; items: Array<{ name?: 
     <div className="space-y-3">
       {items.map((item, idx) => (
         <div key={`${title}-${idx}`} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="font-semibold text-gray-900">{item.name || 'Insight'}</div>
-          <p className="text-sm text-gray-600 mt-1">{item.reason || 'Keep logging for more detail.'}</p>
+          <div className="font-semibold text-gray-900">{replaceIsoDates(item.name || 'Insight')}</div>
+          <div className="mt-1 space-y-1 text-sm text-gray-600">
+            {(splitIntoLines(item.reason || 'Keep logging for more detail.') || []).map((line, lineIdx) => (
+              <p key={`${title}-${idx}-line-${lineIdx}`}>{line}</p>
+            ))}
+          </div>
         </div>
       ))}
     </div>
@@ -58,11 +62,56 @@ function formatMl(value: number | null | undefined) {
   return `${Math.round(ml)} ml`
 }
 
+function formatDateForLocale(value?: string | Date | null) {
+  if (!value) return ''
+  const date = typeof value === 'string' ? new Date(value) : value
+  if (Number.isNaN(date.getTime())) return String(value)
+  return new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
+}
+
+function formatDateRange(start?: string | null, end?: string | null) {
+  const startText = start ? formatDateForLocale(start) : ''
+  const endText = end ? formatDateForLocale(end) : ''
+  if (startText && endText) return `${startText} to ${endText}`
+  return startText || endText || ''
+}
+
+function replaceIsoDates(text: string) {
+  if (!text) return ''
+  return text.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_match, y, m, d) => {
+    const date = new Date(Number(y), Number(m) - 1, Number(d))
+    if (Number.isNaN(date.getTime())) return `${y}-${m}-${d}`
+    return formatDateForLocale(date)
+  })
+}
+
+function splitIntoPoints(text: string) {
+  const cleaned = replaceIsoDates(text).replace(/\r/g, '').trim()
+  if (!cleaned) return []
+  const lines = cleaned.split(/\n+/)
+  const points = lines.flatMap((line) => {
+    const normalized = line.replace(/([.!?])\s+(?=[A-Z0-9])/g, '$1|')
+    return normalized.split('|')
+  })
+  return points.map((line) => line.trim()).filter(Boolean)
+}
+
+function splitIntoLines(text: string) {
+  const cleaned = replaceIsoDates(text).replace(/\r/g, '').trim()
+  if (!cleaned) return []
+  const lines = cleaned.split(/\n+/)
+  return lines.map((line) => line.trim()).filter(Boolean)
+}
+
 export default function WeeklyReportClient({ report, reports, nextReportDueAt, canManualReport }: WeeklyReportClientProps) {
   const [activeTab, setActiveTab] = useState<SectionKey>('overview')
   const router = useRouter()
   const [manualStatus, setManualStatus] = useState<'idle' | 'running' | 'error'>('idle')
   const [manualMessage, setManualMessage] = useState<string | null>(null)
+  const [progressPercent, setProgressPercent] = useState(0)
+  const [progressStage, setProgressStage] = useState('Getting your data')
+  const [progressActive, setProgressActive] = useState(false)
+  const progressTimerRef = useRef<number | null>(null)
 
   const payload = useMemo(() => {
     if (!report || !report.report) return null
@@ -89,6 +138,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
       }
     }
     const priority: Array<{ key: SectionKey; label: string }> = [
+      { key: 'overview', label: 'Overview' },
       { key: 'nutrition', label: 'Nutrition' },
       { key: 'hydration', label: 'Hydration' },
       { key: 'exercise', label: 'Exercise' },
@@ -180,17 +230,60 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
     return `/api/reports/weekly/pdf?reportId=${encodeURIComponent(report.id)}`
   }, [report])
 
+  const updateProgressStage = (percent: number) => {
+    if (percent < 25) return 'Getting your data'
+    if (percent < 55) return 'Finding patterns'
+    if (percent < 80) return 'Writing your report'
+    return 'Final checks'
+  }
+
+  const startProgress = () => {
+    setProgressActive(true)
+    setProgressPercent(10)
+    setProgressStage('Getting your data')
+    if (progressTimerRef.current) {
+      window.clearInterval(progressTimerRef.current)
+    }
+    progressTimerRef.current = window.setInterval(() => {
+      setProgressPercent((prev) => {
+        const next = Math.min(prev + 4, 95)
+        setProgressStage(updateProgressStage(next))
+        return next
+      })
+    }, 900)
+  }
+
+  const stopProgress = (success: boolean) => {
+    if (progressTimerRef.current) {
+      window.clearInterval(progressTimerRef.current)
+      progressTimerRef.current = null
+    }
+    if (success) {
+      setProgressPercent(100)
+      setProgressStage('Done')
+      window.setTimeout(() => {
+        setProgressActive(false)
+      }, 1200)
+    } else {
+      setProgressActive(false)
+      setProgressPercent(0)
+    }
+  }
+
   const runManualReport = async () => {
     if (manualStatus === 'running') return
     setManualStatus('running')
-    setManualMessage(null)
+    setManualMessage('Creating your report now. This can take a minute.')
+    startProgress()
     let navigated = false
+    let success = false
     try {
       const res = await fetch('/api/reports/weekly/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ triggerSource: 'manual' }),
       })
+      success = res.ok
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to start report')
@@ -206,11 +299,37 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
       setManualMessage('Could not start the report. Please try again in a moment.')
       return
     } finally {
+      stopProgress(success && !navigated)
       if (!navigated) {
         setManualStatus('idle')
       }
     }
   }
+
+  useEffect(() => {
+    if (!report?.id) return
+    const storageKey = `helfi-weekly-report-viewed:${report.id}`
+    if (typeof window !== 'undefined' && window.sessionStorage?.getItem(storageKey)) return
+    try {
+      window.sessionStorage.setItem(storageKey, '1')
+    } catch {
+      // ignore
+    }
+    fetch('/api/reports/weekly/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reportId: report.id, action: 'viewed' }),
+    }).catch(() => {})
+  }, [report?.id])
+
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) {
+        window.clearInterval(progressTimerRef.current)
+        progressTimerRef.current = null
+      }
+    }
+  }, [])
 
   if (!report) {
     return (
@@ -222,7 +341,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           </p>
           {nextReportDueAt && (
             <p className="text-sm text-gray-500 mt-4">
-              Next report due: {new Date(nextReportDueAt).toLocaleDateString()}
+              Next report due: {formatDateForLocale(nextReportDueAt)}
             </p>
           )}
           <a
@@ -234,13 +353,29 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             Download PDF (current data)
           </a>
           {canManualReport && (
-            <button
-              onClick={runManualReport}
-              disabled={manualStatus === 'running'}
-              className="inline-flex mt-4 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
-            >
-              {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
-            </button>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                onClick={runManualReport}
+                disabled={manualStatus === 'running'}
+                className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
+              >
+                {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
+              </button>
+              {progressActive && (
+                <div className="w-full max-w-xs">
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>{progressStage}</span>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <div className="mt-1 h-2 w-full rounded-full bg-gray-200">
+                    <div
+                      className="h-2 rounded-full bg-emerald-500"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           {manualMessage && (
             <p className="text-sm text-red-600 mt-3">{manualMessage}</p>
@@ -314,13 +449,29 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             We could not generate this report. Please try again later.
           </p>
           {canManualReport && (
-            <button
-              onClick={runManualReport}
-              disabled={manualStatus === 'running'}
-              className="inline-flex mt-4 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
-            >
-              {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
-            </button>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                onClick={runManualReport}
+                disabled={manualStatus === 'running'}
+                className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
+              >
+                {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
+              </button>
+              {progressActive && (
+                <div className="w-full max-w-xs">
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>{progressStage}</span>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <div className="mt-1 h-2 w-full rounded-full bg-gray-200">
+                    <div
+                      className="h-2 rounded-full bg-emerald-500"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           {manualMessage && (
             <p className="text-sm text-red-600 mt-3">{manualMessage}</p>
@@ -354,6 +505,9 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
   const hydrationTotal = hydrationSummary?.totalMl ?? 0
   const hydrationAverage = hydrationSummary?.dailyAverageMl ?? 0
   const hydrationTop = Array.isArray(hydrationSummary?.topDrinks) ? hydrationSummary?.topDrinks : []
+  const summaryText = report.summary || payload?.summary || 'Summary coming soon.'
+  const summaryPoints = splitIntoPoints(summaryText)
+  const periodRangeLabel = formatDateRange(report.periodStart, report.periodEnd)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -362,18 +516,34 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           <div>
             <h1 className="text-3xl font-bold text-gray-900">7-day health report</h1>
             <p className="text-sm text-gray-600 mt-1">
-              {report.periodStart} to {report.periodEnd}
+              {periodRangeLabel}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             {canManualReport && (
-              <button
-                onClick={runManualReport}
-                disabled={manualStatus === 'running'}
-                className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
-              >
-                {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={runManualReport}
+                  disabled={manualStatus === 'running'}
+                  className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
+                >
+                  {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
+                </button>
+                {progressActive && (
+                  <div className="w-full max-w-xs">
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>{progressStage}</span>
+                      <span>{progressPercent}%</span>
+                    </div>
+                    <div className="mt-1 h-2 w-full rounded-full bg-gray-200">
+                      <div
+                        className="h-2 rounded-full bg-emerald-500"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           {pdfHref && (
             <a
@@ -469,7 +639,15 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
 
         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Weekly summary</h2>
-          <p className="text-sm text-gray-600 mt-2">{report.summary || payload?.summary || 'Summary coming soon.'}</p>
+          {summaryPoints.length > 0 ? (
+            <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-gray-600">
+              {summaryPoints.map((point, idx) => (
+                <li key={`summary-point-${idx}`}>{point}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-600 mt-2">{replaceIsoDates(summaryText)}</p>
+          )}
           {estimatedCost && (
             <p className="text-xs text-gray-500 mt-2">
               Estimated AI cost for this report: ${estimatedCost}
@@ -489,8 +667,12 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     {insight.label}
                   </div>
-                  <div className="mt-2 font-semibold text-gray-900">{insight.name || 'Insight'}</div>
-                  <p className="mt-1 text-sm text-gray-600">{insight.reason || ''}</p>
+                  <div className="mt-2 font-semibold text-gray-900">{replaceIsoDates(insight.name || 'Insight')}</div>
+                  <div className="mt-1 space-y-1 text-sm text-gray-600">
+                    {splitIntoLines(insight.reason || '').map((line, lineIdx) => (
+                      <p key={`key-insight-${idx}-line-${lineIdx}`}>{line}</p>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -566,8 +748,12 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
                 )}
                 {wins.map((item: any, idx: number) => (
                   <div key={`win-${idx}`} className="rounded-xl border border-emerald-100 bg-white p-4">
-                    <div className="font-semibold text-emerald-900">{item.name || 'Win'}</div>
-                    <p className="text-sm text-emerald-800 mt-1">{item.reason || ''}</p>
+                    <div className="font-semibold text-emerald-900">{replaceIsoDates(item.name || 'Win')}</div>
+                    <div className="mt-1 space-y-1 text-sm text-emerald-800">
+                      {splitIntoLines(item.reason || '').map((line, lineIdx) => (
+                        <p key={`win-${idx}-line-${lineIdx}`}>{line}</p>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -581,8 +767,12 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
                 )}
                 {gaps.map((item: any, idx: number) => (
                   <div key={`gap-${idx}`} className="rounded-xl border border-amber-100 bg-white p-4">
-                    <div className="font-semibold text-amber-900">{item.name || 'Gap'}</div>
-                    <p className="text-sm text-amber-800 mt-1">{item.reason || ''}</p>
+                    <div className="font-semibold text-amber-900">{replaceIsoDates(item.name || 'Gap')}</div>
+                    <div className="mt-1 space-y-1 text-sm text-amber-800">
+                      {splitIntoLines(item.reason || '').map((line, lineIdx) => (
+                        <p key={`gap-${idx}-line-${lineIdx}`}>{line}</p>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -640,8 +830,10 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
                     href={`/insights/weekly-report?id=${encodeURIComponent(item.id)}`}
                     className="block hover:text-helfi-green"
                   >
-                    <div className="font-semibold">{item.periodStart} to {item.periodEnd}</div>
-                    <div className="text-xs text-gray-500 mt-1">Generated {new Date(item.createdAt).toLocaleDateString()}</div>
+                    <div className="font-semibold">{formatDateRange(item.periodStart, item.periodEnd)}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Generated {formatDateForLocale(item.createdAt)}
+                    </div>
                   </Link>
                   <div className="mt-3 flex items-center gap-3">
                     <a

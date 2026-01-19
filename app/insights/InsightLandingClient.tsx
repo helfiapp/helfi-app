@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState, useTransition, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import type { IssueSummary, InsightDataNeed } from '@/lib/insights/issue-engine'
 import InsightsTopNav from './InsightsTopNav'
@@ -35,6 +35,10 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const [isCreatingReport, setIsCreatingReport] = useState(false)
   const [createReportMessage, setCreateReportMessage] = useState<string | null>(null)
   const [createReportError, setCreateReportError] = useState(false)
+  const [progressPercent, setProgressPercent] = useState(0)
+  const [progressStage, setProgressStage] = useState('Getting your data')
+  const [progressActive, setProgressActive] = useState(false)
+  const progressTimerRef = useRef<number | null>(null)
   const [countdown, setCountdown] = useState<{
     days: number
     hours: number
@@ -124,6 +128,15 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     return () => clearInterval(interval)
   }, [weeklyStatus?.nextReportDueAt])
 
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) {
+        window.clearInterval(progressTimerRef.current)
+        progressTimerRef.current = null
+      }
+    }
+  }, [])
+
   async function handleUpdateInsights() {
     if (isUpdating) return
     
@@ -154,11 +167,52 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     }
   }
 
+  const updateProgressStage = (percent: number) => {
+    if (percent < 25) return 'Getting your data'
+    if (percent < 55) return 'Finding patterns'
+    if (percent < 80) return 'Writing your report'
+    return 'Final checks'
+  }
+
+  const startProgress = () => {
+    setProgressActive(true)
+    setProgressPercent(10)
+    setProgressStage('Getting your data')
+    if (progressTimerRef.current) {
+      window.clearInterval(progressTimerRef.current)
+    }
+    progressTimerRef.current = window.setInterval(() => {
+      setProgressPercent((prev) => {
+        const next = Math.min(prev + 4, 95)
+        setProgressStage(updateProgressStage(next))
+        return next
+      })
+    }, 900)
+  }
+
+  const stopProgress = (success: boolean) => {
+    if (progressTimerRef.current) {
+      window.clearInterval(progressTimerRef.current)
+      progressTimerRef.current = null
+    }
+    if (success) {
+      setProgressPercent(100)
+      setProgressStage('Done')
+      window.setTimeout(() => {
+        setProgressActive(false)
+      }, 1200)
+    } else {
+      setProgressActive(false)
+      setProgressPercent(0)
+    }
+  }
+
   async function handleCreateReportNow() {
     if (isCreatingReport) return
     setIsCreatingReport(true)
     setCreateReportError(false)
     setCreateReportMessage('Creating your report now. This can take a minute.')
+    startProgress()
     try {
       const response = await fetch('/api/reports/weekly/run', {
         method: 'POST',
@@ -171,6 +225,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       } catch {
         data = null
       }
+      const success = response.ok
       if (response.ok) {
         const status = String(data?.status || '').toLowerCase()
         if (status === 'locked') {
@@ -192,9 +247,11 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
             : 'Sorry, we could not create the report right now. Please try again in a minute.'
         setCreateReportMessage(friendly)
       }
+      stopProgress(success)
     } catch (error) {
       setCreateReportError(true)
       setCreateReportMessage('Sorry, we could not create the report right now.')
+      stopProgress(false)
     } finally {
       setIsCreatingReport(false)
     }
@@ -250,10 +307,16 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     })
   }
 
+  const formatDateForLocale = (value?: string | number | null) => {
+    if (!value) return ''
+    const date = typeof value === 'number' ? new Date(value) : new Date(value)
+    if (Number.isNaN(date.getTime())) return String(value)
+    return new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
+  }
   const padTime = (value: number) => String(value).padStart(2, '0')
   const dueDateLabel = countdown?.dueAtMs
-    ? new Date(countdown.dueAtMs).toLocaleDateString()
-    : weeklyStatus?.nextReportDueAt
+    ? formatDateForLocale(countdown.dueAtMs)
+    : formatDateForLocale(weeklyStatus?.nextReportDueAt || '')
     ? new Date(weeklyStatus.nextReportDueAt).toLocaleDateString()
     : null
 
@@ -398,6 +461,20 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   >
                     {isCreatingReport || isReportRunning ? 'Creating report...' : 'Create report now'}
                   </button>
+                  {progressActive && (
+                    <div className="w-full max-w-xs">
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>{progressStage}</span>
+                        <span>{progressPercent}%</span>
+                      </div>
+                      <div className="mt-1 h-2 w-full rounded-full bg-gray-200">
+                        <div
+                          className="h-2 rounded-full bg-emerald-500"
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                   <span className="text-xs text-gray-400">Makes a fresh report from your last 7 days.</span>
                 </div>
               )}
