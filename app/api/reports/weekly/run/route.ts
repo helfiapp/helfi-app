@@ -2679,7 +2679,7 @@ export async function POST(request: NextRequest) {
     sectionSignals: reportContext.sectionSignals,
     nutritionSignals,
   }
-  const MAX_LLM_CONTEXT_CHARS = 45000
+  const MAX_LLM_CONTEXT_CHARS = 120000
   const { json: llmPayloadJson, size: llmPayloadSize } = buildLlmPayload(llmContext, MAX_LLM_CONTEXT_CHARS)
 
   const rawModel = String(process.env.OPENAI_WEEKLY_REPORT_MODEL || '').trim()
@@ -2691,7 +2691,14 @@ export async function POST(request: NextRequest) {
   let llmUsage: { promptTokens: number; completionTokens: number; costCents: number; model: string } | null = null
 
   const llmPayloadReady = Boolean(llmPayloadJson) && llmPayloadSize <= MAX_LLM_CONTEXT_CHARS
-  if (llmEnabled && process.env.OPENAI_API_KEY && llmPayloadReady) {
+  let llmStatus: 'ok' | 'disabled' | 'missing_key' | 'payload_too_large' | 'error' = 'disabled'
+  if (!llmEnabled) {
+    llmStatus = 'disabled'
+  } else if (!process.env.OPENAI_API_KEY) {
+    llmStatus = 'missing_key'
+  } else if (!llmPayloadReady) {
+    llmStatus = 'payload_too_large'
+  } else {
     try {
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
       const prompt = `You are a careful, data-driven health coach. Use ONLY the JSON data provided.
@@ -2766,6 +2773,7 @@ ${llmPayloadJson}
         costCents,
         model,
       }
+      llmStatus = 'ok'
 
       const content = completion.choices?.[0]?.message?.content || ''
       const parsed = safeJsonParse(content)
@@ -2775,8 +2783,10 @@ ${llmPayloadJson}
       }
     } catch (error) {
       console.warn('[weekly-report] LLM generation failed', error)
+      llmStatus = 'error'
     }
-  } else if (llmEnabled && !llmPayloadReady) {
+  }
+  if (llmEnabled && !llmPayloadReady) {
     console.warn('[weekly-report] LLM payload too large', {
       size: llmPayloadSize,
       max: MAX_LLM_CONTEXT_CHARS,
@@ -2853,6 +2863,9 @@ ${llmPayloadJson}
         labTrends,
         labHighlights,
         llmUsage,
+        llmStatus,
+        llmPayloadSize,
+        llmPayloadMax: MAX_LLM_CONTEXT_CHARS,
         lockedReason: 'insufficient_credits',
       },
       report: null,
@@ -2885,6 +2898,9 @@ ${llmPayloadJson}
       labTrends,
       labHighlights,
       llmUsage,
+      llmStatus,
+      llmPayloadSize,
+      llmPayloadMax: MAX_LLM_CONTEXT_CHARS,
       ...(chargeFailed ? { chargeSkipped: true } : {}),
     },
     report: reportPayload,
