@@ -5982,10 +5982,14 @@ export default function FoodDiary() {
     const tokenMatches = (token: string, word: string) => {
       if (!token || !word) return false
       if (word.startsWith(token)) return true
+      if (token.startsWith(word)) return true // Also match if the query token starts with the word
       const singular = singularizeToken(token)
       if (singular !== token && word.startsWith(singular)) return true
+      if (singular !== token && singular.startsWith(word)) return true
       if (token.length >= 4 && word.includes(token)) return true
       if (singular.length >= 4 && word.includes(singular)) return true
+      // For full words (4+ chars), also allow if word contains the token
+      if (word.length >= 4 && token.includes(word)) return true
       return false
     }
     const requireFirstWord = options?.requireFirstWord ?? false
