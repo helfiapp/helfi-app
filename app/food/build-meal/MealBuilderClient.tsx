@@ -1032,7 +1032,7 @@ export default function MealBuilderClient() {
     setSearchLoading(true)
     try {
       const matches = await fetchSearchItems(lookup, { kindOverride: 'single', sourceOverride: 'usda' })
-      const filtered = matches.filter((candidate) => candidate?.source === 'usda')
+      const filtered = (matches as NormalizedFoodItem[]).filter((candidate) => candidate?.source === 'usda')
       const best =
         filtered.find((candidate) => nameMatchesSearchQuery(candidate?.name || '', lookup, { requireFirstWord: false })) ||
         filtered[0] ||
