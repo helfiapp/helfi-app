@@ -45,8 +45,8 @@ export type FeaturePageContent = {
   heroImage: FeaturePageImage
   bannerImage?: FeaturePageImage
   carouselImages?: FeaturePageImage[]
-  bannerSpacerHeight?: string
   bannerLayout?: 'carousel' | 'grid'
+  bannerPresentation?: 'background' | 'full'
   showHeroImage?: boolean
   showSegmentImages?: boolean
   overviewLayout?: 'default' | 'expanded'
@@ -1719,7 +1719,7 @@ export const featurePages: FeaturePageContent[] = [
       height: 660,
       kind: 'photo',
     },
-    bannerSpacerHeight: 'h-[420px]',
+    bannerPresentation: 'full',
     primaryCta,
     secondaryCta,
     capabilities: [
