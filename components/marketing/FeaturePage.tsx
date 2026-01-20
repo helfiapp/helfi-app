@@ -29,8 +29,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   const hasBanner = !!page.bannerImage
   const hasCarousel = !!page.carouselImages && page.carouselImages.length > 0
   const bannerLayout = page.bannerLayout ?? 'carousel'
-  const bannerPresentation = page.bannerPresentation ?? 'background'
-  const bannerHeight = page.bannerHeight
+  const bannerSpacerHeight = page.bannerSpacerHeight ?? 'h-36 md:h-44'
   const ctaPlacement = page.ctaPlacement ?? 'text'
   const overviewPaddingClass = page.overviewSpacing === 'spacious' ? 'pt-16 md:pt-20' : 'pt-10'
   const ctaButtonsClass = ctaPlacement === 'image' ? 'mt-6 flex flex-wrap gap-3' : 'flex flex-wrap gap-3 mt-8'
@@ -82,57 +81,30 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
       <main>
         {hasBanner && page.bannerImage && (
           <section id="gallery" className="relative w-full overflow-hidden">
-            {bannerPresentation === 'full' ? (
-              <div className="relative w-full" style={bannerHeight ? { height: bannerHeight } : undefined}>
-                {bannerHeight ? (
-                  <Image
-                    src={page.bannerImage.src}
-                    alt={page.bannerImage.alt}
-                    fill
-                    sizes="100vw"
-                    className="object-contain"
-                    priority
-                  />
+            <div className="absolute inset-0">
+              <Image
+                src={page.bannerImage.src}
+                alt={page.bannerImage.alt}
+                fill
+                sizes="100vw"
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0 bg-black/35" />
+            </div>
+            <div className="relative z-10 px-6 py-12 md:py-16">
+              <div className="max-w-6xl mx-auto">
+                {hasCarousel && page.carouselImages ? (
+                  bannerLayout === 'grid' ? (
+                    <MockupGallery images={page.carouselImages} />
+                  ) : (
+                    <MockupCarousel images={page.carouselImages} />
+                  )
                 ) : (
-                  <Image
-                    src={page.bannerImage.src}
-                    alt={page.bannerImage.alt}
-                    width={page.bannerImage.width ?? 1600}
-                    height={page.bannerImage.height ?? 700}
-                    sizes="100vw"
-                    className="w-full h-auto object-contain"
-                    priority
-                  />
+                  <div className={bannerSpacerHeight} />
                 )}
               </div>
-            ) : (
-              <>
-                <div className="absolute inset-0">
-                  <Image
-                    src={page.bannerImage.src}
-                    alt={page.bannerImage.alt}
-                    fill
-                    sizes="100vw"
-                    className="object-cover"
-                    priority
-                  />
-                  <div className="absolute inset-0 bg-black/35" />
-                </div>
-                <div className="relative z-10 px-6 py-12 md:py-16">
-                  <div className="max-w-6xl mx-auto">
-                    {hasCarousel && page.carouselImages ? (
-                      bannerLayout === 'grid' ? (
-                        <MockupGallery images={page.carouselImages} />
-                      ) : (
-                        <MockupCarousel images={page.carouselImages} />
-                      )
-                    ) : (
-                      <div className="h-36 md:h-44" />
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
+            </div>
           </section>
         )}
         <section id="overview" className={`px-6 ${overviewPaddingClass} pb-12`}>
