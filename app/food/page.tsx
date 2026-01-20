@@ -6307,32 +6307,31 @@ export default function FoodDiary() {
       // Ignore late responses from older searches.
       if (officialSearchSeqRef.current !== seq) return
 
-      let nextItems = Array.isArray(data.items) ? data.items : []
+      let baseItems = Array.isArray(data.items) ? data.items : []
       if (mode === 'single') {
-        nextItems = nextItems.filter((item: any) => item?.source === 'usda')
-        if (nextItems.length === 0) {
+        baseItems = baseItems.filter((item: any) => item?.source === 'usda')
+        if (baseItems.length === 0) {
           const fallback = buildSingleFoodFallback(query)
           if (fallback) {
             const retry = await fetchItems(fallback)
             if (retry.res.ok) {
               data = await retry.res.json()
-              nextItems = Array.isArray(data.items) ? data.items : []
-              nextItems = nextItems.filter((item: any) => item?.source === 'usda')
+              baseItems = Array.isArray(data.items) ? data.items : []
+              baseItems = baseItems.filter((item: any) => item?.source === 'usda')
             }
           }
         }
       }
 
-      if (hasToken) {
-        nextItems = nextItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode))
-      }
+      const filteredItems = hasToken ? baseItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : baseItems
+      const finalItems = mode === 'single' && filteredItems.length === 0 && baseItems.length > 0 ? baseItems : filteredItems
 
       const brandMatches =
         mode === 'packaged' && hasToken
           ? await fetchOfficialBrandSuggestions(query)
           : []
 
-      const merged = mode === 'packaged' ? mergeBrandSuggestions(nextItems, brandMatches) : nextItems
+      const merged = mode === 'packaged' ? mergeBrandSuggestions(finalItems, brandMatches) : finalItems
 
       const finalResults = mode === 'single' ? mergeSearchSuggestions(merged, query) : merged
       if (officialSearchSeqRef.current !== seq) return
@@ -6344,7 +6343,7 @@ export default function FoodDiary() {
               ...prev,
               status: res.status,
               source: data?.source || 'auto',
-              itemCount: nextItems.length,
+              itemCount: finalItems.length,
             }
           : prev,
       )

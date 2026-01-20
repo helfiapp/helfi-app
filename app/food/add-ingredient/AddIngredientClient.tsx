@@ -782,32 +782,31 @@ export default function AddIngredientClient() {
         return
       }
       if (seqRef.current !== seq) return
-      let nextResults = Array.isArray(data?.items) ? data.items : []
+      let baseResults = Array.isArray(data?.items) ? data.items : []
       if (k === 'single') {
-        nextResults = nextResults.filter((item: NormalizedFoodItem) => item?.source === 'usda')
-        if (nextResults.length === 0) {
+        baseResults = baseResults.filter((item: NormalizedFoodItem) => item?.source === 'usda')
+        if (baseResults.length === 0) {
           const fallback = buildSingleFoodFallback(q)
           if (fallback) {
             const retry = await fetchItems(fallback)
             if (retry.res.ok) {
               const retryItems = Array.isArray(retry.data?.items) ? retry.data.items : []
-              nextResults = retryItems.filter((item: NormalizedFoodItem) => item?.source === 'usda')
+              baseResults = retryItems.filter((item: NormalizedFoodItem) => item?.source === 'usda')
             }
           }
         }
       }
       const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
-      if (hasToken) {
-        nextResults = nextResults.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k))
-      }
+      const filteredResults = hasToken ? baseResults.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k)) : baseResults
+      const finalResults = k === 'single' && filteredResults.length === 0 && baseResults.length > 0 ? baseResults : filteredResults
       const brandMatches =
         k === 'packaged' && hasToken
           ? await fetchBrandSuggestions(q)
           : []
       const merged =
         k === 'packaged'
-          ? mergeBrandSuggestions(nextResults, brandMatches)
-          : mergeSearchSuggestions(nextResults, q)
+          ? mergeBrandSuggestions(finalResults, brandMatches)
+          : mergeSearchSuggestions(finalResults, q)
       if (seqRef.current !== seq) return
       setResults(merged)
     } catch (e: any) {

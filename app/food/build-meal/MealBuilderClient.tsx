@@ -887,25 +887,31 @@ export default function MealBuilderClient() {
     try {
       let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
+      const rawItems = nextItems
       const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
-      if (hasToken) {
-        nextItems = nextItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind))
+      let filteredItems = hasToken ? nextItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : nextItems
+      if (kind === 'single' && filteredItems.length === 0 && rawItems.length > 0) {
+        filteredItems = rawItems
       }
-      if (nextItems.length === 0 && kind === 'single') {
+      if (filteredItems.length === 0 && kind === 'single') {
         try {
           const lastWord = getLastSearchToken(q)
           if (lastWord && lastWord !== q && lastWord.length >= 2) {
             const fallbackItems = await fetchSearchItems(lastWord)
             if (seqRef.current === seq) {
-              nextItems = fallbackItems.filter((item: NormalizedFoodItem) => nameMatchesSearchQuery(item.name || '', lastWord))
+              const fallbackFiltered =
+                hasToken && fallbackItems.length > 0
+                  ? fallbackItems.filter((item: NormalizedFoodItem) => nameMatchesSearchQuery(item.name || '', lastWord))
+                  : fallbackItems
+              filteredItems = fallbackFiltered.length > 0 ? fallbackFiltered : fallbackItems
             }
           }
         } catch {}
       }
       const merged =
         kind === 'single'
-          ? mergeSearchSuggestions(nextItems, q)
-          : mergeBrandSuggestions(nextItems, brandSuggestionsRef.current)
+          ? mergeSearchSuggestions(filteredItems, q)
+          : mergeBrandSuggestions(filteredItems, brandSuggestionsRef.current)
       if (seqRef.current !== seq) return
       setResults(merged)
       return merged
