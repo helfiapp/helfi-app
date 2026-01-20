@@ -6317,7 +6317,7 @@ export default function FoodDiary() {
         }
       }
 
-      if (hasToken) {
+      if (hasToken && mode === 'packaged') {
         nextItems = nextItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode))
       }
 

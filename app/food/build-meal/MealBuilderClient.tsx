@@ -882,7 +882,7 @@ export default function MealBuilderClient() {
       let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
       const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
-      if (hasToken) {
+      if (hasToken && kind === 'packaged') {
         nextItems = nextItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind))
       }
       if (nextItems.length === 0 && kind === 'single') {

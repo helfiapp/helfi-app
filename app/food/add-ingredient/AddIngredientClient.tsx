@@ -791,7 +791,7 @@ export default function AddIngredientClient() {
         }
       }
       const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
-      if (hasToken) {
+      if (hasToken && k === 'packaged') {
         nextResults = nextResults.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k))
       }
       const brandMatches =
