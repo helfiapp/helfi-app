@@ -439,110 +439,85 @@ function sliceList<T>(value: T[] | undefined | null, max: number) {
   return Array.isArray(value) ? value.slice(0, max) : value
 }
 
-function trimFoodHighlights(
-  highlights: { overallTopFoods?: Array<any>; dailyTopFoods?: Array<any> } | null | undefined,
-  maxOverall: number,
-  maxDays: number,
-  maxPerDay: number
-) {
-  if (!highlights) return highlights
-  const overallTopFoods = sliceList(highlights.overallTopFoods, maxOverall) || []
-  const dailyTopFoods = (sliceList(highlights.dailyTopFoods, maxDays) || []).map((day: any) => ({
-    date: day?.date,
-    foods: sliceList(day?.foods, maxPerDay) || [],
+function buildReportSignals(params: {
+  reportContext: any
+  nutritionSummary: any
+  hydrationSummary: any
+  exerciseSummary: any
+  moodSummary: any
+  symptomSummary: any
+  checkinSummary: any
+  mealTimingSummary: any
+  timeOfDayNutrition: any
+  correlationSignals: any
+  trendSignals: any
+  riskFlags: any
+  dataFlags: any
+  overlapSignals: any
+  labHighlights: any
+  labTrends: any
+  insightCandidates: any
+  talkToAiSummary: any
+  journalEntries: Array<{ content: string; createdAt: Date; localDate?: string | null; time?: string | null }>
+  dailyStats: any
+  nutritionSignals: any
+  timezone: string
+}) {
+  const journalHighlights = (sliceList(params.journalEntries, 2) || []).map((entry: any) => ({
+    date: entry.localDate || formatLocalDate(entry.createdAt, params.timezone),
+    time: entry.time || formatLocalTime(entry.createdAt, params.timezone),
+    note: clipText(entry.content || '', 200),
   }))
-  return { overallTopFoods, dailyTopFoods }
-}
 
-function buildLlmPayload(context: any, maxChars = 45000) {
-  const steps = [
-    (ctx: any) => ctx,
-    (ctx: any) => ({
-      ...ctx,
-      journalEntries: sliceList(ctx?.journalEntries, 6),
-      journalDigest: sliceList(ctx?.journalDigest, 4),
-      insightCandidates: sliceList(ctx?.insightCandidates, 14),
-      foodHighlights: trimFoodHighlights(ctx?.foodHighlights, 6, 7, 2),
-      talkToAi: ctx?.talkToAi
-        ? {
-            ...ctx.talkToAi,
-            highlights: sliceList(ctx.talkToAi?.highlights, 3),
-            topics: sliceList(ctx.talkToAi?.topics, 4),
-          }
-        : ctx?.talkToAi,
-    }),
-    (ctx: any) => ({
-      ...ctx,
-      journalEntries: sliceList(ctx?.journalEntries, 3),
-      journalDigest: sliceList(ctx?.journalDigest, 2),
-      insightCandidates: sliceList(ctx?.insightCandidates, 10),
-      foodHighlights: trimFoodHighlights(ctx?.foodHighlights, 4, 6, 1),
-      talkToAi: ctx?.talkToAi
-        ? {
-            ...ctx.talkToAi,
-            highlights: sliceList(ctx.talkToAi?.highlights, 2),
-            topics: sliceList(ctx.talkToAi?.topics, 3),
-          }
-        : ctx?.talkToAi,
-    }),
-    (ctx: any) => ({
-      ...ctx,
-      journalEntries: [],
-      journalDigest: [],
-      insightCandidates: sliceList(ctx?.insightCandidates, 6),
-      foodHighlights: trimFoodHighlights(ctx?.foodHighlights, 3, 4, 1),
-      talkToAi: ctx?.talkToAi
-        ? {
-            ...ctx.talkToAi,
-            highlights: [],
-            topics: sliceList(ctx.talkToAi?.topics, 2),
-          }
-        : ctx?.talkToAi,
-    }),
-    (ctx: any) => ({
-      periodStart: ctx?.periodStart,
-      periodEnd: ctx?.periodEnd,
-      timezone: ctx?.timezone,
-      profile: ctx?.profile,
-      goals: ctx?.goals,
-      issues: ctx?.issues,
-      healthSituations: ctx?.healthSituations,
-      allergies: ctx?.allergies,
-      diabetesType: ctx?.diabetesType,
-      supplements: ctx?.supplements,
-      medications: ctx?.medications,
-      nutritionSummary: ctx?.nutritionSummary,
-      hydrationSummary: ctx?.hydrationSummary,
-      exerciseSummary: ctx?.exerciseSummary,
-      moodSummary: ctx?.moodSummary,
-      symptomSummary: ctx?.symptomSummary,
-      checkinSummary: ctx?.checkinSummary,
-      mealTimingSummary: ctx?.mealTimingSummary,
-      timeOfDayNutrition: ctx?.timeOfDayNutrition,
-      nutritionSignals: ctx?.nutritionSignals,
-      dailyStats: sliceList(ctx?.dailyStats, 7),
-      correlationSignals: ctx?.correlationSignals,
-      trendSignals: ctx?.trendSignals,
-      riskFlags: sliceList(ctx?.riskFlags, 5),
-      dataFlags: ctx?.dataFlags,
-      overlapSignals: ctx?.overlapSignals,
-      labHighlights: ctx?.labHighlights,
-      labTrends: sliceList(ctx?.labTrends, 4),
-      sectionSignals: ctx?.sectionSignals,
-    }),
-  ]
-
-  let current = context
-  for (let i = 0; i < steps.length; i += 1) {
-    current = steps[i](current)
-    const json = safeJsonStringify(current)
-    if (json && json.length <= maxChars) {
-      return { context: current, json, size: json.length, trimmed: i > 0 }
-    }
+  return {
+    periodStart: params.reportContext.periodStart,
+    periodEnd: params.reportContext.periodEnd,
+    timezone: params.timezone,
+    profile: params.reportContext.profile,
+    goals: params.reportContext.goals,
+    issues: params.reportContext.issues,
+    healthSituations: params.reportContext.healthSituations,
+    allergies: params.reportContext.allergies,
+    diabetesType: params.reportContext.diabetesType,
+    supplements: params.reportContext.supplements,
+    medications: params.reportContext.medications,
+    sectionSignals: params.reportContext.sectionSignals,
+    nutritionSummary: {
+      dailyAverages: params.nutritionSummary?.dailyAverages,
+      daysWithLogs: params.nutritionSummary?.daysWithLogs,
+      topFoods: params.nutritionSummary?.topFoods,
+      dailyTotals: sliceList(params.nutritionSummary?.dailyTotals, 7),
+    },
+    hydrationSummary: {
+      dailyAverageMl: params.hydrationSummary?.dailyAverageMl,
+      daysWithLogs: params.hydrationSummary?.daysWithLogs,
+      topDrinks: params.hydrationSummary?.topDrinks,
+      dailyTotals: sliceList(params.hydrationSummary?.dailyTotals, 7),
+    },
+    exerciseSummary: params.exerciseSummary,
+    moodSummary: params.moodSummary,
+    symptomSummary: params.symptomSummary,
+    checkinSummary: params.checkinSummary,
+    mealTimingSummary: params.mealTimingSummary,
+    timeOfDayNutrition: params.timeOfDayNutrition,
+    nutritionSignals: params.nutritionSignals,
+    dailyStats: sliceList(params.dailyStats, 7),
+    correlationSignals: params.correlationSignals,
+    trendSignals: params.trendSignals,
+    riskFlags: sliceList(params.riskFlags, 6),
+    dataFlags: params.dataFlags,
+    overlapSignals: params.overlapSignals,
+    labHighlights: params.labHighlights,
+    labTrends: sliceList(params.labTrends, 6),
+    journalHighlights,
+    talkToAi: {
+      userMessageCount: params.talkToAiSummary?.userMessageCount,
+      activeDays: params.talkToAiSummary?.activeDays,
+      topics: sliceList(params.talkToAiSummary?.topics, 4),
+      highlights: sliceList(params.talkToAiSummary?.highlights, 2),
+    },
+    insightCandidates: sliceList(params.insightCandidates, 16),
   }
-
-  const json = safeJsonStringify(current)
-  return { context: current, json, size: json.length, trimmed: true }
 }
 
 function buildMealTimingSummary(
@@ -2627,60 +2602,36 @@ export async function POST(request: NextRequest) {
     ? clipText(typeof healthSituations === 'string' ? healthSituations : JSON.stringify(healthSituations), 600)
     : null
 
-  const llmContext = {
-    periodStart: reportContext.periodStart,
-    periodEnd: reportContext.periodEnd,
-    timezone,
-    profile: reportContext.profile,
-    goals: reportContext.goals,
-    issues: reportContext.issues,
-    healthSituations: healthSituationsText,
-    allergies: reportContext.allergies,
-    diabetesType: reportContext.diabetesType,
-    supplements: reportContext.supplements,
-    medications: reportContext.medications,
-    nutritionSummary: {
-      dailyAverages: nutritionSummary.dailyAverages,
-      daysWithLogs: nutritionSummary.daysWithLogs,
-      topFoods: nutritionSummary.topFoods,
-      dailyTotals: (nutritionSummary.dailyTotals || []).slice(0, 7),
+  const reportSignals = buildReportSignals({
+    reportContext: {
+      ...reportContext,
+      healthSituations: healthSituationsText,
     },
-    hydrationSummary: {
-      dailyAverageMl: hydrationSummary.dailyAverageMl,
-      daysWithLogs: hydrationSummary.daysWithLogs,
-      topDrinks: hydrationSummary.topDrinks,
-      dailyTotals: (hydrationSummary.dailyTotals || []).slice(0, 7),
-    },
-    foodHighlights,
-    dailyStats: compactDailyStats,
+    nutritionSummary,
+    hydrationSummary,
+    exerciseSummary,
+    moodSummary,
+    symptomSummary,
+    checkinSummary,
     mealTimingSummary,
     timeOfDayNutrition,
     correlationSignals,
     trendSignals,
     riskFlags,
-    overlapSignals: reportContext.overlapSignals,
-    checkinSummary,
-    moodSummary,
-    symptomSummary,
-    exerciseSummary,
     dataFlags,
-    insightCandidates: insightCandidates.slice(0, 20),
-    talkToAi: {
-      userMessageCount: talkToAiSummary.userMessageCount,
-      activeDays: talkToAiSummary.activeDays,
-      topics: talkToAiSummary.topics,
-      highlights: talkToAiSummary.highlights,
-    },
-    journalSummary,
-    journalDigest,
-    journalEntries: reportContext.journalEntries,
+    overlapSignals: reportContext.overlapSignals,
     labHighlights,
     labTrends,
-    sectionSignals: reportContext.sectionSignals,
+    insightCandidates,
+    talkToAiSummary,
+    journalEntries: reportContext.journalEntries,
+    dailyStats: compactDailyStats,
     nutritionSignals,
-  }
+    timezone,
+  })
   const MAX_LLM_CONTEXT_CHARS = 120000
-  const { json: llmPayloadJson, size: llmPayloadSize } = buildLlmPayload(llmContext, MAX_LLM_CONTEXT_CHARS)
+  const llmPayloadJson = safeJsonStringify(reportSignals)
+  const llmPayloadSize = llmPayloadJson.length
 
   const rawModel = String(process.env.OPENAI_WEEKLY_REPORT_MODEL || '').trim()
   const model = rawModel.toLowerCase().includes('gpt-5.2') ? rawModel : 'gpt-5.2-chat-latest'
