@@ -64,13 +64,13 @@ export async function GET(request: NextRequest) {
     const getSearchTokens = (value: string) => normalizeForMatch(value).split(' ').filter(Boolean)
 
     const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
-      const queryTokens = getSearchTokens(searchQuery)
-      const nameTokens = getSearchTokens(name)
+      const queryTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+      const nameTokens = getSearchTokens(name).filter((token) => token.length >= 2)
       if (queryTokens.length === 0 || nameTokens.length === 0) return false
       const tokenMatches = (token: string, word: string) => {
         if (!token || !word) return false
         if (word.startsWith(token)) return true
-        if (token.startsWith(word)) return true
+        if (word.length >= 2 && token.startsWith(word)) return true
         const singular = singularizeToken(token)
         if (singular !== token && word.startsWith(singular)) return true
         if (singular !== token && singular.startsWith(word)) return true

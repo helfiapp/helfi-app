@@ -223,13 +223,13 @@ const singularizeToken = (value: string) => {
 const getSearchTokens = (value: string) => normalizeSearchToken(value).split(' ').filter(Boolean)
 
 const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { requireFirstWord?: boolean }) => {
-  const queryTokens = getSearchTokens(searchQuery)
-  const nameTokens = getSearchTokens(name)
+  const queryTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+  const nameTokens = getSearchTokens(name).filter((token) => token.length >= 2)
   if (queryTokens.length === 0 || nameTokens.length === 0) return false
   const tokenMatches = (token: string, word: string) => {
     if (!token || !word) return false
     if (word.startsWith(token)) return true
-    if (token.startsWith(word)) return true // Also match if the query token starts with the word
+    if (word.length >= 2 && token.startsWith(word)) return true // Also match if the query token starts with the word
     const singular = singularizeToken(token)
     if (singular !== token && word.startsWith(singular)) return true
     if (singular !== token && singular.startsWith(word)) return true
