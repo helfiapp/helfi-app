@@ -274,8 +274,8 @@ const mergeSearchSuggestions = (items: NormalizedFoodItem[], searchQuery: string
     seen.add(key)
     merged.push(item)
   }
-  suggestions.forEach(add)
   items.forEach(add)
+  suggestions.forEach(add)
   return merged
 }
 
@@ -882,7 +882,7 @@ export default function MealBuilderClient() {
       let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
       const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
-      if (hasToken && kind === 'packaged') {
+      if (hasToken) {
         nextItems = nextItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind))
       }
       if (nextItems.length === 0 && kind === 'single') {

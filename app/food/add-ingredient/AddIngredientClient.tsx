@@ -295,8 +295,8 @@ const mergeSearchSuggestions = (items: NormalizedFoodItem[], searchQuery: string
     seen.add(key)
     merged.push(item)
   }
-  suggestions.forEach(add)
   items.forEach(add)
+  suggestions.forEach(add)
   return merged
 }
 
@@ -791,7 +791,7 @@ export default function AddIngredientClient() {
         }
       }
       const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
-      if (hasToken && k === 'packaged') {
+      if (hasToken) {
         nextResults = nextResults.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k))
       }
       const brandMatches =

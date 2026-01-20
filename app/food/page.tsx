@@ -6120,8 +6120,8 @@ export default function FoodDiary() {
       seen.add(key)
       merged.push(item)
     }
-    suggestions.forEach(add)
     items.forEach(add)
+    suggestions.forEach(add)
     return merged
   }
 
@@ -6317,7 +6317,7 @@ export default function FoodDiary() {
         }
       }
 
-      if (hasToken && mode === 'packaged') {
+      if (hasToken) {
         nextItems = nextItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode))
       }
 
