@@ -30,6 +30,8 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   const hasCarousel = !!page.carouselImages && page.carouselImages.length > 0
   const bannerLayout = page.bannerLayout ?? 'carousel'
   const bannerSpacerHeight = page.bannerSpacerHeight
+  const bannerImagePosition = page.bannerImagePosition ?? 'center'
+  const bannerImagePositionMobile = page.bannerImagePositionMobile ?? bannerImagePosition
   const ctaPlacement = page.ctaPlacement ?? 'text'
   const overviewPaddingClass = page.overviewSpacing === 'spacious' ? 'pt-16 md:pt-20' : 'pt-10'
   const ctaButtonsClass = ctaPlacement === 'image' ? 'mt-6 flex flex-wrap gap-3' : 'flex flex-wrap gap-3 mt-8'
@@ -87,7 +89,11 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                 alt={page.bannerImage.alt}
                 fill
                 sizes="100vw"
-                className="object-cover"
+                className="object-cover [object-position:var(--banner-position)] md:[object-position:var(--banner-position-desktop)]"
+                style={{
+                  ['--banner-position' as string]: bannerImagePositionMobile,
+                  ['--banner-position-desktop' as string]: bannerImagePosition,
+                }}
                 priority
               />
               <div className="absolute inset-0 bg-black/35" />
