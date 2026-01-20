@@ -67,6 +67,10 @@ export default function Settings() {
   const [showPdf, setShowPdf] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string>('')
   const [exporting, setExporting] = useState(false)
+  const [weeklyReportsEnabled, setWeeklyReportsEnabled] = useState<boolean | null>(null)
+  const [weeklyReportsLoading, setWeeklyReportsLoading] = useState(false)
+  const [weeklyReportsError, setWeeklyReportsError] = useState<string | null>(null)
+  const [weeklyReportsSaving, setWeeklyReportsSaving] = useState(false)
 
   // Initialize settings from localStorage
   useEffect(() => {
@@ -122,6 +126,28 @@ export default function Settings() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    setWeeklyReportsLoading(true)
+    fetch('/api/reports/weekly/preferences')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!mounted || !data) return
+        setWeeklyReportsEnabled(data.reportsEnabled ?? false)
+        setWeeklyReportsError(null)
+      })
+      .catch(() => {
+        if (!mounted) return
+        setWeeklyReportsError('Could not load weekly report settings.')
+      })
+      .finally(() => {
+        if (mounted) setWeeklyReportsLoading(false)
+      })
+    return () => {
+      mounted = false
     }
   }, [])
 
@@ -196,6 +222,32 @@ export default function Settings() {
       }).catch(err => console.log('📊 Analytics tracking error:', err))
     }
   }, [dataAnalytics, session, darkMode, profileVisibility, localPrefsLoaded])
+
+  const handleWeeklyReportsToggle = async (enabled: boolean) => {
+    setWeeklyReportsSaving(true)
+    setWeeklyReportsError(null)
+    try {
+      const res = await fetch('/api/reports/weekly/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (res.status === 402) {
+          setWeeklyReportsError('Weekly reports need a subscription or credits. Please upgrade in Billing.')
+        } else {
+          setWeeklyReportsError('Could not update weekly report setting.')
+        }
+        return
+      }
+      setWeeklyReportsEnabled(data?.reportsEnabled ?? enabled)
+    } catch {
+      setWeeklyReportsError('Could not update weekly report setting.')
+    } finally {
+      setWeeklyReportsSaving(false)
+    }
+  }
 
   // Track individual setting changes
   const trackSettingChange = (settingName: string, newValue: any) => {
@@ -475,6 +527,48 @@ export default function Settings() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Weekly health reports */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Weekly health reports</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Turn on the 7-day report. Reports use credits based on how much you log.
+                </p>
+                {weeklyReportsError && (
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">{weeklyReportsError}</p>
+                )}
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={!!weeklyReportsEnabled}
+                  disabled={weeklyReportsLoading || weeklyReportsSaving || weeklyReportsEnabled === null}
+                  onChange={(e) => handleWeeklyReportsToggle(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+              </label>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <Link
+                href="/billing"
+                className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+              >
+                Upgrade or add credits
+              </Link>
+              {(weeklyReportsLoading || weeklyReportsSaving) && (
+                <span className="text-xs text-gray-500">Saving…</span>
+              )}
+              {weeklyReportsEnabled && !weeklyReportsLoading && !weeklyReportsSaving && (
+                <span className="text-xs text-emerald-700">Weekly reports are on.</span>
+              )}
+              {weeklyReportsEnabled === false && !weeklyReportsLoading && !weeklyReportsSaving && (
+                <span className="text-xs text-gray-500">Reports are off until you turn them on.</span>
+              )}
             </div>
           </div>
 

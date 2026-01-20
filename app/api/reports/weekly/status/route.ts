@@ -82,5 +82,7 @@ export async function GET() {
     dataSummary: latest?.dataSummary ?? null,
     nextReportDueAt: state?.nextReportDueAt ?? null,
     lastReportAt: state?.lastReportAt ?? null,
+    reportsEnabled: state?.reportsEnabled ?? false,
+    reportsEnabledAt: state?.reportsEnabledAt ?? null,
   })
 }

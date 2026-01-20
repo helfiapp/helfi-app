@@ -80,6 +80,8 @@ export default async function InsightsPage() {
         reportLocked,
         status: latestReport?.status ?? null,
         nextReportDueAt: weeklyState?.nextReportDueAt ?? null,
+        reportsEnabled: weeklyState?.reportsEnabled ?? false,
+        reportsEnabledAt: weeklyState?.reportsEnabledAt ?? null,
       }}
     />
   )

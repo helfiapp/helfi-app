@@ -25,6 +25,7 @@ type WeeklyReportClientProps = {
   reports: WeeklyReportRecord[]
   nextReportDueAt: string | null
   canManualReport: boolean
+  reportsEnabled?: boolean
 }
 
 function SectionBucket({ title, items }: { title: string; items: Array<{ name?: string; reason?: string }> }) {
@@ -103,7 +104,7 @@ function splitIntoLines(text: string) {
   return lines.map((line) => line.trim()).filter(Boolean)
 }
 
-export default function WeeklyReportClient({ report, reports, nextReportDueAt, canManualReport }: WeeklyReportClientProps) {
+export default function WeeklyReportClient({ report, reports, nextReportDueAt, canManualReport, reportsEnabled = true }: WeeklyReportClientProps) {
   const [activeTab, setActiveTab] = useState<SectionKey>('overview')
   const router = useRouter()
   const [manualStatus, setManualStatus] = useState<'idle' | 'running' | 'error'>('idle')
@@ -330,6 +331,39 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
       }
     }
   }, [])
+
+  if (!reportsEnabled) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 py-10">
+          <h1 className="text-3xl font-bold text-gray-900">7-day health report</h1>
+          <p className="text-sm text-gray-600 mt-2">
+            Weekly reports are turned off for this account. Turn them on to get your weekly insights and PDF.
+          </p>
+          <div className="mt-4 flex flex-col gap-3">
+            <Link
+              href="/settings"
+              className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
+            >
+              Go to settings
+            </Link>
+            <Link
+              href="/billing"
+              className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Upgrade to enable reports
+            </Link>
+          </div>
+          <Link
+            href="/insights"
+            className="inline-flex mt-6 items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
+          >
+            Back to Insights
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   if (!report) {
     return (

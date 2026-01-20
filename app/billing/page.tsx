@@ -218,6 +218,12 @@ export default function BillingPage() {
               }
             })
             .catch(() => {})
+          // Turn on weekly reports after a successful purchase
+          fetch('/api/reports/weekly/preferences', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: true }),
+          }).catch(() => {})
         })
         .catch(() => {})
     }

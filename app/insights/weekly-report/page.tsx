@@ -35,6 +35,7 @@ export default async function WeeklyReportPage({ searchParams }: WeeklyReportPag
       reports={reports}
       nextReportDueAt={state?.nextReportDueAt ?? null}
       canManualReport={canManualReport}
+      reportsEnabled={state?.reportsEnabled ?? false}
     />
   )
 }

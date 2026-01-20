@@ -22,6 +22,8 @@ interface InsightsLandingClientProps {
     reportLocked?: boolean
     status?: string | null
     nextReportDueAt?: string | null
+    reportsEnabled?: boolean
+    reportsEnabledAt?: string | null
   } | null
 }
 
@@ -35,6 +37,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const [isCreatingReport, setIsCreatingReport] = useState(false)
   const [createReportMessage, setCreateReportMessage] = useState<string | null>(null)
   const [createReportError, setCreateReportError] = useState(false)
+  const [toggleReportsStatus, setToggleReportsStatus] = useState<'idle' | 'saving' | 'error'>('idle')
   const [progressPercent, setProgressPercent] = useState(0)
   const [progressStage, setProgressStage] = useState('Getting your data')
   const [progressActive, setProgressActive] = useState(false)
@@ -50,6 +53,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   } | null>(null)
   const lastLoaded = generatedAt
   const isReportRunning = weeklyStatus?.status === 'RUNNING'
+  const reportsEnabled = weeklyStatus?.reportsEnabled ?? false
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
@@ -208,6 +212,11 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   }
 
   async function handleCreateReportNow() {
+    if (!reportsEnabled) {
+      setCreateReportError(true)
+      setCreateReportMessage('Turn on weekly reports first.')
+      return
+    }
     if (isCreatingReport) return
     setIsCreatingReport(true)
     setCreateReportError(false)
@@ -254,6 +263,48 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       stopProgress(false)
     } finally {
       setIsCreatingReport(false)
+    }
+  }
+
+  async function handleEnableWeeklyReports() {
+    if (toggleReportsStatus === 'saving') return
+    setToggleReportsStatus('saving')
+    setCreateReportError(false)
+    setCreateReportMessage(null)
+    try {
+      const res = await fetch('/api/reports/weekly/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const needsUpgrade = res.status === 402
+        setCreateReportError(true)
+        setCreateReportMessage(
+          needsUpgrade
+            ? 'Weekly reports need a subscription or credits. Please upgrade to turn them on.'
+            : 'Could not turn on weekly reports right now.'
+        )
+        return
+      }
+      setWeeklyStatus((prev: any) => {
+        const safePrev = prev || {}
+        return {
+          ...safePrev,
+          reportsEnabled: data?.reportsEnabled ?? true,
+          reportsEnabledAt: data?.reportsEnabledAt ?? null,
+          nextReportDueAt: data?.nextReportDueAt ?? safePrev?.nextReportDueAt ?? null,
+          status: data?.reportsEnabled ? safePrev?.status ?? 'scheduled' : safePrev?.status ?? null,
+        }
+      })
+      setCreateReportError(false)
+      setCreateReportMessage('Weekly reports are on. We will start your first one now.')
+    } catch {
+      setCreateReportError(true)
+      setCreateReportMessage('Could not turn on weekly reports right now.')
+    } finally {
+      setToggleReportsStatus('idle')
     }
   }
 
@@ -348,18 +399,24 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
               <div>
                 <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">7-day health report</h2>
                 <p className="mt-1 text-base text-gray-600 leading-relaxed">
-                  We build this report automatically every 7 days based on how you use Helfi. No action needed.
+                  We build this report automatically every 7 days based on how you use Helfi.
                 </p>
-                {weeklyStatus?.reportReady && (
+                {!reportsEnabled && (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Weekly reports are off by default. Turn them on to get a full, data-driven report each week. Reports
+                    use credits based on how much you log.
+                  </div>
+                )}
+                {reportsEnabled && weeklyStatus?.reportReady && (
                   <p className="text-sm text-emerald-700 mt-3">Your latest report is ready to view.</p>
                 )}
-                {weeklyStatus?.reportLocked && (
+                {reportsEnabled && weeklyStatus?.reportLocked && (
                   <p className="text-sm text-amber-700 mt-3">
                     Your latest report is ready, but it needs a subscription or top-up credits to unlock.
                   </p>
                 )}
               </div>
-              {weeklyStatus?.nextReportDueAt && countdown && (
+              {reportsEnabled && weeklyStatus?.nextReportDueAt && countdown && (
                 <div className="space-y-4">
                   <div className="flex items-end justify-between">
                     <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
@@ -429,29 +486,48 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
               )}
             </div>
             <div className="flex gap-3">
-              {weeklyStatus?.reportReady ? (
-                <Link
-                  href="/insights/weekly-report"
-                  className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
-                >
-                  View report
-                </Link>
-              ) : weeklyStatus?.reportLocked ? (
-                <Link
-                  href="/billing"
-                  className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                >
-                  Unlock report
-                </Link>
+              {reportsEnabled ? (
+                weeklyStatus?.reportReady ? (
+                  <Link
+                    href="/insights/weekly-report"
+                    className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
+                  >
+                    View report
+                  </Link>
+                ) : weeklyStatus?.reportLocked ? (
+                  <Link
+                    href="/billing"
+                    className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    Unlock report
+                  </Link>
+                ) : (
+                  <Link
+                    href="/onboarding?step=1"
+                    className="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Edit Health Setup
+                  </Link>
+                )
               ) : (
-                <Link
-                  href="/onboarding?step=1"
-                  className="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Edit Health Setup
-                </Link>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleEnableWeeklyReports}
+                    disabled={toggleReportsStatus === 'saving'}
+                    className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-70"
+                  >
+                    {toggleReportsStatus === 'saving' ? 'Turning on…' : 'Turn on weekly reports'}
+                  </button>
+                  <Link
+                    href="/billing"
+                    className="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                  >
+                    Upgrade for reports
+                  </Link>
+                </>
               )}
-              {canManualReport && (
+              {reportsEnabled && canManualReport && (
                 <div className="flex flex-col items-end gap-2">
                   <button
                     type="button"

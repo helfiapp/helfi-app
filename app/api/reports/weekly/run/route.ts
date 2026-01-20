@@ -8,6 +8,7 @@ import { ensureMoodTables } from '@/app/api/mood/_db'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { ensureTalkToAITables } from '@/lib/talk-to-ai-chat-store'
 import { decryptFieldsBatch } from '@/lib/encryption'
+import { costCentsEstimateFromText } from '@/lib/cost-meter'
 import {
   createWeeklyReportRecord,
   getNextDueAt,
@@ -39,6 +40,7 @@ const REPORT_SECTIONS = [
 ] as const
 
 const MANUAL_REPORT_EMAIL = String(process.env.WEEKLY_REPORT_MANUAL_EMAIL || 'info@sonicweb.com.au').toLowerCase()
+const WEEKLY_PREFLIGHT_CENTS = Number(process.env.WEEKLY_REPORT_PREFLIGHT_CENTS || 400)
 
 type ReportSectionKey = (typeof REPORT_SECTIONS)[number]
 type ReportItem = { name?: string; reason?: string }
@@ -1118,6 +1120,121 @@ function clipText(value: string, max = 220) {
   return `${compact.slice(0, Math.max(0, max - 3)).trim()}...`
 }
 
+function buildModelInput(reportSignals: any) {
+  const sliceList = (list: any, max: number) => (Array.isArray(list) ? list.slice(0, max) : [])
+  const trimTopFoods = (foods: any, max: number) =>
+    sliceList(foods, max).map((item: any) => ({ name: clipText(item?.name || '', 60), count: item?.count ?? item?.value ?? null }))
+  const trimDailyStats = (daily: any[]) =>
+    sliceList(daily, 7).map((day: any) => ({
+      date: day?.date,
+      calories: day?.calories,
+      protein_g: day?.protein_g,
+      carbs_g: day?.carbs_g,
+      fat_g: day?.fat_g,
+      fiber_g: day?.fiber_g,
+      sugar_g: day?.sugar_g,
+      sodium_mg: day?.sodium_mg,
+      waterMl: day?.waterMl,
+      hydrationEntries: day?.hydrationEntries,
+      exerciseMinutes: day?.exerciseMinutes,
+      exerciseCount: day?.exerciseCount,
+      moodAvg: day?.moodAvg,
+      moodEntries: day?.moodEntries,
+      symptomCount: day?.symptomCount,
+      checkinCount: day?.checkinCount,
+      journalCount: day?.journalCount,
+      topFoods: trimTopFoods(day?.topFoods || [], 2),
+    }))
+
+  return {
+    periodStart: reportSignals.periodStart,
+    periodEnd: reportSignals.periodEnd,
+    timezone: reportSignals.timezone,
+    profile: reportSignals.profile,
+    goals: sliceList(reportSignals.goals, 8),
+    issues: sliceList(reportSignals.issues, 8),
+    healthSituations: clipText(reportSignals.healthSituations || '', 400),
+    allergies: sliceList(reportSignals.allergies, 6),
+    diabetesType: reportSignals.diabetesType,
+    supplements: sliceList(reportSignals.supplements, 10),
+    medications: sliceList(reportSignals.medications, 10),
+    sectionSignals: reportSignals.sectionSignals,
+    nutritionSummary: reportSignals.nutritionSummary
+      ? {
+          dailyAverages: reportSignals.nutritionSummary.dailyAverages,
+          daysWithLogs: reportSignals.nutritionSummary.daysWithLogs,
+          topFoods: trimTopFoods(reportSignals.nutritionSummary.topFoods || [], 5),
+          dailyTotals: trimDailyStats(reportSignals.nutritionSummary.dailyTotals || []),
+        }
+      : null,
+    hydrationSummary: reportSignals.hydrationSummary
+      ? {
+          dailyAverageMl: reportSignals.hydrationSummary.dailyAverageMl,
+          daysWithLogs: reportSignals.hydrationSummary.daysWithLogs,
+          topDrinks: trimTopFoods(reportSignals.hydrationSummary.topDrinks || [], 5),
+          dailyTotals: sliceList(reportSignals.hydrationSummary.dailyTotals, 7),
+        }
+      : null,
+    exerciseSummary: reportSignals.exerciseSummary,
+    moodSummary: reportSignals.moodSummary,
+    symptomSummary: reportSignals.symptomSummary,
+    checkinSummary: reportSignals.checkinSummary
+      ? {
+          ...reportSignals.checkinSummary,
+          goals: sliceList(reportSignals.checkinSummary.goals, 6),
+          notes: sliceList(reportSignals.checkinSummary.notes, 3),
+        }
+      : null,
+    dailyStats: trimDailyStats(reportSignals.dailyStats || []),
+    correlationSignals: reportSignals.correlationSignals,
+    trendSignals: sliceList(reportSignals.trendSignals, 6),
+    riskFlags: sliceList(reportSignals.riskFlags, 6),
+    dataFlags: reportSignals.dataFlags,
+    overlapSignals: reportSignals.overlapSignals,
+    labHighlights: sliceList(reportSignals.labHighlights, 8),
+    labTrends: sliceList(reportSignals.labTrends, 6),
+    journalHighlights: sliceList(reportSignals.journalHighlights, 4),
+    talkToAi: reportSignals.talkToAi
+      ? {
+          userMessageCount: reportSignals.talkToAi.userMessageCount,
+          activeDays: reportSignals.talkToAi.activeDays,
+          topics: sliceList(reportSignals.talkToAi.topics, 3),
+          highlights: sliceList(reportSignals.talkToAi.highlights, 2),
+        }
+      : null,
+    insightCandidates: sliceList(reportSignals.insightCandidates, 18),
+    coverage: reportSignals.coverage,
+  }
+}
+
+function shrinkModelPayload(payload: any, maxChars: number) {
+  const limit = (list: any, max: number) => (Array.isArray(list) ? list.slice(0, max) : [])
+  const json = safeJsonStringify(payload)
+  if (json.length <= maxChars) return { payload, json, size: json.length }
+
+  const slimmed = {
+    ...payload,
+    dailyStats: limit(payload.dailyStats, 5),
+    insightCandidates: limit(payload.insightCandidates, 12),
+    trendSignals: limit(payload.trendSignals, 4),
+    riskFlags: limit(payload.riskFlags, 4),
+    labTrends: limit(payload.labTrends, 4),
+    labHighlights: limit(payload.labHighlights, 6),
+    journalHighlights: limit(payload.journalHighlights, 2),
+    talkToAi: payload.talkToAi
+      ? {
+          userMessageCount: payload.talkToAi.userMessageCount,
+          activeDays: payload.talkToAi.activeDays,
+          topics: limit(payload.talkToAi.topics, 2),
+          highlights: [],
+        }
+      : null,
+  }
+
+  const slimJson = safeJsonStringify(slimmed)
+  return { payload: slimmed, json: slimJson, size: slimJson.length }
+}
+
 function buildTalkToAiSummary(
   messages: Array<{ role: string; content: string; createdAt: Date }>
 ) {
@@ -1874,6 +1991,9 @@ export async function POST(request: NextRequest) {
 
   const now = new Date()
   let state = await getWeeklyReportState(userId)
+  if (!state?.reportsEnabled) {
+    return NextResponse.json({ status: 'disabled', reason: 'reports_disabled' }, { status: 400 })
+  }
   if (!state?.nextReportDueAt) {
     if (isManualTrigger) {
       await markWeeklyReportOnboardingComplete(userId)
@@ -1926,8 +2046,8 @@ export async function POST(request: NextRequest) {
 
   const cm = new CreditManager(userId)
   const wallet = await cm.getWalletStatus().catch(() => null)
-  const costCredits = CREDIT_COSTS.INSIGHTS_GENERATION
-  const hasCredits = wallet?.totalAvailableCents != null && wallet.totalAvailableCents >= costCredits
+  const preflightCostCents = Number.isFinite(WEEKLY_PREFLIGHT_CENTS) && WEEKLY_PREFLIGHT_CENTS > 0 ? WEEKLY_PREFLIGHT_CENTS : CREDIT_COSTS.INSIGHTS_GENERATION
+  const hasCredits = wallet?.totalAvailableCents != null && wallet.totalAvailableCents >= preflightCostCents
 
   if (!hasCredits) {
     const lockedReport = await updateWeeklyReportRecord(userId, report.id, {
@@ -2630,8 +2750,10 @@ export async function POST(request: NextRequest) {
     timezone,
   })
   const MAX_LLM_CONTEXT_CHARS = 120000
-  const llmPayloadJson = safeJsonStringify(reportSignals)
-  const llmPayloadSize = llmPayloadJson.length
+  const modelInput = buildModelInput({ ...reportSignals, coverage })
+  const modelPayload = shrinkModelPayload(modelInput, MAX_LLM_CONTEXT_CHARS)
+  const llmPayloadJson = modelPayload.json
+  const llmPayloadSize = modelPayload.size
 
   const rawModel = String(process.env.OPENAI_WEEKLY_REPORT_MODEL || '').trim()
   const model = rawModel.toLowerCase().includes('gpt-5.2') ? rawModel : 'gpt-5.2-chat-latest'
@@ -2640,6 +2762,7 @@ export async function POST(request: NextRequest) {
   let reportPayload: any = null
   let summaryText = ''
   let llmUsage: { promptTokens: number; completionTokens: number; costCents: number; model: string } | null = null
+  let chargeCents = preflightCostCents
 
   const llmPayloadReady = Boolean(llmPayloadJson) && llmPayloadSize <= MAX_LLM_CONTEXT_CHARS
   let llmStatus: 'ok' | 'disabled' | 'missing_key' | 'payload_too_large' | 'error' = 'disabled'
@@ -2744,6 +2867,9 @@ ${llmPayloadJson}
     })
   }
 
+  const estimatedCostCents = costCentsEstimateFromText(model, llmPayloadJson, 2600 * 4)
+  chargeCents = Math.max(1, llmUsage?.costCents ?? estimatedCostCents ?? preflightCostCents)
+
   const fallbackPayload = buildFallbackReport(reportContext)
   if (!reportPayload) {
     reportPayload = fallbackPayload
@@ -2790,7 +2916,7 @@ ${llmPayloadJson}
   let charged = false
   let chargeFailed = false
   try {
-    charged = await cm.chargeCents(costCredits)
+    charged = await cm.chargeCents(chargeCents)
   } catch (error) {
     chargeFailed = true
     console.warn('[weekly-report] Credit charge failed', error)
@@ -2815,6 +2941,7 @@ ${llmPayloadJson}
         labHighlights,
         llmUsage,
         llmStatus,
+        llmChargeCents: chargeCents,
         llmPayloadSize,
         llmPayloadMax: MAX_LLM_CONTEXT_CHARS,
         lockedReason: 'insufficient_credits',
@@ -2850,13 +2977,14 @@ ${llmPayloadJson}
       labHighlights,
       llmUsage,
       llmStatus,
+      llmChargeCents: chargeCents,
       llmPayloadSize,
       llmPayloadMax: MAX_LLM_CONTEXT_CHARS,
       ...(chargeFailed ? { chargeSkipped: true } : {}),
     },
     report: reportPayload,
     model,
-    creditsCharged: charged ? costCredits : 0,
+    creditsCharged: charged ? chargeCents : 0,
     readyAt: now.toISOString(),
   })
 
