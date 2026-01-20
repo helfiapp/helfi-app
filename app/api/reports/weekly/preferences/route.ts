@@ -32,15 +32,18 @@ export async function POST(request: NextRequest) {
   }
 
   if (enabled) {
-    // Enforce paid access: require subscription wallet or top-up credits.
+    // Enforce paid access: require either a premium plan or available credits.
     // Soft-allow if wallet lookup fails to avoid blocking paid users.
     const cm = new CreditManager(session.user.id)
     const wallet = await cm.getWalletStatus().catch(() => null)
-    if (wallet) {
-      const totalAvailable = wallet?.totalAvailableCents ?? 0
-      if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
-        return NextResponse.json({ error: 'insufficient_credits' }, { status: 402 })
-      }
+    const totalAvailable = wallet?.totalAvailableCents ?? 0
+    const hasCredits = Number.isFinite(totalAvailable) && totalAvailable > 0
+    const hasPlan = !!wallet?.plan
+    // Founder override
+    const isFounder = (session.user.email || '').toLowerCase() === 'info@sonicweb.com.au'
+
+    if (!isFounder && !hasPlan && !hasCredits) {
+      return NextResponse.json({ error: 'insufficient_credits' }, { status: 402 })
     }
   }
 
