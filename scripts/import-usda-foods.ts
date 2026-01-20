@@ -256,7 +256,6 @@ async function importFoundation(zipPath: string) {
 
   let rowCount = 0
   let inserted = 0
-  const batch: any[] = []
 
   await streamCsvFromZip(zipPath, foodFile, async (row) => {
     rowCount += 1
@@ -266,33 +265,25 @@ async function importFoundation(zipPath: string) {
     const macros = macrosByFdc.get(fdcId)
     if (!macros) return
 
-    batch.push({
-      source: 'usda_foundation',
-      fdcId,
-      name,
-      brand: null,
-      servingSize: '100 g',
-      calories: macros.calories ?? null,
-      proteinG: macros.protein_g ?? null,
-      carbsG: macros.carbs_g ?? null,
-      fatG: macros.fat_g ?? null,
-      fiberG: macros.fiber_g ?? null,
-      sugarG: macros.sugar_g ?? null,
+    await prisma.foodLibraryItem.create({
+      data: {
+        source: 'usda_foundation',
+        fdcId,
+        name,
+        brand: null,
+        servingSize: '100 g',
+        calories: macros.calories ?? null,
+        proteinG: macros.protein_g ?? null,
+        carbsG: macros.carbs_g ?? null,
+        fatG: macros.fat_g ?? null,
+        fiberG: macros.fiber_g ?? null,
+        sugarG: macros.sugar_g ?? null,
+      },
     })
 
     macrosByFdc.delete(fdcId)
-
-    if (batch.length >= 1000) {
-      const result = await prisma.foodLibraryItem.createMany({ data: batch, skipDuplicates: true })
-      inserted += result.count
-      batch.length = 0
-    }
+    inserted += 1
   })
-
-  if (batch.length > 0) {
-    const result = await prisma.foodLibraryItem.createMany({ data: batch, skipDuplicates: true })
-    inserted += result.count
-  }
 
   console.log(`Foundation import finished: ${inserted.toLocaleString()} records from ${rowCount.toLocaleString()} foods.`)
 }
@@ -310,7 +301,6 @@ async function importBranded(zipPath: string) {
 
   let rowCount = 0
   let inserted = 0
-  const batch: any[] = []
 
   await streamCsvFromZip(zipPath, foodFile, async (row) => {
     rowCount += 1
@@ -324,34 +314,26 @@ async function importBranded(zipPath: string) {
     const scaledMacros = scaleMacros(macros, info)
     const servingLabel = buildServingLabel(info)
 
-    batch.push({
-      source: 'usda_branded',
-      fdcId,
-      gtinUpc: info?.gtinUpc || null,
-      name,
-      brand: info?.brand || null,
-      servingSize: servingLabel,
-      calories: scaledMacros.calories ?? null,
-      proteinG: scaledMacros.protein_g ?? null,
-      carbsG: scaledMacros.carbs_g ?? null,
-      fatG: scaledMacros.fat_g ?? null,
-      fiberG: scaledMacros.fiber_g ?? null,
-      sugarG: scaledMacros.sugar_g ?? null,
+    await prisma.foodLibraryItem.create({
+      data: {
+        source: 'usda_branded',
+        fdcId,
+        gtinUpc: info?.gtinUpc || null,
+        name,
+        brand: info?.brand || null,
+        servingSize: servingLabel,
+        calories: scaledMacros.calories ?? null,
+        proteinG: scaledMacros.protein_g ?? null,
+        carbsG: scaledMacros.carbs_g ?? null,
+        fatG: scaledMacros.fat_g ?? null,
+        fiberG: scaledMacros.fiber_g ?? null,
+        sugarG: scaledMacros.sugar_g ?? null,
+      },
     })
 
     macrosByFdc.delete(fdcId)
-
-    if (batch.length >= 1000) {
-      const result = await prisma.foodLibraryItem.createMany({ data: batch, skipDuplicates: true })
-      inserted += result.count
-      batch.length = 0
-    }
+    inserted += 1
   })
-
-  if (batch.length > 0) {
-    const result = await prisma.foodLibraryItem.createMany({ data: batch, skipDuplicates: true })
-    inserted += result.count
-  }
 
   console.log(`Branded import finished: ${inserted.toLocaleString()} records from ${rowCount.toLocaleString()} foods.`)
 }
