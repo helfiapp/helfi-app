@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { searchOpenFoodFactsByQuery, searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition, searchLocalFoods } from '@/lib/food-data'
 import { prisma } from '@/lib/prisma'
 
+let usdaHealthCache: { count: number | null; checkedAt: number } = { count: null, checkedAt: 0 }
+
 // Lightweight read-only endpoint that proxies to external food databases
 // and returns a normalized list of items in a format compatible with the
 // Food Diary `items[]` structure (name, brand, serving_size, macros).
@@ -14,6 +16,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    let usdaHealthCache: { count: number | null; checkedAt: number } = { count: null, checkedAt: 0 }
     const source = (searchParams.get('source') || '').toLowerCase()
     const query = (searchParams.get('q') || '').trim()
     const kind = (searchParams.get('kind') || '').toLowerCase()

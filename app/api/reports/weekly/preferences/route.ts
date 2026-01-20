@@ -33,11 +33,14 @@ export async function POST(request: NextRequest) {
 
   if (enabled) {
     // Enforce paid access: require subscription wallet or top-up credits.
+    // Soft-allow if wallet lookup fails to avoid blocking paid users.
     const cm = new CreditManager(session.user.id)
     const wallet = await cm.getWalletStatus().catch(() => null)
-    const totalAvailable = wallet?.totalAvailableCents ?? 0
-    if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
-      return NextResponse.json({ error: 'insufficient_credits' }, { status: 402 })
+    if (wallet) {
+      const totalAvailable = wallet?.totalAvailableCents ?? 0
+      if (!Number.isFinite(totalAvailable) || totalAvailable <= 0) {
+        return NextResponse.json({ error: 'insufficient_credits' }, { status: 402 })
+      }
     }
   }
 
