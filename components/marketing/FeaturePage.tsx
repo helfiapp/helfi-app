@@ -29,6 +29,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   const hasBanner = !!page.bannerImage
   const hasCarousel = !!page.carouselImages && page.carouselImages.length > 0
   const bannerLayout = page.bannerLayout ?? 'carousel'
+  const bannerSpacerHeight = page.bannerSpacerHeight ?? 'h-36 md:h-44'
   const ctaPlacement = page.ctaPlacement ?? 'text'
   const overviewPaddingClass = page.overviewSpacing === 'spacious' ? 'pt-16 md:pt-20' : 'pt-10'
   const ctaButtonsClass = ctaPlacement === 'image' ? 'mt-6 flex flex-wrap gap-3' : 'flex flex-wrap gap-3 mt-8'
@@ -100,7 +101,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                     <MockupCarousel images={page.carouselImages} />
                   )
                 ) : (
-                  <div className="h-36 md:h-44" />
+                  <div className={bannerSpacerHeight} />
                 )}
               </div>
             </div>

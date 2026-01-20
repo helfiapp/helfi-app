@@ -45,6 +45,7 @@ export type FeaturePageContent = {
   heroImage: FeaturePageImage
   bannerImage?: FeaturePageImage
   carouselImages?: FeaturePageImage[]
+  bannerSpacerHeight?: string
   bannerLayout?: 'carousel' | 'grid'
   showHeroImage?: boolean
   showSegmentImages?: boolean
@@ -1718,29 +1719,7 @@ export const featurePages: FeaturePageContent[] = [
       height: 660,
       kind: 'photo',
     },
-    carouselImages: [
-      {
-        src: '/screenshots/hero/ASK AI.png',
-        alt: 'Talk to Helfi chat on a phone',
-        width: 1450,
-        height: 2936,
-        kind: 'phone',
-      },
-      {
-        src: '/screenshots/hero/INSIGHTS.png',
-        alt: 'Talk to Helfi insights view on a phone',
-        width: 1450,
-        height: 2936,
-        kind: 'phone',
-      },
-      {
-        src: '/screenshots/hero/MORE MENU.png',
-        alt: 'Talk to Helfi privacy controls on a phone',
-        width: 1450,
-        height: 2936,
-        kind: 'phone',
-      },
-    ],
+    bannerSpacerHeight: 'h-[420px]',
     primaryCta,
     secondaryCta,
     capabilities: [
