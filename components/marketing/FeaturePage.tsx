@@ -30,6 +30,7 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   const hasCarousel = !!page.carouselImages && page.carouselImages.length > 0
   const bannerLayout = page.bannerLayout ?? 'carousel'
   const bannerPresentation = page.bannerPresentation ?? 'background'
+  const bannerHeight = page.bannerHeight
   const ctaPlacement = page.ctaPlacement ?? 'text'
   const overviewPaddingClass = page.overviewSpacing === 'spacious' ? 'pt-16 md:pt-20' : 'pt-10'
   const ctaButtonsClass = ctaPlacement === 'image' ? 'mt-6 flex flex-wrap gap-3' : 'flex flex-wrap gap-3 mt-8'
@@ -82,16 +83,27 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
         {hasBanner && page.bannerImage && (
           <section id="gallery" className="relative w-full overflow-hidden">
             {bannerPresentation === 'full' ? (
-              <div className="relative w-full">
-                <Image
-                  src={page.bannerImage.src}
-                  alt={page.bannerImage.alt}
-                  width={page.bannerImage.width ?? 1600}
-                  height={page.bannerImage.height ?? 700}
-                  sizes="100vw"
-                  className="w-full h-auto object-contain"
-                  priority
-                />
+              <div className="relative w-full" style={bannerHeight ? { height: bannerHeight } : undefined}>
+                {bannerHeight ? (
+                  <Image
+                    src={page.bannerImage.src}
+                    alt={page.bannerImage.alt}
+                    fill
+                    sizes="100vw"
+                    className="object-contain"
+                    priority
+                  />
+                ) : (
+                  <Image
+                    src={page.bannerImage.src}
+                    alt={page.bannerImage.alt}
+                    width={page.bannerImage.width ?? 1600}
+                    height={page.bannerImage.height ?? 700}
+                    sizes="100vw"
+                    className="w-full h-auto object-contain"
+                    priority
+                  />
+                )}
               </div>
             ) : (
               <>
