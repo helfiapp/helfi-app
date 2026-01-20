@@ -6096,7 +6096,9 @@ export default function FoodDiary() {
   const buildSingleFoodSuggestions = (searchQuery: string) => {
     const tokens = getSearchTokens(searchQuery)
     if (!tokens.some((token) => token.length >= 2)) return []
+    const normalizedQuery = normalizeSearchToken(searchQuery)
     const matches = COMMON_SINGLE_FOOD_SUGGESTIONS.filter((item) =>
+      (normalizedQuery.length >= 4 && normalizeSearchToken(item.name).includes(normalizedQuery)) ||
       nameMatchesSearchQuery(item.name, searchQuery, { requireFirstWord: false }),
     )
     return matches.slice(0, 8).map((item) => ({
