@@ -141,6 +141,8 @@ export async function GET(request: NextRequest) {
       return Array.from(candidates).filter((q) => q.toLowerCase() !== original.toLowerCase())
     }
 
+    // LOCKED: Single-food search must use the local USDA library (foodLibraryItem) only.
+    // Do not swap back to the external USDA API. See GUARD_RAILS.md for restore steps.
     const searchUsdaSingleFood = async (value: string) => {
       const sources = ['usda_foundation', 'usda_branded']
       const attempt = async (q: string) => {

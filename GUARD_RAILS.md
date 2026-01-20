@@ -199,6 +199,26 @@ Files:
 - Reads a hidden `HealthGoal` named `__HEALTH_SETUP_REMINDER_DISABLED__` to set
   `reminderDisabled`.
 
+---
+
+## 4. Ingredient search – USDA data source (Jan 2026 – Locked)
+
+**Scope:** All ingredient search surfaces (Build a Meal, Add Ingredient page, Food Diary add-ingredient modal).
+
+- Single-food searches **must use the local USDA library in Neon Postgres** (`foodLibraryItem`) and **must not call the external USDA API**.
+- The local query must include both sources: `usda_foundation` and `usda_branded`.
+- Server code: `app/api/food-data/route.ts` uses `searchLocalFoods` for single foods and fallbacks (singular/raw/cooked) against the local library. Do not remove or bypass this.
+- Import script: `scripts/import-usda-foods.ts` loads USDA zips from `data/food-import/` into `foodLibraryItem`. Keep this as the source of truth.
+
+**Restore steps if broken:**
+1) Ensure USDA zips are present in `data/food-import/` (foundation + branded).  
+2) Re-run the import locally or in the job environment:  
+   `TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{"module":"commonjs","moduleResolution":"node"}' npx ts-node scripts/import-usda-foods.ts --all`  
+3) Verify the library has walnut rows (example):  
+   run a prisma check to count `foodLibraryItem` where name contains “walnut” (should be thousands).  
+4) Hit `/api/food-data?source=usda&kind=single&q=walnuts&limit=20` and confirm results show `source: usda_foundation` or `usda_branded` (not remote API).  
+5) Keep `searchLocalPreferred` and `searchUsdaSingleFood` using `searchLocalFoods` with both sources; do not revert to USDA HTTP calls.
+
 `POST /api/health-setup-status` with `{ disableReminder: true }`:
 - Upserts the `__HEALTH_SETUP_REMINDER_DISABLED__` record to disable the reminder
   **for that account across all devices**.
