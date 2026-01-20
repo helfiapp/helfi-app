@@ -61,6 +61,28 @@ export async function GET(request: NextRequest) {
       return value
     }
 
+    const getSearchTokens = (value: string) => normalizeForMatch(value).split(' ').filter(Boolean)
+
+    const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
+      const queryTokens = getSearchTokens(searchQuery)
+      const nameTokens = getSearchTokens(name)
+      if (queryTokens.length === 0 || nameTokens.length === 0) return false
+      const tokenMatches = (token: string, word: string) => {
+        if (!token || !word) return false
+        if (word.startsWith(token)) return true
+        if (token.startsWith(word)) return true
+        const singular = singularizeToken(token)
+        if (singular !== token && word.startsWith(singular)) return true
+        if (singular !== token && singular.startsWith(word)) return true
+        if (token.length >= 4 && word.includes(token)) return true
+        if (singular.length >= 4 && word.includes(singular)) return true
+        if (word.length >= 4 && token.includes(word)) return true
+        return false
+      }
+      if (queryTokens.length === 1) return nameTokens.some((word) => tokenMatches(queryTokens[0], word))
+      return queryTokens.every((token) => nameTokens.some((word) => tokenMatches(token, word)))
+    }
+
     const queryNorm = normalizeForMatch(query)
     const queryCompact = normalizeForCompact(query)
     const queryTokens = queryNorm ? queryNorm.split(' ').filter(Boolean) : []
@@ -190,12 +212,21 @@ export async function GET(request: NextRequest) {
         return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
       }
       const foundation = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] })
-      if (foundation.length >= limit) return foundation
-      const legacy = await searchLocalFoods(value, { pageSize: limit - foundation.length, sources: ['usda_sr_legacy'] })
-      const combined = [...foundation, ...legacy]
-      if (combined.length >= limit) return combined
-      const branded = await searchLocalFoods(value, { pageSize: limit - combined.length, sources: ['usda_branded'] })
-      return [...combined, ...branded]
+      const legacy = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_sr_legacy'] })
+      const branded = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
+
+      const combined = [...foundation, ...legacy, ...branded]
+      const seen = new Set<string>()
+      const deduped = combined.filter((item) => {
+        const key = `${normalizeForMatch(item?.name)}|${normalizeForMatch(item?.brand)}`
+        if (!key || key === '|') return false
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+
+      const filtered = deduped.filter((item) => nameMatchesSearchQuery(item?.name || '', value))
+      return (filtered.length > 0 ? filtered : deduped).slice(0, limit)
     }
 
     if (source === 'auto' || !source) {
