@@ -448,7 +448,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   href="/onboarding?step=1"
                   className="inline-flex items-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  Edit Health Setup (optional)
+                  Edit Health Setup
                 </Link>
               )}
               {canManualReport && (
