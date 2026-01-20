@@ -16,7 +16,6 @@ let usdaHealthCache: { count: number | null; checkedAt: number } = { count: null
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    let usdaHealthCache: { count: number | null; checkedAt: number } = { count: null, checkedAt: 0 }
     const source = (searchParams.get('source') || '').toLowerCase()
     const query = (searchParams.get('q') || '').trim()
     const kind = (searchParams.get('kind') || '').toLowerCase()
