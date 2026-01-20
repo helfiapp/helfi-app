@@ -108,6 +108,17 @@ export async function ensureWeeklyReportTables() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE WeeklyHealthReportState ADD COLUMN IF NOT EXISTS reportsEnabledAt TIMESTAMPTZ'
     ).catch(() => {})
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM WeeklyHealthReportState
+      WHERE ctid NOT IN (
+        SELECT DISTINCT ON (userId) ctid
+        FROM WeeklyHealthReportState
+        ORDER BY userId, lastAttemptAt DESC NULLS LAST, nextReportDueAt DESC NULLS LAST
+      )
+    `).catch(() => {})
+    await prisma.$executeRawUnsafe(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_report_state_user ON WeeklyHealthReportState(userId)'
+    ).catch(() => {})
     weeklyTablesEnsured = true
   } catch (error) {
     console.error('[weekly-report] Failed to ensure tables', error)
