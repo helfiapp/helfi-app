@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { searchOpenFoodFactsByQuery, searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition, searchLocalFoods } from '@/lib/food-data'
+import { prisma } from '@/lib/prisma'
 
 // Lightweight read-only endpoint that proxies to external food databases
 // and returns a normalized list of items in a format compatible with the
@@ -143,6 +144,14 @@ export async function GET(request: NextRequest) {
 
     // LOCKED: Single-food search must use the local USDA library (foodLibraryItem) only.
     // Do not swap back to the external USDA API. See GUARD_RAILS.md for restore steps.
+    const checkUsdaLibraryHealth = async () => {
+      const now = Date.now()
+      if (now - usdaHealthCache.checkedAt < 10 * 60 * 1000 && usdaHealthCache.count != null) return usdaHealthCache.count
+      const count = await prisma.foodLibraryItem.count({ where: { source: { in: ['usda_foundation', 'usda_branded'] } } })
+      usdaHealthCache = { count, checkedAt: now }
+      return count
+    }
+
     const searchUsdaSingleFood = async (value: string) => {
       const sources = ['usda_foundation', 'usda_branded']
       const attempt = async (q: string) => {
@@ -159,6 +168,10 @@ export async function GET(request: NextRequest) {
         if (next.length > 0) return next
       }
 
+      const libraryCount = await checkUsdaLibraryHealth()
+      if (libraryCount < 100000) {
+        console.warn(`USDA library looks thin (${libraryCount} rows). Consider re-importing USDA data.`)
+      }
       // As a last resort, hit USDA API so users still get results if the local library is empty.
       const remote = await searchUsdaFoods(value, { pageSize: limit, dataType: 'generic' })
       if (remote.length > 0) return remote
