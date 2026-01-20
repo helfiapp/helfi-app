@@ -141,19 +141,22 @@ export async function GET(request: NextRequest) {
       return Array.from(candidates).filter((q) => q.toLowerCase() !== original.toLowerCase())
     }
 
-    const filterGenericUsda = (list: any[]) =>
-      Array.isArray(list) ? list.filter((item) => !item?.brand) : []
-
     const searchUsdaSingleFood = async (value: string) => {
-      const primaryAll = await searchUsdaFoods(value, { pageSize: limit, dataType: 'all' })
-      const primary = filterGenericUsda(primaryAll)
+      const sources = ['usda_foundation', 'usda_branded']
+      const attempt = async (q: string) => {
+        if (!q) return []
+        return await searchLocalFoods(q, { pageSize: limit, sources })
+      }
+
+      const primary = await attempt(value)
       if (primary.length > 0) return primary
+
       const fallbacks = buildSingleFoodFallbacks(value)
       for (const fallback of fallbacks) {
-        const nextAll = await searchUsdaFoods(fallback, { pageSize: limit, dataType: 'all' })
-        const next = filterGenericUsda(nextAll)
+        const next = await attempt(fallback)
         if (next.length > 0) return next
       }
+
       return []
     }
 
@@ -162,8 +165,8 @@ export async function GET(request: NextRequest) {
       if (resolvedKind === 'packaged') {
         return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
       }
-      const foundation = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] })
-      if (foundation.length > 0) return foundation
+      const foundationAndBranded = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation', 'usda_branded'] })
+      if (foundationAndBranded.length > 0) return foundationAndBranded
       return []
     }
 
