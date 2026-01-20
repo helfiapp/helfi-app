@@ -365,15 +365,44 @@ export async function getLatestWeeklyReport(userId: string): Promise<WeeklyRepor
   }
 }
 
+export async function getWeeklyReportByPeriod(
+  userId: string,
+  periodStart: string,
+  periodEnd: string
+): Promise<WeeklyReportRecord | null> {
+  await ensureWeeklyReportTables()
+  try {
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      'SELECT * FROM WeeklyHealthReports WHERE userId = $1 AND periodStart = $2 AND periodEnd = $3 ORDER BY createdAt DESC LIMIT 1',
+      userId,
+      periodStart,
+      periodEnd
+    )
+    return normalizeReportRow(rows?.[0])
+  } catch (error) {
+    console.warn('[weekly-report] Failed to read report by period', error)
+    return null
+  }
+}
+
 export async function listWeeklyReports(userId: string, limit = 8): Promise<WeeklyReportRecord[]> {
   await ensureWeeklyReportTables()
   try {
     const rows: any[] = await prisma.$queryRawUnsafe(
       'SELECT * FROM WeeklyHealthReports WHERE userId = $1 ORDER BY createdAt DESC LIMIT $2',
       userId,
-      limit
+      Math.max(limit * 3, limit)
     )
-    return rows.map(normalizeReportRow).filter(Boolean) as WeeklyReportRecord[]
+    const unique = new Map<string, WeeklyReportRecord>()
+    for (const row of rows) {
+      const report = normalizeReportRow(row)
+      if (!report) continue
+      const key = `${report.periodStart}|${report.periodEnd}`
+      if (!unique.has(key)) {
+        unique.set(key, report)
+      }
+    }
+    return Array.from(unique.values()).slice(0, limit)
   } catch (error) {
     console.warn('[weekly-report] Failed to list reports', error)
     return []

@@ -11,6 +11,7 @@ import { decryptFieldsBatch } from '@/lib/encryption'
 import {
   createWeeklyReportRecord,
   getNextDueAt,
+  getWeeklyReportByPeriod,
   getWeeklyReportState,
   markWeeklyReportOnboardingComplete,
   queueWeeklyReportNotification,
@@ -89,6 +90,40 @@ function buildDefaultSections(): Record<ReportSectionKey, ReportSectionBucket> {
     acc[key] = { ...section }
     return acc
   }, {} as Record<ReportSectionKey, ReportSectionBucket>)
+}
+
+function normalizeReportItem(item: ReportItem | null | undefined): ReportItem {
+  const name = String(item?.name || '').trim()
+  const reason = String(item?.reason || '').trim()
+  return { name, reason }
+}
+
+function dedupeReportSections(
+  sections: Record<ReportSectionKey, ReportSectionBucket>
+): Record<ReportSectionKey, ReportSectionBucket> {
+  const seen = new Set<string>()
+  const output = buildDefaultSections()
+  for (const key of REPORT_SECTIONS) {
+    const section = sections[key] || { working: [], suggested: [], avoid: [] }
+    const dedupeBucket = (items: ReportItem[]) => {
+      const unique: ReportItem[] = []
+      for (const item of items) {
+        const normalized = normalizeReportItem(item)
+        const identity = `${normalized.name.toLowerCase()}|${normalized.reason.toLowerCase()}`
+        if (!normalized.name && !normalized.reason) continue
+        if (seen.has(identity)) continue
+        seen.add(identity)
+        unique.push(normalized)
+      }
+      return unique
+    }
+    output[key] = {
+      working: dedupeBucket(section.working || []),
+      suggested: dedupeBucket(section.suggested || []),
+      avoid: dedupeBucket(section.avoid || []),
+    }
+  }
+  return output
 }
 
 function resolveDayKey(localDate?: string | null, createdAt?: Date | string | null) {
@@ -392,33 +427,122 @@ function buildJournalDigest(
     .map(([date, data]) => ({ date, notes: data.notes, count: data.total }))
 }
 
-function trimLlmContext(context: any, maxChars = 160000) {
+function safeJsonStringify(value: any) {
   try {
-    const raw = JSON.stringify(context)
-    if (raw.length <= maxChars) return context
-    const trimmed = {
-      ...context,
-      journalEntries: Array.isArray(context?.journalEntries) ? context.journalEntries.slice(0, 8) : context?.journalEntries,
-      journalDigest: Array.isArray(context?.journalDigest) ? context.journalDigest.slice(0, 4) : context?.journalDigest,
-      insightCandidates: Array.isArray(context?.insightCandidates) ? context.insightCandidates.slice(0, 8) : context?.insightCandidates,
-      foodLogSample: Array.isArray(context?.foodLogSample) ? context.foodLogSample.slice(0, 8) : context?.foodLogSample,
-      talkToAi: context?.talkToAi
-        ? {
-            ...context.talkToAi,
-            highlights: Array.isArray(context.talkToAi?.highlights) ? context.talkToAi.highlights.slice(0, 3) : context.talkToAi?.highlights,
-            topics: Array.isArray(context.talkToAi?.topics) ? context.talkToAi.topics.slice(0, 4) : context.talkToAi?.topics,
-          }
-        : context?.talkToAi,
-    }
-    const trimmedRaw = JSON.stringify(trimmed)
-    if (trimmedRaw.length <= maxChars) return trimmed
-    return {
-      ...trimmed,
-      dailyStats: Array.isArray(context?.dailyStats) ? context.dailyStats.slice(-7) : context?.dailyStats,
-    }
+    return JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? val.toString() : val))
   } catch {
-    return context
+    return ''
   }
+}
+
+function sliceList<T>(value: T[] | undefined | null, max: number) {
+  return Array.isArray(value) ? value.slice(0, max) : value
+}
+
+function trimFoodHighlights(
+  highlights: { overallTopFoods?: Array<any>; dailyTopFoods?: Array<any> } | null | undefined,
+  maxOverall: number,
+  maxDays: number,
+  maxPerDay: number
+) {
+  if (!highlights) return highlights
+  const overallTopFoods = sliceList(highlights.overallTopFoods, maxOverall) || []
+  const dailyTopFoods = (sliceList(highlights.dailyTopFoods, maxDays) || []).map((day: any) => ({
+    date: day?.date,
+    foods: sliceList(day?.foods, maxPerDay) || [],
+  }))
+  return { overallTopFoods, dailyTopFoods }
+}
+
+function buildLlmPayload(context: any, maxChars = 45000) {
+  const steps = [
+    (ctx: any) => ctx,
+    (ctx: any) => ({
+      ...ctx,
+      journalEntries: sliceList(ctx?.journalEntries, 6),
+      journalDigest: sliceList(ctx?.journalDigest, 4),
+      insightCandidates: sliceList(ctx?.insightCandidates, 14),
+      foodHighlights: trimFoodHighlights(ctx?.foodHighlights, 6, 7, 2),
+      talkToAi: ctx?.talkToAi
+        ? {
+            ...ctx.talkToAi,
+            highlights: sliceList(ctx.talkToAi?.highlights, 3),
+            topics: sliceList(ctx.talkToAi?.topics, 4),
+          }
+        : ctx?.talkToAi,
+    }),
+    (ctx: any) => ({
+      ...ctx,
+      journalEntries: sliceList(ctx?.journalEntries, 3),
+      journalDigest: sliceList(ctx?.journalDigest, 2),
+      insightCandidates: sliceList(ctx?.insightCandidates, 10),
+      foodHighlights: trimFoodHighlights(ctx?.foodHighlights, 4, 6, 1),
+      talkToAi: ctx?.talkToAi
+        ? {
+            ...ctx.talkToAi,
+            highlights: sliceList(ctx.talkToAi?.highlights, 2),
+            topics: sliceList(ctx.talkToAi?.topics, 3),
+          }
+        : ctx?.talkToAi,
+    }),
+    (ctx: any) => ({
+      ...ctx,
+      journalEntries: [],
+      journalDigest: [],
+      insightCandidates: sliceList(ctx?.insightCandidates, 6),
+      foodHighlights: trimFoodHighlights(ctx?.foodHighlights, 3, 4, 1),
+      talkToAi: ctx?.talkToAi
+        ? {
+            ...ctx.talkToAi,
+            highlights: [],
+            topics: sliceList(ctx.talkToAi?.topics, 2),
+          }
+        : ctx?.talkToAi,
+    }),
+    (ctx: any) => ({
+      periodStart: ctx?.periodStart,
+      periodEnd: ctx?.periodEnd,
+      timezone: ctx?.timezone,
+      profile: ctx?.profile,
+      goals: ctx?.goals,
+      issues: ctx?.issues,
+      healthSituations: ctx?.healthSituations,
+      allergies: ctx?.allergies,
+      diabetesType: ctx?.diabetesType,
+      supplements: ctx?.supplements,
+      medications: ctx?.medications,
+      nutritionSummary: ctx?.nutritionSummary,
+      hydrationSummary: ctx?.hydrationSummary,
+      exerciseSummary: ctx?.exerciseSummary,
+      moodSummary: ctx?.moodSummary,
+      symptomSummary: ctx?.symptomSummary,
+      checkinSummary: ctx?.checkinSummary,
+      mealTimingSummary: ctx?.mealTimingSummary,
+      timeOfDayNutrition: ctx?.timeOfDayNutrition,
+      nutritionSignals: ctx?.nutritionSignals,
+      dailyStats: sliceList(ctx?.dailyStats, 7),
+      correlationSignals: ctx?.correlationSignals,
+      trendSignals: ctx?.trendSignals,
+      riskFlags: sliceList(ctx?.riskFlags, 5),
+      dataFlags: ctx?.dataFlags,
+      overlapSignals: ctx?.overlapSignals,
+      labHighlights: ctx?.labHighlights,
+      labTrends: sliceList(ctx?.labTrends, 4),
+      sectionSignals: ctx?.sectionSignals,
+    }),
+  ]
+
+  let current = context
+  for (let i = 0; i < steps.length; i += 1) {
+    current = steps[i](current)
+    const json = safeJsonStringify(current)
+    if (json && json.length <= maxChars) {
+      return { context: current, json, size: json.length, trimmed: i > 0 }
+    }
+  }
+
+  const json = safeJsonStringify(current)
+  return { context: current, json, size: json.length, trimmed: true }
 }
 
 function buildMealTimingSummary(
@@ -1801,6 +1925,18 @@ export async function POST(request: NextRequest) {
   const periodStartDate = toDateOnly(periodStart)
   const periodEndDate = toDateOnly(periodEnd)
 
+  const existingReport = await getWeeklyReportByPeriod(userId, periodStartDate, periodEndDate)
+  if (existingReport && existingReport.status !== 'FAILED') {
+    const statusText = existingReport.status === 'READY'
+      ? 'ready'
+      : existingReport.status === 'RUNNING'
+        ? 'running'
+        : existingReport.status === 'LOCKED'
+          ? 'locked'
+          : 'skipped'
+    return NextResponse.json({ status: statusText, reportId: existingReport.id })
+  }
+
   const report = await createWeeklyReportRecord({
     userId,
     periodStart: periodStartDate,
@@ -1884,7 +2020,7 @@ export async function POST(request: NextRequest) {
     }),
     prisma.foodLog
       .findMany({
-        where: { userId, createdAt: { gte: periodStart } },
+        where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
         orderBy: { createdAt: 'desc' },
         take: 75,
       })
@@ -1894,7 +2030,7 @@ export async function POST(request: NextRequest) {
       }),
     prisma.waterLog
       .findMany({
-        where: { userId, createdAt: { gte: periodStart } },
+        where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
         orderBy: { createdAt: 'desc' },
         take: 120,
       })
@@ -1904,7 +2040,7 @@ export async function POST(request: NextRequest) {
       }),
     prisma.healthLog
       .findMany({
-        where: { userId, createdAt: { gte: periodStart } },
+        where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
         orderBy: { createdAt: 'desc' },
         take: 50,
         include: { goal: { select: { name: true } } },
@@ -1925,7 +2061,7 @@ export async function POST(request: NextRequest) {
       }),
     prisma.exerciseLog
       .findMany({
-        where: { userId, createdAt: { gte: periodStart } },
+        where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
         orderBy: { createdAt: 'desc' },
         take: 50,
       })
@@ -1935,7 +2071,7 @@ export async function POST(request: NextRequest) {
       }),
     prisma.exerciseEntry
       .findMany({
-        where: { userId, createdAt: { gte: periodStart } },
+        where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
         orderBy: { createdAt: 'desc' },
         take: 50,
       })
@@ -1972,9 +2108,10 @@ export async function POST(request: NextRequest) {
   try {
     await ensureMoodTables()
     moodRows = await prisma.$queryRawUnsafe(
-      'SELECT mood, timestamp, localDate, tags, note FROM MoodEntries WHERE userId = $1 AND timestamp >= $2 ORDER BY timestamp DESC LIMIT 120',
+      'SELECT mood, timestamp, localDate, tags, note FROM MoodEntries WHERE userId = $1 AND timestamp >= $2 AND timestamp <= $3 ORDER BY timestamp DESC LIMIT 120',
       userId,
-      periodStart
+      periodStart,
+      periodEnd
     )
   } catch (error) {
     console.warn('[weekly-report] Failed to load mood entries', error)
@@ -1995,24 +2132,19 @@ export async function POST(request: NextRequest) {
     checkinRatings = await prisma.$queryRawUnsafe(
       `SELECT r.id,
               r.date,
-              COALESCE(r.timestamp, r.date::date) AS timestamp,
+              r.date::timestamptz AS timestamp,
               r.value,
               r.note,
-              r.isNa,
+              r.isna,
               i.name,
               i.polarity
-       FROM CheckinRatings r
-       JOIN CheckinIssues i ON i.id = r.issueId
-       WHERE r.userId = $1
-         AND (
-           (r.timestamp >= $2 AND r.timestamp <= $3)
-           OR (r.date BETWEEN $4 AND $5)
-         )
-       ORDER BY COALESCE(r.timestamp, r.date::date) DESC
+       FROM checkinratings r
+       JOIN checkinissues i ON i.id = r.issueid
+       WHERE r.userid = $1
+         AND r.date BETWEEN $2 AND $3
+       ORDER BY r.date DESC
        LIMIT 200`,
       userId,
-      periodStart,
-      periodEnd,
       periodStartDate,
       periodEndDate
     )
@@ -2033,7 +2165,7 @@ export async function POST(request: NextRequest) {
   let symptomAnalyses: Array<{ summary: string | null; analysisText: string | null; createdAt: Date; symptoms: any }> = []
   try {
     symptomAnalyses = await prisma.symptomAnalysis.findMany({
-      where: { userId, createdAt: { gte: periodStart } },
+      where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
       orderBy: { createdAt: 'desc' },
       take: 12,
       select: { summary: true, analysisText: true, createdAt: true, symptoms: true },
@@ -2046,7 +2178,7 @@ export async function POST(request: NextRequest) {
   let labReports: Array<{ id: string; createdAt: Date }> = []
   try {
     labReports = await prisma.report.findMany({
-      where: { userId, createdAt: { gte: periodStart } },
+      where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
       select: { id: true, createdAt: true },
       take: 20,
     })
@@ -2498,6 +2630,7 @@ export async function POST(request: NextRequest) {
   const llmContext = {
     periodStart: reportContext.periodStart,
     periodEnd: reportContext.periodEnd,
+    timezone,
     profile: reportContext.profile,
     goals: reportContext.goals,
     issues: reportContext.issues,
@@ -2519,7 +2652,6 @@ export async function POST(request: NextRequest) {
       dailyTotals: (hydrationSummary.dailyTotals || []).slice(0, 7),
     },
     foodHighlights,
-    foodLogSample: reportContext.foodLogSample,
     dailyStats: compactDailyStats,
     mealTimingSummary,
     timeOfDayNutrition,
@@ -2532,7 +2664,7 @@ export async function POST(request: NextRequest) {
     symptomSummary,
     exerciseSummary,
     dataFlags,
-    insightCandidates: insightCandidates.slice(0, 16),
+    insightCandidates: insightCandidates.slice(0, 20),
     talkToAi: {
       userMessageCount: talkToAiSummary.userMessageCount,
       activeDays: talkToAiSummary.activeDays,
@@ -2542,9 +2674,13 @@ export async function POST(request: NextRequest) {
     journalSummary,
     journalDigest,
     journalEntries: reportContext.journalEntries,
-    timezone,
+    labHighlights,
+    labTrends,
+    sectionSignals: reportContext.sectionSignals,
+    nutritionSignals,
   }
-  const trimmedLlmContext = trimLlmContext(llmContext)
+  const MAX_LLM_CONTEXT_CHARS = 45000
+  const { json: llmPayloadJson, size: llmPayloadSize } = buildLlmPayload(llmContext, MAX_LLM_CONTEXT_CHARS)
 
   const rawModel = String(process.env.OPENAI_WEEKLY_REPORT_MODEL || '').trim()
   const model = rawModel.toLowerCase().includes('gpt-5.2') ? rawModel : 'gpt-5.2-chat-latest'
@@ -2554,7 +2690,8 @@ export async function POST(request: NextRequest) {
   let summaryText = ''
   let llmUsage: { promptTokens: number; completionTokens: number; costCents: number; model: string } | null = null
 
-  if (llmEnabled && process.env.OPENAI_API_KEY) {
+  const llmPayloadReady = Boolean(llmPayloadJson) && llmPayloadSize <= MAX_LLM_CONTEXT_CHARS
+  if (llmEnabled && process.env.OPENAI_API_KEY && llmPayloadReady) {
     try {
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
       const prompt = `You are a careful, data-driven health coach. Use ONLY the JSON data provided.
@@ -2588,6 +2725,7 @@ Rules:
 - Use nutritionSummary.topFoods, foodHighlights, and dailyStats.topFoods to name actual foods (not just calories).
 - Do not ask the user what they ate or to log meals. Use the foods already in the data.
 - If journalEntries exist, include at least 2 items that quote the note with date/time and link it to the same day's foods, fluids, exercise, mood, symptoms, or check-ins.
+- If check-in data exists, include at least 1 item that names the goal and ties it to a specific date range or change.
 - Do not list raw log counts or repeat "you logged X entries" unless it directly supports a pattern or gap.
 - Avoid telling the user to "keep logging" unless a section has no usable data.
 - If sectionSignals show data for a section, include 2-3 items in "working" or "suggested" when there is enough data; otherwise include at least 1.
@@ -2603,9 +2741,10 @@ Rules:
 - If labTrends or lab highlights are present, describe movement (up/down/flat) without labeling good or bad.
 - If you suggest supplements, diet changes, or possible medications based on labs, check against current medications and allergies. If unsure, say to check with a clinician.
 - Do not tell the user how to navigate the app or where to find logs.
+- Do not repeat the same insight in more than one section.
 
 JSON data:
-${JSON.stringify(trimmedLlmContext)}
+${llmPayloadJson}
 `
 
       const isGpt5 = model.toLowerCase().includes('gpt-5')
@@ -2637,6 +2776,11 @@ ${JSON.stringify(trimmedLlmContext)}
     } catch (error) {
       console.warn('[weekly-report] LLM generation failed', error)
     }
+  } else if (llmEnabled && !llmPayloadReady) {
+    console.warn('[weekly-report] LLM payload too large', {
+      size: llmPayloadSize,
+      max: MAX_LLM_CONTEXT_CHARS,
+    })
   }
 
   const fallbackPayload = buildFallbackReport(reportContext)
@@ -2675,7 +2819,7 @@ ${JSON.stringify(trimmedLlmContext)}
     }
   })
 
-  reportPayload.sections = sections
+  reportPayload.sections = dedupeReportSections(sections)
   reportPayload.wins = wins
   reportPayload.gaps = gaps
   if (!summaryText) {
