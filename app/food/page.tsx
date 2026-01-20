@@ -5511,19 +5511,54 @@ export default function FoodDiary() {
     }
   }
 
+  const resolveOfficialSuggestionItem = async (item: any) => {
+    if (!item || !(item as any).__suggestion) return item
+    const lookup = String((item as any).__searchQuery || item.name || '').trim()
+    if (!lookup) return null
+    try {
+      const params = new URLSearchParams({
+        source: 'usda',
+        q: lookup,
+        kind: 'single',
+        limit: '20',
+      })
+      const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
+      if (!res.ok) return null
+      const data = await res.json().catch(() => ({}))
+      let items = Array.isArray(data?.items) ? data.items : []
+      items = items.filter((candidate: any) => candidate?.source === 'usda')
+      if (items.length === 0) return null
+      const normalizedLookup = lookup.toLowerCase()
+      const exact =
+        items.find((candidate: any) => String(candidate?.name || '').toLowerCase() === normalizedLookup) || null
+      return exact || items[0]
+    } catch {
+      return null
+    }
+  }
+
   const addIngredientFromOfficial = async (item: any) => {
     if (!item) return
+    let resolved = item
+    if ((item as any).__suggestion) {
+      const match = await resolveOfficialSuggestionItem(item)
+      if (!match) {
+        setOfficialError('No match found. Try a longer search.')
+        return
+      }
+      resolved = match
+    }
     const newItem = {
-      name: item.name || 'Unknown food',
-      brand: item.brand ?? null,
-      serving_size: item.serving_size || '',
+      name: resolved.name || 'Unknown food',
+      brand: resolved.brand ?? null,
+      serving_size: resolved.serving_size || '',
       servings: 1,
-      calories: item.calories ?? null,
-      protein_g: item.protein_g ?? null,
-      carbs_g: item.carbs_g ?? null,
-      fat_g: item.fat_g ?? null,
-      fiber_g: item.fiber_g ?? null,
-      sugar_g: item.sugar_g ?? null,
+      calories: resolved.calories ?? null,
+      protein_g: resolved.protein_g ?? null,
+      carbs_g: resolved.carbs_g ?? null,
+      fat_g: resolved.fat_g ?? null,
+      fiber_g: resolved.fiber_g ?? null,
+      sugar_g: resolved.sugar_g ?? null,
     }
 
     // If the modal was opened from the Today’s Meals (+) dropdown, add this as a new diary entry
@@ -5821,23 +5856,32 @@ export default function FoodDiary() {
 
   const replaceIngredientFromOfficial = async (item: any, index: number) => {
     if (!item || index === null || index === undefined) return
+    let resolved = item
+    if ((item as any).__suggestion) {
+      const match = await resolveOfficialSuggestionItem(item)
+      if (!match) {
+        setOfficialError('No match found. Try a longer search.')
+        return
+      }
+      resolved = match
+    }
     const itemsCopy = [...analyzedItems]
     if (!itemsCopy[index]) return
     const currentServings =
       Number.isFinite(Number(itemsCopy[index]?.servings)) && Number(itemsCopy[index]?.servings) > 0
         ? Number(itemsCopy[index]?.servings)
         : 1
-    const nextItem = buildOfficialItem(item, currentServings)
+    const nextItem = buildOfficialItem(resolved, currentServings)
     nextItem.dbLocked = true
-    if (item?.source) {
-      nextItem.dbSource = item.source
+    if (resolved?.source) {
+      nextItem.dbSource = resolved.source
     }
-    if (item?.id) {
-      nextItem.dbId = item.id
+    if (resolved?.id) {
+      nextItem.dbId = resolved.id
     }
-    if (item?.source && item?.id) {
+    if (resolved?.source && resolved?.id) {
       try {
-        const params = new URLSearchParams({ source: item.source, id: String(item.id) })
+        const params = new URLSearchParams({ source: resolved.source, id: String(resolved.id) })
         const res = await fetch(`/api/food-data/servings?${params.toString()}`)
         if (res.ok) {
           const data = await res.json()
@@ -5935,7 +5979,15 @@ export default function FoodDiary() {
     const queryTokens = getSearchTokens(searchQuery)
     const nameTokens = getSearchTokens(name)
     if (queryTokens.length === 0 || nameTokens.length === 0) return false
-    const tokenMatches = (token: string, word: string) => word.startsWith(token)
+    const tokenMatches = (token: string, word: string) => {
+      if (!token || !word) return false
+      if (word.startsWith(token)) return true
+      const singular = singularizeToken(token)
+      if (singular !== token && word.startsWith(singular)) return true
+      if (token.length >= 4 && word.includes(token)) return true
+      if (singular.length >= 4 && word.includes(singular)) return true
+      return false
+    }
     const requireFirstWord = options?.requireFirstWord ?? false
     if (requireFirstWord) {
       if (!queryTokens.some((token) => tokenMatches(token, nameTokens[0]))) return false
@@ -6229,6 +6281,7 @@ export default function FoodDiary() {
       if (!res.ok) {
         const text = await res.text()
         console.error('Food data search failed:', text)
+        if (officialSearchSeqRef.current !== seq) return
         setOfficialError('Unable to fetch official data right now. Please try again.')
         if (officialSearchSeqRef.current === seq) {
           setOfficialLastRequest((prev) =>
@@ -6276,6 +6329,7 @@ export default function FoodDiary() {
       const merged = mode === 'packaged' ? mergeBrandSuggestions(nextItems, brandMatches) : nextItems
 
       const finalResults = mode === 'single' ? mergeSearchSuggestions(merged, query) : merged
+      if (officialSearchSeqRef.current !== seq) return
       setOfficialResults(finalResults)
       setOfficialResultsSource(data?.source || 'auto')
       setOfficialLastRequest((prev) =>
@@ -6291,6 +6345,7 @@ export default function FoodDiary() {
     } catch (err: any) {
       if (err?.name === 'AbortError') return
       console.error('Food data search error:', err)
+      if (officialSearchSeqRef.current !== seq) return
       setOfficialError('Something went wrong while searching. Please try again.')
       if (officialSearchSeqRef.current === seq) {
         setOfficialLastRequest((prev) =>

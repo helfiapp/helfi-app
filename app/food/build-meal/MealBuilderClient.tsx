@@ -104,6 +104,24 @@ const normalizeSearchToken = (value: string) =>
     .trim()
     .replace(/\s+/g, ' ')
 
+const singularizeToken = (value: string) => {
+  const lower = value.toLowerCase()
+  if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
+  if (
+    lower.endsWith('es') &&
+    value.length > 3 &&
+    !lower.endsWith('ses') &&
+    !lower.endsWith('xes') &&
+    !lower.endsWith('zes') &&
+    !lower.endsWith('ches') &&
+    !lower.endsWith('shes')
+  ) {
+    return value.slice(0, -2)
+  }
+  if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
+  return value
+}
+
 const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: string }> = [
   { name: 'Apple, raw', serving_size: '100 g' },
   { name: 'Banana, raw', serving_size: '100 g' },
@@ -187,7 +205,15 @@ const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { r
   const queryTokens = getSearchTokens(searchQuery)
   const nameTokens = getSearchTokens(name)
   if (queryTokens.length === 0 || nameTokens.length === 0) return false
-  const tokenMatches = (token: string, word: string) => word.startsWith(token)
+  const tokenMatches = (token: string, word: string) => {
+    if (!token || !word) return false
+    if (word.startsWith(token)) return true
+    const singular = singularizeToken(token)
+    if (singular !== token && word.startsWith(singular)) return true
+    if (token.length >= 4 && word.includes(token)) return true
+    if (singular.length >= 4 && word.includes(singular)) return true
+    return false
+  }
   const requireFirstWord = options?.requireFirstWord ?? false
   if (requireFirstWord) {
     if (!queryTokens.some((token) => tokenMatches(token, nameTokens[0]))) return false
@@ -874,9 +900,11 @@ export default function MealBuilderClient() {
         kind === 'single'
           ? mergeSearchSuggestions(nextItems, q)
           : mergeBrandSuggestions(nextItems, brandSuggestionsRef.current)
+      if (seqRef.current !== seq) return
       setResults(merged)
       return merged
     } catch (e: any) {
+      if (seqRef.current !== seq) return
       setError('Search failed. Please try again.')
     } finally {
       if (seqRef.current === seq) setSearchLoading(false)
@@ -1003,8 +1031,12 @@ export default function MealBuilderClient() {
     const lookup = item.__searchQuery || item.name
     setSearchLoading(true)
     try {
-      const matches = await runSearch(lookup)
-      const best = Array.isArray(matches) && matches.length > 0 ? matches[0] : null
+      const matches = await fetchSearchItems(lookup, { kindOverride: 'single', sourceOverride: 'usda' })
+      const filtered = matches.filter((candidate) => candidate?.source === 'usda')
+      const best =
+        filtered.find((candidate) => nameMatchesSearchQuery(candidate?.name || '', lookup, { requireFirstWord: false })) ||
+        filtered[0] ||
+        null
       if (best) {
         addItem(best)
       } else {

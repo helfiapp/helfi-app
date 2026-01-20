@@ -202,13 +202,39 @@ const normalizeSearchToken = (value: string) =>
     .trim()
     .replace(/\s+/g, ' ')
 
+const singularizeToken = (value: string) => {
+  const lower = value.toLowerCase()
+  if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
+  if (
+    lower.endsWith('es') &&
+    value.length > 3 &&
+    !lower.endsWith('ses') &&
+    !lower.endsWith('xes') &&
+    !lower.endsWith('zes') &&
+    !lower.endsWith('ches') &&
+    !lower.endsWith('shes')
+  ) {
+    return value.slice(0, -2)
+  }
+  if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
+  return value
+}
+
 const getSearchTokens = (value: string) => normalizeSearchToken(value).split(' ').filter(Boolean)
 
 const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { requireFirstWord?: boolean }) => {
   const queryTokens = getSearchTokens(searchQuery)
   const nameTokens = getSearchTokens(name)
   if (queryTokens.length === 0 || nameTokens.length === 0) return false
-  const tokenMatches = (token: string, word: string) => word.startsWith(token)
+  const tokenMatches = (token: string, word: string) => {
+    if (!token || !word) return false
+    if (word.startsWith(token)) return true
+    const singular = singularizeToken(token)
+    if (singular !== token && word.startsWith(singular)) return true
+    if (token.length >= 4 && word.includes(token)) return true
+    if (singular.length >= 4 && word.includes(singular)) return true
+    return false
+  }
   const requireFirstWord = options?.requireFirstWord ?? false
   if (requireFirstWord) {
     if (!queryTokens.some((token) => tokenMatches(token, nameTokens[0]))) return false
@@ -460,24 +486,6 @@ export default function AddIngredientClient() {
       .replace(/\s+/g, ' ')
       .trim()
 
-  const singularizeToken = (value: string) => {
-    const lower = value.toLowerCase()
-    if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
-    if (
-      lower.endsWith('es') &&
-      value.length > 3 &&
-      !lower.endsWith('ses') &&
-      !lower.endsWith('xes') &&
-      !lower.endsWith('zes') &&
-      !lower.endsWith('ches') &&
-      !lower.endsWith('shes')
-    ) {
-      return value.slice(0, -2)
-    }
-    if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
-    return value
-  }
-
   const buildSingleFoodFallback = (value: string) => {
     const cleaned = cleanSingleFoodQuery(value)
     if (!cleaned) return null
@@ -676,6 +684,32 @@ export default function AddIngredientClient() {
     }
   }
 
+  const resolveSuggestionItem = async (r: NormalizedFoodItem): Promise<NormalizedFoodItem | null> => {
+    if (!r || !(r as any).__suggestion) return r
+    const lookup = String((r as any).__searchQuery || r.name || '').trim()
+    if (!lookup) return null
+    try {
+      const params = new URLSearchParams({
+        source: 'usda',
+        q: lookup,
+        kind: 'single',
+        limit: '20',
+      })
+      const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
+      if (!res.ok) return null
+      const data = await res.json().catch(() => ({}))
+      let items: NormalizedFoodItem[] = Array.isArray(data?.items) ? data.items : []
+      items = items.filter((item) => item?.source === 'usda')
+      if (items.length === 0) return null
+      const match =
+        items.find((item) => nameMatchesSearchQuery(item?.name || '', lookup, { requireFirstWord: false })) ||
+        items[0]
+      return match
+    } catch {
+      return null
+    }
+  }
+
   const fetchBrandSuggestions = async (searchQuery: string) => {
     const prefix = getSearchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
@@ -738,7 +772,7 @@ export default function AddIngredientClient() {
             : typeof data?.message === 'string'
             ? data.message
             : 'Search failed. Please try again.'
-        setError(msg)
+        if (seqRef.current === seq) setError(msg)
         return
       }
       if (seqRef.current !== seq) return
@@ -768,9 +802,11 @@ export default function AddIngredientClient() {
         k === 'packaged'
           ? mergeBrandSuggestions(nextResults, brandMatches)
           : mergeSearchSuggestions(nextResults, q)
+      if (seqRef.current !== seq) return
       setResults(merged)
     } catch (e: any) {
       if (e?.name === 'AbortError') return
+      if (seqRef.current !== seq) return
       setError('Search failed. Please try again.')
     } finally {
       if (seqRef.current === seq) setLoading(false)
@@ -839,8 +875,17 @@ export default function AddIngredientClient() {
     triggerHaptic(10)
     setAddingId(`${r.source}:${r.id}`)
     try {
-      const upgraded = await loadServingOverride(r)
-      const final = upgraded || r
+      let target = r
+      if ((r as any).__suggestion) {
+        const resolved = await resolveSuggestionItem(r)
+        if (!resolved) {
+          setError('No match found. Try a longer search.')
+          return
+        }
+        target = resolved
+      }
+      const upgraded = await loadServingOverride(target)
+      const final = upgraded || target
       const baseItem = {
         name: String(final.name || 'Food'),
         brand: final.brand ?? null,
