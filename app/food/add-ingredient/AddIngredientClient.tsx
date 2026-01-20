@@ -800,13 +800,9 @@ export default function AddIngredientClient() {
       const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
       const filteredResults = hasToken ? baseResults.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k)) : baseResults
       const finalResults = k === 'single' && filteredResults.length === 0 && baseResults.length > 0 ? baseResults : filteredResults
-      const brandMatches =
-        k === 'packaged' && hasToken
-          ? await fetchBrandSuggestions(q)
-          : []
       const merged =
         k === 'packaged'
-          ? mergeBrandSuggestions(finalResults, brandMatches)
+          ? mergeBrandSuggestions(finalResults, brandSuggestionsRef.current)
           : mergeSearchSuggestions(finalResults, q)
       if (seqRef.current !== seq) return
       setResults(merged)

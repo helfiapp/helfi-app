@@ -97,12 +97,13 @@ function parseNumber(value: any): number | null {
 
 export async function searchLocalFoods(
   query: string,
-  opts: { pageSize?: number; sources?: string[] } = {},
+  opts: { pageSize?: number; sources?: string[]; mode?: 'prefix' | 'prefix-contains' } = {},
 ): Promise<NormalizedFoodItem[]> {
   const q = String(query || '').trim()
   if (!q) return []
   const pageSize = opts.pageSize ?? 10
   const sources = Array.isArray(opts.sources) && opts.sources.length > 0 ? opts.sources : null
+  const mode = opts.mode || 'prefix-contains'
 
   try {
     const sourceFilter = sources ? { source: { in: sources } } : null
@@ -137,7 +138,7 @@ export async function searchLocalFoods(
     const remaining = Math.max(0, pageSize - prefixRows.length)
     const prefixIds = prefixRows.map((row) => row.id)
     const containsRows =
-      remaining > 0
+      remaining > 0 && mode !== 'prefix'
         ? await prisma.foodLibraryItem.findMany({
             where: buildWhere(containsFilter, prefixIds),
             take: remaining,

@@ -210,7 +210,7 @@ export async function GET(request: NextRequest) {
     const searchLocalPreferred = async (value: string, resolvedKind: 'packaged' | 'single') => {
       if (!value) return []
       if (resolvedKind === 'packaged') {
-        return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
+        return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'], mode: 'prefix' })
       }
       const foundation = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] })
       const legacy = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_sr_legacy'] })
@@ -232,7 +232,6 @@ export async function GET(request: NextRequest) {
 
     if (source === 'auto' || !source) {
       const resolvedKind = kind === 'packaged' ? 'packaged' : 'single'
-      const usdaDataType = resolvedKind === 'packaged' ? 'all' : 'generic'
 
       const scoredServing = (serving: string | null | undefined, calories?: number | null) => {
         const s = (serving || '').toLowerCase()
@@ -382,7 +381,7 @@ export async function GET(request: NextRequest) {
       ]
       const isFastFoodQuery = queryTokensNormalized.some((token) => fastFoodTokens.some((k) => k.includes(token) || token.includes(k)))
 
-      const localItems = await searchLocalPreferred(query, resolvedKind)
+      const localItems = resolvedKind === 'single' ? await searchLocalPreferred(query, resolvedKind) : []
       if (resolvedKind === 'single' && localItems.length > 0) {
         items = [...localItems].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
         actualSource = 'auto'
@@ -391,17 +390,6 @@ export async function GET(request: NextRequest) {
         actualSource = 'usda'
       } else {
         const perSource = Math.min(Math.max(limit, 10), 25)
-
-        const externalRequests = [
-          searchOpenFoodFactsByQuery(query, { pageSize: perSource }),
-          searchFatSecretFoods(query, { pageSize: perSource }),
-        ]
-
-        const externalResults = await Promise.allSettled(externalRequests)
-        const externalPool: any[] = []
-        for (const res of externalResults) {
-          if (res.status === 'fulfilled' && Array.isArray(res.value)) externalPool.push(...res.value)
-        }
 
         const normalized = (value: any) => String(value || '').trim().toLowerCase()
         const dedupe = (list: any[]) => {
@@ -416,38 +404,50 @@ export async function GET(request: NextRequest) {
           return Array.from(byNameBrand.values())
         }
 
-        if (isFastFoodQuery) {
-          const external = dedupe(externalPool)
-          const merged = [...external]
-          if (localItems.length > 0) {
-            localItems.forEach((it) => {
-              const key = `${normalized(it?.name)}|${normalized(it?.brand)}`
-              if (!key || key === '|') return
-              if (!merged.some((m) => `${normalized(m?.name)}|${normalized(m?.brand)}` === key)) merged.push(it)
-            })
-          }
-          items = merged.slice(0, limit)
-          actualSource = external.length > 0 ? 'auto' : 'usda'
-        } else if (localItems.length > 0) {
-          items = [...localItems].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
-          actualSource = 'auto'
-        } else {
-          const pooled = dedupe(externalPool)
+        const fetchExternalPool = async () => {
+          const off = await searchOpenFoodFactsByQuery(query, { pageSize: perSource })
+          if (off.length > 0) return off
+          return await searchFatSecretFoods(query, { pageSize: perSource })
+        }
 
-          if (resolvedKind === 'packaged' && isMealQuery) {
-            const hasFullMeal = pooled.some((it) => isLikelyFullMeal(it))
-            if (!hasFullMeal) {
-              const usdaBoost = await searchUsdaFoods(query, { pageSize: perSource, dataType: 'branded' })
-              pooled.push(...usdaBoost)
+        if (!isFastFoodQuery) {
+          const localPackaged = await searchLocalPreferred(query, 'packaged')
+          if (localPackaged.length > 0) {
+            items = [...localPackaged].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+            actualSource = 'auto'
+          } else {
+            const pooled = dedupe(await fetchExternalPool())
+
+            if (resolvedKind === 'packaged' && isMealQuery) {
+              const hasFullMeal = pooled.some((it) => isLikelyFullMeal(it))
+              if (!hasFullMeal) {
+                const usdaBoost = await searchUsdaFoods(query, { pageSize: perSource, dataType: 'branded' })
+                pooled.push(...usdaBoost)
+              }
+            }
+
+            items = pooled.slice(0, limit)
+            actualSource = 'auto'
+
+            if (items.length === 0) {
+              // Fallback: if packaged sources return nothing, try USDA so users still get results.
+              items = await searchUsdaFoods(query, { pageSize: limit, dataType: 'all' })
             }
           }
-
+        } else {
+          const pooled = dedupe(await fetchExternalPool())
           items = pooled.slice(0, limit)
           actualSource = 'auto'
 
           if (items.length === 0) {
-            // Fallback: if packaged sources return nothing, try USDA so users still get results.
-            items = await searchUsdaFoods(query, { pageSize: limit, dataType: 'all' })
+            const localPackaged = await searchLocalPreferred(query, 'packaged')
+            if (localPackaged.length > 0) {
+              items = [...localPackaged].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+              actualSource = 'auto'
+            } else {
+              items = await searchUsdaFoods(query, { pageSize: limit, dataType: 'all' })
+              actualSource = 'usda'
+            }
           }
         }
       }

@@ -6327,13 +6327,7 @@ export default function FoodDiary() {
       const filteredItems = hasToken ? baseItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : baseItems
       const finalItems = mode === 'single' && filteredItems.length === 0 && baseItems.length > 0 ? baseItems : filteredItems
 
-      const brandMatches =
-        mode === 'packaged' && hasToken
-          ? await fetchOfficialBrandSuggestions(query)
-          : []
-
-      const merged = mode === 'packaged' ? mergeBrandSuggestions(finalItems, brandMatches) : finalItems
-
+      const merged = finalItems
       const finalResults = mode === 'single' ? mergeSearchSuggestions(merged, query) : merged
       if (officialSearchSeqRef.current !== seq) return
       setOfficialResults(finalResults)
@@ -6348,6 +6342,14 @@ export default function FoodDiary() {
             }
           : prev,
       )
+
+      if (mode === 'packaged' && hasToken) {
+        void fetchOfficialBrandSuggestions(query).then((brandMatches) => {
+          if (officialSearchSeqRef.current !== seq) return
+          if (!Array.isArray(brandMatches) || brandMatches.length === 0) return
+          setOfficialResults((prev) => mergeBrandSuggestions(prev, brandMatches))
+        })
+      }
     } catch (err: any) {
       if (err?.name === 'AbortError') return
       console.error('Food data search error:', err)
