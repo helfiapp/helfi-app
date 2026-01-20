@@ -92,7 +92,7 @@ function buildDefaultSections(): Record<ReportSectionKey, ReportSectionBucket> {
   }, {} as Record<ReportSectionKey, ReportSectionBucket>)
 }
 
-function normalizeReportItem(item: ReportItem | null | undefined): ReportItem {
+function normalizeReportItem(item: ReportItem | null | undefined): { name: string; reason: string } {
   const name = String(item?.name || '').trim()
   const reason = String(item?.reason || '').trim()
   return { name, reason }
