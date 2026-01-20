@@ -30,6 +30,7 @@ const DATA_DIRS = [
 
 const FOUNDATION_ZIP_PREFIX = 'FoodData_Central_foundation_food_csv_'
 const BRANDED_ZIP_PREFIX = 'FoodData_Central_branded_food_csv_'
+const SR_LEGACY_ZIP_PREFIX = 'FoodData_Central_sr_legacy_food_csv_'
 
 function findZip(prefix: string): string | null {
   for (const dir of DATA_DIRS) {
@@ -288,6 +289,49 @@ async function importFoundation(zipPath: string) {
   console.log(`Foundation import finished: ${inserted.toLocaleString()} records from ${rowCount.toLocaleString()} foods.`)
 }
 
+async function importSrLegacy(zipPath: string) {
+  console.log(`\nImporting USDA SR Legacy foods from: ${zipPath}`)
+  const root = getZipRoot(zipPath)
+  const nutrientIds = await loadNutrientIds(zipPath)
+  const macrosByFdc = await loadMacroMap(zipPath, nutrientIds)
+  const foodFile = `${root}/food.csv`
+
+  await prisma.foodLibraryItem.deleteMany({ where: { source: 'usda_sr_legacy' } })
+  console.log('Cleared existing SR Legacy records.')
+
+  let rowCount = 0
+  let inserted = 0
+
+  await streamCsvFromZip(zipPath, foodFile, async (row) => {
+    rowCount += 1
+    const fdcId = Number(row.fdc_id)
+    const name = String(row.description || '').trim()
+    if (!Number.isFinite(fdcId) || !name) return
+    const macros = macrosByFdc.get(fdcId)
+    if (!macros) return
+
+    await prisma.foodLibraryItem.create({
+      data: {
+        source: 'usda_sr_legacy',
+        fdcId,
+        name,
+        brand: null,
+        servingSize: '100 g',
+        calories: macros.calories ?? null,
+        proteinG: macros.protein_g ?? null,
+        carbsG: macros.carbs_g ?? null,
+        fatG: macros.fat_g ?? null,
+        fiberG: macros.fiber_g ?? null,
+        sugarG: macros.sugar_g ?? null,
+      },
+    })
+    inserted += 1
+    macrosByFdc.delete(fdcId)
+  })
+
+  console.log(`SR Legacy import finished: ${inserted.toLocaleString()} records from ${rowCount.toLocaleString()} foods.`)
+}
+
 async function importBranded(zipPath: string) {
   console.log(`\nImporting USDA branded foods from: ${zipPath}`)
   const root = getZipRoot(zipPath)
@@ -342,19 +386,27 @@ async function run() {
   const args = new Set(process.argv.slice(2))
   const foundationZip = findZip(FOUNDATION_ZIP_PREFIX)
   const brandedZip = findZip(BRANDED_ZIP_PREFIX)
+  const legacyZip = findZip(SR_LEGACY_ZIP_PREFIX)
 
-  if (!foundationZip && !brandedZip) {
+  if (!foundationZip && !brandedZip && !legacyZip) {
     console.error('No USDA zip files found. Put them in data/food-import/.')
     process.exit(1)
   }
 
   const runFoundation = args.size === 0 || args.has('--foundation') || args.has('--all')
   const runBranded = args.size === 0 || args.has('--branded') || args.has('--all')
+  const runLegacy = args.size === 0 || args.has('--legacy') || args.has('--sr-legacy') || args.has('--all')
 
   if (runFoundation && foundationZip) {
     await importFoundation(foundationZip)
   } else if (runFoundation) {
     console.log('Foundation zip not found. Skipping foundation import.')
+  }
+
+  if (runLegacy && legacyZip) {
+    await importSrLegacy(legacyZip)
+  } else if (runLegacy) {
+    console.log('SR Legacy zip not found. Skipping SR Legacy import.')
   }
 
   if (runBranded && brandedZip) {

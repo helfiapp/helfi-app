@@ -149,13 +149,13 @@ export async function GET(request: NextRequest) {
     const checkUsdaLibraryHealth = async () => {
       const now = Date.now()
       if (now - usdaHealthCache.checkedAt < 10 * 60 * 1000 && usdaHealthCache.count != null) return usdaHealthCache.count
-      const count = await prisma.foodLibraryItem.count({ where: { source: { in: ['usda_foundation', 'usda_branded'] } } })
+      const count = await prisma.foodLibraryItem.count({ where: { source: { in: ['usda_foundation', 'usda_sr_legacy', 'usda_branded'] } } })
       usdaHealthCache = { count, checkedAt: now }
       return count
     }
 
     const searchUsdaSingleFood = async (value: string) => {
-      const sources = ['usda_foundation', 'usda_branded']
+      const sources = ['usda_foundation', 'usda_sr_legacy', 'usda_branded']
       const attempt = async (q: string) => {
         if (!q) return []
         return await searchLocalFoods(q, { pageSize: limit, sources })
@@ -189,9 +189,13 @@ export async function GET(request: NextRequest) {
       if (resolvedKind === 'packaged') {
         return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
       }
-      const foundationAndBranded = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation', 'usda_branded'] })
-      if (foundationAndBranded.length > 0) return foundationAndBranded
-      return []
+      const foundation = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] })
+      if (foundation.length >= limit) return foundation
+      const legacy = await searchLocalFoods(value, { pageSize: limit - foundation.length, sources: ['usda_sr_legacy'] })
+      const combined = [...foundation, ...legacy]
+      if (combined.length >= limit) return combined
+      const branded = await searchLocalFoods(value, { pageSize: limit - combined.length, sources: ['usda_branded'] })
+      return [...combined, ...branded]
     }
 
     if (source === 'auto' || !source) {

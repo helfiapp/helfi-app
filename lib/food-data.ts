@@ -105,18 +105,47 @@ export async function searchLocalFoods(
   const sources = Array.isArray(opts.sources) && opts.sources.length > 0 ? opts.sources : null
 
   try {
-    const searchFilter = {
+    const sourceFilter = sources ? { source: { in: sources } } : null
+    const prefixFilter = {
+      OR: [
+        { name: { startsWith: q, mode: 'insensitive' as const } },
+        { brand: { startsWith: q, mode: 'insensitive' as const } },
+      ],
+    }
+    const containsFilter = {
       OR: [
         { name: { contains: q, mode: 'insensitive' as const } },
         { brand: { contains: q, mode: 'insensitive' as const } },
       ],
     }
-    const where = sources ? { AND: [{ source: { in: sources } }, searchFilter] } : searchFilter
-    const rows = await prisma.foodLibraryItem.findMany({
-      where,
+    const buildWhere = (filter: any, excludeIds?: string[]) => {
+      const clauses = []
+      if (sourceFilter) clauses.push(sourceFilter)
+      if (filter) clauses.push(filter)
+      if (excludeIds && excludeIds.length > 0) clauses.push({ id: { notIn: excludeIds } })
+      if (clauses.length === 0) return {}
+      if (clauses.length === 1) return clauses[0]
+      return { AND: clauses }
+    }
+
+    const prefixRows = await prisma.foodLibraryItem.findMany({
+      where: buildWhere(prefixFilter),
       take: pageSize,
       orderBy: { name: 'asc' },
     })
+
+    const remaining = Math.max(0, pageSize - prefixRows.length)
+    const prefixIds = prefixRows.map((row) => row.id)
+    const containsRows =
+      remaining > 0
+        ? await prisma.foodLibraryItem.findMany({
+            where: buildWhere(containsFilter, prefixIds),
+            take: remaining,
+            orderBy: { name: 'asc' },
+          })
+        : []
+
+    const rows = [...prefixRows, ...containsRows]
     return rows.map((row) => ({
       source: 'usda',
       id: String(row.fdcId ?? row.id),
