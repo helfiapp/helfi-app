@@ -159,6 +159,13 @@ export async function GET(request: NextRequest) {
         if (next.length > 0) return next
       }
 
+      // As a last resort, hit USDA API so users still get results if the local library is empty.
+      const remote = await searchUsdaFoods(value, { pageSize: limit, dataType: 'generic' })
+      if (remote.length > 0) return remote
+      for (const fallback of fallbacks) {
+        const remoteNext = await searchUsdaFoods(fallback, { pageSize: limit, dataType: 'generic' })
+        if (remoteNext.length > 0) return remoteNext
+      }
       return []
     }
 
@@ -406,7 +413,8 @@ export async function GET(request: NextRequest) {
         if (resolvedKind !== 'packaged') {
           items = await searchUsdaSingleFood(query)
         } else {
-          items = await searchUsdaFoods(query, { pageSize: limit, dataType })
+          const remote = await searchUsdaFoods(query, { pageSize: limit, dataType })
+          items = remote
         }
       }
     } else if (source === 'fatsecret') {
