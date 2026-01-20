@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
     const getSearchTokens = (value: string) => normalizeForMatch(value).split(' ').filter(Boolean)
 
     const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
+      // Ignore 1-letter tokens so "art" does not match "Bartlett" via "t".
       const queryTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
       const nameTokens = getSearchTokens(name).filter((token) => token.length >= 2)
       if (queryTokens.length === 0 || nameTokens.length === 0) return false

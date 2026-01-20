@@ -205,19 +205,24 @@ Files:
 
 **Scope:** All ingredient search surfaces (Build a Meal, Add Ingredient page, Food Diary add-ingredient modal).
 
-- Single-food searches **must use the local USDA library in Neon Postgres** (`foodLibraryItem`) and **must not call the external USDA API**.
-- The local query must include both sources: `usda_foundation` and `usda_branded`.
+- Single-food searches **must use the local USDA library in Neon Postgres** (`foodLibraryItem`) and **must not call the external USDA API** during normal use.
+- The local query must include **all** USDA sources: `usda_foundation`, `usda_sr_legacy`, and `usda_branded`.
+- SR Legacy is the “regular foods” list. If it is missing, normal foods (like artichoke) will not show up on short searches.
 - Server code: `app/api/food-data/route.ts` uses `searchLocalFoods` for single foods and fallbacks (singular/raw/cooked) against the local library. Do not remove or bypass this.
 - Import script: `scripts/import-usda-foods.ts` loads USDA zips from `data/food-import/` into `foodLibraryItem`. Keep this as the source of truth.
+- Search safety rule: ignore 1‑letter tokens so “art” does not match “Bartlett” via the single letter “t”.
 
 **Restore steps if broken:**
-1) Ensure USDA zips are present in `data/food-import/` (foundation + branded).  
-2) Re-run the import locally or in the job environment:  
+1) Confirm the production database is the **populated USDA database** (the one with ~1.8M branded rows). If the DB is empty, searches will fail.  
+2) Make sure all three USDA zip files exist in `data/food-import/`:  
+   - `FoodData_Central_foundation_food_csv_*.zip`  
+   - `FoodData_Central_sr_legacy_food_csv_*.zip`  
+   - `FoodData_Central_branded_food_csv_*.zip`  
+3) Re-run the import (low‑memory safe):  
    `TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{"module":"commonjs","moduleResolution":"node"}' npx ts-node scripts/import-usda-foods.ts --all`  
-3) Verify the library has walnut rows (example):  
-   run a prisma check to count `foodLibraryItem` where name contains “walnut” (should be thousands).  
-4) Hit `/api/food-data?source=usda&kind=single&q=walnuts&limit=20` and confirm results show `source: usda_foundation` or `usda_branded` (not remote API).  
-5) Keep `searchLocalPreferred` and `searchUsdaSingleFood` using `searchLocalFoods` with both sources; do not revert to USDA HTTP calls.
+4) Verify counts: `usda_foundation` ~6k, `usda_sr_legacy` ~7k, `usda_branded` ~1.8M.  
+5) Verify behavior by searching “art” and “artichoke”. You should see artichokes at the top, not pears.  
+6) Do not remove the “ignore 1‑letter tokens” rule in search matching; it prevents false matches like “Bartlett”.
 
 `POST /api/health-setup-status` with `{ disableReminder: true }`:
 - Upserts the `__HEALTH_SETUP_REMINDER_DISABLED__` record to disable the reminder

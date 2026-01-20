@@ -289,6 +289,8 @@ async function importFoundation(zipPath: string) {
   console.log(`Foundation import finished: ${inserted.toLocaleString()} records from ${rowCount.toLocaleString()} foods.`)
 }
 
+// NOTE: SR Legacy contains the "regular foods" list (e.g., artichokes).
+// Do not remove this import. Search relevance breaks without it.
 async function importSrLegacy(zipPath: string) {
   console.log(`\nImporting USDA SR Legacy foods from: ${zipPath}`)
   const root = getZipRoot(zipPath)
