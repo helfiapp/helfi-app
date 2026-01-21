@@ -840,7 +840,10 @@ export default function MealBuilderClient() {
     return { title: name, showBrandSuffix: true }
   }
 
-  const fetchSearchItems = async (searchQuery: string, options?: { kindOverride?: 'packaged' | 'single'; sourceOverride?: string }) => {
+  const fetchSearchItems = async (
+    searchQuery: string,
+    options?: { kindOverride?: 'packaged' | 'single'; sourceOverride?: string; localOnly?: boolean },
+  ) => {
     const q = String(searchQuery || '').trim()
     if (!q) return []
     const kindToUse = options?.kindOverride || kind
@@ -851,6 +854,7 @@ export default function MealBuilderClient() {
       kind: kindToUse,
       limit: '20',
     })
+    if (options?.localOnly) params.set('localOnly', '1')
     const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
     if (!res.ok) return []
     const data = await res.json().catch(() => ({} as any))
@@ -886,6 +890,16 @@ export default function MealBuilderClient() {
     const seq = ++seqRef.current
 
     try {
+      if (kind === 'packaged') {
+        const quickItems = await fetchSearchItems(q, { kindOverride: 'packaged', sourceOverride: 'usda', localOnly: true })
+        if (seqRef.current === seq && quickItems.length > 0) {
+          const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+          const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : quickItems
+          const quickMerged = mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current)
+          if (seqRef.current === seq) setResults(quickMerged)
+        }
+      }
+
       let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
       const rawItems = nextItems

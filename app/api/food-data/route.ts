@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const source = (searchParams.get('source') || '').toLowerCase()
     const query = (searchParams.get('q') || '').trim()
     const kind = (searchParams.get('kind') || '').toLowerCase()
+    const localOnly = searchParams.get('localOnly') === '1'
     const limitRaw = searchParams.get('limit')
     const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : NaN
     const limit = Number.isFinite(limitParsed) ? Math.min(Math.max(limitParsed, 1), 50) : 20
@@ -458,6 +459,9 @@ export async function GET(request: NextRequest) {
       const localItems = await searchLocalPreferred(query, resolvedKind)
       if (localItems.length > 0) {
         items = localItems
+        actualSource = 'usda'
+      } else if (localOnly) {
+        items = []
         actualSource = 'usda'
       } else {
         const dataType = resolvedKind === 'packaged' ? 'all' : 'generic'

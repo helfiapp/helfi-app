@@ -759,16 +759,30 @@ export default function AddIngredientClient() {
 
     try {
       const sourceParam = source === 'auto' ? 'auto' : source
-      const fetchItems = async (searchQuery: string) => {
+      const fetchItems = async (searchQuery: string, options?: { sourceParam?: SearchSource; localOnly?: boolean }) => {
         const params = new URLSearchParams({
-          source: sourceParam,
+          source: options?.sourceParam ?? sourceParam,
           q: searchQuery,
           kind: k,
           limit: '20',
         })
+        if (options?.localOnly) params.set('localOnly', '1')
         const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET', signal: controller.signal })
         const data = await res.json().catch(() => ({}))
         return { res, data }
+      }
+
+      if (k === 'packaged' && sourceParam === 'auto') {
+        const quick = await fetchItems(q, { sourceParam: 'usda', localOnly: true })
+        if (quick.res.ok && seqRef.current === seq) {
+          const quickItems = Array.isArray(quick.data?.items) ? quick.data.items : []
+          const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+          const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k)) : quickItems
+          const quickMerged = mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current)
+          if (seqRef.current === seq && quickMerged.length > 0) {
+            setResults(quickMerged)
+          }
+        }
       }
 
       let { res, data } = await fetchItems(q)
