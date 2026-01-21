@@ -683,6 +683,8 @@ const FOOD_DIARY_LOCAL_DATE_REPAIR_KEY = 'foodDiary:localDateRepair:last'
 const FOOD_DIARY_LOCAL_DATE_REPAIR_TTL_MS = 12 * 60 * 60 * 1000
 // GUARD RAIL: local restore prompt must stay user-controlled and never auto-hide without a restore or explicit action.
 const FOOD_DIARY_LOCAL_RESTORE_HIDE_KEY = 'foodDiary:localRestore:hide'
+// Owner request: disable restore banners for everyone until re-enabled.
+const SHOW_LOCAL_RESTORE_PROMPT = false
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
@@ -21807,11 +21809,11 @@ Please add nutritional information manually if needed.`);
                           No meals yet today. Here are your daily targets to start the day.
                         </p>
                       )}
-                      {source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
+                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
                         <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
                       )}
                       {/* GUARD RAIL: local restore is best-effort and should never be forced on the user. */}
-                      {source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
+                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
                         <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
                           <div>We found saved entries on this device.</div>
                           <div className="flex flex-wrap gap-2">
@@ -21882,7 +21884,7 @@ Please add nutritional information manually if needed.`);
                       {source.length === 0 && rescueMessage && (
                         <div className="mb-3 text-xs text-gray-600">{rescueMessage}</div>
                       )}
-                      {source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && localSnapshotDates.length === 0 && (
+                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && localSnapshotDates.length === 0 && (
                         <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <div>We found saved entries on {formatShortDayLabel(lastKnownEntryDate)}.</div>
                           <button
