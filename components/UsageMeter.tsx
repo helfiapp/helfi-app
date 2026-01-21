@@ -55,6 +55,24 @@ const readLastStoredCreditStatus = (feature?: string): CreditStatusCacheEntry | 
   }
 }
 
+const clearStoredCreditStatus = (userKey: string, feature?: string) => {
+  if (!userKey || typeof window === 'undefined') return
+  try {
+    window.sessionStorage.removeItem(buildCreditStatusStorageKey(userKey, feature))
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+const clearLastStoredCreditStatus = (feature?: string) => {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.removeItem(buildLastCreditStatusStorageKey(feature))
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 const writeStoredCreditStatus = (userKey: string, feature?: string, data?: any) => {
   if (!userKey || !data || typeof window === 'undefined') return
   try {
@@ -147,7 +165,18 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   // Listen for global refresh events so sidebar meter updates immediately after charges
   const [eventTick, setEventTick] = useState(0)
   useEffect(() => {
-    const handler = () => setEventTick((v) => v + 1)
+    const handler = (event?: Event) => {
+      const detail = (event as CustomEvent | null)?.detail as { force?: boolean } | null
+      if (detail?.force) {
+        const key = feature || 'all'
+        delete creditStatusCache[key]
+        if (userCacheKey) {
+          clearStoredCreditStatus(userCacheKey, feature)
+        }
+        clearLastStoredCreditStatus(feature)
+      }
+      setEventTick((v) => v + 1)
+    }
     try {
       window.addEventListener('credits:refresh', handler)
       return () => window.removeEventListener('credits:refresh', handler)
@@ -155,7 +184,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
       // SSR/no-window safe
       return () => {}
     }
-  }, [])
+  }, [feature, userCacheKey])
 
   const applyCreditStatus = useCallback((data: any) => {
     if (!data) return

@@ -3040,6 +3040,7 @@ export default function FoodDiary() {
   const pendingServerIdRef = useRef<Map<string, { localId: number; savedAt: number }>>(new Map())
   const historyLoadSeqRef = useRef(0)
   const localDateRepairInFlightRef = useRef(false)
+  const todayServerFetchRef = useRef<Record<string, boolean>>({})
   const foodLibraryRefreshRef = useRef<{ last: number; inFlight: boolean }>({ last: 0, inFlight: false })
   const renameSaveRef = useRef<((value: string) => void) | null>(null)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
@@ -5381,6 +5382,34 @@ export default function FoodDiary() {
     }
   }
 
+  const extractTotalsFromDescription = (value: any) => {
+    const text = String(value || '').trim()
+    if (!text) return null
+    const matchNumber = (regex: RegExp) => {
+      const match = text.match(regex)
+      if (!match) return null
+      const parsed = parseFloat(match[1])
+      return Number.isFinite(parsed) ? parsed : null
+    }
+    const totals: NutritionTotals = {
+      calories:
+        matchNumber(/calories?[:\s]*([0-9]+(?:\.[0-9]+)?)/i) ??
+        matchNumber(/([0-9]+(?:\.[0-9]+)?)\s*kcal/i),
+      protein: matchNumber(/protein[:\s]*([0-9]+(?:\.[0-9]+)?)\s*g/i),
+      carbs: matchNumber(/carb(?:ohydrate)?s?[:\s]*([0-9]+(?:\.[0-9]+)?)\s*g/i),
+      fat: matchNumber(/fat[:\s]*([0-9]+(?:\.[0-9]+)?)\s*g/i),
+      fiber: matchNumber(/fib(?:er|re)[:\s]*([0-9]+(?:\.[0-9]+)?)\s*g/i),
+      sugar: matchNumber(/sugar[:\s]*([0-9]+(?:\.[0-9]+)?)\s*g/i),
+    }
+    const hasValues = Object.values(totals).some((v) => v !== null && Number.isFinite(Number(v)))
+    return hasValues ? totals : null
+  }
+
+  const hasNonZeroTotals = (totals: NutritionTotals | null) => {
+    if (!totals) return false
+    return Object.values(totals).some((value) => Number.isFinite(Number(value)) && Number(value) > 0)
+  }
+
   const getEntryTotals = (entry: any) => {
     try {
       const portionScale = getEntryPortionScale(entry)
@@ -5390,17 +5419,24 @@ export default function FoodDiary() {
           return portionScale ? applyPortionScaleToTotals(recalculated, portionScale) : recalculated
         }
       }
-      return (
+      const storedTotals =
         sanitizeNutritionTotals((entry as any).total) ||
-        sanitizeNutritionTotals(entry?.nutrition) || {
-          calories: 0,
-          protein: 0,
-          carbs: 0,
-          fat: 0,
-          fiber: 0,
-          sugar: 0,
-        }
-      )
+        sanitizeNutritionTotals(entry?.nutrition) ||
+        null
+      const parsedTotals = extractTotalsFromDescription(entry?.description || entry?.name || '')
+      const pickedTotals =
+        storedTotals && hasNonZeroTotals(storedTotals) ? storedTotals : parsedTotals || storedTotals
+      if (pickedTotals) {
+        return portionScale ? applyPortionScaleToTotals(pickedTotals, portionScale) : pickedTotals
+      }
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
+        sugar: 0,
+      }
     } catch {
       return {
         calories: 0,
@@ -7865,6 +7901,37 @@ const applyStructuredItems = (
     }
   }
 
+  const readFavoritesFromDevice = () => {
+    if (typeof window === 'undefined') return []
+    try {
+      const raw = localStorage.getItem('food:favorites')
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  const restoreFavoritesFromDevice = async (entries: any[]) => {
+    if (!Array.isArray(entries) || entries.length === 0) return false
+    const repaired = repairAndDedupeFavorites(entries)
+    if (!repaired.next.length) return false
+    try {
+      const res = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorites: repaired.next }),
+      })
+      if (!res.ok) return false
+      setFavorites(repaired.next)
+      updateUserData({ favorites: repaired.next }, { trackLocal: false })
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const runDataRescue = async () => {
     if (isRescuingData) return
     setIsRescuingData(true)
@@ -7881,8 +7948,17 @@ const applyStructuredItems = (
       if (nextDate && /^\d{4}-\d{2}-\d{2}$/.test(nextDate)) {
         setSelectedDate(nextDate)
       }
+      let restoredFromDevice = false
+      if (!data?.favoritesRestored && favorites.length === 0) {
+        const deviceFavorites = readFavoritesFromDevice()
+        if (deviceFavorites.length > 0) {
+          restoredFromDevice = await restoreFavoritesFromDevice(deviceFavorites)
+        }
+      }
       if (data?.favoritesRestored) {
         setRescueMessage('Fix complete. Please refresh the page once.')
+      } else if (restoredFromDevice) {
+        setRescueMessage('Fix complete. Favorites restored from this device.')
       } else if (data?.favoritesBackupFound === false) {
         setRescueMessage('Fix complete. No favorites backup was found.')
       } else {
@@ -7890,7 +7966,7 @@ const applyStructuredItems = (
       }
       await refreshEntriesFromServer({ mode: 'manual' })
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('credits:refresh'))
+        window.dispatchEvent(new CustomEvent('credits:refresh', { detail: { force: true } }))
         window.dispatchEvent(new CustomEvent('userData:refresh'))
       }
       await refreshData()
@@ -8348,6 +8424,15 @@ const applyStructuredItems = (
       diaryMergeInFlightRef.current[targetDate] = false
     }
   };
+
+  useEffect(() => {
+    if (!isViewingToday) return
+    if (!foodDiaryLoaded) return
+    if (todaysFoodsForSelectedDate.length > 0) return
+    if (todayServerFetchRef.current[selectedDate]) return
+    todayServerFetchRef.current[selectedDate] = true
+    refreshEntriesFromServer({ mode: 'manual' })
+  }, [isViewingToday, selectedDate, foodDiaryLoaded, todaysFoodsForSelectedDate.length, refreshEntriesFromServer])
 
   // Cross-device sync:
   // - Refresh on focus or manual action (keeps desktop + mobile aligned without constant polling)
@@ -20319,11 +20404,6 @@ Please add nutritional information manually if needed.`);
                     : snapshotEntries || []
                   const source = dedupeEntries(baseEntries, { fallbackDate: selectedDate })
 
-                const safeNumber = (value: any) => {
-                  const num = Number(value)
-                  return Number.isFinite(num) ? num : 0
-                }
-
                 // ⚠️ GUARD RAIL: Today’s Totals must always be rebuilt from ingredient cards.
                 // Fiber/sugar accuracy depends on this. Stored totals are used only as a fallback.
                 const deriveItemsForEntry = (entry: any) => {
@@ -20341,18 +20421,6 @@ Please add nutritional information manually if needed.`);
                     }
                   }
                   return null
-                }
-
-                const convertStoredTotals = (input: any) => {
-                  if (!input) return null
-                  return {
-                    calories: safeNumber(input.calories ?? input.calories_g ?? input.kcal),
-                    protein: safeNumber(input.protein ?? input.protein_g),
-                    carbs: safeNumber(input.carbs ?? input.carbs_g ?? input.carbohydrates),
-                    fat: safeNumber(input.fat ?? input.fat_g ?? input.total_fat),
-                    fiber: safeNumber(input.fiber ?? input.fiber_g ?? input.dietary_fiber_g),
-                    sugar: safeNumber(input.sugar ?? input.sugar_g ?? input.sugars_g),
-                  }
                 }
 
                 const fallbackFatGoodKeywords = [
@@ -21510,23 +21578,14 @@ Please add nutritional information manually if needed.`);
                     return acc
                   }
 
-                  const storedTotals =
-                    convertStoredTotals(item?.total) ||
-                    convertStoredTotals(item?.nutrition) || {
-                      calories: 0,
-                      protein: 0,
-                      carbs: 0,
-                      fat: 0,
-                      fiber: 0,
-                      sugar: 0,
-                    }
+                  const storedTotals = getEntryTotals(item)
 
-                  acc.calories += storedTotals.calories
-                  acc.protein += storedTotals.protein
-                  acc.carbs += storedTotals.carbs
-                  acc.fat += storedTotals.fat
-                  acc.fiber += storedTotals.fiber
-                  acc.sugar += storedTotals.sugar
+                  acc.calories += Number(storedTotals?.calories) || 0
+                  acc.protein += Number(storedTotals?.protein) || 0
+                  acc.carbs += Number(storedTotals?.carbs) || 0
+                  acc.fat += Number(storedTotals?.fat) || 0
+                  acc.fiber += Number(storedTotals?.fiber) || 0
+                  acc.sugar += Number(storedTotals?.sugar) || 0
                   if (splitFromItems) {
                     fatSplit.good += splitFromItems.good
                     fatSplit.bad += splitFromItems.bad
@@ -21534,17 +21593,18 @@ Please add nutritional information manually if needed.`);
                   } else {
                     const entryLabel = item?.label || item?.name || item?.description || ''
                     const entryDisplayLabel = buildFatDisplayLabel(entryLabel, item?.brand)
-                    if (isZeroFatItem(entryLabel, storedTotals.fat)) return acc
-                    const bucket = classifyFatLabel(entryLabel, storedTotals.fat)
+                    const fatValue = Number(storedTotals?.fat) || 0
+                    if (isZeroFatItem(entryLabel, fatValue)) return acc
+                    const bucket = classifyFatLabel(entryLabel, fatValue)
                     if (bucket === 'good') {
-                      fatSplit.good += storedTotals.fat
-                      addFatDetail('good', entryDisplayLabel, storedTotals.fat)
+                      fatSplit.good += fatValue
+                      addFatDetail('good', entryDisplayLabel, fatValue)
                     } else if (bucket === 'bad') {
-                      fatSplit.bad += storedTotals.fat
-                      addFatDetail('bad', entryDisplayLabel, storedTotals.fat)
+                      fatSplit.bad += fatValue
+                      addFatDetail('bad', entryDisplayLabel, fatValue)
                     } else {
-                      fatSplit.unclear += storedTotals.fat
-                      addFatDetail('unclear', entryDisplayLabel, storedTotals.fat)
+                      fatSplit.unclear += fatValue
+                      addFatDetail('unclear', entryDisplayLabel, fatValue)
                     }
                   }
                   return acc
@@ -21768,7 +21828,7 @@ Please add nutritional information manually if needed.`);
                           {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
                         </div>
                       )}
-                      {source.length === 0 && (favorites.length === 0 || (lastKnownEntryDate && lastKnownEntryDate !== selectedDate)) && (
+                      {source.length === 0 && favorites.length === 0 && (
                         <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <div>Fix favorites or credits if they look wrong.</div>
                           <button

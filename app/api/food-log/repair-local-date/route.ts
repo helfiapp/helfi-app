@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
+const FUTURE_GRACE_MS = 36 * 60 * 60 * 1000
+
 const isValidLocalDate = (value: string | null) => {
   if (!value) return false
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -64,12 +66,24 @@ const extractLoggedAtMs = (log: any) => {
   return Number.isFinite(clientMs) ? clientMs : NaN
 }
 
-const extractBestTimestampMs = (log: any) => {
-  const loggedAtMs = extractLoggedAtMs(log)
-  if (Number.isFinite(loggedAtMs)) return loggedAtMs
+const isPlausibleTimestamp = (timestampMs: number, nowMs: number) => {
+  if (!Number.isFinite(timestampMs)) return false
+  if (timestampMs < 946684800000) return false
+  return timestampMs <= nowMs + FUTURE_GRACE_MS
+}
+
+const pickBestTimestampMs = (log: any, nowMs: number) => {
   const createdMs = coerceTimestampMs(log?.createdAt)
-  if (Number.isFinite(createdMs)) return createdMs
-  return NaN
+  const loggedAtMs = extractLoggedAtMs(log)
+  const createdOk = isPlausibleTimestamp(createdMs, nowMs)
+  const loggedOk = isPlausibleTimestamp(loggedAtMs, nowMs)
+  if (createdOk && loggedOk) {
+    const drift = Math.abs(loggedAtMs - createdMs)
+    if (drift <= FUTURE_GRACE_MS) return loggedAtMs
+  }
+  if (createdOk) return createdMs
+  if (loggedOk) return loggedAtMs
+  return Number.isFinite(createdMs) ? createdMs : loggedAtMs
 }
 
 export async function POST(request: NextRequest) {
@@ -103,6 +117,7 @@ export async function POST(request: NextRequest) {
     const mode = (searchParams.get('mode') || '').toLowerCase().trim()
     const fullMode = mode === 'full'
     const tzMin = Number.isFinite(parseInt(tzRaw, 10)) ? parseInt(tzRaw, 10) : 0
+    const nowMs = Date.now()
 
     const logs = await prisma.foodLog.findMany({
       where: fullMode
@@ -119,7 +134,7 @@ export async function POST(request: NextRequest) {
       .filter((log) => !isValidLocalDate(log.localDate))
       .map((log) => ({
         id: log.id,
-        localDate: formatLocalDateFromTimestamp(extractBestTimestampMs(log), tzMin),
+        localDate: formatLocalDateFromTimestamp(pickBestTimestampMs(log, nowMs), tzMin),
       }))
       .filter((row) => row.localDate)
 
@@ -128,7 +143,7 @@ export async function POST(request: NextRequest) {
           .map((log) => ({
             id: log.id,
             current: log.localDate || null,
-            localDate: formatLocalDateFromTimestamp(extractBestTimestampMs(log), tzMin),
+            localDate: formatLocalDateFromTimestamp(pickBestTimestampMs(log, nowMs), tzMin),
           }))
           .filter((row) => row.localDate && row.localDate !== row.current)
       : []
