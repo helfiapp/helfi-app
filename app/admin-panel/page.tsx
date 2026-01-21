@@ -5681,6 +5681,25 @@ The Helfi Team`,
                                 </button>
                                 <button
                                   onClick={() => {
+                                    const newPassword = prompt('Enter new password (min 8 chars):')
+                                    if (!newPassword) return
+                                    if (newPassword.length < 8) {
+                                      alert('Password must be at least 8 characters.')
+                                      return
+                                    }
+                                    const confirmPassword = prompt('Re-enter the new password to confirm:')
+                                    if (confirmPassword !== newPassword) {
+                                      alert('Passwords do not match.')
+                                      return
+                                    }
+                                    handleUserAction('set_password', user.id, { newPassword })
+                                  }}
+                                  className="bg-amber-500 text-white px-3 py-1 rounded text-xs hover:bg-amber-600 transition-colors"
+                                >
+                                  Reset Password
+                                </button>
+                                <button
+                                  onClick={() => {
                                     const credits = prompt('Enter credit package (250, 500, or 1000):')
                                     if (credits && ['250', '500', '1000'].includes(credits)) {
                                       handleUserAction('add_credits', user.id, { creditPackage: credits })

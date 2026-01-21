@@ -4,6 +4,7 @@ import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { CreditManager } from '@/lib/credit-system'
 import { revokeUserSessions } from '@/lib/session-revocation'
 import Stripe from 'stripe'
+import bcrypt from 'bcryptjs'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
 
@@ -273,6 +274,21 @@ export async function POST(request: NextRequest) {
           message: 'User sessions revoked. They will be logged out on their next request.',
           revokedAt,
         })
+      }
+      case 'set_password': {
+        const newPassword = typeof data?.newPassword === 'string' ? data.newPassword : ''
+        if (!newPassword || newPassword.length < 8) {
+          return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 })
+        }
+        const passwordHash = await bcrypt.hash(newPassword, 12)
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            passwordHash,
+            emailVerified: new Date(),
+          },
+        })
+        return NextResponse.json({ success: true, message: 'Password reset successfully.' })
       }
 
       case 'grant_subscription':
