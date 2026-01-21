@@ -681,6 +681,7 @@ const FOOD_AUTO_REFRESH_ON_RESUME = false
 const FOOD_DIARY_LAST_VISIT_KEY = 'food:diary:lastVisitDate'
 const FOOD_DIARY_LOCAL_DATE_REPAIR_KEY = 'foodDiary:localDateRepair:last'
 const FOOD_DIARY_LOCAL_DATE_REPAIR_TTL_MS = 12 * 60 * 60 * 1000
+const FOOD_DIARY_LOCAL_RESTORE_HIDE_KEY = 'foodDiary:localRestore:hide'
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
@@ -769,6 +770,23 @@ const writeLocalDateRepairStamp = (value: number) => {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(FOOD_DIARY_LOCAL_DATE_REPAIR_KEY, String(value || 0))
+  } catch {}
+}
+
+const readHideLocalRestorePrompt = (): boolean => {
+  if (typeof window === 'undefined') return false
+  try {
+    const raw = window.localStorage.getItem(FOOD_DIARY_LOCAL_RESTORE_HIDE_KEY)
+    return raw === 'true'
+  } catch {
+    return false
+  }
+}
+
+const writeHideLocalRestorePrompt = (value: boolean) => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(FOOD_DIARY_LOCAL_RESTORE_HIDE_KEY, value ? 'true' : 'false')
   } catch {}
 }
 
@@ -3465,6 +3483,7 @@ export default function FoodDiary() {
   const [favorites, setFavorites] = useState<any[]>([])
   const [foodLibrary, setFoodLibrary] = useState<any[]>([])
   const [foodNameOverrides, setFoodNameOverrides] = useState<any[]>([])
+  const [hideLocalRestorePrompt, setHideLocalRestorePrompt] = useState<boolean>(() => readHideLocalRestorePrompt())
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
   type MultiCopyClipboardItem = {
@@ -7861,6 +7880,8 @@ const applyStructuredItems = (
     if (!options?.skipStatus) {
       if (restored > 0) {
         setLocalRestoreMessage(`Restored ${restored} entries.`)
+        setHideLocalRestorePrompt(true)
+        writeHideLocalRestorePrompt(true)
       } else {
         setLocalRestoreMessage('No entries were restored.')
       }
@@ -7892,6 +7913,8 @@ const applyStructuredItems = (
     }
     if (restoredTotal > 0) {
       setLocalRestoreMessage(`Restored ${restoredTotal} entries.`)
+      setHideLocalRestorePrompt(true)
+      writeHideLocalRestorePrompt(true)
       await refreshEntriesFromServer({ mode: 'manual' })
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('userData:refresh'))
@@ -21785,7 +21808,7 @@ Please add nutritional information manually if needed.`);
                       {source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
                         <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
                       )}
-                      {source.length === 0 && localSnapshotDates.length > 0 && (
+                      {source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
                         <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
                           <div>We found saved entries on this device.</div>
                           <div className="flex flex-wrap gap-2">
@@ -21824,6 +21847,17 @@ Please add nutritional information manually if needed.`);
                                 {isRestoringLocalEntries ? 'Restoring…' : 'Restore all days'}
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHideLocalRestorePrompt(true)
+                                writeHideLocalRestorePrompt(true)
+                              }}
+                              className="px-3 py-1 text-xs font-semibold bg-white text-emerald-900 border border-emerald-200"
+                              style={{ borderRadius: 0 }}
+                            >
+                              Hide this message
+                            </button>
                           </div>
                           {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
                         </div>
