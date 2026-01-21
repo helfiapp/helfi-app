@@ -11,15 +11,6 @@ const isValidLocalDate = (value: string | null) => {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
-const formatLocalDateFromTimestamp = (timestampMs: number, tzMin: number) => {
-  if (!Number.isFinite(timestampMs)) return null
-  const local = new Date(timestampMs - tzMin * 60 * 1000)
-  const y = local.getUTCFullYear()
-  const m = String(local.getUTCMonth() + 1).padStart(2, '0')
-  const d = String(local.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
 const parseClientIdTimestampMs = (clientId: string) => {
   if (!clientId) return NaN
   const parts = clientId.split('-')
@@ -64,15 +55,16 @@ const extractLoggedAtMs = (log: any) => {
   return Number.isFinite(clientMs) ? clientMs : NaN
 }
 
-const extractBestTimestampMs = (log: any) => {
-  const loggedAtMs = extractLoggedAtMs(log)
-  if (Number.isFinite(loggedAtMs)) return loggedAtMs
-  const createdMs = coerceTimestampMs(log?.createdAt)
-  if (Number.isFinite(createdMs)) return createdMs
-  return NaN
+const formatLocalDateFromTimestamp = (timestampMs: number, tzMin: number) => {
+  if (!Number.isFinite(timestampMs)) return null
+  const local = new Date(timestampMs - tzMin * 60 * 1000)
+  const y = local.getUTCFullYear()
+  const m = String(local.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(local.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     let session = await getServerSession(authOptions)
     let userEmail: string | null = session?.user?.email ?? null
@@ -103,44 +95,41 @@ export async function POST(request: NextRequest) {
     const tzMin = Number.isFinite(parseInt(tzRaw, 10)) ? parseInt(tzRaw, 10) : 0
 
     const logs = await prisma.foodLog.findMany({
-      where: {
-        userId: user.id,
-        OR: [{ localDate: null }, { localDate: '' }],
-      },
-      select: { id: true, createdAt: true, localDate: true, nutrients: true },
+      where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: { id: true, createdAt: true, localDate: true, nutrients: true },
     })
 
-    const updates = logs
-      .filter((log) => !isValidLocalDate(log.localDate))
-      .map((log) => ({
-        id: log.id,
-        localDate: formatLocalDateFromTimestamp(extractBestTimestampMs(log), tzMin),
-      }))
-      .filter((row) => row.localDate)
-
-    const updatedIds: string[] = []
-    const batchSize = 200
-    for (let i = 0; i < updates.length; i += batchSize) {
-      const batch = updates.slice(i, i + batchSize)
-      await prisma.$transaction(
-        batch.map((row) =>
-          prisma.foodLog.update({
-            where: { id: row.id },
-            data: { localDate: row.localDate as string },
-          }),
-        ),
-      )
-      updatedIds.push(...batch.map((row) => row.id))
+    if (logs.length === 0) {
+      return NextResponse.json({ success: true, date: null })
     }
 
-    return NextResponse.json({
-      success: true,
-      scanned: logs.length,
-      updated: updatedIds.length,
-    })
+    let best: { date: string | null; stamp: number } = { date: null, stamp: NaN }
+    for (const log of logs) {
+      const loggedAtMs = extractLoggedAtMs(log)
+      const createdMs = coerceTimestampMs(log.createdAt)
+      const stamp = Number.isFinite(loggedAtMs) ? loggedAtMs : createdMs
+      const date =
+        isValidLocalDate(log.localDate) ? log.localDate : formatLocalDateFromTimestamp(stamp, tzMin)
+      if (!date) continue
+      if (!Number.isFinite(best.stamp) || (Number.isFinite(stamp) && stamp > best.stamp)) {
+        best = { date, stamp }
+      }
+    }
+
+    if (!best.date) {
+      const fallback = logs[0]
+      const fallbackDate =
+        isValidLocalDate(fallback.localDate)
+          ? fallback.localDate
+          : formatLocalDateFromTimestamp(coerceTimestampMs(fallback.createdAt), tzMin)
+      return NextResponse.json({ success: true, date: fallbackDate || null })
+    }
+
+    return NextResponse.json({ success: true, date: best.date })
   } catch (error) {
-    console.error('POST /api/food-log/repair-local-date error', error)
-    return NextResponse.json({ error: 'Repair failed' }, { status: 500 })
+    console.error('GET /api/food-log/most-recent error', error)
+    return NextResponse.json({ error: 'Failed to load most recent date' }, { status: 500 })
   }
 }

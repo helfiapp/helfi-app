@@ -3109,6 +3109,9 @@ export default function FoodDiary() {
     barcode?: string | null
   } | null>(null)
   const barcodeSaveNoticeTimeoutRef = useRef<number | null>(null)
+  const [lastKnownEntryDate, setLastKnownEntryDate] = useState<string | null>(null)
+  const [lastKnownEntryLoading, setLastKnownEntryLoading] = useState(false)
+  const lastKnownEntryRequestedRef = useRef(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
   const midnightTimerRef = useRef<number | null>(null)
   const todayIsoRef = useRef<string>(buildTodayIso())
@@ -7225,6 +7228,14 @@ const applyStructuredItems = (
     })
     return grouped
   }, [sourceEntries])
+
+  useEffect(() => {
+    if (!foodDiaryLoaded) return
+    if (sourceEntries.length > 0) return
+    if (lastKnownEntryDate) return
+    if (lastKnownEntryLoading) return
+    loadLastKnownEntryDate()
+  }, [foodDiaryLoaded, sourceEntries.length, lastKnownEntryDate, lastKnownEntryLoading])
   const linkedWaterLogIds = useMemo(() => {
     const set = new Set<string>()
     sourceEntries.forEach((entry) => {
@@ -7721,6 +7732,26 @@ const applyStructuredItems = (
     })()
   }, [analyzedItems, editingEntry, analysisPhase])
 
+  const loadLastKnownEntryDate = async () => {
+    if (lastKnownEntryRequestedRef.current) return
+    lastKnownEntryRequestedRef.current = true
+    setLastKnownEntryLoading(true)
+    try {
+      const tz = new Date().getTimezoneOffset()
+      const res = await fetch(`/api/food-log/most-recent?tz=${tz}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json().catch(() => ({} as any))
+      const date = typeof data?.date === 'string' ? data.date.slice(0, 10) : ''
+      if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        setLastKnownEntryDate(date)
+      }
+    } catch {
+      // best effort only
+    } finally {
+      setLastKnownEntryLoading(false)
+    }
+  }
+
   // Load history for non-today dates
   useEffect(() => {
     const loadHistory = async () => {
@@ -7817,6 +7848,7 @@ const applyStructuredItems = (
                 return;
               }
             }
+            await loadLastKnownEntryDate()
           }
 
           const mapped = mapLogsToEntries(logs, selectedDate)
@@ -7834,6 +7866,7 @@ const applyStructuredItems = (
           }
           // Mark as loaded even if API call fails or returns no entries
           setFoodDiaryLoaded(true);
+          await loadLastKnownEntryDate()
         }
       } catch (e) {
         if (requestId !== historyLoadSeqRef.current) return
@@ -7843,6 +7876,7 @@ const applyStructuredItems = (
         }
         // Mark as loaded even on error to prevent infinite loading state
         setFoodDiaryLoaded(true);
+        await loadLastKnownEntryDate()
       } finally {
         if (requestId === historyLoadSeqRef.current) {
           setIsLoadingHistory(false);
@@ -21538,6 +21572,22 @@ Please add nutritional information manually if needed.`);
                         <p className="text-xs text-gray-500 mb-3">
                           No meals yet today. Here are your daily targets to start the day.
                         </p>
+                      )}
+                      {source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
+                        <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
+                      )}
+                      {source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && (
+                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div>We found saved entries on {formatShortDayLabel(lastKnownEntryDate)}.</div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDate(lastKnownEntryDate)}
+                            className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white"
+                            style={{ borderRadius: 0 }}
+                          >
+                            Show that day
+                          </button>
+                        </div>
                       )}
                       {(() => {
                           const slides: JSX.Element[] = []
