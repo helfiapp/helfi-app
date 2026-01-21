@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { reportCriticalError } from '@/lib/error-reporter'
+
+const SUPPORT_ALERT_EMAIL = (process.env.SUPPORT_ALERT_EMAIL || 'support@helfi.ai').trim() || 'support@helfi.ai'
 
 const toNumber = (value: any): number | null => {
   if (value === null || value === undefined || value === '') return null
@@ -221,6 +224,14 @@ export async function POST(req: NextRequest) {
       })
     } catch (saveError) {
       console.warn('Barcode label save failed, trying fallback storage', saveError)
+      await reportCriticalError({
+        source: 'barcode-label-save',
+        error: saveError,
+        userId: user.id,
+        userEmail: session.user.email,
+        details: { barcode, step: 'barcodeProduct' },
+        recipientEmail: SUPPORT_ALERT_EMAIL,
+      })
       try {
         const existing = await prisma.foodLibraryItem.findFirst({
           where: { gtinUpc: barcode },
@@ -259,6 +270,14 @@ export async function POST(req: NextRequest) {
         })
       } catch (fallbackError) {
         console.error('Barcode label fallback save failed', fallbackError)
+        await reportCriticalError({
+          source: 'barcode-label-save-fallback',
+          error: fallbackError,
+          userId: user.id,
+          userEmail: session.user.email,
+          details: { barcode, step: 'foodLibraryItem' },
+          recipientEmail: SUPPORT_ALERT_EMAIL,
+        })
         return NextResponse.json(
           {
             error: 'Failed to save barcode label',

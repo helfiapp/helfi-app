@@ -91,11 +91,12 @@ export async function sendOwnerErrorAlertEmail(options: {
   userEmail?: string
   details?: string
   count?: number
+  recipientEmail?: string
 }) {
   const resend = getResendClient()
   if (!resend) return
 
-  const recipientEmail = getOwnerEmail()
+  const recipientEmail = (options.recipientEmail || getOwnerEmail()).trim() || getOwnerEmail()
   const countText = typeof options.count === 'number' ? `${options.count}` : '1'
   const subject = `Helfi error alert: ${options.source}`
 

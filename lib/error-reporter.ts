@@ -6,6 +6,7 @@ type ErrorReportOptions = {
   userId?: string
   userEmail?: string
   details?: Record<string, unknown>
+  recipientEmail?: string
 }
 
 type ErrorReportCacheEntry = {
@@ -83,6 +84,7 @@ export async function reportCriticalError(options: ErrorReportOptions): Promise<
       userEmail: options.userEmail,
       count,
       details,
+      recipientEmail: options.recipientEmail,
     })
   } catch (error) {
     console.error('❌ [ERROR REPORTER] Failed to report error:', error)
