@@ -7524,13 +7524,16 @@ const applyStructuredItems = (
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
+      const historyForDate = Array.isArray(historyFoods)
+        ? filterEntriesForDate(historyFoods, selectedDate)
+        : []
       const payload: WarmDiaryState = {
         selectedDate,
         todaysFoods,
         expandedCategories: collapseEmptyCategories(expandedCategories, sourceEntries).map,
       }
-      if (Array.isArray(historyFoods)) {
-        payload.historyByDate = { [selectedDate]: historyFoods }
+      if (historyForDate.length > 0) {
+        payload.historyByDate = { [selectedDate]: historyForDate }
       }
       sessionStorage.setItem('foodDiary:warmState', JSON.stringify(payload))
     } catch (err) {
@@ -7542,11 +7545,13 @@ const applyStructuredItems = (
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
+      if (!isViewingToday && !Array.isArray(historyFoods)) return
       const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
-      const sourceEntriesForDate = normalizeDiaryList(
-        isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []),
-        selectedDate,
-      )
+      const rawEntries = isViewingToday
+        ? todaysFoodsForSelectedDate
+        : filterEntriesForDate(historyFoods, selectedDate)
+      if (!isViewingToday && isLoadingHistory && rawEntries.length === 0) return
+      const sourceEntriesForDate = normalizeDiaryList(rawEntries, selectedDate)
       const normalized = dedupeEntries(sourceEntriesForDate, { fallbackDate: selectedDate })
       snapshot.byDate[selectedDate] = {
         entries: normalized,
@@ -7558,7 +7563,7 @@ const applyStructuredItems = (
     } catch (err) {
       console.warn('Could not persist diary snapshot', err)
     }
-  }, [selectedDate, isViewingToday, todaysFoods, historyFoods, expandedCategories, refreshPersistentDiarySnapshot])
+  }, [selectedDate, isViewingToday, todaysFoods, historyFoods, expandedCategories, isLoadingHistory, refreshPersistentDiarySnapshot])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
