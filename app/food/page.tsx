@@ -3018,6 +3018,7 @@ export default function FoodDiary() {
   const favoriteInsertDebounceRef = useRef<Record<string, number>>({})
   const mealInsertDebounceRef = useRef<Record<string, number>>({})
   const pendingServerIdRef = useRef<Map<string, { localId: number; savedAt: number }>>(new Map())
+  const historyLoadSeqRef = useRef(0)
   const foodLibraryRefreshRef = useRef<{ last: number; inFlight: boolean }>({ last: 0, inFlight: false })
   const renameSaveRef = useRef<((value: string) => void) | null>(null)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
@@ -7693,22 +7694,36 @@ const applyStructuredItems = (
         setFoodDiaryLoaded(true); // Already loaded via today's foods
         return;
       }
+      const requestId = ++historyLoadSeqRef.current
+      let hasCachedHistory = false
       try {
         console.log(`🔍 Loading history for date: ${selectedDate}, isViewingToday: ${isViewingToday}`);
         const snapshot = readPersistentDiarySnapshot()
         const cached = snapshot?.byDate?.[selectedDate]?.entries
-        if (cached && Array.isArray(cached) && cached.length > 0) {
-          const normalizedCached = dedupeEntries(normalizeDiaryList(cached, selectedDate), { fallbackDate: selectedDate })
-          setHistoryFoods(normalizedCached)
+        const normalizedSnapshot = Array.isArray(cached)
+          ? dedupeEntries(normalizeDiaryList(cached, selectedDate), { fallbackDate: selectedDate })
+          : []
+        const cachedFromState = Array.isArray(latestHistoryFoodsRef.current)
+          ? filterEntriesForDate(latestHistoryFoodsRef.current, selectedDate)
+          : []
+        const normalizedState = dedupeEntries(normalizeDiaryList(cachedFromState, selectedDate), {
+          fallbackDate: selectedDate,
+        })
+        const mergedCached = dedupeEntries([...normalizedSnapshot, ...normalizedState], {
+          fallbackDate: selectedDate,
+        })
+        hasCachedHistory = mergedCached.length > 0
+        if (hasCachedHistory) {
+          setHistoryFoods(mergedCached)
           setFoodDiaryLoaded(true)
         }
         setIsLoadingHistory(true);
-        const hasCachedHistory = Array.isArray(historyFoods) && historyFoods.length > 0
         setFoodDiaryLoaded(hasCachedHistory); // Show cached state instantly when available
         const tz = new Date().getTimezoneOffset();
         const apiUrl = `/api/food-log?date=${selectedDate}&tz=${tz}`;
         console.log(`📡 Fetching from API: ${apiUrl}`);
         const res = await fetch(`${apiUrl}&t=${Date.now()}`, { cache: 'no-store' });
+        if (requestId !== historyLoadSeqRef.current) return
         console.log(`📡 API response status: ${res.status}, ok: ${res.ok}`);
         if (res.ok) {
           const json = await res.json()
@@ -7723,6 +7738,10 @@ const applyStructuredItems = (
             })) : []
           });
           const logs = Array.isArray(json.logs) ? json.logs : []
+          if (logs.length === 0 && hasCachedHistory) {
+            setFoodDiaryLoaded(true);
+            return;
+          }
 
           const mapped = mapLogsToEntries(logs, selectedDate)
           // Guard rail: route all loads through dedupeEntries + normalization.
@@ -7734,17 +7753,24 @@ const applyStructuredItems = (
           setFoodDiaryLoaded(true);
         } else {
           console.log(`⚠️ API call failed or returned no entries for date ${selectedDate}, status: ${res.status}`);
-          setHistoryFoods([]);
+          if (!hasCachedHistory) {
+            setHistoryFoods([]);
+          }
           // Mark as loaded even if API call fails or returns no entries
           setFoodDiaryLoaded(true);
         }
       } catch (e) {
+        if (requestId !== historyLoadSeqRef.current) return
         console.error(`❌ Error loading history for date ${selectedDate}:`, e);
-        setHistoryFoods([]);
+        if (!hasCachedHistory) {
+          setHistoryFoods([]);
+        }
         // Mark as loaded even on error to prevent infinite loading state
         setFoodDiaryLoaded(true);
       } finally {
-        setIsLoadingHistory(false);
+        if (requestId === historyLoadSeqRef.current) {
+          setIsLoadingHistory(false);
+        }
       }
     };
     loadHistory();
