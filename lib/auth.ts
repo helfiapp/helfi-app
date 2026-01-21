@@ -258,15 +258,21 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        if (!user.emailVerified) {
-          console.log('❌ Email not verified for user:', email)
-          throw new Error('EMAIL_NOT_VERIFIED')
-        }
-
         const match = await bcrypt.compare(credentials.password, user.passwordHash)
         if (!match) {
           console.log('❌ Invalid password for user:', email)
           return null
+        }
+
+        if (!user.emailVerified) {
+          try {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { emailVerified: new Date() },
+            })
+          } catch (error) {
+            console.warn('⚠️ Failed to set emailVerified for user:', email, error)
+          }
         }
 
         console.log('✅ Allowing credentials signin for user:', user.email)
