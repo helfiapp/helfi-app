@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron/barcode-health",
-      "schedule": "0 * * * *"
+      "schedule": "0 7 * * 1"
     }
   ]
 }
