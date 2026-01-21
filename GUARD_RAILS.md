@@ -1209,6 +1209,9 @@ for a change.
         2) If `BarcodeProduct` is still missing due to migration history drift, run:
            - `prisma/migrations/20251223120000_add_barcode_product/migration.sql`
         3) Verify both tables exist before declaring the fix complete.
+    - **Never wipe barcode data (Jan 2026 – locked):**
+      - Do not delete, truncate, or reset barcode tables in live.
+      - If someone asks for a wipe, stop and get explicit written approval.
     - **Rollback (if this ever causes bad data):**
       - Revert the fallback save in `app/api/barcode/label/route.ts`.
       - Revert the save confirmation banner in `app/food/page.tsx`.

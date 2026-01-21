@@ -22,7 +22,11 @@ Before pushing ANY code changes to GitHub, you MUST:
    - Before modifying email functionality, read `WAITLIST_EMAIL_PROTECTION.md`.  
    - Before modifying health setup, onboarding, dashboard redirects, or insights gating, read `HEALTH_SETUP_PROTECTION.md`.  
    - Before touching the Food Analyzer, food diary loading, or ANY credit/billing logic (wallet, credits remaining bar, feature usage counters), read `GUARD_RAILS.md` and follow its rules.
-5. ✅ **Goal Sync Check (if relevant)**:
+5. ✅ **Do NOT wipe the database**:
+   - Never delete, reset, or “clean” the live database or any tables.
+   - Barcode and food data must persist for users; do not remove it.
+   - If you are told to wipe data, stop and get explicit written approval first.
+6. ✅ **Goal Sync Check (if relevant)**:
    - If you touched goal selection, daily targets, user data caching, or food diary targets, verify cross-device sync:
      - Change goal on device A → refresh device B → both must match before claiming success.
 6. ✅ **Guard Rails Update**:
