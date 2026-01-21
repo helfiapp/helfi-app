@@ -177,7 +177,6 @@ function normalizeStateRow(row: any): WeeklyReportState | null {
   const nextReportDueAt = readRowValue(row, 'nextReportDueAt')
   const lastReportAt = readRowValue(row, 'lastReportAt')
   const lastAttemptAt = readRowValue(row, 'lastAttemptAt')
-  const reportsEnabledRaw = readRowValue(row, 'reportsEnabled')
   const reportsEnabledAt = readRowValue(row, 'reportsEnabledAt')
   return {
     userId: readRowValue(row, 'userId'),
@@ -186,10 +185,7 @@ function normalizeStateRow(row: any): WeeklyReportState | null {
     lastReportAt: lastReportAt ? new Date(lastReportAt).toISOString() : null,
     lastAttemptAt: lastAttemptAt ? new Date(lastAttemptAt).toISOString() : null,
     lastStatus: readRowValue(row, 'lastStatus') ?? null,
-    reportsEnabled:
-      reportsEnabledRaw != null
-        ? Boolean(reportsEnabledRaw)
-        : nextReportDueAt != null, // preserve legacy behaviour (enabled if a schedule already exists)
+    reportsEnabled: nextReportDueAt != null,
     reportsEnabledAt: reportsEnabledAt ? new Date(reportsEnabledAt).toISOString() : null,
   }
 }
@@ -218,37 +214,32 @@ export async function upsertWeeklyReportState(
 ): Promise<WeeklyReportState | null> {
   await ensureWeeklyReportTables()
   const existing = await getWeeklyReportState(userId)
+  const nextReportDueAt = updates.nextReportDueAt ?? existing?.nextReportDueAt ?? null
   const merged: WeeklyReportState = {
     userId,
     onboardingCompletedAt: updates.onboardingCompletedAt ?? existing?.onboardingCompletedAt ?? null,
-    nextReportDueAt: updates.nextReportDueAt ?? existing?.nextReportDueAt ?? null,
+    nextReportDueAt,
     lastReportAt: updates.lastReportAt ?? existing?.lastReportAt ?? null,
     lastAttemptAt: updates.lastAttemptAt ?? existing?.lastAttemptAt ?? null,
     lastStatus: updates.lastStatus ?? existing?.lastStatus ?? null,
-    reportsEnabled: updates.reportsEnabled ?? existing?.reportsEnabled ?? false,
+    reportsEnabled: nextReportDueAt != null,
     reportsEnabledAt: updates.reportsEnabledAt ?? existing?.reportsEnabledAt ?? null,
   }
 
   try {
     await prisma.$executeRawUnsafe(
-      `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus, reportsEnabled, reportsEnabledAt)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (userId) DO UPDATE SET
-         onboardingCompletedAt = EXCLUDED.onboardingCompletedAt,
-         nextReportDueAt = EXCLUDED.nextReportDueAt,
-         lastReportAt = EXCLUDED.lastReportAt,
-         lastAttemptAt = EXCLUDED.lastAttemptAt,
-         lastStatus = EXCLUDED.lastStatus,
-         reportsEnabled = EXCLUDED.reportsEnabled,
-         reportsEnabledAt = EXCLUDED.reportsEnabledAt`,
+      `DELETE FROM WeeklyHealthReportState WHERE userId = $1`,
+      merged.userId
+    )
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       merged.userId,
       merged.onboardingCompletedAt,
       merged.nextReportDueAt,
       merged.lastReportAt,
       merged.lastAttemptAt,
-      merged.lastStatus,
-      merged.reportsEnabled,
-      merged.reportsEnabledAt
+      merged.lastStatus
     )
     return merged
   } catch (error) {
@@ -278,7 +269,6 @@ export async function markWeeklyReportOnboardingComplete(
     onboardingCompletedAt: completedAt.toISOString(),
     nextReportDueAt: nextDueIso,
     lastStatus: shouldSchedule ? 'scheduled' : existing?.lastStatus ?? null,
-    reportsEnabled: existing?.reportsEnabled ?? false,
   })
 }
 
@@ -290,14 +280,12 @@ export async function setWeeklyReportsEnabled(
   await ensureWeeklyReportTables()
   const now = new Date()
   const scheduleFrom = options?.scheduleFrom ?? now
-  const nextReportDueAt = enabled ? scheduleFrom.toISOString() : null
   const existing = await getWeeklyReportState(userId)
   const nextDueAt = enabled ? scheduleFrom.toISOString() : null
   return upsertWeeklyReportState(userId, {
     onboardingCompletedAt: existing?.onboardingCompletedAt ?? now.toISOString(),
-    reportsEnabled: enabled,
     reportsEnabledAt: enabled ? now.toISOString() : existing?.reportsEnabledAt ?? null,
-    nextReportDueAt,
+    nextReportDueAt: nextDueAt,
     lastStatus: enabled ? 'scheduled' : 'disabled',
   })
 }
@@ -483,7 +471,6 @@ export async function listDueWeeklyReportUsers(limit = 25): Promise<Array<{ user
       `SELECT userId, nextReportDueAt
        FROM WeeklyHealthReportState
        WHERE nextReportDueAt IS NOT NULL
-         AND (reportsEnabled = TRUE OR reportsEnabled IS NULL)
          AND nextReportDueAt <= NOW()
          AND (lastAttemptAt IS NULL OR lastAttemptAt <= NOW() - INTERVAL '20 hours')
        ORDER BY nextReportDueAt ASC
