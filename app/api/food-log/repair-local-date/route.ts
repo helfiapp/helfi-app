@@ -100,13 +100,17 @@ export async function POST(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const tzRaw = searchParams.get('tz') || '0'
+    const mode = (searchParams.get('mode') || '').toLowerCase().trim()
+    const fullMode = mode === 'full'
     const tzMin = Number.isFinite(parseInt(tzRaw, 10)) ? parseInt(tzRaw, 10) : 0
 
     const logs = await prisma.foodLog.findMany({
-      where: {
-        userId: user.id,
-        OR: [{ localDate: null }, { localDate: '' }],
-      },
+      where: fullMode
+        ? { userId: user.id }
+        : {
+            userId: user.id,
+            OR: [{ localDate: null }, { localDate: '' }],
+          },
       select: { id: true, createdAt: true, localDate: true, nutrients: true },
       orderBy: { createdAt: 'desc' },
     })
@@ -119,10 +123,22 @@ export async function POST(request: NextRequest) {
       }))
       .filter((row) => row.localDate)
 
+    const fullUpdates = fullMode
+      ? logs
+          .map((log) => ({
+            id: log.id,
+            current: log.localDate || null,
+            localDate: formatLocalDateFromTimestamp(extractBestTimestampMs(log), tzMin),
+          }))
+          .filter((row) => row.localDate && row.localDate !== row.current)
+      : []
+
+    const updateQueue = fullMode ? fullUpdates : updates
+
     const updatedIds: string[] = []
     const batchSize = 200
-    for (let i = 0; i < updates.length; i += batchSize) {
-      const batch = updates.slice(i, i + batchSize)
+    for (let i = 0; i < updateQueue.length; i += batchSize) {
+      const batch = updateQueue.slice(i, i + batchSize)
       await prisma.$transaction(
         batch.map((row) =>
           prisma.foodLog.update({
@@ -138,6 +154,7 @@ export async function POST(request: NextRequest) {
       success: true,
       scanned: logs.length,
       updated: updatedIds.length,
+      mode: fullMode ? 'full' : 'missing',
     })
   } catch (error) {
     console.error('POST /api/food-log/repair-local-date error', error)

@@ -3112,6 +3112,8 @@ export default function FoodDiary() {
   const [lastKnownEntryDate, setLastKnownEntryDate] = useState<string | null>(null)
   const [lastKnownEntryLoading, setLastKnownEntryLoading] = useState(false)
   const lastKnownEntryRequestedRef = useRef(false)
+  const [isRestoringLocalEntries, setIsRestoringLocalEntries] = useState(false)
+  const [localRestoreMessage, setLocalRestoreMessage] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
   const midnightTimerRef = useRef<number | null>(null)
   const todayIsoRef = useRef<string>(buildTodayIso())
@@ -7219,6 +7221,23 @@ const applyStructuredItems = (
       ),
     [todaysFoodsForSelectedDate, historyFoods, isViewingToday, deletedEntryNonce, selectedDate],
   )
+  const localSnapshotEntriesForSelectedDate = useMemo(() => {
+    const raw = persistentDiarySnapshot?.byDate?.[selectedDate]?.entries
+    if (!Array.isArray(raw) || raw.length === 0) return []
+    return dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
+  }, [persistentDiarySnapshot, selectedDate])
+  const localSnapshotDates = useMemo(() => {
+    const byDate = persistentDiarySnapshot?.byDate || {}
+    return Object.keys(byDate).filter((date) => {
+      const entries = byDate?.[date]?.entries
+      return Array.isArray(entries) && entries.length > 0
+    })
+  }, [persistentDiarySnapshot])
+  const latestLocalSnapshotDate = useMemo(() => {
+    if (localSnapshotDates.length === 0) return null
+    const sorted = [...localSnapshotDates].sort()
+    return sorted[sorted.length - 1] || null
+  }, [localSnapshotDates])
   const entriesByCategory = useMemo(() => {
     const grouped: Record<string, any[]> = {}
     sourceEntries.forEach((entry) => {
@@ -7752,6 +7771,95 @@ const applyStructuredItems = (
     }
   }
 
+  const restoreEntriesFromLocalSnapshot = async (
+    targetDate: string,
+    entries: any[],
+    options?: { skipStatus?: boolean; skipRefresh?: boolean },
+  ) => {
+    if (!targetDate || !Array.isArray(entries) || entries.length === 0) return 0
+    if (!options?.skipStatus) {
+      setIsRestoringLocalEntries(true)
+      setLocalRestoreMessage(null)
+    }
+    let restored = 0
+    try {
+      for (const entry of entries) {
+        if (!entry || isEntryDeleted(entry)) continue
+        const descriptionText = (entry?.description || entry?.name || '').toString().trim()
+        const hasNutrition = Boolean(entry?.nutrition)
+        const hasItems = Array.isArray(entry?.items) && entry.items.length > 0
+        if (!descriptionText && !hasNutrition && !hasItems) continue
+        const createdSeed =
+          getEntryLoggedAtRaw(entry) ||
+          (entry as any)?.createdAt ||
+          (entry as any)?.id ||
+          new Date().toISOString()
+        const payload = {
+          description: descriptionText,
+          nutrition: buildPayloadNutrition(entry),
+          imageUrl: entry?.photo || entry?.imageUrl || null,
+          items: Array.isArray(entry?.items) && entry.items.length > 0 ? entry.items : null,
+          meal: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
+          category: normalizeCategory(entry?.category || entry?.meal || entry?.mealType),
+          localDate: targetDate,
+          createdAt: alignTimestampToLocalDate(createdSeed, targetDate),
+        }
+        try {
+          const res = await fetch('/api/food-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          if (res.ok) restored += 1
+        } catch {
+          // best effort per entry
+        }
+      }
+    } finally {
+      if (!options?.skipStatus) {
+        setIsRestoringLocalEntries(false)
+      }
+    }
+    if (!options?.skipStatus) {
+      if (restored > 0) {
+        setLocalRestoreMessage(`Restored ${restored} entries.`)
+      } else {
+        setLocalRestoreMessage('No entries were restored.')
+      }
+    }
+    if (!options?.skipRefresh && restored > 0) {
+      await refreshEntriesFromServer({ mode: 'manual' })
+    }
+    return restored
+  }
+
+  const restoreAllLocalSnapshots = async () => {
+    if (localSnapshotDates.length === 0) return
+    setIsRestoringLocalEntries(true)
+    setLocalRestoreMessage(null)
+    let restoredTotal = 0
+    try {
+      const sortedDates = [...localSnapshotDates].sort()
+      for (const date of sortedDates) {
+        const raw = persistentDiarySnapshot?.byDate?.[date]?.entries
+        if (!Array.isArray(raw) || raw.length === 0) continue
+        const normalized = dedupeEntries(normalizeDiaryList(raw, date), { fallbackDate: date })
+        restoredTotal += await restoreEntriesFromLocalSnapshot(date, normalized, {
+          skipStatus: true,
+          skipRefresh: true,
+        })
+      }
+    } finally {
+      setIsRestoringLocalEntries(false)
+    }
+    if (restoredTotal > 0) {
+      setLocalRestoreMessage(`Restored ${restoredTotal} entries.`)
+      await refreshEntriesFromServer({ mode: 'manual' })
+    } else {
+      setLocalRestoreMessage('No entries were restored.')
+    }
+  }
+
   // Load history for non-today dates
   useEffect(() => {
     const loadHistory = async () => {
@@ -7794,7 +7902,7 @@ const applyStructuredItems = (
           writeLocalDateRepairStamp(Date.now())
           try {
             const tz = new Date().getTimezoneOffset()
-            const res = await fetch(`/api/food-log/repair-local-date?tz=${tz}`, { method: 'POST' })
+            const res = await fetch(`/api/food-log/repair-local-date?tz=${tz}&mode=full`, { method: 'POST' })
             if (!res.ok) return false
             const data = await res.json().catch(() => ({} as any))
             return Boolean(data?.updated) || res.ok
@@ -21576,7 +21684,50 @@ Please add nutritional information manually if needed.`);
                       {source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
                         <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
                       )}
-                      {source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && (
+                      {source.length === 0 && localSnapshotDates.length > 0 && (
+                        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
+                          <div>We found saved entries on this device.</div>
+                          <div className="flex flex-wrap gap-2">
+                            {localSnapshotEntriesForSelectedDate.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  restoreEntriesFromLocalSnapshot(selectedDate, localSnapshotEntriesForSelectedDate)
+                                }
+                                disabled={isRestoringLocalEntries}
+                                className="px-3 py-1 text-xs font-semibold bg-emerald-700 text-white disabled:opacity-60"
+                                style={{ borderRadius: 0 }}
+                              >
+                                {isRestoringLocalEntries ? 'Restoring…' : 'Restore this day'}
+                              </button>
+                            )}
+                            {latestLocalSnapshotDate && latestLocalSnapshotDate !== selectedDate && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedDate(latestLocalSnapshotDate)}
+                                disabled={isRestoringLocalEntries}
+                                className="px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-200 disabled:opacity-60"
+                                style={{ borderRadius: 0 }}
+                              >
+                                Show latest saved day
+                              </button>
+                            )}
+                            {localSnapshotDates.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => restoreAllLocalSnapshots()}
+                                disabled={isRestoringLocalEntries}
+                                className="px-3 py-1 text-xs font-semibold bg-emerald-600 text-white disabled:opacity-60"
+                                style={{ borderRadius: 0 }}
+                              >
+                                {isRestoringLocalEntries ? 'Restoring…' : 'Restore all days'}
+                              </button>
+                            )}
+                          </div>
+                          {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
+                        </div>
+                      )}
+                      {source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && localSnapshotDates.length === 0 && (
                         <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <div>We found saved entries on {formatShortDayLabel(lastKnownEntryDate)}.</div>
                           <button
