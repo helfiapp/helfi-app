@@ -152,6 +152,7 @@ export async function POST(request: NextRequest) {
     })
     const favoritesCount = parseFavoritesCount(favoritesGoal?.category || null)
     let favoritesRestored = false
+    let favoritesBackupFound = false
 
     if (favoritesCount === 0) {
       const backup = await prisma.healthGoal.findFirst({
@@ -161,6 +162,7 @@ export async function POST(request: NextRequest) {
         },
         orderBy: { createdAt: 'desc' },
       })
+      favoritesBackupFound = Boolean(backup?.category)
       if (backup?.category) {
         if (favoritesGoal?.id) {
           await prisma.healthGoal.update({
@@ -211,6 +213,7 @@ export async function POST(request: NextRequest) {
       success: true,
       updatedDates: updatedIds.length,
       favoritesRestored,
+      favoritesBackupFound,
       mostRecentDate,
     })
   } catch (error) {

@@ -2358,7 +2358,7 @@ export default function FoodDiary() {
   const router = useRouter()
   const isAnalysisRoute = pathname === '/food/analysis'
   const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
-  const { userData, profileImage, updateUserData } = useUserData()
+  const { userData, profileImage, updateUserData, refreshData } = useUserData()
   const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
   const initialDeviceStatus = useMemo(() => readDeviceStatusSnapshot(userCacheKey), [userCacheKey])
   const initialFavoritesAllSnapshot = useMemo(() => readFavoritesAllSnapshot(userCacheKey), [userCacheKey])
@@ -7857,6 +7857,9 @@ const applyStructuredItems = (
     if (restoredTotal > 0) {
       setLocalRestoreMessage(`Restored ${restoredTotal} entries.`)
       await refreshEntriesFromServer({ mode: 'manual' })
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('userData:refresh'))
+      }
     } else {
       setLocalRestoreMessage('No entries were restored.')
     }
@@ -7870,7 +7873,7 @@ const applyStructuredItems = (
       const tz = new Date().getTimezoneOffset()
       const res = await fetch(`/api/food-log/rescue?tz=${tz}`, { method: 'POST' })
       if (!res.ok) {
-        setRescueMessage('Could not repair your data yet. Please try again.')
+        setRescueMessage('Could not fix this yet. Please try again.')
         return
       }
       const data = await res.json().catch(() => ({} as any))
@@ -7879,13 +7882,20 @@ const applyStructuredItems = (
         setSelectedDate(nextDate)
       }
       if (data?.favoritesRestored) {
-        setRescueMessage('Repair complete. Please refresh the page once.')
+        setRescueMessage('Fix complete. Please refresh the page once.')
+      } else if (data?.favoritesBackupFound === false) {
+        setRescueMessage('Fix complete. No favorites backup was found.')
       } else {
-        setRescueMessage('Repair complete. Please refresh the page once.')
+        setRescueMessage('Fix complete. Please refresh the page once.')
       }
       await refreshEntriesFromServer({ mode: 'manual' })
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('credits:refresh'))
+        window.dispatchEvent(new CustomEvent('userData:refresh'))
+      }
+      await refreshData()
     } catch {
-      setRescueMessage('Could not repair your data yet. Please try again.')
+      setRescueMessage('Could not fix this yet. Please try again.')
     } finally {
       setIsRescuingData(false)
     }
@@ -21758,9 +21768,9 @@ Please add nutritional information manually if needed.`);
                           {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
                         </div>
                       )}
-                      {source.length === 0 && lastKnownEntryDate && (
+                      {source.length === 0 && (favorites.length === 0 || (lastKnownEntryDate && lastKnownEntryDate !== selectedDate)) && (
                         <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div>Repair saved entries and favorites for this account.</div>
+                          <div>Fix favorites or credits if they look wrong.</div>
                           <button
                             type="button"
                             onClick={() => runDataRescue()}
@@ -21768,7 +21778,7 @@ Please add nutritional information manually if needed.`);
                             className="px-3 py-1 text-xs font-semibold bg-rose-600 text-white disabled:opacity-60"
                             style={{ borderRadius: 0 }}
                           >
-                            {isRescuingData ? 'Repairing…' : 'Repair my data'}
+                            {isRescuingData ? 'Fixing…' : 'Fix favorites & credits'}
                           </button>
                         </div>
                       )}
