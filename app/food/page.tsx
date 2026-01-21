@@ -3114,6 +3114,8 @@ export default function FoodDiary() {
   const lastKnownEntryRequestedRef = useRef(false)
   const [isRestoringLocalEntries, setIsRestoringLocalEntries] = useState(false)
   const [localRestoreMessage, setLocalRestoreMessage] = useState<string | null>(null)
+  const [isRescuingData, setIsRescuingData] = useState(false)
+  const [rescueMessage, setRescueMessage] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
   const midnightTimerRef = useRef<number | null>(null)
   const todayIsoRef = useRef<string>(buildTodayIso())
@@ -7857,6 +7859,35 @@ const applyStructuredItems = (
       await refreshEntriesFromServer({ mode: 'manual' })
     } else {
       setLocalRestoreMessage('No entries were restored.')
+    }
+  }
+
+  const runDataRescue = async () => {
+    if (isRescuingData) return
+    setIsRescuingData(true)
+    setRescueMessage(null)
+    try {
+      const tz = new Date().getTimezoneOffset()
+      const res = await fetch(`/api/food-log/rescue?tz=${tz}`, { method: 'POST' })
+      if (!res.ok) {
+        setRescueMessage('Could not repair your data yet. Please try again.')
+        return
+      }
+      const data = await res.json().catch(() => ({} as any))
+      const nextDate = typeof data?.mostRecentDate === 'string' ? data.mostRecentDate.slice(0, 10) : ''
+      if (nextDate && /^\d{4}-\d{2}-\d{2}$/.test(nextDate)) {
+        setSelectedDate(nextDate)
+      }
+      if (data?.favoritesRestored) {
+        setRescueMessage('Repair complete. Please refresh the page once.')
+      } else {
+        setRescueMessage('Repair complete. Please refresh the page once.')
+      }
+      await refreshEntriesFromServer({ mode: 'manual' })
+    } catch {
+      setRescueMessage('Could not repair your data yet. Please try again.')
+    } finally {
+      setIsRescuingData(false)
     }
   }
 
@@ -21726,6 +21757,23 @@ Please add nutritional information manually if needed.`);
                           </div>
                           {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
                         </div>
+                      )}
+                      {source.length === 0 && lastKnownEntryDate && (
+                        <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div>Repair saved entries and favorites for this account.</div>
+                          <button
+                            type="button"
+                            onClick={() => runDataRescue()}
+                            disabled={isRescuingData}
+                            className="px-3 py-1 text-xs font-semibold bg-rose-600 text-white disabled:opacity-60"
+                            style={{ borderRadius: 0 }}
+                          >
+                            {isRescuingData ? 'Repairing…' : 'Repair my data'}
+                          </button>
+                        </div>
+                      )}
+                      {source.length === 0 && rescueMessage && (
+                        <div className="mb-3 text-xs text-gray-600">{rescueMessage}</div>
                       )}
                       {source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && localSnapshotDates.length === 0 && (
                         <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
