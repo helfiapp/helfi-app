@@ -679,6 +679,8 @@ const FOOD_RESUME_LAST_PREFIX = 'food:resume:last:'
 const FOOD_RESUME_REFRESH_MIN_MS = 2 * 60 * 1000
 const FOOD_AUTO_REFRESH_ON_RESUME = false
 const FOOD_DIARY_LAST_VISIT_KEY = 'food:diary:lastVisitDate'
+const FOOD_DIARY_LOCAL_DATE_REPAIR_KEY = 'foodDiary:localDateRepair:last'
+const FOOD_DIARY_LOCAL_DATE_REPAIR_TTL_MS = 12 * 60 * 60 * 1000
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
@@ -750,6 +752,24 @@ const readFoodResumeStamp = (scope: string): number => {
   } catch {
     return 0
   }
+}
+
+const readLocalDateRepairStamp = (): number => {
+  if (typeof window === 'undefined') return 0
+  try {
+    const raw = window.localStorage.getItem(FOOD_DIARY_LOCAL_DATE_REPAIR_KEY)
+    const parsed = raw ? Number(raw) : 0
+    return Number.isFinite(parsed) ? parsed : 0
+  } catch {
+    return 0
+  }
+}
+
+const writeLocalDateRepairStamp = (value: number) => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(FOOD_DIARY_LOCAL_DATE_REPAIR_KEY, String(value || 0))
+  } catch {}
 }
 
 const shouldRefreshOnResume = (scope: string): boolean => {
@@ -3019,6 +3039,7 @@ export default function FoodDiary() {
   const mealInsertDebounceRef = useRef<Record<string, number>>({})
   const pendingServerIdRef = useRef<Map<string, { localId: number; savedAt: number }>>(new Map())
   const historyLoadSeqRef = useRef(0)
+  const localDateRepairInFlightRef = useRef(false)
   const foodLibraryRefreshRef = useRef<{ last: number; inFlight: boolean }>({ last: 0, inFlight: false })
   const renameSaveRef = useRef<((value: string) => void) | null>(null)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
@@ -6259,19 +6280,33 @@ export default function FoodDiary() {
 
     try {
       const sourceParam = mode === 'single' ? 'usda' : 'auto'
-      const fetchItems = async (searchQuery: string) => {
+      const fetchItems = async (searchQuery: string, options?: { sourceParam?: string; localOnly?: boolean }) => {
         const params = new URLSearchParams({
-          source: sourceParam,
+          source: options?.sourceParam ?? sourceParam,
           q: searchQuery,
           kind: mode,
           limit: '20',
         })
+        if (options?.localOnly) params.set('localOnly', '1')
         const url = `/api/food-data?${params.toString()}`
         const res = await fetch(url, {
           method: 'GET',
           signal: controller.signal,
         })
         return { res, url }
+      }
+
+      if (mode === 'packaged') {
+        const quick = await fetchItems(query, { sourceParam: 'usda', localOnly: true })
+        if (quick.res.ok && officialSearchSeqRef.current === seq) {
+          const quickData = await quick.res.json().catch(() => ({} as any))
+          const quickItems = Array.isArray(quickData?.items) ? quickData.items : []
+          const quickFiltered = hasToken ? quickItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : quickItems
+          if (quickFiltered.length > 0 && officialSearchSeqRef.current === seq) {
+            const immediateBrands = hasToken ? buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, query) : []
+            setOfficialResults(mergeBrandSuggestions(quickFiltered, immediateBrands))
+          }
+        }
       }
 
       const { res, url } = await fetchItems(query)
@@ -7719,6 +7754,25 @@ const applyStructuredItems = (
         }
         setIsLoadingHistory(true);
         setFoodDiaryLoaded(hasCachedHistory); // Show cached state instantly when available
+        const attemptLocalDateRepair = async () => {
+          if (typeof window === 'undefined') return false
+          if (localDateRepairInFlightRef.current) return false
+          const last = readLocalDateRepairStamp()
+          if (last && Date.now() - last < FOOD_DIARY_LOCAL_DATE_REPAIR_TTL_MS) return false
+          localDateRepairInFlightRef.current = true
+          writeLocalDateRepairStamp(Date.now())
+          try {
+            const tz = new Date().getTimezoneOffset()
+            const res = await fetch(`/api/food-log/repair-local-date?tz=${tz}`, { method: 'POST' })
+            if (!res.ok) return false
+            const data = await res.json().catch(() => ({} as any))
+            return Boolean(data?.updated) || res.ok
+          } catch {
+            return false
+          } finally {
+            localDateRepairInFlightRef.current = false
+          }
+        }
         const tz = new Date().getTimezoneOffset();
         const apiUrl = `/api/food-log?date=${selectedDate}&tz=${tz}`;
         console.log(`📡 Fetching from API: ${apiUrl}`);
@@ -7738,9 +7792,31 @@ const applyStructuredItems = (
             })) : []
           });
           const logs = Array.isArray(json.logs) ? json.logs : []
-          if (logs.length === 0 && hasCachedHistory) {
-            setFoodDiaryLoaded(true);
-            return;
+          if (logs.length === 0) {
+            if (hasCachedHistory) {
+              setFoodDiaryLoaded(true);
+              return;
+            }
+            const repaired = await attemptLocalDateRepair()
+            if (repaired && requestId === historyLoadSeqRef.current) {
+              const retry = await fetch(`${apiUrl}&t=${Date.now()}`, { cache: 'no-store' })
+              if (requestId !== historyLoadSeqRef.current) return
+              if (retry.ok) {
+                const retryJson = await retry.json().catch(() => ({} as any))
+                const retryLogs = Array.isArray(retryJson.logs) ? retryJson.logs : []
+                if (retryLogs.length === 0) {
+                  setHistoryFoods([]);
+                  setFoodDiaryLoaded(true);
+                  return;
+                }
+                const retryMapped = mapLogsToEntries(retryLogs, selectedDate)
+                const retryDeduped = dedupeEntries(retryMapped, { fallbackDate: selectedDate })
+                console.log(`✅ Setting historyFoods with ${retryDeduped.length} entries for date ${selectedDate}`);
+                setHistoryFoods(retryDeduped)
+                setFoodDiaryLoaded(true);
+                return;
+              }
+            }
           }
 
           const mapped = mapLogsToEntries(logs, selectedDate)
