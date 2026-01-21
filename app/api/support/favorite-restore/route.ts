@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
+// GUARD RAIL: Recovery-only route. Keep identity checks and match logic strict to avoid wrong meals.
 const IDENTITY_MARKER = '[SYSTEM] Identity verified'
 const IDENTITY_MAX_AGE_MS = 24 * 60 * 60 * 1000
 

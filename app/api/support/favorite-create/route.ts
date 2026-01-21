@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
+// GUARD RAIL: Recovery-only route. This creates a placeholder favorite; ingredients must be filled later.
 const IDENTITY_MARKER = '[SYSTEM] Identity verified'
 const IDENTITY_MAX_AGE_MS = 24 * 60 * 60 * 1000
 

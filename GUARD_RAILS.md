@@ -975,6 +975,29 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
   3) Re-check the affected dates (same script as above) and confirm zero rows.
 - Do not weaken any of the protections above (anchored saves, auto-heal, multi-date delete sweep, cache clear + reload).
 
+### 3.7.2 Food Diary Restore & Favorites Recovery (Jan 2026 - Locked)
+
+**Purpose:** If the diary shows zero data, favorites/custom meals vanish, or credits look wrong.
+
+**Guard rails (do not remove):**
+- Local device restore is **best-effort** and must stay **user-controlled**. Hide only after a successful restore or an explicit “hide” click.
+- Do **not** clear local diary snapshots unless the user explicitly asks; they are the last-resort safety net.
+- Support recovery routes must always require **identity verification** via a support ticket.
+
+**If it breaks, restore in this order (do not improvise):**
+1) Confirm the server still has food log data for the date.
+2) Run `POST /api/support/account-repair` (repairs credits/subscription, fixes bad dates, restores favorites from backup if available).
+3) If favorites/custom meals are still missing, run `POST /api/support/favorites-rebuild` (backs up then rebuilds from recent food logs).
+4) If a single favorite is missing, run `POST /api/support/favorite-restore` with the label. If not found, use `POST /api/support/favorite-create` and re-add ingredients manually.
+5) Use the local “Restore this day / Restore all days” banner in Food Diary to bring back device-only entries.
+
+**Protected files:**
+- `app/food/page.tsx` (local restore banner + hide flag)
+- `app/api/support/account-repair/route.ts`
+- `app/api/support/favorites-rebuild/route.ts`
+- `app/api/support/favorite-restore/route.ts`
+- `app/api/support/favorite-create/route.ts`
+
 ### 3.8 Ingredient Card Summary Filtering (Dec 2025 – Locked)
 - In `app/food/page.tsx`, keep the guard that strips generic “plate/meal” summary items when multiple ingredients exist (e.g., “The image shows…”, long “burger with …” phrases). Do not remove or relax this filter without approval.
 - Ingredient cards for multi-item meals must remain one per distinct ingredient; do not reintroduce plate-level summary cards into the list.

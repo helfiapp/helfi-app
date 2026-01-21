@@ -681,6 +681,7 @@ const FOOD_AUTO_REFRESH_ON_RESUME = false
 const FOOD_DIARY_LAST_VISIT_KEY = 'food:diary:lastVisitDate'
 const FOOD_DIARY_LOCAL_DATE_REPAIR_KEY = 'foodDiary:localDateRepair:last'
 const FOOD_DIARY_LOCAL_DATE_REPAIR_TTL_MS = 12 * 60 * 60 * 1000
+// GUARD RAIL: local restore prompt must stay user-controlled and never auto-hide without a restore or explicit action.
 const FOOD_DIARY_LOCAL_RESTORE_HIDE_KEY = 'foodDiary:localRestore:hide'
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
@@ -3483,6 +3484,7 @@ export default function FoodDiary() {
   const [favorites, setFavorites] = useState<any[]>([])
   const [foodLibrary, setFoodLibrary] = useState<any[]>([])
   const [foodNameOverrides, setFoodNameOverrides] = useState<any[]>([])
+  // GUARD RAIL: once hidden, the local restore banner stays hidden until the user shows it again.
   const [hideLocalRestorePrompt, setHideLocalRestorePrompt] = useState<boolean>(() => readHideLocalRestorePrompt())
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
@@ -21808,6 +21810,7 @@ Please add nutritional information manually if needed.`);
                       {source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
                         <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
                       )}
+                      {/* GUARD RAIL: local restore is best-effort and should never be forced on the user. */}
                       {source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
                         <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
                           <div>We found saved entries on this device.</div>
