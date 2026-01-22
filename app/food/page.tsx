@@ -7325,6 +7325,8 @@ const applyStructuredItems = (
     const normalized = dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
     return filterEntriesForDate(normalized, selectedDate)
   }, [selectedDate, persistentDiarySnapshotVersion])
+  // SEVERE GUARD RAIL: Keep the local snapshot while history loads.
+  // This prevents the "full calories / zero" flash when switching dates.
   const sourceEntries = useMemo(() => {
     const historyReady =
       !isViewingToday &&
