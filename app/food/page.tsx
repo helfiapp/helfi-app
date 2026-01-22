@@ -28,7 +28,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, Component } f
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
@@ -2377,6 +2377,8 @@ export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const debugMode = searchParams?.get('debug') === '1'
   const isAnalysisRoute = pathname === '/food/analysis'
   const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
   const { userData, profileImage, updateUserData, refreshData } = useUserData()
@@ -2412,6 +2414,24 @@ export default function FoodDiary() {
     const m = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
     return `${y}-${m}-${day}`
+  }
+  const extractLogDates = (logs: any[]) => {
+    const set = new Set<string>()
+    if (!Array.isArray(logs)) return []
+    logs.forEach((log) => {
+      const local =
+        typeof log?.localDate === 'string' && log.localDate.length >= 8 ? String(log.localDate).slice(0, 10) : ''
+      if (local) {
+        set.add(local)
+        return
+      }
+      const createdAt = log?.createdAt
+      if (!createdAt) return
+      const ms = new Date(createdAt).getTime()
+      if (!Number.isFinite(ms)) return
+      set.add(formatDateFromMs(ms))
+    })
+    return Array.from(set).sort()
   }
   const extractEntryTimestampMs = (entry: any) => {
     const ts =
@@ -3360,6 +3380,14 @@ export default function FoodDiary() {
     return null
   })
   const [historyFoodsDate, setHistoryFoodsDate] = useState<string | null>(null)
+  const [lastDiaryFetchInfo, setLastDiaryFetchInfo] = useState<{
+    date: string
+    from: 'history' | 'today'
+    ok: boolean
+    logsCount: number | null
+    logDates: string[]
+    receivedAt: number
+  } | null>(null)
   const [waterEntries, setWaterEntries] = useState<WaterLogEntry[]>([])
   const [waterLoading, setWaterLoading] = useState(false)
   const [waterDeletingId, setWaterDeletingId] = useState<string | null>(null)
@@ -7304,6 +7332,14 @@ const applyStructuredItems = (
     selectedDate,
     localSnapshotEntriesForSelectedDate,
   ])
+  const sourceDateKeys = useMemo(() => {
+    const set = new Set<string>()
+    sourceEntries.forEach((entry) => {
+      const key = dateKeyForEntry(entry)
+      if (key) set.add(key)
+    })
+    return Array.from(set).sort()
+  }, [sourceEntries])
   const localSnapshotDates = useMemo(() => {
     const snapshot = readPersistentDiarySnapshot()
     const byDate = snapshot?.byDate || {}
@@ -8089,7 +8125,7 @@ const applyStructuredItems = (
         const res = await fetch(`${apiUrl}&t=${Date.now()}`, { cache: 'no-store' });
         if (requestId !== historyLoadSeqRef.current) return
         console.log(`📡 API response status: ${res.status}, ok: ${res.ok}`);
-        if (res.ok) {
+          if (res.ok) {
           const json = await res.json()
           console.log(`📦 API response data:`, { 
             success: json.success, 
@@ -8102,6 +8138,14 @@ const applyStructuredItems = (
             })) : []
           });
           const logs = Array.isArray(json.logs) ? json.logs : []
+          setLastDiaryFetchInfo({
+            date: selectedDate,
+            from: 'history',
+            ok: true,
+            logsCount: logs.length,
+            logDates: extractLogDates(logs),
+            receivedAt: Date.now(),
+          })
           if (logs.length === 0) {
             if (hasCachedHistory) {
               setFoodDiaryLoaded(true);
@@ -8143,6 +8187,14 @@ const applyStructuredItems = (
           setFoodDiaryLoaded(true);
         } else {
           console.log(`⚠️ API call failed or returned no entries for date ${selectedDate}, status: ${res.status}`);
+          setLastDiaryFetchInfo({
+            date: selectedDate,
+            from: 'history',
+            ok: false,
+            logsCount: null,
+            logDates: [],
+            receivedAt: Date.now(),
+          })
           if (!hasCachedHistory) {
             setHistoryFoods([]);
             setHistoryFoodsDate(selectedDate)
@@ -8430,10 +8482,28 @@ const applyStructuredItems = (
       const res = await fetch(`/api/food-log?date=${targetDate}&tz=${tz}&t=${Date.now()}`, {
         cache: 'no-store',
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setLastDiaryFetchInfo({
+          date: targetDate,
+          from: isViewingToday ? 'today' : 'history',
+          ok: false,
+          logsCount: null,
+          logDates: [],
+          receivedAt: Date.now(),
+        })
+        return;
+      }
 
       const json = await res.json();
       const logs = Array.isArray(json.logs) ? json.logs : [];
+      setLastDiaryFetchInfo({
+        date: targetDate,
+        from: isViewingToday ? 'today' : 'history',
+        ok: true,
+        logsCount: logs.length,
+        logDates: extractLogDates(logs),
+        receivedAt: Date.now(),
+      })
       const mapped = mapLogsToEntries(logs, targetDate, { preferCreatedAtDate: true });
       const localList = isViewingToday
         ? dedupeEntries(todaysFoodsForSelectedDate, { fallbackDate: targetDate })
@@ -20450,6 +20520,10 @@ Please add nutritional information manually if needed.`);
 	            <div className="mb-4">
 	              {(() => {
                   const source = sourceEntries
+                  const lastServerLabel = lastDiaryFetchInfo
+                    ? `${lastDiaryFetchInfo.from} ${lastDiaryFetchInfo.date} | ok=${lastDiaryFetchInfo.ok ? 'yes' : 'no'} | count=${lastDiaryFetchInfo.logsCount ?? 'n/a'} | dates=${lastDiaryFetchInfo.logDates.length > 0 ? lastDiaryFetchInfo.logDates.join(', ') : 'none'}`
+                    : 'none'
+                  const sourceDatesLabel = sourceDateKeys.length > 0 ? sourceDateKeys.join(', ') : 'none'
 
                 // ⚠️ GUARD RAIL: Today’s Totals must always be rebuilt from ingredient cards.
                 // Fiber/sugar accuracy depends on this. Stored totals are used only as a fallback.
@@ -21789,6 +21863,13 @@ Please add nutritional information manually if needed.`);
 
                 return (
                   <div className="space-y-4">
+                    {debugMode && (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                        <div>Debug: date={selectedDate} view={isViewingToday ? 'today' : 'history'} loading={isLoadingHistory ? 'yes' : 'no'} historyDate={historyFoodsDate || 'none'}</div>
+                        <div>Debug: sourceCount={source.length} sourceDates={sourceDatesLabel}</div>
+                        <div>Debug: lastServer={lastServerLabel}</div>
+                      </div>
+                    )}
                     {/* Daily rings header */}
                     <div
                       className="mb-2 bg-transparent border-0 shadow-none rounded-none px-4 py-2 sm:bg-white sm:border sm:border-gray-200 sm:rounded-xl sm:shadow-sm sm:px-4 sm:py-4"
