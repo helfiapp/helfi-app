@@ -1017,7 +1017,7 @@ const formatEnergyNumber = (value: number | null | undefined, unit: 'kcal' | 'kJ
   return `${rounded}`
 }
 
-const formatServingSizeDisplay = (label: string, item: any) => {
+const formatServingSizeDisplay = (label: string, item: any, unit: 'kcal' | 'kJ' = 'kcal') => {
   const base = label && label.trim().length > 0 ? label.trim() : 'Not specified'
   if (item?.labelNeedsReview) return base
   const macros: string[] = []
@@ -1025,7 +1025,10 @@ const formatServingSizeDisplay = (label: string, item: any) => {
   const protein = Number(item?.protein_g)
   const carbs = Number(item?.carbs_g)
   const fat = Number(item?.fat_g)
-  if (Number.isFinite(kcal) && kcal > 0) macros.push(`${Math.round(kcal)} kcal`)
+  if (Number.isFinite(kcal) && kcal > 0) {
+    const energyValue = unit === 'kJ' ? Math.round(kcal * KCAL_TO_KJ) : Math.round(kcal)
+    macros.push(`${energyValue} ${unit}`)
+  }
   if (Number.isFinite(protein) && protein > 0) macros.push(`${Math.round(protein * 10) / 10}g protein`)
   if (Number.isFinite(carbs) && carbs > 0) macros.push(`${Math.round(carbs * 10) / 10}g carbs`)
   if (Number.isFinite(fat) && fat > 0) macros.push(`${Math.round(fat * 10) / 10}g fat`)
@@ -18862,7 +18865,10 @@ Please add nutritional information manually if needed.`);
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
                         const macroMultiplier = macroMultiplierForItem(item)
-                        const totalCalories = Math.round((item.calories || 0) * servingsCount * macroMultiplier)
+                        const caloriesBase = Number(item?.calories || 0)
+                        const totalCalories = Number.isFinite(caloriesBase)
+                          ? caloriesBase * servingsCount * macroMultiplier
+                          : 0
                         const totalProtein = Math.round(((item.protein_g || 0) * servingsCount * macroMultiplier) * 10) / 10
                         const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount * macroMultiplier) * 10) / 10
                         const totalFat = Math.round(((item.fat_g || 0) * servingsCount * macroMultiplier) * 10) / 10
@@ -19117,7 +19123,7 @@ Please add nutritional information manually if needed.`);
                                     }
                                   }}
                                 >
-                                  Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
+                                  Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item, energyUnit)}
                                 </div>
                                 {servingOptions.length > 0 && (
                                   <div className="mt-2">
