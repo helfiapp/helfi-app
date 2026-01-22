@@ -7353,16 +7353,8 @@ const applyStructuredItems = (
     if (isViewingToday) {
       return isDiaryHydrated(selectedDate) && foodDiaryLoaded
     }
-    if (localSnapshotEntriesForSelectedDate.length > 0) return true
-    return !isLoadingHistory && historyFoodsDate === selectedDate
-  }, [
-    isViewingToday,
-    selectedDate,
-    foodDiaryLoaded,
-    isLoadingHistory,
-    historyFoodsDate,
-    localSnapshotEntriesForSelectedDate,
-  ])
+    return true
+  }, [isViewingToday, selectedDate, foodDiaryLoaded])
   const sourceDateKeys = useMemo(() => {
     const set = new Set<string>()
     sourceEntries.forEach((entry) => {
