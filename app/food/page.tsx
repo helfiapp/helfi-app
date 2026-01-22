@@ -7274,19 +7274,51 @@ const applyStructuredItems = (
     }
   }
 
-  const sourceEntries = useMemo(
-    () =>
-      dedupeEntries(
-        normalizeDiaryList(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), selectedDate),
-        { fallbackDate: selectedDate },
-      ),
-    [todaysFoodsForSelectedDate, historyFoods, isViewingToday, deletedEntryNonce, selectedDate],
-  )
   const localSnapshotEntriesForSelectedDate = useMemo(() => {
     const raw = persistentDiarySnapshot?.byDate?.[selectedDate]?.entries
     if (!Array.isArray(raw) || raw.length === 0) return []
-    return dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
-  }, [persistentDiarySnapshot, selectedDate])
+    const normalized = dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
+    return filterEntriesForDate(normalized, selectedDate)
+  }, [selectedDate, persistentDiarySnapshotVersion])
+  // SEVERE GUARD RAIL: Keep the local snapshot while history loads.
+  // This prevents the "full calories / zero" flash when switching dates.
+  const sourceEntries = useMemo(() => {
+    const historyReady =
+      !isViewingToday &&
+      historyFoodsDate === selectedDate &&
+      Array.isArray(historyFoods)
+    const historyForSelectedDate = historyReady ? historyFoods : []
+    const base = isViewingToday
+      ? todaysFoodsForSelectedDate
+      : historyReady
+      ? historyForSelectedDate
+      : localSnapshotEntriesForSelectedDate.length > 0
+      ? localSnapshotEntriesForSelectedDate
+      : []
+    return dedupeEntries(normalizeDiaryList(base || [], selectedDate), { fallbackDate: selectedDate })
+  }, [
+    todaysFoodsForSelectedDate,
+    historyFoods,
+    historyFoodsDate,
+    isViewingToday,
+    deletedEntryNonce,
+    selectedDate,
+    localSnapshotEntriesForSelectedDate,
+  ])
+  const summaryReady = useMemo(() => {
+    if (isViewingToday) {
+      return isDiaryHydrated(selectedDate) && foodDiaryLoaded
+    }
+    return true
+  }, [isViewingToday, selectedDate, foodDiaryLoaded])
+  const sourceDateKeys = useMemo(() => {
+    const set = new Set<string>()
+    sourceEntries.forEach((entry) => {
+      const key = dateKeyForEntry(entry)
+      if (key) set.add(key)
+    })
+    return Array.from(set).sort()
+  }, [sourceEntries])
   const localSnapshotDates = useMemo(() => {
     const byDate = persistentDiarySnapshot?.byDate || {}
     return Object.keys(byDate).filter((date) => {

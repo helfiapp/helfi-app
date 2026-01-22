@@ -371,14 +371,14 @@ export async function GET(request: NextRequest) {
     // - Remove the filtering/deduplication steps below
     //
     // DO:
-    // - Query broadly to catch entries with missing/incorrect localDate
+    // - Query broadly to catch entries with missing/incorrect localDate (for repair)
     // - Filter precisely after querying to ensure correct date
     // - Always deduplicate results
     //
     // Prefer the explicit localDate column when present so entries never drift to the wrong day.
     // For older rows that predate localDate, fall back to the createdAt time-window.
-    // CRITICAL FIX: Query more broadly to catch entries that might have incorrect localDate
-    // We'll filter them properly below
+    // CRITICAL FIX: Query broadly so we can detect incorrect localDate values.
+    // We will filter mismatches out below and repair localDate separately.
     console.log('🔍 GET /api/food-log - Querying database for entries...');
     let logs;
     try {
@@ -391,9 +391,9 @@ export async function GET(request: NextRequest) {
               localDate: null,
               createdAt: { gte: queryStart, lte: queryEnd },
             },
-            // Include entries created within the wider query window (even if localDate is set incorrectly)
-            // This ensures we don't lose entries due to date mismatches or timezone issues
-            // DO NOT REMOVE THIS CONDITION - it prevents entries from disappearing
+            // Include entries created within the wider query window to detect localDate mismatches.
+            // We still filter them out below if localDate does not match the requested day.
+            // DO NOT REMOVE THIS CONDITION - it supports localDate repair.
             {
               createdAt: { gte: queryStart, lte: queryEnd },
             },
@@ -410,19 +410,18 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
     
-    // 🛡️ GUARD RAIL: Post-Query Filtering (REQUIRED)
-    // Filter to ensure we only return entries for the requested date
-    // This handles entries that might have incorrect localDate values
+    // 🛡️ SEVERE GUARD RAIL: Post-Query Filtering (REQUIRED; owner approval to change)
+    // Filter to ensure we only return entries for the requested date.
+    // Entries with incorrect localDate must be excluded (and then repaired).
     // DO NOT remove this filtering step - it ensures accuracy after broad query
     const filteredLogs = logs.filter((log) => {
       try {
         // If localDate matches exactly, include it
         if (log.localDate === validatedDateStr) return true;
         
-        // If localDate is null or doesn't match, check the actual calendar date of createdAt
-        // CRITICAL: Use the user's timezone to determine the calendar date, not UTC
-        // This ensures entries are matched to the correct day regardless of timezone issues
-        if (!log.localDate || log.localDate !== validatedDateStr) {
+        // GUARD RAIL: If localDate exists and differs, do NOT include it for this day.
+        // Only fall back to createdAt when localDate is missing.
+        if (!log.localDate) {
           // Safety check: createdAt must exist and be a valid date
           if (!log.createdAt) {
             console.warn(`⚠️ Entry ${log.id} has no createdAt, skipping date check`);

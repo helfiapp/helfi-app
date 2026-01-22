@@ -662,6 +662,45 @@ On January 19th, 2025, food diary entries disappeared because entries were being
 - Opening the **last** category (Other / `uncategorized`) should auto‑scroll to the **last** entry in that category so it’s visible without manual scrolling.
 - Do not remove or bypass these UI safeguards without explicit owner approval.
 
+### 3.4.1 SEVERE LOCK - Energy Summary Flash + Same-Day Totals (Jan 2026)
+This section was breaking for weeks. Do **not** touch it without explicit owner approval.
+
+**Protected files:**
+- `app/food/page.tsx`
+- `app/api/food-log/route.ts`
+
+**What broke before:**
+- Energy summary flashed "full calories / zero used" when switching days.
+- Multiple different days showed the same totals.
+- Root cause: entries had wrong `localDate`, and the UI cleared to empty while history loaded.
+
+**Non-negotiable rules (do not change):**
+- On date switch, **never** clear the summary to empty if a saved snapshot exists for that day.
+- While history is loading, **keep showing** the saved per-date snapshot.
+- The server **must not** include entries whose `localDate` exists but does **not** match the requested day.
+- Only use `createdAt` as a fallback **when `localDate` is missing**.
+
+**Restore steps (exact, no guessing):**
+1) **Server date filter** (`app/api/food-log/route.ts`):
+   - Keep the broad query (OR window) to detect mismatches.
+   - In the filter step:
+     - If `localDate` exists and **does not** match the requested day -> **exclude**.
+     - If `localDate` is **missing**, then use `createdAt` to decide the day.
+2) **Client snapshot usage** (`app/food/page.tsx`):
+   - `sourceEntries` must keep `localSnapshotEntriesForSelectedDate` while history loads.
+   - Do **not** return `[]` during date switches if a snapshot exists.
+3) **Repair wrong dates** (when totals repeat across days):
+   - Run: `POST /api/food-log/repair-local-date?tz=<offset>&mode=full`
+   - This rewrites `localDate` from the best timestamp so future loads are correct.
+4) **Verify:**
+   - Compare Jan 10/11 and Jan 17/18/19.
+   - Totals must differ across days and no "zero" flash should appear.
+
+**Last stable fix (staging):**
+- Commit: `6d7d940b`
+- Date: 2026-01-22
+- Note: This must be re-verified on live once approved.
+
 ### 3.6 Food Search Consistency (Jan 2026 – Locked)
 - Single‑food searches must use USDA; packaged searches use FatSecret + OpenFoodFacts.
 - Plural searches should automatically fall back to the singular form (e.g., “fried eggs” → “fried egg”) to prevent empty/irrelevant results.
@@ -685,14 +724,14 @@ On January 19th, 2025, food diary entries disappeared because entries were being
    - Use OR conditions to catch entries with:
      - Correct `localDate` matching requested date
      - Null `localDate` but `createdAt` within date window
-     - Incorrect `localDate` but `createdAt` within date window
+     - Incorrect `localDate` (so it can be detected and repaired)
    - After querying, filter results to ensure only entries for requested date are returned
    - Remove duplicates before returning results
 
 2. **Never filter by `localDate` alone:**
-   - Always check `createdAt` timestamp as fallback
-   - Entries might have been saved with wrong `localDate` due to timezone issues or bugs
-   - The `createdAt` timestamp is the source of truth for when entry was actually created
+   - Use `createdAt` **only** when `localDate` is missing
+   - If `localDate` exists but is wrong, **exclude** it and repair `localDate`
+   - Do **not** use `createdAt` to override a mismatched `localDate`
 
 3. **Deduplication is required:**
    - Multiple OR conditions might return the same entry multiple times
@@ -704,7 +743,7 @@ On January 19th, 2025, food diary entries disappeared because entries were being
 - Remove the database verification step in the frontend loading logic
 - Make date filtering stricter or more restrictive
 - Remove the fallback OR conditions in the backend query
-- Filter entries out solely based on `localDate` mismatch
+- Include entries whose `localDate` exists but does **not** match the requested day
 - Remove deduplication logic
 - Assume cached data is always complete or correct
 - Skip the database check "for performance" - reliability is more important
