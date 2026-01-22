@@ -7274,26 +7274,34 @@ const applyStructuredItems = (
     }
   }
 
-  const sourceEntries = useMemo(
-    () =>
-      dedupeEntries(
-        normalizeDiaryList(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), selectedDate),
-        { fallbackDate: selectedDate },
-      ),
-    [todaysFoodsForSelectedDate, historyFoods, isViewingToday, deletedEntryNonce, selectedDate],
-  )
   const localSnapshotEntriesForSelectedDate = useMemo(() => {
-    const raw = persistentDiarySnapshot?.byDate?.[selectedDate]?.entries
+    const snapshot = readPersistentDiarySnapshot()
+    const raw = snapshot?.byDate?.[selectedDate]?.entries
     if (!Array.isArray(raw) || raw.length === 0) return []
-    return dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
-  }, [persistentDiarySnapshot, selectedDate])
+    const normalized = dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
+    return filterEntriesForDate(normalized, selectedDate)
+  }, [selectedDate, persistentDiarySnapshotVersion])
+  const sourceEntries = useMemo(() => {
+    const historyForSelectedDate = Array.isArray(historyFoods)
+      ? filterEntriesForDate(historyFoods, selectedDate)
+      : []
+    const base = isViewingToday
+      ? todaysFoodsForSelectedDate
+      : historyForSelectedDate.length > 0
+      ? historyForSelectedDate
+      : localSnapshotEntriesForSelectedDate
+    return dedupeEntries(normalizeDiaryList(base || [], selectedDate), { fallbackDate: selectedDate })
+  }, [todaysFoodsForSelectedDate, historyFoods, isViewingToday, deletedEntryNonce, selectedDate, localSnapshotEntriesForSelectedDate])
   const localSnapshotDates = useMemo(() => {
-    const byDate = persistentDiarySnapshot?.byDate || {}
+    const snapshot = readPersistentDiarySnapshot()
+    const byDate = snapshot?.byDate || {}
     return Object.keys(byDate).filter((date) => {
       const entries = byDate?.[date]?.entries
-      return Array.isArray(entries) && entries.length > 0
+      if (!Array.isArray(entries) || entries.length === 0) return false
+      const normalized = dedupeEntries(normalizeDiaryList(entries, date), { fallbackDate: date })
+      return filterEntriesForDate(normalized, date).length > 0
     })
-  }, [persistentDiarySnapshot])
+  }, [persistentDiarySnapshotVersion])
   const latestLocalSnapshotDate = useMemo(() => {
     if (localSnapshotDates.length === 0) return null
     const sorted = [...localSnapshotDates].sort()
@@ -20422,19 +20430,7 @@ Please add nutritional information manually if needed.`);
 	          {!editingEntry && (
 	            <div className="mb-4">
 	              {(() => {
-	                const historyFiltered = isViewingToday
-                    ? []
-                    : filterEntriesForDate(historyFoods, selectedDate)
-                  const snapshotEntries =
-                    !isViewingToday && persistentDiarySnapshot?.byDate?.[selectedDate]?.entries
-                      ? persistentDiarySnapshot.byDate[selectedDate]?.entries
-                      : []
-                  const baseEntries = isViewingToday
-                    ? todaysFoodsForSelectedDate
-                    : historyFiltered.length > 0
-                    ? historyFiltered
-                    : snapshotEntries || []
-                  const source = dedupeEntries(baseEntries, { fallbackDate: selectedDate })
+                  const source = sourceEntries
 
                 // ⚠️ GUARD RAIL: Today’s Totals must always be rebuilt from ingredient cards.
                 // Fiber/sugar accuracy depends on this. Stored totals are used only as a fallback.
