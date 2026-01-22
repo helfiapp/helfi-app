@@ -685,6 +685,8 @@ const FOOD_DIARY_LOCAL_DATE_REPAIR_TTL_MS = 12 * 60 * 60 * 1000
 const FOOD_DIARY_LOCAL_RESTORE_HIDE_KEY = 'foodDiary:localRestore:hide'
 // Owner request: disable restore banners for everyone until re-enabled.
 const SHOW_LOCAL_RESTORE_PROMPT = false
+// Owner request: disable the "Fix favorites & credits" banner on load.
+const SHOW_FAVORITES_RESCUE_PROMPT = false
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
@@ -21986,7 +21988,7 @@ Please add nutritional information manually if needed.`);
                           {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
                         </div>
                       )}
-                      {source.length === 0 && favorites.length === 0 && (
+                      {SHOW_FAVORITES_RESCUE_PROMPT && source.length === 0 && favorites.length === 0 && (
                         <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <div>Fix favorites or credits if they look wrong.</div>
                           <button

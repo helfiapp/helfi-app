@@ -1023,6 +1023,7 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - Do **not** clear local diary snapshots unless the user explicitly asks; they are the last-resort safety net.
 - Support recovery routes must always require **identity verification** via a support ticket.
 - Restore banner is currently disabled via `SHOW_LOCAL_RESTORE_PROMPT = false` in `app/food/page.tsx`. Flip to `true` only if the owner asks to re-enable.
+- The "Fix favorites & credits" banner is disabled via `SHOW_FAVORITES_RESCUE_PROMPT = false` in `app/food/page.tsx`. Flip to `true` only if the owner asks.
 
 **If it breaks, restore in this order (do not improvise):**
 1) Confirm the server still has food log data for the date.
