@@ -2441,29 +2441,6 @@ export default function FoodDiary() {
       return `${id}:${short || 'untitled'}`
     })
   }
-  const runDebugLocalDateRepair = async () => {
-    if (debugRepairLoading) return
-    setDebugRepairLoading(true)
-    setDebugRepairStatus(null)
-    try {
-      const tz = new Date().getTimezoneOffset()
-      const res = await fetch(`/api/food-log/repair-local-date?tz=${tz}&mode=full`, { method: 'POST' })
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        setDebugRepairStatus(`Fix failed (${res.status}). ${text || ''}`.trim())
-        return
-      }
-      const data = await res.json().catch(() => ({} as any))
-      const updated = Number(data?.updated ?? 0)
-      const scanned = Number(data?.scanned ?? 0)
-      setDebugRepairStatus(`Fix complete. Updated ${updated} of ${scanned} entries.`)
-      await refreshEntriesFromServer({ mode: 'manual' })
-    } catch (err: any) {
-      setDebugRepairStatus(`Fix failed. ${err?.message || 'Please try again.'}`)
-    } finally {
-      setDebugRepairLoading(false)
-    }
-  }
   const extractEntryTimestampMs = (entry: any) => {
     const ts =
       typeof entry?.createdAt === 'string' || entry?.createdAt instanceof Date
@@ -3420,8 +3397,6 @@ export default function FoodDiary() {
     logSample: string[]
     receivedAt: number
   } | null>(null)
-  const [debugRepairStatus, setDebugRepairStatus] = useState<string | null>(null)
-  const [debugRepairLoading, setDebugRepairLoading] = useState(false)
   const [waterEntries, setWaterEntries] = useState<WaterLogEntry[]>([])
   const [waterLoading, setWaterLoading] = useState(false)
   const [waterDeletingId, setWaterDeletingId] = useState<string | null>(null)
@@ -7372,6 +7347,20 @@ const applyStructuredItems = (
     isLoadingHistory,
     deletedEntryNonce,
     selectedDate,
+    localSnapshotEntriesForSelectedDate,
+  ])
+  const summaryReady = useMemo(() => {
+    if (isViewingToday) {
+      return isDiaryHydrated(selectedDate) && foodDiaryLoaded
+    }
+    if (localSnapshotEntriesForSelectedDate.length > 0) return true
+    return !isLoadingHistory && historyFoodsDate === selectedDate
+  }, [
+    isViewingToday,
+    selectedDate,
+    foodDiaryLoaded,
+    isLoadingHistory,
+    historyFoodsDate,
     localSnapshotEntriesForSelectedDate,
   ])
   const sourceDateKeys = useMemo(() => {
@@ -21922,20 +21911,6 @@ Please add nutritional information manually if needed.`);
                         <div>Debug: sourceCount={source.length} sourceDates={sourceDatesLabel}</div>
                         <div>Debug: sourceSample={sourceSampleLabel}</div>
                         <div>Debug: lastServer={lastServerLabel}</div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={runDebugLocalDateRepair}
-                            disabled={debugRepairLoading}
-                            className="px-2 py-1 text-[11px] font-semibold bg-amber-700 text-white disabled:opacity-60"
-                            style={{ borderRadius: 0 }}
-                          >
-                            {debugRepairLoading ? 'Fixing dates…' : 'Fix saved day labels'}
-                          </button>
-                          {debugRepairStatus && (
-                            <span className="text-[11px] text-amber-900">{debugRepairStatus}</span>
-                          )}
-                        </div>
                       </div>
                     )}
                     {/* Daily rings header */}
@@ -21973,98 +21948,104 @@ Please add nutritional information manually if needed.`);
                           </button>
                         </div>
                       </div>
-                      {source.length === 0 && (
-                        <p className="text-xs text-gray-500 mb-3">
-                          No meals yet today. Here are your daily targets to start the day.
-                        </p>
-                      )}
-                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
-                        <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
-                      )}
-                      {/* GUARD RAIL: local restore is best-effort and should never be forced on the user. */}
-                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
-                        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
-                          <div>We found saved entries on this device.</div>
-                          <div className="flex flex-wrap gap-2">
-                            {localSnapshotEntriesForSelectedDate.length > 0 && (
+                      {!summaryReady ? (
+                        <div className="text-xs text-gray-500 mb-3">Loading this day\u2019s summary\u2026</div>
+                      ) : (
+                        <>
+                          {source.length === 0 && (
+                            <p className="text-xs text-gray-500 mb-3">
+                              No meals yet today. Here are your daily targets to start the day.
+                            </p>
+                          )}
+                          {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
+                            <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
+                          )}
+                          {/* GUARD RAIL: local restore is best-effort and should never be forced on the user. */}
+                          {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
+                            <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
+                              <div>We found saved entries on this device.</div>
+                              <div className="flex flex-wrap gap-2">
+                                {localSnapshotEntriesForSelectedDate.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      restoreEntriesFromLocalSnapshot(selectedDate, localSnapshotEntriesForSelectedDate)
+                                    }
+                                    disabled={isRestoringLocalEntries}
+                                    className="px-3 py-1 text-xs font-semibold bg-emerald-700 text-white disabled:opacity-60"
+                                    style={{ borderRadius: 0 }}
+                                  >
+                                    {isRestoringLocalEntries ? 'Restoring…' : 'Restore this day'}
+                                  </button>
+                                )}
+                                {latestLocalSnapshotDate && latestLocalSnapshotDate !== selectedDate && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedDate(latestLocalSnapshotDate)}
+                                    disabled={isRestoringLocalEntries}
+                                    className="px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-200 disabled:opacity-60"
+                                    style={{ borderRadius: 0 }}
+                                  >
+                                    Show latest saved day
+                                  </button>
+                                )}
+                                {localSnapshotDates.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => restoreAllLocalSnapshots()}
+                                    disabled={isRestoringLocalEntries}
+                                    className="px-3 py-1 text-xs font-semibold bg-emerald-600 text-white disabled:opacity-60"
+                                    style={{ borderRadius: 0 }}
+                                  >
+                                    {isRestoringLocalEntries ? 'Restoring…' : 'Restore all days'}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setHideLocalRestorePrompt(true)
+                                    writeHideLocalRestorePrompt(true)
+                                  }}
+                                  className="px-3 py-1 text-xs font-semibold bg-white text-emerald-900 border border-emerald-200"
+                                  style={{ borderRadius: 0 }}
+                                >
+                                  Hide this message
+                                </button>
+                              </div>
+                              {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
+                            </div>
+                          )}
+                          {source.length === 0 && favorites.length === 0 && (
+                            <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div>Fix favorites or credits if they look wrong.</div>
                               <button
                                 type="button"
-                                onClick={() =>
-                                  restoreEntriesFromLocalSnapshot(selectedDate, localSnapshotEntriesForSelectedDate)
-                                }
-                                disabled={isRestoringLocalEntries}
-                                className="px-3 py-1 text-xs font-semibold bg-emerald-700 text-white disabled:opacity-60"
+                                onClick={() => runDataRescue()}
+                                disabled={isRescuingData}
+                                className="px-3 py-1 text-xs font-semibold bg-rose-600 text-white disabled:opacity-60"
                                 style={{ borderRadius: 0 }}
                               >
-                                {isRestoringLocalEntries ? 'Restoring…' : 'Restore this day'}
+                                {isRescuingData ? 'Fixing…' : 'Fix favorites & credits'}
                               </button>
-                            )}
-                            {latestLocalSnapshotDate && latestLocalSnapshotDate !== selectedDate && (
+                            </div>
+                          )}
+                          {source.length === 0 && rescueMessage && (
+                            <div className="mb-3 text-xs text-gray-600">{rescueMessage}</div>
+                          )}
+                          {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && localSnapshotDates.length === 0 && (
+                            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div>We found saved entries on {formatShortDayLabel(lastKnownEntryDate)}.</div>
                               <button
                                 type="button"
-                                onClick={() => setSelectedDate(latestLocalSnapshotDate)}
-                                disabled={isRestoringLocalEntries}
-                                className="px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-200 disabled:opacity-60"
+                                onClick={() => setSelectedDate(lastKnownEntryDate)}
+                                className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white"
                                 style={{ borderRadius: 0 }}
                               >
-                                Show latest saved day
+                                Show that day
                               </button>
-                            )}
-                            {localSnapshotDates.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => restoreAllLocalSnapshots()}
-                                disabled={isRestoringLocalEntries}
-                                className="px-3 py-1 text-xs font-semibold bg-emerald-600 text-white disabled:opacity-60"
-                                style={{ borderRadius: 0 }}
-                              >
-                                {isRestoringLocalEntries ? 'Restoring…' : 'Restore all days'}
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setHideLocalRestorePrompt(true)
-                                writeHideLocalRestorePrompt(true)
-                              }}
-                              className="px-3 py-1 text-xs font-semibold bg-white text-emerald-900 border border-emerald-200"
-                              style={{ borderRadius: 0 }}
-                            >
-                              Hide this message
-                            </button>
-                          </div>
-                          {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
-                        </div>
-                      )}
-                      {source.length === 0 && favorites.length === 0 && (
-                        <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div>Fix favorites or credits if they look wrong.</div>
-                          <button
-                            type="button"
-                            onClick={() => runDataRescue()}
-                            disabled={isRescuingData}
-                            className="px-3 py-1 text-xs font-semibold bg-rose-600 text-white disabled:opacity-60"
-                            style={{ borderRadius: 0 }}
-                          >
-                            {isRescuingData ? 'Fixing…' : 'Fix favorites & credits'}
-                          </button>
-                        </div>
-                      )}
-                      {source.length === 0 && rescueMessage && (
-                        <div className="mb-3 text-xs text-gray-600">{rescueMessage}</div>
-                      )}
-                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && localSnapshotDates.length === 0 && (
-                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div>We found saved entries on {formatShortDayLabel(lastKnownEntryDate)}.</div>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDate(lastKnownEntryDate)}
-                            className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white"
-                            style={{ borderRadius: 0 }}
-                          >
-                            Show that day
-                          </button>
-                        </div>
+                            </div>
+                          )}
+                        </>
                       )}
                       {(() => {
                           const slides: JSX.Element[] = []
