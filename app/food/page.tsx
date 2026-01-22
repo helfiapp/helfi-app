@@ -7335,7 +7335,7 @@ const applyStructuredItems = (
       ? todaysFoodsForSelectedDate
       : historyReady
       ? historyForSelectedDate
-      : !isLoadingHistory
+      : localSnapshotEntriesForSelectedDate.length > 0
       ? localSnapshotEntriesForSelectedDate
       : []
     return dedupeEntries(normalizeDiaryList(base || [], selectedDate), { fallbackDate: selectedDate })
@@ -7344,7 +7344,6 @@ const applyStructuredItems = (
     historyFoods,
     historyFoodsDate,
     isViewingToday,
-    isLoadingHistory,
     deletedEntryNonce,
     selectedDate,
     localSnapshotEntriesForSelectedDate,
