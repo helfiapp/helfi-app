@@ -2432,6 +2432,15 @@ export default function FoodDiary() {
     })
     return Array.from(set).sort()
   }
+  const buildLogSample = (logs: any[]) => {
+    if (!Array.isArray(logs)) return []
+    return logs.slice(0, 3).map((log) => {
+      const id = log?.id ? String(log.id) : 'no-id'
+      const label = String(log?.name || log?.description || '').trim()
+      const short = label.length > 18 ? `${label.slice(0, 18)}…` : label
+      return `${id}:${short || 'untitled'}`
+    })
+  }
   const extractEntryTimestampMs = (entry: any) => {
     const ts =
       typeof entry?.createdAt === 'string' || entry?.createdAt instanceof Date
@@ -3385,6 +3394,7 @@ export default function FoodDiary() {
     ok: boolean
     logsCount: number | null
     logDates: string[]
+    logSample: string[]
     receivedAt: number
   } | null>(null)
   const [waterEntries, setWaterEntries] = useState<WaterLogEntry[]>([])
@@ -8151,6 +8161,7 @@ const applyStructuredItems = (
             ok: true,
             logsCount: logs.length,
             logDates: extractLogDates(logs),
+            logSample: buildLogSample(logs),
             receivedAt: Date.now(),
           })
           if (logs.length === 0) {
@@ -8200,6 +8211,7 @@ const applyStructuredItems = (
             ok: false,
             logsCount: null,
             logDates: [],
+            logSample: [],
             receivedAt: Date.now(),
           })
           if (!hasCachedHistory) {
@@ -8496,6 +8508,7 @@ const applyStructuredItems = (
           ok: false,
           logsCount: null,
           logDates: [],
+          logSample: [],
           receivedAt: Date.now(),
         })
         return;
@@ -8509,6 +8522,7 @@ const applyStructuredItems = (
         ok: true,
         logsCount: logs.length,
         logDates: extractLogDates(logs),
+        logSample: buildLogSample(logs),
         receivedAt: Date.now(),
       })
       const mapped = mapLogsToEntries(logs, targetDate, { preferCreatedAtDate: true });
@@ -20528,9 +20542,16 @@ Please add nutritional information manually if needed.`);
 	              {(() => {
                   const source = sourceEntries
                   const lastServerLabel = lastDiaryFetchInfo
-                    ? `${lastDiaryFetchInfo.from} ${lastDiaryFetchInfo.date} | ok=${lastDiaryFetchInfo.ok ? 'yes' : 'no'} | count=${lastDiaryFetchInfo.logsCount ?? 'n/a'} | dates=${lastDiaryFetchInfo.logDates.length > 0 ? lastDiaryFetchInfo.logDates.join(', ') : 'none'}`
+                    ? `${lastDiaryFetchInfo.from} ${lastDiaryFetchInfo.date} | ok=${lastDiaryFetchInfo.ok ? 'yes' : 'no'} | count=${lastDiaryFetchInfo.logsCount ?? 'n/a'} | dates=${lastDiaryFetchInfo.logDates.length > 0 ? lastDiaryFetchInfo.logDates.join(', ') : 'none'} | sample=${lastDiaryFetchInfo.logSample.length > 0 ? lastDiaryFetchInfo.logSample.join(', ') : 'none'}`
                     : 'none'
                   const sourceDatesLabel = sourceDateKeys.length > 0 ? sourceDateKeys.join(', ') : 'none'
+                  const sourceSampleLabel =
+                    source.slice(0, 3).map((entry: any) => {
+                      const id = entry?.dbId ?? entry?.id ?? 'no-id'
+                      const label = String(entry?.description || entry?.label || '').trim()
+                      const short = label.length > 18 ? `${label.slice(0, 18)}…` : label
+                      return `${id}:${short || 'untitled'}`
+                    }).join(', ') || 'none'
 
                 // ⚠️ GUARD RAIL: Today’s Totals must always be rebuilt from ingredient cards.
                 // Fiber/sugar accuracy depends on this. Stored totals are used only as a fallback.
@@ -21874,6 +21895,7 @@ Please add nutritional information manually if needed.`);
                       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
                         <div>Debug: date={selectedDate} view={isViewingToday ? 'today' : 'history'} loading={isLoadingHistory ? 'yes' : 'no'} historyDate={historyFoodsDate || 'none'}</div>
                         <div>Debug: sourceCount={source.length} sourceDates={sourceDatesLabel}</div>
+                        <div>Debug: sourceSample={sourceSampleLabel}</div>
                         <div>Debug: lastServer={lastServerLabel}</div>
                       </div>
                     )}
