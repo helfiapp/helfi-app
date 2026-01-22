@@ -213,9 +213,11 @@ export async function GET(request: NextRequest) {
       if (resolvedKind === 'packaged') {
         return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'], mode: 'prefix' })
       }
-      const foundation = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] })
-      const legacy = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_sr_legacy'] })
-      const branded = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
+      const [foundation, legacy, branded] = await Promise.all([
+        searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] }),
+        searchLocalFoods(value, { pageSize: limit, sources: ['usda_sr_legacy'] }),
+        searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] }),
+      ])
 
       const combined = [...foundation, ...legacy, ...branded]
       const seen = new Set<string>()

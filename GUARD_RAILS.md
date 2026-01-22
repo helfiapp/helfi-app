@@ -212,6 +212,7 @@ Files:
 - Import script: `scripts/import-usda-foods.ts` loads USDA zips from `data/food-import/` into `foodLibraryItem`. Keep this as the source of truth.
 - Search safety rule: ignore 1‑letter tokens so “art” does not match “Bartlett” via the single letter “t”.
 - Multi‑word searches must match by words (order does not matter). Do not require the full phrase to appear exactly, or full‑word searches will return nothing.
+- Speed rule: return prefix matches fast; only use slow “contains” fallback when prefix returns nothing and the query is 4+ letters.
 
 **Restore steps if broken:**
 1) Confirm the production database is the **populated USDA database** (the one with ~1.8M branded rows). If the DB is empty, searches will fail.  

@@ -106,37 +106,77 @@ export async function searchLocalFoods(
   const mode = opts.mode || 'prefix-contains'
 
   try {
-    const normalizedTokens = q
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim()
-      .split(/\s+/)
+    const normalizePrefixToken = (value: string) =>
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+        .replace(/\s+/g, ' ')
+    const singularizeToken = (value: string) => {
+      const lower = value.toLowerCase()
+      if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
+      if (
+        lower.endsWith('es') &&
+        value.length > 3 &&
+        !lower.endsWith('ses') &&
+        !lower.endsWith('xes') &&
+        !lower.endsWith('zes') &&
+        !lower.endsWith('ches') &&
+        !lower.endsWith('shes')
+      ) {
+        return value.slice(0, -2)
+      }
+      if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
+      return value
+    }
+    const toTitleCase = (value: string) =>
+      value.replace(/\b([a-z])/g, (match) => match.toUpperCase())
+    const buildMcVariant = (value: string) => {
+      const lower = value.toLowerCase()
+      if (lower.startsWith('mc') && lower.length > 2) {
+        return `Mc${lower[2].toUpperCase()}${lower.slice(3)}`
+      }
+      if (lower.startsWith('mac') && lower.length > 3) {
+        return `Mac${lower[3].toUpperCase()}${lower.slice(4)}`
+      }
+      return null
+    }
+    const rawTokens = normalizePrefixToken(q)
+      .split(' ')
       .filter(Boolean)
       .filter((token) => token.length >= 2)
-    const tokenFilters =
-      normalizedTokens.length > 1
-        ? normalizedTokens.slice(0, 4).map((token) => ({
-            OR: [
-              { name: { contains: token, mode: 'insensitive' as const } },
-              { brand: { contains: token, mode: 'insensitive' as const } },
-            ],
-          }))
-        : null
+    const prefixTokens = rawTokens.length > 0 ? rawTokens.slice(0, 4) : [q]
+    const prefixCandidates = new Set<string>()
+    const addPrefixCandidate = (value: string | null | undefined) => {
+      const v = String(value || '').trim()
+      if (!v) return
+      prefixCandidates.add(v)
+      prefixCandidates.add(v.toLowerCase())
+      prefixCandidates.add(v.toUpperCase())
+      prefixCandidates.add(toTitleCase(v))
+      const mc = buildMcVariant(v)
+      if (mc) prefixCandidates.add(mc)
+    }
+    for (const token of prefixTokens) {
+      const singular = singularizeToken(token)
+      addPrefixCandidate(token)
+      if (singular && singular !== token) addPrefixCandidate(singular)
+    }
     const sourceFilter = sources ? { source: { in: sources } } : null
-    const prefixFilter = {
-      OR: [
-        { name: { startsWith: q, mode: 'insensitive' as const } },
-        { brand: { startsWith: q, mode: 'insensitive' as const } },
-      ],
-    }
-    const tokenFilter = tokenFilters ? { AND: tokenFilters } : null
-    const containsFilter = {
-      OR: [
-        { name: { contains: q, mode: 'insensitive' as const } },
-        { brand: { contains: q, mode: 'insensitive' as const } },
-      ],
-    }
-    const fallbackFilter = tokenFilter ?? containsFilter
+    const prefixConditions = Array.from(prefixCandidates).flatMap((candidate) => [
+      { name: { startsWith: candidate } },
+      { brand: { startsWith: candidate } },
+    ])
+    const prefixFilter = prefixConditions.length > 0 ? { OR: prefixConditions } : null
+    const allowContains = mode !== 'prefix' && q.length >= 4
+    const containsFilter = allowContains
+      ? {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' as const } },
+            { brand: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : null
     const buildWhere = (filter: any, excludeIds?: string[]) => {
       const clauses = []
       if (sourceFilter) clauses.push(sourceFilter)
@@ -156,9 +196,9 @@ export async function searchLocalFoods(
     const remaining = Math.max(0, pageSize - prefixRows.length)
     const prefixIds = prefixRows.map((row) => row.id)
     const containsRows =
-      remaining > 0 && mode !== 'prefix'
+      remaining > 0 && mode !== 'prefix' && prefixRows.length === 0 && containsFilter
         ? await prisma.foodLibraryItem.findMany({
-            where: buildWhere(fallbackFilter, prefixIds),
+            where: buildWhere(containsFilter, prefixIds),
             take: remaining,
             orderBy: { name: 'asc' },
           })
