@@ -1788,6 +1788,26 @@ you rename them and after you add them to the diary.
    - Add it to the diary.
    - You must be able to edit it from both the diary and Favorites.
 
+## 7.5 Favorites Add/Preview Choice (Jan 2026 - Locked)
+
+**Goal (non-negotiable):** When a user taps a favorite in “Add from favorites,”
+they must see a choice to **Add** or **Preview**. Preview shows the nutrition
+cards without adding to the diary.
+
+**Do not:**
+- Remove the Add/Preview choice from the Favorites picker.
+- Change the add behavior (Add must use the same add flow as before).
+- Show this popup for “Replace ingredient” or “Add to this meal” flows.
+
+**Where the code lives:**
+- `app/food/page.tsx` (Favorites picker UI and the Add/Preview modal)
+
+**If this breaks again, fix checklist (only in `app/food/page.tsx`):**
+1) Ensure the favorites list tap uses `shouldPromptFavoriteAction()` to show the modal.
+2) Ensure **Add** calls the same add logic (`runFavoriteAdd(...)`).
+3) Ensure **Preview** opens the nutrition cards without saving anything.
+4) Confirm it **does not** show for Replace/Analysis flows.
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
