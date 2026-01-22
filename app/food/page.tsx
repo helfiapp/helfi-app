@@ -2441,6 +2441,29 @@ export default function FoodDiary() {
       return `${id}:${short || 'untitled'}`
     })
   }
+  const runDebugLocalDateRepair = async () => {
+    if (debugRepairLoading) return
+    setDebugRepairLoading(true)
+    setDebugRepairStatus(null)
+    try {
+      const tz = new Date().getTimezoneOffset()
+      const res = await fetch(`/api/food-log/repair-local-date?tz=${tz}&mode=full`, { method: 'POST' })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        setDebugRepairStatus(`Fix failed (${res.status}). ${text || ''}`.trim())
+        return
+      }
+      const data = await res.json().catch(() => ({} as any))
+      const updated = Number(data?.updated ?? 0)
+      const scanned = Number(data?.scanned ?? 0)
+      setDebugRepairStatus(`Fix complete. Updated ${updated} of ${scanned} entries.`)
+      await refreshEntriesFromServer({ mode: 'manual' })
+    } catch (err: any) {
+      setDebugRepairStatus(`Fix failed. ${err?.message || 'Please try again.'}`)
+    } finally {
+      setDebugRepairLoading(false)
+    }
+  }
   const extractEntryTimestampMs = (entry: any) => {
     const ts =
       typeof entry?.createdAt === 'string' || entry?.createdAt instanceof Date
@@ -3397,6 +3420,8 @@ export default function FoodDiary() {
     logSample: string[]
     receivedAt: number
   } | null>(null)
+  const [debugRepairStatus, setDebugRepairStatus] = useState<string | null>(null)
+  const [debugRepairLoading, setDebugRepairLoading] = useState(false)
   const [waterEntries, setWaterEntries] = useState<WaterLogEntry[]>([])
   const [waterLoading, setWaterLoading] = useState(false)
   const [waterDeletingId, setWaterDeletingId] = useState<string | null>(null)
@@ -21897,6 +21922,20 @@ Please add nutritional information manually if needed.`);
                         <div>Debug: sourceCount={source.length} sourceDates={sourceDatesLabel}</div>
                         <div>Debug: sourceSample={sourceSampleLabel}</div>
                         <div>Debug: lastServer={lastServerLabel}</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={runDebugLocalDateRepair}
+                            disabled={debugRepairLoading}
+                            className="px-2 py-1 text-[11px] font-semibold bg-amber-700 text-white disabled:opacity-60"
+                            style={{ borderRadius: 0 }}
+                          >
+                            {debugRepairLoading ? 'Fixing dates…' : 'Fix saved day labels'}
+                          </button>
+                          {debugRepairStatus && (
+                            <span className="text-[11px] text-amber-900">{debugRepairStatus}</span>
+                          )}
+                        </div>
                       </div>
                     )}
                     {/* Daily rings header */}
