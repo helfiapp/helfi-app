@@ -419,10 +419,9 @@ export async function GET(request: NextRequest) {
         // If localDate matches exactly, include it
         if (log.localDate === validatedDateStr) return true;
         
-        // If localDate is null or doesn't match, check the actual calendar date of createdAt
-        // CRITICAL: Use the user's timezone to determine the calendar date, not UTC
-        // This ensures entries are matched to the correct day regardless of timezone issues
-        if (!log.localDate || log.localDate !== validatedDateStr) {
+        // If localDate is missing, fall back to createdAt to decide the day.
+        // If localDate exists and differs, do NOT include it for this day.
+        if (!log.localDate) {
           // Safety check: createdAt must exist and be a valid date
           if (!log.createdAt) {
             console.warn(`⚠️ Entry ${log.id} has no createdAt, skipping date check`);
