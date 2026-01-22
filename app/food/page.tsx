@@ -22772,15 +22772,37 @@ Please add nutritional information manually if needed.`);
 	          {/* Hide energy summary + meals while editing an entry to keep the user focused on editing */}
 		          {!editingEntry && (
 		            <>
-		              <div className="flex items-center justify-between mb-4">
-		                <h3 className="text-lg font-semibold">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
-		                <Link
-		                  href={`/chat?context=food&date=${encodeURIComponent(selectedDate)}`}
-		                  className="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
-		                >
-		                  Ask AI
-		                </Link>
-		              </div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setEnergyUnit('kcal')}
+                      className={`px-2 py-0.5 rounded-full ${
+                        energyUnit === 'kcal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                      }`}
+                    >
+                      kcal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnergyUnit('kJ')}
+                      className={`px-2 py-0.5 rounded-full ${
+                        energyUnit === 'kJ' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                      }`}
+                    >
+                      kJ
+                    </button>
+                  </div>
+                  <Link
+                    href={`/chat?context=food&date=${encodeURIComponent(selectedDate)}`}
+                    className="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
+                  >
+                    Ask AI
+                  </Link>
+                </div>
+              </div>
 
 		              <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden mb-4">
 		                <div className="px-4 py-4 flex items-start justify-between gap-3">
@@ -22982,7 +23004,10 @@ Please add nutritional information manually if needed.`);
                       const drinkMeta = !isWaterEntry ? getDrinkMetaFromEntry(food) : null
                       const isDrinkEntry = !isWaterEntry && Boolean(drinkMeta?.type)
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
-                      const entryCalories = !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Math.round(Number(entryTotals?.calories)) : null
+                      const entryCaloriesValue =
+                        !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Number(entryTotals?.calories) : null
+                      const entryCaloriesLabel =
+                        entryCaloriesValue === null ? null : `${formatEnergyNumber(entryCaloriesValue, energyUnit)} ${energyUnit}`
                       const waterLabel = isWaterEntry ? String(food?.label || 'Water') : null
                       const waterIconSrc = isWaterEntry ? getWaterIconSrc(waterLabel) : null
                       const drinkIconSrc = isDrinkEntry ? getWaterIconSrc(drinkMeta?.type) : null
@@ -23317,7 +23342,7 @@ Please add nutritional information manually if needed.`);
                                   })()}
                                 </div>
                                 <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
-                                  {entryCalories !== null && <span className="font-semibold text-gray-900">{entryCalories} kcal</span>}
+                                  {entryCaloriesLabel !== null && <span className="font-semibold text-gray-900">{entryCaloriesLabel}</span>}
                                   <span className="text-gray-500">
                                     {formatTimeWithAMPM(food.time)}
                                     {(food as any)?.__pendingSave ? ' • Saving...' : ''}
@@ -23460,7 +23485,7 @@ Please add nutritional information manually if needed.`);
                           0,
                         ) + drinkTotalMl
                         const summaryParts: string[] = []
-                        if (totals.calories > 0) summaryParts.push(`${Math.round(totals.calories)} kcal`)
+                        if (totals.calories > 0) summaryParts.push(`${formatEnergyNumber(totals.calories, energyUnit)} ${energyUnit}`)
                         if (totals.protein > 0) summaryParts.push(`${Math.round(totals.protein)}g Protein`)
                         if (totals.carbs > 0) summaryParts.push(`${Math.round(totals.carbs)}g Carbs`)
                         if (totals.fat > 0) summaryParts.push(`${Math.round(totals.fat)}g Fat`)
