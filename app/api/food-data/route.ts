@@ -381,12 +381,27 @@ export async function GET(request: NextRequest) {
           return Array.from(byNameBrand.values())
         }
 
+        const buildCompactFoodQuery = (value: string) => {
+          const normalized = normalizeForMatch(value)
+          if (!normalized) return null
+          const compacted = normalized.replace(/\bcheese burger\b/g, 'cheeseburger')
+          return compacted !== normalized ? compacted : null
+        }
+
         const fetchExternalPool = async () => {
-          const [off, fat] = await Promise.all([
-            searchOpenFoodFactsByQuery(query, { pageSize: perSource }),
-            searchFatSecretFoods(query, { pageSize: perSource }),
-          ])
-          return dedupe([...off, ...fat])
+          const fetchForQuery = async (value: string) => {
+            const [off, fat] = await Promise.all([
+              searchOpenFoodFactsByQuery(value, { pageSize: perSource }),
+              searchFatSecretFoods(value, { pageSize: perSource }),
+            ])
+            return dedupe([...off, ...fat])
+          }
+
+          const primary = await fetchForQuery(query)
+          if (primary.length > 0) return primary
+          const compactQuery = buildCompactFoodQuery(query)
+          if (!compactQuery) return primary
+          return await fetchForQuery(compactQuery)
         }
 
         const localPackaged = await searchLocalPreferred(query, 'packaged')
@@ -394,14 +409,11 @@ export async function GET(request: NextRequest) {
           const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
           return nameMatchesSearchQuery(combined || item?.name || '', query)
         })
-        if (localPackagedFiltered.length > 0) {
-          items = [...localPackagedFiltered].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
-          actualSource = 'auto'
-        } else {
-          const pooled = await fetchExternalPool()
-          items = pooled.slice(0, limit)
-          actualSource = 'auto'
-        }
+        const minLocalOnly = 5
+        const pooled = localPackagedFiltered.length < minLocalOnly ? await fetchExternalPool() : []
+        const combined = dedupe([...localPackagedFiltered, ...pooled])
+        items = combined.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+        actualSource = 'auto'
       }
     } else if (source === 'openfoodfacts') {
       items = await searchOpenFoodFactsByQuery(query, { pageSize: limit })

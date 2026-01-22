@@ -216,6 +216,7 @@ Files:
 - Search speed booster: keep the `pg_trgm` indexes on `FoodLibraryItem.name` and `FoodLibraryItem.brand` (they make fast typing results possible).
 - Packaged brand suggestions must only use brand‑like tokens; ignore generic food words (e.g., burger, cheese, nuggets). If there is no brand token in the query, do not show brand suggestions.
 - Packaged searches: use OpenFoodFacts + FatSecret unless the local USDA branded library already has matches. Single foods remain USDA local only.
+- Packaged searches: if local USDA branded matches are fewer than 5, add OpenFoodFacts + FatSecret results to fill the list. Also normalize "cheese burger" to "cheeseburger" when external sources return nothing.
 
 **Restore steps if broken:**
 1) Confirm the production database is the **populated USDA database** (the one with ~1.8M branded rows). If the DB is empty, searches will fail.  
