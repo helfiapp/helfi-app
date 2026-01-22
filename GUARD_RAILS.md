@@ -852,6 +852,23 @@ numbers show wrong and different screens disagree (favorites vs edit screen).
 - Commit: `a02cc1de`
 - Date: 2026-01-23
 
+### 3.4.4 Zero‑calorie macro fixes (Jan 2026 - Locked)
+
+**Why this exists:** Some USDA foods can carry macros but no calories. That causes
+0 kcal totals in the diary and in favorites, even though macros are present.
+
+**Protected file:**
+- `app/food/page.tsx`
+
+**Rule that must stay:**
+- When recalculating totals from items, if calories are missing/0 but protein/carbs/fat exist,
+  calories must be derived from macros (protein×4 + carbs×4 + fat×9) so entries never show 0 kcal
+  when macros are present.
+
+**Last stable fix (staging):**
+- Commit: `599b3d0b`
+- Date: 2026-01-23
+
 #### 3.4.3 Ingredient Card Integrity (Mar 2026 - Locked)
 
 **Protected files:**
