@@ -2999,9 +2999,14 @@ export default function FoodDiary() {
       if (cached.length > 0) setOfficialResults(mergeSearchSuggestions(cached, q))
       return
     }
+    const cached = getCachedOfficialResults(q, officialSource, officialSearchCacheRef.current)
+    const allowBrands = shouldShowBrandSuggestions(q)
+    if (!allowBrands) {
+      if (cached.length > 0) setOfficialResults(cached)
+      return
+    }
     const immediateBrands = buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, q)
     if (immediateBrands.length > 0) setOfficialResults(immediateBrands)
-    const cached = getCachedOfficialResults(q, officialSource, officialSearchCacheRef.current)
     if (cached.length > 0) setOfficialResults(mergeBrandSuggestions(cached, immediateBrands))
   }, [officialSearchQuery, officialSource])
 
@@ -6154,6 +6159,68 @@ export default function FoodDiary() {
     return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false })
   }
 
+  const GENERIC_FOOD_TOKENS = new Set([
+    'burger',
+    'cheese',
+    'cheeseburger',
+    'fries',
+    'nugget',
+    'nuggets',
+    'wrap',
+    'pizza',
+    'meal',
+    'combo',
+    'sandwich',
+    'salad',
+    'taco',
+    'burrito',
+    'coffee',
+    'latte',
+    'tea',
+    'drink',
+    'soda',
+    'cola',
+    'coke',
+    'shake',
+    'ice',
+    'cream',
+    'icecream',
+    'muffin',
+    'donut',
+    'doughnut',
+    'chicken',
+    'beef',
+    'fish',
+    'pork',
+    'bacon',
+    'sausage',
+    'egg',
+    'breakfast',
+  ])
+
+  const getBrandMatchTokens = (searchQuery: string) =>
+    getSearchTokens(searchQuery)
+      .filter((token) => token.length >= 2)
+      .filter((token) => !GENERIC_FOOD_TOKENS.has(token))
+      .map((token) => normalizeBrandToken(token))
+      .filter(Boolean)
+
+  const shouldShowBrandSuggestions = (searchQuery: string) => {
+    const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+    if (tokens.length === 0) return false
+    const brandTokens = getBrandMatchTokens(searchQuery)
+    if (brandTokens.length === 0) return false
+    return true
+  }
+
+  const getQuickPackagedQuery = (searchQuery: string) => {
+    const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+    if (tokens.length <= 1) return searchQuery
+    const brandTokens = getBrandMatchTokens(searchQuery)
+    if (brandTokens.length > 0) return brandTokens[0]
+    return tokens[0]
+  }
+
   const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
     'McDonald\'s',
     'KFC',
@@ -6227,13 +6294,12 @@ export default function FoodDiary() {
   ]
 
   const buildBrandSuggestions = (names: string[], searchQuery: string) => {
-    const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
-    if (tokens.length === 0) return []
-    const normalizedTokens = tokens.map(normalizeSearchToken).filter(Boolean)
+    const normalizedTokens = getBrandMatchTokens(searchQuery).filter(Boolean)
     if (normalizedTokens.length === 0) return []
     const matches = names.filter((name) => {
-      const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
-      return normalizedTokens.some((token) => tokens.some((nameToken) => nameToken.startsWith(token)))
+      const normalizedBrand = normalizeBrandToken(name)
+      if (!normalizedBrand) return false
+      return normalizedTokens.some((token) => normalizedBrand.startsWith(token))
     })
     return matches.slice(0, 8).map((name) => ({
       source: 'fatsecret',
@@ -6370,7 +6436,7 @@ export default function FoodDiary() {
   }
 
   const fetchOfficialBrandSuggestions = async (searchQuery: string) => {
-    const prefix = getSearchTokens(searchQuery)[0] || ''
+    const prefix = getBrandMatchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
     try {
       const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
@@ -6404,10 +6470,13 @@ export default function FoodDiary() {
     setOfficialLoading(true)
     setOfficialSource(mode)
     const hasToken = getSearchTokens(query).some((token) => token.length >= 2)
-    if (mode === 'packaged' && hasToken) {
-      const immediateBrands = buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, query)
-      if (immediateBrands.length > 0) {
+    const allowBrandSuggestions = mode === 'packaged' && shouldShowBrandSuggestions(query)
+    const immediateBrands = allowBrandSuggestions ? buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, query) : []
+    if (mode === 'packaged') {
+      if (allowBrandSuggestions && immediateBrands.length > 0) {
         setOfficialResults(immediateBrands)
+      } else if (!allowBrandSuggestions) {
+        setOfficialResults([])
       }
     } else if (mode === 'single' && hasToken) {
       const instant = buildSingleFoodSuggestions(query)
@@ -6437,16 +6506,18 @@ export default function FoodDiary() {
       }
 
       if (mode === 'packaged') {
-        const quick = await fetchItems(query, { sourceParam: 'usda', localOnly: true })
-        if (quick.res.ok && officialSearchSeqRef.current === seq) {
-          const quickData = await quick.res.json().catch(() => ({} as any))
-          const quickItems = Array.isArray(quickData?.items) ? quickData.items : []
-          const quickFiltered = hasToken ? quickItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : quickItems
-          if (quickFiltered.length > 0 && officialSearchSeqRef.current === seq) {
-            const immediateBrands = hasToken ? buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, query) : []
-            const quickMerged = mergeBrandSuggestions(quickFiltered, immediateBrands)
-            setOfficialResults(quickMerged)
-            if (quickMerged.length > 0) officialSearchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+        const quickQuery = getQuickPackagedQuery(query)
+        if (quickQuery.length >= 2) {
+          const quick = await fetchItems(quickQuery, { sourceParam: 'usda', localOnly: true })
+          if (quick.res.ok && officialSearchSeqRef.current === seq) {
+            const quickData = await quick.res.json().catch(() => ({} as any))
+            const quickItems = Array.isArray(quickData?.items) ? quickData.items : []
+            const quickFiltered = hasToken ? quickItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : quickItems
+            if (quickFiltered.length > 0 && officialSearchSeqRef.current === seq) {
+              const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, immediateBrands) : quickFiltered
+              setOfficialResults(quickMerged)
+              if (quickMerged.length > 0) officialSearchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+            }
           }
         }
       }
@@ -6506,7 +6577,12 @@ export default function FoodDiary() {
       const finalItems = mode === 'single' && filteredItems.length === 0 && baseItems.length > 0 ? baseItems : filteredItems
 
       const merged = finalItems
-      const finalResults = mode === 'single' ? mergeSearchSuggestions(merged, query) : merged
+      const finalResults =
+        mode === 'single'
+          ? mergeSearchSuggestions(merged, query)
+          : allowBrandSuggestions
+          ? mergeBrandSuggestions(merged, immediateBrands)
+          : merged
       if (officialSearchSeqRef.current !== seq) return
       setOfficialResults(finalResults)
       if (finalResults.length > 0) officialSearchCacheRef.current.set(cacheKey, { items: finalResults, at: Date.now() })
@@ -6522,7 +6598,7 @@ export default function FoodDiary() {
           : prev,
       )
 
-      if (mode === 'packaged' && hasToken) {
+      if (allowBrandSuggestions) {
         void fetchOfficialBrandSuggestions(query).then((brandMatches) => {
           if (officialSearchSeqRef.current !== seq) return
           if (!Array.isArray(brandMatches) || brandMatches.length === 0) return

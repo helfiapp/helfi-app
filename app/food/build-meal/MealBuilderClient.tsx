@@ -233,14 +233,75 @@ const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, k
   return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false })
 }
 
-const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
+const GENERIC_FOOD_TOKENS = new Set([
+  'burger',
+  'cheese',
+  'cheeseburger',
+  'fries',
+  'nugget',
+  'nuggets',
+  'wrap',
+  'pizza',
+  'meal',
+  'combo',
+  'sandwich',
+  'salad',
+  'taco',
+  'burrito',
+  'coffee',
+  'latte',
+  'tea',
+  'drink',
+  'soda',
+  'cola',
+  'coke',
+  'shake',
+  'ice',
+  'cream',
+  'icecream',
+  'muffin',
+  'donut',
+  'doughnut',
+  'chicken',
+  'beef',
+  'fish',
+  'pork',
+  'bacon',
+  'sausage',
+  'egg',
+  'breakfast',
+])
+
+const getBrandMatchTokens = (searchQuery: string) =>
+  getSearchTokens(searchQuery)
+    .filter((token) => token.length >= 2)
+    .filter((token) => !GENERIC_FOOD_TOKENS.has(token))
+    .map((token) => normalizeBrandToken(token))
+    .filter(Boolean)
+
+const shouldShowBrandSuggestions = (searchQuery: string) => {
   const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
-  if (tokens.length === 0) return []
-  const normalizedTokens = tokens.map(normalizeSearchToken).filter(Boolean)
+  if (tokens.length === 0) return false
+  const brandTokens = getBrandMatchTokens(searchQuery)
+  if (brandTokens.length === 0) return false
+  return true
+}
+
+const getQuickPackagedQuery = (searchQuery: string) => {
+  const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+  if (tokens.length <= 1) return searchQuery
+  const brandTokens = getBrandMatchTokens(searchQuery)
+  if (brandTokens.length > 0) return brandTokens[0]
+  return tokens[0]
+}
+
+const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
+  const normalizedTokens = getBrandMatchTokens(searchQuery).filter(Boolean)
   if (normalizedTokens.length === 0) return []
   const matches = names.filter((name) => {
-    const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
-    return normalizedTokens.some((token) => tokens.some((nameToken) => nameToken.startsWith(token)))
+    const normalizedBrand = normalizeBrandToken(name)
+    if (!normalizedBrand) return false
+    return normalizedTokens.some((token) => normalizedBrand.startsWith(token))
   })
   return matches.slice(0, 8).map((name) => ({
     source: 'fatsecret',
@@ -887,7 +948,7 @@ export default function MealBuilderClient() {
   }
 
   const fetchBrandSuggestions = async (searchQuery: string) => {
-    const prefix = getSearchTokens(searchQuery)[0] || ''
+    const prefix = getBrandMatchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
     try {
       const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
@@ -916,15 +977,19 @@ export default function MealBuilderClient() {
     const seq = ++seqRef.current
 
     try {
+      const allowBrandSuggestions = kind === 'packaged' && shouldShowBrandSuggestions(q)
       if (kind === 'packaged') {
-        const quickItems = await fetchSearchItems(q, { kindOverride: 'packaged', sourceOverride: 'usda', localOnly: true })
-        if (seqRef.current === seq && quickItems.length > 0) {
-          const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
-          const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : quickItems
-          const quickMerged = mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current)
-          if (seqRef.current === seq) {
-            setResults(quickMerged)
-            if (quickMerged.length > 0) searchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+        const quickQuery = getQuickPackagedQuery(q)
+        if (quickQuery.length >= 2) {
+          const quickItems = await fetchSearchItems(quickQuery, { kindOverride: 'packaged', sourceOverride: 'usda', localOnly: true })
+          if (seqRef.current === seq && quickItems.length > 0) {
+            const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+            const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : quickItems
+            const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current) : quickFiltered
+            if (seqRef.current === seq) {
+              setResults(quickMerged)
+              if (quickMerged.length > 0) searchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+            }
           }
         }
       }
@@ -955,7 +1020,9 @@ export default function MealBuilderClient() {
       const merged =
         kind === 'single'
           ? mergeSearchSuggestions(filteredItems, q)
-          : mergeBrandSuggestions(filteredItems, brandSuggestionsRef.current)
+          : allowBrandSuggestions
+          ? mergeBrandSuggestions(filteredItems, brandSuggestionsRef.current)
+          : filteredItems
       if (seqRef.current !== seq) return
       setResults(merged)
       if (merged.length > 0) searchCacheRef.current.set(cacheKey, { items: merged, at: Date.now() })
@@ -988,7 +1055,11 @@ export default function MealBuilderClient() {
     const cached = getCachedSearchResults(q, kind, searchCacheRef.current)
     if (cached.length > 0) {
       const mergedCached =
-        kind === 'single' ? mergeSearchSuggestions(cached, q) : mergeBrandSuggestions(cached, brandSuggestionsRef.current)
+        kind === 'single'
+          ? mergeSearchSuggestions(cached, q)
+          : shouldShowBrandSuggestions(q)
+          ? mergeBrandSuggestions(cached, brandSuggestionsRef.current)
+          : cached
       setResults(mergedCached)
     }
     setSearchLoading(true)
@@ -1015,6 +1086,11 @@ export default function MealBuilderClient() {
       return
     }
     if (q.length < 2) {
+      brandSeqRef.current += 1
+      setBrandSuggestions([])
+      return
+    }
+    if (!shouldShowBrandSuggestions(q)) {
       brandSeqRef.current += 1
       setBrandSuggestions([])
       return

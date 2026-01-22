@@ -254,14 +254,75 @@ const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, k
   return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false })
 }
 
-const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
+const GENERIC_FOOD_TOKENS = new Set([
+  'burger',
+  'cheese',
+  'cheeseburger',
+  'fries',
+  'nugget',
+  'nuggets',
+  'wrap',
+  'pizza',
+  'meal',
+  'combo',
+  'sandwich',
+  'salad',
+  'taco',
+  'burrito',
+  'coffee',
+  'latte',
+  'tea',
+  'drink',
+  'soda',
+  'cola',
+  'coke',
+  'shake',
+  'ice',
+  'cream',
+  'icecream',
+  'muffin',
+  'donut',
+  'doughnut',
+  'chicken',
+  'beef',
+  'fish',
+  'pork',
+  'bacon',
+  'sausage',
+  'egg',
+  'breakfast',
+])
+
+const getBrandMatchTokens = (searchQuery: string) =>
+  getSearchTokens(searchQuery)
+    .filter((token) => token.length >= 2)
+    .filter((token) => !GENERIC_FOOD_TOKENS.has(token))
+    .map((token) => normalizeBrandToken(token))
+    .filter(Boolean)
+
+const shouldShowBrandSuggestions = (searchQuery: string) => {
   const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
-  if (tokens.length === 0) return []
-  const normalizedTokens = tokens.map(normalizeSearchToken).filter(Boolean)
+  if (tokens.length === 0) return false
+  const brandTokens = getBrandMatchTokens(searchQuery)
+  if (brandTokens.length === 0) return false
+  return true
+}
+
+const getQuickPackagedQuery = (searchQuery: string) => {
+  const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+  if (tokens.length <= 1) return searchQuery
+  const brandTokens = getBrandMatchTokens(searchQuery)
+  if (brandTokens.length > 0) return brandTokens[0]
+  return tokens[0]
+}
+
+const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
+  const normalizedTokens = getBrandMatchTokens(searchQuery).filter(Boolean)
   if (normalizedTokens.length === 0) return []
   const matches = names.filter((name) => {
-    const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
-    return normalizedTokens.some((token) => tokens.some((nameToken) => nameToken.startsWith(token)))
+    const normalizedBrand = normalizeBrandToken(name)
+    if (!normalizedBrand) return false
+    return normalizedTokens.some((token) => normalizedBrand.startsWith(token))
   })
   return matches.slice(0, 8).map((name) => ({
     source: 'fatsecret',
@@ -593,8 +654,8 @@ export default function AddIngredientClient() {
     }
     const cached = getCachedSearchResults(q, kind, sourceChoice, searchCacheRef.current)
     if (cached.length > 0) {
-      const mergedCached =
-        kind === 'packaged' ? mergeBrandSuggestions(cached, brandSuggestionsRef.current) : mergeSearchSuggestions(cached, q)
+      const allowBrands = kind === 'packaged' && shouldShowBrandSuggestions(q)
+      const mergedCached = allowBrands ? mergeBrandSuggestions(cached, brandSuggestionsRef.current) : kind === 'packaged' ? cached : mergeSearchSuggestions(cached, q)
       setResults(mergedCached)
     }
     setLoading(true)
@@ -616,6 +677,11 @@ export default function AddIngredientClient() {
       brandSearchDebounceRef.current = null
     }
     if (kind !== 'packaged' || q.length < 2) {
+      brandSeqRef.current += 1
+      setBrandSuggestions([])
+      return
+    }
+    if (!shouldShowBrandSuggestions(q)) {
       brandSeqRef.current += 1
       setBrandSuggestions([])
       return
@@ -750,7 +816,7 @@ export default function AddIngredientClient() {
   }
 
   const fetchBrandSuggestions = async (searchQuery: string) => {
-    const prefix = getSearchTokens(searchQuery)[0] || ''
+    const prefix = getBrandMatchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
     try {
       const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
@@ -805,16 +871,20 @@ export default function AddIngredientClient() {
         return { res, data }
       }
 
+      const allowBrandSuggestions = k === 'packaged' && shouldShowBrandSuggestions(q)
       if (k === 'packaged' && sourceParam === 'auto') {
-        const quick = await fetchItems(q, { sourceParam: 'usda', localOnly: true })
-        if (quick.res.ok && seqRef.current === seq) {
-          const quickItems = Array.isArray(quick.data?.items) ? quick.data.items : []
-          const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
-          const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k)) : quickItems
-          const quickMerged = mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current)
-          if (seqRef.current === seq && quickMerged.length > 0) {
-            setResults(quickMerged)
-            searchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+        const quickQuery = getQuickPackagedQuery(q)
+        if (quickQuery.length >= 2) {
+          const quick = await fetchItems(quickQuery, { sourceParam: 'usda', localOnly: true })
+          if (quick.res.ok && seqRef.current === seq) {
+            const quickItems = Array.isArray(quick.data?.items) ? quick.data.items : []
+            const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+            const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, k)) : quickItems
+            const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current) : quickFiltered
+            if (seqRef.current === seq && quickMerged.length > 0) {
+              setResults(quickMerged)
+              searchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+            }
           }
         }
       }
@@ -850,7 +920,9 @@ export default function AddIngredientClient() {
       const finalResults = k === 'single' && filteredResults.length === 0 && baseResults.length > 0 ? baseResults : filteredResults
       const merged =
         k === 'packaged'
-          ? mergeBrandSuggestions(finalResults, brandSuggestionsRef.current)
+          ? allowBrandSuggestions
+            ? mergeBrandSuggestions(finalResults, brandSuggestionsRef.current)
+            : finalResults
           : mergeSearchSuggestions(finalResults, q)
       if (seqRef.current !== seq) return
       setResults(merged)
