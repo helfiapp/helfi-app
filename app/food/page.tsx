@@ -3370,11 +3370,12 @@ export default function FoodDiary() {
     latestHistoryFoodsRef.current = Array.isArray(historyFoods) ? historyFoods : null
   }, [historyFoods])
   useEffect(() => {
-    if (isViewingToday) return
+    const isToday = selectedDate === buildTodayIso()
+    if (isToday) return
     if (historyFoodsDate) return
     if (!Array.isArray(historyFoods) || historyFoods.length === 0) return
     setHistoryFoodsDate(selectedDate)
-  }, [historyFoods, historyFoodsDate, isViewingToday, selectedDate])
+  }, [historyFoods, historyFoodsDate, selectedDate])
   useEffect(() => {
     let isMounted = true
     const loadFatFoodList = async () => {
