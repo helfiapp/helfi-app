@@ -8096,7 +8096,7 @@ const applyStructuredItems = (
                   setFoodDiaryLoaded(true);
                   return;
                 }
-                const retryMapped = mapLogsToEntries(retryLogs, selectedDate)
+                const retryMapped = mapLogsToEntries(retryLogs, selectedDate, { preferCreatedAtDate: true })
                 const retryDeduped = dedupeEntries(retryMapped, { fallbackDate: selectedDate })
                 console.log(`✅ Setting historyFoods with ${retryDeduped.length} entries for date ${selectedDate}`);
                 setHistoryFoods(retryDeduped)
@@ -8107,7 +8107,7 @@ const applyStructuredItems = (
             await loadLastKnownEntryDate()
           }
 
-          const mapped = mapLogsToEntries(logs, selectedDate)
+          const mapped = mapLogsToEntries(logs, selectedDate, { preferCreatedAtDate: true })
           // Guard rail: route all loads through dedupeEntries + normalization.
           const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate })
 
@@ -8406,7 +8406,7 @@ const applyStructuredItems = (
 
       const json = await res.json();
       const logs = Array.isArray(json.logs) ? json.logs : [];
-      const mapped = mapLogsToEntries(logs, targetDate);
+      const mapped = mapLogsToEntries(logs, targetDate, { preferCreatedAtDate: true });
       const localList = isViewingToday
         ? dedupeEntries(todaysFoodsForSelectedDate, { fallbackDate: targetDate })
         : Array.isArray(historyFoods)
@@ -15264,7 +15264,7 @@ Please add nutritional information manually if needed.`);
         if (res.ok) {
           const json = await res.json();
           const logs = Array.isArray(json.logs) ? json.logs : [];
-          const mapped = mapLogsToEntries(logs, selectedDate);
+          const mapped = mapLogsToEntries(logs, selectedDate, { preferCreatedAtDate: true });
           const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate });
           setHistoryFoods(deduped);
         }
