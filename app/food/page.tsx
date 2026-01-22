@@ -25074,19 +25074,13 @@ Please add nutritional information manually if needed.`);
                 </div>
                 <div className="mt-4">
                   {(() => {
-                    const totals = favoriteActionModal.totals
-                    const hasTotals = Boolean(
-                      totals &&
-                        Object.values(totals).some(
-                          (v) => Number.isFinite(Number(v)) && Number(v) > 0,
-                        ),
-                    )
-                    if (!hasTotals) {
-                      return (
-                        <div className="text-sm text-gray-600">
-                          No nutrition data for this item yet.
-                        </div>
-                      )
+                    const totals = favoriteActionModal.totals || {
+                      calories: 0,
+                      protein: 0,
+                      carbs: 0,
+                      fat: 0,
+                      fiber: 0,
+                      sugar: 0,
                     }
                     return (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -25099,7 +25093,7 @@ Please add nutritional information manually if needed.`);
                               : Number(raw)
                           const display =
                             value === null || !Number.isFinite(value)
-                              ? '—'
+                              ? formatNutrientValue(key, 0)
                               : formatNutrientValue(key, value)
                           const label =
                             key === 'calories'
