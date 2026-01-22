@@ -234,13 +234,13 @@ const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, k
 }
 
 const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
-  const prefix = getSearchTokens(searchQuery)[0] || ''
-  if (prefix.length < 2) return []
-  const normalizedPrefix = normalizeSearchToken(prefix)
-  if (!normalizedPrefix) return []
+  const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+  if (tokens.length === 0) return []
+  const normalizedTokens = tokens.map(normalizeSearchToken).filter(Boolean)
+  if (normalizedTokens.length === 0) return []
   const matches = names.filter((name) => {
     const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
-    return tokens.some((token) => token.startsWith(normalizedPrefix))
+    return normalizedTokens.some((token) => tokens.some((nameToken) => nameToken.startsWith(token)))
   })
   return matches.slice(0, 8).map((name) => ({
     source: 'fatsecret',
@@ -299,6 +299,20 @@ const mergeBrandSuggestions = (items: NormalizedFoodItem[], suggestions: Normali
   suggestions.forEach(add)
   items.forEach(add)
   return merged
+}
+
+const buildSearchCacheKey = (kind: 'packaged' | 'single') => `builder:${kind}`
+
+const getCachedSearchResults = (
+  q: string,
+  kind: 'packaged' | 'single',
+  cache: Map<string, { items: NormalizedFoodItem[]; at: number }>,
+) => {
+  const cached = cache.get(buildSearchCacheKey(kind))
+  if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
+  const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+  const filtered = hasToken ? cached.items.filter((item) => itemMatchesSearchQuery(item, q, kind)) : cached.items
+  return filtered.slice(0, 20)
 }
 
 const triggerHaptic = (duration = 10) => {
@@ -561,6 +575,7 @@ export default function MealBuilderClient() {
   const brandSearchDebounceRef = useRef<number | null>(null)
   const [brandSuggestions, setBrandSuggestions] = useState<NormalizedFoodItem[]>([])
   const brandSuggestionsRef = useRef<NormalizedFoodItem[]>([])
+  const searchCacheRef = useRef<Map<string, { items: NormalizedFoodItem[]; at: number }>>(new Map())
 
   const seqRef = useRef(0)
   const brandSeqRef = useRef(0)
@@ -617,6 +632,16 @@ export default function MealBuilderClient() {
   useEffect(() => {
     brandSuggestionsRef.current = brandSuggestions
   }, [brandSuggestions])
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      const key = 'helfi:food-search-warm'
+      if (sessionStorage.getItem(key) === '1') return
+      sessionStorage.setItem(key, '1')
+      fetch('/api/food-data?source=usda&kind=single&q=apple&limit=5&localOnly=1').catch(() => {})
+    } catch {}
+  }, [])
 
   useEffect(() => {
     // Cleanup blob preview URLs.
@@ -879,6 +904,7 @@ export default function MealBuilderClient() {
   const runSearch = async (searchQuery?: string) => {
     const raw = String(searchQuery ?? query)
     const q = raw.trim()
+    const cacheKey = buildSearchCacheKey(kind)
     if (!q) {
       setError('Please type a food name to search.')
       return
@@ -896,7 +922,10 @@ export default function MealBuilderClient() {
           const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
           const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : quickItems
           const quickMerged = mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current)
-          if (seqRef.current === seq) setResults(quickMerged)
+          if (seqRef.current === seq) {
+            setResults(quickMerged)
+            if (quickMerged.length > 0) searchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+          }
         }
       }
 
@@ -929,6 +958,7 @@ export default function MealBuilderClient() {
           : mergeBrandSuggestions(filteredItems, brandSuggestionsRef.current)
       if (seqRef.current !== seq) return
       setResults(merged)
+      if (merged.length > 0) searchCacheRef.current.set(cacheKey, { items: merged, at: Date.now() })
       return merged
     } catch (e: any) {
       if (seqRef.current !== seq) return
@@ -954,6 +984,12 @@ export default function MealBuilderClient() {
     if (kind === 'single') {
       const instant = buildInstantSuggestions(q)
       if (instant.length > 0) setResults(instant)
+    }
+    const cached = getCachedSearchResults(q, kind, searchCacheRef.current)
+    if (cached.length > 0) {
+      const mergedCached =
+        kind === 'single' ? mergeSearchSuggestions(cached, q) : mergeBrandSuggestions(cached, brandSuggestionsRef.current)
+      setResults(mergedCached)
     }
     setSearchLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {

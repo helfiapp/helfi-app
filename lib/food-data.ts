@@ -129,43 +129,21 @@ export async function searchLocalFoods(
       if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
       return value
     }
-    const toTitleCase = (value: string) =>
-      value.replace(/\b([a-z])/g, (match) => match.toUpperCase())
-    const buildMcVariant = (value: string) => {
-      const lower = value.toLowerCase()
-      if (lower.startsWith('mc') && lower.length > 2) {
-        return `Mc${lower[2].toUpperCase()}${lower.slice(3)}`
-      }
-      if (lower.startsWith('mac') && lower.length > 3) {
-        return `Mac${lower[3].toUpperCase()}${lower.slice(4)}`
-      }
-      return null
-    }
     const rawTokens = normalizePrefixToken(q)
       .split(' ')
       .filter(Boolean)
       .filter((token) => token.length >= 2)
-    const prefixTokens =
-      rawTokens.length > 0 ? [...rawTokens].sort((a, b) => b.length - a.length).slice(0, 2) : [q]
-    const prefixCandidates = new Set<string>()
-    const addPrefixCandidate = (value: string | null | undefined) => {
-      const v = String(value || '').trim().toLowerCase()
-      if (!v) return
-      prefixCandidates.add(v)
-      prefixCandidates.add(v.toUpperCase())
-      prefixCandidates.add(toTitleCase(v))
-      const mc = buildMcVariant(v)
-      if (mc) prefixCandidates.add(mc)
-    }
+    const prefixTokens = rawTokens.length > 0 ? [...rawTokens].sort((a, b) => b.length - a.length).slice(0, 2) : [q]
+    const tokenSet = new Set<string>()
     for (const token of prefixTokens) {
       const singular = singularizeToken(token)
-      addPrefixCandidate(token)
-      if (singular && singular !== token) addPrefixCandidate(singular)
+      tokenSet.add(token)
+      if (singular && singular !== token) tokenSet.add(singular)
     }
     const sourceFilter = sources ? { source: { in: sources } } : null
-    const prefixConditions = Array.from(prefixCandidates).flatMap((candidate) => [
-      { name: { startsWith: candidate } },
-      { brand: { startsWith: candidate } },
+    const prefixConditions = Array.from(tokenSet).flatMap((token) => [
+      { name: { startsWith: token, mode: 'insensitive' as const } },
+      { brand: { startsWith: token, mode: 'insensitive' as const } },
     ])
     const prefixFilter = prefixConditions.length > 0 ? { OR: prefixConditions } : null
     const allowContains = mode !== 'prefix' && q.length >= 4

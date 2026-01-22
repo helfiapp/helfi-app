@@ -2949,6 +2949,7 @@ export default function FoodDiary() {
   const officialSearchDebounceRef = useRef<any>(null)
   const officialSearchInputRef = useRef<HTMLInputElement | null>(null)
   const officialSearchPressRef = useRef(0)
+  const officialSearchCacheRef = useRef<Map<string, { items: any[]; at: number }>>(new Map())
   const analysisSequenceRef = useRef(0)
   const analysisHealthCheckKeyRef = useRef<string | null>(null)
   const pendingAnalysisHealthCheckRef = useRef<{
@@ -2994,11 +2995,25 @@ export default function FoodDiary() {
     if (officialSource === 'single') {
       const instant = buildSingleFoodSuggestions(q)
       if (instant.length > 0) setOfficialResults(instant)
+      const cached = getCachedOfficialResults(q, officialSource, officialSearchCacheRef.current)
+      if (cached.length > 0) setOfficialResults(mergeSearchSuggestions(cached, q))
       return
     }
     const immediateBrands = buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, q)
     if (immediateBrands.length > 0) setOfficialResults(immediateBrands)
+    const cached = getCachedOfficialResults(q, officialSource, officialSearchCacheRef.current)
+    if (cached.length > 0) setOfficialResults(mergeBrandSuggestions(cached, immediateBrands))
   }, [officialSearchQuery, officialSource])
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      const key = 'helfi:food-search-warm'
+      if (sessionStorage.getItem(key) === '1') return
+      sessionStorage.setItem(key, '1')
+      fetch('/api/food-data?source=usda&kind=single&q=apple&limit=5&localOnly=1').catch(() => {})
+    } catch {}
+  }, [])
   
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
@@ -6212,13 +6227,13 @@ export default function FoodDiary() {
   ]
 
   const buildBrandSuggestions = (names: string[], searchQuery: string) => {
-    const prefix = getSearchTokens(searchQuery)[0] || ''
-    if (prefix.length < 2) return []
-    const normalizedPrefix = normalizeSearchToken(prefix)
-    if (!normalizedPrefix) return []
+    const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+    if (tokens.length === 0) return []
+    const normalizedTokens = tokens.map(normalizeSearchToken).filter(Boolean)
+    if (normalizedTokens.length === 0) return []
     const matches = names.filter((name) => {
       const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
-      return tokens.some((token) => token.startsWith(normalizedPrefix))
+      return normalizedTokens.some((token) => tokens.some((nameToken) => nameToken.startsWith(token)))
     })
     return matches.slice(0, 8).map((name) => ({
       source: 'fatsecret',
@@ -6277,6 +6292,20 @@ export default function FoodDiary() {
     suggestions.forEach(add)
     items.forEach(add)
     return merged
+  }
+
+  const buildOfficialSearchCacheKey = (mode: 'packaged' | 'single') => `official:${mode}`
+
+  const getCachedOfficialResults = (
+    q: string,
+    mode: 'packaged' | 'single',
+    cache: Map<string, { items: any[]; at: number }>,
+  ) => {
+    const cached = cache.get(buildOfficialSearchCacheKey(mode))
+    if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
+    const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+    const filtered = hasToken ? cached.items.filter((item: any) => itemMatchesSearchQuery(item, q, mode)) : cached.items
+    return filtered.slice(0, 20)
   }
 
   const buildOfficialSearchDisplay = (item: any, searchQuery: string) => {
@@ -6357,6 +6386,7 @@ export default function FoodDiary() {
 
   const handleOfficialSearch = async (mode: 'packaged' | 'single', queryOverride?: string) => {
     const query = (queryOverride ?? officialSearchQuery).trim()
+    const cacheKey = buildOfficialSearchCacheKey(mode)
     if (!query) {
       setOfficialError('Please enter a product name or barcode to search.')
       return
@@ -6414,7 +6444,9 @@ export default function FoodDiary() {
           const quickFiltered = hasToken ? quickItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : quickItems
           if (quickFiltered.length > 0 && officialSearchSeqRef.current === seq) {
             const immediateBrands = hasToken ? buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, query) : []
-            setOfficialResults(mergeBrandSuggestions(quickFiltered, immediateBrands))
+            const quickMerged = mergeBrandSuggestions(quickFiltered, immediateBrands)
+            setOfficialResults(quickMerged)
+            if (quickMerged.length > 0) officialSearchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
           }
         }
       }
@@ -6477,6 +6509,7 @@ export default function FoodDiary() {
       const finalResults = mode === 'single' ? mergeSearchSuggestions(merged, query) : merged
       if (officialSearchSeqRef.current !== seq) return
       setOfficialResults(finalResults)
+      if (finalResults.length > 0) officialSearchCacheRef.current.set(cacheKey, { items: finalResults, at: Date.now() })
       setOfficialResultsSource(data?.source || 'auto')
       setOfficialLastRequest((prev) =>
         prev

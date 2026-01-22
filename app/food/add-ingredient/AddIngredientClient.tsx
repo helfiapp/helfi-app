@@ -255,13 +255,13 @@ const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, k
 }
 
 const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
-  const prefix = getSearchTokens(searchQuery)[0] || ''
-  if (prefix.length < 2) return []
-  const normalizedPrefix = normalizeSearchToken(prefix)
-  if (!normalizedPrefix) return []
+  const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+  if (tokens.length === 0) return []
+  const normalizedTokens = tokens.map(normalizeSearchToken).filter(Boolean)
+  if (normalizedTokens.length === 0) return []
   const matches = names.filter((name) => {
     const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
-    return tokens.some((token) => token.startsWith(normalizedPrefix))
+    return normalizedTokens.some((token) => tokens.some((nameToken) => nameToken.startsWith(token)))
   })
   return matches.slice(0, 8).map((name) => ({
     source: 'fatsecret',
@@ -320,6 +320,21 @@ const mergeBrandSuggestions = (items: NormalizedFoodItem[], suggestions: Normali
   suggestions.forEach(add)
   items.forEach(add)
   return merged
+}
+
+const buildSearchCacheKey = (kind: SearchKind, source: SearchSource) => `${kind}:${source}`
+
+const getCachedSearchResults = (
+  q: string,
+  kind: SearchKind,
+  source: SearchSource,
+  cache: Map<string, { items: NormalizedFoodItem[]; at: number }>,
+) => {
+  const cached = cache.get(buildSearchCacheKey(kind, source))
+  if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
+  const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+  const filtered = hasToken ? cached.items.filter((item) => itemMatchesSearchQuery(item, q, kind)) : cached.items
+  return filtered.slice(0, 20)
 }
 
 const parseServingGrams = (label?: string | null) => {
@@ -485,6 +500,7 @@ export default function AddIngredientClient() {
   const queryInputRef = useRef<HTMLInputElement | null>(null)
   const searchPressRef = useRef(0)
   const brandSuggestionsRef = useRef<NormalizedFoodItem[]>([])
+  const searchCacheRef = useRef<Map<string, { items: NormalizedFoodItem[]; at: number }>>(new Map())
   const brandSearchDebounceRef = useRef<number | null>(null)
 
   const cleanSingleFoodQuery = (value: string) =>
@@ -534,6 +550,16 @@ export default function AddIngredientClient() {
   }, [brandSuggestions])
 
   useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      const key = 'helfi:food-search-warm'
+      if (sessionStorage.getItem(key) === '1') return
+      sessionStorage.setItem(key, '1')
+      fetch('/api/food-data?source=usda&kind=single&q=apple&limit=5&localOnly=1').catch(() => {})
+    } catch {}
+  }, [])
+
+  useEffect(() => {
     if (prefillAppliedRef.current) return
     const next = String(prefillQuery || '').trim()
     if (!next) return
@@ -564,6 +590,12 @@ export default function AddIngredientClient() {
     if (kind === 'single') {
       const instant = buildSingleFoodSuggestions(q)
       if (instant.length > 0) setResults(instant)
+    }
+    const cached = getCachedSearchResults(q, kind, sourceChoice, searchCacheRef.current)
+    if (cached.length > 0) {
+      const mergedCached =
+        kind === 'packaged' ? mergeBrandSuggestions(cached, brandSuggestionsRef.current) : mergeSearchSuggestions(cached, q)
+      setResults(mergedCached)
     }
     setLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {
@@ -741,6 +773,7 @@ export default function AddIngredientClient() {
     const q = String(qOverride ?? query).trim()
     const source = sourceOverride ?? sourceChoice
     const k = kindOverride ?? kind
+    const cacheKey = buildSearchCacheKey(k, source)
     if (!q) {
       setError('Please type a food name to search.')
       return
@@ -781,6 +814,7 @@ export default function AddIngredientClient() {
           const quickMerged = mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current)
           if (seqRef.current === seq && quickMerged.length > 0) {
             setResults(quickMerged)
+            searchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
           }
         }
       }
@@ -820,6 +854,7 @@ export default function AddIngredientClient() {
           : mergeSearchSuggestions(finalResults, q)
       if (seqRef.current !== seq) return
       setResults(merged)
+      if (merged.length > 0) searchCacheRef.current.set(cacheKey, { items: merged, at: Date.now() })
     } catch (e: any) {
       if (e?.name === 'AbortError') return
       if (seqRef.current !== seq) return
