@@ -3359,6 +3359,7 @@ export default function FoodDiary() {
     if (persisted?.entries && Array.isArray(persisted.entries)) return persisted.entries
     return null
   })
+  const [historyFoodsDate, setHistoryFoodsDate] = useState<string | null>(null)
   const [waterEntries, setWaterEntries] = useState<WaterLogEntry[]>([])
   const [waterLoading, setWaterLoading] = useState(false)
   const [waterDeletingId, setWaterDeletingId] = useState<string | null>(null)
@@ -3368,6 +3369,12 @@ export default function FoodDiary() {
   useEffect(() => {
     latestHistoryFoodsRef.current = Array.isArray(historyFoods) ? historyFoods : null
   }, [historyFoods])
+  useEffect(() => {
+    if (isViewingToday) return
+    if (historyFoodsDate) return
+    if (!Array.isArray(historyFoods) || historyFoods.length === 0) return
+    setHistoryFoodsDate(selectedDate)
+  }, [historyFoods, historyFoodsDate, isViewingToday, selectedDate])
   useEffect(() => {
     let isMounted = true
     const loadFatFoodList = async () => {
@@ -7273,16 +7280,29 @@ const applyStructuredItems = (
     return filterEntriesForDate(normalized, selectedDate)
   }, [selectedDate, persistentDiarySnapshotVersion])
   const sourceEntries = useMemo(() => {
-    const historyForSelectedDate = Array.isArray(historyFoods)
-      ? filterEntriesForDate(historyFoods, selectedDate)
-      : []
+    const historyReady =
+      !isViewingToday &&
+      historyFoodsDate === selectedDate &&
+      Array.isArray(historyFoods)
+    const historyForSelectedDate = historyReady ? historyFoods : []
     const base = isViewingToday
       ? todaysFoodsForSelectedDate
-      : historyForSelectedDate.length > 0
+      : historyReady
       ? historyForSelectedDate
-      : localSnapshotEntriesForSelectedDate
+      : !isLoadingHistory
+      ? localSnapshotEntriesForSelectedDate
+      : []
     return dedupeEntries(normalizeDiaryList(base || [], selectedDate), { fallbackDate: selectedDate })
-  }, [todaysFoodsForSelectedDate, historyFoods, isViewingToday, deletedEntryNonce, selectedDate, localSnapshotEntriesForSelectedDate])
+  }, [
+    todaysFoodsForSelectedDate,
+    historyFoods,
+    historyFoodsDate,
+    isViewingToday,
+    isLoadingHistory,
+    deletedEntryNonce,
+    selectedDate,
+    localSnapshotEntriesForSelectedDate,
+  ])
   const localSnapshotDates = useMemo(() => {
     const snapshot = readPersistentDiarySnapshot()
     const byDate = snapshot?.byDate || {}
@@ -8013,6 +8033,7 @@ const applyStructuredItems = (
     const loadHistory = async () => {
       if (isViewingToday) {
         setHistoryFoods(null);
+        setHistoryFoodsDate(null);
         setFoodDiaryLoaded(true); // Already loaded via today's foods
         return;
       }
@@ -8037,6 +8058,7 @@ const applyStructuredItems = (
         hasCachedHistory = mergedCached.length > 0
         if (hasCachedHistory) {
           setHistoryFoods(mergedCached)
+          setHistoryFoodsDate(selectedDate)
           setFoodDiaryLoaded(true)
         }
         setIsLoadingHistory(true);
@@ -8093,6 +8115,7 @@ const applyStructuredItems = (
                 const retryLogs = Array.isArray(retryJson.logs) ? retryJson.logs : []
                 if (retryLogs.length === 0) {
                   setHistoryFoods([]);
+                  setHistoryFoodsDate(selectedDate)
                   setFoodDiaryLoaded(true);
                   return;
                 }
@@ -8100,6 +8123,7 @@ const applyStructuredItems = (
                 const retryDeduped = dedupeEntries(retryMapped, { fallbackDate: selectedDate })
                 console.log(`✅ Setting historyFoods with ${retryDeduped.length} entries for date ${selectedDate}`);
                 setHistoryFoods(retryDeduped)
+                setHistoryFoodsDate(selectedDate)
                 setFoodDiaryLoaded(true);
                 return;
               }
@@ -8113,12 +8137,14 @@ const applyStructuredItems = (
 
           console.log(`✅ Setting historyFoods with ${deduped.length} entries for date ${selectedDate}`);
           setHistoryFoods(deduped)
+          setHistoryFoodsDate(selectedDate)
           // Mark as loaded after history load completes
           setFoodDiaryLoaded(true);
         } else {
           console.log(`⚠️ API call failed or returned no entries for date ${selectedDate}, status: ${res.status}`);
           if (!hasCachedHistory) {
             setHistoryFoods([]);
+            setHistoryFoodsDate(selectedDate)
           }
           // Mark as loaded even if API call fails or returns no entries
           setFoodDiaryLoaded(true);
@@ -8129,6 +8155,7 @@ const applyStructuredItems = (
         console.error(`❌ Error loading history for date ${selectedDate}:`, e);
         if (!hasCachedHistory) {
           setHistoryFoods([]);
+          setHistoryFoodsDate(selectedDate)
         }
         // Mark as loaded even on error to prevent infinite loading state
         setFoodDiaryLoaded(true);
