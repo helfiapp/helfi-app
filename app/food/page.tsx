@@ -685,8 +685,6 @@ const FOOD_DIARY_LOCAL_DATE_REPAIR_TTL_MS = 12 * 60 * 60 * 1000
 const FOOD_DIARY_LOCAL_RESTORE_HIDE_KEY = 'foodDiary:localRestore:hide'
 // Owner request: disable restore banners for everyone until re-enabled.
 const SHOW_LOCAL_RESTORE_PROMPT = false
-// Owner request: disable the "Fix favorites & credits" banner on load.
-const SHOW_FAVORITES_RESCUE_PROMPT = false
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
@@ -5653,7 +5651,7 @@ export default function FoodDiary() {
       }
       resolved = match
     }
-    const newItem: any = {
+    const newItem = {
       name: resolved.name || 'Unknown food',
       brand: resolved.brand ?? null,
       serving_size: resolved.serving_size || '',
@@ -5665,8 +5663,6 @@ export default function FoodDiary() {
       fiber_g: resolved.fiber_g ?? null,
       sugar_g: resolved.sugar_g ?? null,
     }
-    if (resolved?.source) newItem.dbSource = resolved.source
-    if (resolved?.id) newItem.dbId = resolved.id
 
     // If the modal was opened from the Today’s Meals (+) dropdown, add this as a new diary entry
     // in that meal category instead of adding to the analysis ingredient cards.
@@ -19294,33 +19290,7 @@ Please add nutritional information manually if needed.`);
                                 <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                                   Nutritional breakdown
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
-                                    <button
-                                      type="button"
-                                      onClick={() => setEnergyUnit('kcal')}
-                                      className={`px-2 py-0.5 rounded-full ${
-                                        energyUnit === 'kcal'
-                                          ? 'bg-white text-gray-900 shadow-sm'
-                                          : 'text-gray-500'
-                                      }`}
-                                    >
-                                      kcal
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setEnergyUnit('kJ')}
-                                      className={`px-2 py-0.5 rounded-full ${
-                                        energyUnit === 'kJ'
-                                          ? 'bg-white text-gray-900 shadow-sm'
-                                          : 'text-gray-500'
-                                      }`}
-                                    >
-                                      kJ
-                                    </button>
-                                  </div>
-                                  <div className="text-xs text-slate-400">Total for {totalsLabel}</div>
-                                </div>
+                                <div className="text-xs text-slate-400">Total for {totalsLabel}</div>
                               </div>
                               <div className="grid grid-cols-3 gap-3">
                                 {ITEM_NUTRIENT_META.map((meta) => {
@@ -19995,61 +19965,37 @@ Please add nutritional information manually if needed.`);
                         const macroMultiplier = macroMultiplierForItem(item) || 1
                         const totalMultiplier = Math.max(0, servingsCount * macroMultiplier)
                         const divider = totalMultiplier > 0 ? totalMultiplier : 1
-                        const formatTotal = (value: any, decimals: number, isCalories = false) => {
+                        const formatTotal = (value: any, decimals: number) => {
                           const num = Number(value)
                           if (!Number.isFinite(num)) return ''
                           const scaled = totalMultiplier > 0 ? num * totalMultiplier : 0
-                          const display = isCalories && energyUnit === 'kJ' ? scaled * KCAL_TO_KJ : scaled
-                          if (decimals <= 0) return String(Math.round(display))
+                          if (decimals <= 0) return String(Math.round(scaled))
                           const factor = Math.pow(10, decimals)
-                          return String(Math.round(display * factor) / factor)
+                          return String(Math.round(scaled * factor) / factor)
                         }
-                        const computePerServingFromTotal = (value: any, isCalories = false) => {
+                        const computePerServingFromTotal = (value: any) => {
                           const total = Number(value)
                           if (!Number.isFinite(total)) return null
-                          const normalized = isCalories && energyUnit === 'kJ' ? total / KCAL_TO_KJ : total
-                          if (totalMultiplier > 0) return normalized / totalMultiplier
-                          return normalized
+                          if (totalMultiplier > 0) return total / totalMultiplier
+                          return total
                         }
-                        const updateMacroFromTotalInput = (value: any, fieldName: string, isCalories = false) => {
-                          const perServingValue = computePerServingFromTotal(value, isCalories)
+                        const updateMacroFromTotalInput = (value: any, fieldName: string) => {
+                          const perServingValue = computePerServingFromTotal(value)
                           if (perServingValue === null) return
                           updateItemField(editingItemIndex, fieldName as any, perServingValue)
                         }
                         const totalLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         return (
                           <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="block text-sm font-medium text-gray-700">
-                                Totals for {totalLabel}
-                              </div>
-                              <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
-                                <button
-                                  type="button"
-                                  onClick={() => setEnergyUnit('kcal')}
-                                  className={`px-2 py-0.5 rounded-full ${
-                                    energyUnit === 'kcal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                                  }`}
-                                >
-                                  kcal
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEnergyUnit('kJ')}
-                                  className={`px-2 py-0.5 rounded-full ${
-                                    energyUnit === 'kJ' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                                  }`}
-                                >
-                                  kJ
-                                </button>
-                              </div>
+                            <div className="block text-sm font-medium text-gray-700 mb-2">
+                              Totals for {totalLabel}
                             </div>
                             <div className="text-xs text-gray-500 mb-2">
                               Changing these numbers will not change servings or weight.
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <label className="block text-xs text-gray-600 mb-1">Calories ({energyUnit})</label>
+                                <label className="block text-xs text-gray-600 mb-1">Calories</label>
                                 <input
                                   type="number"
                                   inputMode="decimal"
@@ -20059,7 +20005,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:calories`
                                     return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
                                       ? numericInputDrafts[key]
-                                      : formatTotal(item?.calories ?? '', 0, true)
+                                      : formatTotal(item?.calories ?? '', 0)
                                   })()}
                                   onFocus={() => {
                                     const key = `ai:modal:${editingItemIndex}:calories`
@@ -20069,7 +20015,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:calories`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'calories', true)
+                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'calories')
                                   }}
                                   onBlur={() => {
                                     const key = `ai:modal:${editingItemIndex}:calories`
@@ -20080,7 +20026,7 @@ Please add nutritional information manually if needed.`);
                                     })
                                   }}
                                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                  placeholder={energyUnit}
+                                  placeholder="kcal"
                                 />
                               </div>
                           <div>
@@ -21977,76 +21923,20 @@ Please add nutritional information manually if needed.`);
                           </button>
                         </div>
                       </div>
-                      {!summaryReady ? (
-                        <div className="text-xs text-gray-500 mb-3">Loading this day\u2019s summary\u2026</div>
-                      ) : (
-                        <>
-                          {source.length === 0 && (
-                            <p className="text-xs text-gray-500 mb-3">
-                              No meals yet today. Here are your daily targets to start the day.
-                            </p>
-                          )}
-                          {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
-                            <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
-                          )}
-                          {/* GUARD RAIL: local restore is best-effort and should never be forced on the user. */}
-                          {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
-                            <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
-                              <div>We found saved entries on this device.</div>
-                              <div className="flex flex-wrap gap-2">
-                                {localSnapshotEntriesForSelectedDate.length > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      restoreEntriesFromLocalSnapshot(selectedDate, localSnapshotEntriesForSelectedDate)
-                                    }
-                                    disabled={isRestoringLocalEntries}
-                                    className="px-3 py-1 text-xs font-semibold bg-emerald-700 text-white disabled:opacity-60"
-                                    style={{ borderRadius: 0 }}
-                                  >
-                                    {isRestoringLocalEntries ? 'Restoring…' : 'Restore this day'}
-                                  </button>
-                                )}
-                                {latestLocalSnapshotDate && latestLocalSnapshotDate !== selectedDate && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedDate(latestLocalSnapshotDate)}
-                                    disabled={isRestoringLocalEntries}
-                                    className="px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-200 disabled:opacity-60"
-                                    style={{ borderRadius: 0 }}
-                                  >
-                                    Show latest saved day
-                                  </button>
-                                )}
-                                {localSnapshotDates.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => restoreAllLocalSnapshots()}
-                                    disabled={isRestoringLocalEntries}
-                                    className="px-3 py-1 text-xs font-semibold bg-emerald-600 text-white disabled:opacity-60"
-                                    style={{ borderRadius: 0 }}
-                                  >
-                                    {isRestoringLocalEntries ? 'Restoring…' : 'Restore all days'}
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setHideLocalRestorePrompt(true)
-                                    writeHideLocalRestorePrompt(true)
-                                  }}
-                                  className="px-3 py-1 text-xs font-semibold bg-white text-emerald-900 border border-emerald-200"
-                                  style={{ borderRadius: 0 }}
-                                >
-                                  Hide this message
-                                </button>
-                              </div>
-                              {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
-                            </div>
-                          )}
-                          {SHOW_FAVORITES_RESCUE_PROMPT && source.length === 0 && favorites.length === 0 && (
-                            <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                              <div>Fix favorites or credits if they look wrong.</div>
+                      {source.length === 0 && (
+                        <p className="text-xs text-gray-500 mb-3">
+                          No meals yet today. Here are your daily targets to start the day.
+                        </p>
+                      )}
+                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
+                        <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
+                      )}
+                      {/* GUARD RAIL: local restore is best-effort and should never be forced on the user. */}
+                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
+                        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
+                          <div>We found saved entries on this device.</div>
+                          <div className="flex flex-wrap gap-2">
+                            {localSnapshotEntriesForSelectedDate.length > 0 && (
                               <button
                                 type="button"
                                 onClick={() =>
