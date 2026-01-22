@@ -106,6 +106,22 @@ export async function searchLocalFoods(
   const mode = opts.mode || 'prefix-contains'
 
   try {
+    const normalizedTokens = q
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter((token) => token.length >= 2)
+    const tokenFilters =
+      normalizedTokens.length > 1
+        ? normalizedTokens.slice(0, 4).map((token) => ({
+            OR: [
+              { name: { contains: token, mode: 'insensitive' as const } },
+              { brand: { contains: token, mode: 'insensitive' as const } },
+            ],
+          }))
+        : null
     const sourceFilter = sources ? { source: { in: sources } } : null
     const prefixFilter = {
       OR: [
@@ -113,12 +129,14 @@ export async function searchLocalFoods(
         { brand: { startsWith: q, mode: 'insensitive' as const } },
       ],
     }
+    const tokenFilter = tokenFilters ? { AND: tokenFilters } : null
     const containsFilter = {
       OR: [
         { name: { contains: q, mode: 'insensitive' as const } },
         { brand: { contains: q, mode: 'insensitive' as const } },
       ],
     }
+    const fallbackFilter = tokenFilter ?? containsFilter
     const buildWhere = (filter: any, excludeIds?: string[]) => {
       const clauses = []
       if (sourceFilter) clauses.push(sourceFilter)
@@ -140,7 +158,7 @@ export async function searchLocalFoods(
     const containsRows =
       remaining > 0 && mode !== 'prefix'
         ? await prisma.foodLibraryItem.findMany({
-            where: buildWhere(containsFilter, prefixIds),
+            where: buildWhere(fallbackFilter, prefixIds),
             take: remaining,
             orderBy: { name: 'asc' },
           })
