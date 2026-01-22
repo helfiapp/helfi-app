@@ -7730,7 +7730,9 @@ const applyStructuredItems = (
     }
   }, [selectedDate, todaysFoods, historyFoods, expandedCategories])
 
-  // Persist a durable snapshot per date to avoid reload flicker across navigations
+  // Persist a durable snapshot per date to avoid reload flicker across navigations.
+  // SEVERE GUARD RAIL: Do not let this write loop depend on snapshot state.
+  // It can block left menu clicks on desktop if it keeps re-running.
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {

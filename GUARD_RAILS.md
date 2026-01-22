@@ -706,6 +706,35 @@ This section was breaking for weeks. Do **not** touch it without explicit owner 
 - Date: 2026-01-22
 - Note: This must be re-verified on live once approved.
 
+### 3.4.2 SEVERE LOCK - Left Menu Clicks Blocked on Food Diary (Jan 2026)
+This caused the left menu to stop working on desktop whenever Food Diary was open.
+
+**Protected file:**
+- `app/food/page.tsx`
+
+**What broke before:**
+- Left menu clicks did nothing on the Food Diary page.
+- The click would only fire later (after tapping the date buttons).
+- Cause: the page got stuck in a snapshot update loop.
+
+**Non-negotiable rules (do not change):**
+- Do not write the per-day snapshot in a way that depends on the snapshot itself.
+- Do not keep re-writing the same snapshot while history is still loading.
+- If the day is not fully loaded yet, do not overwrite the saved day with empty data.
+
+**Restore steps (exact, no guessing):**
+1) In `app/food/page.tsx`, the "Persist a durable snapshot" block must:
+   - Only write after the day is loaded.
+   - Never keep re-writing from the snapshot itself.
+2) Test on desktop:
+   - Open Food Diary.
+   - Click any left menu item.
+   - It must navigate immediately, every time.
+
+**Last stable fix (live):**
+- Commit: `22ef0673`
+- Date: 2026-01-22
+
 ### 3.6 Food Search Consistency (Jan 2026 – Locked)
 - Single‑food searches must use USDA; packaged searches use FatSecret + OpenFoodFacts.
 - Plural searches should automatically fall back to the singular form (e.g., “fried eggs” → “fried egg”) to prevent empty/irrelevant results.
