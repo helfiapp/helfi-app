@@ -145,13 +145,13 @@ export async function searchLocalFoods(
       .split(' ')
       .filter(Boolean)
       .filter((token) => token.length >= 2)
-    const prefixTokens = rawTokens.length > 0 ? rawTokens.slice(0, 4) : [q]
+    const prefixTokens =
+      rawTokens.length > 0 ? [...rawTokens].sort((a, b) => b.length - a.length).slice(0, 2) : [q]
     const prefixCandidates = new Set<string>()
     const addPrefixCandidate = (value: string | null | undefined) => {
-      const v = String(value || '').trim()
+      const v = String(value || '').trim().toLowerCase()
       if (!v) return
       prefixCandidates.add(v)
-      prefixCandidates.add(v.toLowerCase())
       prefixCandidates.add(v.toUpperCase())
       prefixCandidates.add(toTitleCase(v))
       const mc = buildMcVariant(v)
