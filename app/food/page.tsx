@@ -5568,7 +5568,16 @@ export default function FoodDiary() {
       const pickedTotals =
         storedTotals && hasNonZeroTotals(storedTotals) ? storedTotals : parsedTotals || storedTotals
       if (pickedTotals) {
-        return portionScale ? applyPortionScaleToTotals(pickedTotals, portionScale) : pickedTotals
+        const scaled = portionScale ? applyPortionScaleToTotals(pickedTotals, portionScale) : pickedTotals
+        const protein = Math.max(0, Number((scaled as any)?.protein) || 0)
+        const carbs = Math.max(0, Number((scaled as any)?.carbs) || 0)
+        const fat = Math.max(0, Number((scaled as any)?.fat) || 0)
+        const macroEnergy = protein * 4 + carbs * 4 + fat * 9
+        const calories = Number((scaled as any)?.calories)
+        if ((!Number.isFinite(calories) || calories <= 0) && macroEnergy > 0) {
+          return { ...(scaled as any), calories: Math.round(macroEnergy) }
+        }
+        return scaled
       }
       return {
         calories: 0,
@@ -9737,12 +9746,25 @@ const applyStructuredItems = (
     items.forEach((item: any) => {
       const servings = effectiveServings(item)
       const multiplier = macroMultiplierForItem(item)
-      totals.calories += (item.calories || 0) * servings * multiplier
-      totals.protein += (item.protein_g || 0) * servings * multiplier
-      totals.carbs += (item.carbs_g || 0) * servings * multiplier
-      totals.fat += (item.fat_g || 0) * servings * multiplier
-      totals.fiber += (item.fiber_g || 0) * servings * multiplier
-      totals.sugar += (item.sugar_g || 0) * servings * multiplier
+      const protein = Number(item?.protein_g) || 0
+      const carbs = Number(item?.carbs_g) || 0
+      const fat = Number(item?.fat_g) || 0
+      const fiber = Number(item?.fiber_g) || 0
+      const sugar = Number(item?.sugar_g) || 0
+      const safeProtein = Math.max(0, protein)
+      const safeCarbs = Math.max(0, carbs)
+      const safeFat = Math.max(0, fat)
+      const macroEnergy = safeProtein * 4 + safeCarbs * 4 + safeFat * 9
+      let calories = Number(item?.calories)
+      if (!Number.isFinite(calories) || calories <= 0) {
+        calories = macroEnergy > 0 ? macroEnergy : 0
+      }
+      totals.calories += calories * servings * multiplier
+      totals.protein += protein * servings * multiplier
+      totals.carbs += carbs * servings * multiplier
+      totals.fat += fat * servings * multiplier
+      totals.fiber += fiber * servings * multiplier
+      totals.sugar += sugar * servings * multiplier
     })
 
     const round = (value: number, decimals = 1) => {
@@ -23012,6 +23034,9 @@ Please add nutritional information manually if needed.`);
                       const waterIconSrc = isWaterEntry ? getWaterIconSrc(waterLabel) : null
                       const drinkIconSrc = isDrinkEntry ? getWaterIconSrc(drinkMeta?.type) : null
                       const drinkAmountLabel = isDrinkEntry ? formatDrinkEntryAmount(drinkMeta) : ''
+                      const entryDisplayLabel = isWaterEntry
+                        ? waterLabel || 'Water'
+                        : applyFoodNameOverride(food?.description || food?.label || 'Meal', food)
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
@@ -23327,9 +23352,7 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm sm:text-base text-gray-900 truncate">
-                                    {isWaterEntry
-                                      ? waterLabel || 'Water'
-                                      : sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
+                                    {sanitizeMealDescription(String(entryDisplayLabel).split('\n')[0].split('Calories:')[0])}
                                   </p>
                                   {(() => {
                                     const amountLabel = isWaterEntry
