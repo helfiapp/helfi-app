@@ -685,6 +685,8 @@ const FOOD_DIARY_LOCAL_DATE_REPAIR_TTL_MS = 12 * 60 * 60 * 1000
 const FOOD_DIARY_LOCAL_RESTORE_HIDE_KEY = 'foodDiary:localRestore:hide'
 // Owner request: disable restore banners for everyone until re-enabled.
 const SHOW_LOCAL_RESTORE_PROMPT = false
+// Owner request: disable the "Fix favorites & credits" banner on load.
+const SHOW_FAVORITES_RESCUE_PROMPT = false
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
@@ -5707,7 +5709,7 @@ export default function FoodDiary() {
       }
       resolved = match
     }
-    const newItem = {
+    const newItem: any = {
       name: resolved.name || 'Unknown food',
       brand: resolved.brand ?? null,
       serving_size: resolved.serving_size || '',
@@ -5719,6 +5721,8 @@ export default function FoodDiary() {
       fiber_g: resolved.fiber_g ?? null,
       sugar_g: resolved.sugar_g ?? null,
     }
+    if (resolved?.source) newItem.dbSource = resolved.source
+    if (resolved?.id) newItem.dbId = resolved.id
 
     // If the modal was opened from the Today’s Meals (+) dropdown, add this as a new diary entry
     // in that meal category instead of adding to the analysis ingredient cards.
@@ -19462,7 +19466,33 @@ Please add nutritional information manually if needed.`);
                                 <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                                   Nutritional breakdown
                                 </div>
-                                <div className="text-xs text-slate-400">Total for {totalsLabel}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEnergyUnit('kcal')}
+                                      className={`px-2 py-0.5 rounded-full ${
+                                        energyUnit === 'kcal'
+                                          ? 'bg-white text-gray-900 shadow-sm'
+                                          : 'text-gray-500'
+                                      }`}
+                                    >
+                                      kcal
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEnergyUnit('kJ')}
+                                      className={`px-2 py-0.5 rounded-full ${
+                                        energyUnit === 'kJ'
+                                          ? 'bg-white text-gray-900 shadow-sm'
+                                          : 'text-gray-500'
+                                      }`}
+                                    >
+                                      kJ
+                                    </button>
+                                  </div>
+                                  <div className="text-xs text-slate-400">Total for {totalsLabel}</div>
+                                </div>
                               </div>
                               <div className="grid grid-cols-3 gap-3">
                                 {ITEM_NUTRIENT_META.map((meta) => {
@@ -20137,37 +20167,61 @@ Please add nutritional information manually if needed.`);
                         const macroMultiplier = macroMultiplierForItem(item) || 1
                         const totalMultiplier = Math.max(0, servingsCount * macroMultiplier)
                         const divider = totalMultiplier > 0 ? totalMultiplier : 1
-                        const formatTotal = (value: any, decimals: number) => {
+                        const formatTotal = (value: any, decimals: number, isCalories = false) => {
                           const num = Number(value)
                           if (!Number.isFinite(num)) return ''
                           const scaled = totalMultiplier > 0 ? num * totalMultiplier : 0
-                          if (decimals <= 0) return String(Math.round(scaled))
+                          const display = isCalories && energyUnit === 'kJ' ? scaled * KCAL_TO_KJ : scaled
+                          if (decimals <= 0) return String(Math.round(display))
                           const factor = Math.pow(10, decimals)
-                          return String(Math.round(scaled * factor) / factor)
+                          return String(Math.round(display * factor) / factor)
                         }
-                        const computePerServingFromTotal = (value: any) => {
+                        const computePerServingFromTotal = (value: any, isCalories = false) => {
                           const total = Number(value)
                           if (!Number.isFinite(total)) return null
-                          if (totalMultiplier > 0) return total / totalMultiplier
-                          return total
+                          const normalized = isCalories && energyUnit === 'kJ' ? total / KCAL_TO_KJ : total
+                          if (totalMultiplier > 0) return normalized / totalMultiplier
+                          return normalized
                         }
-                        const updateMacroFromTotalInput = (value: any, fieldName: string) => {
-                          const perServingValue = computePerServingFromTotal(value)
+                        const updateMacroFromTotalInput = (value: any, fieldName: string, isCalories = false) => {
+                          const perServingValue = computePerServingFromTotal(value, isCalories)
                           if (perServingValue === null) return
                           updateItemField(editingItemIndex, fieldName as any, perServingValue)
                         }
                         const totalLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         return (
                           <div>
-                            <div className="block text-sm font-medium text-gray-700 mb-2">
-                              Totals for {totalLabel}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="block text-sm font-medium text-gray-700">
+                                Totals for {totalLabel}
+                              </div>
+                              <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                                <button
+                                  type="button"
+                                  onClick={() => setEnergyUnit('kcal')}
+                                  className={`px-2 py-0.5 rounded-full ${
+                                    energyUnit === 'kcal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                                  }`}
+                                >
+                                  kcal
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEnergyUnit('kJ')}
+                                  className={`px-2 py-0.5 rounded-full ${
+                                    energyUnit === 'kJ' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                                  }`}
+                                >
+                                  kJ
+                                </button>
+                              </div>
                             </div>
                             <div className="text-xs text-gray-500 mb-2">
                               Changing these numbers will not change servings or weight.
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <label className="block text-xs text-gray-600 mb-1">Calories</label>
+                                <label className="block text-xs text-gray-600 mb-1">Calories ({energyUnit})</label>
                                 <input
                                   type="number"
                                   inputMode="decimal"
@@ -20177,7 +20231,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:calories`
                                     return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
                                       ? numericInputDrafts[key]
-                                      : formatTotal(item?.calories ?? '', 0)
+                                      : formatTotal(item?.calories ?? '', 0, true)
                                   })()}
                                   onFocus={() => {
                                     const key = `ai:modal:${editingItemIndex}:calories`
@@ -20187,7 +20241,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:calories`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'calories')
+                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'calories', true)
                                   }}
                                   onBlur={() => {
                                     const key = `ai:modal:${editingItemIndex}:calories`
@@ -20198,7 +20252,7 @@ Please add nutritional information manually if needed.`);
                                     })
                                   }}
                                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                  placeholder="kcal"
+                                  placeholder={energyUnit}
                                 />
                               </div>
                           <div>
@@ -22169,7 +22223,7 @@ Please add nutritional information manually if needed.`);
                               {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
                             </div>
                           )}
-                          {source.length === 0 && favorites.length === 0 && (
+                          {SHOW_FAVORITES_RESCUE_PROMPT && source.length === 0 && favorites.length === 0 && (
                             <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                               <div>Fix favorites or credits if they look wrong.</div>
                               <button
