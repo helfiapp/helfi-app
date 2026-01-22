@@ -310,6 +310,36 @@ export async function GET(request: NextRequest) {
       ]
       const isMealQuery = queryTokensNormalized.some((token) => mealKeywords.includes(token))
 
+      const restaurantKeywords = [
+        'mcdonald',
+        'mcdonalds',
+        'burger king',
+        'kfc',
+        'subway',
+        'domino',
+        'pizza hut',
+        'starbucks',
+        'dunkin',
+        'taco bell',
+        'wendy',
+        'popeyes',
+        'chipotle',
+        'panera',
+        'chick fil',
+        'chick-fil',
+        'five guys',
+        'in n out',
+        'innout',
+        'jack in the box',
+        'carls jr',
+        'hardees',
+        'shake shack',
+        'arby',
+        'dairy queen',
+        'white castle',
+      ]
+      const isRestaurantQuery = restaurantKeywords.some((keyword) => queryNorm.includes(keyword))
+
       const isLikelyFullMeal = (it: any) => {
         const servingText = String(it?.serving_size || '').toLowerCase()
         const grams = parseServingGrams(it?.serving_size)
@@ -404,16 +434,22 @@ export async function GET(request: NextRequest) {
           return await fetchForQuery(compactQuery)
         }
 
-        const localPackaged = await searchLocalPreferred(query, 'packaged')
-        const localPackagedFiltered = localPackaged.filter((item) => {
-          const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-          return nameMatchesSearchQuery(combined || item?.name || '', query)
-        })
-        const minLocalOnly = 5
-        const pooled = localPackagedFiltered.length < minLocalOnly ? await fetchExternalPool() : []
-        const combined = dedupe([...localPackagedFiltered, ...pooled])
-        items = combined.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
-        actualSource = 'auto'
+        if (isRestaurantQuery) {
+          const pooled = await fetchExternalPool()
+          items = pooled.slice(0, limit)
+          actualSource = 'auto'
+        } else {
+          const localPackaged = await searchLocalPreferred(query, 'packaged')
+          const localPackagedFiltered = localPackaged.filter((item) => {
+            const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+            return nameMatchesSearchQuery(combined || item?.name || '', query)
+          })
+          const minLocalOnly = 5
+          const pooled = localPackagedFiltered.length < minLocalOnly ? await fetchExternalPool() : []
+          const combined = dedupe([...localPackagedFiltered, ...pooled])
+          items = combined.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+          actualSource = 'auto'
+        }
       }
     } else if (source === 'openfoodfacts') {
       items = await searchOpenFoodFactsByQuery(query, { pageSize: limit })
