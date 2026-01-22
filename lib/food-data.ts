@@ -190,7 +190,6 @@ export async function searchLocalFoods(
     const prefixRows = await prisma.foodLibraryItem.findMany({
       where: buildWhere(prefixFilter),
       take: pageSize,
-      orderBy: { name: 'asc' },
     })
 
     const remaining = Math.max(0, pageSize - prefixRows.length)
@@ -200,7 +199,6 @@ export async function searchLocalFoods(
         ? await prisma.foodLibraryItem.findMany({
             where: buildWhere(containsFilter, prefixIds),
             take: remaining,
-            orderBy: { name: 'asc' },
           })
         : []
 
