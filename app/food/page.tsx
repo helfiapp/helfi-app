@@ -5506,11 +5506,53 @@ export default function FoodDiary() {
     return Object.values(totals).some((value) => Number.isFinite(Number(value)) && Number(value) > 0)
   }
 
+  const normalizeSuspiciousKjItems = (items: any[] | null | undefined) => {
+    if (!Array.isArray(items) || items.length === 0) return { items, changed: false }
+    let changed = false
+    const nextItems = items.map((item) => {
+      if (!item || typeof item !== 'object') return item
+      if ((item as any).__energyUnitFixed === 'kJ') return item
+      const calories = Number((item as any)?.calories)
+      if (!Number.isFinite(calories) || calories <= 0) return item
+      const hasMacro =
+        Number((item as any)?.protein_g) > 0 ||
+        Number((item as any)?.carbs_g) > 0 ||
+        Number((item as any)?.fat_g) > 0 ||
+        Number((item as any)?.fiber_g) > 0 ||
+        Number((item as any)?.sugar_g) > 0
+      if (hasMacro) return item
+      const servingLabel = String((item as any)?.serving_size || '')
+      const isDrink = isLikelyLiquidFood(String((item as any)?.name || ''), servingLabel) || /\bml\b/i.test(servingLabel)
+      if (!isDrink) return item
+      if (calories > 120) return item
+      const converted = Math.round((calories / KCAL_TO_KJ) * 1000) / 1000
+      if (!Number.isFinite(converted) || converted <= 0 || converted >= calories) return item
+      changed = true
+      return { ...item, calories: converted, __energyUnitFixed: 'kJ' }
+    })
+    return { items: nextItems, changed }
+  }
+
+  const mergeNutritionTotals = (base: any, totals: NutritionTotals | null) => {
+    if (!totals) return base
+    if (!base || typeof base !== 'object') return totals
+    return {
+      ...(base as any),
+      calories: totals.calories,
+      protein: totals.protein,
+      carbs: totals.carbs,
+      fat: totals.fat,
+      fiber: totals.fiber,
+      sugar: totals.sugar,
+    }
+  }
+
   const getEntryTotals = (entry: any) => {
     try {
       const portionScale = getEntryPortionScale(entry)
       if (Array.isArray(entry?.items) && entry.items.length > 0) {
-        const recalculated = recalculateNutritionFromItems(entry.items)
+        const normalized = normalizeSuspiciousKjItems(entry.items)
+        const recalculated = recalculateNutritionFromItems(normalized.items || [])
         if (recalculated) {
           return portionScale ? applyPortionScaleToTotals(recalculated, portionScale) : recalculated
         }
@@ -5723,6 +5765,7 @@ export default function FoodDiary() {
     }
     if (resolved?.source) newItem.dbSource = resolved.source
     if (resolved?.id) newItem.dbId = resolved.id
+    newItem.dbLocked = true
 
     // If the modal was opened from the Today’s Meals (+) dropdown, add this as a new diary entry
     // in that meal category instead of adding to the analysis ingredient cards.
@@ -8459,6 +8502,17 @@ const applyStructuredItems = (
           : l.imageUrl
           ? 'photo'
           : 'text'
+      const rawItems = (l as any).items || (l.nutrients as any)?.items || null
+      const normalizedItemsResult = normalizeSuspiciousKjItems(rawItems)
+      const normalizedItems = normalizedItemsResult.items
+      const baseNutrition = (l as any).nutrients || null
+      const recalculatedTotals = normalizedItemsResult.changed
+        ? recalculateNutritionFromItems(normalizedItems || [])
+        : null
+      const normalizedNutrition = normalizedItemsResult.changed
+        ? mergeNutritionTotals(baseNutrition, recalculatedTotals)
+        : baseNutrition
+
       return {
         id: new Date(createdAtIso).getTime(), // UI key and sorting by timestamp
         dbId: l.id, // actual database id for delete operations
@@ -8470,8 +8524,8 @@ const applyStructuredItems = (
         }),
         method,
         photo: l.imageUrl || null,
-        nutrition: l.nutrients || null,
-        items: (l as any).items || (l.nutrients as any)?.items || null,
+        nutrition: normalizedNutrition,
+        items: normalizedItems,
         meal: category,
         category,
         persistedCategory: category,

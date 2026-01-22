@@ -98,6 +98,21 @@ const formatEnergyValue = (value: number | null | undefined, unit: 'kcal' | 'kJ'
   return Math.round(display)
 }
 
+const MEAL_TOTAL_CARDS: Array<{
+  key: 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'
+  label: string
+  unit?: string
+  gradient: string
+  accent: string
+}> = [
+  { key: 'calories', label: 'Calories', unit: '', gradient: 'from-orange-50 to-orange-100', accent: 'text-orange-500' },
+  { key: 'protein', label: 'Protein', unit: 'g', gradient: 'from-blue-50 to-blue-100', accent: 'text-blue-500' },
+  { key: 'carbs', label: 'Carbs', unit: 'g', gradient: 'from-green-50 to-green-100', accent: 'text-green-500' },
+  { key: 'fat', label: 'Fat', unit: 'g', gradient: 'from-purple-50 to-purple-100', accent: 'text-purple-500' },
+  { key: 'fiber', label: 'Fiber', unit: 'g', gradient: 'from-amber-50 to-amber-100', accent: 'text-amber-500' },
+  { key: 'sugar', label: 'Sugar', unit: 'g', gradient: 'from-pink-50 to-pink-100', accent: 'text-pink-500' },
+]
+
 const normalizeBrandToken = (value: string) =>
   value
     .toLowerCase()
@@ -2893,31 +2908,35 @@ export default function MealBuilderClient() {
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Calories</span>
-              <span className="font-semibold text-gray-900">{formatEnergyValue(mealTotals.calories, energyUnit)} {energyUnit}</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Protein</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.protein)} g</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Carbs</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.carbs)} g</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Fat</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.fat)} g</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Fibre</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.fiber)} g</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Sugar</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.sugar)} g</span>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {MEAL_TOTAL_CARDS.map((card) => {
+              const value =
+                card.key === 'calories'
+                  ? formatEnergyValue(mealTotals.calories, energyUnit)
+                  : card.key === 'protein'
+                  ? round3(mealTotals.protein)
+                  : card.key === 'carbs'
+                  ? round3(mealTotals.carbs)
+                  : card.key === 'fat'
+                  ? round3(mealTotals.fat)
+                  : card.key === 'fiber'
+                  ? round3(mealTotals.fiber)
+                  : round3(mealTotals.sugar)
+              const label = card.key === 'calories' ? (energyUnit === 'kJ' ? 'Kilojoules' : 'Calories') : card.label
+              const unit = card.key === 'calories' ? energyUnit : card.unit || ''
+              return (
+                <div
+                  key={card.key}
+                  className={`rounded-xl p-3 bg-gradient-to-br ${card.gradient} border border-gray-100`}
+                >
+                  <div className={`text-lg font-bold ${card.accent}`}>
+                    {value}
+                    {unit ? ` ${unit}` : ''}
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{label}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
 

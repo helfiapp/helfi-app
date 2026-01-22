@@ -236,16 +236,22 @@ function normalizeOpenFoodFactsProduct(product: any): NormalizedFoodItem | null 
   let fiber_g: number | null = null
   let sugar_g: number | null = null
 
-  // If per-serving values exist, use them; otherwise fall back to per 100g/ml
-  const kcalServing = parseNumber(nutr['energy-kcal_serving'] ?? nutr['energy_serving'])
+  // If per-serving values exist, use them; otherwise fall back to per 100g/ml.
+  // OpenFoodFacts reports energy in kJ unless the "-kcal" field is present.
+  const kcalServing = parseNumber(nutr['energy-kcal_serving'])
+  const kjServing = parseNumber(nutr['energy-kj_serving'] ?? nutr['energy_serving'])
   const proteinServing = parseNumber(nutr['proteins_serving'])
   const carbsServing = parseNumber(nutr['carbohydrates_serving'])
   const fatServing = parseNumber(nutr['fat_serving'])
   const fiberServing = parseNumber(nutr['fiber_serving'])
   const sugarServing = parseNumber(nutr['sugars_serving'])
+  const kcal100g = parseNumber(nutr['energy-kcal_100g'])
+  const kj100g = parseNumber(nutr['energy-kj_100g'] ?? nutr['energy_100g'])
+  const convertKjToKcal = (value: number | null) =>
+    value != null && Number.isFinite(value) ? value / 4.184 : null
 
-  if (kcalServing != null || proteinServing != null || carbsServing != null || fatServing != null) {
-    calories = kcalServing ?? parseNumber(nutr['energy-kcal_100g'] ?? nutr['energy_100g'])
+  if (kcalServing != null || kjServing != null || proteinServing != null || carbsServing != null || fatServing != null) {
+    calories = kcalServing ?? convertKjToKcal(kjServing) ?? kcal100g ?? convertKjToKcal(kj100g)
     protein_g = proteinServing ?? parseNumber(nutr['proteins_100g'])
     carbs_g = carbsServing ?? parseNumber(nutr['carbohydrates_100g'])
     fat_g = fatServing ?? parseNumber(nutr['fat_100g'])
@@ -253,7 +259,7 @@ function normalizeOpenFoodFactsProduct(product: any): NormalizedFoodItem | null 
     sugar_g = sugarServing ?? parseNumber(nutr['sugars_100g'])
   } else {
     // Fallback: use per 100g/ml as "per serving"
-    calories = parseNumber(nutr['energy-kcal_100g'] ?? nutr['energy_100g'])
+    calories = kcal100g ?? convertKjToKcal(kj100g)
     protein_g = parseNumber(nutr['proteins_100g'])
     carbs_g = parseNumber(nutr['carbohydrates_100g'])
     fat_g = parseNumber(nutr['fat_100g'])
