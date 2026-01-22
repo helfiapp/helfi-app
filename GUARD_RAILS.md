@@ -818,6 +818,40 @@ This section controls how detected ingredients are shown and edited. It has been
 - Do not break the two-way sync between Weight, Servings, and macros.
 - Do not allow front card values to differ from the edit screen.
 
+### 3.4.3 Packaged Energy Units + kcal/kJ Toggle (Jan 2026 - Locked)
+
+**Why this exists:** Packaged foods can report energy in kJ only. If treated as kcal,
+numbers show wrong and different screens disagree (favorites vs edit screen).
+
+**Protected files:**
+- `lib/food-data.ts`
+- `app/food/page.tsx`
+- `app/food/build-meal/MealBuilderClient.tsx`
+
+**Rules that must stay:**
+- OpenFoodFacts energy must be normalized:
+  - Use `energy-kcal_*` when present.
+  - If only kJ is present, convert to kcal before saving.
+- Official packaged adds must store `dbSource` + `dbId` and set `dbLocked = true`
+  so auto-matching does not overwrite the item later.
+- The kcal/kJ toggle must appear above the nutrient cards in:
+  - Food Diary entry breakdown.
+  - Adjust Food Details modal.
+- The Build‑a‑Meal “Meal totals” cards must stay in the colored card style
+  (matching the rest of the app).
+- The `normalizeSuspiciousKjItems(...)` guard must remain in `app/food/page.tsx`
+  so zero‑macro drinks with small energy don’t show kJ as kcal.
+
+**Restore steps if broken:**
+1) Re‑add the OpenFoodFacts kJ → kcal conversion in `lib/food-data.ts`.
+2) Re‑add `dbSource`, `dbId`, and `dbLocked` for official add items in `app/food/page.tsx`.
+3) Re‑add the kcal/kJ toggle blocks in the breakdown + edit modal.
+4) Re‑apply the colored card layout in `app/food/build-meal/MealBuilderClient.tsx`.
+
+**Last stable fix (staging):**
+- Commit: `a02cc1de`
+- Date: 2026-01-23
+
 #### 3.4.3 Ingredient Card Integrity (Mar 2026 - Locked)
 
 **Protected files:**
