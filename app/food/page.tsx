@@ -2636,7 +2636,7 @@ export default function FoodDiary() {
     const explicitLocalDate =
       typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
     const derivedDate = deriveDateFromEntryTimestamp(entry)
-    const localDate = derivedDate || explicitLocalDate || fallbackDate
+    const localDate = explicitLocalDate || derivedDate || fallbackDate
     const description =
       typeof entry?.description === 'string'
         ? entry.description.slice(0, 2000)
@@ -2764,18 +2764,9 @@ export default function FoodDiary() {
     if (!entry) return false
     const localDate =
       typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
-    const derivedDate = deriveDateFromEntryTimestamp(entry)
-
-    if (derivedDate) {
-      // If we have a trustworthy timestamp date and it conflicts with localDate, trust the timestamp
-      // to prevent cached prior-day rows leaking into a new day.
-      if (localDate && localDate !== derivedDate) {
-        return derivedDate === targetDate
-      }
-      if (derivedDate === targetDate) return true
-    }
-
     if (localDate) return localDate === targetDate
+    const derivedDate = deriveDateFromEntryTimestamp(entry)
+    if (derivedDate) return derivedDate === targetDate
     return false
   }
   const filterEntriesForDate = (entries: any[] | null | undefined, targetDate: string) =>
@@ -7233,7 +7224,7 @@ const applyStructuredItems = (
     const explicitLocalDate =
       typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
     const derivedDate = deriveDateFromEntryTimestamp(entry)
-    const localDate = derivedDate || explicitLocalDate || fallbackDate
+    const localDate = explicitLocalDate || derivedDate || fallbackDate
     const createdAtIso = alignTimestampToLocalDate(rawCreatedAtIso, localDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     return {
