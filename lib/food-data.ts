@@ -133,17 +133,24 @@ export async function searchLocalFoods(
       .split(' ')
       .filter(Boolean)
       .filter((token) => token.length >= 2)
-    const prefixTokens = rawTokens.length > 0 ? [...rawTokens].sort((a, b) => b.length - a.length).slice(0, 2) : [q]
+    const toTitleCase = (value: string) => value.replace(/\b([a-z])/g, (match) => match.toUpperCase())
+    const prefixTokens = rawTokens.length > 0 ? [...rawTokens].sort((a, b) => b.length - a.length).slice(0, 1) : [q]
     const tokenSet = new Set<string>()
+    const addTokenVariants = (value: string) => {
+      if (!value) return
+      tokenSet.add(value)
+      tokenSet.add(value.toUpperCase())
+      tokenSet.add(toTitleCase(value))
+    }
     for (const token of prefixTokens) {
       const singular = singularizeToken(token)
-      tokenSet.add(token)
-      if (singular && singular !== token) tokenSet.add(singular)
+      addTokenVariants(token)
+      if (singular && singular !== token) addTokenVariants(singular)
     }
     const sourceFilter = sources ? { source: { in: sources } } : null
     const prefixConditions = Array.from(tokenSet).flatMap((token) => [
-      { name: { startsWith: token, mode: 'insensitive' as const } },
-      { brand: { startsWith: token, mode: 'insensitive' as const } },
+      { name: { startsWith: token } },
+      { brand: { startsWith: token } },
     ])
     const prefixFilter = prefixConditions.length > 0 ? { OR: prefixConditions } : null
     const allowContains = mode !== 'prefix' && q.length >= 4
