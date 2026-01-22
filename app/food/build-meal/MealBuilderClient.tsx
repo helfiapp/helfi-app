@@ -90,6 +90,13 @@ const toNumber = (v: any): number | null => {
 }
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
+const KCAL_TO_KJ = 4.184
+
+const formatEnergyValue = (value: number | null | undefined, unit: 'kcal' | 'kJ') => {
+  const base = typeof value === 'number' && Number.isFinite(value) ? value : 0
+  const display = unit === 'kJ' ? base * KCAL_TO_KJ : base
+  return Math.round(display)
+}
 
 const normalizeBrandToken = (value: string) =>
   value
@@ -612,6 +619,7 @@ export default function MealBuilderClient() {
   const mealNameEditedRef = useRef(false)
   const mealNameWasClearedOnFocusRef = useRef(false)
 
+  const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<'packaged' | 'single'>('packaged')
   const [searchLoading, setSearchLoading] = useState(false)
@@ -2146,19 +2154,6 @@ export default function MealBuilderClient() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 md:ml-auto md:items-end">
-            <button
-              type="button"
-              onClick={createMeal}
-              disabled={busy || favoriteSaving}
-              className="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
-            >
-              {editFavoriteId ? (favoriteSaving ? 'Saving…' : 'Save changes') : 'Save meal'}
-            </button>
-            <div className="text-sm text-gray-500 md:text-right md:max-w-[260px]">
-              Find this later in <span className="font-semibold">Food Diary → {CATEGORY_LABELS[category]}</span> (tap to edit) and <span className="font-semibold">Favorites → Custom</span>.
-            </div>
-          </div>
         </div>
       </div>
 
@@ -2268,6 +2263,7 @@ export default function MealBuilderClient() {
                       {data.map((item, idx) => {
                         const label = String(item?.label || 'Meal').trim() || 'Meal'
                         const calories = typeof item?.calories === 'number' && Number.isFinite(item.calories) ? item.calories : null
+                        const displayCalories = calories !== null ? formatEnergyValue(calories, energyUnit) : null
                         const tag = String(item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom'))
                         const serving = String(item?.serving || '1 serving')
                         const key = normalizeMealLabel(label).toLowerCase()
@@ -2293,12 +2289,16 @@ export default function MealBuilderClient() {
                             >
                               <div className="min-w-0">
                                 <div className="text-sm font-semibold text-gray-900 truncate">{label}</div>
-                                <div className="text-xs text-gray-500 truncate">
-                                  {serving} • {tag}
-                                </div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {serving} • {tag}
                               </div>
-                              {calories !== null && <div className="text-sm font-semibold text-gray-900">{calories} kcal</div>}
-                            </button>
+                            </div>
+                            {displayCalories !== null && (
+                              <div className="text-sm font-semibold text-gray-900">
+                                {displayCalories} {energyUnit}
+                              </div>
+                            )}
+                          </button>
 
                             {favoritesActiveTab === 'all' && (
                               <div className="flex items-center pr-2">
@@ -2830,7 +2830,7 @@ export default function MealBuilderClient() {
 
                         <div className="flex flex-wrap gap-2">
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{Math.round(totals.calories)}</span> kcal
+                            <span className="font-semibold text-gray-900">{formatEnergyValue(totals.calories, energyUnit)}</span> {energyUnit}
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
                             <span className="font-semibold text-gray-900">{round3(totals.protein)}</span> g protein
@@ -2870,11 +2870,33 @@ export default function MealBuilderClient() {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
-          <div className="text-sm font-semibold text-gray-900 mb-2">Meal totals</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold text-gray-900">Meal totals</div>
+            <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setEnergyUnit('kcal')}
+                className={`px-2 py-0.5 rounded-full ${
+                  energyUnit === 'kcal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                kcal
+              </button>
+              <button
+                type="button"
+                onClick={() => setEnergyUnit('kJ')}
+                className={`px-2 py-0.5 rounded-full ${
+                  energyUnit === 'kJ' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                kJ
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
               <span className="text-gray-700">Calories</span>
-              <span className="font-semibold text-gray-900">{Math.round(mealTotals.calories)} kcal</span>
+              <span className="font-semibold text-gray-900">{formatEnergyValue(mealTotals.calories, energyUnit)} {energyUnit}</span>
             </div>
             <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
               <span className="text-gray-700">Protein</span>
@@ -2905,7 +2927,7 @@ export default function MealBuilderClient() {
           disabled={busy}
           className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold rounded-2xl"
         >
-          Save meal
+          {savingMeal ? 'Saving…' : editFavoriteId || sourceLogId ? 'Update' : 'Save meal'}
         </button>
 
         <div className="pb-10" />
