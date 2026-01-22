@@ -28,7 +28,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, Component } f
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
@@ -2377,8 +2377,7 @@ export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const debugMode = searchParams?.get('debug') === '1'
+  const [debugMode, setDebugMode] = useState(false)
   const isAnalysisRoute = pathname === '/food/analysis'
   const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
   const { userData, profileImage, updateUserData, refreshData } = useUserData()
@@ -3617,6 +3616,14 @@ export default function FoodDiary() {
     window.addEventListener('resize', updateIsMobile)
     return () => window.removeEventListener('resize', updateIsMobile)
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      setDebugMode(params.get('debug') === '1')
+    } catch {}
+  }, [pathname])
 
   useEffect(() => {
     setSummarySlideIndex(0)
