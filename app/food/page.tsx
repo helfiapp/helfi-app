@@ -7578,16 +7578,27 @@ const applyStructuredItems = (
     }
   }, [selectedDate, todaysFoods, historyFoods, expandedCategories])
 
-  // Persist a durable snapshot per date to avoid reload flicker across navigations
+  // Persist a durable snapshot per date to avoid reload flicker across navigations.
+  // Guard: do not overwrite a saved day with empty data until we know that day is loaded.
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
       const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
-      const sourceEntriesForDate = normalizeDiaryList(
-        isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []),
-        selectedDate,
+      const historyReady =
+        !isViewingToday &&
+        historyFoodsDate === selectedDate &&
+        Array.isArray(historyFoods)
+      const todayReady = isViewingToday && isDiaryHydrated(selectedDate) && foodDiaryLoaded
+      const baseEntries = isViewingToday
+        ? todaysFoodsForSelectedDate
+        : historyReady
+        ? historyFoods
+        : localSnapshotEntriesForSelectedDate
+      const normalized = dedupeEntries(
+        normalizeDiaryList(baseEntries || [], selectedDate),
+        { fallbackDate: selectedDate },
       )
-      const normalized = dedupeEntries(sourceEntriesForDate, { fallbackDate: selectedDate })
+      if (!historyReady && !todayReady && normalized.length === 0) return
       snapshot.byDate[selectedDate] = {
         entries: normalized,
         expandedCategories: collapseEmptyCategories(expandedCategories, normalized).map,
@@ -7598,7 +7609,17 @@ const applyStructuredItems = (
     } catch (err) {
       console.warn('Could not persist diary snapshot', err)
     }
-  }, [selectedDate, isViewingToday, todaysFoods, historyFoods, expandedCategories, refreshPersistentDiarySnapshot])
+  }, [
+    selectedDate,
+    isViewingToday,
+    todaysFoods,
+    historyFoods,
+    historyFoodsDate,
+    expandedCategories,
+    localSnapshotEntriesForSelectedDate,
+    foodDiaryLoaded,
+    refreshPersistentDiarySnapshot,
+  ])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
