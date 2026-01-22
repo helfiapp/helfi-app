@@ -3522,6 +3522,13 @@ export default function FoodDiary() {
     energyLabel?: string
     macros: MacroSegment[]
   } | null>(null)
+  const [favoriteActionModal, setFavoriteActionModal] = useState<{
+    item: any
+    label: string
+    servingLabel: string
+    totals: NutritionTotals | null
+    mode: 'choose' | 'preview'
+  } | null>(null)
   const [fatDetailState, setFatDetailState] = useState<{
     type: 'good' | 'bad' | 'unclear'
     source: 'bar' | 'ring'
@@ -14299,6 +14306,49 @@ Please add nutritional information manually if needed.`);
     setShowFavoritesPicker(false)
     favoritesReplaceTargetRef.current = null
     favoritesActionRef.current = null
+    setFavoriteActionModal(null)
+  }
+
+  const shouldPromptFavoriteAction = () => {
+    const replaceIndex = favoritesReplaceTargetRef.current
+    if (replaceIndex !== null && replaceIndex !== undefined) return false
+    if (favoritesActionRef.current === 'analysis') return false
+    return true
+  }
+
+  const buildFavoritePreview = (item: any) => {
+    const source = item?.entry || item?.favorite || item
+    const totals = getEntryTotals(source)
+    const label =
+      (item?.label || source?.description || source?.label || 'Meal').toString().trim() || 'Meal'
+    const servingLabel =
+      (item?.serving ||
+        (Array.isArray(source?.items) && source.items[0]?.serving_size) ||
+        source?.serving ||
+        '1 serving')?.toString().trim() || '1 serving'
+    return { item, label, servingLabel, totals }
+  }
+
+  const runFavoriteAdd = (item: any) => {
+    const source = item.favorite || item.entry || item
+    const replaceIndex = favoritesReplaceTargetRef.current
+    if (replaceIndex !== null && replaceIndex !== undefined) {
+      replaceIngredientFromFavoriteSource(source, replaceIndex)
+      closeFavoritesPicker()
+      return
+    }
+    if (favoritesActionRef.current === 'analysis') {
+      addFavoriteIngredientToAnalysis(source)
+      closeFavoritesPicker()
+      return
+    }
+    if (item.favorite) {
+      insertFavoriteIntoDiary(item.favorite, selectedAddCategory)
+    } else if (item.entry) {
+      insertMealIntoDiary(item.entry, selectedAddCategory)
+    } else {
+      insertMealIntoDiary(item, selectedAddCategory)
+    }
   }
 
   const insertFavoriteIntoDiary = async (favorite: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
@@ -24212,25 +24262,15 @@ Please add nutritional information manually if needed.`);
                         const tag = item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom')
                         const serving = item?.serving || '1 serving'
                         const handleSelect = () => {
-                          const source = item.favorite || item.entry || item
-                          const replaceIndex = favoritesReplaceTargetRef.current
-                          if (replaceIndex !== null && replaceIndex !== undefined) {
-                            replaceIngredientFromFavoriteSource(source, replaceIndex)
-                            closeFavoritesPicker()
+                          if (shouldPromptFavoriteAction()) {
+                            const preview = buildFavoritePreview(item)
+                            setFavoriteActionModal({
+                              ...preview,
+                              mode: 'choose',
+                            })
                             return
                           }
-                          if (favoritesActionRef.current === 'analysis') {
-                            addFavoriteIngredientToAnalysis(source)
-                            closeFavoritesPicker()
-                            return
-                          }
-                          if (item.favorite) {
-                            insertFavoriteIntoDiary(item.favorite, selectedAddCategory)
-                          } else if (item.entry) {
-                            insertMealIntoDiary(item.entry, selectedAddCategory)
-                          } else {
-                            insertMealIntoDiary(item, selectedAddCategory)
-                          }
+                          runFavoriteAdd(item)
                         }
                         const favoriteId =
                           item?.favorite?.id || (typeof item?.id === 'string' && item.id.startsWith('fav-') ? item.id : null)
@@ -24960,6 +25000,155 @@ Please add nutritional information manually if needed.`);
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {favoriteActionModal && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setFavoriteActionModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {favoriteActionModal.mode === 'choose' ? (
+              <>
+                <div className="text-base font-semibold text-gray-900">
+                  {favoriteActionModal.label}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">
+                  What would you like to do?
+                </div>
+                <div className="mt-4 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const item = favoriteActionModal.item
+                      setFavoriteActionModal(null)
+                      runFavoriteAdd(item)
+                    }}
+                    className="w-full px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
+                  >
+                    Add to diary
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFavoriteActionModal((prev) =>
+                        prev ? { ...prev, mode: 'preview' } : prev,
+                      )
+                    }
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                  >
+                    Preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFavoriteActionModal(null)}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                      Nutritional breakdown
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Total for {favoriteActionModal.servingLabel}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFavoriteActionModal(null)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <span aria-hidden>✕</span>
+                  </button>
+                </div>
+                <div className="mt-4">
+                  {(() => {
+                    const totals = favoriteActionModal.totals
+                    const hasTotals = Boolean(
+                      totals &&
+                        Object.values(totals).some(
+                          (v) => Number.isFinite(Number(v)) && Number(v) > 0,
+                        ),
+                    )
+                    if (!hasTotals) {
+                      return (
+                        <div className="text-sm text-gray-600">
+                          No nutrition data for this item yet.
+                        </div>
+                      )
+                    }
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {NUTRIENT_DISPLAY_ORDER.map((key) => {
+                          const meta = NUTRIENT_CARD_META[key]
+                          const raw = totals ? (totals as any)[key] : null
+                          const value =
+                            raw === null || raw === undefined
+                              ? null
+                              : Number(raw)
+                          const display =
+                            value === null || !Number.isFinite(value)
+                              ? '—'
+                              : formatNutrientValue(key, value)
+                          const label =
+                            key === 'calories'
+                              ? energyUnit === 'kJ'
+                                ? 'Kilojoules'
+                                : 'Calories'
+                              : meta.label
+                          return (
+                            <div
+                              key={key}
+                              className={`rounded-2xl border border-gray-100 bg-gradient-to-br ${meta.gradient} p-4`}
+                            >
+                              <div
+                                className={`text-xl font-bold ${meta.accent}`}
+                              >
+                                {display}
+                              </div>
+                              <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mt-1">
+                                {label}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+                </div>
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFavoriteActionModal((prev) =>
+                        prev ? { ...prev, mode: 'choose' } : prev,
+                      )
+                    }
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFavoriteActionModal(null)}
+                    className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
