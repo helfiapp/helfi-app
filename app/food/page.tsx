@@ -7589,11 +7589,13 @@ const applyStructuredItems = (
         historyFoodsDate === selectedDate &&
         Array.isArray(historyFoods)
       const todayReady = isViewingToday && isDiaryHydrated(selectedDate) && foodDiaryLoaded
+      const existingEntries = snapshot?.byDate?.[selectedDate]?.entries
+      const fallbackEntries = Array.isArray(existingEntries) ? existingEntries : []
       const baseEntries = isViewingToday
         ? todaysFoodsForSelectedDate
         : historyReady
         ? historyFoods
-        : localSnapshotEntriesForSelectedDate
+        : fallbackEntries
       const normalized = dedupeEntries(
         normalizeDiaryList(baseEntries || [], selectedDate),
         { fallbackDate: selectedDate },
@@ -7616,7 +7618,6 @@ const applyStructuredItems = (
     historyFoods,
     historyFoodsDate,
     expandedCategories,
-    localSnapshotEntriesForSelectedDate,
     foodDiaryLoaded,
     refreshPersistentDiarySnapshot,
   ])
