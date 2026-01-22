@@ -390,8 +390,12 @@ export async function GET(request: NextRequest) {
         }
 
         const localPackaged = await searchLocalPreferred(query, 'packaged')
-        if (localPackaged.length > 0) {
-          items = [...localPackaged].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+        const localPackagedFiltered = localPackaged.filter((item) => {
+          const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+          return nameMatchesSearchQuery(combined || item?.name || '', query)
+        })
+        if (localPackagedFiltered.length > 0) {
+          items = [...localPackagedFiltered].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
           actualSource = 'auto'
         } else {
           const pooled = await fetchExternalPool()
