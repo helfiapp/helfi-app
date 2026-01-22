@@ -1758,6 +1758,36 @@ owner approval.
   - `git show 7db259ab:components/support/SupportChatWidget.tsx`
   - `git show 7db259ab:lib/support-automation.ts`
 
+## 7.4 Barcode Favorites Editing (Jan 2026 - Locked)
+
+**Goal (non-negotiable):** Barcode-scanned favorites must stay editable after
+you rename them and after you add them to the diary.
+
+**Do not:**
+- Strip barcode markers from items when editing a favorite.
+- Replace the original item ids with Build-a-meal editor ids for non-custom favorites.
+- Make changes here without telling the owner that this section has guard rails.
+
+**Must keep (source of truth):**
+- `app/food/build-meal/MealBuilderClient.tsx` stores the original favorite items
+  when `editFavoriteId` is used.
+- When saving an edited favorite that is **not** a custom meal, keep these item fields:
+  `barcode`, `barcodeSource`, `detectionMethod`, `source`.
+- When saving an edited favorite that is **not** a custom meal, keep the original
+  item `id` (or remove the Build-a-meal id).
+
+**If this breaks again, fix checklist (only in `app/food/build-meal/MealBuilderClient.tsx`):**
+1) In the edit load effect, save the original `favItems` into
+   `editFavoriteSourceItemsRef` and set `editFavoriteIsCustomRef` using `isCustomMealFavorite(fav)`.
+2) In `createMeal`, when building `cleanedItems`:
+   - If `editFavoriteId` is set **and** `editFavoriteIsCustomRef` is false,
+     copy the barcode fields from the original items.
+   - Keep the original item `id` (or delete the Build-a-meal `id`).
+3) Re-test:
+   - Rename a barcode favorite.
+   - Add it to the diary.
+   - You must be able to edit it from both the diary and Favorites.
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
