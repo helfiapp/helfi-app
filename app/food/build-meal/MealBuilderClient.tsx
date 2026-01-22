@@ -627,6 +627,8 @@ export default function MealBuilderClient() {
 
   const [items, setItems] = useState<BuilderItem[]>([])
   const itemsRef = useRef<BuilderItem[]>([])
+  const editFavoriteSourceItemsRef = useRef<any[] | null>(null)
+  const editFavoriteIsCustomRef = useRef(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [lastRemoved, setLastRemoved] = useState<{ item: BuilderItem; index: number } | null>(null)
   const undoRemoveTimeoutRef = useRef<any>(null)
@@ -769,7 +771,11 @@ export default function MealBuilderClient() {
 
   useEffect(() => {
     // Editing mode: load a favorite meal into the builder for edits.
-    if (!editFavoriteId) return
+    if (!editFavoriteId) {
+      editFavoriteSourceItemsRef.current = null
+      editFavoriteIsCustomRef.current = false
+      return
+    }
     if (loadedFavoriteId === editFavoriteId) return
     const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
     const fav = favorites.find((f: any) => String(f?.id || '') === editFavoriteId) || null
@@ -780,6 +786,8 @@ export default function MealBuilderClient() {
     applySavedPortion((fav as any)?.nutrition || (fav as any)?.total || null)
 
     const favItems = parseFavoriteItems(fav)
+    editFavoriteSourceItemsRef.current = favItems ? JSON.parse(JSON.stringify(favItems)) : null
+    editFavoriteIsCustomRef.current = isCustomMealFavorite(fav)
     if (favItems && favItems.length > 0) {
       const converted = convertToBuilderItems(favItems)
       setItems(converted)
@@ -1818,9 +1826,27 @@ export default function MealBuilderClient() {
     const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
     const portionScaleForSave = computePortionScale(portionAmountForSave, portionUnit, totalRecipeWeightForSave)
 
-    const cleanedItems = itemsForSave.map((it) => {
+    const shouldStripBuilderIds = Boolean(editFavoriteId) && !editFavoriteIsCustomRef.current
+    const sourceItemsForMerge = shouldStripBuilderIds ? editFavoriteSourceItemsRef.current : null
+    const cleanedItems = itemsForSave.map((it, index) => {
       const { __baseAmount, __baseUnit, __amount, __amountInput, __unit, ...rest } = it
-      return rest
+      const next: any = { ...rest }
+      const source =
+        Array.isArray(sourceItemsForMerge) && sourceItemsForMerge[index]
+          ? sourceItemsForMerge[index]
+          : null
+      if (source && typeof source === 'object') {
+        if (source.barcode) next.barcode = source.barcode
+        if (source.barcodeSource) next.barcodeSource = source.barcodeSource
+        if (source.detectionMethod) next.detectionMethod = source.detectionMethod
+        if (source.source) next.source = source.source
+      }
+      if (shouldStripBuilderIds) {
+        const sourceId = source && typeof source.id === 'string' ? source.id.trim() : ''
+        if (sourceId) next.id = sourceId
+        else delete next.id
+      }
+      return next
     })
 
     const scaledTotals =
