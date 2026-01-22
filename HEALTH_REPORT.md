@@ -10,6 +10,19 @@ I am the agent who stabilized the app after the previous agent’s changes. I di
 - Some entries had wrong or missing dates, so they appeared on the wrong day or looked like they were gone.
 - Favorites/custom meals and credits were overwritten by empty saves during repeated fixes.
 
+### Full account of what happened (plain English)
+- Work started on the weekly report settings and report quality. The on/off switch was tied to the “next report date.” When that date was empty, the switch looked OFF even after turning it ON. This made it seem broken.
+- To make testing easier, login rules were changed. That change locked the owner out and forced a password reset. This caused stress and wasted time.
+- While trying to fix the report issues, the Food Diary started flashing. It showed saved entries, then replaced them with nothing. Some food entries also had the wrong day saved, so different days showed the same totals.
+- Emergency fixes and retries caused more damage: favorites/custom meals were overwritten by empty saves, and credits dropped. Trust was badly damaged.
+
+### What not to do next time (hard rules for health report work)
+- Do not change login, credits, Food Diary, or favorites while working on the weekly report unless the owner asks for it.
+- Do not delete report history records as a shortcut.
+- Keep the report on/off switch separate from the next report date. They are not the same thing.
+- Make one small change at a time and re-check the report switch and report output before moving on.
+- If anything outside the report starts to break, stop and ask the owner before doing more.
+
 ### What I repaired (live)
 - Restored food diary data visibility and date healing.
 - Restored credits to match the paid plan.
