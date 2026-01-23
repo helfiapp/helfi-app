@@ -16022,6 +16022,9 @@ Please add nutritional information manually if needed.`);
   //   expose internal formatting and confuse users.
   const foodTitle = useMemo(() => {
     if (mealSummary) return mealSummary;
+    const entryDescription = editingEntry?.description || editingEntry?.label || '';
+    const overrideTitle = editingEntry ? applyFoodNameOverride(entryDescription, editingEntry) : '';
+    if (overrideTitle) return overrideTitle;
     const singleItemName =
       editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
         ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
@@ -16030,9 +16033,12 @@ Please add nutritional information manually if needed.`);
     if (editingEntry?.description) return extractBaseMealDescription(editingEntry.description || '');
     if (aiDescription) return extractBaseMealDescription(aiDescription);
     return '';
-  }, [mealSummary, analyzedItems, editingEntry, aiDescription]);
+  }, [mealSummary, analyzedItems, editingEntry, aiDescription, applyFoodNameOverride]);
 
   const foodDescriptionText = useMemo(() => {
+    const entryDescription = editingEntry?.description || editingEntry?.label || '';
+    const overrideTitle = editingEntry ? applyFoodNameOverride(entryDescription, editingEntry) : '';
+    if (overrideTitle) return overrideTitle
     const singleItemName =
       editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
         ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
@@ -23063,9 +23069,11 @@ Please add nutritional information manually if needed.`);
                         !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1
                           ? String(food.items[0]?.name || food.items[0]?.label || '').trim()
                           : ''
+                      const baseEntryLabel = food?.description || food?.label || 'Meal'
+                      const overrideLabel = isWaterEntry ? '' : applyFoodNameOverride(baseEntryLabel, food)
                       const entryDisplayLabel = isWaterEntry
                         ? waterLabel || 'Water'
-                        : entryItemName || applyFoodNameOverride(food?.description || food?.label || 'Meal', food)
+                        : overrideLabel || entryItemName || baseEntryLabel
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
