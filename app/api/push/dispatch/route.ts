@@ -73,10 +73,10 @@ export async function POST(req: NextRequest) {
       where: { id: userId },
       include: { subscription: true, creditTopUps: true },
     })
-    const now = new Date()
-    const hasSubscription = isSubscriptionActive(user?.subscription, now)
+    const paidCheckNow = new Date()
+    const hasSubscription = isSubscriptionActive(user?.subscription, paidCheckNow)
     const hasPurchasedCredits = (user?.creditTopUps || []).some(
-      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+      (topUp: any) => topUp.expiresAt > paidCheckNow && (topUp.amountCents - topUp.usedCents) > 0
     )
     const maxFrequency = (hasSubscription || hasPurchasedCredits) ? 4 : 1
     const resolvedFrequency = Math.max(1, Math.min(maxFrequency, settings?.frequency ?? 3))
