@@ -1097,7 +1097,7 @@ const PhysicalStep = memo(function PhysicalStep({
     }
     if (
       initial.goalIntensity &&
-      (!goalIntensityTouchedRef.current || forceHydrate) &&
+      !goalIntensityTouchedRef.current &&
       (!goalIntensityHydratedRef.current || forceHydrate) &&
       initial.goalIntensity !== goalIntensity
     ) {
