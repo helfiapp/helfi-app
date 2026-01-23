@@ -16022,12 +16022,22 @@ Please add nutritional information manually if needed.`);
   //   expose internal formatting and confuse users.
   const foodTitle = useMemo(() => {
     if (mealSummary) return mealSummary;
+    const singleItemName =
+      editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
+        ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
+        : ''
+    if (singleItemName) return singleItemName;
     if (editingEntry?.description) return extractBaseMealDescription(editingEntry.description || '');
     if (aiDescription) return extractBaseMealDescription(aiDescription);
     return '';
-  }, [mealSummary, editingEntry, aiDescription]);
+  }, [mealSummary, analyzedItems, editingEntry, aiDescription]);
 
   const foodDescriptionText = useMemo(() => {
+    const singleItemName =
+      editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
+        ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
+        : ''
+    if (singleItemName) return singleItemName
     const singleItemOverride =
       editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
         ? applyFoodNameOverride(editingEntry?.description || editingEntry?.label || '', editingEntry)
@@ -18887,13 +18897,20 @@ Please add nutritional information manually if needed.`);
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
                         const macroMultiplier = macroMultiplierForItem(item)
-                        const caloriesBase = Number(item?.calories || 0)
-                        const totalCalories = Number.isFinite(caloriesBase)
-                          ? caloriesBase * servingsCount * macroMultiplier
+                        const baseProtein = Number(item?.protein_g) || 0
+                        const baseCarbs = Number(item?.carbs_g) || 0
+                        const baseFat = Number(item?.fat_g) || 0
+                        const macroEnergyPerServing =
+                          Math.max(0, baseProtein) * 4 + Math.max(0, baseCarbs) * 4 + Math.max(0, baseFat) * 9
+                        const caloriesBase = Number(item?.calories)
+                        const effectiveCaloriesPerServing =
+                          Number.isFinite(caloriesBase) && caloriesBase > 0 ? caloriesBase : macroEnergyPerServing
+                        const totalCalories = Number.isFinite(effectiveCaloriesPerServing)
+                          ? effectiveCaloriesPerServing * servingsCount * macroMultiplier
                           : 0
-                        const totalProtein = Math.round(((item.protein_g || 0) * servingsCount * macroMultiplier) * 10) / 10
-                        const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount * macroMultiplier) * 10) / 10
-                        const totalFat = Math.round(((item.fat_g || 0) * servingsCount * macroMultiplier) * 10) / 10
+                        const totalProtein = Math.round((baseProtein * servingsCount * macroMultiplier) * 10) / 10
+                        const totalCarbs = Math.round((baseCarbs * servingsCount * macroMultiplier) * 10) / 10
+                        const totalFat = Math.round((baseFat * servingsCount * macroMultiplier) * 10) / 10
                         const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount * macroMultiplier) * 10) / 10
                         const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount * macroMultiplier) * 10) / 10
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
@@ -20247,6 +20264,14 @@ Please add nutritional information manually if needed.`);
                         const item = analyzedItems[editingItemIndex]
                         const servingsCount = Number.isFinite(item?.servings) ? Number(item.servings) : 1
                         const macroMultiplier = macroMultiplierForItem(item) || 1
+                        const baseProtein = Number(item?.protein_g) || 0
+                        const baseCarbs = Number(item?.carbs_g) || 0
+                        const baseFat = Number(item?.fat_g) || 0
+                        const macroEnergyPerServing =
+                          Math.max(0, baseProtein) * 4 + Math.max(0, baseCarbs) * 4 + Math.max(0, baseFat) * 9
+                        const caloriesBase = Number(item?.calories)
+                        const effectiveCaloriesPerServing =
+                          Number.isFinite(caloriesBase) && caloriesBase > 0 ? caloriesBase : macroEnergyPerServing
                         const totalMultiplier = Math.max(0, servingsCount * macroMultiplier)
                         const divider = totalMultiplier > 0 ? totalMultiplier : 1
                         const formatTotal = (value: any, decimals: number, isCalories = false) => {
@@ -20313,7 +20338,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:calories`
                                     return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
                                       ? numericInputDrafts[key]
-                                      : formatTotal(item?.calories ?? '', 0, true)
+                                      : formatTotal(effectiveCaloriesPerServing, 0, true)
                                   })()}
                                   onFocus={() => {
                                     const key = `ai:modal:${editingItemIndex}:calories`
@@ -23034,9 +23059,13 @@ Please add nutritional information manually if needed.`);
                       const waterIconSrc = isWaterEntry ? getWaterIconSrc(waterLabel) : null
                       const drinkIconSrc = isDrinkEntry ? getWaterIconSrc(drinkMeta?.type) : null
                       const drinkAmountLabel = isDrinkEntry ? formatDrinkEntryAmount(drinkMeta) : ''
+                      const entryItemName =
+                        !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1
+                          ? String(food.items[0]?.name || food.items[0]?.label || '').trim()
+                          : ''
                       const entryDisplayLabel = isWaterEntry
                         ? waterLabel || 'Water'
-                        : applyFoodNameOverride(food?.description || food?.label || 'Meal', food)
+                        : entryItemName || applyFoodNameOverride(food?.description || food?.label || 'Meal', food)
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
