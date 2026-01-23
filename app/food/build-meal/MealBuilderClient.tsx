@@ -926,6 +926,8 @@ export default function MealBuilderClient() {
 
   const totalRecipeWeightG = useMemo(() => computeTotalRecipeWeightG(items), [items])
 
+  // Guard rail: portionScale must allow values above 1 to scale larger-than-recipe servings.
+  // See GUARD_RAILS.md section "Build a Meal portion scaling".
   const portionScale = useMemo(
     () => computePortionScale(portionAmountInput, portionUnit, totalRecipeWeightG),
     [portionAmountInput, portionUnit, totalRecipeWeightG],

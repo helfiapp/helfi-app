@@ -7851,6 +7851,8 @@ export default function Onboarding() {
   const healthSetupMetaInFlightRef = useRef(false);
   const lastServerHealthSetupUpdatedAtRef = useRef(0);
   const lastLocalEditAtRef = useRef(0);
+  // Guard rail: keep these refs; they stop server hydration from overriding the user's first goal click.
+  // See GUARD_RAILS.md section "Goal intensity selection + daily allowance sync".
   const goalChoiceTouchedRef = useRef(false);
   const goalIntensityTouchedRef = useRef(false);
 

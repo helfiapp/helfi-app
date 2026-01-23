@@ -5454,6 +5454,8 @@ export default function FoodDiary() {
   const isDiaryHydrated = (date: string) => Boolean(diaryHydrationRef.current[date]?.hydrated)
   const isDiaryVerified = (date: string) => Boolean(diaryHydrationRef.current[date]?.verified)
 
+  // Guard rail: keep __portionScale handling so daily totals match Build a Meal portions.
+  // See GUARD_RAILS.md section "Build a Meal portion scaling".
   const getEntryPortionScale = (entry: any) => {
     const raw =
       (entry?.nutrition && typeof entry.nutrition === 'object' ? (entry.nutrition as any).__portionScale : null) ??
