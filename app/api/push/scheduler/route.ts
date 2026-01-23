@@ -4,6 +4,7 @@ import webpush from 'web-push'
 import crypto from 'crypto'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { createInboxNotification } from '@/lib/notification-inbox'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 // Force dynamic execution - prevent caching for cron jobs
 export const dynamic = 'force-dynamic'
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
     time1: string
     time2: string
     time3: string
+    time4: string
     timezone: string
     frequency: number
     subscription: any
@@ -109,12 +111,32 @@ export async function POST(req: NextRequest) {
       COALESCE(s.time1, '12:30') AS time1,
       COALESCE(s.time2, '18:30') AS time2,
       COALESCE(s.time3, '21:30') AS time3,
+      COALESCE(s.time4, '09:00') AS time4,
       COALESCE(s.timezone, 'Australia/Melbourne') AS timezone,
       COALESCE(s.frequency, 3) AS frequency,
       p.subscription
     FROM PushSubscriptions p
     LEFT JOIN CheckinSettings s ON s.userId = p.userId
   `)
+
+  const nowForPaid = new Date()
+  const userIds = rows.map((row) => row.userId).filter((id): id is string => !!id)
+  const paidUserIds = new Set<string>()
+  if (userIds.length) {
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      include: { subscription: true, creditTopUps: true },
+    })
+    for (const user of users) {
+      const hasSubscription = isSubscriptionActive(user.subscription, nowForPaid)
+      const hasPurchasedCredits = (user.creditTopUps || []).some(
+        (topUp: any) => topUp.expiresAt > nowForPaid && (topUp.amountCents - topUp.usedCents) > 0
+      )
+      if (hasSubscription || hasPurchasedCredits) {
+        paidUserIds.add(user.id)
+      }
+    }
+  }
 
   // Determine current HH:MM in each user's timezone and match against their reminder times
   const nowUtc = new Date()
@@ -189,11 +211,14 @@ export async function POST(req: NextRequest) {
       const day = dateParts.find(p => p.type === 'day')?.value || '01'
       const localDate = `${year}-${month}-${day}`
 
+      const maxFrequency = r.userId && paidUserIds.has(r.userId) ? 4 : 1
+      const resolvedFrequency = Math.max(1, Math.min(maxFrequency, r.frequency || 1))
       // Build array of reminder times based on frequency
       const reminderTimes: string[] = []
-      if (r.frequency >= 1) reminderTimes.push(r.time1 || '12:30')
-      if (r.frequency >= 2) reminderTimes.push(r.time2 || '18:30')
-      if (r.frequency >= 3) reminderTimes.push(r.time3 || '21:30')
+      if (resolvedFrequency >= 1) reminderTimes.push(r.time1 || '12:30')
+      if (resolvedFrequency >= 2) reminderTimes.push(r.time2 || '18:30')
+      if (resolvedFrequency >= 3) reminderTimes.push(r.time3 || '21:30')
+      if (resolvedFrequency >= 4) reminderTimes.push(r.time4 || '09:00')
 
       // Matching: Exact match, up to N minutes after (catch late cron), or 1 minute early
       let shouldSend = false

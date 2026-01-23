@@ -5,6 +5,7 @@ import { scheduleAllActiveReminders, scheduleReminderWithQStash } from '@/lib/qs
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 import { createInboxNotification } from '@/lib/notification-inbox'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -59,20 +60,31 @@ export async function POST(req: NextRequest) {
     //     frequency INTEGER NOT NULL DEFAULT 3
     //   )
     // `)
-    const settingsRows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; timezone: string; frequency: number | null }> =
+    const settingsRows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; time4: string | null; timezone: string; frequency: number | null }> =
       await prisma.$queryRawUnsafe(
-        `SELECT enabled, time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
+        `SELECT enabled, time1, time2, time3, time4, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
         userId
       )
     const settings = settingsRows[0]
     if (settings && settings.enabled === false) {
       return NextResponse.json({ skipped: 'disabled' })
     }
-    const resolvedFrequency = Math.max(1, Math.min(3, settings?.frequency ?? 3))
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { subscription: true, creditTopUps: true },
+    })
+    const now = new Date()
+    const hasSubscription = isSubscriptionActive(user?.subscription, now)
+    const hasPurchasedCredits = (user?.creditTopUps || []).some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    )
+    const maxFrequency = (hasSubscription || hasPurchasedCredits) ? 4 : 1
+    const resolvedFrequency = Math.max(1, Math.min(maxFrequency, settings?.frequency ?? 3))
     const activeTimes: string[] = []
     if (resolvedFrequency >= 1 && settings?.time1) activeTimes.push(settings.time1)
     if (resolvedFrequency >= 2 && settings?.time2) activeTimes.push(settings.time2)
     if (resolvedFrequency >= 3 && settings?.time3) activeTimes.push(settings.time3)
+    if (resolvedFrequency >= 4 && settings?.time4) activeTimes.push(settings.time4)
     const timezoneToUse = settings?.timezone || timezone
 
     const reminderStillActive = settings ? activeTimes.includes(reminderTime) : true
@@ -93,6 +105,7 @@ export async function POST(req: NextRequest) {
             time1: settings.time1,
             time2: settings.time2,
             time3: settings.time3,
+            time4: settings.time4,
             timezone: settings.timezone,
             frequency: resolvedFrequency,
           })

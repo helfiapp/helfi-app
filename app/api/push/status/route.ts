@@ -28,6 +28,7 @@ export async function GET(_req: NextRequest) {
         time1 TEXT NOT NULL,
         time2 TEXT NOT NULL,
         time3 TEXT NOT NULL,
+        time4 TEXT NOT NULL,
         timezone TEXT NOT NULL,
         frequency INTEGER NOT NULL DEFAULT 3
       )
@@ -37,9 +38,9 @@ export async function GET(_req: NextRequest) {
       `SELECT subscription FROM PushSubscriptions WHERE userId = $1`,
       user.id
     )
-    const settingsRows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
+    const settingsRows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; time4: string; timezone: string; frequency: number }> =
       await prisma.$queryRawUnsafe(
-        `SELECT enabled, time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
+        `SELECT enabled, time1, time2, time3, time4, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
         user.id
       )
 

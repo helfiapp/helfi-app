@@ -349,13 +349,14 @@ export async function publishWithQStash(
  */
 export async function scheduleAllActiveReminders(
   userId: string,
-  settings: { time1: string; time2: string; time3: string; timezone: string; frequency: number }
+  settings: { time1: string; time2: string; time3: string; time4?: string | null; timezone: string; frequency: number }
 ) {
-  const { time1, time2, time3, timezone, frequency } = settings
+  const { time1, time2, time3, time4, timezone, frequency } = settings
   const reminders: string[] = []
   if (frequency >= 1) reminders.push(time1)
   if (frequency >= 2) reminders.push(time2)
   if (frequency >= 3) reminders.push(time3)
+  if (frequency >= 4 && time4) reminders.push(time4)
 
   const tasks = reminders.map((reminderTime) =>
     scheduleReminderWithQStash(userId, reminderTime, timezone).then((result) => ({
@@ -374,13 +375,14 @@ export async function scheduleAllActiveReminders(
 
 export async function scheduleAllMoodReminders(
   userId: string,
-  settings: { time1: string; time2: string; time3: string; timezone: string; frequency: number }
+  settings: { time1: string; time2: string; time3: string; time4?: string | null; timezone: string; frequency: number }
 ) {
-  const { time1, time2, time3, timezone, frequency } = settings
+  const { time1, time2, time3, time4, timezone, frequency } = settings
   const reminders: string[] = []
   if (frequency >= 1) reminders.push(time1)
   if (frequency >= 2) reminders.push(time2)
   if (frequency >= 3) reminders.push(time3)
+  if (frequency >= 4 && time4) reminders.push(time4)
 
   const tasks = reminders.map((reminderTime) =>
     scheduleMoodReminderWithQStash(userId, reminderTime, timezone).then((result) => ({

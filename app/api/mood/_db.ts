@@ -52,10 +52,15 @@ export async function ensureMoodTables() {
       time1 TEXT NOT NULL DEFAULT '20:00',
       time2 TEXT NOT NULL DEFAULT '12:00',
       time3 TEXT NOT NULL DEFAULT '18:00',
+      time4 TEXT NOT NULL DEFAULT '09:00',
       timezone TEXT NOT NULL DEFAULT 'UTC',
       frequency INTEGER NOT NULL DEFAULT 1
     )
   `)
+
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE MoodReminderSettings ADD COLUMN IF NOT EXISTS time4 TEXT NOT NULL DEFAULT '09:00'`
+  ).catch(() => {})
 
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS MoodReminderDeliveryLog (
