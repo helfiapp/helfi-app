@@ -8201,6 +8201,26 @@ export default function Onboarding() {
             );
           }
           const nextForm = { ...(userData.data || {}) };
+          const localDraft = formRef.current;
+          if (localDraft && typeof localDraft === 'object') {
+            const localGoalChoice =
+              typeof (localDraft as any).goalChoice === 'string'
+                ? (localDraft as any).goalChoice.trim()
+                : '';
+            if (goalChoiceTouchedRef.current && localGoalChoice) {
+              (nextForm as any).goalChoice = localGoalChoice;
+            }
+            const localGoalIntensity =
+              typeof (localDraft as any).goalIntensity === 'string'
+                ? (localDraft as any).goalIntensity.trim().toLowerCase()
+                : '';
+            if (
+              goalIntensityTouchedRef.current &&
+              (localGoalIntensity === 'mild' || localGoalIntensity === 'standard' || localGoalIntensity === 'aggressive')
+            ) {
+              (nextForm as any).goalIntensity = localGoalIntensity;
+            }
+          }
           mergedForBaseline = nextForm;
           formRef.current = nextForm;
           setForm(nextForm);
