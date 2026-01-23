@@ -82,6 +82,29 @@ getting user approval.
 - If a user previously tapped “Skip for now,” typing into any Health situations field must **clear the skip** and keep auto‑save active.
 - Insights generation must include Health situations notes (e.g., DHT sensitivity) and treat them as constraints when generating supplement guidance.
 
+### 2.6 Goal intensity selection + daily allowance sync (Jan 2026 – Locked)
+
+**Protected file:** `app/onboarding/page.tsx`
+
+Problem this prevents:
+- When a user taps **Mild / Standard / Aggressive**, the choice must stick on the first click, and daily allowance must update immediately.  
+- The choice must not “bounce back” when the page reloads or when the app refreshes data from the server.
+
+Guard rail:
+- Keep the local **touched** refs that block server hydration from overwriting the user’s first click:
+  - `goalChoiceTouchedRef`
+  - `goalIntensityTouchedRef`
+- `loadUserData` must preserve local `goalChoice` and `goalIntensity` when those refs are marked.
+- `persistForm` must mark those refs when a local goal choice or intensity is saved.
+
+Restore steps if broken:
+1. Re‑add the two touched refs in `app/onboarding/page.tsx`.
+2. When saving goal choice/intensity, set those refs to `true`.
+3. In `loadUserData`, keep local `goalChoice`/`goalIntensity` if the refs are `true`.
+
+Fix commits (do not remove): `36a4ae03`, `19c75dc6`, `4fa85060`, `9cfcc278`  
+Last stable deployment: `9cfcc278` (2026-01-24)
+
 ---
 
 ### 2.2 Onboarding Page Popup (“Complete your health setup”)
@@ -1161,6 +1184,29 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
   - On save, the meal stores metadata in `nutrition`: `__origin: 'ai-recommended'`, `__aiRecipe`, `__aiWhy`, and `__aiMealId`.
   - For older saves with no metadata, the diary fetches AI history from `/api/ai-meal-recommendation?date&category` (stored under `AI_MEAL_RECOMMENDATION_GOAL_NAME`) and matches by id/name/items.
 - Do not strip or overwrite these fields or the fallback matching logic; the tabs depend on them.
+
+### 3.13 Build a Meal portion scaling (Jan 2026 – Locked)
+
+**Protected files:**
+- `app/food/build-meal/MealBuilderClient.tsx`
+- `app/food/page.tsx`
+
+Problem this prevents:
+- Changing **Portion size** must scale the meal totals correctly (including sizes **larger** than the full recipe).
+- The Food Diary daily totals must use the same scaled values.
+
+Guard rail:
+- Do not clamp `portionScale` to 1.0 for saved meals. Portions can be **less than or greater than** 1.
+- Keep `__portionScale` on saved meals so the diary can scale totals later.
+- Daily totals must apply `applyPortionScaleToTotals(...)` when `__portionScale` exists.
+
+Restore steps if broken:
+1. In `MealBuilderClient`, restore `portionScale` calculation and make sure totals for save are multiplied by it.
+2. Ensure saved meals keep `__portionScale` in their totals.
+3. In `app/food/page.tsx`, apply `applyPortionScaleToTotals(...)` when calculating entry totals.
+
+Fix commit: `0347b9c7` (2026-01-23)  
+Last stable deployment: `0347b9c7` (2026-01-23)
 
 ---
 
