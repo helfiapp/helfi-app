@@ -604,7 +604,22 @@ const computePortionScale = (amountRaw: any, unit: 'g' | 'oz', totalRecipeWeight
   if (!grams || !Number.isFinite(grams) || grams <= 0) return 1
   const raw = grams / totalRecipeWeightG
   if (!Number.isFinite(raw) || raw <= 0) return 1
-  return Math.min(1, raw)
+  return raw
+}
+
+const applyPortionScaleToTotals = (
+  totals: { calories: number; protein: number; carbs: number; fat: number; fiber: number; sugar: number },
+  scale: number,
+) => {
+  if (!Number.isFinite(scale) || scale <= 0 || scale === 1) return totals
+  return {
+    calories: totals.calories * scale,
+    protein: totals.protein * scale,
+    carbs: totals.carbs * scale,
+    fat: totals.fat * scale,
+    fiber: totals.fiber * scale,
+    sugar: totals.sugar * scale,
+  }
 }
 
 const sanitizeMealTitle = (v: string) => v.replace(/\s+/g, ' ').trim()
@@ -895,7 +910,7 @@ export default function MealBuilderClient() {
     } catch {}
   }, [selectedDate])
 
-  const mealTotals = useMemo(() => {
+  const baseMealTotals = useMemo(() => {
     const total = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 }
     for (const it of items) {
       const t = computeItemTotals(it)
@@ -914,6 +929,11 @@ export default function MealBuilderClient() {
   const portionScale = useMemo(
     () => computePortionScale(portionAmountInput, portionUnit, totalRecipeWeightG),
     [portionAmountInput, portionUnit, totalRecipeWeightG],
+  )
+
+  const mealTotals = useMemo(
+    () => applyPortionScaleToTotals(baseMealTotals, portionScale),
+    [baseMealTotals, portionScale],
   )
 
   const addBuilderItem = (next: BuilderItem) => {
@@ -1872,17 +1892,17 @@ export default function MealBuilderClient() {
       return next
     })
 
-    const scaledTotals =
-      portionScaleForSave < 1
-        ? {
-            calories: totalsForSave.calories * portionScaleForSave,
-            protein: totalsForSave.protein * portionScaleForSave,
-            carbs: totalsForSave.carbs * portionScaleForSave,
-            fat: totalsForSave.fat * portionScaleForSave,
-            fiber: totalsForSave.fiber * portionScaleForSave,
-            sugar: totalsForSave.sugar * portionScaleForSave,
-          }
-        : totalsForSave
+    const shouldScaleTotals = Number.isFinite(portionScaleForSave) && portionScaleForSave !== 1
+    const scaledTotals = shouldScaleTotals
+      ? {
+          calories: totalsForSave.calories * portionScaleForSave,
+          protein: totalsForSave.protein * portionScaleForSave,
+          carbs: totalsForSave.carbs * portionScaleForSave,
+          fat: totalsForSave.fat * portionScaleForSave,
+          fiber: totalsForSave.fiber * portionScaleForSave,
+          sugar: totalsForSave.sugar * portionScaleForSave,
+        }
+      : totalsForSave
     const portionWeightForSave = (() => {
       const raw = parseNumericInput(portionAmountForSave)
       if (!raw || raw <= 0) return null
