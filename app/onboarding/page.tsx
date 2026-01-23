@@ -1949,6 +1949,9 @@ const PhysicalStep = memo(function PhysicalStep({
       if (onPartialSave) {
         onPartialSave({ goalChoice: choice, goalIntensity: nextIntensity });
       }
+      try {
+        updateUserData(sanitizeUserDataPayload({ goalChoice: choice, goalIntensity: nextIntensity }));
+      } catch {}
       fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2986,6 +2989,9 @@ const PhysicalStep = memo(function PhysicalStep({
                   if (onPartialSave) {
                     onPartialSave({ goalChoice, goalIntensity: nextIntensity });
                   }
+                  try {
+                    updateUserData(sanitizeUserDataPayload({ goalChoice, goalIntensity: nextIntensity }));
+                  } catch {}
                   fetch('/api/user-data', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
