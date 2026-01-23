@@ -22021,13 +22021,14 @@ Please add nutritional information manually if needed.`);
                   map.set(name, (map.get(name) || 0) + grams)
                 }
 
-                const splitFatFromItems = (items: any[]) => {
+                const splitFatFromItems = (items: any[], scaleRaw: number | null) => {
                   const split = { good: 0, bad: 0, unclear: 0 }
                   if (!items || items.length === 0) return split
+                  const scale = Number.isFinite(Number(scaleRaw)) && Number(scaleRaw) > 0 ? Number(scaleRaw) : 1
                   items.forEach((entry: any) => {
                     const servings = effectiveServings(entry)
                     const multiplier = macroMultiplierForItem(entry)
-                    const fat = Number(entry?.fat_g || 0) * servings * multiplier
+                    const fat = Number(entry?.fat_g || 0) * servings * multiplier * scale
                     if (!Number.isFinite(fat) || fat <= 0) return
                     const label = entry?.name || entry?.label || entry?.description || ''
                     const displayLabel = buildFatDisplayLabel(label, entry?.brand)
@@ -22052,14 +22053,17 @@ Please add nutritional information manually if needed.`);
                 const totals = source.reduce((acc: Record<typeof NUTRIENT_DISPLAY_ORDER[number], number>, item: any) => {
                   const derivedItems = deriveItemsForEntry(item)
                   const recalculated = derivedItems ? recalculateNutritionFromItems(derivedItems) : null
-                  const splitFromItems = derivedItems ? splitFatFromItems(derivedItems) : null
-                  if (recalculated) {
-                    acc.calories += recalculated.calories || 0
-                    acc.protein += recalculated.protein || 0
-                    acc.carbs += recalculated.carbs || 0
-                    acc.fat += recalculated.fat || 0
-                    acc.fiber += recalculated.fiber || 0
-                    acc.sugar += recalculated.sugar || 0
+                  const portionScale = getEntryPortionScale(item)
+                  const scaledRecalculated =
+                    recalculated && portionScale ? applyPortionScaleToTotals(recalculated, portionScale) : recalculated
+                  const splitFromItems = derivedItems ? splitFatFromItems(derivedItems, portionScale) : null
+                  if (scaledRecalculated) {
+                    acc.calories += scaledRecalculated.calories || 0
+                    acc.protein += scaledRecalculated.protein || 0
+                    acc.carbs += scaledRecalculated.carbs || 0
+                    acc.fat += scaledRecalculated.fat || 0
+                    acc.fiber += scaledRecalculated.fiber || 0
+                    acc.sugar += scaledRecalculated.sugar || 0
                     if (splitFromItems) {
                       fatSplit.good += splitFromItems.good
                       fatSplit.bad += splitFromItems.bad
