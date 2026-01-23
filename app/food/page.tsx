@@ -16023,6 +16023,9 @@ Please add nutritional information manually if needed.`);
   const foodTitle = useMemo(() => {
     if (mealSummary) return mealSummary;
     const entryDescription = editingEntry?.description || editingEntry?.label || '';
+    const resolvedFavorite = editingEntry ? resolveFavoriteForEntry(editingEntry, entryDescription) : null;
+    const favoriteTitle = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : '';
+    if (favoriteTitle) return favoriteTitle;
     const overrideTitle = editingEntry ? applyFoodNameOverride(entryDescription, editingEntry) : '';
     if (overrideTitle) return overrideTitle;
     const singleItemName =
@@ -16033,10 +16036,13 @@ Please add nutritional information manually if needed.`);
     if (editingEntry?.description) return extractBaseMealDescription(editingEntry.description || '');
     if (aiDescription) return extractBaseMealDescription(aiDescription);
     return '';
-  }, [mealSummary, analyzedItems, editingEntry, aiDescription, applyFoodNameOverride]);
+  }, [mealSummary, analyzedItems, editingEntry, aiDescription, applyFoodNameOverride, favorites]);
 
   const foodDescriptionText = useMemo(() => {
     const entryDescription = editingEntry?.description || editingEntry?.label || '';
+    const resolvedFavorite = editingEntry ? resolveFavoriteForEntry(editingEntry, entryDescription) : null;
+    const favoriteTitle = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : '';
+    if (favoriteTitle) return favoriteTitle
     const overrideTitle = editingEntry ? applyFoodNameOverride(entryDescription, editingEntry) : '';
     if (overrideTitle) return overrideTitle
     const singleItemName =
@@ -16066,7 +16072,7 @@ Please add nutritional information manually if needed.`);
     }
     if (editingEntry?.description) return editingEntry.description;
     return '';
-  }, [aiDescription, analyzedItems, applyFoodNameOverride, editingEntry]);
+  }, [aiDescription, analyzedItems, applyFoodNameOverride, editingEntry, favorites]);
 
   const aiSavedMealMeta = useMemo(() => {
     const nutrition = editingEntry?.nutrition
@@ -23070,10 +23076,12 @@ Please add nutritional information manually if needed.`);
                           ? String(food.items[0]?.name || food.items[0]?.label || '').trim()
                           : ''
                       const baseEntryLabel = food?.description || food?.label || 'Meal'
+                      const resolvedFavorite = isWaterEntry ? null : resolveFavoriteForEntry(food, baseEntryLabel)
+                      const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
                       const overrideLabel = isWaterEntry ? '' : applyFoodNameOverride(baseEntryLabel, food)
                       const entryDisplayLabel = isWaterEntry
                         ? waterLabel || 'Water'
-                        : overrideLabel || entryItemName || baseEntryLabel
+                        : favoriteLabel || overrideLabel || entryItemName || baseEntryLabel
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
