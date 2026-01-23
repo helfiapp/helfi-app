@@ -7851,6 +7851,8 @@ export default function Onboarding() {
   const healthSetupMetaInFlightRef = useRef(false);
   const lastServerHealthSetupUpdatedAtRef = useRef(0);
   const lastLocalEditAtRef = useRef(0);
+  const goalChoiceTouchedRef = useRef(false);
+  const goalIntensityTouchedRef = useRef(false);
 
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
   useEffect(() => {
@@ -8400,6 +8402,12 @@ export default function Onboarding() {
 
   const persistForm = useCallback(
     (partial: any) => {
+      if (typeof partial?.goalChoice === 'string' && partial.goalChoice.trim()) {
+        goalChoiceTouchedRef.current = true;
+      }
+      if (typeof partial?.goalIntensity === 'string' && partial.goalIntensity.trim()) {
+        goalIntensityTouchedRef.current = true;
+      }
       setForm((prev: any) => {
         let next = { ...prev, ...partial };
         if (shouldStampHealthSetup(partial)) {
