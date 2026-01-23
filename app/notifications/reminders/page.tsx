@@ -423,8 +423,12 @@ export default function ReminderSettingsPage() {
     setMoodFrequency(value)
   }
 
-  const maxReminderLabel = checkinsMaxFrequency >= 4 ? 'Up to 4 reminders per day.' : 'Free plan: 1 reminder per day.'
-  const moodMaxReminderLabel = moodMaxFrequency >= 4 ? 'Up to 4 reminders per day.' : 'Free plan: 1 reminder per day.'
+  const maxReminderLabel = checkinsMaxFrequency >= 4
+    ? 'You can set up to 4 reminders per day.'
+    : 'Free members can set 1 reminder per day.'
+  const moodMaxReminderLabel = moodMaxFrequency >= 4
+    ? 'You can set up to 4 reminders per day.'
+    : 'Free members can set 1 reminder per day.'
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -453,6 +457,9 @@ export default function ReminderSettingsPage() {
               On iPhone: Add to Home Screen first, then open the app icon to enable notifications.
             </p>
           )}
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+            Step 1: turn on push notifications. Step 2: turn on the check-in and mood reminders below and pick times.
+          </p>
         </div>
 
         {!pushNotifications && (
@@ -469,7 +476,7 @@ export default function ReminderSettingsPage() {
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Daily check-in reminders</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                These reminders help build your 7-day health report (paid plan or credits).
+                These reminders help you build your 7-day health report. The full report is for paid members or people who bought credits.
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -487,6 +494,11 @@ export default function ReminderSettingsPage() {
           {checkinsMaxFrequency < 4 && (
             <div className="text-xs text-gray-600 dark:text-gray-400 mb-4">
               Want more reminders? <Link href="/billing" className="text-helfi-green font-semibold hover:underline">Subscribe or buy credits</Link> to unlock up to 4 per day.
+            </div>
+          )}
+          {!pushNotifications && (
+            <div className="text-xs text-amber-700 mb-4">
+              Turn on push notifications above so these reminders can show up on this device.
             </div>
           )}
 
@@ -616,7 +628,7 @@ export default function ReminderSettingsPage() {
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Mood reminders</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                These reminders help build your 7-day health report (paid plan or credits).
+                These reminders help you build your 7-day health report. The full report is for paid members or people who bought credits.
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -634,6 +646,11 @@ export default function ReminderSettingsPage() {
           {moodMaxFrequency < 4 && (
             <div className="text-xs text-gray-600 dark:text-gray-400 mb-4">
               Want more reminders? <Link href="/billing" className="text-helfi-green font-semibold hover:underline">Subscribe or buy credits</Link> to unlock up to 4 per day.
+            </div>
+          )}
+          {!pushNotifications && (
+            <div className="text-xs text-amber-700 mb-4">
+              Turn on push notifications above so these reminders can show up on this device.
             </div>
           )}
 

@@ -1747,6 +1747,28 @@ If reminder taps open the wrong page OR the inbox does not clear after a complet
    - Fix by reading both `createdAt` and `createdat` (and the same for `readAt`)
      in `lib/notification-inbox.ts` so the real saved time is used.
 
+### 14.1 Reminder limits (Free vs Paid) — Locked
+
+**Protected files:**
+- `app/notifications/reminders/page.tsx`
+- `app/api/checkins/settings/route.ts`
+- `app/api/mood/reminders/route.ts`
+- `app/api/push/scheduler/route.ts`
+- `app/api/mood/push-scheduler/route.ts`
+
+**Required behavior (must not change):**
+- Free members can set **1 reminder per day**.  
+- Paid members (subscription **or** purchased credits) can set **up to 4 per day**.  
+- “Free starter credits” do **not** unlock more reminders.
+- The UI must show the limit and prompt users to subscribe/buy credits when they try to pick more than 1.
+
+**Restore steps (if this breaks again):**
+1) In the settings APIs, ensure `maxFrequency = isPaidUser ? 4 : 1` and clamp `frequency` to that limit.
+2) In the UI, keep the warning prompt when a free user tries to pick more than 1.
+3) Confirm both check‑in and mood reminders use the same limits.
+
+Fix commit: `TBD` (2026-01-24)
+
 ### Medium and low priority fixes that must stay locked
 - Session lifetime must not be multi-year, and admin logout/revoke must remain available.
 - No fallback default secrets in production. Missing secrets must be flagged, not silently replaced.
