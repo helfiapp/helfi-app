@@ -1767,7 +1767,7 @@ If reminder taps open the wrong page OR the inbox does not clear after a complet
 2) In the UI, keep the warning prompt when a free user tries to pick more than 1.
 3) Confirm both check‑in and mood reminders use the same limits.
 
-Fix commit: `TBD` (2026-01-24)
+Fix commit: `b93a187e` (2026-01-24)
 
 ### Medium and low priority fixes that must stay locked
 - Session lifetime must not be multi-year, and admin logout/revoke must remain available.
