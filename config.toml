@@ -1,0 +1,3 @@
+# Agent startup
+start_here = "AGENTS.md"
+ignore_files = ["AGENT_START_HERE.md", "AGENT_HANDOVER_MESSAGE.md"]

@@ -106,19 +106,62 @@ export async function searchLocalFoods(
   const mode = opts.mode || 'prefix-contains'
 
   try {
+    const normalizePrefixToken = (value: string) =>
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+        .replace(/\s+/g, ' ')
+    const singularizeToken = (value: string) => {
+      const lower = value.toLowerCase()
+      if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
+      if (
+        lower.endsWith('es') &&
+        value.length > 3 &&
+        !lower.endsWith('ses') &&
+        !lower.endsWith('xes') &&
+        !lower.endsWith('zes') &&
+        !lower.endsWith('ches') &&
+        !lower.endsWith('shes')
+      ) {
+        return value.slice(0, -2)
+      }
+      if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
+      return value
+    }
+    const rawTokens = normalizePrefixToken(q)
+      .split(' ')
+      .filter(Boolean)
+      .filter((token) => token.length >= 2)
+    const toTitleCase = (value: string) => value.replace(/\b([a-z])/g, (match) => match.toUpperCase())
+    const prefixTokens = rawTokens.length > 0 ? [...rawTokens].sort((a, b) => b.length - a.length).slice(0, 1) : [q]
+    const tokenSet = new Set<string>()
+    const addTokenVariants = (value: string) => {
+      if (!value) return
+      tokenSet.add(value)
+      tokenSet.add(value.toUpperCase())
+      tokenSet.add(toTitleCase(value))
+    }
+    for (const token of prefixTokens) {
+      const singular = singularizeToken(token)
+      addTokenVariants(token)
+      if (singular && singular !== token) addTokenVariants(singular)
+    }
     const sourceFilter = sources ? { source: { in: sources } } : null
-    const prefixFilter = {
-      OR: [
-        { name: { startsWith: q, mode: 'insensitive' as const } },
-        { brand: { startsWith: q, mode: 'insensitive' as const } },
-      ],
-    }
-    const containsFilter = {
-      OR: [
-        { name: { contains: q, mode: 'insensitive' as const } },
-        { brand: { contains: q, mode: 'insensitive' as const } },
-      ],
-    }
+    const prefixConditions = Array.from(tokenSet).flatMap((token) => [
+      { name: { startsWith: token } },
+      { brand: { startsWith: token } },
+    ])
+    const prefixFilter = prefixConditions.length > 0 ? { OR: prefixConditions } : null
+    const allowContains = mode !== 'prefix' && q.length >= 4
+    const containsFilter = allowContains
+      ? {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' as const } },
+            { brand: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : null
     const buildWhere = (filter: any, excludeIds?: string[]) => {
       const clauses = []
       if (sourceFilter) clauses.push(sourceFilter)
@@ -132,17 +175,15 @@ export async function searchLocalFoods(
     const prefixRows = await prisma.foodLibraryItem.findMany({
       where: buildWhere(prefixFilter),
       take: pageSize,
-      orderBy: { name: 'asc' },
     })
 
     const remaining = Math.max(0, pageSize - prefixRows.length)
     const prefixIds = prefixRows.map((row) => row.id)
     const containsRows =
-      remaining > 0 && mode !== 'prefix'
+      remaining > 0 && mode !== 'prefix' && prefixRows.length === 0 && containsFilter
         ? await prisma.foodLibraryItem.findMany({
             where: buildWhere(containsFilter, prefixIds),
             take: remaining,
-            orderBy: { name: 'asc' },
           })
         : []
 
@@ -195,16 +236,22 @@ function normalizeOpenFoodFactsProduct(product: any): NormalizedFoodItem | null 
   let fiber_g: number | null = null
   let sugar_g: number | null = null
 
-  // If per-serving values exist, use them; otherwise fall back to per 100g/ml
-  const kcalServing = parseNumber(nutr['energy-kcal_serving'] ?? nutr['energy_serving'])
+  // If per-serving values exist, use them; otherwise fall back to per 100g/ml.
+  // OpenFoodFacts reports energy in kJ unless the "-kcal" field is present.
+  const kcalServing = parseNumber(nutr['energy-kcal_serving'])
+  const kjServing = parseNumber(nutr['energy-kj_serving'] ?? nutr['energy_serving'])
   const proteinServing = parseNumber(nutr['proteins_serving'])
   const carbsServing = parseNumber(nutr['carbohydrates_serving'])
   const fatServing = parseNumber(nutr['fat_serving'])
   const fiberServing = parseNumber(nutr['fiber_serving'])
   const sugarServing = parseNumber(nutr['sugars_serving'])
+  const kcal100g = parseNumber(nutr['energy-kcal_100g'])
+  const kj100g = parseNumber(nutr['energy-kj_100g'] ?? nutr['energy_100g'])
+  const convertKjToKcal = (value: number | null) =>
+    value != null && Number.isFinite(value) ? value / 4.184 : null
 
-  if (kcalServing != null || proteinServing != null || carbsServing != null || fatServing != null) {
-    calories = kcalServing ?? parseNumber(nutr['energy-kcal_100g'] ?? nutr['energy_100g'])
+  if (kcalServing != null || kjServing != null || proteinServing != null || carbsServing != null || fatServing != null) {
+    calories = kcalServing ?? convertKjToKcal(kjServing) ?? kcal100g ?? convertKjToKcal(kj100g)
     protein_g = proteinServing ?? parseNumber(nutr['proteins_100g'])
     carbs_g = carbsServing ?? parseNumber(nutr['carbohydrates_100g'])
     fat_g = fatServing ?? parseNumber(nutr['fat_100g'])
@@ -212,7 +259,7 @@ function normalizeOpenFoodFactsProduct(product: any): NormalizedFoodItem | null 
     sugar_g = sugarServing ?? parseNumber(nutr['sugars_100g'])
   } else {
     // Fallback: use per 100g/ml as "per serving"
-    calories = parseNumber(nutr['energy-kcal_100g'] ?? nutr['energy_100g'])
+    calories = kcal100g ?? convertKjToKcal(kj100g)
     protein_g = parseNumber(nutr['proteins_100g'])
     carbs_g = parseNumber(nutr['carbohydrates_100g'])
     fat_g = parseNumber(nutr['fat_100g'])

@@ -211,6 +211,13 @@ Files:
 - Server code: `app/api/food-data/route.ts` uses `searchLocalFoods` for single foods and fallbacks (singular/raw/cooked) against the local library. Do not remove or bypass this.
 - Import script: `scripts/import-usda-foods.ts` loads USDA zips from `data/food-import/` into `foodLibraryItem`. Keep this as the source of truth.
 - Search safety rule: ignore 1‑letter tokens so “art” does not match “Bartlett” via the single letter “t”.
+- Multi‑word searches must match by words (order does not matter). Do not require the full phrase to appear exactly, or full‑word searches will return nothing.
+- Speed rule: return prefix matches fast; only use slow “contains” fallback when prefix returns nothing and the query is 4+ letters.
+- Search speed booster: keep the `pg_trgm` indexes on `FoodLibraryItem.name` and `FoodLibraryItem.brand` (they make fast typing results possible).
+- Packaged brand suggestions must only use brand‑like tokens; ignore generic food words (e.g., burger, cheese, nuggets). If there is no brand token in the query, do not show brand suggestions.
+- Packaged searches: use OpenFoodFacts + FatSecret unless the local USDA branded library already has matches. Single foods remain USDA local only.
+- Packaged searches: if local USDA branded matches are fewer than 5, add OpenFoodFacts + FatSecret results to fill the list. Also normalize "cheese burger" to "cheeseburger" when external sources return nothing.
+- Packaged fast‑food/restaurant searches must skip USDA entirely and only use OpenFoodFacts + FatSecret.
 
 **Restore steps if broken:**
 1) Confirm the production database is the **populated USDA database** (the one with ~1.8M branded rows). If the DB is empty, searches will fail.  
@@ -701,6 +708,35 @@ This section was breaking for weeks. Do **not** touch it without explicit owner 
 - Date: 2026-01-22
 - Note: This must be re-verified on live once approved.
 
+### 3.4.2 SEVERE LOCK - Left Menu Clicks Blocked on Food Diary (Jan 2026)
+This caused the left menu to stop working on desktop whenever Food Diary was open.
+
+**Protected file:**
+- `app/food/page.tsx`
+
+**What broke before:**
+- Left menu clicks did nothing on the Food Diary page.
+- The click would only fire later (after tapping the date buttons).
+- Cause: the page got stuck in a snapshot update loop.
+
+**Non-negotiable rules (do not change):**
+- Do not write the per-day snapshot in a way that depends on the snapshot itself.
+- Do not keep re-writing the same snapshot while history is still loading.
+- If the day is not fully loaded yet, do not overwrite the saved day with empty data.
+
+**Restore steps (exact, no guessing):**
+1) In `app/food/page.tsx`, the "Persist a durable snapshot" block must:
+   - Only write after the day is loaded.
+   - Never keep re-writing from the snapshot itself.
+2) Test on desktop:
+   - Open Food Diary.
+   - Click any left menu item.
+   - It must navigate immediately, every time.
+
+**Last stable fix (live):**
+- Commit: `22ef0673`
+- Date: 2026-01-22
+
 ### 3.6 Food Search Consistency (Jan 2026 – Locked)
 - Single‑food searches must use USDA; packaged searches use FatSecret + OpenFoodFacts.
 - Plural searches should automatically fall back to the singular form (e.g., “fried eggs” → “fried egg”) to prevent empty/irrelevant results.
@@ -781,6 +817,57 @@ This section controls how detected ingredients are shown and edited. It has been
 - Do not rename Weight back to "Serving Size".
 - Do not break the two-way sync between Weight, Servings, and macros.
 - Do not allow front card values to differ from the edit screen.
+
+### 3.4.3 Packaged Energy Units + kcal/kJ Toggle (Jan 2026 - Locked)
+
+**Why this exists:** Packaged foods can report energy in kJ only. If treated as kcal,
+numbers show wrong and different screens disagree (favorites vs edit screen).
+
+**Protected files:**
+- `lib/food-data.ts`
+- `app/food/page.tsx`
+- `app/food/build-meal/MealBuilderClient.tsx`
+
+**Rules that must stay:**
+- OpenFoodFacts energy must be normalized:
+  - Use `energy-kcal_*` when present.
+  - If only kJ is present, convert to kcal before saving.
+- Official packaged adds must store `dbSource` + `dbId` and set `dbLocked = true`
+  so auto-matching does not overwrite the item later.
+- The kcal/kJ toggle must appear above the nutrient cards in:
+  - Food Diary entry breakdown.
+  - Adjust Food Details modal.
+- The Build‑a‑Meal “Meal totals” cards must stay in the colored card style
+  (matching the rest of the app).
+- The `normalizeSuspiciousKjItems(...)` guard must remain in `app/food/page.tsx`
+  so zero‑macro drinks with small energy don’t show kJ as kcal.
+
+**Restore steps if broken:**
+1) Re‑add the OpenFoodFacts kJ → kcal conversion in `lib/food-data.ts`.
+2) Re‑add `dbSource`, `dbId`, and `dbLocked` for official add items in `app/food/page.tsx`.
+3) Re‑add the kcal/kJ toggle blocks in the breakdown + edit modal.
+4) Re‑apply the colored card layout in `app/food/build-meal/MealBuilderClient.tsx`.
+
+**Last stable fix (staging):**
+- Commit: `a02cc1de`
+- Date: 2026-01-23
+
+### 3.4.4 Zero‑calorie macro fixes (Jan 2026 - Locked)
+
+**Why this exists:** Some USDA foods can carry macros but no calories. That causes
+0 kcal totals in the diary and in favorites, even though macros are present.
+
+**Protected file:**
+- `app/food/page.tsx`
+
+**Rule that must stay:**
+- When recalculating totals from items, if calories are missing/0 but protein/carbs/fat exist,
+  calories must be derived from macros (protein×4 + carbs×4 + fat×9) so entries never show 0 kcal
+  when macros are present.
+
+**Last stable fix (staging):**
+- Commit: `599b3d0b`
+- Date: 2026-01-23
 
 #### 3.4.3 Ingredient Card Integrity (Mar 2026 - Locked)
 
@@ -1023,7 +1110,7 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - Do **not** clear local diary snapshots unless the user explicitly asks; they are the last-resort safety net.
 - Support recovery routes must always require **identity verification** via a support ticket.
 - Restore banner is currently disabled via `SHOW_LOCAL_RESTORE_PROMPT = false` in `app/food/page.tsx`. Flip to `true` only if the owner asks to re-enable.
-- The "Fix favorites & credits" banner is disabled via `SHOW_FAVORITES_RESCUE_PROMPT = false` in `app/food/page.tsx`. Flip to `true` only if the owner asks.
+- The "Fix favorites & credits" banner is also disabled via `SHOW_FAVORITES_RESCUE_PROMPT = false` in `app/food/page.tsx`. Flip to `true` only if the owner asks.
 
 **If it breaks, restore in this order (do not improvise):**
 1) Confirm the server still has food log data for the date.

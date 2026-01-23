@@ -90,6 +90,28 @@ const toNumber = (v: any): number | null => {
 }
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
+const KCAL_TO_KJ = 4.184
+
+const formatEnergyValue = (value: number | null | undefined, unit: 'kcal' | 'kJ') => {
+  const base = typeof value === 'number' && Number.isFinite(value) ? value : 0
+  const display = unit === 'kJ' ? base * KCAL_TO_KJ : base
+  return Math.round(display)
+}
+
+const MEAL_TOTAL_CARDS: Array<{
+  key: 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'
+  label: string
+  unit?: string
+  gradient: string
+  accent: string
+}> = [
+  { key: 'calories', label: 'Calories', unit: '', gradient: 'from-orange-50 to-orange-100', accent: 'text-orange-500' },
+  { key: 'protein', label: 'Protein', unit: 'g', gradient: 'from-blue-50 to-blue-100', accent: 'text-blue-500' },
+  { key: 'carbs', label: 'Carbs', unit: 'g', gradient: 'from-green-50 to-green-100', accent: 'text-green-500' },
+  { key: 'fat', label: 'Fat', unit: 'g', gradient: 'from-purple-50 to-purple-100', accent: 'text-purple-500' },
+  { key: 'fiber', label: 'Fiber', unit: 'g', gradient: 'from-amber-50 to-amber-100', accent: 'text-amber-500' },
+  { key: 'sugar', label: 'Sugar', unit: 'g', gradient: 'from-pink-50 to-pink-100', accent: 'text-pink-500' },
+]
 
 const normalizeBrandToken = (value: string) =>
   value
@@ -233,14 +255,75 @@ const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, k
   return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false })
 }
 
+const GENERIC_FOOD_TOKENS = new Set([
+  'burger',
+  'cheese',
+  'cheeseburger',
+  'fries',
+  'nugget',
+  'nuggets',
+  'wrap',
+  'pizza',
+  'meal',
+  'combo',
+  'sandwich',
+  'salad',
+  'taco',
+  'burrito',
+  'coffee',
+  'latte',
+  'tea',
+  'drink',
+  'soda',
+  'cola',
+  'coke',
+  'shake',
+  'ice',
+  'cream',
+  'icecream',
+  'muffin',
+  'donut',
+  'doughnut',
+  'chicken',
+  'beef',
+  'fish',
+  'pork',
+  'bacon',
+  'sausage',
+  'egg',
+  'breakfast',
+])
+
+const getBrandMatchTokens = (searchQuery: string) =>
+  getSearchTokens(searchQuery)
+    .filter((token) => token.length >= 2)
+    .filter((token) => !GENERIC_FOOD_TOKENS.has(token))
+    .map((token) => normalizeBrandToken(token))
+    .filter(Boolean)
+
+const shouldShowBrandSuggestions = (searchQuery: string) => {
+  const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+  if (tokens.length === 0) return false
+  const brandTokens = getBrandMatchTokens(searchQuery)
+  if (brandTokens.length === 0) return false
+  return true
+}
+
+const getQuickPackagedQuery = (searchQuery: string) => {
+  const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+  if (tokens.length <= 1) return searchQuery
+  const brandTokens = getBrandMatchTokens(searchQuery)
+  if (brandTokens.length > 0) return brandTokens[0]
+  return tokens[0]
+}
+
 const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
-  const prefix = getSearchTokens(searchQuery)[0] || ''
-  if (prefix.length < 2) return []
-  const normalizedPrefix = normalizeSearchToken(prefix)
-  if (!normalizedPrefix) return []
+  const normalizedTokens = getBrandMatchTokens(searchQuery).filter(Boolean)
+  if (normalizedTokens.length === 0) return []
   const matches = names.filter((name) => {
-    const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
-    return tokens.some((token) => token.startsWith(normalizedPrefix))
+    const normalizedBrand = normalizeBrandToken(name)
+    if (!normalizedBrand) return false
+    return normalizedTokens.some((token) => normalizedBrand.startsWith(token))
   })
   return matches.slice(0, 8).map((name) => ({
     source: 'fatsecret',
@@ -299,6 +382,20 @@ const mergeBrandSuggestions = (items: NormalizedFoodItem[], suggestions: Normali
   suggestions.forEach(add)
   items.forEach(add)
   return merged
+}
+
+const buildSearchCacheKey = (kind: 'packaged' | 'single') => `builder:${kind}`
+
+const getCachedSearchResults = (
+  q: string,
+  kind: 'packaged' | 'single',
+  cache: Map<string, { items: NormalizedFoodItem[]; at: number }>,
+) => {
+  const cached = cache.get(buildSearchCacheKey(kind))
+  if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
+  const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+  const filtered = hasToken ? cached.items.filter((item) => itemMatchesSearchQuery(item, q, kind)) : cached.items
+  return filtered.slice(0, 20)
 }
 
 const triggerHaptic = (duration = 10) => {
@@ -537,6 +634,7 @@ export default function MealBuilderClient() {
   const mealNameEditedRef = useRef(false)
   const mealNameWasClearedOnFocusRef = useRef(false)
 
+  const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<'packaged' | 'single'>('packaged')
   const [searchLoading, setSearchLoading] = useState(false)
@@ -563,6 +661,7 @@ export default function MealBuilderClient() {
   const brandSearchDebounceRef = useRef<number | null>(null)
   const [brandSuggestions, setBrandSuggestions] = useState<NormalizedFoodItem[]>([])
   const brandSuggestionsRef = useRef<NormalizedFoodItem[]>([])
+  const searchCacheRef = useRef<Map<string, { items: NormalizedFoodItem[]; at: number }>>(new Map())
 
   const seqRef = useRef(0)
   const brandSeqRef = useRef(0)
@@ -619,6 +718,16 @@ export default function MealBuilderClient() {
   useEffect(() => {
     brandSuggestionsRef.current = brandSuggestions
   }, [brandSuggestions])
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      const key = 'helfi:food-search-warm'
+      if (sessionStorage.getItem(key) === '1') return
+      sessionStorage.setItem(key, '1')
+      fetch('/api/food-data?source=usda&kind=single&q=apple&limit=5&localOnly=1').catch(() => {})
+    } catch {}
+  }, [])
 
   useEffect(() => {
     // Cleanup blob preview URLs.
@@ -848,7 +957,10 @@ export default function MealBuilderClient() {
     return { title: name, showBrandSuffix: true }
   }
 
-  const fetchSearchItems = async (searchQuery: string, options?: { kindOverride?: 'packaged' | 'single'; sourceOverride?: string }) => {
+  const fetchSearchItems = async (
+    searchQuery: string,
+    options?: { kindOverride?: 'packaged' | 'single'; sourceOverride?: string; localOnly?: boolean },
+  ) => {
     const q = String(searchQuery || '').trim()
     if (!q) return []
     const kindToUse = options?.kindOverride || kind
@@ -859,6 +971,7 @@ export default function MealBuilderClient() {
       kind: kindToUse,
       limit: '20',
     })
+    if (options?.localOnly) params.set('localOnly', '1')
     const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
     if (!res.ok) return []
     const data = await res.json().catch(() => ({} as any))
@@ -866,7 +979,7 @@ export default function MealBuilderClient() {
   }
 
   const fetchBrandSuggestions = async (searchQuery: string) => {
-    const prefix = getSearchTokens(searchQuery)[0] || ''
+    const prefix = getBrandMatchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
     try {
       const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
@@ -883,6 +996,7 @@ export default function MealBuilderClient() {
   const runSearch = async (searchQuery?: string) => {
     const raw = String(searchQuery ?? query)
     const q = raw.trim()
+    const cacheKey = buildSearchCacheKey(kind)
     if (!q) {
       setError('Please type a food name to search.')
       return
@@ -894,6 +1008,23 @@ export default function MealBuilderClient() {
     const seq = ++seqRef.current
 
     try {
+      const allowBrandSuggestions = kind === 'packaged' && shouldShowBrandSuggestions(q)
+      if (kind === 'packaged') {
+        const quickQuery = getQuickPackagedQuery(q)
+        if (quickQuery.length >= 2) {
+          const quickItems = await fetchSearchItems(quickQuery, { kindOverride: 'packaged', sourceOverride: 'usda', localOnly: true })
+          if (seqRef.current === seq && quickItems.length > 0) {
+            const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+            const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : quickItems
+            const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current) : quickFiltered
+            if (seqRef.current === seq) {
+              setResults(quickMerged)
+              if (quickMerged.length > 0) searchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+            }
+          }
+        }
+      }
+
       let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
       const rawItems = nextItems
@@ -920,9 +1051,12 @@ export default function MealBuilderClient() {
       const merged =
         kind === 'single'
           ? mergeSearchSuggestions(filteredItems, q)
-          : mergeBrandSuggestions(filteredItems, brandSuggestionsRef.current)
+          : allowBrandSuggestions
+          ? mergeBrandSuggestions(filteredItems, brandSuggestionsRef.current)
+          : filteredItems
       if (seqRef.current !== seq) return
       setResults(merged)
+      if (merged.length > 0) searchCacheRef.current.set(cacheKey, { items: merged, at: Date.now() })
       return merged
     } catch (e: any) {
       if (seqRef.current !== seq) return
@@ -949,6 +1083,16 @@ export default function MealBuilderClient() {
       const instant = buildInstantSuggestions(q)
       if (instant.length > 0) setResults(instant)
     }
+    const cached = getCachedSearchResults(q, kind, searchCacheRef.current)
+    if (cached.length > 0) {
+      const mergedCached =
+        kind === 'single'
+          ? mergeSearchSuggestions(cached, q)
+          : shouldShowBrandSuggestions(q)
+          ? mergeBrandSuggestions(cached, brandSuggestionsRef.current)
+          : cached
+      setResults(mergedCached)
+    }
     setSearchLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {
       runSearch(q)
@@ -973,6 +1117,11 @@ export default function MealBuilderClient() {
       return
     }
     if (q.length < 2) {
+      brandSeqRef.current += 1
+      setBrandSuggestions([])
+      return
+    }
+    if (!shouldShowBrandSuggestions(q)) {
       brandSeqRef.current += 1
       setBrandSuggestions([])
       return
@@ -2020,19 +2169,6 @@ export default function MealBuilderClient() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 md:ml-auto md:items-end">
-            <button
-              type="button"
-              onClick={createMeal}
-              disabled={busy || favoriteSaving}
-              className="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
-            >
-              {editFavoriteId ? (favoriteSaving ? 'Saving…' : 'Save changes') : 'Save meal'}
-            </button>
-            <div className="text-sm text-gray-500 md:text-right md:max-w-[260px]">
-              Find this later in <span className="font-semibold">Food Diary → {CATEGORY_LABELS[category]}</span> (tap to edit) and <span className="font-semibold">Favorites → Custom</span>.
-            </div>
-          </div>
         </div>
       </div>
 
@@ -2142,6 +2278,7 @@ export default function MealBuilderClient() {
                       {data.map((item, idx) => {
                         const label = String(item?.label || 'Meal').trim() || 'Meal'
                         const calories = typeof item?.calories === 'number' && Number.isFinite(item.calories) ? item.calories : null
+                        const displayCalories = calories !== null ? formatEnergyValue(calories, energyUnit) : null
                         const tag = String(item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom'))
                         const serving = String(item?.serving || '1 serving')
                         const key = normalizeMealLabel(label).toLowerCase()
@@ -2167,12 +2304,16 @@ export default function MealBuilderClient() {
                             >
                               <div className="min-w-0">
                                 <div className="text-sm font-semibold text-gray-900 truncate">{label}</div>
-                                <div className="text-xs text-gray-500 truncate">
-                                  {serving} • {tag}
-                                </div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {serving} • {tag}
                               </div>
-                              {calories !== null && <div className="text-sm font-semibold text-gray-900">{calories} kcal</div>}
-                            </button>
+                            </div>
+                            {displayCalories !== null && (
+                              <div className="text-sm font-semibold text-gray-900">
+                                {displayCalories} {energyUnit}
+                              </div>
+                            )}
+                          </button>
 
                             {favoritesActiveTab === 'all' && (
                               <div className="flex items-center pr-2">
@@ -2704,7 +2845,7 @@ export default function MealBuilderClient() {
 
                         <div className="flex flex-wrap gap-2">
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{Math.round(totals.calories)}</span> kcal
+                            <span className="font-semibold text-gray-900">{formatEnergyValue(totals.calories, energyUnit)}</span> {energyUnit}
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
                             <span className="font-semibold text-gray-900">{round3(totals.protein)}</span> g protein
@@ -2744,32 +2885,58 @@ export default function MealBuilderClient() {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
-          <div className="text-sm font-semibold text-gray-900 mb-2">Meal totals</div>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Calories</span>
-              <span className="font-semibold text-gray-900">{Math.round(mealTotals.calories)} kcal</span>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold text-gray-900">Meal totals</div>
+            <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setEnergyUnit('kcal')}
+                className={`px-2 py-0.5 rounded-full ${
+                  energyUnit === 'kcal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                kcal
+              </button>
+              <button
+                type="button"
+                onClick={() => setEnergyUnit('kJ')}
+                className={`px-2 py-0.5 rounded-full ${
+                  energyUnit === 'kJ' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                kJ
+              </button>
             </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Protein</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.protein)} g</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Carbs</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.carbs)} g</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Fat</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.fat)} g</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Fibre</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.fiber)} g</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="text-gray-700">Sugar</span>
-              <span className="font-semibold text-gray-900">{round3(mealTotals.sugar)} g</span>
-            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {MEAL_TOTAL_CARDS.map((card) => {
+              const value =
+                card.key === 'calories'
+                  ? formatEnergyValue(mealTotals.calories, energyUnit)
+                  : card.key === 'protein'
+                  ? round3(mealTotals.protein)
+                  : card.key === 'carbs'
+                  ? round3(mealTotals.carbs)
+                  : card.key === 'fat'
+                  ? round3(mealTotals.fat)
+                  : card.key === 'fiber'
+                  ? round3(mealTotals.fiber)
+                  : round3(mealTotals.sugar)
+              const label = card.key === 'calories' ? (energyUnit === 'kJ' ? 'Kilojoules' : 'Calories') : card.label
+              const unit = card.key === 'calories' ? energyUnit : card.unit || ''
+              return (
+                <div
+                  key={card.key}
+                  className={`rounded-xl p-3 bg-gradient-to-br ${card.gradient} border border-gray-100`}
+                >
+                  <div className={`text-lg font-bold ${card.accent}`}>
+                    {value}
+                    {unit ? ` ${unit}` : ''}
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{label}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -2779,7 +2946,7 @@ export default function MealBuilderClient() {
           disabled={busy}
           className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold rounded-2xl"
         >
-          Save meal
+          {savingMeal ? 'Saving…' : editFavoriteId || sourceLogId ? 'Update' : 'Save meal'}
         </button>
 
         <div className="pb-10" />

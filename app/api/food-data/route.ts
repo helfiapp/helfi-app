@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const source = (searchParams.get('source') || '').toLowerCase()
     const query = (searchParams.get('q') || '').trim()
     const kind = (searchParams.get('kind') || '').toLowerCase()
+    const localOnly = searchParams.get('localOnly') === '1'
     const limitRaw = searchParams.get('limit')
     const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : NaN
     const limit = Number.isFinite(limitParsed) ? Math.min(Math.max(limitParsed, 1), 50) : 20
@@ -212,9 +213,11 @@ export async function GET(request: NextRequest) {
       if (resolvedKind === 'packaged') {
         return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'], mode: 'prefix' })
       }
-      const foundation = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] })
-      const legacy = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_sr_legacy'] })
-      const branded = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] })
+      const [foundation, legacy, branded] = await Promise.all([
+        searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] }),
+        searchLocalFoods(value, { pageSize: limit, sources: ['usda_sr_legacy'] }),
+        searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] }),
+      ])
 
       const combined = [...foundation, ...legacy, ...branded]
       const seen = new Set<string>()
@@ -307,6 +310,36 @@ export async function GET(request: NextRequest) {
       ]
       const isMealQuery = queryTokensNormalized.some((token) => mealKeywords.includes(token))
 
+      const restaurantKeywords = [
+        'mcdonald',
+        'mcdonalds',
+        'burger king',
+        'kfc',
+        'subway',
+        'domino',
+        'pizza hut',
+        'starbucks',
+        'dunkin',
+        'taco bell',
+        'wendy',
+        'popeyes',
+        'chipotle',
+        'panera',
+        'chick fil',
+        'chick-fil',
+        'five guys',
+        'in n out',
+        'innout',
+        'jack in the box',
+        'carls jr',
+        'hardees',
+        'shake shack',
+        'arby',
+        'dairy queen',
+        'white castle',
+      ]
+      const isRestaurantQuery = restaurantKeywords.some((keyword) => queryNorm.includes(keyword))
+
       const isLikelyFullMeal = (it: any) => {
         const servingText = String(it?.serving_size || '').toLowerCase()
         const grams = parseServingGrams(it?.serving_size)
@@ -355,32 +388,6 @@ export async function GET(request: NextRequest) {
         return score
       }
 
-      const fastFoodTokens = [
-        'mcdonald',
-        'kfc',
-        'burger king',
-        'subway',
-        'domino',
-        'pizza hut',
-        'starbucks',
-        'dunkin',
-        'taco bell',
-        'wendy',
-        'popeyes',
-        'chipotle',
-        'panera',
-        'chick fil',
-        'five guys',
-        'in n out',
-        'jack in the box',
-        'carls jr',
-        'hardees',
-        'shake shack',
-        'arby',
-        'dairy queen',
-      ]
-      const isFastFoodQuery = queryTokensNormalized.some((token) => fastFoodTokens.some((k) => k.includes(token) || token.includes(k)))
-
       const localItems = resolvedKind === 'single' ? await searchLocalPreferred(query, resolvedKind) : []
       if (resolvedKind === 'single' && localItems.length > 0) {
         items = [...localItems].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
@@ -404,51 +411,44 @@ export async function GET(request: NextRequest) {
           return Array.from(byNameBrand.values())
         }
 
-        const fetchExternalPool = async () => {
-          const off = await searchOpenFoodFactsByQuery(query, { pageSize: perSource })
-          if (off.length > 0) return off
-          return await searchFatSecretFoods(query, { pageSize: perSource })
+        const buildCompactFoodQuery = (value: string) => {
+          const normalized = normalizeForMatch(value)
+          if (!normalized) return null
+          const compacted = normalized.replace(/\bcheese burger\b/g, 'cheeseburger')
+          return compacted !== normalized ? compacted : null
         }
 
-        if (!isFastFoodQuery) {
-          const localPackaged = await searchLocalPreferred(query, 'packaged')
-          if (localPackaged.length > 0) {
-            items = [...localPackaged].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
-            actualSource = 'auto'
-          } else {
-            const pooled = dedupe(await fetchExternalPool())
-
-            if (resolvedKind === 'packaged' && isMealQuery) {
-              const hasFullMeal = pooled.some((it) => isLikelyFullMeal(it))
-              if (!hasFullMeal) {
-                const usdaBoost = await searchUsdaFoods(query, { pageSize: perSource, dataType: 'branded' })
-                pooled.push(...usdaBoost)
-              }
-            }
-
-            items = pooled.slice(0, limit)
-            actualSource = 'auto'
-
-            if (items.length === 0) {
-              // Fallback: if packaged sources return nothing, try USDA so users still get results.
-              items = await searchUsdaFoods(query, { pageSize: limit, dataType: 'all' })
-            }
+        const fetchExternalPool = async () => {
+          const fetchForQuery = async (value: string) => {
+            const [off, fat] = await Promise.all([
+              searchOpenFoodFactsByQuery(value, { pageSize: perSource }),
+              searchFatSecretFoods(value, { pageSize: perSource }),
+            ])
+            return dedupe([...off, ...fat])
           }
-        } else {
-          const pooled = dedupe(await fetchExternalPool())
+
+          const primary = await fetchForQuery(query)
+          if (primary.length > 0) return primary
+          const compactQuery = buildCompactFoodQuery(query)
+          if (!compactQuery) return primary
+          return await fetchForQuery(compactQuery)
+        }
+
+        if (isRestaurantQuery) {
+          const pooled = await fetchExternalPool()
           items = pooled.slice(0, limit)
           actualSource = 'auto'
-
-          if (items.length === 0) {
-            const localPackaged = await searchLocalPreferred(query, 'packaged')
-            if (localPackaged.length > 0) {
-              items = [...localPackaged].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
-              actualSource = 'auto'
-            } else {
-              items = await searchUsdaFoods(query, { pageSize: limit, dataType: 'all' })
-              actualSource = 'usda'
-            }
-          }
+        } else {
+          const localPackaged = await searchLocalPreferred(query, 'packaged')
+          const localPackagedFiltered = localPackaged.filter((item) => {
+            const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+            return nameMatchesSearchQuery(combined || item?.name || '', query)
+          })
+          const minLocalOnly = 5
+          const pooled = localPackagedFiltered.length < minLocalOnly ? await fetchExternalPool() : []
+          const combined = dedupe([...localPackagedFiltered, ...pooled])
+          items = combined.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+          actualSource = 'auto'
         }
       }
     } else if (source === 'openfoodfacts') {
@@ -458,6 +458,9 @@ export async function GET(request: NextRequest) {
       const localItems = await searchLocalPreferred(query, resolvedKind)
       if (localItems.length > 0) {
         items = localItems
+        actualSource = 'usda'
+      } else if (localOnly) {
+        items = []
         actualSource = 'usda'
       } else {
         const dataType = resolvedKind === 'packaged' ? 'all' : 'generic'

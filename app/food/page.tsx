@@ -1017,7 +1017,7 @@ const formatEnergyNumber = (value: number | null | undefined, unit: 'kcal' | 'kJ
   return `${rounded}`
 }
 
-const formatServingSizeDisplay = (label: string, item: any) => {
+const formatServingSizeDisplay = (label: string, item: any, unit: 'kcal' | 'kJ' = 'kcal') => {
   const base = label && label.trim().length > 0 ? label.trim() : 'Not specified'
   if (item?.labelNeedsReview) return base
   const macros: string[] = []
@@ -1025,7 +1025,10 @@ const formatServingSizeDisplay = (label: string, item: any) => {
   const protein = Number(item?.protein_g)
   const carbs = Number(item?.carbs_g)
   const fat = Number(item?.fat_g)
-  if (Number.isFinite(kcal) && kcal > 0) macros.push(`${Math.round(kcal)} kcal`)
+  if (Number.isFinite(kcal) && kcal > 0) {
+    const energyValue = unit === 'kJ' ? Math.round(kcal * KCAL_TO_KJ) : Math.round(kcal)
+    macros.push(`${energyValue} ${unit}`)
+  }
   if (Number.isFinite(protein) && protein > 0) macros.push(`${Math.round(protein * 10) / 10}g protein`)
   if (Number.isFinite(carbs) && carbs > 0) macros.push(`${Math.round(carbs * 10) / 10}g carbs`)
   if (Number.isFinite(fat) && fat > 0) macros.push(`${Math.round(fat * 10) / 10}g fat`)
@@ -2379,6 +2382,7 @@ export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const router = useRouter()
+  const [debugMode, setDebugMode] = useState(false)
   const isAnalysisRoute = pathname === '/food/analysis'
   const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
   const { userData, profileImage, updateUserData, refreshData } = useUserData()
@@ -2414,6 +2418,33 @@ export default function FoodDiary() {
     const m = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
     return `${y}-${m}-${day}`
+  }
+  const extractLogDates = (logs: any[]) => {
+    const set = new Set<string>()
+    if (!Array.isArray(logs)) return []
+    logs.forEach((log) => {
+      const local =
+        typeof log?.localDate === 'string' && log.localDate.length >= 8 ? String(log.localDate).slice(0, 10) : ''
+      if (local) {
+        set.add(local)
+        return
+      }
+      const createdAt = log?.createdAt
+      if (!createdAt) return
+      const ms = new Date(createdAt).getTime()
+      if (!Number.isFinite(ms)) return
+      set.add(formatDateFromMs(ms))
+    })
+    return Array.from(set).sort()
+  }
+  const buildLogSample = (logs: any[]) => {
+    if (!Array.isArray(logs)) return []
+    return logs.slice(0, 3).map((log) => {
+      const id = log?.id ? String(log.id) : 'no-id'
+      const label = String(log?.name || log?.description || '').trim()
+      const short = label.length > 18 ? `${label.slice(0, 18)}…` : label
+      return `${id}:${short || 'untitled'}`
+    })
   }
   const extractEntryTimestampMs = (entry: any) => {
     const ts =
@@ -2638,7 +2669,7 @@ export default function FoodDiary() {
     const explicitLocalDate =
       typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
     const derivedDate = deriveDateFromEntryTimestamp(entry)
-    const localDate = derivedDate || explicitLocalDate || fallbackDate
+    const localDate = explicitLocalDate || derivedDate || fallbackDate
     const description =
       typeof entry?.description === 'string'
         ? entry.description.slice(0, 2000)
@@ -2766,18 +2797,9 @@ export default function FoodDiary() {
     if (!entry) return false
     const localDate =
       typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
-    const derivedDate = deriveDateFromEntryTimestamp(entry)
-
-    if (derivedDate) {
-      // If we have a trustworthy timestamp date and it conflicts with localDate, trust the timestamp
-      // to prevent cached prior-day rows leaking into a new day.
-      if (localDate && localDate !== derivedDate) {
-        return derivedDate === targetDate
-      }
-      if (derivedDate === targetDate) return true
-    }
-
     if (localDate) return localDate === targetDate
+    const derivedDate = deriveDateFromEntryTimestamp(entry)
+    if (derivedDate) return derivedDate === targetDate
     return false
   }
   const filterEntriesForDate = (entries: any[] | null | undefined, targetDate: string) =>
@@ -2932,6 +2954,7 @@ export default function FoodDiary() {
   const officialSearchDebounceRef = useRef<any>(null)
   const officialSearchInputRef = useRef<HTMLInputElement | null>(null)
   const officialSearchPressRef = useRef(0)
+  const officialSearchCacheRef = useRef<Map<string, { items: any[]; at: number }>>(new Map())
   const analysisSequenceRef = useRef(0)
   const analysisHealthCheckKeyRef = useRef<string | null>(null)
   const pendingAnalysisHealthCheckRef = useRef<{
@@ -2977,11 +3000,30 @@ export default function FoodDiary() {
     if (officialSource === 'single') {
       const instant = buildSingleFoodSuggestions(q)
       if (instant.length > 0) setOfficialResults(instant)
+      const cached = getCachedOfficialResults(q, officialSource, officialSearchCacheRef.current)
+      if (cached.length > 0) setOfficialResults(mergeSearchSuggestions(cached, q))
+      return
+    }
+    const cached = getCachedOfficialResults(q, officialSource, officialSearchCacheRef.current)
+    const allowBrands = shouldShowBrandSuggestions(q)
+    if (!allowBrands) {
+      if (cached.length > 0) setOfficialResults(cached)
       return
     }
     const immediateBrands = buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, q)
     if (immediateBrands.length > 0) setOfficialResults(immediateBrands)
+    if (cached.length > 0) setOfficialResults(mergeBrandSuggestions(cached, immediateBrands))
   }, [officialSearchQuery, officialSource])
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      const key = 'helfi:food-search-warm'
+      if (sessionStorage.getItem(key) === '1') return
+      sessionStorage.setItem(key, '1')
+      fetch('/api/food-data?source=usda&kind=single&q=apple&limit=5&localOnly=1').catch(() => {})
+    } catch {}
+  }, [])
   
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
@@ -3371,6 +3413,15 @@ export default function FoodDiary() {
     return null
   })
   const [historyFoodsDate, setHistoryFoodsDate] = useState<string | null>(null)
+  const [lastDiaryFetchInfo, setLastDiaryFetchInfo] = useState<{
+    date: string
+    from: 'history' | 'today'
+    ok: boolean
+    logsCount: number | null
+    logDates: string[]
+    logSample: string[]
+    receivedAt: number
+  } | null>(null)
   const [waterEntries, setWaterEntries] = useState<WaterLogEntry[]>([])
   const [waterLoading, setWaterLoading] = useState(false)
   const [waterDeletingId, setWaterDeletingId] = useState<string | null>(null)
@@ -3607,6 +3658,14 @@ export default function FoodDiary() {
     window.addEventListener('resize', updateIsMobile)
     return () => window.removeEventListener('resize', updateIsMobile)
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      setDebugMode(params.get('debug') === '1')
+    } catch {}
+  }, [pathname])
 
   useEffect(() => {
     setSummarySlideIndex(0)
@@ -5450,11 +5509,53 @@ export default function FoodDiary() {
     return Object.values(totals).some((value) => Number.isFinite(Number(value)) && Number(value) > 0)
   }
 
+  const normalizeSuspiciousKjItems = (items: any[] | null | undefined) => {
+    if (!Array.isArray(items) || items.length === 0) return { items, changed: false }
+    let changed = false
+    const nextItems = items.map((item) => {
+      if (!item || typeof item !== 'object') return item
+      if ((item as any).__energyUnitFixed === 'kJ') return item
+      const calories = Number((item as any)?.calories)
+      if (!Number.isFinite(calories) || calories <= 0) return item
+      const hasMacro =
+        Number((item as any)?.protein_g) > 0 ||
+        Number((item as any)?.carbs_g) > 0 ||
+        Number((item as any)?.fat_g) > 0 ||
+        Number((item as any)?.fiber_g) > 0 ||
+        Number((item as any)?.sugar_g) > 0
+      if (hasMacro) return item
+      const servingLabel = String((item as any)?.serving_size || '')
+      const isDrink = isLikelyLiquidFood(String((item as any)?.name || ''), servingLabel) || /\bml\b/i.test(servingLabel)
+      if (!isDrink) return item
+      if (calories > 120) return item
+      const converted = Math.round((calories / KCAL_TO_KJ) * 1000) / 1000
+      if (!Number.isFinite(converted) || converted <= 0 || converted >= calories) return item
+      changed = true
+      return { ...item, calories: converted, __energyUnitFixed: 'kJ' }
+    })
+    return { items: nextItems, changed }
+  }
+
+  const mergeNutritionTotals = (base: any, totals: NutritionTotals | null) => {
+    if (!totals) return base
+    if (!base || typeof base !== 'object') return totals
+    return {
+      ...(base as any),
+      calories: totals.calories,
+      protein: totals.protein,
+      carbs: totals.carbs,
+      fat: totals.fat,
+      fiber: totals.fiber,
+      sugar: totals.sugar,
+    }
+  }
+
   const getEntryTotals = (entry: any) => {
     try {
       const portionScale = getEntryPortionScale(entry)
       if (Array.isArray(entry?.items) && entry.items.length > 0) {
-        const recalculated = recalculateNutritionFromItems(entry.items)
+        const normalized = normalizeSuspiciousKjItems(entry.items)
+        const recalculated = recalculateNutritionFromItems(normalized.items || [])
         if (recalculated) {
           return portionScale ? applyPortionScaleToTotals(recalculated, portionScale) : recalculated
         }
@@ -5467,7 +5568,16 @@ export default function FoodDiary() {
       const pickedTotals =
         storedTotals && hasNonZeroTotals(storedTotals) ? storedTotals : parsedTotals || storedTotals
       if (pickedTotals) {
-        return portionScale ? applyPortionScaleToTotals(pickedTotals, portionScale) : pickedTotals
+        const scaled = portionScale ? applyPortionScaleToTotals(pickedTotals, portionScale) : pickedTotals
+        const protein = Math.max(0, Number((scaled as any)?.protein) || 0)
+        const carbs = Math.max(0, Number((scaled as any)?.carbs) || 0)
+        const fat = Math.max(0, Number((scaled as any)?.fat) || 0)
+        const macroEnergy = protein * 4 + carbs * 4 + fat * 9
+        const calories = Number((scaled as any)?.calories)
+        if ((!Number.isFinite(calories) || calories <= 0) && macroEnergy > 0) {
+          return { ...(scaled as any), calories: Math.round(macroEnergy) }
+        }
+        return scaled
       }
       return {
         calories: 0,
@@ -5653,7 +5763,7 @@ export default function FoodDiary() {
       }
       resolved = match
     }
-    const newItem = {
+    const newItem: any = {
       name: resolved.name || 'Unknown food',
       brand: resolved.brand ?? null,
       serving_size: resolved.serving_size || '',
@@ -5665,6 +5775,9 @@ export default function FoodDiary() {
       fiber_g: resolved.fiber_g ?? null,
       sugar_g: resolved.sugar_g ?? null,
     }
+    if (resolved?.source) newItem.dbSource = resolved.source
+    if (resolved?.id) newItem.dbId = resolved.id
+    newItem.dbLocked = true
 
     // If the modal was opened from the Today’s Meals (+) dropdown, add this as a new diary entry
     // in that meal category instead of adding to the analysis ingredient cards.
@@ -6112,6 +6225,68 @@ export default function FoodDiary() {
     return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false })
   }
 
+  const GENERIC_FOOD_TOKENS = new Set([
+    'burger',
+    'cheese',
+    'cheeseburger',
+    'fries',
+    'nugget',
+    'nuggets',
+    'wrap',
+    'pizza',
+    'meal',
+    'combo',
+    'sandwich',
+    'salad',
+    'taco',
+    'burrito',
+    'coffee',
+    'latte',
+    'tea',
+    'drink',
+    'soda',
+    'cola',
+    'coke',
+    'shake',
+    'ice',
+    'cream',
+    'icecream',
+    'muffin',
+    'donut',
+    'doughnut',
+    'chicken',
+    'beef',
+    'fish',
+    'pork',
+    'bacon',
+    'sausage',
+    'egg',
+    'breakfast',
+  ])
+
+  const getBrandMatchTokens = (searchQuery: string) =>
+    getSearchTokens(searchQuery)
+      .filter((token) => token.length >= 2)
+      .filter((token) => !GENERIC_FOOD_TOKENS.has(token))
+      .map((token) => normalizeBrandToken(token))
+      .filter(Boolean)
+
+  const shouldShowBrandSuggestions = (searchQuery: string) => {
+    const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+    if (tokens.length === 0) return false
+    const brandTokens = getBrandMatchTokens(searchQuery)
+    if (brandTokens.length === 0) return false
+    return true
+  }
+
+  const getQuickPackagedQuery = (searchQuery: string) => {
+    const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+    if (tokens.length <= 1) return searchQuery
+    const brandTokens = getBrandMatchTokens(searchQuery)
+    if (brandTokens.length > 0) return brandTokens[0]
+    return tokens[0]
+  }
+
   const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
     'McDonald\'s',
     'KFC',
@@ -6185,13 +6360,12 @@ export default function FoodDiary() {
   ]
 
   const buildBrandSuggestions = (names: string[], searchQuery: string) => {
-    const prefix = getSearchTokens(searchQuery)[0] || ''
-    if (prefix.length < 2) return []
-    const normalizedPrefix = normalizeSearchToken(prefix)
-    if (!normalizedPrefix) return []
+    const normalizedTokens = getBrandMatchTokens(searchQuery).filter(Boolean)
+    if (normalizedTokens.length === 0) return []
     const matches = names.filter((name) => {
-      const tokens = normalizeSearchToken(name).split(' ').filter(Boolean)
-      return tokens.some((token) => token.startsWith(normalizedPrefix))
+      const normalizedBrand = normalizeBrandToken(name)
+      if (!normalizedBrand) return false
+      return normalizedTokens.some((token) => normalizedBrand.startsWith(token))
     })
     return matches.slice(0, 8).map((name) => ({
       source: 'fatsecret',
@@ -6250,6 +6424,20 @@ export default function FoodDiary() {
     suggestions.forEach(add)
     items.forEach(add)
     return merged
+  }
+
+  const buildOfficialSearchCacheKey = (mode: 'packaged' | 'single') => `official:${mode}`
+
+  const getCachedOfficialResults = (
+    q: string,
+    mode: 'packaged' | 'single',
+    cache: Map<string, { items: any[]; at: number }>,
+  ) => {
+    const cached = cache.get(buildOfficialSearchCacheKey(mode))
+    if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
+    const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+    const filtered = hasToken ? cached.items.filter((item: any) => itemMatchesSearchQuery(item, q, mode)) : cached.items
+    return filtered.slice(0, 20)
   }
 
   const buildOfficialSearchDisplay = (item: any, searchQuery: string) => {
@@ -6314,7 +6502,7 @@ export default function FoodDiary() {
   }
 
   const fetchOfficialBrandSuggestions = async (searchQuery: string) => {
-    const prefix = getSearchTokens(searchQuery)[0] || ''
+    const prefix = getBrandMatchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
     try {
       const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
@@ -6330,6 +6518,7 @@ export default function FoodDiary() {
 
   const handleOfficialSearch = async (mode: 'packaged' | 'single', queryOverride?: string) => {
     const query = (queryOverride ?? officialSearchQuery).trim()
+    const cacheKey = buildOfficialSearchCacheKey(mode)
     if (!query) {
       setOfficialError('Please enter a product name or barcode to search.')
       return
@@ -6347,10 +6536,13 @@ export default function FoodDiary() {
     setOfficialLoading(true)
     setOfficialSource(mode)
     const hasToken = getSearchTokens(query).some((token) => token.length >= 2)
-    if (mode === 'packaged' && hasToken) {
-      const immediateBrands = buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, query)
-      if (immediateBrands.length > 0) {
+    const allowBrandSuggestions = mode === 'packaged' && shouldShowBrandSuggestions(query)
+    const immediateBrands = allowBrandSuggestions ? buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, query) : []
+    if (mode === 'packaged') {
+      if (allowBrandSuggestions && immediateBrands.length > 0) {
         setOfficialResults(immediateBrands)
+      } else if (!allowBrandSuggestions) {
+        setOfficialResults([])
       }
     } else if (mode === 'single' && hasToken) {
       const instant = buildSingleFoodSuggestions(query)
@@ -6380,14 +6572,18 @@ export default function FoodDiary() {
       }
 
       if (mode === 'packaged') {
-        const quick = await fetchItems(query, { sourceParam: 'usda', localOnly: true })
-        if (quick.res.ok && officialSearchSeqRef.current === seq) {
-          const quickData = await quick.res.json().catch(() => ({} as any))
-          const quickItems = Array.isArray(quickData?.items) ? quickData.items : []
-          const quickFiltered = hasToken ? quickItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : quickItems
-          if (quickFiltered.length > 0 && officialSearchSeqRef.current === seq) {
-            const immediateBrands = hasToken ? buildBrandSuggestions(COMMON_PACKAGED_BRAND_SUGGESTIONS, query) : []
-            setOfficialResults(mergeBrandSuggestions(quickFiltered, immediateBrands))
+        const quickQuery = getQuickPackagedQuery(query)
+        if (quickQuery.length >= 2) {
+          const quick = await fetchItems(quickQuery, { sourceParam: 'usda', localOnly: true })
+          if (quick.res.ok && officialSearchSeqRef.current === seq) {
+            const quickData = await quick.res.json().catch(() => ({} as any))
+            const quickItems = Array.isArray(quickData?.items) ? quickData.items : []
+            const quickFiltered = hasToken ? quickItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : quickItems
+            if (quickFiltered.length > 0 && officialSearchSeqRef.current === seq) {
+              const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, immediateBrands) : quickFiltered
+              setOfficialResults(quickMerged)
+              if (quickMerged.length > 0) officialSearchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+            }
           }
         }
       }
@@ -6447,9 +6643,15 @@ export default function FoodDiary() {
       const finalItems = mode === 'single' && filteredItems.length === 0 && baseItems.length > 0 ? baseItems : filteredItems
 
       const merged = finalItems
-      const finalResults = mode === 'single' ? mergeSearchSuggestions(merged, query) : merged
+      const finalResults =
+        mode === 'single'
+          ? mergeSearchSuggestions(merged, query)
+          : allowBrandSuggestions
+          ? mergeBrandSuggestions(merged, immediateBrands)
+          : merged
       if (officialSearchSeqRef.current !== seq) return
       setOfficialResults(finalResults)
+      if (finalResults.length > 0) officialSearchCacheRef.current.set(cacheKey, { items: finalResults, at: Date.now() })
       setOfficialResultsSource(data?.source || 'auto')
       setOfficialLastRequest((prev) =>
         prev
@@ -6462,7 +6664,7 @@ export default function FoodDiary() {
           : prev,
       )
 
-      if (mode === 'packaged' && hasToken) {
+      if (allowBrandSuggestions) {
         void fetchOfficialBrandSuggestions(query).then((brandMatches) => {
           if (officialSearchSeqRef.current !== seq) return
           if (!Array.isArray(brandMatches) || brandMatches.length === 0) return
@@ -7250,7 +7452,7 @@ const applyStructuredItems = (
     const explicitLocalDate =
       typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
     const derivedDate = deriveDateFromEntryTimestamp(entry)
-    const localDate = derivedDate || explicitLocalDate || fallbackDate
+    const localDate = explicitLocalDate || derivedDate || fallbackDate
     const createdAtIso = alignTimestampToLocalDate(rawCreatedAtIso, localDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     return {
@@ -7292,7 +7494,8 @@ const applyStructuredItems = (
   }
 
   const localSnapshotEntriesForSelectedDate = useMemo(() => {
-    const raw = persistentDiarySnapshot?.byDate?.[selectedDate]?.entries
+    const snapshot = readPersistentDiarySnapshot()
+    const raw = snapshot?.byDate?.[selectedDate]?.entries
     if (!Array.isArray(raw) || raw.length === 0) return []
     const normalized = dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
     return filterEntriesForDate(normalized, selectedDate)
@@ -7337,12 +7540,15 @@ const applyStructuredItems = (
     return Array.from(set).sort()
   }, [sourceEntries])
   const localSnapshotDates = useMemo(() => {
-    const byDate = persistentDiarySnapshot?.byDate || {}
+    const snapshot = readPersistentDiarySnapshot()
+    const byDate = snapshot?.byDate || {}
     return Object.keys(byDate).filter((date) => {
       const entries = byDate?.[date]?.entries
-      return Array.isArray(entries) && entries.length > 0
+      if (!Array.isArray(entries) || entries.length === 0) return false
+      const normalized = dedupeEntries(normalizeDiaryList(entries, date), { fallbackDate: date })
+      return filterEntriesForDate(normalized, date).length > 0
     })
-  }, [persistentDiarySnapshot])
+  }, [persistentDiarySnapshotVersion])
   const latestLocalSnapshotDate = useMemo(() => {
     if (localSnapshotDates.length === 0) return null
     const sorted = [...localSnapshotDates].sort()
@@ -7573,13 +7779,16 @@ const applyStructuredItems = (
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
+      const historyForDate = Array.isArray(historyFoods)
+        ? filterEntriesForDate(historyFoods, selectedDate)
+        : []
       const payload: WarmDiaryState = {
         selectedDate,
         todaysFoods,
         expandedCategories: collapseEmptyCategories(expandedCategories, sourceEntries).map,
       }
-      if (Array.isArray(historyFoods)) {
-        payload.historyByDate = { [selectedDate]: historyFoods }
+      if (historyForDate.length > 0) {
+        payload.historyByDate = { [selectedDate]: historyForDate }
       }
       sessionStorage.setItem('foodDiary:warmState', JSON.stringify(payload))
     } catch (err) {
@@ -7588,28 +7797,19 @@ const applyStructuredItems = (
   }, [selectedDate, todaysFoods, historyFoods, expandedCategories])
 
   // Persist a durable snapshot per date to avoid reload flicker across navigations.
-  // Guard: do not overwrite a saved day with empty data until we know that day is loaded.
+  // SEVERE GUARD RAIL: Do not let this write loop depend on snapshot state.
+  // It can block left menu clicks on desktop if it keeps re-running.
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
+      if (!isViewingToday && !Array.isArray(historyFoods)) return
       const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
-      const historyReady =
-        !isViewingToday &&
-        historyFoodsDate === selectedDate &&
-        Array.isArray(historyFoods)
-      const todayReady = isViewingToday && isDiaryHydrated(selectedDate) && foodDiaryLoaded
-      const existingEntries = snapshot?.byDate?.[selectedDate]?.entries
-      const fallbackEntries = Array.isArray(existingEntries) ? existingEntries : []
-      const baseEntries = isViewingToday
+      const rawEntries = isViewingToday
         ? todaysFoodsForSelectedDate
-        : historyReady
-        ? historyFoods
-        : fallbackEntries
-      const normalized = dedupeEntries(
-        normalizeDiaryList(baseEntries || [], selectedDate),
-        { fallbackDate: selectedDate },
-      )
-      if (!historyReady && !todayReady && normalized.length === 0) return
+        : filterEntriesForDate(historyFoods, selectedDate)
+      if (!isViewingToday && isLoadingHistory && rawEntries.length === 0) return
+      const sourceEntriesForDate = normalizeDiaryList(rawEntries, selectedDate)
+      const normalized = dedupeEntries(sourceEntriesForDate, { fallbackDate: selectedDate })
       snapshot.byDate[selectedDate] = {
         entries: normalized,
         expandedCategories: collapseEmptyCategories(expandedCategories, normalized).map,
@@ -7620,16 +7820,7 @@ const applyStructuredItems = (
     } catch (err) {
       console.warn('Could not persist diary snapshot', err)
     }
-  }, [
-    selectedDate,
-    isViewingToday,
-    todaysFoods,
-    historyFoods,
-    historyFoodsDate,
-    expandedCategories,
-    foodDiaryLoaded,
-    refreshPersistentDiarySnapshot,
-  ])
+  }, [selectedDate, isViewingToday, todaysFoods, historyFoods, expandedCategories, isLoadingHistory, refreshPersistentDiarySnapshot])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -8135,7 +8326,7 @@ const applyStructuredItems = (
         const res = await fetch(`${apiUrl}&t=${Date.now()}`, { cache: 'no-store' });
         if (requestId !== historyLoadSeqRef.current) return
         console.log(`📡 API response status: ${res.status}, ok: ${res.ok}`);
-        if (res.ok) {
+          if (res.ok) {
           const json = await res.json()
           console.log(`📦 API response data:`, { 
             success: json.success, 
@@ -8148,6 +8339,15 @@ const applyStructuredItems = (
             })) : []
           });
           const logs = Array.isArray(json.logs) ? json.logs : []
+          setLastDiaryFetchInfo({
+            date: selectedDate,
+            from: 'history',
+            ok: true,
+            logsCount: logs.length,
+            logDates: extractLogDates(logs),
+            logSample: buildLogSample(logs),
+            receivedAt: Date.now(),
+          })
           if (logs.length === 0) {
             if (hasCachedHistory) {
               setFoodDiaryLoaded(true);
@@ -8166,7 +8366,7 @@ const applyStructuredItems = (
                   setFoodDiaryLoaded(true);
                   return;
                 }
-                const retryMapped = mapLogsToEntries(retryLogs, selectedDate)
+                const retryMapped = mapLogsToEntries(retryLogs, selectedDate, { preferCreatedAtDate: true })
                 const retryDeduped = dedupeEntries(retryMapped, { fallbackDate: selectedDate })
                 console.log(`✅ Setting historyFoods with ${retryDeduped.length} entries for date ${selectedDate}`);
                 setHistoryFoods(retryDeduped)
@@ -8178,7 +8378,7 @@ const applyStructuredItems = (
             await loadLastKnownEntryDate()
           }
 
-          const mapped = mapLogsToEntries(logs, selectedDate)
+          const mapped = mapLogsToEntries(logs, selectedDate, { preferCreatedAtDate: true })
           // Guard rail: route all loads through dedupeEntries + normalization.
           const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate })
 
@@ -8189,6 +8389,15 @@ const applyStructuredItems = (
           setFoodDiaryLoaded(true);
         } else {
           console.log(`⚠️ API call failed or returned no entries for date ${selectedDate}, status: ${res.status}`);
+          setLastDiaryFetchInfo({
+            date: selectedDate,
+            from: 'history',
+            ok: false,
+            logsCount: null,
+            logDates: [],
+            logSample: [],
+            receivedAt: Date.now(),
+          })
           if (!hasCachedHistory) {
             setHistoryFoods([]);
             setHistoryFoodsDate(selectedDate)
@@ -8305,6 +8514,17 @@ const applyStructuredItems = (
           : l.imageUrl
           ? 'photo'
           : 'text'
+      const rawItems = (l as any).items || (l.nutrients as any)?.items || null
+      const normalizedItemsResult = normalizeSuspiciousKjItems(rawItems)
+      const normalizedItems = normalizedItemsResult.items
+      const baseNutrition = (l as any).nutrients || null
+      const recalculatedTotals = normalizedItemsResult.changed
+        ? recalculateNutritionFromItems(normalizedItems || [])
+        : null
+      const normalizedNutrition = normalizedItemsResult.changed
+        ? mergeNutritionTotals(baseNutrition, recalculatedTotals)
+        : baseNutrition
+
       return {
         id: new Date(createdAtIso).getTime(), // UI key and sorting by timestamp
         dbId: l.id, // actual database id for delete operations
@@ -8316,8 +8536,8 @@ const applyStructuredItems = (
         }),
         method,
         photo: l.imageUrl || null,
-        nutrition: l.nutrients || null,
-        items: (l as any).items || (l.nutrients as any)?.items || null,
+        nutrition: normalizedNutrition,
+        items: normalizedItems,
         meal: category,
         category,
         persistedCategory: category,
@@ -8476,11 +8696,31 @@ const applyStructuredItems = (
       const res = await fetch(`/api/food-log?date=${targetDate}&tz=${tz}&t=${Date.now()}`, {
         cache: 'no-store',
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setLastDiaryFetchInfo({
+          date: targetDate,
+          from: isViewingToday ? 'today' : 'history',
+          ok: false,
+          logsCount: null,
+          logDates: [],
+          logSample: [],
+          receivedAt: Date.now(),
+        })
+        return;
+      }
 
       const json = await res.json();
       const logs = Array.isArray(json.logs) ? json.logs : [];
-      const mapped = mapLogsToEntries(logs, targetDate);
+      setLastDiaryFetchInfo({
+        date: targetDate,
+        from: isViewingToday ? 'today' : 'history',
+        ok: true,
+        logsCount: logs.length,
+        logDates: extractLogDates(logs),
+        logSample: buildLogSample(logs),
+        receivedAt: Date.now(),
+      })
+      const mapped = mapLogsToEntries(logs, targetDate, { preferCreatedAtDate: true });
       const localList = isViewingToday
         ? dedupeEntries(todaysFoodsForSelectedDate, { fallbackDate: targetDate })
         : Array.isArray(historyFoods)
@@ -9506,12 +9746,25 @@ const applyStructuredItems = (
     items.forEach((item: any) => {
       const servings = effectiveServings(item)
       const multiplier = macroMultiplierForItem(item)
-      totals.calories += (item.calories || 0) * servings * multiplier
-      totals.protein += (item.protein_g || 0) * servings * multiplier
-      totals.carbs += (item.carbs_g || 0) * servings * multiplier
-      totals.fat += (item.fat_g || 0) * servings * multiplier
-      totals.fiber += (item.fiber_g || 0) * servings * multiplier
-      totals.sugar += (item.sugar_g || 0) * servings * multiplier
+      const protein = Number(item?.protein_g) || 0
+      const carbs = Number(item?.carbs_g) || 0
+      const fat = Number(item?.fat_g) || 0
+      const fiber = Number(item?.fiber_g) || 0
+      const sugar = Number(item?.sugar_g) || 0
+      const safeProtein = Math.max(0, protein)
+      const safeCarbs = Math.max(0, carbs)
+      const safeFat = Math.max(0, fat)
+      const macroEnergy = safeProtein * 4 + safeCarbs * 4 + safeFat * 9
+      let calories = Number(item?.calories)
+      if (!Number.isFinite(calories) || calories <= 0) {
+        calories = macroEnergy > 0 ? macroEnergy : 0
+      }
+      totals.calories += calories * servings * multiplier
+      totals.protein += protein * servings * multiplier
+      totals.carbs += carbs * servings * multiplier
+      totals.fat += fat * servings * multiplier
+      totals.fiber += fiber * servings * multiplier
+      totals.sugar += sugar * servings * multiplier
     })
 
     const round = (value: number, decimals = 1) => {
@@ -15381,7 +15634,7 @@ Please add nutritional information manually if needed.`);
         if (res.ok) {
           const json = await res.json();
           const logs = Array.isArray(json.logs) ? json.logs : [];
-          const mapped = mapLogsToEntries(logs, selectedDate);
+          const mapped = mapLogsToEntries(logs, selectedDate, { preferCreatedAtDate: true });
           const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate });
           setHistoryFoods(deduped);
         }
@@ -15769,12 +16022,34 @@ Please add nutritional information manually if needed.`);
   //   expose internal formatting and confuse users.
   const foodTitle = useMemo(() => {
     if (mealSummary) return mealSummary;
+    const entryDescription = editingEntry?.description || editingEntry?.label || '';
+    const resolvedFavorite = editingEntry ? resolveFavoriteForEntry(editingEntry, entryDescription) : null;
+    const favoriteTitle = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : '';
+    if (favoriteTitle) return favoriteTitle;
+    const overrideTitle = editingEntry ? applyFoodNameOverride(entryDescription, editingEntry) : '';
+    if (overrideTitle) return overrideTitle;
+    const singleItemName =
+      editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
+        ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
+        : ''
+    if (singleItemName) return singleItemName;
     if (editingEntry?.description) return extractBaseMealDescription(editingEntry.description || '');
     if (aiDescription) return extractBaseMealDescription(aiDescription);
     return '';
-  }, [mealSummary, editingEntry, aiDescription]);
+  }, [mealSummary, analyzedItems, editingEntry, aiDescription, applyFoodNameOverride, favorites]);
 
   const foodDescriptionText = useMemo(() => {
+    const entryDescription = editingEntry?.description || editingEntry?.label || '';
+    const resolvedFavorite = editingEntry ? resolveFavoriteForEntry(editingEntry, entryDescription) : null;
+    const favoriteTitle = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : '';
+    if (favoriteTitle) return favoriteTitle
+    const overrideTitle = editingEntry ? applyFoodNameOverride(entryDescription, editingEntry) : '';
+    if (overrideTitle) return overrideTitle
+    const singleItemName =
+      editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
+        ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
+        : ''
+    if (singleItemName) return singleItemName
     const singleItemOverride =
       editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
         ? applyFoodNameOverride(editingEntry?.description || editingEntry?.label || '', editingEntry)
@@ -15797,7 +16072,7 @@ Please add nutritional information manually if needed.`);
     }
     if (editingEntry?.description) return editingEntry.description;
     return '';
-  }, [aiDescription, analyzedItems, applyFoodNameOverride, editingEntry]);
+  }, [aiDescription, analyzedItems, applyFoodNameOverride, editingEntry, favorites]);
 
   const aiSavedMealMeta = useMemo(() => {
     const nutrition = editingEntry?.nutrition
@@ -18634,10 +18909,20 @@ Please add nutritional information manually if needed.`);
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
                         const macroMultiplier = macroMultiplierForItem(item)
-                        const totalCalories = Math.round((item.calories || 0) * servingsCount * macroMultiplier)
-                        const totalProtein = Math.round(((item.protein_g || 0) * servingsCount * macroMultiplier) * 10) / 10
-                        const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount * macroMultiplier) * 10) / 10
-                        const totalFat = Math.round(((item.fat_g || 0) * servingsCount * macroMultiplier) * 10) / 10
+                        const baseProtein = Number(item?.protein_g) || 0
+                        const baseCarbs = Number(item?.carbs_g) || 0
+                        const baseFat = Number(item?.fat_g) || 0
+                        const macroEnergyPerServing =
+                          Math.max(0, baseProtein) * 4 + Math.max(0, baseCarbs) * 4 + Math.max(0, baseFat) * 9
+                        const caloriesBase = Number(item?.calories)
+                        const effectiveCaloriesPerServing =
+                          Number.isFinite(caloriesBase) && caloriesBase > 0 ? caloriesBase : macroEnergyPerServing
+                        const totalCalories = Number.isFinite(effectiveCaloriesPerServing)
+                          ? effectiveCaloriesPerServing * servingsCount * macroMultiplier
+                          : 0
+                        const totalProtein = Math.round((baseProtein * servingsCount * macroMultiplier) * 10) / 10
+                        const totalCarbs = Math.round((baseCarbs * servingsCount * macroMultiplier) * 10) / 10
+                        const totalFat = Math.round((baseFat * servingsCount * macroMultiplier) * 10) / 10
                         const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount * macroMultiplier) * 10) / 10
                         const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount * macroMultiplier) * 10) / 10
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
@@ -18889,7 +19174,7 @@ Please add nutritional information manually if needed.`);
                                     }
                                   }}
                                 >
-                                  Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
+                                  Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item, energyUnit)}
                                 </div>
                                 {servingOptions.length > 0 && (
                                   <div className="mt-2">
@@ -19292,7 +19577,33 @@ Please add nutritional information manually if needed.`);
                                 <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                                   Nutritional breakdown
                                 </div>
-                                <div className="text-xs text-slate-400">Total for {totalsLabel}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEnergyUnit('kcal')}
+                                      className={`px-2 py-0.5 rounded-full ${
+                                        energyUnit === 'kcal'
+                                          ? 'bg-white text-gray-900 shadow-sm'
+                                          : 'text-gray-500'
+                                      }`}
+                                    >
+                                      kcal
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEnergyUnit('kJ')}
+                                      className={`px-2 py-0.5 rounded-full ${
+                                        energyUnit === 'kJ'
+                                          ? 'bg-white text-gray-900 shadow-sm'
+                                          : 'text-gray-500'
+                                      }`}
+                                    >
+                                      kJ
+                                    </button>
+                                  </div>
+                                  <div className="text-xs text-slate-400">Total for {totalsLabel}</div>
+                                </div>
                               </div>
                               <div className="grid grid-cols-3 gap-3">
                                 {ITEM_NUTRIENT_META.map((meta) => {
@@ -19965,39 +20276,71 @@ Please add nutritional information manually if needed.`);
                         const item = analyzedItems[editingItemIndex]
                         const servingsCount = Number.isFinite(item?.servings) ? Number(item.servings) : 1
                         const macroMultiplier = macroMultiplierForItem(item) || 1
+                        const baseProtein = Number(item?.protein_g) || 0
+                        const baseCarbs = Number(item?.carbs_g) || 0
+                        const baseFat = Number(item?.fat_g) || 0
+                        const macroEnergyPerServing =
+                          Math.max(0, baseProtein) * 4 + Math.max(0, baseCarbs) * 4 + Math.max(0, baseFat) * 9
+                        const caloriesBase = Number(item?.calories)
+                        const effectiveCaloriesPerServing =
+                          Number.isFinite(caloriesBase) && caloriesBase > 0 ? caloriesBase : macroEnergyPerServing
                         const totalMultiplier = Math.max(0, servingsCount * macroMultiplier)
                         const divider = totalMultiplier > 0 ? totalMultiplier : 1
-                        const formatTotal = (value: any, decimals: number) => {
+                        const formatTotal = (value: any, decimals: number, isCalories = false) => {
                           const num = Number(value)
                           if (!Number.isFinite(num)) return ''
                           const scaled = totalMultiplier > 0 ? num * totalMultiplier : 0
-                          if (decimals <= 0) return String(Math.round(scaled))
+                          const display = isCalories && energyUnit === 'kJ' ? scaled * KCAL_TO_KJ : scaled
+                          if (decimals <= 0) return String(Math.round(display))
                           const factor = Math.pow(10, decimals)
-                          return String(Math.round(scaled * factor) / factor)
+                          return String(Math.round(display * factor) / factor)
                         }
-                        const computePerServingFromTotal = (value: any) => {
+                        const computePerServingFromTotal = (value: any, isCalories = false) => {
                           const total = Number(value)
                           if (!Number.isFinite(total)) return null
-                          if (totalMultiplier > 0) return total / totalMultiplier
-                          return total
+                          const normalized = isCalories && energyUnit === 'kJ' ? total / KCAL_TO_KJ : total
+                          if (totalMultiplier > 0) return normalized / totalMultiplier
+                          return normalized
                         }
-                        const updateMacroFromTotalInput = (value: any, fieldName: string) => {
-                          const perServingValue = computePerServingFromTotal(value)
+                        const updateMacroFromTotalInput = (value: any, fieldName: string, isCalories = false) => {
+                          const perServingValue = computePerServingFromTotal(value, isCalories)
                           if (perServingValue === null) return
                           updateItemField(editingItemIndex, fieldName as any, perServingValue)
                         }
                         const totalLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         return (
                           <div>
-                            <div className="block text-sm font-medium text-gray-700 mb-2">
-                              Totals for {totalLabel}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="block text-sm font-medium text-gray-700">
+                                Totals for {totalLabel}
+                              </div>
+                              <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                                <button
+                                  type="button"
+                                  onClick={() => setEnergyUnit('kcal')}
+                                  className={`px-2 py-0.5 rounded-full ${
+                                    energyUnit === 'kcal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                                  }`}
+                                >
+                                  kcal
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEnergyUnit('kJ')}
+                                  className={`px-2 py-0.5 rounded-full ${
+                                    energyUnit === 'kJ' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                                  }`}
+                                >
+                                  kJ
+                                </button>
+                              </div>
                             </div>
                             <div className="text-xs text-gray-500 mb-2">
                               Changing these numbers will not change servings or weight.
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <label className="block text-xs text-gray-600 mb-1">Calories</label>
+                                <label className="block text-xs text-gray-600 mb-1">Calories ({energyUnit})</label>
                                 <input
                                   type="number"
                                   inputMode="decimal"
@@ -20007,7 +20350,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:calories`
                                     return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
                                       ? numericInputDrafts[key]
-                                      : formatTotal(item?.calories ?? '', 0)
+                                      : formatTotal(effectiveCaloriesPerServing, 0, true)
                                   })()}
                                   onFocus={() => {
                                     const key = `ai:modal:${editingItemIndex}:calories`
@@ -20017,7 +20360,7 @@ Please add nutritional information manually if needed.`);
                                     const key = `ai:modal:${editingItemIndex}:calories`
                                     const v = e.target.value
                                     setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'calories')
+                                    if (String(v).trim() !== '') updateMacroFromTotalInput(v, 'calories', true)
                                   }}
                                   onBlur={() => {
                                     const key = `ai:modal:${editingItemIndex}:calories`
@@ -20028,7 +20371,7 @@ Please add nutritional information manually if needed.`);
                                     })
                                   }}
                                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                  placeholder="kcal"
+                                  placeholder={energyUnit}
                                 />
                               </div>
                           <div>
@@ -20538,19 +20881,18 @@ Please add nutritional information manually if needed.`);
 	          {!editingEntry && (
 	            <div className="mb-4">
 	              {(() => {
-	                const historyFiltered = isViewingToday
-                    ? []
-                    : filterEntriesForDate(historyFoods, selectedDate)
-                  const snapshotEntries =
-                    !isViewingToday && persistentDiarySnapshot?.byDate?.[selectedDate]?.entries
-                      ? persistentDiarySnapshot.byDate[selectedDate]?.entries
-                      : []
-                  const baseEntries = isViewingToday
-                    ? todaysFoodsForSelectedDate
-                    : historyFiltered.length > 0
-                    ? historyFiltered
-                    : snapshotEntries || []
-                  const source = dedupeEntries(baseEntries, { fallbackDate: selectedDate })
+                  const source = sourceEntries
+                  const lastServerLabel = lastDiaryFetchInfo
+                    ? `${lastDiaryFetchInfo.from} ${lastDiaryFetchInfo.date} | ok=${lastDiaryFetchInfo.ok ? 'yes' : 'no'} | count=${lastDiaryFetchInfo.logsCount ?? 'n/a'} | dates=${lastDiaryFetchInfo.logDates.length > 0 ? lastDiaryFetchInfo.logDates.join(', ') : 'none'} | sample=${lastDiaryFetchInfo.logSample.length > 0 ? lastDiaryFetchInfo.logSample.join(', ') : 'none'}`
+                    : 'none'
+                  const sourceDatesLabel = sourceDateKeys.length > 0 ? sourceDateKeys.join(', ') : 'none'
+                  const sourceSampleLabel =
+                    source.slice(0, 3).map((entry: any) => {
+                      const id = entry?.dbId ?? entry?.id ?? 'no-id'
+                      const label = String(entry?.description || entry?.label || '').trim()
+                      const short = label.length > 18 ? `${label.slice(0, 18)}…` : label
+                      return `${id}:${short || 'untitled'}`
+                    }).join(', ') || 'none'
 
                 // ⚠️ GUARD RAIL: Today’s Totals must always be rebuilt from ingredient cards.
                 // Fiber/sugar accuracy depends on this. Stored totals are used only as a fallback.
@@ -21890,6 +22232,14 @@ Please add nutritional information manually if needed.`);
 
                 return (
                   <div className="space-y-4">
+                    {debugMode && (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                        <div>Debug: date={selectedDate} view={isViewingToday ? 'today' : 'history'} loading={isLoadingHistory ? 'yes' : 'no'} historyDate={historyFoodsDate || 'none'}</div>
+                        <div>Debug: sourceCount={source.length} sourceDates={sourceDatesLabel}</div>
+                        <div>Debug: sourceSample={sourceSampleLabel}</div>
+                        <div>Debug: lastServer={lastServerLabel}</div>
+                      </div>
+                    )}
                     {/* Daily rings header */}
                     <div
                       className="mb-2 bg-transparent border-0 shadow-none rounded-none px-4 py-2 sm:bg-white sm:border sm:border-gray-200 sm:rounded-xl sm:shadow-sm sm:px-4 sm:py-4"
@@ -21925,98 +22275,104 @@ Please add nutritional information manually if needed.`);
                           </button>
                         </div>
                       </div>
-                      {source.length === 0 && (
-                        <p className="text-xs text-gray-500 mb-3">
-                          No meals yet today. Here are your daily targets to start the day.
-                        </p>
-                      )}
-                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
-                        <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
-                      )}
-                      {/* GUARD RAIL: local restore is best-effort and should never be forced on the user. */}
-                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
-                        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
-                          <div>We found saved entries on this device.</div>
-                          <div className="flex flex-wrap gap-2">
-                            {localSnapshotEntriesForSelectedDate.length > 0 && (
+                      {!summaryReady ? (
+                        <div className="text-xs text-gray-500 mb-3">Loading this day\u2019s summary\u2026</div>
+                      ) : (
+                        <>
+                          {source.length === 0 && (
+                            <p className="text-xs text-gray-500 mb-3">
+                              No meals yet today. Here are your daily targets to start the day.
+                            </p>
+                          )}
+                          {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryLoading && !lastKnownEntryDate && (
+                            <p className="text-xs text-gray-400 mb-3">Looking for your saved entries...</p>
+                          )}
+                          {/* GUARD RAIL: local restore is best-effort and should never be forced on the user. */}
+                          {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && localSnapshotDates.length > 0 && !hideLocalRestorePrompt && (
+                            <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 flex flex-col gap-2">
+                              <div>We found saved entries on this device.</div>
+                              <div className="flex flex-wrap gap-2">
+                                {localSnapshotEntriesForSelectedDate.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      restoreEntriesFromLocalSnapshot(selectedDate, localSnapshotEntriesForSelectedDate)
+                                    }
+                                    disabled={isRestoringLocalEntries}
+                                    className="px-3 py-1 text-xs font-semibold bg-emerald-700 text-white disabled:opacity-60"
+                                    style={{ borderRadius: 0 }}
+                                  >
+                                    {isRestoringLocalEntries ? 'Restoring…' : 'Restore this day'}
+                                  </button>
+                                )}
+                                {latestLocalSnapshotDate && latestLocalSnapshotDate !== selectedDate && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedDate(latestLocalSnapshotDate)}
+                                    disabled={isRestoringLocalEntries}
+                                    className="px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-200 disabled:opacity-60"
+                                    style={{ borderRadius: 0 }}
+                                  >
+                                    Show latest saved day
+                                  </button>
+                                )}
+                                {localSnapshotDates.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => restoreAllLocalSnapshots()}
+                                    disabled={isRestoringLocalEntries}
+                                    className="px-3 py-1 text-xs font-semibold bg-emerald-600 text-white disabled:opacity-60"
+                                    style={{ borderRadius: 0 }}
+                                  >
+                                    {isRestoringLocalEntries ? 'Restoring…' : 'Restore all days'}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setHideLocalRestorePrompt(true)
+                                    writeHideLocalRestorePrompt(true)
+                                  }}
+                                  className="px-3 py-1 text-xs font-semibold bg-white text-emerald-900 border border-emerald-200"
+                                  style={{ borderRadius: 0 }}
+                                >
+                                  Hide this message
+                                </button>
+                              </div>
+                              {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
+                            </div>
+                          )}
+                          {SHOW_FAVORITES_RESCUE_PROMPT && source.length === 0 && favorites.length === 0 && (
+                            <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div>Fix favorites or credits if they look wrong.</div>
                               <button
                                 type="button"
-                                onClick={() =>
-                                  restoreEntriesFromLocalSnapshot(selectedDate, localSnapshotEntriesForSelectedDate)
-                                }
-                                disabled={isRestoringLocalEntries}
-                                className="px-3 py-1 text-xs font-semibold bg-emerald-700 text-white disabled:opacity-60"
+                                onClick={() => runDataRescue()}
+                                disabled={isRescuingData}
+                                className="px-3 py-1 text-xs font-semibold bg-rose-600 text-white disabled:opacity-60"
                                 style={{ borderRadius: 0 }}
                               >
-                                {isRestoringLocalEntries ? 'Restoring…' : 'Restore this day'}
+                                {isRescuingData ? 'Fixing…' : 'Fix favorites & credits'}
                               </button>
-                            )}
-                            {latestLocalSnapshotDate && latestLocalSnapshotDate !== selectedDate && (
+                            </div>
+                          )}
+                          {source.length === 0 && rescueMessage && (
+                            <div className="mb-3 text-xs text-gray-600">{rescueMessage}</div>
+                          )}
+                          {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && localSnapshotDates.length === 0 && (
+                            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div>We found saved entries on {formatShortDayLabel(lastKnownEntryDate)}.</div>
                               <button
                                 type="button"
-                                onClick={() => setSelectedDate(latestLocalSnapshotDate)}
-                                disabled={isRestoringLocalEntries}
-                                className="px-3 py-1 text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-200 disabled:opacity-60"
+                                onClick={() => setSelectedDate(lastKnownEntryDate)}
+                                className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white"
                                 style={{ borderRadius: 0 }}
                               >
-                                Show latest saved day
+                                Show that day
                               </button>
-                            )}
-                            {localSnapshotDates.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => restoreAllLocalSnapshots()}
-                                disabled={isRestoringLocalEntries}
-                                className="px-3 py-1 text-xs font-semibold bg-emerald-600 text-white disabled:opacity-60"
-                                style={{ borderRadius: 0 }}
-                              >
-                                {isRestoringLocalEntries ? 'Restoring…' : 'Restore all days'}
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setHideLocalRestorePrompt(true)
-                                writeHideLocalRestorePrompt(true)
-                              }}
-                              className="px-3 py-1 text-xs font-semibold bg-white text-emerald-900 border border-emerald-200"
-                              style={{ borderRadius: 0 }}
-                            >
-                              Hide this message
-                            </button>
-                          </div>
-                          {localRestoreMessage && <div className="text-emerald-800">{localRestoreMessage}</div>}
-                        </div>
-                      )}
-                      {SHOW_FAVORITES_RESCUE_PROMPT && source.length === 0 && favorites.length === 0 && (
-                        <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div>Fix favorites or credits if they look wrong.</div>
-                          <button
-                            type="button"
-                            onClick={() => runDataRescue()}
-                            disabled={isRescuingData}
-                            className="px-3 py-1 text-xs font-semibold bg-rose-600 text-white disabled:opacity-60"
-                            style={{ borderRadius: 0 }}
-                          >
-                            {isRescuingData ? 'Fixing…' : 'Fix favorites & credits'}
-                          </button>
-                        </div>
-                      )}
-                      {source.length === 0 && rescueMessage && (
-                        <div className="mb-3 text-xs text-gray-600">{rescueMessage}</div>
-                      )}
-                      {SHOW_LOCAL_RESTORE_PROMPT && source.length === 0 && lastKnownEntryDate && lastKnownEntryDate !== selectedDate && localSnapshotDates.length === 0 && (
-                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div>We found saved entries on {formatShortDayLabel(lastKnownEntryDate)}.</div>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDate(lastKnownEntryDate)}
-                            className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white"
-                            style={{ borderRadius: 0 }}
-                          >
-                            Show that day
-                          </button>
-                        </div>
+                            </div>
+                          )}
+                        </>
                       )}
                       {(() => {
                           const slides: JSX.Element[] = []
@@ -22475,15 +22831,37 @@ Please add nutritional information manually if needed.`);
 	          {/* Hide energy summary + meals while editing an entry to keep the user focused on editing */}
 		          {!editingEntry && (
 		            <>
-		              <div className="flex items-center justify-between mb-4">
-		                <h3 className="text-lg font-semibold">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
-		                <Link
-		                  href={`/chat?context=food&date=${encodeURIComponent(selectedDate)}`}
-		                  className="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
-		                >
-		                  Ask AI
-		                </Link>
-		              </div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setEnergyUnit('kcal')}
+                      className={`px-2 py-0.5 rounded-full ${
+                        energyUnit === 'kcal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                      }`}
+                    >
+                      kcal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnergyUnit('kJ')}
+                      className={`px-2 py-0.5 rounded-full ${
+                        energyUnit === 'kJ' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                      }`}
+                    >
+                      kJ
+                    </button>
+                  </div>
+                  <Link
+                    href={`/chat?context=food&date=${encodeURIComponent(selectedDate)}`}
+                    className="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
+                  >
+                    Ask AI
+                  </Link>
+                </div>
+              </div>
 
 		              <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden mb-4">
 		                <div className="px-4 py-4 flex items-start justify-between gap-3">
@@ -22685,11 +23063,25 @@ Please add nutritional information manually if needed.`);
                       const drinkMeta = !isWaterEntry ? getDrinkMetaFromEntry(food) : null
                       const isDrinkEntry = !isWaterEntry && Boolean(drinkMeta?.type)
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
-                      const entryCalories = !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Math.round(Number(entryTotals?.calories)) : null
+                      const entryCaloriesValue =
+                        !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Number(entryTotals?.calories) : null
+                      const entryCaloriesLabel =
+                        entryCaloriesValue === null ? null : `${formatEnergyNumber(entryCaloriesValue, energyUnit)} ${energyUnit}`
                       const waterLabel = isWaterEntry ? String(food?.label || 'Water') : null
                       const waterIconSrc = isWaterEntry ? getWaterIconSrc(waterLabel) : null
                       const drinkIconSrc = isDrinkEntry ? getWaterIconSrc(drinkMeta?.type) : null
                       const drinkAmountLabel = isDrinkEntry ? formatDrinkEntryAmount(drinkMeta) : ''
+                      const entryItemName =
+                        !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1
+                          ? String(food.items[0]?.name || food.items[0]?.label || '').trim()
+                          : ''
+                      const baseEntryLabel = food?.description || food?.label || 'Meal'
+                      const resolvedFavorite = isWaterEntry ? null : resolveFavoriteForEntry(food, baseEntryLabel)
+                      const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
+                      const overrideLabel = isWaterEntry ? '' : applyFoodNameOverride(baseEntryLabel, food)
+                      const entryDisplayLabel = isWaterEntry
+                        ? waterLabel || 'Water'
+                        : favoriteLabel || overrideLabel || entryItemName || baseEntryLabel
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
@@ -23005,9 +23397,7 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm sm:text-base text-gray-900 truncate">
-                                    {isWaterEntry
-                                      ? waterLabel || 'Water'
-                                      : sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
+                                    {sanitizeMealDescription(String(entryDisplayLabel).split('\n')[0].split('Calories:')[0])}
                                   </p>
                                   {(() => {
                                     const amountLabel = isWaterEntry
@@ -23020,7 +23410,7 @@ Please add nutritional information manually if needed.`);
                                   })()}
                                 </div>
                                 <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
-                                  {entryCalories !== null && <span className="font-semibold text-gray-900">{entryCalories} kcal</span>}
+                                  {entryCaloriesLabel !== null && <span className="font-semibold text-gray-900">{entryCaloriesLabel}</span>}
                                   <span className="text-gray-500">
                                     {formatTimeWithAMPM(food.time)}
                                     {(food as any)?.__pendingSave ? ' • Saving...' : ''}
@@ -23163,7 +23553,7 @@ Please add nutritional information manually if needed.`);
                           0,
                         ) + drinkTotalMl
                         const summaryParts: string[] = []
-                        if (totals.calories > 0) summaryParts.push(`${Math.round(totals.calories)} kcal`)
+                        if (totals.calories > 0) summaryParts.push(`${formatEnergyNumber(totals.calories, energyUnit)} ${energyUnit}`)
                         if (totals.protein > 0) summaryParts.push(`${Math.round(totals.protein)}g Protein`)
                         if (totals.carbs > 0) summaryParts.push(`${Math.round(totals.carbs)}g Carbs`)
                         if (totals.fat > 0) summaryParts.push(`${Math.round(totals.fat)}g Fat`)
@@ -24891,19 +25281,13 @@ Please add nutritional information manually if needed.`);
                 </div>
                 <div className="mt-4">
                   {(() => {
-                    const totals = favoriteActionModal.totals
-                    const hasTotals = Boolean(
-                      totals &&
-                        Object.values(totals).some(
-                          (v) => Number.isFinite(Number(v)) && Number(v) > 0,
-                        ),
-                    )
-                    if (!hasTotals) {
-                      return (
-                        <div className="text-sm text-gray-600">
-                          No nutrition data for this item yet.
-                        </div>
-                      )
+                    const totals = favoriteActionModal.totals || {
+                      calories: 0,
+                      protein: 0,
+                      carbs: 0,
+                      fat: 0,
+                      fiber: 0,
+                      sugar: 0,
                     }
                     return (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -24916,7 +25300,7 @@ Please add nutritional information manually if needed.`);
                               : Number(raw)
                           const display =
                             value === null || !Number.isFinite(value)
-                              ? '—'
+                              ? formatNutrientValue(key, 0)
                               : formatNutrientValue(key, value)
                           const label =
                             key === 'calories'
