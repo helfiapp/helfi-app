@@ -1012,7 +1012,14 @@ https://www.helfi.ai`)
   const loadUserStats = async (token?: string) => {
     setIsLoadingUsers(true)
     try {
-      const authToken = token || adminToken
+      const storedToken = (() => {
+        try {
+          return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
+        } catch {
+          return null
+        }
+      })()
+      const authToken = token || storedToken || adminToken
       // We'll create a simple endpoint to get user count and basic stats
       const response = await fetch('/api/admin/users', {
         headers: {
@@ -1024,7 +1031,7 @@ https://www.helfi.ai`)
         setUserStats(result)
       } else {
         // Fallback: try to populate the table via management endpoint even if stats failed
-        loadUserManagement(userSearch, userFilter, currentPage)
+        loadUserManagement(userSearch, userFilter, currentPage, authToken || undefined)
       }
     } catch (error) {
       console.error('Error loading user stats:', error)
@@ -1035,7 +1042,18 @@ https://www.helfi.ai`)
   const loadUserManagement = async (search = '', filter = 'all', page = 1, tokenOverride?: string) => {
     setIsLoadingManagement(true)
     try {
-      const authToken = tokenOverride || adminToken
+      const storedToken = (() => {
+        try {
+          return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
+        } catch {
+          return null
+        }
+      })()
+      const authToken = tokenOverride || storedToken || adminToken
+      if (!authToken) {
+        setIsLoadingManagement(false)
+        return
+      }
       const params = new URLSearchParams({
         search,
         plan: filter,
@@ -1479,6 +1497,12 @@ https://www.helfi.ai`)
     if (!adminToken) return
     loadPractitionerEntries()
   }, [activeTab, adminToken, practitionerPage, practitionerPageSize])
+
+  useEffect(() => {
+    if (activeTab !== 'management') return
+    if (!adminToken) return
+    loadUserManagement(userSearch, userFilter, currentPage)
+  }, [activeTab, adminToken])
 
   const refreshData = () => {
     loadAnalyticsData()
@@ -2875,10 +2899,15 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     type="text"
                     id="otp"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
+                    onChange={(e) => {
+                      const nextValue = e.target.value.replace(/\D/g, '').slice(0, 6)
+                      setOtp(nextValue)
+                    }}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     placeholder="Enter 6-digit code"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
                     autoComplete="one-time-code"
                   />
                 </div>
