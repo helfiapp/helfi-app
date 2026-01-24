@@ -840,6 +840,7 @@ const PhysicalStep = memo(function PhysicalStep({
   const [birthYear, setBirthYear] = useState('');
   const [birthMonth, setBirthMonth] = useState('');
   const [birthDay, setBirthDay] = useState('');
+  const birthdateTouchedRef = useRef(false);
   const [height, setHeight] = useState(initial?.height || '');
   const [feet, setFeet] = useState(initial?.feet || '');
   const [inches, setInches] = useState(initial?.inches || '');
@@ -1207,34 +1208,6 @@ const PhysicalStep = memo(function PhysicalStep({
       setBirthDay(String(max).padStart(2, '0'));
     }
   }, [daysInMonth, birthDay]);
-
-  // Keep canonical birthdate string in sync with dropdowns and block future dates
-  useEffect(() => {
-    if (birthYear && birthMonth && birthDay) {
-      const y = parseInt(birthYear, 10);
-      const m = parseInt(birthMonth, 10);
-      const d = parseInt(birthDay, 10);
-
-      if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
-        return;
-      }
-
-      const candidate = new Date(y, m - 1, d);
-      const now = new Date();
-
-      if (candidate > now) {
-        // Don’t allow future birthdates – keep current value until user picks a valid date
-        return;
-      }
-
-      const yyyy = String(y).padStart(4, '0');
-      const mm = String(m).padStart(2, '0');
-      const dd = String(d).padStart(2, '0');
-      setBirthdate(`${yyyy}-${mm}-${dd}`);
-    } else {
-      setBirthdate('');
-    }
-  }, [birthYear, birthMonth, birthDay]);
 
   // Track when basic profile values differ from what we initially loaded
   useEffect(() => {
@@ -2114,12 +2087,38 @@ const PhysicalStep = memo(function PhysicalStep({
     }
   }, [initial?.birthdate]);
 
+  // Keep canonical birthdate string in sync with dropdowns and block future dates
   useEffect(() => {
-    const value = (birthdateFromParts || '').trim();
-    if (!value || value === lastBirthdateSavedRef.current) return;
-    lastBirthdateSavedRef.current = value;
-    schedulePartialSave({ birthdate: value });
-  }, [birthdateFromParts, schedulePartialSave]);
+    if (birthYear && birthMonth && birthDay) {
+      const y = parseInt(birthYear, 10);
+      const m = parseInt(birthMonth, 10);
+      const d = parseInt(birthDay, 10);
+
+      if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+        return;
+      }
+
+      const candidate = new Date(y, m - 1, d);
+      const now = new Date();
+
+      if (candidate > now) {
+        // Don’t allow future birthdates – keep current value until user picks a valid date
+        return;
+      }
+
+      const yyyy = String(y).padStart(4, '0');
+      const mm = String(m).padStart(2, '0');
+      const dd = String(d).padStart(2, '0');
+      const nextBirthdate = `${yyyy}-${mm}-${dd}`;
+      setBirthdate(nextBirthdate);
+      if (birthdateTouchedRef.current && nextBirthdate !== lastBirthdateSavedRef.current) {
+        lastBirthdateSavedRef.current = nextBirthdate;
+        schedulePartialSave({ birthdate: nextBirthdate });
+      }
+    } else {
+      setBirthdate('');
+    }
+  }, [birthYear, birthMonth, birthDay, schedulePartialSave]);
 
   const handleAddAllergy = useCallback(
     (value?: string) => {
@@ -2795,7 +2794,10 @@ const PhysicalStep = memo(function PhysicalStep({
           <select
             className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
             value={birthDay}
-            onChange={(e) => setBirthDay(e.target.value)}
+            onChange={(e) => {
+              birthdateTouchedRef.current = true;
+              setBirthDay(e.target.value);
+            }}
           >
             <option value="">Day</option>
             {Array.from({ length: daysInMonth }, (_, idx) => {
@@ -2818,7 +2820,10 @@ const PhysicalStep = memo(function PhysicalStep({
           <select
             className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
             value={birthMonth}
-            onChange={(e) => setBirthMonth(e.target.value)}
+            onChange={(e) => {
+              birthdateTouchedRef.current = true;
+              setBirthMonth(e.target.value);
+            }}
           >
             <option value="">Month</option>
             {[
@@ -2852,7 +2857,10 @@ const PhysicalStep = memo(function PhysicalStep({
           <select
             className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
             value={birthYear}
-            onChange={(e) => setBirthYear(e.target.value)}
+            onChange={(e) => {
+              birthdateTouchedRef.current = true;
+              setBirthYear(e.target.value);
+            }}
           >
             <option value="">Year</option>
             {Array.from({ length: currentYear - minYear + 1 }, (_, idx) => {
