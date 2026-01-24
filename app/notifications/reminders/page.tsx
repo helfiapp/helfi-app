@@ -107,6 +107,8 @@ export default function ReminderSettingsPage() {
   })
   const moodDirtyRef = useRef(false)
   const moodCacheKey = session?.user?.email ? `mood-reminders:${session.user.email}` : ''
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [upgradeModalMessage, setUpgradeModalMessage] = useState('')
 
   useEffect(() => {
     try {
@@ -407,9 +409,14 @@ export default function ReminderSettingsPage() {
     void saveMood({ silent: true, keepalive: true, payload: moodRef.current })
   })
 
+  const openUpgradeModal = (message: string) => {
+    setUpgradeModalMessage(message)
+    setUpgradeModalOpen(true)
+  }
+
   const handleCheckinsFrequencyChange = (value: number) => {
     if (value > checkinsMaxFrequency) {
-      alert('Free members can set 1 reminder per day. Subscribe or buy credits to unlock up to 4 reminders per day.')
+      openUpgradeModal('Free members can set 1 reminder per day. Subscribe or buy credits to unlock up to 4 reminders per day.')
       return
     }
     setCheckinsFrequency(value)
@@ -417,7 +424,7 @@ export default function ReminderSettingsPage() {
 
   const handleMoodFrequencyChange = (value: number) => {
     if (value > moodMaxFrequency) {
-      alert('Free members can set 1 reminder per day. Subscribe or buy credits to unlock up to 4 reminders per day.')
+      openUpgradeModal('Free members can set 1 reminder per day. Subscribe or buy credits to unlock up to 4 reminders per day.')
       return
     }
     setMoodFrequency(value)
@@ -778,6 +785,30 @@ export default function ReminderSettingsPage() {
           )}
         </div>
       </main>
+
+      {upgradeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Upgrade for more reminders</h3>
+            <p className="text-sm text-gray-700 mb-6">{upgradeModalMessage}</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                onClick={() => setUpgradeModalOpen(false)}
+                className="w-full sm:w-auto rounded-lg border border-helfi-green px-4 py-2 text-helfi-green font-semibold hover:bg-helfi-green/10"
+              >
+                OK
+              </button>
+              <Link
+                href="/billing"
+                className="w-full sm:w-auto rounded-lg bg-helfi-green px-4 py-2 text-center text-white font-semibold hover:bg-helfi-green/90"
+                onClick={() => setUpgradeModalOpen(false)}
+              >
+                Upgrade
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
