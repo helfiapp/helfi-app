@@ -1198,25 +1198,14 @@ const PhysicalStep = memo(function PhysicalStep({
   const currentYear = today.getFullYear();
   const minYear = currentYear - 110; // sensible lower bound for age
 
-  const daysInMonth = React.useMemo(() => {
-    if (!birthYear || !birthMonth) {
-      return 31;
-    }
-    const y = parseInt(birthYear, 10);
-    const m = parseInt(birthMonth, 10);
-    if (!Number.isFinite(y) || !Number.isFinite(m)) return 31;
-    return new Date(y, m, 0).getDate();
-  }, [birthYear, birthMonth]);
+  const maxBirthdate = React.useMemo(() => {
+    const yyyy = String(today.getFullYear()).padStart(4, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, [today]);
 
-  // Clamp day if month/year change to a month with fewer days
-  useEffect(() => {
-    if (!birthDay) return;
-    const max = daysInMonth;
-    const d = parseInt(birthDay, 10);
-    if (Number.isFinite(d) && d > max) {
-      setBirthDay(String(max).padStart(2, '0'));
-    }
-  }, [daysInMonth, birthDay]);
+  const minBirthdate = React.useMemo(() => `${String(minYear).padStart(4, '0')}-01-01`, [minYear]);
 
   // Keep canonical birthdate string in sync with dropdowns and block future dates
   useEffect(() => {
@@ -2836,109 +2825,36 @@ const PhysicalStep = memo(function PhysicalStep({
       <p className="mb-4 text-gray-600">
         We’ll calculate your age from your birthdate to set safe calorie and nutrition targets.
       </p>
-      <div className="grid grid-cols-3 gap-3 mb-2">
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Day</label>
-          <select
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
-            value={birthDay}
-            onChange={(e) => {
-              const nextDay = e.target.value;
-              birthdateTouchedRef.current = true;
-              setBirthDay(nextDay);
-              const nextBirthdate = buildValidBirthdate(birthYear, birthMonth, nextDay);
-              setBirthdate(nextBirthdate);
+      <div className="mb-2">
+        <label className="block text-xs font-medium text-gray-500 mb-1">Date of birth</label>
+        <input
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+          type="date"
+          value={birthdateFromParts || birthdate || ''}
+          max={maxBirthdate}
+          min={minBirthdate}
+          onChange={(e) => {
+            const nextValue = e.target.value;
+            birthdateTouchedRef.current = true;
+            setBirthdate(nextValue);
+            if (!nextValue) {
+              setBirthYear('');
+              setBirthMonth('');
+              setBirthDay('');
+              return;
+            }
+            const [y, m, d] = nextValue.split('-');
+            if (y && m && d) {
+              setBirthYear(y);
+              setBirthMonth(m);
+              setBirthDay(d);
+              const nextBirthdate = buildValidBirthdate(y, m, d);
               if (nextBirthdate) {
                 saveBirthdateNow(nextBirthdate);
               }
-            }}
-          >
-            <option value="">Day</option>
-            {Array.from({ length: daysInMonth }, (_, idx) => {
-              const dayNumber = idx + 1;
-              const value = String(dayNumber).padStart(2, '0');
-              const isFutureDay =
-                birthYear === String(currentYear) &&
-                birthMonth === String(today.getMonth() + 1).padStart(2, '0') &&
-                dayNumber > today.getDate();
-              return (
-                <option key={value} value={value} disabled={isFutureDay}>
-                  {dayNumber}
-                </option>
-              );
-            })}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Month</label>
-          <select
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
-            value={birthMonth}
-            onChange={(e) => {
-              const nextMonth = e.target.value;
-              birthdateTouchedRef.current = true;
-              setBirthMonth(nextMonth);
-              const nextBirthdate = buildValidBirthdate(birthYear, nextMonth, birthDay);
-              setBirthdate(nextBirthdate);
-              if (nextBirthdate) {
-                saveBirthdateNow(nextBirthdate);
-              }
-            }}
-          >
-            <option value="">Month</option>
-            {[
-              { value: '01', label: 'Jan' },
-              { value: '02', label: 'Feb' },
-              { value: '03', label: 'Mar' },
-              { value: '04', label: 'Apr' },
-              { value: '05', label: 'May' },
-              { value: '06', label: 'Jun' },
-              { value: '07', label: 'Jul' },
-              { value: '08', label: 'Aug' },
-              { value: '09', label: 'Sep' },
-              { value: '10', label: 'Oct' },
-              { value: '11', label: 'Nov' },
-              { value: '12', label: 'Dec' },
-            ].map((month) => {
-              const monthNumber = parseInt(month.value, 10);
-              const isFutureMonth =
-                birthYear === String(currentYear) &&
-                monthNumber > today.getMonth() + 1;
-              return (
-                <option key={month.value} value={month.value} disabled={isFutureMonth}>
-                  {month.label}
-                </option>
-              );
-            })}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
-          <select
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
-            value={birthYear}
-            onChange={(e) => {
-              const nextYear = e.target.value;
-              birthdateTouchedRef.current = true;
-              setBirthYear(nextYear);
-              const nextBirthdate = buildValidBirthdate(nextYear, birthMonth, birthDay);
-              setBirthdate(nextBirthdate);
-              if (nextBirthdate) {
-                saveBirthdateNow(nextBirthdate);
-              }
-            }}
-          >
-            <option value="">Year</option>
-            {Array.from({ length: currentYear - minYear + 1 }, (_, idx) => {
-              const year = currentYear - idx;
-              return (
-                <option key={year} value={String(year)}>
-                  {year}
-                </option>
-              );
-            })}
-          </select>
-        </div>
+            }
+          }}
+        />
       </div>
       <h2 className="text-2xl font-bold mb-4">How tall are you?</h2>
       <p className="mb-4 text-gray-600">Height helps us calculate key health metrics.</p>
