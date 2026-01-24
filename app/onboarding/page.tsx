@@ -8355,16 +8355,20 @@ export default function Onboarding() {
     }
   }, [form, hasMeaningfulCacheData]);
 
-  // If user is clearly new or incomplete, show the health-setup modal whenever
-  // they arrive on this page, but allow them to dismiss it for the current visit
-  // so they can actually complete the steps.
+  // If the user is incomplete, show the health-setup modal only on step 1.
+  // This avoids interrupting someone who is already working through later steps.
   useEffect(() => {
     if (status !== 'authenticated' || !dataLoaded) return;
     try {
       const hasBasic = form && form.gender && form.weight && form.height;
       const hasGoals = Array.isArray(form?.goals) && form.goals.length > 0;
       const needsSetup = !(hasBasic && hasGoals);
-      const shouldForceModal = needsSetup && !firstTimeModalDismissed;
+      const stepParam = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('step')
+        : null;
+      const stepNumber = stepParam ? parseInt(stepParam, 10) : NaN;
+      const isFirstStep = Number.isFinite(stepNumber) ? stepNumber <= 1 : step === 0;
+      const shouldForceModal = needsSetup && !firstTimeModalDismissed && isFirstStep;
 
       if (shouldForceModal && !showFirstTimeModal) {
         setShowFirstTimeModal(true);
@@ -8373,7 +8377,7 @@ export default function Onboarding() {
         setShowFirstTimeModal(false);
       }
     } catch {}
-  }, [status, form, showFirstTimeModal, dataLoaded, firstTimeModalDismissed]);
+  }, [status, form, showFirstTimeModal, dataLoaded, firstTimeModalDismissed, step]);
 
   const debouncedSave = useCallback(async (data: any) => {
     pendingSaveRef.current = data;
