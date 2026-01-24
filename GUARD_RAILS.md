@@ -1362,6 +1362,14 @@ for a change.
 - `app/api/credit/feature-usage/route.ts` (“This AI feature has been used X times…”)
 - `app/api/credit/feature-usage-stats/route.ts` (Billing page “Your usage” time-range stats)
 - `app/api/credit/usage-breakdown/route.ts` (admin/diagnostic usage breakdown)
+
+### 5.1 Billing Page AI Feature Credit Costs (Jan 2026 - Locked)
+
+- The "AI feature credit costs" box on the Billing page is display-only, but it must match real charges.
+- Source of truth for this display list: `data/creditCosts.ts` (used by `app/billing/page.tsx`).
+- Do not change labels or numbers without the owner's written approval.
+- After any approved change, verify the Billing page shows the correct numbers and they match actual charges.
+- Last stable deployment: `ad684039` (2026-01-24)
 - **Food image freshness + curated USDA enforcement (Dec 2025):**
   - `app/api/analyze-food/route.ts` still hashes images, but **food photo analysis and barcode label scans must pass `forceFresh`** so each analysis is new. Do not re-enable cached reuse for these scans without explicit user approval.
   - `app/food/page.tsx` enriches common items (bun, patty, cheese, ketchup, etc.) with curated USDA-backed macros, enforces realistic floors, and normalizes names (e.g., “Burger bun” instead of random variants). Do not weaken or remove this enrichment/normalization.
