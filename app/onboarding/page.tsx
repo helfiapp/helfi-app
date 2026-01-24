@@ -2106,6 +2106,20 @@ const PhysicalStep = memo(function PhysicalStep({
     },
     [onPartialSave],
   );
+  const lastBirthdateSavedRef = useRef<string>('');
+
+  useEffect(() => {
+    if (typeof initial?.birthdate === 'string' && initial.birthdate) {
+      lastBirthdateSavedRef.current = initial.birthdate;
+    }
+  }, [initial?.birthdate]);
+
+  useEffect(() => {
+    const value = (birthdateFromParts || '').trim();
+    if (!value || value === lastBirthdateSavedRef.current) return;
+    lastBirthdateSavedRef.current = value;
+    schedulePartialSave({ birthdate: value });
+  }, [birthdateFromParts, schedulePartialSave]);
 
   const handleAddAllergy = useCallback(
     (value?: string) => {
