@@ -840,6 +840,12 @@ const PhysicalStep = memo(function PhysicalStep({
   const [birthYear, setBirthYear] = useState('');
   const [birthMonth, setBirthMonth] = useState('');
   const [birthDay, setBirthDay] = useState('');
+  const [birthDayOpen, setBirthDayOpen] = useState(false);
+  const [birthMonthOpen, setBirthMonthOpen] = useState(false);
+  const [birthYearOpen, setBirthYearOpen] = useState(false);
+  const birthDayRef = useRef<HTMLDivElement | null>(null);
+  const birthMonthRef = useRef<HTMLDivElement | null>(null);
+  const birthYearRef = useRef<HTMLDivElement | null>(null);
   const [height, setHeight] = useState(initial?.height || '');
   const [feet, setFeet] = useState(initial?.feet || '');
   const [inches, setInches] = useState(initial?.inches || '');
@@ -1217,6 +1223,34 @@ const PhysicalStep = memo(function PhysicalStep({
       setBirthDay(String(max).padStart(2, '0'));
     }
   }, [daysInMonth, birthDay]);
+
+  // Keep canonical birthdate string in sync with dropdowns and block future dates
+  useEffect(() => {
+    if (birthYear && birthMonth && birthDay) {
+      const y = parseInt(birthYear, 10);
+      const m = parseInt(birthMonth, 10);
+      const d = parseInt(birthDay, 10);
+
+      if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+        return;
+      }
+
+      const candidate = new Date(y, m - 1, d);
+      const now = new Date();
+
+      if (candidate > now) {
+        // Don’t allow future birthdates – keep current value until user picks a valid date
+        return;
+      }
+
+      const yyyy = String(y).padStart(4, '0');
+      const mm = String(m).padStart(2, '0');
+      const dd = String(d).padStart(2, '0');
+      setBirthdate(`${yyyy}-${mm}-${dd}`);
+    } else {
+      setBirthdate('');
+    }
+  }, [birthYear, birthMonth, birthDay]);
 
   // Track when basic profile values differ from what we initially loaded
   useEffect(() => {
@@ -2115,6 +2149,46 @@ const PhysicalStep = memo(function PhysicalStep({
     }
   }, [initial?.birthdate]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const inDay = birthDayRef.current?.contains(target);
+      const inMonth = birthMonthRef.current?.contains(target);
+      const inYear = birthYearRef.current?.contains(target);
+      if (inDay || inMonth || inYear) return;
+      setBirthDayOpen(false);
+      setBirthMonthOpen(false);
+      setBirthYearOpen(false);
+    };
+    window.addEventListener('mousedown', handleOutside);
+    return () => window.removeEventListener('mousedown', handleOutside);
+  }, []);
+
+  const closeBirthMenus = useCallback(() => {
+    setBirthDayOpen(false);
+    setBirthMonthOpen(false);
+    setBirthYearOpen(false);
+  }, []);
+
+  const monthOptions = React.useMemo(
+    () => [
+      { value: '01', label: 'Jan' },
+      { value: '02', label: 'Feb' },
+      { value: '03', label: 'Mar' },
+      { value: '04', label: 'Apr' },
+      { value: '05', label: 'May' },
+      { value: '06', label: 'Jun' },
+      { value: '07', label: 'Jul' },
+      { value: '08', label: 'Aug' },
+      { value: '09', label: 'Sep' },
+      { value: '10', label: 'Oct' },
+      { value: '11', label: 'Nov' },
+      { value: '12', label: 'Dec' },
+    ],
+    [],
+  );
+
   const buildValidBirthdate = useCallback((year: string, month: string, day: string) => {
     if (!year || !month || !day) return '';
     const y = parseInt(year, 10);
@@ -2809,107 +2883,152 @@ const PhysicalStep = memo(function PhysicalStep({
         We’ll calculate your age from your birthdate to set safe calorie and nutrition targets.
       </p>
       <div className="grid grid-cols-3 gap-3 mb-2">
-        <div>
+        <div ref={birthDayRef} className="relative">
           <label className="block text-xs font-medium text-gray-500 mb-1">Day</label>
-          <select
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
-            value={birthDay}
-            onChange={(e) => {
-              const nextDay = e.target.value;
-              birthdateTouchedRef.current = true;
-              setBirthDay(nextDay);
-              const nextBirthdate = buildValidBirthdate(birthYear, birthMonth, nextDay);
-              setBirthdate(nextBirthdate);
-              if (nextBirthdate) {
-                saveBirthdateNow(nextBirthdate);
-              }
+          <button
+            type="button"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left bg-white focus:border-green-500 focus:ring-1 focus:ring-green-500 shadow-sm"
+            aria-haspopup="listbox"
+            aria-expanded={birthDayOpen}
+            onClick={() => {
+              setBirthDayOpen((open) => !open);
+              setBirthMonthOpen(false);
+              setBirthYearOpen(false);
             }}
           >
-            <option value="">Day</option>
-            {Array.from({ length: daysInMonth }, (_, idx) => {
-              const dayNumber = idx + 1;
-              const value = String(dayNumber).padStart(2, '0');
-              const isFutureDay =
-                birthYear === String(currentYear) &&
-                birthMonth === String(today.getMonth() + 1).padStart(2, '0') &&
-                dayNumber > today.getDate();
-              return (
-                <option key={value} value={value} disabled={isFutureDay}>
-                  {dayNumber}
-                </option>
-              );
-            })}
-          </select>
+            {birthDay ? String(parseInt(birthDay, 10)) : 'Day'}
+          </button>
+          {birthDayOpen && (
+            <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+              {Array.from({ length: daysInMonth }, (_, idx) => {
+                const dayNumber = idx + 1;
+                const value = String(dayNumber).padStart(2, '0');
+                const isFutureDay =
+                  birthYear === String(currentYear) &&
+                  birthMonth === String(today.getMonth() + 1).padStart(2, '0') &&
+                  dayNumber > today.getDate();
+                const isSelected = birthDay === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`w-full px-3 py-2 text-left text-sm ${
+                      isSelected ? 'bg-helfi-green text-white' : 'hover:bg-gray-100'
+                    } ${isFutureDay ? 'text-gray-300 cursor-not-allowed hover:bg-white' : ''}`}
+                    disabled={isFutureDay}
+                    onClick={() => {
+                      if (isFutureDay) return;
+                      birthdateTouchedRef.current = true;
+                      setBirthDay(value);
+                      const nextBirthdate = buildValidBirthdate(birthYear, birthMonth, value);
+                      setBirthdate(nextBirthdate);
+                      if (nextBirthdate) {
+                        saveBirthdateNow(nextBirthdate);
+                      }
+                      closeBirthMenus();
+                    }}
+                  >
+                    {dayNumber}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
-        <div>
+        <div ref={birthMonthRef} className="relative">
           <label className="block text-xs font-medium text-gray-500 mb-1">Month</label>
-          <select
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
-            value={birthMonth}
-            onChange={(e) => {
-              const nextMonth = e.target.value;
-              birthdateTouchedRef.current = true;
-              setBirthMonth(nextMonth);
-              const nextBirthdate = buildValidBirthdate(birthYear, nextMonth, birthDay);
-              setBirthdate(nextBirthdate);
-              if (nextBirthdate) {
-                saveBirthdateNow(nextBirthdate);
-              }
+          <button
+            type="button"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left bg-white focus:border-green-500 focus:ring-1 focus:ring-green-500 shadow-sm"
+            aria-haspopup="listbox"
+            aria-expanded={birthMonthOpen}
+            onClick={() => {
+              setBirthMonthOpen((open) => !open);
+              setBirthDayOpen(false);
+              setBirthYearOpen(false);
             }}
           >
-            <option value="">Month</option>
-            {[
-              { value: '01', label: 'Jan' },
-              { value: '02', label: 'Feb' },
-              { value: '03', label: 'Mar' },
-              { value: '04', label: 'Apr' },
-              { value: '05', label: 'May' },
-              { value: '06', label: 'Jun' },
-              { value: '07', label: 'Jul' },
-              { value: '08', label: 'Aug' },
-              { value: '09', label: 'Sep' },
-              { value: '10', label: 'Oct' },
-              { value: '11', label: 'Nov' },
-              { value: '12', label: 'Dec' },
-            ].map((month) => {
-              const monthNumber = parseInt(month.value, 10);
-              const isFutureMonth =
-                birthYear === String(currentYear) &&
-                monthNumber > today.getMonth() + 1;
-              return (
-                <option key={month.value} value={month.value} disabled={isFutureMonth}>
-                  {month.label}
-                </option>
-              );
-            })}
-          </select>
+            {monthOptions.find((month) => month.value === birthMonth)?.label || 'Month'}
+          </button>
+          {birthMonthOpen && (
+            <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+              {monthOptions.map((month) => {
+                const monthNumber = parseInt(month.value, 10);
+                const isFutureMonth =
+                  birthYear === String(currentYear) && monthNumber > today.getMonth() + 1;
+                const isSelected = birthMonth === month.value;
+                return (
+                  <button
+                    key={month.value}
+                    type="button"
+                    className={`w-full px-3 py-2 text-left text-sm ${
+                      isSelected ? 'bg-helfi-green text-white' : 'hover:bg-gray-100'
+                    } ${isFutureMonth ? 'text-gray-300 cursor-not-allowed hover:bg-white' : ''}`}
+                    disabled={isFutureMonth}
+                    onClick={() => {
+                      if (isFutureMonth) return;
+                      birthdateTouchedRef.current = true;
+                      setBirthMonth(month.value);
+                      const nextBirthdate = buildValidBirthdate(birthYear, month.value, birthDay);
+                      setBirthdate(nextBirthdate);
+                      if (nextBirthdate) {
+                        saveBirthdateNow(nextBirthdate);
+                      }
+                      closeBirthMenus();
+                    }}
+                  >
+                    {month.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
-        <div>
+        <div ref={birthYearRef} className="relative">
           <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
-          <select
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
-            value={birthYear}
-            onChange={(e) => {
-              const nextYear = e.target.value;
-              birthdateTouchedRef.current = true;
-              setBirthYear(nextYear);
-              const nextBirthdate = buildValidBirthdate(nextYear, birthMonth, birthDay);
-              setBirthdate(nextBirthdate);
-              if (nextBirthdate) {
-                saveBirthdateNow(nextBirthdate);
-              }
+          <button
+            type="button"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left bg-white focus:border-green-500 focus:ring-1 focus:ring-green-500 shadow-sm"
+            aria-haspopup="listbox"
+            aria-expanded={birthYearOpen}
+            onClick={() => {
+              setBirthYearOpen((open) => !open);
+              setBirthDayOpen(false);
+              setBirthMonthOpen(false);
             }}
           >
-            <option value="">Year</option>
-            {Array.from({ length: currentYear - minYear + 1 }, (_, idx) => {
-              const year = currentYear - idx;
-              return (
-                <option key={year} value={String(year)}>
-                  {year}
-                </option>
-              );
-            })}
-          </select>
+            {birthYear || 'Year'}
+          </button>
+          {birthYearOpen && (
+            <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+              {Array.from({ length: currentYear - minYear + 1 }, (_, idx) => {
+                const year = currentYear - idx;
+                const yearValue = String(year);
+                const isSelected = birthYear === yearValue;
+                return (
+                  <button
+                    key={yearValue}
+                    type="button"
+                    className={`w-full px-3 py-2 text-left text-sm ${
+                      isSelected ? 'bg-helfi-green text-white' : 'hover:bg-gray-100'
+                    }`}
+                    onClick={() => {
+                      birthdateTouchedRef.current = true;
+                      setBirthYear(yearValue);
+                      const nextBirthdate = buildValidBirthdate(yearValue, birthMonth, birthDay);
+                      setBirthdate(nextBirthdate);
+                      if (nextBirthdate) {
+                        saveBirthdateNow(nextBirthdate);
+                      }
+                      closeBirthMenus();
+                    }}
+                  >
+                    {yearValue}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
       <h2 className="text-2xl font-bold mb-4">How tall are you?</h2>
