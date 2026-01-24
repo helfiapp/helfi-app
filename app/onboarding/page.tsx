@@ -850,6 +850,7 @@ const PhysicalStep = memo(function PhysicalStep({
   );
   const goalChoiceTouchedRef = useRef(false);
   const goalIntensityTouchedRef = useRef(false);
+  const birthdateTouchedRef = useRef(false);
   const goalChoiceHydratedRef = useRef(false);
   const goalIntensityHydratedRef = useRef(false);
   const lastSyncVersionRef = useRef<number>(0);
@@ -1029,11 +1030,16 @@ const PhysicalStep = memo(function PhysicalStep({
       initialSnapshotRef.current = initial;
     }
 
-    if (
-      (forceHydrate || !birthdate) &&
-      typeof initial.birthdate === 'string' &&
-      initial.birthdate.trim().length >= 8
-    ) {
+    const initialBirthdate = typeof initial.birthdate === 'string' ? initial.birthdate.trim() : '';
+    const localBirthdate =
+      birthYear && birthMonth && birthDay
+        ? `${birthYear}-${birthMonth}-${birthDay}`.trim()
+        : (birthdate || '').trim();
+    if (birthdateTouchedRef.current && initialBirthdate && localBirthdate && initialBirthdate === localBirthdate) {
+      birthdateTouchedRef.current = false;
+    }
+    const allowBirthdateHydration = !birthdateTouchedRef.current;
+    if (allowBirthdateHydration && (forceHydrate || !birthdate) && initialBirthdate.length >= 8) {
       setBirthdate(initial.birthdate);
     }
 
@@ -1174,7 +1180,11 @@ const PhysicalStep = memo(function PhysicalStep({
       goalDetailsHydratedRef.current = true;
     }
 
-    if ((forceHydrate || (!birthYear && !birthMonth && !birthDay)) && typeof initial.birthdate === 'string') {
+    if (
+      allowBirthdateHydration &&
+      (forceHydrate || (!birthYear && !birthMonth && !birthDay)) &&
+      typeof initial.birthdate === 'string'
+    ) {
       const [y, m, d] = initial.birthdate.split('-');
       if (y && m && d) {
         setBirthYear(y);
@@ -2781,7 +2791,16 @@ const PhysicalStep = memo(function PhysicalStep({
           <select
             className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
             value={birthDay}
-            onChange={(e) => setBirthDay(e.target.value)}
+            onChange={(e) => {
+              const nextDay = e.target.value;
+              birthdateTouchedRef.current = true;
+              setBirthDay(nextDay);
+              const nextBirthdate = buildValidBirthdate(birthYear, birthMonth, nextDay);
+              setBirthdate(nextBirthdate);
+              if (nextBirthdate) {
+                saveBirthdateNow(nextBirthdate);
+              }
+            }}
           >
             <option value="">Day</option>
             {Array.from({ length: daysInMonth }, (_, idx) => {
@@ -2804,7 +2823,16 @@ const PhysicalStep = memo(function PhysicalStep({
           <select
             className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
             value={birthMonth}
-            onChange={(e) => setBirthMonth(e.target.value)}
+            onChange={(e) => {
+              const nextMonth = e.target.value;
+              birthdateTouchedRef.current = true;
+              setBirthMonth(nextMonth);
+              const nextBirthdate = buildValidBirthdate(birthYear, nextMonth, birthDay);
+              setBirthdate(nextBirthdate);
+              if (nextBirthdate) {
+                saveBirthdateNow(nextBirthdate);
+              }
+            }}
           >
             <option value="">Month</option>
             {[
@@ -2838,7 +2866,16 @@ const PhysicalStep = memo(function PhysicalStep({
           <select
             className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
             value={birthYear}
-            onChange={(e) => setBirthYear(e.target.value)}
+            onChange={(e) => {
+              const nextYear = e.target.value;
+              birthdateTouchedRef.current = true;
+              setBirthYear(nextYear);
+              const nextBirthdate = buildValidBirthdate(nextYear, birthMonth, birthDay);
+              setBirthdate(nextBirthdate);
+              if (nextBirthdate) {
+                saveBirthdateNow(nextBirthdate);
+              }
+            }}
           >
             <option value="">Year</option>
             {Array.from({ length: currentYear - minYear + 1 }, (_, idx) => {
@@ -7855,6 +7892,7 @@ export default function Onboarding() {
   // See GUARD_RAILS.md section "Goal intensity selection + daily allowance sync".
   const goalChoiceTouchedRef = useRef(false);
   const goalIntensityTouchedRef = useRef(false);
+  const birthdateTouchedRef = useRef(false);
 
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
   useEffect(() => {
@@ -8207,6 +8245,25 @@ export default function Onboarding() {
           const nextForm = { ...(userData.data || {}) };
           const localDraft = formRef.current;
           if (localDraft && typeof localDraft === 'object') {
+            const localBirthdate =
+              typeof (localDraft as any).birthdate === 'string'
+                ? (localDraft as any).birthdate.trim()
+                : '';
+            const serverBirthdate =
+              typeof (userData.data as any)?.birthdate === 'string'
+                ? String((userData.data as any).birthdate).trim()
+                : '';
+            if (
+              birthdateTouchedRef.current &&
+              localBirthdate &&
+              serverBirthdate &&
+              serverBirthdate === localBirthdate
+            ) {
+              birthdateTouchedRef.current = false;
+            }
+            if (birthdateTouchedRef.current && localBirthdate) {
+              (nextForm as any).birthdate = localBirthdate;
+            }
             const localGoalChoice =
               typeof (localDraft as any).goalChoice === 'string'
                 ? (localDraft as any).goalChoice.trim()
@@ -8413,6 +8470,9 @@ export default function Onboarding() {
       }
       if (typeof partial?.goalIntensity === 'string' && partial.goalIntensity.trim()) {
         goalIntensityTouchedRef.current = true;
+      }
+      if (typeof partial?.birthdate === 'string' && partial.birthdate.trim()) {
+        birthdateTouchedRef.current = true;
       }
       setForm((prev: any) => {
         let next = { ...prev, ...partial };
