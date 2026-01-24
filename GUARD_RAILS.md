@@ -1914,6 +1914,33 @@ owner approval.
   - `git show 7db259ab:components/support/SupportChatWidget.tsx`
   - `git show 7db259ab:lib/support-automation.ts`
 
+## 7.4 Admin Login + Authenticator (Locked)
+
+**Goal:** Prevent admin lockouts caused by password or authenticator changes.
+
+**Protected files:**
+- `app/admin-panel/page.tsx`
+- `app/admin-panel/qr-login/page.tsx`
+- `app/api/admin/auth/route.ts`
+- `app/api/admin/qr-login/start/route.ts`
+- `app/api/admin/qr-login/status/route.ts`
+- `app/api/admin/qr-login/approve/route.ts`
+- `lib/admin-auth.ts`
+
+**Rules (do not change without explicit owner approval):**
+- Do not change the admin login flow, password checks, or authenticator logic.
+- Do not reset admin passwords or authenticator secrets in the database.
+- Do not change the admin email in the database.
+
+**If login breaks:**
+1. Get the owner’s written approval before any password or authenticator reset.
+2. If a reset is approved, tell the owner they must scan a new QR code.
+3. After any change, test both:
+   - Email + authenticator login on desktop.
+   - QR login approval on phone.
+
+**Last stable deployment:** `dbe9205a` (2026-01-24)
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
