@@ -2080,6 +2080,25 @@ const PhysicalStep = memo(function PhysicalStep({
     [onPartialSave],
   );
   const lastBirthdateSavedRef = useRef<string>('');
+  const saveBirthdateNow = useCallback(
+    (value: string) => {
+      if (!value) return;
+      if (value === lastBirthdateSavedRef.current) return;
+      lastBirthdateSavedRef.current = value;
+      schedulePartialSave({ birthdate: value });
+      try {
+        updateUserData(sanitizeUserDataPayload({ birthdate: value }));
+      } catch {}
+      fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitizeUserDataPayload({ birthdate: value })),
+        keepalive: true,
+      })
+        .catch(() => {});
+    },
+    [schedulePartialSave, updateUserData],
+  );
 
   useEffect(() => {
     if (typeof initial?.birthdate === 'string' && initial.birthdate) {
@@ -2111,9 +2130,9 @@ const PhysicalStep = memo(function PhysicalStep({
       const dd = String(d).padStart(2, '0');
       const nextBirthdate = `${yyyy}-${mm}-${dd}`;
       setBirthdate(nextBirthdate);
-      if (birthdateTouchedRef.current && nextBirthdate !== lastBirthdateSavedRef.current) {
-        lastBirthdateSavedRef.current = nextBirthdate;
-        schedulePartialSave({ birthdate: nextBirthdate });
+      if (birthdateTouchedRef.current) {
+        birthdateTouchedRef.current = false;
+        saveBirthdateNow(nextBirthdate);
       }
     } else {
       setBirthdate('');
