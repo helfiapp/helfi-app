@@ -1,9 +1,9 @@
 export const CREDIT_DISPLAY = {
-  foodAnalysis: 15,
+  foodAnalysis: 10,
   symptomAnalysis: 6,
   medicalImageAnalysis: 8,
   insightsGeneration: 8,
-  chatLight: 2,
+  chatLight: 10,
 };
 
 export const creditDisplayList = [
@@ -11,5 +11,5 @@ export const creditDisplayList = [
   { label: 'Symptom analysis', key: 'symptomAnalysis', credits: CREDIT_DISPLAY.symptomAnalysis },
   { label: 'Medical image analysis', key: 'medicalImageAnalysis', credits: CREDIT_DISPLAY.medicalImageAnalysis },
   { label: 'Insights generation', key: 'insightsGeneration', credits: CREDIT_DISPLAY.insightsGeneration },
-  { label: 'Light chat (e.g., symptoms chat)', key: 'chatLight', credits: CREDIT_DISPLAY.chatLight },
+  { label: 'Talk to Helfi chat', key: 'chatLight', credits: CREDIT_DISPLAY.chatLight },
 ];
