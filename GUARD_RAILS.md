@@ -107,6 +107,39 @@ Last stable deployment: `9cfcc278` (2026-01-24)
 
 ---
 
+### 2.6.2 Birthdate picker + save lock (Jan 2026 – Locked)
+
+**Protected file:** `app/onboarding/page.tsx`
+
+Problem this prevents:
+- Birthdate changes must stick on the first click (no 2–3 click “bounce”).  
+- The background refresh must not overwrite a user’s recent birthdate choice.  
+- The birthdate dropdown must stay short and scrollable (not a full‑page list).
+
+Guard rail:
+- Keep the custom **Day / Month / Year** dropdowns (button + list), with a short scroll area:
+  - `max-h-56` + `overflow-y-auto`
+  - Do **not** revert to native `<select>` or `<input type="date">`.
+- Keep `birthdateTouchedRef` and do **not** let server hydration overwrite when it’s `true`.
+- Keep `saveBirthdateNow`, `buildValidBirthdate`, and the effect that syncs the parts → birthdate.
+- When a value is picked, it must:
+  - set `birthYear` / `birthMonth` / `birthDay`
+  - build a valid date
+  - call `saveBirthdateNow`
+- Close the dropdown menus on outside click so they don’t get stuck open.
+
+Restore steps if broken:
+1. Re‑add the custom dropdowns (buttons + list) and remove native date inputs.  
+2. Ensure each selection saves immediately using:
+   - `buildValidBirthdate(...)`
+   - `saveBirthdateNow(...)`
+3. Keep `birthdateTouchedRef` and block server re‑hydration when it’s set.  
+4. Keep the outside‑click handler that closes the menus.  
+
+Last stable deployment: `348f9377` (2026-01-25)
+
+---
+
 ### 2.2 Onboarding Page Popup (“Complete your health setup”)
 
 File: `app/onboarding/page.tsx`
