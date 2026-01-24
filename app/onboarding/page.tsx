@@ -2769,7 +2769,7 @@ const PhysicalStep = memo(function PhysicalStep({
         placeholder={`Weight (${unit === 'metric' ? 'kg' : 'lbs'})`}
         value={weight}
         onChange={e => setWeight(e.target.value)}
-        onFocus={() => setWeight('')}
+        onFocus={(e) => e.currentTarget.select()}
       />
       <h2 className="text-2xl font-bold mb-2">What is your date of birth?</h2>
       <p className="mb-4 text-gray-600">
@@ -2877,7 +2877,7 @@ const PhysicalStep = memo(function PhysicalStep({
             placeholder="Height (cm)"
             value={height}
             onChange={e => setHeight(e.target.value)}
-            onFocus={() => setHeight('')}
+            onFocus={(e) => e.currentTarget.select()}
           />
         ) : (
           <div className="flex gap-3">
@@ -2889,7 +2889,7 @@ const PhysicalStep = memo(function PhysicalStep({
                 placeholder="Feet"
                 value={feet}
                 onChange={e => setFeet(e.target.value)}
-                onFocus={() => setFeet('')}
+                onFocus={(e) => e.currentTarget.select()}
               />
             </div>
             <div className="flex-1">
@@ -2900,7 +2900,7 @@ const PhysicalStep = memo(function PhysicalStep({
                 placeholder="Inches"
                 value={inches}
                 onChange={e => setInches(e.target.value)}
-                onFocus={() => setInches('')}
+                onFocus={(e) => e.currentTarget.select()}
               />
             </div>
           </div>
