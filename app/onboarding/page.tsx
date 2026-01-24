@@ -2116,6 +2116,57 @@ const PhysicalStep = memo(function PhysicalStep({
     },
     [onPartialSave],
   );
+  const lastBirthdateSavedRef = useRef<string>('');
+  const saveBirthdateNow = useCallback(
+    (value: string) => {
+      if (!value) return;
+      if (value === lastBirthdateSavedRef.current) return;
+      lastBirthdateSavedRef.current = value;
+      schedulePartialSave({ birthdate: value });
+      try {
+        updateUserData(sanitizeUserDataPayload({ birthdate: value }));
+      } catch {}
+      fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitizeUserDataPayload({ birthdate: value })),
+        keepalive: true,
+      })
+        .catch(() => {});
+    },
+    [schedulePartialSave, updateUserData],
+  );
+
+  useEffect(() => {
+    if (typeof initial?.birthdate === 'string' && initial.birthdate) {
+      lastBirthdateSavedRef.current = initial.birthdate;
+    }
+  }, [initial?.birthdate]);
+
+  const buildValidBirthdate = useCallback((year: string, month: string, day: string) => {
+    if (!year || !month || !day) return '';
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+    const d = parseInt(day, 10);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return '';
+    const candidate = new Date(y, m - 1, d);
+    const now = new Date();
+    if (candidate > now) return '';
+    if (candidate.getFullYear() !== y || candidate.getMonth() !== m - 1 || candidate.getDate() !== d) return '';
+    const yyyy = String(y).padStart(4, '0');
+    const mm = String(m).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
+  // Keep canonical birthdate string in sync with dropdowns and block future dates
+  useEffect(() => {
+    const nextBirthdate = buildValidBirthdate(birthYear, birthMonth, birthDay);
+    setBirthdate(nextBirthdate);
+    if (nextBirthdate) {
+      saveBirthdateNow(nextBirthdate);
+    }
+  }, [birthYear, birthMonth, birthDay, buildValidBirthdate, saveBirthdateNow]);
 
   const handleAddAllergy = useCallback(
     (value?: string) => {
