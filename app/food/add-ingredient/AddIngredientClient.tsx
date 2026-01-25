@@ -827,49 +827,6 @@ export default function AddIngredientClient() {
     return hasCalories && hasProtein && hasCarbs && hasFat
   }
 
-  const pickBestMacroMatch = (items: NormalizedFoodItem[], lookup: string) => {
-    const filtered = items.filter((candidate) => hasMacroData(candidate))
-    if (filtered.length === 0) return null
-    return (
-      filtered.find((candidate) => nameMatchesSearchQuery(candidate?.name || '', lookup, { requireFirstWord: false })) ||
-      filtered[0]
-    )
-  }
-
-  const resolveItemWithMacros = async (lookup: string) => {
-    const trimmed = String(lookup || '').trim()
-    if (!trimmed) return null
-    try {
-      const usdaParams = new URLSearchParams({
-        source: 'usda',
-        q: trimmed,
-        kind: 'single',
-        limit: '20',
-      })
-      usdaParams.set('localOnly', '1')
-      const usdaRes = await fetch(`/api/food-data?${usdaParams.toString()}`, { method: 'GET' })
-      if (usdaRes.ok) {
-        const data = await usdaRes.json().catch(() => ({}))
-        const items: NormalizedFoodItem[] = Array.isArray(data?.items) ? data.items : []
-        const match = pickBestMacroMatch(items, trimmed)
-        if (match) return match
-      }
-      const packagedParams = new URLSearchParams({
-        source: 'auto',
-        q: trimmed,
-        kind: 'packaged',
-        limit: '20',
-      })
-      const packagedRes = await fetch(`/api/food-data?${packagedParams.toString()}`, { method: 'GET' })
-      if (!packagedRes.ok) return null
-      const packagedData = await packagedRes.json().catch(() => ({}))
-      const packagedItems: NormalizedFoodItem[] = Array.isArray(packagedData?.items) ? packagedData.items : []
-      return pickBestMacroMatch(packagedItems, trimmed)
-    } catch {
-      return null
-    }
-  }
-
   const fetchBrandSuggestions = async (searchQuery: string) => {
     const prefix = getBrandMatchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
@@ -1066,13 +1023,8 @@ export default function AddIngredientClient() {
       const resolvedTarget = upgraded || target
       let final = resolvedTarget
       if (!hasMacroData(final)) {
-        const lookup = String((resolvedTarget as any)?.__searchQuery || resolvedTarget?.name || '').trim()
-        const fallback = lookup ? await resolveItemWithMacros(lookup) : null
-        if (!fallback) {
-          setError('This item has no nutrition data. Please choose another result.')
-          return
-        }
-        final = fallback
+        setError('This item has no nutrition data. Please choose another result.')
+        return
       }
       const baseItem = {
         name: String(final.name || 'Food'),

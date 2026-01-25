@@ -1613,24 +1613,11 @@ export default function MealBuilderClient() {
 
   const addItemWithMacros = async (item: NormalizedFoodItem) => {
     if (!item) return
-    const lookup = String((item as any)?.__searchQuery || item?.name || '').trim()
-    if (hasMacroData(item)) {
-      addItemDirect(item)
+    if (!hasMacroData(item)) {
+      setError('This item has no nutrition data. Please choose another result.')
       return
     }
-    setSearchLoading(true)
-    try {
-      const resolved = lookup ? await resolveItemWithMacros(lookup) : null
-      if (!resolved) {
-        setError('This item has no nutrition data. Please choose another result.')
-        return
-      }
-      addItemDirect(resolved)
-    } catch {
-      setError('Search failed. Please try again.')
-    } finally {
-      setSearchLoading(false)
-    }
+    addItemDirect(item)
   }
 
   const addSuggestionItem = async (item: NormalizedFoodItem) => {
