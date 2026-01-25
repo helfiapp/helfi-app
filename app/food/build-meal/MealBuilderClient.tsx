@@ -23,6 +23,21 @@ type NormalizedFoodItem = {
   __searchQuery?: string
 }
 
+type ServingOption = {
+  id: string
+  label?: string | null
+  serving_size?: string | null
+  grams?: number | null
+  ml?: number | null
+  calories?: number | null
+  protein_g?: number | null
+  carbs_g?: number | null
+  fat_g?: number | null
+  fiber_g?: number | null
+  sugar_g?: number | null
+  source?: string | null
+}
+
 type BuilderUnit =
   | 'g'
   | 'ml'
@@ -57,6 +72,10 @@ type BuilderItem = {
   __amountInput: string
   __unit: BuilderUnit | null
   __pieceGrams: number | null
+  __servingOptions?: ServingOption[] | null
+  __selectedServingId?: string | null
+  __source?: NormalizedFoodItem['source'] | null
+  __sourceId?: string | null
 }
 
 const CATEGORY_LABELS: Record<MealCategory, string> = {
@@ -545,60 +564,84 @@ const normalizeLegacyBaseUnit = (amount: number | null, unit: BuilderUnit | null
   return { amount, unit }
 }
 
-const estimatePieceGrams = (
-  nameRaw: string,
-  servingRaw?: string | null,
-  baseAmount?: number | null,
-  baseUnit?: BuilderUnit | null,
-) => {
-  const name = String(nameRaw || '').toLowerCase()
-  const serving = String(servingRaw || '').toLowerCase()
-  const label = `${name} ${serving}`.trim()
-  if (!label) return null
+const isGenericSizeLabel = (label: string) => {
+  const l = (label || '').toLowerCase().trim()
+  if (!l) return false
+  return ['small', 'medium', 'large', 'extra large', 'extra-large', 'xl', 'jumbo', 'mini', 'regular'].includes(l)
+}
 
-  const normalized = label.replace(/[^a-z0-9]+/g, ' ').trim()
-  const hasWord = (word: string) => new RegExp(`\\b${word}\\b`).test(normalized)
-  const hasPhrase = (phrase: string) => normalized.includes(phrase)
-
-  const basePieceHint =
-    baseUnit === 'g' &&
-    baseAmount &&
-    baseAmount > 0 &&
-    baseAmount <= 300 &&
-    !/\bserving\b/.test(normalized) &&
-    (hasWord('piece') || hasWord('whole') || hasWord('medium') || hasWord('large') || hasWord('small') || hasWord('egg'))
-  if (basePieceHint) return baseAmount
-
-  const curated: Array<{ keywords: string[]; grams: number }> = [
-    { keywords: ['egg', 'eggs'], grams: 50 },
-    { keywords: ['bacon', 'rasher', 'rashers', 'strip', 'strips'], grams: 15 },
-    { keywords: ['sausage', 'sausages', 'link', 'links'], grams: 80 },
-    { keywords: ['carrot', 'carrots'], grams: 61 },
-    { keywords: ['zucchini', 'zucchinis', 'courgette', 'courgettes'], grams: 200 },
-    { keywords: ['banana', 'bananas'], grams: 118 },
-    { keywords: ['apple', 'apples'], grams: 182 },
-    { keywords: ['tomato', 'tomatoes'], grams: 123 },
-    { keywords: ['onion', 'onions'], grams: 110 },
-    { keywords: ['potato', 'potatoes'], grams: 170 },
-    { keywords: ['pancake', 'pancakes'], grams: 40 },
-    { keywords: ['hash brown', 'hashbrown'], grams: 70 },
-    { keywords: ['fish fillet', 'fish fingers', 'fish sticks'], grams: 90 },
-    { keywords: ['shrimp', 'prawn', 'prawns'], grams: 30 },
-    { keywords: ['wing', 'wings'], grams: 30 },
-    { keywords: ['nugget', 'nuggets'], grams: 20 },
-    { keywords: ['meatball', 'meatballs'], grams: 20 },
-    { keywords: ['patty', 'pattie'], grams: 115 },
-    { keywords: ['bun', 'roll'], grams: 75 },
-  ]
-
-  for (const entry of curated) {
-    if (entry.keywords.some((k) => (k.includes(' ') ? hasPhrase(k) : hasWord(k)))) {
-      return entry.grams
+const parseServingQuantity = (value: string): number | null => {
+  const trimmed = value.trim()
+  const mixed = trimmed.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/)
+  if (mixed) {
+    const whole = Number(mixed[1])
+    const num = Number(mixed[2])
+    const den = Number(mixed[3])
+    if (Number.isFinite(whole) && Number.isFinite(num) && Number.isFinite(den) && den > 0) {
+      return whole + num / den
     }
   }
-
-  return null
+  const frac = trimmed.match(/^(\d+)\s*\/\s*(\d+)$/)
+  if (frac) {
+    const num = Number(frac[1])
+    const den = Number(frac[2])
+    if (Number.isFinite(num) && Number.isFinite(den) && den > 0) return num / den
+  }
+  const num = parseFloat(trimmed)
+  return Number.isFinite(num) ? num : null
 }
+
+const parseServingUnitMeta = (label: string) => {
+  const normalized = String(label || '').trim()
+  if (!normalized) return null
+  const numberToken = normalized.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
+  if (!numberToken) return null
+  const quantity = parseServingQuantity(numberToken[0])
+  if (!quantity || quantity <= 0) return null
+  const unitLabel = normalized.replace(numberToken[0], '').trim().replace(/^of\s+/i, '').trim()
+  return { quantity, unitLabel }
+}
+
+const DISCRETE_UNIT_TERMS = [
+  'egg','eggs','piece','pieces','slice','slices','bacon','rasher','rashers','strip','strips','sausage','sausages',
+  'link','links','patty','pattie','nugget','nuggets','wing','wings','meatball','meatballs','bar','stick','cookie',
+  'biscuit','cracker','pancake','scoop','banana','apple','tomato','potato','onion','carrot','zucchini','courgette',
+  'bun','roll','sandwich','burger'
+]
+
+const isDiscreteUnitLabel = (label: string) => {
+  const l = (label || '').toLowerCase().trim()
+  if (!l) return false
+  return DISCRETE_UNIT_TERMS.some((term) => l.includes(term))
+}
+
+const normalizeServingOptionLabel = (option: ServingOption, itemName: string) => {
+  const raw = String(option?.label || option?.serving_size || '').trim()
+  if (!raw) return raw
+  const grams = Number(option?.grams)
+  const base = raw.split('—')[0]?.trim() || raw
+  if (isGenericSizeLabel(base) && itemName) {
+    const gramsLabel = Number.isFinite(grams) && grams > 0 ? ` — ${Math.round(grams)}g` : ''
+    return `1 ${base} ${itemName}${gramsLabel}`.trim()
+  }
+  return raw
+}
+
+const normalizeServingOptionsForItem = (options: ServingOption[], itemName: string) =>
+  options.map((opt) => ({
+    ...opt,
+    label: normalizeServingOptionLabel(opt, itemName),
+  }))
+
+const extractPieceGramsFromLabel = (label: string) => {
+  const meta = parseServingUnitMeta(label)
+  if (!meta || !isDiscreteUnitLabel(meta.unitLabel)) return null
+  const parsed = parseServingBase(label)
+  if (!parsed.amount || parsed.unit !== 'g') return null
+  if (meta.quantity <= 0) return null
+  return parsed.amount / meta.quantity
+}
+
 
 const isLikelyLiquidItem = (nameRaw: string, servingRaw?: string | null) => {
   const name = String(nameRaw || '').toLowerCase()
@@ -704,7 +747,12 @@ const convertAmount = (
   return amount
 }
 
-const allowedUnitsForItem = (_item?: BuilderItem) => [...DISPLAY_UNITS]
+const allowedUnitsForItem = (item?: BuilderItem) => {
+  const units = [...DISPLAY_UNITS]
+  const pieceGrams = item?.__pieceGrams
+  if (!pieceGrams || pieceGrams <= 0) return units.filter((u) => u !== 'piece')
+  return units
+}
 
 const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
   if (unit === 'g') return 'g'
@@ -858,6 +906,8 @@ export default function MealBuilderClient() {
   const [brandSuggestions, setBrandSuggestions] = useState<NormalizedFoodItem[]>([])
   const brandSuggestionsRef = useRef<NormalizedFoodItem[]>([])
   const searchCacheRef = useRef<Map<string, { items: NormalizedFoodItem[]; at: number }>>(new Map())
+  const servingOptionsCacheRef = useRef<Map<string, ServingOption[]>>(new Map())
+  const servingOptionsPendingRef = useRef<Set<string>>(new Set())
 
   const seqRef = useRef(0)
   const brandSeqRef = useRef(0)
@@ -916,6 +966,32 @@ export default function MealBuilderClient() {
   }, [brandSuggestions])
 
   useEffect(() => {
+    if (!expandedId) return
+    const item = itemsRef.current.find((entry) => entry.id === expandedId)
+    if (!item) return
+    if (Array.isArray(item.__servingOptions) && item.__servingOptions.length > 0) return
+    loadServingOptionsForItem(item).then((options) => {
+      if (!options || options.length === 0) return
+      setItems((prev) =>
+        prev.map((entry) => {
+          if (entry.id !== item.id) return entry
+          const currentLabel = String(entry.serving_size || '').toLowerCase()
+          const selected =
+            options.find((opt) => String(opt?.label || opt?.serving_size || '').toLowerCase() === currentLabel) || null
+          const pieceFromSelected =
+            selected && !entry.__pieceGrams ? extractPieceGramsFromLabel(String(selected.label || selected.serving_size || '')) : null
+          return {
+            ...entry,
+            __servingOptions: options,
+            __selectedServingId: selected?.id || entry.__selectedServingId || null,
+            __pieceGrams: entry.__pieceGrams || pieceFromSelected || null,
+          }
+        }),
+      )
+    })
+  }, [expandedId])
+
+  useEffect(() => {
     try {
       if (typeof window === 'undefined') return
       const key = 'helfi:food-search-warm'
@@ -958,7 +1034,7 @@ export default function MealBuilderClient() {
       const base = seedBaseServing(parseServingBase(serving_size))
       let baseAmount = base.amount
       let baseUnit = base.unit
-      const pieceGrams = estimatePieceGrams(name, serving_size, baseAmount, baseUnit)
+      const pieceGrams = extractPieceGramsFromLabel(serving_size)
       const liquidItem = isLikelyLiquidItem(name, serving_size)
       if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
         const converted = convertAmount(baseAmount, baseUnit, 'g')
@@ -988,6 +1064,12 @@ export default function MealBuilderClient() {
         __amountInput: String(baseAmount && baseUnit ? round3(baseAmount * resolvedServings) : round3(resolvedServings)),
         __unit: baseUnit,
         __pieceGrams: pieceGrams,
+        __source: typeof raw?.source === 'string' ? raw.source : null,
+        __sourceId: raw?.id ? String(raw.id) : null,
+        __servingOptions: Array.isArray(raw?.servingOptions)
+          ? normalizeServingOptionsForItem(raw.servingOptions, name)
+          : null,
+        __selectedServingId: raw?.selectedServingId ?? null,
       })
     }
     return next
@@ -1392,12 +1474,94 @@ export default function MealBuilderClient() {
     runSearch(raw)
   }
 
+  const loadServingOptionsForItem = async (item: BuilderItem) => {
+    if (!item?.__source || !item?.__sourceId) return null
+    if (item.__source !== 'usda' && item.__source !== 'fatsecret') return null
+    const key = `${item.__source}:${item.__sourceId}`
+    const cached = servingOptionsCacheRef.current.get(key)
+    if (cached) return cached
+    if (servingOptionsPendingRef.current.has(key)) return null
+    servingOptionsPendingRef.current.add(key)
+    try {
+      const params = new URLSearchParams({ source: item.__source, id: String(item.__sourceId) })
+      const res = await fetch(`/api/food-data/servings?${params.toString()}`, { method: 'GET' })
+      if (!res.ok) return null
+      const data = await res.json().catch(() => ({}))
+      const optionsRaw: ServingOption[] = Array.isArray(data?.options) ? data.options : []
+      const options = normalizeServingOptionsForItem(optionsRaw, item.name || 'Food')
+      if (options.length > 0) servingOptionsCacheRef.current.set(key, options)
+      return options
+    } catch {
+      return null
+    } finally {
+      servingOptionsPendingRef.current.delete(key)
+    }
+  }
+
+  const applyServingOptionToItem = (item: BuilderItem, option: ServingOption) => {
+    const next = { ...item }
+    const label = String(option?.label || option?.serving_size || '').trim()
+    if (label) next.serving_size = label
+    if (option?.calories != null) next.calories = toNumber(option.calories)
+    if (option?.protein_g != null) next.protein_g = toNumber(option.protein_g)
+    if (option?.carbs_g != null) next.carbs_g = toNumber(option.carbs_g)
+    if (option?.fat_g != null) next.fat_g = toNumber(option.fat_g)
+    if (option?.fiber_g != null) next.fiber_g = toNumber(option.fiber_g)
+    if (option?.sugar_g != null) next.sugar_g = toNumber(option.sugar_g)
+
+    const grams = Number(option?.grams)
+    const ml = Number(option?.ml)
+    let baseAmount = next.__baseAmount
+    let baseUnit = next.__baseUnit
+    if (Number.isFinite(grams) && grams > 0) {
+      baseAmount = grams
+      baseUnit = 'g'
+    } else if (Number.isFinite(ml) && ml > 0) {
+      baseAmount = ml
+      baseUnit = 'ml'
+    } else if (label) {
+      const parsed = parseServingBase(label)
+      baseAmount = parsed.amount
+      baseUnit = parsed.unit
+    }
+
+    const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+    baseAmount = normalized.amount
+    baseUnit = normalized.unit
+
+    next.__baseAmount = baseAmount
+    next.__baseUnit = baseUnit
+    next.__unit = baseUnit
+    next.__selectedServingId = option?.id || null
+    next.__pieceGrams = label ? extractPieceGramsFromLabel(label) : null
+
+    if (baseAmount && baseUnit) {
+      const servings = Number.isFinite(Number(next.servings)) ? Number(next.servings) : 1
+      next.__amount = round3(baseAmount * servings)
+      next.__amountInput = String(next.__amount)
+    }
+
+    return next
+  }
+
+  const setServingOption = (id: string, optionId: string) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== id) return it
+        const options = Array.isArray(it.__servingOptions) ? it.__servingOptions : []
+        const selected = options.find((opt) => opt?.id === optionId)
+        if (!selected) return { ...it, __selectedServingId: optionId }
+        return applyServingOptionToItem(it, selected)
+      }),
+    )
+  }
+
   const addItemDirect = (r: NormalizedFoodItem) => {
     triggerHaptic(10)
     const base = seedBaseServing(parseServingBase(r?.serving_size))
     let baseAmount = base.amount
     let baseUnit = base.unit
-    const pieceGrams = estimatePieceGrams(r?.name || '', r?.serving_size, baseAmount, baseUnit)
+    const pieceGrams = extractPieceGramsFromLabel(r?.serving_size || '')
     const liquidItem = isLikelyLiquidItem(r?.name || '', r?.serving_size)
     if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
       const converted = convertAmount(baseAmount, baseUnit, 'g')
@@ -1433,6 +1597,10 @@ export default function MealBuilderClient() {
       __amountInput: String(defaultAmount),
       __unit: baseUnit,
       __pieceGrams: pieceGrams,
+      __source: r?.source ?? null,
+      __sourceId: r?.id ? String(r.id) : null,
+      __servingOptions: null,
+      __selectedServingId: null,
     }
 
     // If we know the base amount, treat the amount as units in the base and compute servings.
@@ -1494,7 +1662,7 @@ export default function MealBuilderClient() {
       const base = seedBaseServing(parseServingBase(serving_size))
       let baseAmount = base.amount
       let baseUnit = base.unit
-      const pieceGrams = estimatePieceGrams(name, serving_size, baseAmount, baseUnit)
+      const pieceGrams = extractPieceGramsFromLabel(serving_size)
       const liquidItem = isLikelyLiquidItem(name, serving_size)
       if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
         const converted = convertAmount(baseAmount, baseUnit, 'g')
@@ -1524,6 +1692,12 @@ export default function MealBuilderClient() {
         __amountInput: String(baseAmount && baseUnit ? round3(baseAmount * (Number.isFinite(servings) ? servings : 1)) : round3(Number.isFinite(servings) ? servings : 1)),
         __unit: baseUnit,
         __pieceGrams: pieceGrams,
+        __source: ai?.source ?? null,
+        __sourceId: ai?.id ? String(ai.id) : null,
+        __servingOptions: Array.isArray(ai?.servingOptions)
+          ? normalizeServingOptionsForItem(ai.servingOptions, name)
+          : null,
+        __selectedServingId: ai?.selectedServingId ?? null,
       }
       addBuilderItem(next)
     }
@@ -2113,7 +2287,19 @@ export default function MealBuilderClient() {
     const shouldStripBuilderIds = Boolean(editFavoriteId) && !editFavoriteIsCustomRef.current
     const sourceItemsForMerge = shouldStripBuilderIds ? editFavoriteSourceItemsRef.current : null
     const cleanedItems = itemsForSave.map((it, index) => {
-      const { __baseAmount, __baseUnit, __amount, __amountInput, __unit, __pieceGrams, ...rest } = it
+      const {
+        __baseAmount,
+        __baseUnit,
+        __amount,
+        __amountInput,
+        __unit,
+        __pieceGrams,
+        __servingOptions,
+        __selectedServingId,
+        __source,
+        __sourceId,
+        ...rest
+      } = it
       const next: any = { ...rest }
       const source =
         Array.isArray(sourceItemsForMerge) && sourceItemsForMerge[index]
@@ -3070,6 +3256,23 @@ export default function MealBuilderClient() {
 
                     {expanded && (
                       <div className="px-3 pb-3 bg-white space-y-3">
+                        {Array.isArray(it.__servingOptions) && it.__servingOptions.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="text-xs font-semibold text-gray-700">Serving size options</div>
+                            <select
+                              value={it.__selectedServingId || ''}
+                              onChange={(e) => setServingOption(it.id, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            >
+                              <option value="">Choose a size</option>
+                              {it.__servingOptions.map((opt) => (
+                                <option key={opt.id} value={opt.id}>
+                                  {opt.label || opt.serving_size}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-1">
                             <div className="text-xs font-semibold text-gray-700">Amount</div>

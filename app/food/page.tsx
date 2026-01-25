@@ -112,11 +112,13 @@ const WEIGHT_UNIT_OPTIONS: Array<{ value: WeightUnit; label: string }> = [
   { value: 'piece', label: WEIGHT_UNIT_LABELS.piece },
 ]
 
-const getWeightUnitOptions = (current?: WeightUnit) => {
-  if (!current) return WEIGHT_UNIT_OPTIONS
-  if (WEIGHT_UNIT_OPTIONS.some((option) => option.value === current)) return WEIGHT_UNIT_OPTIONS
+const getWeightUnitOptions = (current?: WeightUnit, pieceAvailable?: boolean) => {
+  let options = WEIGHT_UNIT_OPTIONS
+  if (!pieceAvailable) options = options.filter((option) => option.value !== 'piece')
+  if (!current) return options
+  if (options.some((option) => option.value === current)) return options
   const label = WEIGHT_UNIT_LABELS[current] || current
-  return [...WEIGHT_UNIT_OPTIONS, { value: current, label }]
+  return [...options, { value: current, label }]
 }
 
 const WEIGHT_UNIT_TO_GRAMS: Record<WeightUnit, number> = {
@@ -4635,53 +4637,6 @@ export default function FoodDiary() {
     return score
   }
 
-  const buildEggSizeOptions = (item: any) => {
-    const baseCalories = Number(item?.calories)
-    const baseProtein = Number(item?.protein_g)
-    const baseCarbs = Number(item?.carbs_g)
-    const baseFat = Number(item?.fat_g)
-    const baseFiber = Number(item?.fiber_g)
-    const baseSugar = Number(item?.sugar_g)
-    const hasBase =
-      (Number.isFinite(baseCalories) && baseCalories > 0) ||
-      (Number.isFinite(baseProtein) && baseProtein > 0) ||
-      (Number.isFinite(baseCarbs) && baseCarbs > 0) ||
-      (Number.isFinite(baseFat) && baseFat > 0)
-    if (!hasBase) return []
-
-    const sizes = [
-      { id: 'egg:small', label: '1 egg (small) — 38g', grams: 38 },
-      { id: 'egg:medium', label: '1 egg (medium) — 44g', grams: 44 },
-      { id: 'egg:large', label: '1 egg (large) — 50g', grams: 50 },
-      { id: 'egg:extra-large', label: '1 egg (extra large) — 56g', grams: 56 },
-      { id: 'egg:jumbo', label: '1 egg (jumbo) — 63g', grams: 63 },
-    ]
-
-    const roundMacro = (value: number, factor: number, decimals: number) => {
-      const num = value * factor
-      const precision = Math.pow(10, decimals)
-      return Math.round(num * precision) / precision
-    }
-
-    return sizes.map((size) => {
-      const factor = size.grams / 100
-      return {
-        id: size.id,
-        label: size.label,
-        serving_size: size.label,
-        grams: size.grams,
-        unit: 'g',
-        calories: Number.isFinite(baseCalories) ? Math.round(baseCalories * factor) : null,
-        protein_g: Number.isFinite(baseProtein) ? roundMacro(baseProtein, factor, 1) : null,
-        carbs_g: Number.isFinite(baseCarbs) ? roundMacro(baseCarbs, factor, 1) : null,
-        fat_g: Number.isFinite(baseFat) ? roundMacro(baseFat, factor, 1) : null,
-        fiber_g: Number.isFinite(baseFiber) ? roundMacro(baseFiber, factor, 1) : null,
-        sugar_g: Number.isFinite(baseSugar) ? roundMacro(baseSugar, factor, 1) : null,
-        source: 'usda',
-      }
-    })
-  }
-
   const getEdibleYieldFactor = (query: string) => {
     const q = normalizeDbQuery(query)
     if (!q.includes('whole')) return 1
@@ -4689,6 +4644,56 @@ export default function FoodDiary() {
     if (/(fish|salmon|trout|snapper|mackerel|sardine)/i.test(q)) return 0.7
     if (/(lamb|goat|pork|beef)/i.test(q)) return 0.65
     return 1
+  }
+
+  const normalizeServingOptionLabel = (option: any, itemName: string) => {
+    const raw = String(option?.label || option?.serving_size || '').trim()
+    if (!raw) return raw
+    const grams = Number(option?.grams)
+    const base = raw.split('—')[0]?.trim() || raw
+    if (isGenericSizeLabel(base) && itemName) {
+      const gramsLabel = Number.isFinite(grams) && grams > 0 ? ` — ${Math.round(grams)}g` : ''
+      return `1 ${base} ${itemName}${gramsLabel}`.trim()
+    }
+    return raw
+  }
+
+  const normalizeServingOptionsForItem = (options: any[], itemName: string) =>
+    options.map((opt) => ({
+      ...opt,
+      label: normalizeServingOptionLabel(opt, itemName),
+    }))
+
+  const is100gServing = (servingSize?: string | null) => {
+    const label = String(servingSize || '').toLowerCase()
+    return /\b100\s*g\b/.test(label)
+  }
+
+  const scoreServingOption = (opt: any) => {
+    const label = String(opt?.label || opt?.serving_size || '').toLowerCase()
+    let score = 0
+    if (label.includes('serving')) score += 4
+    if (label.includes('piece') || label.includes('slice') || label.includes('egg')) score += 3
+    const grams = Number(opt?.grams)
+    if (Number.isFinite(grams)) {
+      if (grams >= 40 && grams <= 400) score += 3
+      if (grams === 100) score -= 6
+    }
+    if (is100gServing(label)) score -= 10
+    return score
+  }
+
+  const pickDefaultServingOption = (options: any[], currentServingSize?: string | null) => {
+    if (!Array.isArray(options) || options.length === 0) return null
+    const current = String(currentServingSize || '').toLowerCase()
+    if (current) {
+      const match = options.find((opt) => String(opt?.label || opt?.serving_size || '').toLowerCase() === current)
+      if (match) return match
+    }
+    const non100 = options.filter((opt) => !is100gServing(opt?.serving_size || opt?.label))
+    const pool = non100.length > 0 ? non100 : options
+    const sorted = [...pool].sort((a, b) => scoreServingOption(b) - scoreServingOption(a))
+    return sorted[0] || null
   }
 
   const applyServingOptionToItem = (item: any, option: any) => {
@@ -4936,9 +4941,7 @@ export default function FoodDiary() {
       }
 
       if (options.length > 0) {
-        const useEggSizes = hasEgg && !analysisHasEggDish
-        const eggOptions = useEggSizes ? buildEggSizeOptions(nextItem) : []
-        const finalOptions = eggOptions.length > 0 ? eggOptions : options
+        const finalOptions = normalizeServingOptionsForItem(options, nextItem.name || '')
         nextItem.servingOptions = finalOptions
         const isDiscreteItem =
           (Number.isFinite(Number(nextItem?.piecesPerServing)) && Number(nextItem.piecesPerServing) > 1) ||
@@ -4968,7 +4971,6 @@ export default function FoodDiary() {
         )
         let selected =
           singleDiscrete ||
-          (useEggSizes ? finalOptions.find((opt: any) => Number(opt?.grams) === 50) : null) ||
           (discreteOptions.length > 0 ? discreteOptions[0] : null) ||
           wholeMatch ||
           match ||
@@ -4980,7 +4982,7 @@ export default function FoodDiary() {
             selected = withGrams[0]
           }
         }
-        if (!selected) selected = options[0]
+        if (!selected) selected = finalOptions[0]
         nextItem.selectedServingId = selected?.id || null
         if (selected) {
           const merged = applyServingOptionToItem(nextItem, selected)
@@ -5949,7 +5951,7 @@ export default function FoodDiary() {
       }
       resolved = fallback
     }
-    const newItem: any = {
+    let newItem: any = {
       name: resolved.name || 'Unknown food',
       brand: resolved.brand ?? null,
       serving_size: resolved.serving_size || '',
@@ -5964,6 +5966,26 @@ export default function FoodDiary() {
     if (resolved?.source) newItem.dbSource = resolved.source
     if (resolved?.id) newItem.dbId = resolved.id
     newItem.dbLocked = true
+
+    if (newItem?.dbSource && newItem?.dbId && (newItem.dbSource === 'usda' || newItem.dbSource === 'fatsecret')) {
+      try {
+        const params = new URLSearchParams({ source: newItem.dbSource, id: String(newItem.dbId) })
+        const res = await fetch(`/api/food-data/servings?${params.toString()}`, { method: 'GET' })
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}))
+          const optionsRaw = Array.isArray(data?.options) ? data.options : []
+          const options = normalizeServingOptionsForItem(optionsRaw, newItem.name || '')
+          if (options.length > 0) {
+            const selected = pickDefaultServingOption(options, newItem.serving_size)
+            newItem.servingOptions = options
+            newItem.selectedServingId = selected?.id || null
+            if (selected) {
+              newItem = applyServingOptionToItem(newItem, selected)
+            }
+          }
+        }
+      } catch {}
+    }
 
     // If the modal was opened from the Today’s Meals (+) dropdown, add this as a new diary entry
     // in that meal category instead of adding to the analysis ingredient cards.
@@ -6297,13 +6319,18 @@ export default function FoodDiary() {
         const res = await fetch(`/api/food-data/servings?${params.toString()}`)
         if (res.ok) {
           const data = await res.json()
-          const options = Array.isArray(data.options) ? data.options : []
+          const optionsRaw = Array.isArray(data.options) ? data.options : []
+          const options = normalizeServingOptionsForItem(optionsRaw, nextItem.name || '')
           if (options.length > 0) {
             nextItem.servingOptions = options
-            const selected = options[0]
+            const selected = pickDefaultServingOption(options, nextItem.serving_size)
             nextItem.selectedServingId = selected?.id || null
-            const merged = applyServingOptionToItem(nextItem, selected)
-            itemsCopy[index] = merged
+            if (selected) {
+              const merged = applyServingOptionToItem(nextItem, selected)
+              itemsCopy[index] = merged
+            } else {
+              itemsCopy[index] = nextItem
+            }
           } else {
             itemsCopy[index] = nextItem
           }
@@ -9770,17 +9797,46 @@ const applyStructuredItems = (
     return perPiece * pieces
   }
 
+  const getPieceGramsForItem = (item: any, baseGrams: number | null) => {
+    const servingOptions = Array.isArray(item?.servingOptions) ? item.servingOptions : []
+    for (const option of servingOptions) {
+      const grams = Number(option?.grams)
+      if (!Number.isFinite(grams) || grams <= 0) continue
+      const label = String(option?.label || option?.serving_size || '')
+      const meta = parseServingUnitMetadata(label)
+      if (!meta || !isDiscreteUnitLabel(meta.unitLabel)) continue
+      if (!meta.quantity || meta.quantity <= 0) continue
+      return grams / meta.quantity
+    }
+
+    const servingLabel = String(item?.serving_size || '')
+    const meta = parseServingUnitMetadata(servingLabel)
+    if (meta && isDiscreteUnitLabel(meta.unitLabel) && meta.quantity > 0) {
+      const info = parseServingSizeInfo(item)
+      const gramsFromServing =
+        Number.isFinite(Number(info.gramsPerServing)) && Number(info.gramsPerServing) > 0
+          ? Number(info.gramsPerServing)
+          : Number.isFinite(Number(item?.customGramsPerServing)) && Number(item.customGramsPerServing) > 0
+          ? Number(item.customGramsPerServing)
+          : null
+      if (gramsFromServing && gramsFromServing > 0) return gramsFromServing / meta.quantity
+    }
+
+    if (baseGrams && baseGrams > 0 && meta && isDiscreteUnitLabel(meta.unitLabel) && meta.quantity > 0) {
+      return baseGrams / meta.quantity
+    }
+
+    return null
+  }
+
   const getUnitGramsForItem = (unit: WeightUnit, item: any, baseGrams: number | null) => {
     if (unit === 'serving') {
       return baseGrams && baseGrams > 0 ? baseGrams : WEIGHT_UNIT_TO_GRAMS.serving
     }
     if (unit === 'piece' || unit === 'slice') {
-      if (baseGrams && baseGrams > 0) {
-        const pieces = getPiecesPerServing(item)
-        if (pieces && pieces > 0) return baseGrams / pieces
-        return baseGrams
-      }
-      return WEIGHT_UNIT_TO_GRAMS[unit]
+      const pieceGrams = getPieceGramsForItem(item, baseGrams)
+      if (pieceGrams && pieceGrams > 0) return pieceGrams
+      return null
     }
     if (unit === 'pinch' || unit === 'handful') return WEIGHT_UNIT_TO_GRAMS[unit]
     return WEIGHT_UNIT_TO_GRAMS[unit]
@@ -9789,14 +9845,14 @@ const applyStructuredItems = (
   const weightAmountToGrams = (amount: number, unit: WeightUnit, item: any, baseGrams: number | null) => {
     if (!Number.isFinite(amount)) return null
     const gramsPerUnit = getUnitGramsForItem(unit, item, baseGrams)
-    if (!Number.isFinite(gramsPerUnit) || gramsPerUnit <= 0) return null
+    if (!gramsPerUnit || !Number.isFinite(gramsPerUnit) || gramsPerUnit <= 0) return null
     return amount * gramsPerUnit
   }
 
   const gramsToWeightAmount = (grams: number, unit: WeightUnit, item: any, baseGrams: number | null) => {
     if (!Number.isFinite(grams)) return null
     const gramsPerUnit = getUnitGramsForItem(unit, item, baseGrams)
-    if (!Number.isFinite(gramsPerUnit) || gramsPerUnit <= 0) return null
+    if (!gramsPerUnit || !Number.isFinite(gramsPerUnit) || gramsPerUnit <= 0) return null
     return grams / gramsPerUnit
   }
 
@@ -19190,6 +19246,8 @@ Please add nutritional information manually if needed.`);
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         const baseWeightPerServing = getBaseWeightPerServing(item)
                         const weightUnit = normalizeWeightUnit(item?.weightUnit)
+                        const pieceGrams = getPieceGramsForItem(item, baseWeightPerServing)
+                        const pieceAvailable = Boolean(pieceGrams && pieceGrams > 0)
                         
                         // Function to focus weight input (for mobile serving size click)
                         const focusWeightInput = () => {
@@ -19711,7 +19769,7 @@ Please add nutritional information manually if needed.`);
                                       className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none"
                                       style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
                                     >
-                                      {getWeightUnitOptions(weightUnit).map((option) => (
+                                      {getWeightUnitOptions(weightUnit, pieceAvailable).map((option) => (
                                         <option key={option.value} value={option.value}>
                                           {option.label}
                                         </option>
@@ -20159,6 +20217,8 @@ Please add nutritional information manually if needed.`);
                         const servingsCount = Number.isFinite(item?.servings) ? Number(item.servings) : 1
                         const baseWeightPerServing = getBaseWeightPerServing(item)
                         const unit = normalizeWeightUnit(item?.weightUnit)
+                        const pieceGrams = getPieceGramsForItem(item, baseWeightPerServing)
+                        const pieceAvailable = Boolean(pieceGrams && pieceGrams > 0)
                         const amountKey = `ai:modal:${editingItemIndex}:weightAmount`
                         const amountValue = Object.prototype.hasOwnProperty.call(numericInputDrafts, amountKey)
                           ? numericInputDrafts[amountKey]
@@ -20208,7 +20268,7 @@ Please add nutritional information manually if needed.`);
                                 onChange={(e) => updateItemField(editingItemIndex, 'weightUnit', e.target.value)}
                                 className="w-24 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               >
-                                {getWeightUnitOptions(unit).map((option) => (
+                                {getWeightUnitOptions(unit, pieceAvailable).map((option) => (
                                   <option key={option.value} value={option.value}>
                                     {option.label}
                                   </option>
