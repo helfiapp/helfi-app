@@ -56,6 +56,7 @@ type BuilderItem = {
   __amount: number
   __amountInput: string
   __unit: BuilderUnit | null
+  __pieceGrams: number | null
 }
 
 const CATEGORY_LABELS: Record<MealCategory, string> = {
@@ -458,6 +459,20 @@ const ALL_UNITS: BuilderUnit[] = [
   'serving',
 ]
 
+const DISPLAY_UNITS: BuilderUnit[] = [
+  'g',
+  'ml',
+  'oz',
+  'tsp',
+  'tbsp',
+  'quarter-cup',
+  'half-cup',
+  'three-quarter-cup',
+  'cup',
+  'pinch',
+  'piece',
+]
+
 const parseServingBase = (servingSize: any): { amount: number | null; unit: BuilderUnit | null } => {
   const raw = String(servingSize || '').trim()
   if (!raw) return { amount: null, unit: null }
@@ -522,6 +537,69 @@ const seedBaseServing = (base: { amount: number | null; unit: BuilderUnit | null
   return { amount: 1, unit: 'serving' as BuilderUnit }
 }
 
+const normalizeLegacyBaseUnit = (amount: number | null, unit: BuilderUnit | null) => {
+  if (!amount || !unit) return { amount, unit }
+  if (unit === 'serving') return { amount: amount * DEFAULT_SERVING_GRAMS, unit: 'g' as BuilderUnit }
+  if (unit === 'slice') return { amount: amount * UNIT_GRAMS.slice, unit: 'g' as BuilderUnit }
+  if (unit === 'handful') return { amount: amount * UNIT_GRAMS.handful, unit: 'g' as BuilderUnit }
+  return { amount, unit }
+}
+
+const estimatePieceGrams = (
+  nameRaw: string,
+  servingRaw?: string | null,
+  baseAmount?: number | null,
+  baseUnit?: BuilderUnit | null,
+) => {
+  const name = String(nameRaw || '').toLowerCase()
+  const serving = String(servingRaw || '').toLowerCase()
+  const label = `${name} ${serving}`.trim()
+  if (!label) return null
+
+  const normalized = label.replace(/[^a-z0-9]+/g, ' ').trim()
+  const hasWord = (word: string) => new RegExp(`\\b${word}\\b`).test(normalized)
+  const hasPhrase = (phrase: string) => normalized.includes(phrase)
+
+  const basePieceHint =
+    baseUnit === 'g' &&
+    baseAmount &&
+    baseAmount > 0 &&
+    baseAmount <= 300 &&
+    !/\bserving\b/.test(normalized) &&
+    (hasWord('piece') || hasWord('whole') || hasWord('medium') || hasWord('large') || hasWord('small') || hasWord('egg'))
+  if (basePieceHint) return baseAmount
+
+  const curated: Array<{ keywords: string[]; grams: number }> = [
+    { keywords: ['egg', 'eggs'], grams: 50 },
+    { keywords: ['bacon', 'rasher', 'rashers', 'strip', 'strips'], grams: 15 },
+    { keywords: ['sausage', 'sausages', 'link', 'links'], grams: 80 },
+    { keywords: ['carrot', 'carrots'], grams: 61 },
+    { keywords: ['zucchini', 'zucchinis', 'courgette', 'courgettes'], grams: 200 },
+    { keywords: ['banana', 'bananas'], grams: 118 },
+    { keywords: ['apple', 'apples'], grams: 182 },
+    { keywords: ['tomato', 'tomatoes'], grams: 123 },
+    { keywords: ['onion', 'onions'], grams: 110 },
+    { keywords: ['potato', 'potatoes'], grams: 170 },
+    { keywords: ['pancake', 'pancakes'], grams: 40 },
+    { keywords: ['hash brown', 'hashbrown'], grams: 70 },
+    { keywords: ['fish fillet', 'fish fingers', 'fish sticks'], grams: 90 },
+    { keywords: ['shrimp', 'prawn', 'prawns'], grams: 30 },
+    { keywords: ['wing', 'wings'], grams: 30 },
+    { keywords: ['nugget', 'nuggets'], grams: 20 },
+    { keywords: ['meatball', 'meatballs'], grams: 20 },
+    { keywords: ['patty', 'pattie'], grams: 115 },
+    { keywords: ['bun', 'roll'], grams: 75 },
+  ]
+
+  for (const entry of curated) {
+    if (entry.keywords.some((k) => (k.includes(' ') ? hasPhrase(k) : hasWord(k)))) {
+      return entry.grams
+    }
+  }
+
+  return null
+}
+
 const isLikelyLiquidItem = (nameRaw: string, servingRaw?: string | null) => {
   const name = String(nameRaw || '').toLowerCase()
   const serving = String(servingRaw || '').toLowerCase()
@@ -581,9 +659,18 @@ const isLikelyPieceItem = (nameRaw: string, servingRaw?: string | null) => {
   return produceHints.some((hint) => label.includes(hint))
 }
 
-const resolveUnitGrams = (unit: BuilderUnit, baseAmount?: number | null, baseUnit?: BuilderUnit | null) => {
+const resolveUnitGrams = (
+  unit: BuilderUnit,
+  baseAmount?: number | null,
+  baseUnit?: BuilderUnit | null,
+  pieceGrams?: number | null,
+) => {
+  if (unit === 'piece') {
+    if (pieceGrams && pieceGrams > 0) return pieceGrams
+    return UNIT_GRAMS.piece
+  }
   if (
-    (unit === 'serving' || unit === 'piece' || unit === 'slice') &&
+    (unit === 'serving' || unit === 'slice' || unit === 'handful') &&
     baseAmount &&
     baseUnit &&
     Object.prototype.hasOwnProperty.call(UNIT_GRAMS, baseUnit)
@@ -599,6 +686,7 @@ const convertAmount = (
   to: BuilderUnit,
   baseAmount?: number | null,
   baseUnit?: BuilderUnit | null,
+  pieceGrams?: number | null,
 ) => {
   if (!Number.isFinite(amount)) return amount
   if (from === to) return amount
@@ -607,8 +695,8 @@ const convertAmount = (
 
   // Weight conversions
   if (weightUnits.includes(from) && weightUnits.includes(to)) {
-    const fromGrams = resolveUnitGrams(from, baseAmount, baseUnit)
-    const toGrams = resolveUnitGrams(to, baseAmount, baseUnit)
+    const fromGrams = resolveUnitGrams(from, baseAmount, baseUnit, pieceGrams)
+    const toGrams = resolveUnitGrams(to, baseAmount, baseUnit, pieceGrams)
     if (!Number.isFinite(fromGrams) || !Number.isFinite(toGrams) || toGrams <= 0) return amount
     const grams = amount * fromGrams
     return grams / toGrams
@@ -616,9 +704,9 @@ const convertAmount = (
   return amount
 }
 
-const allowedUnitsForItem = (_item?: BuilderItem) => [...ALL_UNITS]
+const allowedUnitsForItem = (_item?: BuilderItem) => [...DISPLAY_UNITS]
 
-const formatUnitLabel = (unit: BuilderUnit) => {
+const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
   if (unit === 'g') return 'g'
   if (unit === 'tsp') return 'tsp — 5g'
   if (unit === 'tbsp') return 'tbsp — 14g'
@@ -629,10 +717,11 @@ const formatUnitLabel = (unit: BuilderUnit) => {
   if (unit === 'oz') return 'oz — 28g'
   if (unit === 'ml') return 'ml'
   if (unit === 'pinch') return 'pinch — 0.3g'
-  if (unit === 'handful') return 'handful — 30g'
-  if (unit === 'piece') return 'piece — 100g'
-  if (unit === 'slice') return 'slice — 30g'
-  if (unit === 'serving') return 'serving — 100g'
+  if (unit === 'piece') {
+    const grams = item?.__pieceGrams
+    if (grams && grams > 0) return `piece — ${Math.round(grams * 10) / 10}g`
+    return 'piece'
+  }
   return unit
 }
 
@@ -650,8 +739,9 @@ const computeItemTotals = (item: BuilderItem) => {
   }
 }
 
-const unitToGrams = (amount: number, unit: BuilderUnit): number | null => {
+const unitToGrams = (amount: number, unit: BuilderUnit, pieceGrams?: number | null): number | null => {
   if (!Number.isFinite(amount)) return null
+  if (unit === 'piece' && pieceGrams && pieceGrams > 0) return amount * pieceGrams
   if (unit in UNIT_GRAMS) return amount * UNIT_GRAMS[unit]
   return null
 }
@@ -671,8 +761,9 @@ const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
     const servings = Number.isFinite(Number(it?.servings)) ? Number(it.servings) : 0
     const baseAmount = it?.__baseAmount
     const baseUnit = it?.__baseUnit
+    const pieceGrams = it?.__pieceGrams
     if (baseAmount && baseUnit) {
-      const perServing = unitToGrams(baseAmount, baseUnit)
+      const perServing = unitToGrams(baseAmount, baseUnit, pieceGrams)
       if (perServing && Number.isFinite(perServing)) {
         total += perServing * servings
         continue
@@ -680,7 +771,7 @@ const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
     }
     const unit = (it?.__unit || it?.__baseUnit) as BuilderUnit | null
     if (!unit) continue
-    const grams = unitToGrams(Number(it.__amount || 0), unit)
+    const grams = unitToGrams(Number(it.__amount || 0), unit, pieceGrams)
     if (grams && Number.isFinite(grams)) total += grams
   }
   return total
@@ -867,12 +958,16 @@ export default function MealBuilderClient() {
       const base = seedBaseServing(parseServingBase(serving_size))
       let baseAmount = base.amount
       let baseUnit = base.unit
+      const pieceGrams = estimatePieceGrams(name, serving_size, baseAmount, baseUnit)
       const liquidItem = isLikelyLiquidItem(name, serving_size)
       if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
         const converted = convertAmount(baseAmount, baseUnit, 'g')
         baseAmount = Number.isFinite(converted) ? converted : baseAmount
         baseUnit = 'g'
       }
+      const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+      baseAmount = normalized.amount
+      baseUnit = normalized.unit
       const id = `edit:${Date.now()}:${Math.random().toString(16).slice(2)}`
       const resolvedServings = Number.isFinite(servings) && servings > 0 ? servings : 1
       next.push({
@@ -892,6 +987,7 @@ export default function MealBuilderClient() {
         __amount: baseAmount && baseUnit ? round3(baseAmount * resolvedServings) : round3(resolvedServings),
         __amountInput: String(baseAmount && baseUnit ? round3(baseAmount * resolvedServings) : round3(resolvedServings)),
         __unit: baseUnit,
+        __pieceGrams: pieceGrams,
       })
     }
     return next
@@ -1301,12 +1397,16 @@ export default function MealBuilderClient() {
     const base = seedBaseServing(parseServingBase(r?.serving_size))
     let baseAmount = base.amount
     let baseUnit = base.unit
+    const pieceGrams = estimatePieceGrams(r?.name || '', r?.serving_size, baseAmount, baseUnit)
     const liquidItem = isLikelyLiquidItem(r?.name || '', r?.serving_size)
     if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
       const converted = convertAmount(baseAmount, baseUnit, 'g')
       baseAmount = Number.isFinite(converted) ? converted : baseAmount
       baseUnit = 'g'
     }
+    const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+    baseAmount = normalized.amount
+    baseUnit = normalized.unit
 
     const defaultAmount =
       baseAmount && baseUnit
@@ -1332,6 +1432,7 @@ export default function MealBuilderClient() {
       __amount: defaultAmount,
       __amountInput: String(defaultAmount),
       __unit: baseUnit,
+      __pieceGrams: pieceGrams,
     }
 
     // If we know the base amount, treat the amount as units in the base and compute servings.
@@ -1393,12 +1494,16 @@ export default function MealBuilderClient() {
       const base = seedBaseServing(parseServingBase(serving_size))
       let baseAmount = base.amount
       let baseUnit = base.unit
+      const pieceGrams = estimatePieceGrams(name, serving_size, baseAmount, baseUnit)
       const liquidItem = isLikelyLiquidItem(name, serving_size)
       if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
         const converted = convertAmount(baseAmount, baseUnit, 'g')
         baseAmount = Number.isFinite(converted) ? converted : baseAmount
         baseUnit = 'g'
       }
+      const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+      baseAmount = normalized.amount
+      baseUnit = normalized.unit
 
       const id = `ai:${Date.now()}:${Math.random().toString(16).slice(2)}`
       const next: BuilderItem = {
@@ -1418,6 +1523,7 @@ export default function MealBuilderClient() {
         __amount: baseAmount && baseUnit ? round3(baseAmount * (Number.isFinite(servings) ? servings : 1)) : round3(Number.isFinite(servings) ? servings : 1),
         __amountInput: String(baseAmount && baseUnit ? round3(baseAmount * (Number.isFinite(servings) ? servings : 1)) : round3(Number.isFinite(servings) ? servings : 1)),
         __unit: baseUnit,
+        __pieceGrams: pieceGrams,
       }
       addBuilderItem(next)
     }
@@ -1930,10 +2036,11 @@ export default function MealBuilderClient() {
         const baseAmount = it.__baseAmount
         const baseUnit = it.__baseUnit
         const unit = it.__unit
+        const pieceGrams = it.__pieceGrams
         let servings = it.servings
 
         if (baseAmount && baseUnit && unit) {
-          const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit)
+          const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
           servings = baseAmount > 0 ? inBase / baseAmount : 0
         } else {
           // Fallback: treat amount as servings
@@ -1951,12 +2058,13 @@ export default function MealBuilderClient() {
         if (it.id !== id) return it
         const baseAmount = it.__baseAmount
         const baseUnit = it.__baseUnit
+        const pieceGrams = it.__pieceGrams
         if (!baseAmount || !baseUnit) {
           return { ...it, __unit: unit }
         }
         const currentUnit = it.__unit || baseUnit
-        const converted = convertAmount(it.__amount, currentUnit, unit, baseAmount, baseUnit)
-        const inBase = convertAmount(converted, unit, baseUnit, baseAmount, baseUnit)
+        const converted = convertAmount(it.__amount, currentUnit, unit, baseAmount, baseUnit, pieceGrams)
+        const inBase = convertAmount(converted, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
         const servings = baseAmount > 0 ? inBase / baseAmount : 0
         const nextAmount = round3(Math.max(0, converted))
         return { ...it, __unit: unit, __amount: nextAmount, __amountInput: String(nextAmount), servings: round3(Math.max(0, servings)) }
@@ -2005,7 +2113,7 @@ export default function MealBuilderClient() {
     const shouldStripBuilderIds = Boolean(editFavoriteId) && !editFavoriteIsCustomRef.current
     const sourceItemsForMerge = shouldStripBuilderIds ? editFavoriteSourceItemsRef.current : null
     const cleanedItems = itemsForSave.map((it, index) => {
-      const { __baseAmount, __baseUnit, __amount, __amountInput, __unit, ...rest } = it
+      const { __baseAmount, __baseUnit, __amount, __amountInput, __unit, __pieceGrams, ...rest } = it
       const next: any = { ...rest }
       const source =
         Array.isArray(sourceItemsForMerge) && sourceItemsForMerge[index]
@@ -2984,7 +3092,7 @@ export default function MealBuilderClient() {
                               >
                                 {baseUnits.map((u) => (
                                   <option key={u} value={u}>
-                                    {formatUnitLabel(u)}
+                                    {formatUnitLabel(u, it)}
                                   </option>
                                 ))}
                               </select>

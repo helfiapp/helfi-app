@@ -109,11 +109,15 @@ const WEIGHT_UNIT_OPTIONS: Array<{ value: WeightUnit; label: string }> = [
   { value: 'three-quarter-cup', label: WEIGHT_UNIT_LABELS['three-quarter-cup'] },
   { value: 'cup', label: WEIGHT_UNIT_LABELS.cup },
   { value: 'pinch', label: WEIGHT_UNIT_LABELS.pinch },
-  { value: 'handful', label: WEIGHT_UNIT_LABELS.handful },
   { value: 'piece', label: WEIGHT_UNIT_LABELS.piece },
-  { value: 'slice', label: WEIGHT_UNIT_LABELS.slice },
-  { value: 'serving', label: WEIGHT_UNIT_LABELS.serving },
 ]
+
+const getWeightUnitOptions = (current?: WeightUnit) => {
+  if (!current) return WEIGHT_UNIT_OPTIONS
+  if (WEIGHT_UNIT_OPTIONS.some((option) => option.value === current)) return WEIGHT_UNIT_OPTIONS
+  const label = WEIGHT_UNIT_LABELS[current] || current
+  return [...WEIGHT_UNIT_OPTIONS, { value: current, label }]
+}
 
 const WEIGHT_UNIT_TO_GRAMS: Record<WeightUnit, number> = {
   g: 1,
@@ -19707,7 +19711,7 @@ Please add nutritional information manually if needed.`);
                                       className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none"
                                       style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
                                     >
-                                      {WEIGHT_UNIT_OPTIONS.map((option) => (
+                                      {getWeightUnitOptions(weightUnit).map((option) => (
                                         <option key={option.value} value={option.value}>
                                           {option.label}
                                         </option>
@@ -20204,7 +20208,7 @@ Please add nutritional information manually if needed.`);
                                 onChange={(e) => updateItemField(editingItemIndex, 'weightUnit', e.target.value)}
                                 className="w-24 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               >
-                                {WEIGHT_UNIT_OPTIONS.map((option) => (
+                                {getWeightUnitOptions(unit).map((option) => (
                                   <option key={option.value} value={option.value}>
                                     {option.label}
                                   </option>
