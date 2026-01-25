@@ -180,7 +180,9 @@ function normalizeStateRow(row: any): WeeklyReportState | null {
   const reportsEnabledAt = readRowValue(row, 'reportsEnabledAt')
   const reportsEnabledRaw = readRowValue(row, 'reportsEnabled')
   const reportsEnabled =
-    typeof reportsEnabledRaw === 'boolean' ? reportsEnabledRaw : nextReportDueAt != null
+    typeof reportsEnabledRaw === 'boolean'
+      ? reportsEnabledRaw
+      : reportsEnabledAt != null || nextReportDueAt != null
   return {
     userId: readRowValue(row, 'userId'),
     onboardingCompletedAt: onboardingCompletedAt ? new Date(onboardingCompletedAt).toISOString() : null,
@@ -293,13 +295,22 @@ export async function setWeeklyReportsEnabled(
   const scheduleFrom = options?.scheduleFrom ?? now
   const existing = await getWeeklyReportState(userId)
   const nextDueAt = enabled ? getNextDueAt(scheduleFrom).toISOString() : null
-  return upsertWeeklyReportState(userId, {
+  let state = await upsertWeeklyReportState(userId, {
     onboardingCompletedAt: existing?.onboardingCompletedAt ?? now.toISOString(),
     reportsEnabled: enabled,
     reportsEnabledAt: enabled ? now.toISOString() : existing?.reportsEnabledAt ?? null,
     nextReportDueAt: nextDueAt,
     lastStatus: enabled ? 'scheduled' : 'disabled',
   })
+  if (enabled && (!state?.reportsEnabled || !state?.nextReportDueAt)) {
+    state = await upsertWeeklyReportState(userId, {
+      reportsEnabled: true,
+      reportsEnabledAt: now.toISOString(),
+      nextReportDueAt: nextDueAt,
+      lastStatus: 'scheduled',
+    })
+  }
+  return state
 }
 
 export async function createWeeklyReportRecord(params: {

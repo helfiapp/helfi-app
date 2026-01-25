@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
   const state = await setWeeklyReportsEnabled(session.user.id, enabled, {
     scheduleFrom: new Date(),
   })
+  if (enabled && (!state?.reportsEnabled || !state?.nextReportDueAt)) {
+    return NextResponse.json({ error: 'weekly_report_state_failed' }, { status: 500 })
+  }
 
   return NextResponse.json({
     reportsEnabled: state?.reportsEnabled ?? false,

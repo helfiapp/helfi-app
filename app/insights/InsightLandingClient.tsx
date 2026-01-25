@@ -54,7 +54,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   } | null>(null)
   const lastLoaded = generatedAt
   const isReportRunning = weeklyStatus?.status === 'RUNNING'
-  const reportsEnabled = weeklyStatus?.reportsEnabled ?? false
+  const reportsEnabled = Boolean(weeklyStatus?.reportsEnabled ?? weeklyStatus?.reportsEnabledAt)
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
@@ -236,8 +236,8 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         data = null
       }
       const success = response.ok
-      if (response.ok) {
-        const status = String(data?.status || '').toLowerCase()
+        if (response.ok) {
+          const status = String(data?.status || '').toLowerCase()
         if (status === 'locked') {
           setCreateReportMessage('Your report is ready, but it needs a subscription or credits to open.')
         } else if (status === 'ready') {
