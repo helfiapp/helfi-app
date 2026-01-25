@@ -1310,6 +1310,7 @@ The remaining calories ring displays:
      - Red dot + "Used" (what's been consumed)
      - Green dot + "Remaining" (what's left)
 4. **Calculation logic:**
+   - Consumed calories use entry calories when available; only derive from macros when calories are missing (`protein*4 + carbs*4 + fat*9`).
    - `percent` parameter is the *used* fraction (0–1), where 1.0 = 100% consumed
    - `usedFraction = Math.max(0, Math.min(percent, 1))` (clamped to 0–1)
    - `usedLength = usedFraction * circumference` (for red overlay)

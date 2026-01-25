@@ -22106,16 +22106,16 @@ Please add nutritional information manually if needed.`);
                   return acc
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 })
 
-                // Keep rings and macro bars in sync: prefer macros → kcal conversion when available.
+                // Prefer logged calories when present; fall back to macro-based energy when missing.
                 const macroCalories =
                   (totals.protein || 0) * 4 +
                   (totals.carbs || 0) * 4 +
                   (totals.fat || 0) * 9
 
-                const consumedKcal =
-                  (macroCalories && Number.isFinite(macroCalories) ? macroCalories : 0) ||
-                  totals.calories ||
-                  0
+                const hasLoggedCalories = Number.isFinite(totals.calories) && totals.calories > 0
+                const consumedKcal = hasLoggedCalories
+                  ? totals.calories
+                  : (macroCalories && Number.isFinite(macroCalories) ? macroCalories : 0)
                 const baseTargetCalories = dailyTargets.calories
                 const exerciseKcal =
                   Number.isFinite(Number(exerciseCaloriesKcal)) && Number(exerciseCaloriesKcal) > 0
