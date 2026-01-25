@@ -91,6 +91,20 @@ export async function GET(request: NextRequest) {
     const queryTokensNormalized = queryTokens.map((token) => singularizeToken(token))
     const queryFirstToken = queryTokens[0] || ''
 
+    const hasMacroData = (item: any) => {
+      if (!item) return false
+      const calories = Number(item?.calories)
+      const protein = Number(item?.protein_g)
+      const carbs = Number(item?.carbs_g)
+      const fat = Number(item?.fat_g)
+      return (
+        Number.isFinite(calories) &&
+        Number.isFinite(protein) &&
+        Number.isFinite(carbs) &&
+        Number.isFinite(fat)
+      )
+    }
+
     const scoreNameMatch = (name: any) => {
       if (!queryNorm) return 0
       const n = normalizeForMatch(name)
@@ -102,6 +116,23 @@ export async function GET(request: NextRequest) {
       if (n.startsWith(queryNorm)) return 750
       if (nCompact.includes(queryCompact)) return 600
       if (n.includes(queryNorm)) return 500
+      const nameTokens = n.split(' ').filter(Boolean)
+      const scoredTokens = queryTokensNormalized.filter((token) => token.length >= 2)
+      if (scoredTokens.length > 0) {
+        const exactMatches = new Set<string>()
+        const prefixMatches = new Set<string>()
+        for (const token of scoredTokens) {
+          if (nameTokens.includes(token)) {
+            exactMatches.add(token)
+            continue
+          }
+          if (nameTokens.some((word) => word.startsWith(token))) {
+            prefixMatches.add(token)
+          }
+        }
+        if (exactMatches.size > 0) return 520 + exactMatches.size * 120
+        if (prefixMatches.size > 0) return 360 + prefixMatches.size * 40
+      }
       if (queryTokens.length > 0) {
         const hitCount = queryTokens.filter((t) => n.includes(t)).length
         if (hitCount === queryTokens.length) return 420
@@ -478,6 +509,11 @@ export async function GET(request: NextRequest) {
         { success: false, error: 'Invalid source. Expected "openfoodfacts", "usda", "fatsecret", or "auto".' },
         { status: 400 },
       )
+    }
+
+    if (Array.isArray(items) && items.length > 0) {
+      const filtered = items.filter((item) => hasMacroData(item))
+      items = filtered
     }
 
     // For non-auto sources, apply the same name-match ranking so exact matches come first.
