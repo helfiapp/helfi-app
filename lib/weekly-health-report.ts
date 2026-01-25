@@ -178,6 +178,9 @@ function normalizeStateRow(row: any): WeeklyReportState | null {
   const lastReportAt = readRowValue(row, 'lastReportAt')
   const lastAttemptAt = readRowValue(row, 'lastAttemptAt')
   const reportsEnabledAt = readRowValue(row, 'reportsEnabledAt')
+  const reportsEnabledRaw = readRowValue(row, 'reportsEnabled')
+  const reportsEnabled =
+    typeof reportsEnabledRaw === 'boolean' ? reportsEnabledRaw : nextReportDueAt != null
   return {
     userId: readRowValue(row, 'userId'),
     onboardingCompletedAt: onboardingCompletedAt ? new Date(onboardingCompletedAt).toISOString() : null,
@@ -185,7 +188,7 @@ function normalizeStateRow(row: any): WeeklyReportState | null {
     lastReportAt: lastReportAt ? new Date(lastReportAt).toISOString() : null,
     lastAttemptAt: lastAttemptAt ? new Date(lastAttemptAt).toISOString() : null,
     lastStatus: readRowValue(row, 'lastStatus') ?? null,
-    reportsEnabled: nextReportDueAt != null,
+    reportsEnabled,
     reportsEnabledAt: reportsEnabledAt ? new Date(reportsEnabledAt).toISOString() : null,
   }
 }
@@ -215,6 +218,12 @@ export async function upsertWeeklyReportState(
   await ensureWeeklyReportTables()
   const existing = await getWeeklyReportState(userId)
   const nextReportDueAt = updates.nextReportDueAt ?? existing?.nextReportDueAt ?? null
+  const reportsEnabled =
+    typeof updates.reportsEnabled === 'boolean'
+      ? updates.reportsEnabled
+      : typeof existing?.reportsEnabled === 'boolean'
+        ? existing.reportsEnabled
+        : nextReportDueAt != null
   const merged: WeeklyReportState = {
     userId,
     onboardingCompletedAt: updates.onboardingCompletedAt ?? existing?.onboardingCompletedAt ?? null,
@@ -222,7 +231,7 @@ export async function upsertWeeklyReportState(
     lastReportAt: updates.lastReportAt ?? existing?.lastReportAt ?? null,
     lastAttemptAt: updates.lastAttemptAt ?? existing?.lastAttemptAt ?? null,
     lastStatus: updates.lastStatus ?? existing?.lastStatus ?? null,
-    reportsEnabled: nextReportDueAt != null,
+    reportsEnabled,
     reportsEnabledAt: updates.reportsEnabledAt ?? existing?.reportsEnabledAt ?? null,
   }
 
@@ -232,14 +241,16 @@ export async function upsertWeeklyReportState(
       merged.userId
     )
     await prisma.$executeRawUnsafe(
-      `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus, reportsEnabled, reportsEnabledAt)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       merged.userId,
       merged.onboardingCompletedAt,
       merged.nextReportDueAt,
       merged.lastReportAt,
       merged.lastAttemptAt,
-      merged.lastStatus
+      merged.lastStatus,
+      merged.reportsEnabled,
+      merged.reportsEnabledAt
     )
     return merged
   } catch (error) {
@@ -255,8 +266,8 @@ export async function markWeeklyReportOnboardingComplete(
 ) {
   await ensureWeeklyReportTables()
   const existing = await getWeeklyReportState(userId)
-  if (existing?.onboardingCompletedAt && !options?.schedule) return existing
-  const shouldSchedule = Boolean(options?.schedule)
+  if (existing?.onboardingCompletedAt && !options?.schedule && existing?.nextReportDueAt) return existing
+  const shouldSchedule = Boolean(options?.schedule) || (existing?.reportsEnabled && !existing?.nextReportDueAt)
   const nextDueAtRaw = shouldSchedule ? getNextDueAt(completedAt) : existing?.nextReportDueAt ?? null
   const nextDueAt =
     nextDueAtRaw && typeof nextDueAtRaw === 'string'
@@ -281,9 +292,10 @@ export async function setWeeklyReportsEnabled(
   const now = new Date()
   const scheduleFrom = options?.scheduleFrom ?? now
   const existing = await getWeeklyReportState(userId)
-  const nextDueAt = enabled ? scheduleFrom.toISOString() : null
+  const nextDueAt = enabled ? getNextDueAt(scheduleFrom).toISOString() : null
   return upsertWeeklyReportState(userId, {
     onboardingCompletedAt: existing?.onboardingCompletedAt ?? now.toISOString(),
+    reportsEnabled: enabled,
     reportsEnabledAt: enabled ? now.toISOString() : existing?.reportsEnabledAt ?? null,
     nextReportDueAt: nextDueAt,
     lastStatus: enabled ? 'scheduled' : 'disabled',
