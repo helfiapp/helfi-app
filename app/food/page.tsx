@@ -63,6 +63,110 @@ const ITEM_NUTRIENT_META = [
   { key: 'sugar', field: 'sugar_g', label: 'Sugar', unit: 'g', valueClass: 'text-rose-600', labelClass: 'text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/10', border: 'border-rose-100 dark:border-rose-900/20' },
 ] as const
 
+type WeightUnit =
+  | 'g'
+  | 'ml'
+  | 'oz'
+  | 'tsp'
+  | 'tbsp'
+  | 'quarter-cup'
+  | 'half-cup'
+  | 'three-quarter-cup'
+  | 'cup'
+  | 'pinch'
+  | 'handful'
+  | 'piece'
+  | 'slice'
+  | 'serving'
+
+const DEFAULT_SERVING_GRAMS = 100
+
+const WEIGHT_UNIT_LABELS: Record<WeightUnit, string> = {
+  g: 'g',
+  ml: 'ml',
+  oz: 'oz',
+  tsp: 'tsp',
+  tbsp: 'tbsp',
+  'quarter-cup': '1/4 cup',
+  'half-cup': '1/2 cup',
+  'three-quarter-cup': '3/4 cup',
+  cup: 'cup',
+  pinch: 'pinch',
+  handful: 'handful',
+  piece: 'piece',
+  slice: 'slice',
+  serving: 'serving',
+}
+
+const WEIGHT_UNIT_OPTIONS: Array<{ value: WeightUnit; label: string }> = [
+  { value: 'g', label: WEIGHT_UNIT_LABELS.g },
+  { value: 'ml', label: WEIGHT_UNIT_LABELS.ml },
+  { value: 'oz', label: WEIGHT_UNIT_LABELS.oz },
+  { value: 'tsp', label: WEIGHT_UNIT_LABELS.tsp },
+  { value: 'tbsp', label: WEIGHT_UNIT_LABELS.tbsp },
+  { value: 'quarter-cup', label: WEIGHT_UNIT_LABELS['quarter-cup'] },
+  { value: 'half-cup', label: WEIGHT_UNIT_LABELS['half-cup'] },
+  { value: 'three-quarter-cup', label: WEIGHT_UNIT_LABELS['three-quarter-cup'] },
+  { value: 'cup', label: WEIGHT_UNIT_LABELS.cup },
+  { value: 'pinch', label: WEIGHT_UNIT_LABELS.pinch },
+  { value: 'handful', label: WEIGHT_UNIT_LABELS.handful },
+  { value: 'piece', label: WEIGHT_UNIT_LABELS.piece },
+  { value: 'slice', label: WEIGHT_UNIT_LABELS.slice },
+  { value: 'serving', label: WEIGHT_UNIT_LABELS.serving },
+]
+
+const WEIGHT_UNIT_TO_GRAMS: Record<WeightUnit, number> = {
+  g: 1,
+  ml: 1,
+  oz: 28.3495,
+  tsp: 5,
+  tbsp: 14,
+  'quarter-cup': 218 / 4,
+  'half-cup': 218 / 2,
+  'three-quarter-cup': (218 * 3) / 4,
+  cup: 218,
+  pinch: 0.3,
+  handful: 30,
+  piece: 100,
+  slice: 30,
+  serving: DEFAULT_SERVING_GRAMS,
+}
+
+const normalizeWeightUnit = (value: any): WeightUnit => {
+  const raw = String(value || '').trim().toLowerCase()
+  if (!raw) return 'g'
+  if (raw === 'cups') return 'cup'
+  if (raw === 'tablespoon' || raw === 'tablespoons') return 'tbsp'
+  if (raw === 'teaspoon' || raw === 'teaspoons') return 'tsp'
+  if (raw === 'servings') return 'serving'
+  if (raw in WEIGHT_UNIT_TO_GRAMS) return raw as WeightUnit
+  return 'g'
+}
+
+const getWeightInputStep = (unit: WeightUnit) => {
+  if (unit === 'oz') return 0.1
+  if (unit === 'tsp' || unit === 'tbsp') return 0.1
+  if (unit === 'quarter-cup' || unit === 'half-cup' || unit === 'three-quarter-cup' || unit === 'cup') return 0.1
+  if (unit === 'pinch' || unit === 'handful') return 0.1
+  return 1
+}
+
+const roundWeightValue = (value: number, unit: WeightUnit) => {
+  if (!Number.isFinite(value)) return value
+  const precision =
+    unit === 'oz' ||
+    unit === 'tsp' ||
+    unit === 'tbsp' ||
+    unit === 'quarter-cup' ||
+    unit === 'half-cup' ||
+    unit === 'three-quarter-cup' ||
+    unit === 'cup' ||
+    unit === 'pinch'
+      ? 100
+      : 1000
+  return Math.round(value * precision) / precision
+}
+
 type NutritionTotals = {
   calories: number | null
   protein: number | null
@@ -1678,16 +1782,28 @@ const quickParseServingSize = (servingSize: string | null | undefined) => {
   const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/i)
   const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/i)
   const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
+  const parseVolume = (pattern: RegExp, gramsPerUnit: number) => {
+    const match = raw.match(pattern)
+    if (!match) return null
+    const amount = parseServingQuantity(match[1])
+    return amount && amount > 0 ? amount * gramsPerUnit : null
+  }
+  const tspGrams = parseVolume(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*(tsp|teaspoons?)\b/i, WEIGHT_UNIT_TO_GRAMS.tsp)
+  const tbspGrams = parseVolume(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*(tbsp|tablespoons?)\b/i, WEIGHT_UNIT_TO_GRAMS.tbsp)
+  const cupGrams = parseVolume(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*cups?\b/i, WEIGHT_UNIT_TO_GRAMS.cup)
   const gramsPerServing = gramsMatch ? parseFloat(gramsMatch[1]) : null
   const mlPerServing = mlMatch ? parseFloat(mlMatch[1]) : null
   const ozPerServing = ozMatch ? parseFloat(ozMatch[1]) : null
   const gramsFromOz = ozPerServing ? ozPerServing * 28.3495 : null
+  const gramsFromVolume = tspGrams ?? tbspGrams ?? cupGrams ?? null
   return {
     gramsPerServing:
       gramsPerServing && gramsPerServing > 0
         ? gramsPerServing
         : gramsFromOz && gramsFromOz > 0
         ? gramsFromOz
+        : gramsFromVolume && gramsFromVolume > 0
+        ? gramsFromVolume
         : null,
     mlPerServing: mlPerServing && mlPerServing > 0 ? mlPerServing : null,
     ozPerServing: ozPerServing && ozPerServing > 0 ? ozPerServing : null,
@@ -4650,10 +4766,9 @@ export default function FoodDiary() {
     next.selectedServingId = option?.id || next.selectedServingId
     const updatedBaseWeight = getBaseWeightPerServing(next)
     if (updatedBaseWeight && updatedBaseWeight > 0) {
-      const unit = next?.weightUnit === 'ml' ? 'ml' : next?.weightUnit === 'oz' ? 'oz' : 'g'
+      const unit = normalizeWeightUnit(next?.weightUnit)
       const computed = updatedBaseWeight * (next.servings || 1)
-      const precision = unit === 'oz' ? 100 : 1000
-      next.weightAmount = Math.round(computed * precision) / precision
+      next.weightAmount = roundWeightValue(computed, unit)
     }
     return next
   }
@@ -5754,6 +5869,62 @@ export default function FoodDiary() {
     }
   }
 
+  const hasMacroData = (item: any) => {
+    if (!item) return false
+    const calories = item.calories
+    const protein = item.protein_g
+    const carbs = item.carbs_g
+    const fat = item.fat_g
+    const hasCalories = calories !== null && calories !== undefined && Number.isFinite(Number(calories))
+    const hasProtein = protein !== null && protein !== undefined && Number.isFinite(Number(protein))
+    const hasCarbs = carbs !== null && carbs !== undefined && Number.isFinite(Number(carbs))
+    const hasFat = fat !== null && fat !== undefined && Number.isFinite(Number(fat))
+    return hasCalories && hasProtein && hasCarbs && hasFat
+  }
+
+  const pickBestMacroMatch = (items: any[], lookup: string) => {
+    const filtered = items.filter((candidate) => hasMacroData(candidate))
+    if (filtered.length === 0) return null
+    return (
+      filtered.find((candidate: any) => nameMatchesSearchQuery(candidate?.name || '', lookup, { requireFirstWord: false })) ||
+      filtered[0]
+    )
+  }
+
+  const resolveOfficialItemWithMacros = async (lookup: string) => {
+    const trimmed = String(lookup || '').trim()
+    if (!trimmed) return null
+    try {
+      const usdaParams = new URLSearchParams({
+        source: 'usda',
+        q: trimmed,
+        kind: 'single',
+        limit: '20',
+      })
+      usdaParams.set('localOnly', '1')
+      const usdaRes = await fetch(`/api/food-data?${usdaParams.toString()}`, { method: 'GET' })
+      if (usdaRes.ok) {
+        const data = await usdaRes.json().catch(() => ({}))
+        const items = Array.isArray(data?.items) ? data.items : []
+        const match = pickBestMacroMatch(items, trimmed)
+        if (match) return match
+      }
+      const packagedParams = new URLSearchParams({
+        source: 'auto',
+        q: trimmed,
+        kind: 'packaged',
+        limit: '20',
+      })
+      const packagedRes = await fetch(`/api/food-data?${packagedParams.toString()}`, { method: 'GET' })
+      if (!packagedRes.ok) return null
+      const packagedData = await packagedRes.json().catch(() => ({}))
+      const packagedItems = Array.isArray(packagedData?.items) ? packagedData.items : []
+      return pickBestMacroMatch(packagedItems, trimmed)
+    } catch {
+      return null
+    }
+  }
+
   const addIngredientFromOfficial = async (item: any) => {
     if (!item) return
     let resolved = item
@@ -5764,6 +5935,15 @@ export default function FoodDiary() {
         return
       }
       resolved = match
+    }
+    if (!hasMacroData(resolved)) {
+      const lookup = String((resolved as any)?.__searchQuery || resolved?.name || '').trim()
+      const fallback = lookup ? await resolveOfficialItemWithMacros(lookup) : null
+      if (!fallback) {
+        setOfficialError('This item has no nutrition data. Please choose another result.')
+        return
+      }
+      resolved = fallback
     }
     const newItem: any = {
       name: resolved.name || 'Unknown food',
@@ -5895,10 +6075,9 @@ export default function FoodDiary() {
 
     const baseWeight = getBaseWeightPerServing(next)
     if (baseWeight && baseWeight > 0) {
-      const unit = next?.weightUnit === 'ml' ? 'ml' : next?.weightUnit === 'oz' ? 'oz' : 'g'
+      const unit = normalizeWeightUnit(next?.weightUnit)
       const computed = baseWeight * (next.servings || 1)
-      const precision = unit === 'oz' ? 100 : 1000
-      next.weightAmount = Math.round(computed * precision) / precision
+      next.weightAmount = roundWeightValue(computed, unit)
     }
 
     return next
@@ -6084,6 +6263,15 @@ export default function FoodDiary() {
         return
       }
       resolved = match
+    }
+    if (!hasMacroData(resolved)) {
+      const lookup = String((resolved as any)?.__searchQuery || resolved?.name || '').trim()
+      const fallback = lookup ? await resolveOfficialItemWithMacros(lookup) : null
+      if (!fallback) {
+        setOfficialError('This item has no nutrition data. Please choose another result.')
+        return
+      }
+      resolved = fallback
     }
     const itemsCopy = [...analyzedItems]
     if (!itemsCopy[index]) return
@@ -6885,7 +7073,7 @@ const applyStructuredItems = (
       if (inferredWeight && inferredWeight > 0) {
         next.customGramsPerServing = inferredWeight
         if (!next.weightAmount || next.weightAmount < inferredWeight) {
-          next.weightAmount = Math.round(inferredWeight * 100) / 100
+          next.weightAmount = roundWeightValue(inferredWeight, 'g')
           if (!next.weightUnit) next.weightUnit = 'g'
         }
       }
@@ -6894,12 +7082,13 @@ const applyStructuredItems = (
     // Initialize weightAmount from serving size if not set
     if (!next.weightAmount || next.weightAmount === 0) {
       const { gramsPerServing, mlPerServing, ozPerServing } = quickParseServingSize(next?.serving_size)
-      const currentUnit = next?.weightUnit === 'ml' ? 'ml' : next?.weightUnit === 'oz' ? 'oz' : 'g'
+      const currentUnit = normalizeWeightUnit(next?.weightUnit)
       const hasWeightUnit = !!next?.weightUnit
       const servings = Number.isFinite(Number(next?.servings)) && Number(next.servings) > 0 ? Number(next.servings) : 1
+      const baseGrams = getBaseGramsPerServing(next)
       
       let initialWeight: number | null = null
-      let targetUnit = currentUnit
+      let targetUnit: WeightUnit = currentUnit
       
       // Determine which unit to use based on what's available in serving size
       if (ozPerServing && ozPerServing > 0) {
@@ -6915,22 +7104,14 @@ const applyStructuredItems = (
       
       // Convert to current unit if needed (only when the item already has a weight unit)
       if (initialWeight && initialWeight > 0 && hasWeightUnit && targetUnit !== currentUnit) {
-        const toGrams = (value: number, unit: string) => {
-          if (unit === 'oz') return value * 28.3495
-          return value // g or ml (assume ~1g/mL)
-        }
-        const fromGrams = (value: number, unit: string) => {
-          if (unit === 'oz') return value / 28.3495
-          return value // g or ml
-        }
-        const gramsValue = toGrams(initialWeight, targetUnit)
-        initialWeight = fromGrams(gramsValue, currentUnit)
+        const gramsValue = weightAmountToGrams(initialWeight, targetUnit, next, baseGrams)
+        const converted = gramsValue ? gramsToWeightAmount(gramsValue, currentUnit, next, baseGrams) : null
+        if (converted && Number.isFinite(converted)) initialWeight = converted
       }
       
       if (initialWeight && initialWeight > 0) {
         const finalUnit = hasWeightUnit ? currentUnit : targetUnit
-        const precision = finalUnit === 'oz' ? 100 : 1000
-        next.weightAmount = Math.round(initialWeight * precision) / precision
+        next.weightAmount = roundWeightValue(initialWeight, finalUnit)
         if (!next.weightUnit) {
           next.weightUnit = finalUnit
         }
@@ -7163,10 +7344,8 @@ const applyStructuredItems = (
         const baseWeight = getBaseWeightPerServing(itemsCopy[index])
         const servings = Number.isFinite(itemsCopy[index].servings) ? Number(itemsCopy[index].servings) : 1
         if (baseWeight && baseWeight > 0) {
-          const unit =
-            itemsCopy[index]?.weightUnit === 'ml' ? 'ml' : itemsCopy[index]?.weightUnit === 'oz' ? 'oz' : 'g'
-          const precision = unit === 'oz' ? 100 : 1000
-          itemsCopy[index].weightAmount = Math.round(baseWeight * Math.max(0, servings || 1) * precision) / precision
+          const unit = normalizeWeightUnit(itemsCopy[index]?.weightUnit)
+          itemsCopy[index].weightAmount = roundWeightValue(baseWeight * Math.max(0, servings || 1), unit)
         }
       }
     } else if (field === 'servings') {
@@ -7177,33 +7356,33 @@ const applyStructuredItems = (
       // Keep weight in sync if we know per-serving weight
       const baseWeight = getBaseWeightPerServing(itemsCopy[index])
       if (baseWeight && baseWeight > 0) {
-        const unit = itemsCopy[index]?.weightUnit === 'ml' ? 'ml' : itemsCopy[index]?.weightUnit === 'oz' ? 'oz' : 'g'
+        const unit = normalizeWeightUnit(itemsCopy[index]?.weightUnit)
         const computed = baseWeight * rounded
-        const precision = unit === 'oz' ? 100 : 1000
-        itemsCopy[index].weightAmount = Math.round(computed * precision) / precision
+        itemsCopy[index].weightAmount = roundWeightValue(computed, unit)
       }
     } else if (field === 'portionMode') {
       itemsCopy[index].portionMode = value === 'weight' ? 'weight' : 'servings'
       if (itemsCopy[index].portionMode === 'weight') {
         const base = getBaseWeightPerServing(itemsCopy[index])
         const servings = Number.isFinite(itemsCopy[index].servings) ? Number(itemsCopy[index].servings) : 1
+        const unit = normalizeWeightUnit(itemsCopy[index]?.weightUnit)
         if (base && base > 0) {
           const computed = base * Math.max(0, servings || 1)
-          itemsCopy[index].weightAmount = Math.round(computed * 100) / 100
+          itemsCopy[index].weightAmount = roundWeightValue(computed, unit)
         } else {
           const info = parseServingSizeInfo(itemsCopy[index])
           const customSeed =
-            itemsCopy[index].weightUnit === 'ml'
+            unit === 'ml'
               ? itemsCopy[index].customMlPerServing
               : itemsCopy[index].customGramsPerServing
           const seed =
-            (itemsCopy[index].weightUnit === 'ml' ? info.mlPerServing : info.gramsPerServing) ||
+            (unit === 'ml' ? info.mlPerServing : info.gramsPerServing) ||
             info.gramsPerServing ||
             info.mlPerServing ||
             customSeed ||
             null
           if (seed) {
-            itemsCopy[index].weightAmount = Math.round(seed * 100) / 100
+            itemsCopy[index].weightAmount = roundWeightValue(Number(seed), unit)
           }
         }
       }
@@ -7223,27 +7402,17 @@ const applyStructuredItems = (
       }
       clearLabelReviewFlag()
     } else if (field === 'weightUnit') {
-      const previousUnit = itemsCopy[index].weightUnit === 'ml' ? 'ml' : itemsCopy[index].weightUnit === 'oz' ? 'oz' : 'g'
-      const normalized = value === 'ml' ? 'ml' : value === 'oz' ? 'oz' : 'g'
+      const previousUnit = normalizeWeightUnit(itemsCopy[index].weightUnit)
+      const normalized = normalizeWeightUnit(value)
       // Convert weightAmount to preserve the same actual quantity when switching units
       const currentWeight = Number.isFinite(itemsCopy[index].weightAmount) ? Number(itemsCopy[index].weightAmount) : null
       if (currentWeight && currentWeight > 0 && normalized !== previousUnit) {
-        let gramsValue: number | null = null
-        if (previousUnit === 'g') gramsValue = currentWeight
-        else if (previousUnit === 'ml') gramsValue = currentWeight // assume density ~1g/mL when unknown
-        else if (previousUnit === 'oz') gramsValue = currentWeight * 28.3495
-
-        if (gramsValue !== null) {
-          let converted = gramsValue
-          if (normalized === 'g') converted = gramsValue
-          else if (normalized === 'ml') converted = gramsValue // assume ~1g per mL
-          else if (normalized === 'oz') converted = gramsValue / 28.3495
-
-          // Round sensibly
-          if (normalized === 'oz') {
-            itemsCopy[index].weightAmount = Math.round(converted * 100) / 100
-          } else {
-            itemsCopy[index].weightAmount = Math.round(converted * 1000) / 1000
+        const baseGrams = getBaseGramsPerServing(itemsCopy[index])
+        const gramsValue = weightAmountToGrams(currentWeight, previousUnit, itemsCopy[index], baseGrams)
+        if (gramsValue !== null && gramsValue !== undefined) {
+          const converted = gramsToWeightAmount(gramsValue, normalized, itemsCopy[index], baseGrams)
+          if (converted !== null && converted !== undefined) {
+            itemsCopy[index].weightAmount = roundWeightValue(converted, normalized)
           }
         }
       }
@@ -9535,32 +9704,43 @@ const applyStructuredItems = (
       if (!Number.isFinite(start) || !Number.isFinite(end)) return null
       return ((start + end) / 2) * factor
     }
-    const parseSingle = (pattern: RegExp, factor = 1) => {
-      const match = raw.match(pattern)
-      if (!match) return null
-      const value = parseFloat(match[1])
-      return Number.isFinite(value) ? value * factor : null
-    }
+  const parseSingle = (pattern: RegExp, factor = 1) => {
+    const match = raw.match(pattern)
+    if (!match) return null
+    const value = parseFloat(match[1])
+    return Number.isFinite(value) ? value * factor : null
+  }
+  const parseVolume = (pattern: RegExp, gramsPerUnit: number) => {
+    const match = raw.match(pattern)
+    if (!match) return null
+    const amount = parseServingQuantity(match[1])
+    return amount && amount > 0 ? amount * gramsPerUnit : null
+  }
 
-    const gramsRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*g\b/i)
-    const gramsMatch = parseSingle(/(\d+(?:\.\d+)?)\s*g\b/i)
-    const mlRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*ml\b/i)
-    const mlMatch = parseSingle(/(\d+(?:\.\d+)?)\s*ml\b/i)
-    const ozRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:oz|ounce|ounces)\b/i)
-    const ozMatch = parseSingle(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
-    const lbRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:lb|lbs|pound|pounds)\b/i, 453.592)
-    const lbMatch = parseSingle(/(\d+(?:\.\d+)?)\s*(lb|lbs|pound|pounds)\b/i, 453.592)
+  const gramsRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*g\b/i)
+  const gramsMatch = parseSingle(/(\d+(?:\.\d+)?)\s*g\b/i)
+  const mlRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*ml\b/i)
+  const mlMatch = parseSingle(/(\d+(?:\.\d+)?)\s*ml\b/i)
+  const ozRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:oz|ounce|ounces)\b/i)
+  const ozMatch = parseSingle(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
+  const lbRange = parseRange(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:lb|lbs|pound|pounds)\b/i, 453.592)
+  const lbMatch = parseSingle(/(\d+(?:\.\d+)?)\s*(lb|lbs|pound|pounds)\b/i, 453.592)
+  const tspGrams = parseVolume(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*(tsp|teaspoons?)\b/i, WEIGHT_UNIT_TO_GRAMS.tsp)
+  const tbspGrams = parseVolume(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*(tbsp|tablespoons?)\b/i, WEIGHT_UNIT_TO_GRAMS.tbsp)
+  const cupGrams = parseVolume(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*cups?\b/i, WEIGHT_UNIT_TO_GRAMS.cup)
 
-    const gramsFromOzRange = Number.isFinite(ozRange as number) ? (ozRange as number) * 28.3495 : null
-    const gramsFromOzMatch = Number.isFinite(ozMatch as number) ? (ozMatch as number) * 28.3495 : null
-    const gramsPerServing =
-      gramsRange ??
-      gramsMatch ??
-      lbRange ??
-      lbMatch ??
-      gramsFromOzRange ??
-      gramsFromOzMatch ??
-      null
+  const gramsFromOzRange = Number.isFinite(ozRange as number) ? (ozRange as number) * 28.3495 : null
+  const gramsFromOzMatch = Number.isFinite(ozMatch as number) ? (ozMatch as number) * 28.3495 : null
+  const gramsFromVolume = tspGrams ?? tbspGrams ?? cupGrams ?? null
+  const gramsPerServing =
+    gramsRange ??
+    gramsMatch ??
+    lbRange ??
+    lbMatch ??
+    gramsFromOzRange ??
+    gramsFromOzMatch ??
+    gramsFromVolume ??
+    null
     const mlPerServing = mlRange ?? mlMatch ?? null
     const ozPerServing = ozRange ?? ozMatch ?? null
     const gramsFromOz = ozPerServing ? ozPerServing * 28.3495 : null
@@ -9586,14 +9766,80 @@ const applyStructuredItems = (
     return perPiece * pieces
   }
 
+  const getUnitGramsForItem = (unit: WeightUnit, item: any, baseGrams: number | null) => {
+    if (unit === 'serving') {
+      return baseGrams && baseGrams > 0 ? baseGrams : WEIGHT_UNIT_TO_GRAMS.serving
+    }
+    if (unit === 'piece' || unit === 'slice') {
+      if (baseGrams && baseGrams > 0) {
+        const pieces = getPiecesPerServing(item)
+        if (pieces && pieces > 0) return baseGrams / pieces
+        return baseGrams
+      }
+      return WEIGHT_UNIT_TO_GRAMS[unit]
+    }
+    if (unit === 'pinch' || unit === 'handful') return WEIGHT_UNIT_TO_GRAMS[unit]
+    return WEIGHT_UNIT_TO_GRAMS[unit]
+  }
+
+  const weightAmountToGrams = (amount: number, unit: WeightUnit, item: any, baseGrams: number | null) => {
+    if (!Number.isFinite(amount)) return null
+    const gramsPerUnit = getUnitGramsForItem(unit, item, baseGrams)
+    if (!Number.isFinite(gramsPerUnit) || gramsPerUnit <= 0) return null
+    return amount * gramsPerUnit
+  }
+
+  const gramsToWeightAmount = (grams: number, unit: WeightUnit, item: any, baseGrams: number | null) => {
+    if (!Number.isFinite(grams)) return null
+    const gramsPerUnit = getUnitGramsForItem(unit, item, baseGrams)
+    if (!Number.isFinite(gramsPerUnit) || gramsPerUnit <= 0) return null
+    return grams / gramsPerUnit
+  }
+
+  const getBaseGramsPerServing = (item: any): number | null => {
+    const info = parseServingSizeInfo(item)
+    const piecesMultiplier = piecesMultiplierForServing(item)
+    const fallbackDefault = defaultGramsForItem(item)
+    const discreteFloor = getDiscreteWeightFloor(item)
+    const estimatedGrams = estimateGramsPerServing(item)
+
+    if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
+    if (discreteFloor && discreteFloor > 0) {
+      if (info.gramsPerServing && info.gramsPerServing > 0) {
+        if (info.gramsPerServing < discreteFloor) return discreteFloor
+      } else {
+        return discreteFloor
+      }
+    }
+    if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing * piecesMultiplier
+    if (fallbackDefault && fallbackDefault > 0) return fallbackDefault * Math.max(1, piecesMultiplier)
+    if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing * piecesMultiplier
+    if (estimatedGrams && estimatedGrams > 0) return estimatedGrams * Math.max(1, piecesMultiplier)
+    if (Number.isFinite(item?.customMlPerServing)) {
+      const mlValue = Number(item.customMlPerServing)
+      if (mlValue > 0) return mlValue * Math.max(1, piecesMultiplier)
+    }
+
+    const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
+    const weightAmount = Number.isFinite(Number(item?.weightAmount)) ? Number(item.weightAmount) : null
+    if (servings && servings > 0 && weightAmount && weightAmount > 0) {
+      const unit = normalizeWeightUnit(item?.weightUnit)
+      const grams = weightAmountToGrams(weightAmount, unit, item, null)
+      if (grams && grams > 0) return grams / servings
+    }
+
+    return null
+  }
+
   // Get base weight per 1 serving in the item's current weightUnit (defaults to grams)
   const getBaseWeightPerServing = (item: any): number | null => {
     const info = parseServingSizeInfo(item)
-    const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+    const unit = normalizeWeightUnit(item?.weightUnit)
     const estimatedGrams = estimateGramsPerServing(item)
     const piecesMultiplier = piecesMultiplierForServing(item)
     const fallbackDefault = defaultGramsForItem(item)
     const discreteFloor = getDiscreteWeightFloor(item)
+    const baseGrams = getBaseGramsPerServing(item)
     if (unit === 'ml') {
       if (Number.isFinite(item?.customMlPerServing)) return Number(item.customMlPerServing)
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing * piecesMultiplier
@@ -9606,7 +9852,7 @@ const applyStructuredItems = (
       if (info.mlPerServing && info.mlPerServing > 0) return (info.mlPerServing * piecesMultiplier) / 28.3495
       if (fallbackDefault && fallbackDefault > 0) return (fallbackDefault * Math.max(1, piecesMultiplier)) / 28.3495
       if (estimatedGrams && estimatedGrams > 0) return (estimatedGrams * Math.max(1, piecesMultiplier)) / 28.3495
-    } else {
+    } else if (unit === 'g') {
       // grams
       if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
       if (discreteFloor && discreteFloor > 0) {
@@ -9620,6 +9866,9 @@ const applyStructuredItems = (
       if (fallbackDefault && fallbackDefault > 0) return fallbackDefault * Math.max(1, piecesMultiplier)
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing * piecesMultiplier // assume ~1g/mL fallback
       if (estimatedGrams && estimatedGrams > 0) return estimatedGrams * Math.max(1, piecesMultiplier)
+    } else if (baseGrams && baseGrams > 0) {
+      const converted = gramsToWeightAmount(baseGrams, unit, item, baseGrams)
+      if (converted && Number.isFinite(converted) && converted > 0) return converted
     }
     // Fallback: infer from current weightAmount and servings if present
     const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
@@ -9705,7 +9954,7 @@ const applyStructuredItems = (
     const customGrams = Number.isFinite(item?.customGramsPerServing) ? Number(item.customGramsPerServing) : null
     const customMl = Number.isFinite(item?.customMlPerServing) ? Number(item.customMlPerServing) : null
     const weight = Number.isFinite(item?.weightAmount) ? Number(item.weightAmount) : null
-    const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+    const unit = normalizeWeightUnit(item?.weightUnit)
 
     if (!weight || weight <= 0) return baseServings
 
@@ -9725,6 +9974,12 @@ const applyStructuredItems = (
       if (denominator && denominator > 0) {
         const gramsWeight = weight * 28.3495
         return Math.max(0, gramsWeight / denominator)
+      }
+    } else {
+      const baseGrams = getBaseGramsPerServing(item)
+      const gramsWeight = weightAmountToGrams(weight, unit, item, baseGrams)
+      if (baseGrams && baseGrams > 0 && gramsWeight && gramsWeight > 0) {
+        return Math.max(0, gramsWeight / baseGrams)
       }
     }
 
@@ -11425,9 +11680,10 @@ Please add nutritional information manually if needed.`);
       detailParts.push(`${formatNumberInputValue(roundedPieces)} piece${roundedPieces === 1 ? '' : 's'}`)
     }
     const weightAmount = Number(item?.weightAmount)
-    const weightUnit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+    const weightUnit = normalizeWeightUnit(item?.weightUnit)
     if (Number.isFinite(weightAmount) && weightAmount > 0) {
-      detailParts.push(`total weight ${formatNumberInputValue(weightAmount)} ${weightUnit}`)
+      const displayAmount = roundWeightValue(weightAmount, weightUnit)
+      detailParts.push(`total weight ${formatNumberInputValue(displayAmount)} ${WEIGHT_UNIT_LABELS[weightUnit]}`)
     }
     const detail = detailParts.length > 0 ? ` (${detailParts.join(', ')})` : ''
     return `${name}${detail}`
@@ -18929,6 +19185,7 @@ Please add nutritional information manually if needed.`);
                         const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount * macroMultiplier) * 10) / 10
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         const baseWeightPerServing = getBaseWeightPerServing(item)
+                        const weightUnit = normalizeWeightUnit(item?.weightUnit)
                         
                         // Function to focus weight input (for mobile serving size click)
                         const focusWeightInput = () => {
@@ -19387,7 +19644,7 @@ Please add nutritional information manually if needed.`);
                                       type="number"
                                       inputMode="decimal"
                                       min={0}
-                                      step={(item?.weightUnit === 'oz' ? 0.1 : 1) as any}
+                                      step={getWeightInputStep(weightUnit) as any}
                                       data-weight-input-id={`weight-input-${index}`}
                                       value={(() => {
                                         const key = `ai:card:${index}:weightAmount`
@@ -19437,11 +19694,7 @@ Please add nutritional information manually if needed.`);
                                         Object.prototype.hasOwnProperty.call(numericInputDrafts, `ai:card:${index}:weightAmount`)
                                           ? ''
                                           : baseWeightPerServing
-                                          ? String(
-                                              item?.weightUnit === 'oz'
-                                                ? Math.round(baseWeightPerServing * servingsCount * 100) / 100
-                                                : Math.round(baseWeightPerServing * servingsCount),
-                                            )
+                                          ? String(roundWeightValue(baseWeightPerServing * servingsCount, weightUnit))
                                           : 'e.g., 250'
                                       }
                                       className="w-20 bg-transparent border-none font-bold text-lg text-slate-900 text-right tabular-nums outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
@@ -19449,14 +19702,16 @@ Please add nutritional information manually if needed.`);
                                     />
                                     <div className="w-px h-6 bg-slate-300 mx-3" />
                                     <select
-                                      value={item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'}
+                                      value={weightUnit}
                                       onChange={(e) => updateItemField(index, 'weightUnit', e.target.value)}
                                       className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none"
                                       style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
                                     >
-                                      <option value="g">g</option>
-                                      <option value="ml">ml</option>
-                                      <option value="oz">oz</option>
+                                      {WEIGHT_UNIT_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
                                     </select>
                                   </div>
                                 </div>
@@ -19561,11 +19816,9 @@ Please add nutritional information manually if needed.`);
                                   <div className="text-xs text-slate-400">
                                     Total amount ≈{' '}
                                     {(() => {
-                                      const unit =
-                                        item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
                                       const raw = baseWeightPerServing * servingsCount
-                                      const amount = unit === 'oz' ? Math.round(raw * 100) / 100 : Math.round(raw)
-                                      return `${amount} ${unit}`
+                                      const amount = roundWeightValue(raw, weightUnit)
+                                      return `${formatNumberInputValue(amount)} ${WEIGHT_UNIT_LABELS[weightUnit]}`
                                     })()}
                                   </div>
                                 )}
@@ -19901,8 +20154,7 @@ Please add nutritional information manually if needed.`);
                         const item = analyzedItems[editingItemIndex]
                         const servingsCount = Number.isFinite(item?.servings) ? Number(item.servings) : 1
                         const baseWeightPerServing = getBaseWeightPerServing(item)
-                        const unit =
-                          item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+                        const unit = normalizeWeightUnit(item?.weightUnit)
                         const amountKey = `ai:modal:${editingItemIndex}:weightAmount`
                         const amountValue = Object.prototype.hasOwnProperty.call(numericInputDrafts, amountKey)
                           ? numericInputDrafts[amountKey]
@@ -19919,7 +20171,7 @@ Please add nutritional information manually if needed.`);
                                 type="number"
                                 inputMode="decimal"
                                 min={0}
-                                step={(unit === 'oz' ? 0.1 : 1) as any}
+                                step={getWeightInputStep(unit) as any}
                                 value={amountValue}
                                 onFocus={() => {
                                   setNumericInputDrafts((prev) => ({ ...prev, [amountKey]: '' }))
@@ -19941,9 +20193,7 @@ Please add nutritional information manually if needed.`);
                                 placeholder={
                                   baseWeightPerServing
                                     ? String(
-                                        unit === 'oz'
-                                          ? Math.round(baseWeightPerServing * servingsCount * 100) / 100
-                                          : Math.round(baseWeightPerServing * servingsCount),
+                                        roundWeightValue(baseWeightPerServing * servingsCount, unit),
                                       )
                                     : 'e.g., 250'
                                 }
@@ -19954,9 +20204,11 @@ Please add nutritional information manually if needed.`);
                                 onChange={(e) => updateItemField(editingItemIndex, 'weightUnit', e.target.value)}
                                 className="w-24 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               >
-                                <option value="g">g</option>
-                                <option value="ml">ml</option>
-                                <option value="oz">oz</option>
+                                {WEIGHT_UNIT_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
                               </select>
                             </div>
                             {baseWeightPerServing && (
@@ -19964,8 +20216,8 @@ Please add nutritional information manually if needed.`);
                                 Total amount ≈{' '}
                                 {(() => {
                                   const raw = baseWeightPerServing * servingsCount
-                                  const amount = unit === 'oz' ? Math.round(raw * 100) / 100 : Math.round(raw)
-                                  return `${amount} ${unit}`
+                                  const amount = roundWeightValue(raw, unit)
+                                  return `${formatNumberInputValue(amount)} ${WEIGHT_UNIT_LABELS[unit]}`
                                 })()}
                               </p>
                             )}

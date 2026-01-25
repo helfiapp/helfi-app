@@ -815,6 +815,61 @@ export default function AddIngredientClient() {
     }
   }
 
+  const hasMacroData = (item: NormalizedFoodItem | null | undefined) => {
+    if (!item) return false
+    const hasCalories =
+      item.calories !== null && item.calories !== undefined && Number.isFinite(Number(item.calories))
+    const hasProtein =
+      item.protein_g !== null && item.protein_g !== undefined && Number.isFinite(Number(item.protein_g))
+    const hasCarbs =
+      item.carbs_g !== null && item.carbs_g !== undefined && Number.isFinite(Number(item.carbs_g))
+    const hasFat = item.fat_g !== null && item.fat_g !== undefined && Number.isFinite(Number(item.fat_g))
+    return hasCalories && hasProtein && hasCarbs && hasFat
+  }
+
+  const pickBestMacroMatch = (items: NormalizedFoodItem[], lookup: string) => {
+    const filtered = items.filter((candidate) => hasMacroData(candidate))
+    if (filtered.length === 0) return null
+    return (
+      filtered.find((candidate) => nameMatchesSearchQuery(candidate?.name || '', lookup, { requireFirstWord: false })) ||
+      filtered[0]
+    )
+  }
+
+  const resolveItemWithMacros = async (lookup: string) => {
+    const trimmed = String(lookup || '').trim()
+    if (!trimmed) return null
+    try {
+      const usdaParams = new URLSearchParams({
+        source: 'usda',
+        q: trimmed,
+        kind: 'single',
+        limit: '20',
+      })
+      usdaParams.set('localOnly', '1')
+      const usdaRes = await fetch(`/api/food-data?${usdaParams.toString()}`, { method: 'GET' })
+      if (usdaRes.ok) {
+        const data = await usdaRes.json().catch(() => ({}))
+        const items: NormalizedFoodItem[] = Array.isArray(data?.items) ? data.items : []
+        const match = pickBestMacroMatch(items, trimmed)
+        if (match) return match
+      }
+      const packagedParams = new URLSearchParams({
+        source: 'auto',
+        q: trimmed,
+        kind: 'packaged',
+        limit: '20',
+      })
+      const packagedRes = await fetch(`/api/food-data?${packagedParams.toString()}`, { method: 'GET' })
+      if (!packagedRes.ok) return null
+      const packagedData = await packagedRes.json().catch(() => ({}))
+      const packagedItems: NormalizedFoodItem[] = Array.isArray(packagedData?.items) ? packagedData.items : []
+      return pickBestMacroMatch(packagedItems, trimmed)
+    } catch {
+      return null
+    }
+  }
+
   const fetchBrandSuggestions = async (searchQuery: string) => {
     const prefix = getBrandMatchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
@@ -1008,7 +1063,17 @@ export default function AddIngredientClient() {
         target = resolved
       }
       const upgraded = await loadServingOverride(target)
-      const final = upgraded || target
+      const resolvedTarget = upgraded || target
+      let final = resolvedTarget
+      if (!hasMacroData(final)) {
+        const lookup = String((resolvedTarget as any)?.__searchQuery || resolvedTarget?.name || '').trim()
+        const fallback = lookup ? await resolveItemWithMacros(lookup) : null
+        if (!fallback) {
+          setError('This item has no nutrition data. Please choose another result.')
+          return
+        }
+        final = fallback
+      }
       const baseItem = {
         name: String(final.name || 'Food'),
         brand: final.brand ?? null,

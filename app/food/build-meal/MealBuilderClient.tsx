@@ -23,7 +23,21 @@ type NormalizedFoodItem = {
   __searchQuery?: string
 }
 
-type BuilderUnit = 'g' | 'oz' | 'ml' | 'tsp' | 'tbsp' | 'cup' | 'piece'
+type BuilderUnit =
+  | 'g'
+  | 'ml'
+  | 'oz'
+  | 'tsp'
+  | 'tbsp'
+  | 'quarter-cup'
+  | 'half-cup'
+  | 'three-quarter-cup'
+  | 'cup'
+  | 'pinch'
+  | 'handful'
+  | 'piece'
+  | 'slice'
+  | 'serving'
 
 type BuilderItem = {
   id: string
@@ -408,6 +422,42 @@ const triggerHaptic = (duration = 10) => {
   } catch {}
 }
 
+const DEFAULT_SERVING_GRAMS = 100
+
+const UNIT_GRAMS: Record<BuilderUnit, number> = {
+  g: 1,
+  ml: 1,
+  oz: 28.3495,
+  tsp: 5,
+  tbsp: 14,
+  'quarter-cup': 218 / 4,
+  'half-cup': 218 / 2,
+  'three-quarter-cup': (218 * 3) / 4,
+  cup: 218,
+  pinch: 0.3,
+  handful: 30,
+  piece: 100,
+  slice: 30,
+  serving: DEFAULT_SERVING_GRAMS,
+}
+
+const ALL_UNITS: BuilderUnit[] = [
+  'g',
+  'ml',
+  'oz',
+  'tsp',
+  'tbsp',
+  'quarter-cup',
+  'half-cup',
+  'three-quarter-cup',
+  'cup',
+  'pinch',
+  'handful',
+  'piece',
+  'slice',
+  'serving',
+]
+
 const parseServingBase = (servingSize: any): { amount: number | null; unit: BuilderUnit | null } => {
   const raw = String(servingSize || '').trim()
   if (!raw) return { amount: null, unit: null }
@@ -416,10 +466,41 @@ const parseServingBase = (servingSize: any): { amount: number | null; unit: Buil
   const paren = raw.match(/\(([^)]*)\)/)
   const target = paren?.[1] ? paren[1] : raw
 
-  const m = target.match(/(\d+(?:\.\d+)?)\s*(g|grams?|ml|mL|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?|cup|cups?)/i)
-  if (!m) return { amount: null, unit: null }
-  const amount = parseFloat(m[1])
-  if (!Number.isFinite(amount) || amount <= 0) return { amount: null, unit: null }
+  const parseAmount = (value: string): number | null => {
+    const trimmed = value.trim()
+    const mixed = trimmed.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/)
+    if (mixed) {
+      const whole = Number(mixed[1])
+      const num = Number(mixed[2])
+      const den = Number(mixed[3])
+      if (Number.isFinite(whole) && Number.isFinite(num) && Number.isFinite(den) && den > 0) {
+        return whole + num / den
+      }
+    }
+    const frac = trimmed.match(/^(\d+)\s*\/\s*(\d+)$/)
+    if (frac) {
+      const num = Number(frac[1])
+      const den = Number(frac[2])
+      if (Number.isFinite(num) && Number.isFinite(den) && den > 0) return num / den
+    }
+    const num = parseFloat(trimmed)
+    return Number.isFinite(num) ? num : null
+  }
+
+  const m = target.match(
+    /(\d+(?:\.\d+)?(?:\s+\d+\s*\/\s*\d+)?|\d+\s*\/\s*\d+)\s*(g|grams?|ml|mL|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?|cup|cups?|pinch|pinches|handful|handfuls|piece|pieces|slice|slices|serving|servings)/i,
+  )
+  if (!m) {
+    const lower = target.toLowerCase()
+    if (/\bpinch(es)?\b/.test(lower)) return { amount: 1, unit: 'pinch' }
+    if (/\bhandfuls?\b/.test(lower)) return { amount: 1, unit: 'handful' }
+    if (/\bpieces?\b/.test(lower)) return { amount: 1, unit: 'piece' }
+    if (/\bslices?\b/.test(lower)) return { amount: 1, unit: 'slice' }
+    if (/\bservings?\b/.test(lower)) return { amount: 1, unit: 'serving' }
+    return { amount: null, unit: null }
+  }
+  const amount = parseAmount(m[1])
+  if (!amount || !Number.isFinite(amount) || amount <= 0) return { amount: null, unit: null }
   const unitRaw = String(m[2] || '').toLowerCase()
 
   if (unitRaw.startsWith('g')) return { amount, unit: 'g' }
@@ -427,8 +508,18 @@ const parseServingBase = (servingSize: any): { amount: number | null; unit: Buil
   if (unitRaw.startsWith('oz') || unitRaw.startsWith('ounce')) return { amount, unit: 'oz' }
   if (unitRaw.startsWith('tsp') || unitRaw.startsWith('teaspoon')) return { amount, unit: 'tsp' }
   if (unitRaw.startsWith('tbsp') || unitRaw.startsWith('tablespoon')) return { amount, unit: 'tbsp' }
+  if (unitRaw.startsWith('pinch')) return { amount, unit: 'pinch' }
+  if (unitRaw.startsWith('handful')) return { amount, unit: 'handful' }
+  if (unitRaw.startsWith('piece')) return { amount, unit: 'piece' }
+  if (unitRaw.startsWith('slice')) return { amount, unit: 'slice' }
+  if (unitRaw.startsWith('serving')) return { amount, unit: 'serving' }
   if (unitRaw.startsWith('cup')) return { amount, unit: 'cup' }
   return { amount: null, unit: null }
+}
+
+const seedBaseServing = (base: { amount: number | null; unit: BuilderUnit | null }) => {
+  if (base.amount && base.unit) return base
+  return { amount: 1, unit: 'serving' as BuilderUnit }
 }
 
 const isLikelyLiquidItem = (nameRaw: string, servingRaw?: string | null) => {
@@ -490,53 +581,58 @@ const isLikelyPieceItem = (nameRaw: string, servingRaw?: string | null) => {
   return produceHints.some((hint) => label.includes(hint))
 }
 
-const convertAmount = (amount: number, from: BuilderUnit, to: BuilderUnit) => {
+const resolveUnitGrams = (unit: BuilderUnit, baseAmount?: number | null, baseUnit?: BuilderUnit | null) => {
+  if (
+    (unit === 'serving' || unit === 'piece' || unit === 'slice') &&
+    baseAmount &&
+    baseUnit &&
+    Object.prototype.hasOwnProperty.call(UNIT_GRAMS, baseUnit)
+  ) {
+    return baseAmount * UNIT_GRAMS[baseUnit]
+  }
+  return UNIT_GRAMS[unit]
+}
+
+const convertAmount = (
+  amount: number,
+  from: BuilderUnit,
+  to: BuilderUnit,
+  baseAmount?: number | null,
+  baseUnit?: BuilderUnit | null,
+) => {
   if (!Number.isFinite(amount)) return amount
   if (from === to) return amount
 
-  const weightUnits: BuilderUnit[] = ['g', 'oz', 'tsp', 'tbsp', 'cup', 'ml']
-  const weightToGrams: Record<BuilderUnit, number> = {
-    g: 1,
-    oz: 28,
-    tsp: 5,
-    tbsp: 14,
-    cup: 218,
-    ml: 1,
-    piece: 0,
-  }
+  const weightUnits: BuilderUnit[] = [...ALL_UNITS]
 
   // Weight conversions
   if (weightUnits.includes(from) && weightUnits.includes(to)) {
-    const grams = amount * weightToGrams[from]
-    return grams / weightToGrams[to]
+    const fromGrams = resolveUnitGrams(from, baseAmount, baseUnit)
+    const toGrams = resolveUnitGrams(to, baseAmount, baseUnit)
+    if (!Number.isFinite(fromGrams) || !Number.isFinite(toGrams) || toGrams <= 0) return amount
+    const grams = amount * fromGrams
+    return grams / toGrams
   }
   return amount
 }
 
-const allowedUnitsForItem = (item: BuilderItem): BuilderUnit[] => {
-  const baseUnit = item.__baseUnit
-  if (!baseUnit) return []
-  const treatAsLiquid = baseUnit === 'ml' || isLikelyLiquidItem(item?.name || '', item?.serving_size)
-  if (treatAsLiquid) {
-    const baseList: BuilderUnit[] = ['g', 'tsp', 'tbsp', 'cup', 'oz']
-    if (baseUnit === 'ml') return [...baseList, 'ml']
-    return baseList
-  }
-  const baseList: BuilderUnit[] = ['g', 'oz']
-  if (isLikelyPieceItem(item?.name || '', item?.serving_size)) {
-    baseList.push('piece')
-  }
-  return baseList
-}
+const allowedUnitsForItem = (_item?: BuilderItem) => [...ALL_UNITS]
 
 const formatUnitLabel = (unit: BuilderUnit) => {
   if (unit === 'g') return 'g'
   if (unit === 'tsp') return 'tsp — 5g'
   if (unit === 'tbsp') return 'tbsp — 14g'
+  if (unit === 'quarter-cup') return '1/4 cup — 54.5g'
+  if (unit === 'half-cup') return '1/2 cup — 109g'
+  if (unit === 'three-quarter-cup') return '3/4 cup — 163.5g'
   if (unit === 'cup') return 'cup — 218g'
   if (unit === 'oz') return 'oz — 28g'
   if (unit === 'ml') return 'ml'
-  if (unit === 'piece') return 'piece'
+  if (unit === 'pinch') return 'pinch — 0.3g'
+  if (unit === 'handful') return 'handful — 30g'
+  if (unit === 'piece') return 'piece — 100g'
+  if (unit === 'slice') return 'slice — 30g'
+  if (unit === 'serving') return 'serving — 100g'
   return unit
 }
 
@@ -556,12 +652,7 @@ const computeItemTotals = (item: BuilderItem) => {
 
 const unitToGrams = (amount: number, unit: BuilderUnit): number | null => {
   if (!Number.isFinite(amount)) return null
-  if (unit === 'g') return amount
-  if (unit === 'oz') return amount * 28
-  if (unit === 'tsp') return amount * 5
-  if (unit === 'tbsp') return amount * 14
-  if (unit === 'cup') return amount * 218
-  if (unit === 'ml') return amount
+  if (unit in UNIT_GRAMS) return amount * UNIT_GRAMS[unit]
   return null
 }
 
@@ -589,7 +680,6 @@ const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
     }
     const unit = (it?.__unit || it?.__baseUnit) as BuilderUnit | null
     if (!unit) continue
-    if (unit === 'piece') continue
     const grams = unitToGrams(Number(it.__amount || 0), unit)
     if (grams && Number.isFinite(grams)) total += grams
   }
@@ -774,7 +864,7 @@ export default function MealBuilderClient() {
       const brand = raw?.brand ?? null
       const serving_size = raw?.serving_size || raw?.servingSize || raw?.serving || ''
       const servings = toNumber(raw?.servings) ?? 1
-      const base = parseServingBase(serving_size)
+      const base = seedBaseServing(parseServingBase(serving_size))
       let baseAmount = base.amount
       let baseUnit = base.unit
       const liquidItem = isLikelyLiquidItem(name, serving_size)
@@ -1000,6 +1090,39 @@ export default function MealBuilderClient() {
     return Array.isArray(data?.items) ? data.items : []
   }
 
+  const hasMacroData = (item: NormalizedFoodItem | null | undefined) => {
+    if (!item) return false
+    const hasCalories =
+      item.calories !== null && item.calories !== undefined && Number.isFinite(Number(item.calories))
+    const hasProtein =
+      item.protein_g !== null && item.protein_g !== undefined && Number.isFinite(Number(item.protein_g))
+    const hasCarbs =
+      item.carbs_g !== null && item.carbs_g !== undefined && Number.isFinite(Number(item.carbs_g))
+    const hasFat = item.fat_g !== null && item.fat_g !== undefined && Number.isFinite(Number(item.fat_g))
+    return hasCalories && hasProtein && hasCarbs && hasFat
+  }
+
+  const pickBestMacroMatch = (items: NormalizedFoodItem[], lookup: string) => {
+    const filtered = items.filter((candidate) => hasMacroData(candidate))
+    if (filtered.length === 0) return null
+    return (
+      filtered.find((candidate) => nameMatchesSearchQuery(candidate?.name || '', lookup, { requireFirstWord: false })) ||
+      filtered[0]
+    )
+  }
+
+  const resolveItemWithMacros = async (lookup: string) => {
+    const usdaItems = await fetchSearchItems(lookup, { kindOverride: 'single', sourceOverride: 'usda', localOnly: true })
+    const usdaMatch = pickBestMacroMatch(usdaItems as NormalizedFoodItem[], lookup)
+    if (usdaMatch) return usdaMatch
+
+    const fallbackItems = await fetchSearchItems(lookup, { kindOverride: 'packaged', sourceOverride: 'auto' })
+    const fallbackMatch = pickBestMacroMatch(fallbackItems as NormalizedFoodItem[], lookup)
+    if (fallbackMatch) return fallbackMatch
+
+    return null
+  }
+
   const fetchBrandSuggestions = async (searchQuery: string) => {
     const prefix = getBrandMatchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
@@ -1173,9 +1296,9 @@ export default function MealBuilderClient() {
     runSearch(raw)
   }
 
-  const addItem = (r: NormalizedFoodItem) => {
+  const addItemDirect = (r: NormalizedFoodItem) => {
     triggerHaptic(10)
-    const base = parseServingBase(r?.serving_size)
+    const base = seedBaseServing(parseServingBase(r?.serving_size))
     let baseAmount = base.amount
     let baseUnit = base.unit
     const liquidItem = isLikelyLiquidItem(r?.name || '', r?.serving_size)
@@ -1219,21 +1342,38 @@ export default function MealBuilderClient() {
     addBuilderItem(next)
   }
 
+  const addItemWithMacros = async (item: NormalizedFoodItem) => {
+    if (!item) return
+    const lookup = String((item as any)?.__searchQuery || item?.name || '').trim()
+    if (hasMacroData(item)) {
+      addItemDirect(item)
+      return
+    }
+    setSearchLoading(true)
+    try {
+      const resolved = lookup ? await resolveItemWithMacros(lookup) : null
+      if (!resolved) {
+        setError('This item has no nutrition data. Please choose another result.')
+        return
+      }
+      addItemDirect(resolved)
+    } catch {
+      setError('Search failed. Please try again.')
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
   const addSuggestionItem = async (item: NormalizedFoodItem) => {
     const lookup = item.__searchQuery || item.name
     setSearchLoading(true)
     try {
-      const matches = await fetchSearchItems(lookup, { kindOverride: 'single', sourceOverride: 'usda' })
-      const filtered = (matches as NormalizedFoodItem[]).filter((candidate) => candidate?.source === 'usda')
-      const best =
-        filtered.find((candidate) => nameMatchesSearchQuery(candidate?.name || '', lookup, { requireFirstWord: false })) ||
-        filtered[0] ||
-        null
-      if (best) {
-        addItem(best)
-      } else {
-        setError('No match found. Try a longer search.')
+      const resolved = await resolveItemWithMacros(lookup)
+      if (!resolved) {
+        setError('This item has no nutrition data. Please choose another result.')
+        return
       }
+      addItemDirect(resolved)
     } catch {
       setError('Search failed. Please try again.')
     } finally {
@@ -1250,7 +1390,7 @@ export default function MealBuilderClient() {
       const serving_size = ai?.serving_size || ai?.servingSize || ai?.serving || ''
       const servings = toNumber(ai?.servings) ?? 1
 
-      const base = parseServingBase(serving_size)
+      const base = seedBaseServing(parseServingBase(serving_size))
       let baseAmount = base.amount
       let baseUnit = base.unit
       const liquidItem = isLikelyLiquidItem(name, serving_size)
@@ -1662,7 +1802,7 @@ export default function MealBuilderClient() {
         fiber_g: toNumber(food.fiber_g),
         sugar_g: toNumber(food.sugar_g),
       }
-      addItem(normalized)
+      addItemDirect(normalized)
       setBarcodeStatusHint('Added')
       setShowBarcodeScanner(false)
     } catch {
@@ -1792,10 +1932,8 @@ export default function MealBuilderClient() {
         const unit = it.__unit
         let servings = it.servings
 
-        if (unit === 'piece') {
-          servings = amount
-        } else if (baseAmount && baseUnit && unit) {
-          const inBase = convertAmount(amount, unit, baseUnit)
+        if (baseAmount && baseUnit && unit) {
+          const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit)
           servings = baseAmount > 0 ? inBase / baseAmount : 0
         } else {
           // Fallback: treat amount as servings
@@ -1816,16 +1954,9 @@ export default function MealBuilderClient() {
         if (!baseAmount || !baseUnit) {
           return { ...it, __unit: unit }
         }
-        if (unit === 'piece') {
-          const nextAmount = round3(Math.max(0, it.servings))
-          return { ...it, __unit: unit, __amount: nextAmount, __amountInput: String(nextAmount) }
-        }
         const currentUnit = it.__unit || baseUnit
-        const converted =
-          currentUnit === 'piece'
-            ? convertAmount(it.servings * baseAmount, baseUnit, unit)
-            : convertAmount(it.__amount, currentUnit, unit)
-        const inBase = convertAmount(converted, unit, baseUnit)
+        const converted = convertAmount(it.__amount, currentUnit, unit, baseAmount, baseUnit)
+        const inBase = convertAmount(converted, unit, baseUnit, baseAmount, baseUnit)
         const servings = baseAmount > 0 ? inBase / baseAmount : 0
         const nextAmount = round3(Math.max(0, converted))
         return { ...it, __unit: unit, __amount: nextAmount, __amountInput: String(nextAmount), servings: round3(Math.max(0, servings)) }
@@ -2607,7 +2738,7 @@ export default function MealBuilderClient() {
                               addSuggestionItem(r)
                               return
                             }
-                            addItem(r)
+                            addItemWithMacros(r)
                           }}
                           className="ml-3 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
                         >
