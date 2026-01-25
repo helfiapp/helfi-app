@@ -72,10 +72,13 @@ export default function FitbitCorrelations({ rangeDays = 30 }: { rangeDays?: num
         // Mood (preferred)
         const moodRes = await fetch(`/api/mood/entries?start=${startStr}&end=${endStr}`)
         if (moodRes.ok) setMood((await moodRes.json()) as MoodHistory)
-        // Checkins
-        const ciRes = await fetch(`/api/checkins/history?start=${startStr}&end=${endStr}`)
-        if (!ciRes.ok) throw new Error('Failed to load check-ins')
-        setCheckins((await ciRes.json()) as CheckinHistory)
+        // Checkins (optional)
+        try {
+          const ciRes = await fetch(`/api/checkins/history?start=${startStr}&end=${endStr}`)
+          if (ciRes.ok) setCheckins((await ciRes.json()) as CheckinHistory)
+        } catch (e) {
+          console.warn('Check-ins history unavailable:', e)
+        }
       } catch (e: any) {
         setError(e?.message || 'Failed to load correlations')
       } finally {
