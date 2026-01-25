@@ -93,17 +93,35 @@ export async function GET(request: NextRequest) {
 
     const hasMacroData = (item: any) => {
       if (!item) return false
-      const calories = Number(item?.calories)
-      const protein = Number(item?.protein_g)
-      const carbs = Number(item?.carbs_g)
-      const fat = Number(item?.fat_g)
-      return (
-        Number.isFinite(calories) &&
-        Number.isFinite(protein) &&
-        Number.isFinite(carbs) &&
-        Number.isFinite(fat)
-      )
+      const calories = item?.calories
+      const protein = item?.protein_g
+      const carbs = item?.carbs_g
+      const fat = item?.fat_g
+      const hasCalories = calories !== null && calories !== undefined && Number.isFinite(Number(calories))
+      const hasProtein = protein !== null && protein !== undefined && Number.isFinite(Number(protein))
+      const hasCarbs = carbs !== null && carbs !== undefined && Number.isFinite(Number(carbs))
+      const hasFat = fat !== null && fat !== undefined && Number.isFinite(Number(fat))
+      return hasCalories && hasProtein && hasCarbs && hasFat
     }
+
+    const DESCRIPTOR_TOKENS = new Set([
+      'raw',
+      'fresh',
+      'cooked',
+      'uncooked',
+      'frozen',
+      'pasteurized',
+      'pasteurised',
+      'boiled',
+      'baked',
+      'roasted',
+      'fried',
+      'grilled',
+      'steamed',
+      'sauteed',
+      'smoked',
+      'dried',
+    ])
 
     const scoreNameMatch = (name: any) => {
       if (!queryNorm) return 0
@@ -118,6 +136,7 @@ export async function GET(request: NextRequest) {
       if (n.includes(queryNorm)) return 500
       const nameTokens = n.split(' ').filter(Boolean)
       const scoredTokens = queryTokensNormalized.filter((token) => token.length >= 2)
+      const coreTokens = scoredTokens.filter((token) => !DESCRIPTOR_TOKENS.has(token))
       if (scoredTokens.length > 0) {
         const exactMatches = new Set<string>()
         const prefixMatches = new Set<string>()
@@ -131,7 +150,14 @@ export async function GET(request: NextRequest) {
           }
         }
         if (exactMatches.size > 0) return 520 + exactMatches.size * 120
-        if (prefixMatches.size > 0) return 360 + prefixMatches.size * 40
+        if (prefixMatches.size > 0) {
+          let score = 360 + prefixMatches.size * 40
+          if (coreTokens.length > 0) {
+            const exactCoreMatches = coreTokens.filter((token) => nameTokens.includes(token))
+            if (exactCoreMatches.length === 0) score -= 200
+          }
+          return score
+        }
       }
       if (queryTokens.length > 0) {
         const hitCount = queryTokens.filter((t) => n.includes(t)).length
