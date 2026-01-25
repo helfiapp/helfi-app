@@ -22281,9 +22281,7 @@ Please add nutritional information manually if needed.`);
                           </button>
                         </div>
                       </div>
-                      {!summaryReady ? (
-                        <div className="text-xs text-gray-500 mb-3">Loading this day\u2019s summary\u2026</div>
-                      ) : (
+                      {!summaryReady ? null : (
                         <>
                           {source.length === 0 && (
                             <p className="text-xs text-gray-500 mb-3">
