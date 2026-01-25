@@ -2823,6 +2823,11 @@ Rules:
 - If you suggest supplements, diet changes, or possible medications based on labs, check against current medications and allergies. If unsure, say to check with a clinician.
 - Do not tell the user how to navigate the app or where to find logs.
 - Do not repeat the same insight in more than one section.
+- If goals exist, include at least 3 items across the report that name a goal exactly as written and link it to specific data (dates, foods, symptoms, labs, or check-ins).
+- When you name a goal, include the goal rating if present and explain whether the data supports or conflicts with that goal.
+- If issues exist, include at least 2 items across the report that name an issue exactly as written and link it to specific data.
+- Spread goals and issues across different sections when possible. Do not reuse the same goal or issue in multiple sections unless it uses different dates or different evidence.
+- Never invent goals or issues that are not in the JSON.
 
 JSON data:
 ${llmPayloadJson}
