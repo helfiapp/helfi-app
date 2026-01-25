@@ -775,8 +775,23 @@ const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
 
 const macroOrZero = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 
+const computeServingsFromAmount = (item: BuilderItem) => {
+  const baseAmount = item.__baseAmount
+  const baseUnit = item.__baseUnit
+  const unit = item.__unit || baseUnit
+  const amount = Number(item.__amount)
+  const pieceGrams = item.__pieceGrams
+  if (baseAmount && baseUnit && unit && Number.isFinite(amount)) {
+    const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
+    const servings = baseAmount > 0 ? inBase / baseAmount : 0
+    return round3(Math.max(0, servings))
+  }
+  const fallback = Number.isFinite(Number(item.servings)) ? Number(item.servings) : Number(amount)
+  return round3(Math.max(0, fallback || 0))
+}
+
 const computeItemTotals = (item: BuilderItem) => {
-  const servings = typeof item.servings === 'number' && Number.isFinite(item.servings) ? item.servings : 0
+  const servings = computeServingsFromAmount(item)
   return {
     calories: macroOrZero(item.calories) * servings,
     protein: macroOrZero(item.protein_g) * servings,
@@ -806,7 +821,7 @@ const parseNumericInput = (value: any): number | null => {
 const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
   let total = 0
   for (const it of items) {
-    const servings = Number.isFinite(Number(it?.servings)) ? Number(it.servings) : 0
+    const servings = computeServingsFromAmount(it)
     const baseAmount = it?.__baseAmount
     const baseUnit = it?.__baseUnit
     const pieceGrams = it?.__pieceGrams
@@ -2287,7 +2302,7 @@ export default function MealBuilderClient() {
         __sourceId,
         ...rest
       } = it
-      const next: any = { ...rest }
+      const next: any = { ...rest, servings: computeServingsFromAmount(it) }
       const source =
         Array.isArray(sourceItemsForMerge) && sourceItemsForMerge[index]
           ? sourceItemsForMerge[index]
