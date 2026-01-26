@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
 import { DRY_FOOD_MEASUREMENTS } from '@/lib/food/dry-food-measurements'
-import { FRUIT_VEG_MEASUREMENTS } from '@/lib/food/fruit-veg-measurements'
+import { PRODUCE_MEASUREMENTS } from '@/lib/food/produce-measurements'
 import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '@/lib/food/dairy-semi-solid-measurements'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
@@ -54,6 +54,9 @@ type BuilderUnit =
   | 'pinch'
   | 'handful'
   | 'piece'
+  | 'piece-small'
+  | 'piece-medium'
+  | 'piece-large'
   | 'slice'
   | 'serving'
 
@@ -463,6 +466,9 @@ const UNIT_GRAMS: Record<BuilderUnit, number> = {
   pinch: 0.3,
   handful: 30,
   piece: 100,
+  'piece-small': 100,
+  'piece-medium': 100,
+  'piece-large': 100,
   slice: 30,
   serving: DEFAULT_SERVING_GRAMS,
 }
@@ -617,21 +623,24 @@ const getDairySemiSolidUnitGrams = (name: string | null | undefined): FoodUnitGr
     buildDairySemiSolidUnitGrams,
   )
 
-const buildFruitVegUnitGrams = (entry: (typeof FRUIT_VEG_MEASUREMENTS)[number]): FoodUnitGrams => ({
-  'quarter-cup': entry.quarter_cup_g,
-  'half-cup': entry.half_cup_g,
-  'three-quarter-cup': entry.three_quarter_cup_g,
-  cup: entry.cup_g,
+const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): FoodUnitGrams => ({
+  'quarter-cup': entry.quarter_cup_raw_g,
+  'half-cup': entry.half_cup_raw_g,
+  'three-quarter-cup': entry.three_quarter_cup_raw_g,
+  cup: entry.raw_cup_g,
+  'piece-small': entry.piece_small_g,
+  'piece-medium': entry.piece_medium_g,
+  'piece-large': entry.piece_large_g,
 })
 
-const FRUIT_VEG_ALIASES = buildFoodAliases(FRUIT_VEG_MEASUREMENTS)
-const FRUIT_VEG_LOOKUP_CACHE = new Map<string, FoodUnitGrams | null>()
+const PRODUCE_ALIASES = buildFoodAliases(PRODUCE_MEASUREMENTS)
+const PRODUCE_LOOKUP_CACHE = new Map<string, FoodUnitGrams | null>()
 
-const getFruitVegUnitGrams = (name: string | null | undefined): FoodUnitGrams | null =>
-  resolveFoodUnitGrams(name, FRUIT_VEG_MEASUREMENTS, FRUIT_VEG_ALIASES, FRUIT_VEG_LOOKUP_CACHE, buildFruitVegUnitGrams)
+const getProduceUnitGrams = (name: string | null | undefined): FoodUnitGrams | null =>
+  resolveFoodUnitGrams(name, PRODUCE_MEASUREMENTS, PRODUCE_ALIASES, PRODUCE_LOOKUP_CACHE, buildProduceUnitGrams)
 
 const getFoodUnitGrams = (name: string | null | undefined): FoodUnitGrams | null =>
-  getFruitVegUnitGrams(name) || getDairySemiSolidUnitGrams(name) || getDryFoodUnitGrams(name)
+  getProduceUnitGrams(name) || getDairySemiSolidUnitGrams(name) || getDryFoodUnitGrams(name)
 
 const ALL_UNITS: BuilderUnit[] = [
   'g',
@@ -646,6 +655,9 @@ const ALL_UNITS: BuilderUnit[] = [
   'pinch',
   'handful',
   'piece',
+  'piece-small',
+  'piece-medium',
+  'piece-large',
   'slice',
   'serving',
 ]
@@ -662,6 +674,9 @@ const DISPLAY_UNITS: BuilderUnit[] = [
   'cup',
   'pinch',
   'piece',
+  'piece-small',
+  'piece-medium',
+  'piece-large',
 ]
 
 const parseServingBase = (servingSize: any): { amount: number | null; unit: BuilderUnit | null } => {
@@ -883,7 +898,7 @@ const resolveUnitGrams = (
 ) => {
   const foodOverride = foodUnitGrams?.[unit]
   if (Number.isFinite(Number(foodOverride)) && Number(foodOverride) > 0) return Number(foodOverride)
-  if (unit === 'piece') {
+  if (unit === 'piece' || unit === 'piece-small' || unit === 'piece-medium' || unit === 'piece-large') {
     if (pieceGrams && pieceGrams > 0) return pieceGrams
     return UNIT_GRAMS.piece
   }
@@ -926,9 +941,20 @@ const convertAmount = (
 const allowedUnitsForItem = (item?: BuilderItem) => {
   let units = [...DISPLAY_UNITS]
   const pieceGrams = item?.__pieceGrams
-  const isFruitVeg = item?.name ? Boolean(getFruitVegUnitGrams(item.name)) : false
-  if (isFruitVeg) units = units.filter((u) => u !== 'tsp' && u !== 'tbsp' && u !== 'pinch')
-  if (!pieceGrams || pieceGrams <= 0) units = units.filter((u) => u !== 'piece')
+  const produceUnits = item?.name ? getProduceUnitGrams(item.name) : null
+  const isProduce = Boolean(produceUnits)
+  if (isProduce) units = units.filter((u) => u !== 'tsp' && u !== 'tbsp' && u !== 'pinch')
+  const hasPieceSmall = Number.isFinite(Number(produceUnits?.['piece-small'])) && Number(produceUnits?.['piece-small']) > 0
+  const hasPieceMedium = Number.isFinite(Number(produceUnits?.['piece-medium'])) && Number(produceUnits?.['piece-medium']) > 0
+  const hasPieceLarge = Number.isFinite(Number(produceUnits?.['piece-large'])) && Number(produceUnits?.['piece-large']) > 0
+  if (hasPieceSmall || hasPieceMedium || hasPieceLarge) {
+    units = units.filter((u) => u !== 'piece')
+  } else if (!pieceGrams || pieceGrams <= 0) {
+    units = units.filter((u) => u !== 'piece')
+  }
+  if (!hasPieceSmall) units = units.filter((u) => u !== 'piece-small')
+  if (!hasPieceMedium) units = units.filter((u) => u !== 'piece-medium')
+  if (!hasPieceLarge) units = units.filter((u) => u !== 'piece-large')
   return units
 }
 
@@ -949,6 +975,21 @@ const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
     const grams = item?.__pieceGrams
     if (grams && grams > 0) return `piece — ${Math.round(grams * 10) / 10}g`
     return 'piece'
+  }
+  if (unit === 'piece-small') {
+    const grams = Number(unitValue)
+    if (Number.isFinite(grams) && grams > 0) return `small piece — ${Math.round(grams * 10) / 10}g`
+    return 'small piece'
+  }
+  if (unit === 'piece-medium') {
+    const grams = Number(unitValue)
+    if (Number.isFinite(grams) && grams > 0) return `medium piece — ${Math.round(grams * 10) / 10}g`
+    return 'medium piece'
+  }
+  if (unit === 'piece-large') {
+    const grams = Number(unitValue)
+    if (Number.isFinite(grams) && grams > 0) return `large piece — ${Math.round(grams * 10) / 10}g`
+    return 'large piece'
   }
   return unit
 }
