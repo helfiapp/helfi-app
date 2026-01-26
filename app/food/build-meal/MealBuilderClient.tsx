@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
+import { DRY_FOOD_MEASUREMENTS } from '@/lib/food/dry-food-measurements'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 
@@ -464,6 +465,102 @@ const UNIT_GRAMS: Record<BuilderUnit, number> = {
 const OPEN_UNITS: BuilderUnit[] = ['g', 'ml', 'oz']
 const isOpenUnit = (unit?: BuilderUnit | null) => (unit ? OPEN_UNITS.includes(unit) : false)
 
+type DryFoodUnitGrams = Partial<Record<BuilderUnit, number>>
+
+type DryFoodAlias = {
+  tokens: string[]
+  entryIndex: number
+  score: number
+}
+
+const normalizeDryFoodValue = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+
+const tokenizeDryFoodValue = (value: string) =>
+  normalizeDryFoodValue(value)
+    .split(' ')
+    .map((token) => singularizeToken(token))
+    .filter(Boolean)
+
+const splitDryFoodOptions = (value: string) =>
+  value
+    .split(/\/|,|\bor\b/gi)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+
+const buildDryFoodUnitGrams = (entry: (typeof DRY_FOOD_MEASUREMENTS)[number]): DryFoodUnitGrams => ({
+  pinch: entry.pinch_g,
+  tsp: entry.tsp_g,
+  tbsp: entry.tbsp_g,
+  'quarter-cup': entry.quarter_cup_g,
+  'half-cup': entry.half_cup_g,
+  'three-quarter-cup': entry.three_quarter_cup_g,
+  cup: entry.cup_g,
+})
+
+const buildDryFoodAliases = (): DryFoodAlias[] => {
+  const aliases: DryFoodAlias[] = []
+  const seen = new Set<string>()
+  DRY_FOOD_MEASUREMENTS.forEach((entry, entryIndex) => {
+    const raw = String(entry?.food || '').trim()
+    if (!raw) return
+
+    const modifierChunks: string[] = []
+    const baseRaw = raw.replace(/\(([^)]*)\)/g, (_, inner) => {
+      modifierChunks.push(inner)
+      return ' '
+    })
+    const baseParts = baseRaw
+      .split('/')
+      .map((chunk) => chunk.trim())
+      .filter(Boolean)
+    const modifiers = modifierChunks.flatMap((chunk) => splitDryFoodOptions(chunk))
+
+    const addAlias = (phrase: string, scoreBoost = 0) => {
+      const tokens = tokenizeDryFoodValue(phrase)
+      if (tokens.length === 0) return
+      const key = `${entryIndex}:${tokens.join('|')}`
+      if (seen.has(key)) return
+      seen.add(key)
+      aliases.push({ tokens, entryIndex, score: tokens.length + scoreBoost })
+    }
+
+    baseParts.forEach((base) => {
+      addAlias(base)
+      modifiers.forEach((modifier) => addAlias(`${base} ${modifier}`, 1))
+    })
+  })
+  return aliases
+}
+
+const DRY_FOOD_ALIASES = buildDryFoodAliases()
+const DRY_FOOD_LOOKUP_CACHE = new Map<string, DryFoodUnitGrams | null>()
+
+const getDryFoodUnitGrams = (name: string | null | undefined): DryFoodUnitGrams | null => {
+  const normalized = normalizeDryFoodValue(String(name || '').trim())
+  if (!normalized) return null
+  if (DRY_FOOD_LOOKUP_CACHE.has(normalized)) return DRY_FOOD_LOOKUP_CACHE.get(normalized) || null
+  const tokens = new Set(tokenizeDryFoodValue(normalized))
+  let bestScore = 0
+  let bestIndex = -1
+  for (const alias of DRY_FOOD_ALIASES) {
+    if (!alias.tokens.every((token) => tokens.has(token))) continue
+    if (alias.score > bestScore) {
+      bestScore = alias.score
+      bestIndex = alias.entryIndex
+    }
+  }
+  const entry = bestIndex >= 0 ? DRY_FOOD_MEASUREMENTS[bestIndex] : null
+  const result = entry ? buildDryFoodUnitGrams(entry) : null
+  DRY_FOOD_LOOKUP_CACHE.set(normalized, result)
+  return result
+}
+
 const ALL_UNITS: BuilderUnit[] = [
   'g',
   'ml',
@@ -710,7 +807,10 @@ const resolveUnitGrams = (
   baseAmount?: number | null,
   baseUnit?: BuilderUnit | null,
   pieceGrams?: number | null,
+  dryUnitGrams?: DryFoodUnitGrams | null,
 ) => {
+  const dryOverride = dryUnitGrams?.[unit]
+  if (Number.isFinite(Number(dryOverride)) && Number(dryOverride) > 0) return Number(dryOverride)
   if (unit === 'piece') {
     if (pieceGrams && pieceGrams > 0) return pieceGrams
     return UNIT_GRAMS.piece
@@ -733,6 +833,7 @@ const convertAmount = (
   baseAmount?: number | null,
   baseUnit?: BuilderUnit | null,
   pieceGrams?: number | null,
+  dryUnitGrams?: DryFoodUnitGrams | null,
 ) => {
   if (!Number.isFinite(amount)) return amount
   if (from === to) return amount
@@ -741,8 +842,8 @@ const convertAmount = (
 
   // Weight conversions
   if (weightUnits.includes(from) && weightUnits.includes(to)) {
-    const fromGrams = resolveUnitGrams(from, baseAmount, baseUnit, pieceGrams)
-    const toGrams = resolveUnitGrams(to, baseAmount, baseUnit, pieceGrams)
+    const fromGrams = resolveUnitGrams(from, baseAmount, baseUnit, pieceGrams, dryUnitGrams)
+    const toGrams = resolveUnitGrams(to, baseAmount, baseUnit, pieceGrams, dryUnitGrams)
     if (!Number.isFinite(fromGrams) || !Number.isFinite(toGrams) || toGrams <= 0) return amount
     const grams = amount * fromGrams
     return grams / toGrams
@@ -758,16 +859,18 @@ const allowedUnitsForItem = (item?: BuilderItem) => {
 }
 
 const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
+  const dryUnitGrams = item?.name ? getDryFoodUnitGrams(item.name) : null
+  const dryValue = dryUnitGrams?.[unit]
   if (unit === 'g') return 'g'
-  if (unit === 'tsp') return 'tsp — 5g'
-  if (unit === 'tbsp') return 'tbsp — 14g'
-  if (unit === 'quarter-cup') return '1/4 cup — 54.5g'
-  if (unit === 'half-cup') return '1/2 cup — 109g'
-  if (unit === 'three-quarter-cup') return '3/4 cup — 163.5g'
-  if (unit === 'cup') return 'cup — 218g'
+  if (unit === 'tsp') return `tsp — ${Number.isFinite(Number(dryValue)) && Number(dryValue) > 0 ? round3(Number(dryValue)) : 5}g`
+  if (unit === 'tbsp') return `tbsp — ${Number.isFinite(Number(dryValue)) && Number(dryValue) > 0 ? round3(Number(dryValue)) : 14}g`
+  if (unit === 'quarter-cup') return `1/4 cup — ${Number.isFinite(Number(dryValue)) && Number(dryValue) > 0 ? round3(Number(dryValue)) : 54.5}g`
+  if (unit === 'half-cup') return `1/2 cup — ${Number.isFinite(Number(dryValue)) && Number(dryValue) > 0 ? round3(Number(dryValue)) : 109}g`
+  if (unit === 'three-quarter-cup') return `3/4 cup — ${Number.isFinite(Number(dryValue)) && Number(dryValue) > 0 ? round3(Number(dryValue)) : 163.5}g`
+  if (unit === 'cup') return `cup — ${Number.isFinite(Number(dryValue)) && Number(dryValue) > 0 ? round3(Number(dryValue)) : 218}g`
   if (unit === 'oz') return 'oz'
   if (unit === 'ml') return 'ml'
-  if (unit === 'pinch') return 'pinch — 0.3g'
+  if (unit === 'pinch') return `pinch — ${Number.isFinite(Number(dryValue)) && Number(dryValue) > 0 ? round3(Number(dryValue)) : 0.3}g`
   if (unit === 'piece') {
     const grams = item?.__pieceGrams
     if (grams && grams > 0) return `piece — ${Math.round(grams * 10) / 10}g`
@@ -784,8 +887,9 @@ const computeServingsFromAmount = (item: BuilderItem) => {
   const unit = item.__unit || baseUnit
   const amount = Number(item.__amount)
   const pieceGrams = item.__pieceGrams
+  const dryUnitGrams = getDryFoodUnitGrams(item.name)
   if (baseAmount && baseUnit && unit && Number.isFinite(amount)) {
-    const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
+    const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams, dryUnitGrams)
     const servings = baseAmount > 0 ? inBase / baseAmount : 0
     return round3(Math.max(0, servings))
   }
@@ -805,11 +909,18 @@ const computeItemTotals = (item: BuilderItem) => {
   }
 }
 
-const unitToGrams = (amount: number, unit: BuilderUnit, pieceGrams?: number | null): number | null => {
+const unitToGrams = (
+  amount: number,
+  unit: BuilderUnit,
+  pieceGrams?: number | null,
+  baseAmount?: number | null,
+  baseUnit?: BuilderUnit | null,
+  dryUnitGrams?: DryFoodUnitGrams | null,
+): number | null => {
   if (!Number.isFinite(amount)) return null
-  if (unit === 'piece' && pieceGrams && pieceGrams > 0) return amount * pieceGrams
-  if (unit in UNIT_GRAMS) return amount * UNIT_GRAMS[unit]
-  return null
+  const gramsPerUnit = resolveUnitGrams(unit, baseAmount, baseUnit, pieceGrams, dryUnitGrams)
+  if (!Number.isFinite(gramsPerUnit)) return null
+  return amount * gramsPerUnit
 }
 
 const parseNumericInput = (value: any): number | null => {
@@ -828,8 +939,9 @@ const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
     const baseAmount = it?.__baseAmount
     const baseUnit = it?.__baseUnit
     const pieceGrams = it?.__pieceGrams
+    const dryUnitGrams = getDryFoodUnitGrams(it?.name)
     if (baseAmount && baseUnit) {
-      const perServing = unitToGrams(baseAmount, baseUnit, pieceGrams)
+      const perServing = unitToGrams(baseAmount, baseUnit, pieceGrams, baseAmount, baseUnit, dryUnitGrams)
       if (perServing && Number.isFinite(perServing)) {
         total += perServing * servings
         continue
@@ -837,7 +949,7 @@ const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
     }
     const unit = (it?.__unit || it?.__baseUnit) as BuilderUnit | null
     if (!unit) continue
-    const grams = unitToGrams(Number(it.__amount || 0), unit, pieceGrams)
+    const grams = unitToGrams(Number(it.__amount || 0), unit, pieceGrams, baseAmount, baseUnit, dryUnitGrams)
     if (grams && Number.isFinite(grams)) total += grams
   }
   return total
@@ -1054,8 +1166,9 @@ export default function MealBuilderClient() {
       let baseUnit = base.unit
       const pieceGrams = extractPieceGramsFromLabel(serving_size)
       const liquidItem = isLikelyLiquidItem(name, serving_size)
+      const dryUnitGrams = getDryFoodUnitGrams(name)
       if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
-        const converted = convertAmount(baseAmount, baseUnit, 'g')
+        const converted = convertAmount(baseAmount, baseUnit, 'g', undefined, undefined, undefined, dryUnitGrams)
         baseAmount = Number.isFinite(converted) ? converted : baseAmount
         baseUnit = 'g'
       }
@@ -1581,8 +1694,9 @@ export default function MealBuilderClient() {
     let baseUnit = base.unit
     const pieceGrams = extractPieceGramsFromLabel(r?.serving_size || '')
     const liquidItem = isLikelyLiquidItem(r?.name || '', r?.serving_size)
+    const dryUnitGrams = getDryFoodUnitGrams(r?.name || '')
     if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
-      const converted = convertAmount(baseAmount, baseUnit, 'g')
+      const converted = convertAmount(baseAmount, baseUnit, 'g', undefined, undefined, undefined, dryUnitGrams)
       baseAmount = Number.isFinite(converted) ? converted : baseAmount
       baseUnit = 'g'
     }
@@ -1669,8 +1783,9 @@ export default function MealBuilderClient() {
       let baseUnit = base.unit
       const pieceGrams = extractPieceGramsFromLabel(serving_size)
       const liquidItem = isLikelyLiquidItem(name, serving_size)
+      const dryUnitGrams = getDryFoodUnitGrams(name)
       if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
-        const converted = convertAmount(baseAmount, baseUnit, 'g')
+        const converted = convertAmount(baseAmount, baseUnit, 'g', undefined, undefined, undefined, dryUnitGrams)
         baseAmount = Number.isFinite(converted) ? converted : baseAmount
         baseUnit = 'g'
       }
@@ -2216,10 +2331,11 @@ export default function MealBuilderClient() {
         const baseUnit = it.__baseUnit
         const unit = it.__unit || baseUnit
         const pieceGrams = it.__pieceGrams
+        const dryUnitGrams = getDryFoodUnitGrams(it.name)
         let servings = it.servings
 
         if (baseAmount && baseUnit && unit) {
-          const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
+          const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams, dryUnitGrams)
           servings = baseAmount > 0 ? inBase / baseAmount : 0
         } else {
           // Fallback: treat amount as servings
@@ -2241,12 +2357,13 @@ export default function MealBuilderClient() {
         const amount = Number.isFinite(Number(it.__amount)) ? Number(it.__amount) : 0
         const amountInput = typeof it.__amountInput === 'string' ? it.__amountInput : String(amount)
         const currentUnit = it.__unit || it.__baseUnit
+        const dryUnitGrams = getDryFoodUnitGrams(it.name)
         let nextAmount = amount
         let nextAmountInput = amountInput
 
         if (isOpenUnit(unit)) {
           if (currentUnit) {
-            const converted = convertAmount(amount, currentUnit, unit, baseAmount, baseUnit, pieceGrams)
+            const converted = convertAmount(amount, currentUnit, unit, baseAmount, baseUnit, pieceGrams, dryUnitGrams)
             nextAmount = round3(Math.max(0, converted))
             nextAmountInput = String(nextAmount)
           }
@@ -2258,7 +2375,7 @@ export default function MealBuilderClient() {
         if (!baseAmount || !baseUnit) {
           return { ...it, __unit: unit, __amount: nextAmount, __amountInput: nextAmountInput }
         }
-        const inBase = convertAmount(nextAmount, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
+        const inBase = convertAmount(nextAmount, unit, baseUnit, baseAmount, baseUnit, pieceGrams, dryUnitGrams)
         const servings = baseAmount > 0 ? inBase / baseAmount : 0
         return { ...it, __unit: unit, __amount: nextAmount, __amountInput: nextAmountInput, servings: round3(Math.max(0, servings)) }
       }),
