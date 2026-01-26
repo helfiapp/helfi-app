@@ -182,6 +182,9 @@ const singularizeToken = (value: string) => {
 }
 
 const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: string }> = [
+  { name: 'Milk, whole', serving_size: '100 g' },
+  { name: 'Milk, lowfat', serving_size: '100 g' },
+  { name: 'Milk, nonfat', serving_size: '100 g' },
   { name: 'Apple, raw', serving_size: '100 g' },
   { name: 'Banana, raw', serving_size: '100 g' },
   { name: 'Raspberries, raw', serving_size: '100 g' },
@@ -1555,9 +1558,13 @@ export default function MealBuilderClient() {
             const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
             const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : quickItems
             const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current) : quickFiltered
+            const quickWithSuggestions =
+              allowBrandSuggestions || kind !== 'packaged' ? quickMerged : mergeSearchSuggestions(quickMerged, q)
             if (seqRef.current === seq) {
-              setResults(quickMerged)
-              if (quickMerged.length > 0) searchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+              setResults(quickWithSuggestions)
+              if (quickWithSuggestions.length > 0) {
+                searchCacheRef.current.set(cacheKey, { items: quickWithSuggestions, at: Date.now() })
+              }
             }
           }
         }
@@ -1586,12 +1593,15 @@ export default function MealBuilderClient() {
           }
         } catch {}
       }
-      const merged =
+      let merged =
         kind === 'single'
           ? mergeSearchSuggestions(filteredItems, q)
           : allowBrandSuggestions
           ? mergeBrandSuggestions(filteredItems, brandSuggestionsRef.current)
           : filteredItems
+      if (kind === 'packaged' && !allowBrandSuggestions) {
+        merged = mergeSearchSuggestions(merged, q)
+      }
       if (seqRef.current !== seq) return
       setResults(merged)
       if (merged.length > 0) searchCacheRef.current.set(cacheKey, { items: merged, at: Date.now() })
