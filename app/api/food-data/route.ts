@@ -85,11 +85,73 @@ export async function GET(request: NextRequest) {
       return queryTokens.every((token) => nameTokens.some((word) => tokenMatches(token, word)))
     }
 
+    type CustomPackagedItem = {
+      id: string
+      name: string
+      brand?: string | null
+      serving_size?: string | null
+      calories?: number | null
+      protein_g?: number | null
+      carbs_g?: number | null
+      fat_g?: number | null
+      fiber_g?: number | null
+      sugar_g?: number | null
+      source: 'openfoodfacts' | 'usda' | 'fatsecret'
+      aliases?: string[]
+    }
+
+    const CUSTOM_PACKAGED_ITEMS: CustomPackagedItem[] = [
+      {
+        id: 'custom:burger-with-the-lot',
+        name: 'Burger with the lot (fish & chip shop)',
+        brand: null,
+        serving_size: '1 burger',
+        calories: 950,
+        protein_g: 44,
+        carbs_g: 72,
+        fat_g: 62,
+        fiber_g: 6.5,
+        sugar_g: 16,
+        source: 'openfoodfacts',
+        aliases: ['burger with the lot', 'burger with lot', 'fish and chip shop burger', 'fish & chip shop burger'],
+      },
+    ]
+
+    const getCustomPackagedMatches = (value: string) => {
+      if (!value) return []
+      return CUSTOM_PACKAGED_ITEMS.filter((item) => {
+        if (nameMatchesSearchQuery(item.name, value)) return true
+        const aliases = Array.isArray(item.aliases) ? item.aliases : []
+        return aliases.some((alias) => nameMatchesSearchQuery(alias, value))
+      }).map((item) => {
+        const { aliases, ...rest } = item
+        return rest
+      })
+    }
+
+    const mergeCustomPackagedMatches = (list: any[], custom: any[]) => {
+      if (!Array.isArray(custom) || custom.length === 0) return list
+      const seen = new Set<string>()
+      const merged: any[] = []
+      const add = (item: any) => {
+        const key = `${normalizeForMatch(item?.name)}|${normalizeForMatch(item?.brand)}`
+        if (!key || key === '|') return
+        if (seen.has(key)) return
+        seen.add(key)
+        merged.push(item)
+      }
+      custom.forEach(add)
+      list.forEach(add)
+      return merged
+    }
+
     const queryNorm = normalizeForMatch(query)
     const queryCompact = normalizeForCompact(query)
     const queryTokens = queryNorm ? queryNorm.split(' ').filter(Boolean) : []
     const queryTokensNormalized = queryTokens.map((token) => singularizeToken(token))
     const queryFirstToken = queryTokens[0] || ''
+    const customPackagedMatches = kindMode === 'packaged' ? getCustomPackagedMatches(query) : []
+    let customPackagedApplied = false
 
     const hasMacroData = (item: any) => {
       if (!item) return false
@@ -504,8 +566,11 @@ export async function GET(request: NextRequest) {
           const minLocalOnly = 5
           const pooled = localPackagedFiltered.length < minLocalOnly ? await fetchExternalPool() : []
           const combined = dedupe([...localPackagedFiltered, ...pooled])
-          items = combined.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+          const combinedWithCustom =
+            customPackagedMatches.length > 0 ? mergeCustomPackagedMatches(combined, customPackagedMatches) : combined
+          items = combinedWithCustom.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
           actualSource = 'auto'
+          customPackagedApplied = customPackagedMatches.length > 0
         }
       }
     } else if (source === 'openfoodfacts') {
@@ -535,6 +600,10 @@ export async function GET(request: NextRequest) {
         { success: false, error: 'Invalid source. Expected "openfoodfacts", "usda", "fatsecret", or "auto".' },
         { status: 400 },
       )
+    }
+
+    if (kindMode === 'packaged' && customPackagedMatches.length > 0 && !customPackagedApplied) {
+      items = mergeCustomPackagedMatches(items, customPackagedMatches)
     }
 
     if (Array.isArray(items) && items.length > 0) {
