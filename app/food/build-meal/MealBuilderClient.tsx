@@ -239,6 +239,24 @@ const COMMON_SINGLE_FOOD_SUGGESTIONS: Array<{ name: string; serving_size?: strin
   { name: 'Avocado, raw', serving_size: '100 g' },
 ]
 
+const MEASUREMENT_LIST_SUGGESTIONS: Array<{ name: string; serving_size?: string; __searchQuery?: string }> = [
+  ...PRODUCE_MEASUREMENTS.map((item) => ({
+    name: item.food,
+    serving_size: '100 g',
+    __searchQuery: item.food,
+  })),
+  ...DRY_FOOD_MEASUREMENTS.map((item) => ({
+    name: item.food,
+    serving_size: '100 g',
+    __searchQuery: item.food,
+  })),
+  ...DAIRY_SEMI_SOLID_MEASUREMENTS.map((item) => ({
+    name: item.food,
+    serving_size: '100 g',
+    __searchQuery: item.food,
+  })),
+]
+
 const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
   'McDonald\'s',
   'KFC',
@@ -382,7 +400,7 @@ const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
   const tokens = getSearchTokens(searchQuery)
   if (!tokens.some((token) => token.length >= 2)) return []
   const normalizedQuery = normalizeSearchToken(searchQuery)
-  const matches = COMMON_SINGLE_FOOD_SUGGESTIONS.filter((item) =>
+  const matches = [...MEASUREMENT_LIST_SUGGESTIONS, ...COMMON_SINGLE_FOOD_SUGGESTIONS].filter((item) =>
     (normalizedQuery.length >= 4 && normalizeSearchToken(item.name).includes(normalizedQuery)) ||
     nameMatchesSearchQuery(item.name, searchQuery, { requireFirstWord: false }),
   )
@@ -392,7 +410,7 @@ const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
     name: item.name,
     serving_size: item.serving_size || '100 g',
     __suggestion: true,
-    __searchQuery: item.name,
+    __searchQuery: (item as any).__searchQuery || item.name,
   }))
 }
 
@@ -1619,7 +1637,8 @@ export default function MealBuilderClient() {
       const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
       let filteredItems = hasToken ? nextItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : nextItems
       if (kind === 'single' && filteredItems.length === 0 && rawItems.length > 0) {
-        filteredItems = rawItems
+        const tokenCount = getSearchTokens(q).filter((token) => token.length >= 2).length
+        if (tokenCount <= 1) filteredItems = rawItems
       }
       if (filteredItems.length === 0 && kind === 'single') {
         try {

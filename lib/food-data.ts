@@ -134,7 +134,7 @@ export async function searchLocalFoods(
       .filter(Boolean)
       .filter((token) => token.length >= 2)
     const toTitleCase = (value: string) => value.replace(/\b([a-z])/g, (match) => match.toUpperCase())
-    const prefixTokens = rawTokens.length > 0 ? [...rawTokens].sort((a, b) => b.length - a.length).slice(0, 1) : [q]
+    const prefixTokens = rawTokens.length > 0 ? rawTokens.slice(0, 3) : [q]
     const tokenSet = new Set<string>()
     const addTokenVariants = (value: string) => {
       if (!value) return
