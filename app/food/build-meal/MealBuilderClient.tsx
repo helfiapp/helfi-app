@@ -475,13 +475,32 @@ type FoodAlias = {
   score: number
 }
 
-const normalizeFoodValue = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
+const FOOD_VARIANT_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\byoghurt\b/g, 'yogurt'],
+  [/\bchilli\b/g, 'chili'],
+  [/\baubergine\b/g, 'eggplant'],
+  [/\bcourgette\b/g, 'zucchini'],
+  [/\bcapsicum\b/g, 'bell pepper'],
+  [/\bbeetroot\b/g, 'beet'],
+  [/\bsweetcorn\b/g, 'corn'],
+  [/\bgarbanzo\b/g, 'chickpea'],
+  [/\bscallions?\b/g, 'spring onion'],
+  [/\bgreen onions?\b/g, 'spring onion'],
+  [/\brocket\b/g, 'arugula'],
+  [/\bcoriander\b/g, 'cilantro'],
+  [/\bicing sugar\b/g, 'powdered sugar'],
+  [/\bconfectioners? sugar\b/g, 'powdered sugar'],
+  [/\bsultanas?\b/g, 'raisins'],
+]
+
+const normalizeFoodValue = (value: string) => {
+  let normalized = value.toLowerCase().replace(/&/g, ' and ')
+  normalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  FOOD_VARIANT_REPLACEMENTS.forEach(([pattern, replacement]) => {
+    normalized = normalized.replace(pattern, replacement)
+  })
+  return normalized.replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
+}
 
 const tokenizeFoodValue = (value: string) =>
   normalizeFoodValue(value)
