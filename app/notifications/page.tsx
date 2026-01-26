@@ -10,19 +10,9 @@ const notificationSections = [
     href: '/notifications/inbox',
   },
   {
-    title: 'Delivery',
-    description: 'Email and push settings for this device.',
-    href: '/notifications/delivery',
-  },
-  {
-    title: 'Health reminders',
-    description: 'Daily check-in reminder schedule.',
-    href: '/notifications/health-reminders',
-  },
-  {
-    title: 'Mood reminders',
-    description: 'Mood check-in reminder schedule.',
-    href: '/notifications/mood-reminders',
+    title: 'Reminders',
+    description: 'Push setup plus check-in and mood reminders.',
+    href: '/notifications/reminders',
   },
   {
     title: 'AI insights',

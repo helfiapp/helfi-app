@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeSubscriptionList } from '@/lib/push-subscriptions'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 // Debug endpoint to check scheduler status and test timing
 export async function GET(req: NextRequest) {
@@ -11,14 +12,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { subscription: true, creditTopUps: true },
+  })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   try {
     // Get user's settings
-    const settingsRows: Array<{ time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
+    const settingsRows: Array<{ time1: string; time2: string; time3: string; time4: string; timezone: string; frequency: number }> =
       await prisma.$queryRawUnsafe(
-        `SELECT time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
+        `SELECT time1, time2, time3, time4, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
         user.id
       )
 
@@ -34,9 +38,17 @@ export async function GET(req: NextRequest) {
       time1: '12:30',
       time2: '18:30',
       time3: '21:30',
+      time4: '09:00',
       timezone: 'Australia/Melbourne',
       frequency: 3
     }
+    const now = new Date()
+    const hasSubscription = isSubscriptionActive(user.subscription, now)
+    const hasPurchasedCredits = (user.creditTopUps || []).some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    )
+    const maxFrequency = (hasSubscription || hasPurchasedCredits) ? 4 : 1
+    const resolvedFrequency = Math.max(1, Math.min(maxFrequency, settings.frequency || 1))
 
     const tz = settings.timezone || 'Australia/Melbourne'
     const fmt = new Intl.DateTimeFormat('en-GB', {
@@ -52,9 +64,10 @@ export async function GET(req: NextRequest) {
 
     // Build reminder times
     const reminderTimes: string[] = []
-    if (settings.frequency >= 1) reminderTimes.push(settings.time1)
-    if (settings.frequency >= 2) reminderTimes.push(settings.time2)
-    if (settings.frequency >= 3) reminderTimes.push(settings.time3)
+    if (resolvedFrequency >= 1) reminderTimes.push(settings.time1)
+    if (resolvedFrequency >= 2) reminderTimes.push(settings.time2)
+    if (resolvedFrequency >= 3) reminderTimes.push(settings.time3)
+    if (resolvedFrequency >= 4) reminderTimes.push(settings.time4)
 
     // Check if current time matches
     const matches = reminderTimes.map(reminderTime => {
@@ -139,8 +152,10 @@ export async function GET(req: NextRequest) {
         time1: settings.time1,
         time2: settings.time2,
         time3: settings.time3,
+        time4: settings.time4,
         timezone: settings.timezone,
-        frequency: settings.frequency
+        frequency: resolvedFrequency,
+        maxFrequency
       },
       currentTime: {
         utc: nowUtc.toISOString(),

@@ -35,6 +35,8 @@ export default function MoodPreferencesPage() {
   const [time1, setTime1] = useState('20:00')
   const [time2, setTime2] = useState('12:00')
   const [time3, setTime3] = useState('18:00')
+  const [time4, setTime4] = useState('09:00')
+  const [maxFrequency, setMaxFrequency] = useState(1)
 
   const deviceTimezone = useMemo(() => {
     try {
@@ -59,6 +61,7 @@ export default function MoodPreferencesPage() {
     time1: '20:00',
     time2: '12:00',
     time3: '18:00',
+    time4: '09:00',
     timezone: 'UTC',
   })
   const dirtyRef = useRef(false)
@@ -70,10 +73,13 @@ export default function MoodPreferencesPage() {
         if (res.ok) {
           const data = await res.json()
           setEnabled(!!data.enabled)
-          setFrequency(Number(data.frequency) || 1)
+          const maxFreq = Number(data.maxFrequency) || 1
+          setMaxFrequency(maxFreq)
+          setFrequency(Math.min(Math.max(1, Number(data.frequency) || 1), maxFreq))
           setTime1(normalizeTime(data.time1 || '', '20:00'))
           setTime2(normalizeTime(data.time2 || '', '12:00'))
           setTime3(normalizeTime(data.time3 || '', '18:00'))
+          setTime4(normalizeTime(data.time4 || '', '09:00'))
           const savedTimezone = (data.timezone && String(data.timezone).trim()) || deviceTimezone
           setTimezone(savedTimezone)
           setTimezoneQuery(savedTimezone)
@@ -201,6 +207,7 @@ export default function MoodPreferencesPage() {
       time1,
       time2,
       time3,
+      time4,
       timezone,
     }
     if (!options?.silent) {
@@ -217,6 +224,7 @@ export default function MoodPreferencesPage() {
           time1: normalizeTime(payload.time1, '20:00'),
           time2: normalizeTime(payload.time2, '12:00'),
           time3: normalizeTime(payload.time3, '18:00'),
+          time4: normalizeTime(payload.time4, '09:00'),
           timezone: payload.timezone,
         }),
         keepalive: !!options?.keepalive,
@@ -244,7 +252,7 @@ export default function MoodPreferencesPage() {
     } finally {
       if (!options?.silent) setSaving(false)
     }
-  }, [enabled, frequency, time1, time2, time3, timezone])
+  }, [enabled, frequency, time1, time2, time3, time4, timezone])
 
   const toggleEnabled = async () => {
     const next = !enabled
@@ -267,6 +275,7 @@ export default function MoodPreferencesPage() {
       time1,
       time2,
       time3,
+      time4,
       timezone,
     }
     settingsRef.current = nextSettings
@@ -280,7 +289,7 @@ export default function MoodPreferencesPage() {
     const dirty = snapshot !== settingsSnapshotRef.current
     dirtyRef.current = dirty
     setHasUnsavedChanges(dirty)
-  }, [enabled, frequency, time1, time2, time3, timezone, loading])
+  }, [enabled, frequency, time1, time2, time3, time4, timezone, loading])
 
   useSaveOnLeave(() => {
     if (!dirtyRef.current) return
@@ -321,7 +330,7 @@ export default function MoodPreferencesPage() {
         )}
 
         <Link
-          href="/notifications/mood-reminders"
+          href="/notifications/reminders"
           className="mb-4 inline-flex items-center justify-center w-full rounded-xl border border-helfi-green text-helfi-green font-bold py-3 hover:bg-helfi-green/10 transition-colors"
         >
           Set your notifications
@@ -336,7 +345,7 @@ export default function MoodPreferencesPage() {
               <div className="flex flex-col">
                 <span className="font-bold text-base text-slate-800 dark:text-white">Reminders</span>
                 <span className="text-xs text-slate-500 dark:text-gray-400 font-medium">
-                  Get up to 3 reminders per day.
+                  {maxFrequency >= 4 ? 'Get up to 4 reminders per day.' : 'Free plan: 1 reminder per day.'}
                 </span>
               </div>
             </div>
@@ -386,13 +395,22 @@ export default function MoodPreferencesPage() {
           <div className="mt-5">
             <div className="text-sm font-bold text-slate-800 dark:text-white mb-3">How many reminders per day?</div>
             <div className="flex gap-2">
-              {[1, 2, 3].map((n) => {
+              {[1, 2, 3, 4].map((n) => {
                 const active = frequency === n
                 return (
                   <button
                     key={n}
                     type="button"
-                    onClick={() => setFrequency(n)}
+                    onClick={() => {
+                      if (n > maxFrequency) {
+                        setBanner({
+                          type: 'error',
+                          message: 'Free members can set 1 reminder per day. Subscribe or buy credits to unlock up to 4.',
+                        })
+                        return
+                      }
+                      setFrequency(n)
+                    }}
                     disabled={!enabled}
                     className={[
                       'flex-1 rounded-full px-4 py-2 text-sm font-bold transition-all border',
@@ -442,6 +460,18 @@ export default function MoodPreferencesPage() {
                   type="time"
                   value={time3}
                   onChange={(e) => setTime3(e.target.value)}
+                  disabled={!enabled}
+                  className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-slate-800 dark:text-white disabled:opacity-50"
+                />
+              </div>
+            )}
+            {frequency >= 4 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-slate-800 dark:text-white">Reminder 4</span>
+                <input
+                  type="time"
+                  value={time4}
+                  onChange={(e) => setTime4(e.target.value)}
                   disabled={!enabled}
                   className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-slate-800 dark:text-white disabled:opacity-50"
                 />

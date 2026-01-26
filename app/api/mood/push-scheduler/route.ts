@@ -4,6 +4,7 @@ import webpush from 'web-push'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { createInboxNotification } from '@/lib/notification-inbox'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
       time1: string
       time2: string
       time3: string
+      time4: string
       timezone: string
       frequency: number
       subscription: any
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
         COALESCE(s.time1, '20:00') AS time1,
         COALESCE(s.time2, '12:00') AS time2,
         COALESCE(s.time3, '18:00') AS time3,
+        COALESCE(s.time4, '09:00') AS time4,
         COALESCE(s.timezone, 'UTC') AS timezone,
         COALESCE(s.frequency, 1) AS frequency,
         p.subscription
@@ -58,6 +61,25 @@ export async function POST(req: NextRequest) {
     const nowUtc = new Date()
     const sentTo: string[] = []
     const errors: Array<{ userId: string; error: string }> = []
+
+    const nowForPaid = new Date()
+    const userIds = rows.map((row) => row.userId).filter((id): id is string => !!id)
+    const paidUserIds = new Set<string>()
+    if (userIds.length) {
+      const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        include: { subscription: true, creditTopUps: true },
+      })
+      for (const user of users) {
+        const hasSubscription = isSubscriptionActive(user.subscription, nowForPaid)
+        const hasPurchasedCredits = (user.creditTopUps || []).some(
+          (topUp: any) => topUp.expiresAt > nowForPaid && (topUp.amountCents - topUp.usedCents) > 0
+        )
+        if (hasSubscription || hasPurchasedCredits) {
+          paidUserIds.add(user.id)
+        }
+      }
+    }
 
     const backfillWindow = Math.max(1, Math.min(60, parseInt(process.env.REMINDER_LAG_MINUTES || '10', 10)))
 
@@ -95,10 +117,13 @@ export async function POST(req: NextRequest) {
         const day = dateParts.find((p) => p.type === 'day')?.value || '01'
         const localDate = `${year}-${month}-${day}`
 
+        const maxFrequency = paidUserIds.has(r.userId) ? 4 : 1
+        const resolvedFrequency = Math.max(1, Math.min(maxFrequency, r.frequency || 1))
         const reminderTimes: string[] = []
-        if ((r.frequency ?? 1) >= 1) reminderTimes.push(r.time1 || '20:00')
-        if ((r.frequency ?? 1) >= 2) reminderTimes.push(r.time2 || '12:00')
-        if ((r.frequency ?? 1) >= 3) reminderTimes.push(r.time3 || '18:00')
+        if (resolvedFrequency >= 1) reminderTimes.push(r.time1 || '20:00')
+        if (resolvedFrequency >= 2) reminderTimes.push(r.time2 || '12:00')
+        if (resolvedFrequency >= 3) reminderTimes.push(r.time3 || '18:00')
+        if (resolvedFrequency >= 4) reminderTimes.push(r.time4 || '09:00')
 
         let shouldSend = false
         let matchedReminder = ''

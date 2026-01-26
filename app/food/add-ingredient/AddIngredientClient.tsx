@@ -815,6 +815,18 @@ export default function AddIngredientClient() {
     }
   }
 
+  const hasMacroData = (item: NormalizedFoodItem | null | undefined) => {
+    if (!item) return false
+    const hasCalories =
+      item.calories !== null && item.calories !== undefined && Number.isFinite(Number(item.calories))
+    const hasProtein =
+      item.protein_g !== null && item.protein_g !== undefined && Number.isFinite(Number(item.protein_g))
+    const hasCarbs =
+      item.carbs_g !== null && item.carbs_g !== undefined && Number.isFinite(Number(item.carbs_g))
+    const hasFat = item.fat_g !== null && item.fat_g !== undefined && Number.isFinite(Number(item.fat_g))
+    return hasCalories && hasProtein && hasCarbs && hasFat
+  }
+
   const fetchBrandSuggestions = async (searchQuery: string) => {
     const prefix = getBrandMatchTokens(searchQuery)[0] || ''
     if (prefix.length < 2) return []
@@ -1008,7 +1020,12 @@ export default function AddIngredientClient() {
         target = resolved
       }
       const upgraded = await loadServingOverride(target)
-      const final = upgraded || target
+      const resolvedTarget = upgraded || target
+      let final = resolvedTarget
+      if (!hasMacroData(final)) {
+        setError('This item has no nutrition data. Please choose another result.')
+        return
+      }
       const baseItem = {
         name: String(final.name || 'Food'),
         brand: final.brand ?? null,

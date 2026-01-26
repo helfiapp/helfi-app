@@ -274,6 +274,7 @@ Files:
 - Packaged searches: use OpenFoodFacts + FatSecret unless the local USDA branded library already has matches. Single foods remain USDA local only.
 - Packaged searches: if local USDA branded matches are fewer than 5, add OpenFoodFacts + FatSecret results to fill the list. Also normalize "cheese burger" to "cheeseburger" when external sources return nothing.
 - Packaged fast‑food/restaurant searches must skip USDA entirely and only use OpenFoodFacts + FatSecret.
+- Never add an ingredient without calories, protein, carbs, and fat. If the user picks a specific result that is missing macros, do **not** swap it for a different food; block the add and show a clear message so they can choose another result.
 
 **Restore steps if broken:**
 1) Confirm the production database is the **populated USDA database** (the one with ~1.8M branded rows). If the DB is empty, searches will fail.  
@@ -1396,6 +1397,14 @@ for a change.
 - `app/api/credit/feature-usage/route.ts` (“This AI feature has been used X times…”)
 - `app/api/credit/feature-usage-stats/route.ts` (Billing page “Your usage” time-range stats)
 - `app/api/credit/usage-breakdown/route.ts` (admin/diagnostic usage breakdown)
+
+### 5.1 Billing Page AI Feature Credit Costs (Jan 2026 - Locked)
+
+- The "AI feature credit costs" box on the Billing page is display-only, but it must match real charges.
+- Source of truth for this display list: `data/creditCosts.ts` (used by `app/billing/page.tsx`).
+- Do not change labels or numbers without the owner's written approval.
+- After any approved change, verify the Billing page shows the correct numbers and they match actual charges.
+- Last stable deployment: `ad684039` (2026-01-24)
 - **Food image freshness + curated USDA enforcement (Dec 2025):**
   - `app/api/analyze-food/route.ts` still hashes images, but **food photo analysis and barcode label scans must pass `forceFresh`** so each analysis is new. Do not re-enable cached reuse for these scans without explicit user approval.
   - `app/food/page.tsx` enriches common items (bun, patty, cheese, ketchup, etc.) with curated USDA-backed macros, enforces realistic floors, and normalizes names (e.g., “Burger bun” instead of random variants). Do not weaken or remove this enrichment/normalization.
@@ -1997,6 +2006,32 @@ cards without adding to the diary.
 2) Ensure **Add** calls the same add logic (`runFavoriteAdd(...)`).
 3) Ensure **Preview** opens the nutrition cards without saving anything.
 4) Confirm it **does not** show for Replace/Analysis flows.
+## 7.6 Admin Login + Authenticator (Locked)
+
+**Goal:** Prevent admin lockouts caused by password or authenticator changes.
+
+**Protected files:**
+- `app/admin-panel/page.tsx`
+- `app/admin-panel/qr-login/page.tsx`
+- `app/api/admin/auth/route.ts`
+- `app/api/admin/qr-login/start/route.ts`
+- `app/api/admin/qr-login/status/route.ts`
+- `app/api/admin/qr-login/approve/route.ts`
+- `lib/admin-auth.ts`
+
+**Rules (do not change without explicit owner approval):**
+- Do not change the admin login flow, password checks, or authenticator logic.
+- Do not reset admin passwords or authenticator secrets in the database.
+- Do not change the admin email in the database.
+
+**If login breaks:**
+1. Get the owner’s written approval before any password or authenticator reset.
+2. If a reset is approved, tell the owner they must scan a new QR code.
+3. After any change, test both:
+   - Email + authenticator login on desktop.
+   - QR login approval on phone.
+
+**Last stable deployment:** `dbe9205a` (2026-01-24)
 
 ## 8. Rules for Future Modifications
 

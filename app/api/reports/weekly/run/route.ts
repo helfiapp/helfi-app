@@ -496,6 +496,8 @@ function buildReportSignals(params: {
       topDrinks: params.hydrationSummary?.topDrinks,
       dailyTotals: sliceList(params.hydrationSummary?.dailyTotals, 7),
     },
+    foodHighlights: params.reportContext.foodHighlights,
+    foodLogSample: sliceList(params.reportContext.foodLogSample, 12),
     exerciseSummary: params.exerciseSummary,
     moodSummary: params.moodSummary,
     symptomSummary: params.symptomSummary,
@@ -1145,6 +1147,23 @@ function buildModelInput(reportSignals: any) {
       journalCount: day?.journalCount,
       topFoods: trimTopFoods(day?.topFoods || [], 2),
     }))
+  const trimFoodHighlights = (highlights: any) => {
+    if (!highlights) return null
+    return {
+      overallTopFoods: trimTopFoods(highlights.overallTopFoods || [], 6),
+      dailyTopFoods: sliceList(highlights.dailyTopFoods, 5).map((day: any) => ({
+        date: day?.date,
+        foods: trimTopFoods(day?.foods || [], 2),
+      })),
+    }
+  }
+  const trimFoodLogSample = (logs: any[]) =>
+    sliceList(logs, 10).map((item: any) => ({
+      name: clipText(item?.name || '', 60),
+      localDate: item?.localDate ?? null,
+      meal: item?.meal ? clipText(item.meal, 40) : null,
+      time: item?.time ?? null,
+    }))
 
   return {
     periodStart: reportSignals.periodStart,
@@ -1175,6 +1194,8 @@ function buildModelInput(reportSignals: any) {
           dailyTotals: sliceList(reportSignals.hydrationSummary.dailyTotals, 7),
         }
       : null,
+    foodHighlights: trimFoodHighlights(reportSignals.foodHighlights),
+    foodLogSample: trimFoodLogSample(reportSignals.foodLogSample || []),
     exerciseSummary: reportSignals.exerciseSummary,
     moodSummary: reportSignals.moodSummary,
     symptomSummary: reportSignals.symptomSummary,

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { publishWithQStash, scheduleAllActiveReminders } from '@/lib/qstash'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 async function ensureCheckinSettingsTable() {
   await prisma.$executeRawUnsafe(`
@@ -12,6 +13,7 @@ async function ensureCheckinSettingsTable() {
       time1 TEXT NOT NULL,
       time2 TEXT NOT NULL,
       time3 TEXT NOT NULL,
+      time4 TEXT NOT NULL,
       timezone TEXT NOT NULL,
       frequency INTEGER NOT NULL DEFAULT 3
     )
@@ -34,6 +36,11 @@ async function ensureCheckinSettingsTable() {
     .catch(() => {})
   await prisma
     .$executeRawUnsafe(
+      `ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time4 TEXT NOT NULL DEFAULT '09:00'`
+    )
+    .catch(() => {})
+  await prisma
+    .$executeRawUnsafe(
       `ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`
     )
     .catch(() => {})
@@ -42,10 +49,20 @@ async function ensureCheckinSettingsTable() {
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { subscription: true, creditTopUps: true },
+  })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   await ensureCheckinSettingsTable()
+  const now = new Date()
+  const hasSubscription = isSubscriptionActive(user.subscription, now)
+  const hasPurchasedCredits = (user.creditTopUps || []).some(
+    (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+  )
+  const isPaidUser = hasSubscription || hasPurchasedCredits
+  const maxFrequency = isPaidUser ? 4 : 1
 
   // Ensure table exists with full schema
   // await prisma.$executeRawUnsafe(`
@@ -65,35 +82,48 @@ export async function GET() {
   // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`).catch(() => {})
 
   // Load user's settings
-  const rows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
+  const rows: Array<{ enabled: boolean; time1: string; time2: string; time3: string; time4: string; timezone: string; frequency: number }> =
     await prisma.$queryRawUnsafe(
-      `SELECT enabled, time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
+      `SELECT enabled, time1, time2, time3, time4, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
       user.id
     )
 
   if (rows.length > 0) {
-    return NextResponse.json(rows[0])
+    const row = rows[0]
+    return NextResponse.json({
+      ...row,
+      frequency: Math.min(Math.max(1, row.frequency), maxFrequency),
+      maxFrequency,
+      isPaidUser,
+    })
   }
 
   // Return defaults if no settings exist
+  const defaultFrequency = Math.min(3, maxFrequency)
   return NextResponse.json({
     enabled: true,
     time1: '12:30',
     time2: '18:30',
     time3: '21:30',
+    time4: '09:00',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Melbourne',
-    frequency: 3
+    frequency: defaultFrequency,
+    maxFrequency,
+    isPaidUser,
   })
 }
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { subscription: true, creditTopUps: true },
+  })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const body = await req.json().catch(() => ({}))
-  let { enabled, time1, time2, time3, timezone, frequency } = body as any
+  let { enabled, time1, time2, time3, time4, timezone, frequency } = body as any
 
   // Normalize time on the server to avoid client formatting issues
   const normalizeTime = (input?: string, defaultValue: string = '21:00'): string => {
@@ -125,8 +155,16 @@ export async function POST(req: NextRequest) {
   time1 = normalizeTime(time1, '12:30')
   time2 = normalizeTime(time2, '18:30')
   time3 = normalizeTime(time3, '21:30')
+  time4 = normalizeTime(time4, '09:00')
   timezone = (timezone && String(timezone).trim()) || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Melbourne'
-  frequency = Math.max(1, Math.min(3, parseInt(String(frequency || 3), 10)))
+  const now = new Date()
+  const hasSubscription = isSubscriptionActive(user.subscription, now)
+  const hasPurchasedCredits = (user.creditTopUps || []).some(
+    (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+  )
+  const isPaidUser = hasSubscription || hasPurchasedCredits
+  const maxFrequency = isPaidUser ? 4 : 1
+  frequency = Math.max(1, Math.min(maxFrequency, parseInt(String(frequency || 1), 10)))
 
   // Auto-create table with full schema
   try {
@@ -159,20 +197,21 @@ export async function POST(req: NextRequest) {
 
     // Save settings
     await prisma.$queryRawUnsafe(
-      `INSERT INTO CheckinSettings (userId, enabled, time1, time2, time3, timezone, frequency)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO CheckinSettings (userId, enabled, time1, time2, time3, time4, timezone, frequency)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        ON CONFLICT (userId) DO UPDATE SET 
          enabled=EXCLUDED.enabled,
          time1=EXCLUDED.time1, 
          time2=EXCLUDED.time2, 
          time3=EXCLUDED.time3, 
+         time4=EXCLUDED.time4,
          timezone=EXCLUDED.timezone,
          frequency=EXCLUDED.frequency`,
-      user.id, enabled, time1, time2, time3, timezone, frequency
+      user.id, enabled, time1, time2, time3, time4, timezone, frequency
     )
     // Schedule next occurrences for all active reminders and capture outcomes
     const scheduleResults = enabled
-      ? await scheduleAllActiveReminders(user.id, { time1, time2, time3, timezone, frequency }).catch((error) => {
+      ? await scheduleAllActiveReminders(user.id, { time1, time2, time3, time4, timezone, frequency }).catch((error) => {
           console.error('[CHECKINS] Failed to schedule reminders via QStash', error)
           return []
         })
@@ -204,6 +243,7 @@ export async function POST(req: NextRequest) {
       if (frequency >= 1) candidates.push(time1)
       if (frequency >= 2) candidates.push(time2)
       if (frequency >= 3) candidates.push(time3)
+      if (frequency >= 4) candidates.push(time4)
       for (const t of candidates) {
         const [hh, mm] = t.split(':').map(v => parseInt(v, 10))
         const target = hh * 60 + mm

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { normalizeSubscriptionList } from '@/lib/push-subscriptions'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -75,7 +76,10 @@ function snapshotInTimeZone(now: Date, timeZone: string): TimeSnapshot {
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { subscription: true, creditTopUps: true },
+  })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   await ensureMoodTables()
@@ -85,10 +89,11 @@ export async function GET() {
     time1: string
     time2: string
     time3: string
+    time4: string
     timezone: string
     frequency: number
   }> = await prisma.$queryRawUnsafe(
-    `SELECT enabled, time1, time2, time3, timezone, frequency
+    `SELECT enabled, time1, time2, time3, time4, timezone, frequency
      FROM MoodReminderSettings
      WHERE userId = $1
      LIMIT 1`,
@@ -100,18 +105,27 @@ export async function GET() {
     time1: '20:00',
     time2: '12:00',
     time3: '18:00',
+    time4: '09:00',
     timezone: 'UTC',
     frequency: 1,
   }
+  const now = new Date()
+  const hasSubscription = isSubscriptionActive(user.subscription, now)
+  const hasPurchasedCredits = (user.creditTopUps || []).some(
+    (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+  )
+  const maxFrequency = (hasSubscription || hasPurchasedCredits) ? 4 : 1
+  const resolvedFrequency = Math.max(1, Math.min(maxFrequency, settings.frequency || 1))
 
   const nowUtc = new Date()
   const snapshot = snapshotInTimeZone(nowUtc, settings.timezone || 'UTC')
   const backfillWindow = Math.max(1, Math.min(60, parseInt(process.env.REMINDER_LAG_MINUTES || '10', 10)))
 
   const reminderTimes: string[] = []
-  if ((settings.frequency ?? 1) >= 1) reminderTimes.push(settings.time1 || '20:00')
-  if ((settings.frequency ?? 1) >= 2) reminderTimes.push(settings.time2 || '12:00')
-  if ((settings.frequency ?? 1) >= 3) reminderTimes.push(settings.time3 || '18:00')
+  if (resolvedFrequency >= 1) reminderTimes.push(settings.time1 || '20:00')
+  if (resolvedFrequency >= 2) reminderTimes.push(settings.time2 || '12:00')
+  if (resolvedFrequency >= 3) reminderTimes.push(settings.time3 || '18:00')
+  if (resolvedFrequency >= 4) reminderTimes.push(settings.time4 || '09:00')
 
   let shouldSend = false
   let matchedReminder = ''
@@ -174,6 +188,7 @@ export async function GET() {
     userId: user.id,
     nowUtc: nowUtc.toISOString(),
     settings,
+    maxFrequency,
     snapshot,
     reminderTimes,
     match: {

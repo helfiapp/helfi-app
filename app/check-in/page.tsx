@@ -236,7 +236,7 @@ export default function CheckInPage() {
           <div className="bg-white dark:bg-gray-800 rounded-b-2xl shadow-sm p-6">
             <div className="mb-2">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Today's check‑in</h1>
-              <Link href="/notifications/health-reminders" className="inline-flex items-center text-sm text-helfi-green hover:underline font-medium mt-2">
+              <Link href="/notifications/reminders" className="inline-flex items-center text-sm text-helfi-green hover:underline font-medium mt-2">
                 Set your notifications →
               </Link>
             </div>

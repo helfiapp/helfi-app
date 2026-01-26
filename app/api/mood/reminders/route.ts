@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { publishWithQStash, scheduleAllMoodReminders } from '@/lib/qstash'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,13 +37,23 @@ function normalizeTimezone(input: unknown) {
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { subscription: true, creditTopUps: true },
+  })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   await ensureMoodTables()
+  const now = new Date()
+  const hasSubscription = isSubscriptionActive(user.subscription, now)
+  const hasPurchasedCredits = (user.creditTopUps || []).some(
+    (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+  )
+  const isPaidUser = hasSubscription || hasPurchasedCredits
+  const maxFrequency = isPaidUser ? 4 : 1
 
   const rows: any[] = await prisma.$queryRawUnsafe(
-    `SELECT enabled, time1, time2, time3, timezone, frequency
+    `SELECT enabled, time1, time2, time3, time4, timezone, frequency
      FROM MoodReminderSettings
      WHERE userId = $1
      LIMIT 1`,
@@ -55,35 +66,50 @@ export async function GET() {
     time1: row?.time1 ?? '20:00',
     time2: row?.time2 ?? '12:00',
     time3: row?.time3 ?? '18:00',
+    time4: row?.time4 ?? '09:00',
     timezone: row?.timezone ?? 'UTC',
-    frequency: row?.frequency ?? 1,
+    frequency: Math.min(Math.max(1, row?.frequency ?? 1), maxFrequency),
+    maxFrequency,
+    isPaidUser,
   })
 }
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { subscription: true, creditTopUps: true },
+  })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const body = await req.json().catch(() => ({} as any))
   const enabled = !!body?.enabled
-  const frequency = clampInt(body?.frequency, 1, 3, 1)
   const time1 = normalizeTime(body?.time1, '20:00')
   const time2 = normalizeTime(body?.time2, '12:00')
   const time3 = normalizeTime(body?.time3, '18:00')
+  const time4 = normalizeTime(body?.time4, '09:00')
   const timezone = normalizeTimezone(body?.timezone)
+  const now = new Date()
+  const hasSubscription = isSubscriptionActive(user.subscription, now)
+  const hasPurchasedCredits = (user.creditTopUps || []).some(
+    (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+  )
+  const isPaidUser = hasSubscription || hasPurchasedCredits
+  const maxFrequency = isPaidUser ? 4 : 1
+  const frequency = clampInt(body?.frequency, 1, maxFrequency, 1)
 
   await ensureMoodTables()
 
   await prisma.$queryRawUnsafe(
-    `INSERT INTO MoodReminderSettings (userId, enabled, time1, time2, time3, timezone, frequency)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO MoodReminderSettings (userId, enabled, time1, time2, time3, time4, timezone, frequency)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (userId) DO UPDATE SET
        enabled = EXCLUDED.enabled,
        time1 = EXCLUDED.time1,
        time2 = EXCLUDED.time2,
        time3 = EXCLUDED.time3,
+       time4 = EXCLUDED.time4,
        timezone = EXCLUDED.timezone,
        frequency = EXCLUDED.frequency`,
     user.id,
@@ -91,6 +117,7 @@ export async function POST(req: NextRequest) {
     time1,
     time2,
     time3,
+    time4,
     timezone,
     frequency,
   )
@@ -101,6 +128,7 @@ export async function POST(req: NextRequest) {
       time1,
       time2,
       time3,
+      time4,
       timezone,
       frequency,
     }).catch((error) => {
@@ -129,6 +157,7 @@ export async function POST(req: NextRequest) {
       if (frequency >= 1) candidates.push(time1)
       if (frequency >= 2) candidates.push(time2)
       if (frequency >= 3) candidates.push(time3)
+      if (frequency >= 4) candidates.push(time4)
       for (const t of candidates) {
         const [hh, mm] = t.split(':').map((v) => parseInt(v, 10))
         if (Number.isNaN(hh) || Number.isNaN(mm)) continue
