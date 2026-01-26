@@ -1229,6 +1229,19 @@ export default function MealBuilderClient() {
       baseUnit = normalized.unit
       const id = `edit:${Date.now()}:${Math.random().toString(16).slice(2)}`
       const resolvedServings = Number.isFinite(servings) && servings > 0 ? servings : 1
+      const savedUnitRaw = typeof raw?.__unit === 'string' ? raw.__unit.trim() : ''
+      const savedUnit = ALL_UNITS.includes(savedUnitRaw as BuilderUnit) ? (savedUnitRaw as BuilderUnit) : null
+      const savedAmount = toNumber(raw?.__amount)
+      const savedAmountInput = typeof raw?.__amountInput === 'string' ? raw.__amountInput.trim() : ''
+      const allowedUnits = allowedUnitsForItem({ name, __pieceGrams: pieceGrams } as BuilderItem)
+      const fallbackAmount = baseAmount && baseUnit ? round3(baseAmount * resolvedServings) : round3(resolvedServings)
+      const savedUnitAllowed = savedUnit && allowedUnits.includes(savedUnit)
+      const initialUnit = savedUnitAllowed ? savedUnit : baseUnit || allowedUnits[0] || null
+      const initialAmount =
+        savedUnitAllowed && Number.isFinite(Number(savedAmount)) && Number(savedAmount) >= 0
+          ? Number(savedAmount)
+          : fallbackAmount
+      const initialAmountInput = savedUnitAllowed && savedAmountInput ? savedAmountInput : String(initialAmount)
       next.push({
         id,
         name,
@@ -1243,9 +1256,9 @@ export default function MealBuilderClient() {
         servings: resolvedServings,
         __baseAmount: baseAmount,
         __baseUnit: baseUnit,
-        __amount: baseAmount && baseUnit ? round3(baseAmount * resolvedServings) : round3(resolvedServings),
-        __amountInput: String(baseAmount && baseUnit ? round3(baseAmount * resolvedServings) : round3(resolvedServings)),
-        __unit: baseUnit,
+        __amount: initialAmount,
+        __amountInput: initialAmountInput,
+        __unit: initialUnit,
         __pieceGrams: pieceGrams,
         __source: typeof raw?.source === 'string' ? raw.source : null,
         __sourceId: raw?.id ? String(raw.id) : null,
@@ -2478,9 +2491,7 @@ export default function MealBuilderClient() {
       const {
         __baseAmount,
         __baseUnit,
-        __amount,
         __amountInput,
-        __unit,
         __pieceGrams,
         __servingOptions,
         __selectedServingId,
@@ -2488,7 +2499,7 @@ export default function MealBuilderClient() {
         __sourceId,
         ...rest
       } = it
-      const next: any = { ...rest, servings: computeServingsFromAmount(it) }
+      const next: any = { ...rest, __amount: it.__amount, __unit: it.__unit, servings: computeServingsFromAmount(it) }
       const source =
         Array.isArray(sourceItemsForMerge) && sourceItemsForMerge[index]
           ? sourceItemsForMerge[index]
@@ -3469,7 +3480,6 @@ export default function MealBuilderClient() {
                               inputMode="decimal"
                               value={it.__amountInput}
                               onChange={(e) => setAmount(it.id, e.target.value)}
-                              onFocus={() => setAmount(it.id, '')}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                             />
                           </div>
