@@ -2211,7 +2211,7 @@ export default function MealBuilderClient() {
         const amount = Number.isFinite(num) && num >= 0 ? num : 0
         const baseAmount = it.__baseAmount
         const baseUnit = it.__baseUnit
-        const unit = it.__unit
+        const unit = it.__unit || baseUnit
         const pieceGrams = it.__pieceGrams
         let servings = it.servings
 
@@ -2235,15 +2235,14 @@ export default function MealBuilderClient() {
         const baseAmount = it.__baseAmount
         const baseUnit = it.__baseUnit
         const pieceGrams = it.__pieceGrams
+        const amount = Number.isFinite(Number(it.__amount)) ? Number(it.__amount) : 0
+        const amountInput = typeof it.__amountInput === 'string' ? it.__amountInput : String(amount)
         if (!baseAmount || !baseUnit) {
-          return { ...it, __unit: unit }
+          return { ...it, __unit: unit, __amount: amount, __amountInput: amountInput }
         }
-        const currentUnit = it.__unit || baseUnit
-        const converted = convertAmount(it.__amount, currentUnit, unit, baseAmount, baseUnit, pieceGrams)
-        const inBase = convertAmount(converted, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
+        const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
         const servings = baseAmount > 0 ? inBase / baseAmount : 0
-        const nextAmount = round3(Math.max(0, converted))
-        return { ...it, __unit: unit, __amount: nextAmount, __amountInput: String(nextAmount), servings: round3(Math.max(0, servings)) }
+        return { ...it, __unit: unit, __amount: amount, __amountInput: amountInput, servings: round3(Math.max(0, servings)) }
       }),
     )
   }
