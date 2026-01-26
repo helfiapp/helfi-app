@@ -1855,7 +1855,13 @@ export default function MealBuilderClient() {
         setError('This item has no nutrition data. Please choose another result.')
         return
       }
-      addItemDirect(resolved)
+      const displayName = item?.name || resolved?.name
+      const displayBrand = item?.brand ?? resolved?.brand
+      addItemDirect({
+        ...resolved,
+        name: displayName || resolved.name,
+        brand: displayBrand ?? resolved.brand,
+      })
     } catch {
       setError('Search failed. Please try again.')
     } finally {
