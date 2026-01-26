@@ -6,6 +6,7 @@ import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
 import { DRY_FOOD_MEASUREMENTS } from '@/lib/food/dry-food-measurements'
 import { FRUIT_VEG_MEASUREMENTS } from '@/lib/food/fruit-veg-measurements'
+import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '@/lib/food/dairy-semi-solid-measurements'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 
@@ -571,6 +572,29 @@ const DRY_FOOD_LOOKUP_CACHE = new Map<string, FoodUnitGrams | null>()
 const getDryFoodUnitGrams = (name: string | null | undefined): FoodUnitGrams | null =>
   resolveFoodUnitGrams(name, DRY_FOOD_MEASUREMENTS, DRY_FOOD_ALIASES, DRY_FOOD_LOOKUP_CACHE, buildDryFoodUnitGrams)
 
+const buildDairySemiSolidUnitGrams = (
+  entry: (typeof DAIRY_SEMI_SOLID_MEASUREMENTS)[number],
+): FoodUnitGrams => ({
+  tsp: entry.tsp_g,
+  tbsp: entry.tbsp_g,
+  'quarter-cup': entry.quarter_cup_g,
+  'half-cup': entry.half_cup_g,
+  'three-quarter-cup': entry.three_quarter_cup_g,
+  cup: entry.cup_g,
+})
+
+const DAIRY_SEMI_SOLID_ALIASES = buildFoodAliases(DAIRY_SEMI_SOLID_MEASUREMENTS)
+const DAIRY_SEMI_SOLID_LOOKUP_CACHE = new Map<string, FoodUnitGrams | null>()
+
+const getDairySemiSolidUnitGrams = (name: string | null | undefined): FoodUnitGrams | null =>
+  resolveFoodUnitGrams(
+    name,
+    DAIRY_SEMI_SOLID_MEASUREMENTS,
+    DAIRY_SEMI_SOLID_ALIASES,
+    DAIRY_SEMI_SOLID_LOOKUP_CACHE,
+    buildDairySemiSolidUnitGrams,
+  )
+
 const buildFruitVegUnitGrams = (entry: (typeof FRUIT_VEG_MEASUREMENTS)[number]): FoodUnitGrams => ({
   'quarter-cup': entry.quarter_cup_g,
   'half-cup': entry.half_cup_g,
@@ -585,7 +609,7 @@ const getFruitVegUnitGrams = (name: string | null | undefined): FoodUnitGrams | 
   resolveFoodUnitGrams(name, FRUIT_VEG_MEASUREMENTS, FRUIT_VEG_ALIASES, FRUIT_VEG_LOOKUP_CACHE, buildFruitVegUnitGrams)
 
 const getFoodUnitGrams = (name: string | null | undefined): FoodUnitGrams | null =>
-  getFruitVegUnitGrams(name) || getDryFoodUnitGrams(name)
+  getFruitVegUnitGrams(name) || getDairySemiSolidUnitGrams(name) || getDryFoodUnitGrams(name)
 
 const ALL_UNITS: BuilderUnit[] = [
   'g',
