@@ -765,7 +765,7 @@ const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
   if (unit === 'half-cup') return '1/2 cup — 109g'
   if (unit === 'three-quarter-cup') return '3/4 cup — 163.5g'
   if (unit === 'cup') return 'cup — 218g'
-  if (unit === 'oz') return 'oz — 28g'
+  if (unit === 'oz') return 'oz'
   if (unit === 'ml') return 'ml'
   if (unit === 'pinch') return 'pinch — 0.3g'
   if (unit === 'piece') {
