@@ -2920,9 +2920,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 52.5,
     "half_cup_cooked_g": 105,
     "three_quarter_cup_cooked_g": 157.5,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 5,
+    "piece_medium_g": 15,
+    "piece_large_g": 25
   },
   {
     "food": "Sugar snap peas",
