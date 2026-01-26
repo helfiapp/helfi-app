@@ -461,6 +461,9 @@ const UNIT_GRAMS: Record<BuilderUnit, number> = {
   serving: DEFAULT_SERVING_GRAMS,
 }
 
+const OPEN_UNITS: BuilderUnit[] = ['g', 'ml', 'oz']
+const isOpenUnit = (unit?: BuilderUnit | null) => (unit ? OPEN_UNITS.includes(unit) : false)
+
 const ALL_UNITS: BuilderUnit[] = [
   'g',
   'ml',
@@ -2237,12 +2240,27 @@ export default function MealBuilderClient() {
         const pieceGrams = it.__pieceGrams
         const amount = Number.isFinite(Number(it.__amount)) ? Number(it.__amount) : 0
         const amountInput = typeof it.__amountInput === 'string' ? it.__amountInput : String(amount)
-        if (!baseAmount || !baseUnit) {
-          return { ...it, __unit: unit, __amount: amount, __amountInput: amountInput }
+        const currentUnit = it.__unit || it.__baseUnit
+        let nextAmount = amount
+        let nextAmountInput = amountInput
+
+        if (isOpenUnit(unit)) {
+          if (currentUnit) {
+            const converted = convertAmount(amount, currentUnit, unit, baseAmount, baseUnit, pieceGrams)
+            nextAmount = round3(Math.max(0, converted))
+            nextAmountInput = String(nextAmount)
+          }
+        } else if (!currentUnit || isOpenUnit(currentUnit)) {
+          nextAmount = 1
+          nextAmountInput = '1'
         }
-        const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
+
+        if (!baseAmount || !baseUnit) {
+          return { ...it, __unit: unit, __amount: nextAmount, __amountInput: nextAmountInput }
+        }
+        const inBase = convertAmount(nextAmount, unit, baseUnit, baseAmount, baseUnit, pieceGrams)
         const servings = baseAmount > 0 ? inBase / baseAmount : 0
-        return { ...it, __unit: unit, __amount: amount, __amountInput: amountInput, servings: round3(Math.max(0, servings)) }
+        return { ...it, __unit: unit, __amount: nextAmount, __amountInput: nextAmountInput, servings: round3(Math.max(0, servings)) }
       }),
     )
   }
