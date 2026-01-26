@@ -623,14 +623,16 @@ const getDairySemiSolidUnitGrams = (name: string | null | undefined): FoodUnitGr
     buildDairySemiSolidUnitGrams,
   )
 
+const toUnitValue = (value: number | null) => (Number.isFinite(Number(value)) ? Number(value) : undefined)
+
 const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): FoodUnitGrams => ({
-  'quarter-cup': entry.quarter_cup_raw_g,
-  'half-cup': entry.half_cup_raw_g,
-  'three-quarter-cup': entry.three_quarter_cup_raw_g,
-  cup: entry.raw_cup_g,
-  'piece-small': entry.piece_small_g,
-  'piece-medium': entry.piece_medium_g,
-  'piece-large': entry.piece_large_g,
+  'quarter-cup': toUnitValue(entry.quarter_cup_raw_g),
+  'half-cup': toUnitValue(entry.half_cup_raw_g),
+  'three-quarter-cup': toUnitValue(entry.three_quarter_cup_raw_g),
+  cup: toUnitValue(entry.raw_cup_g),
+  'piece-small': toUnitValue(entry.piece_small_g),
+  'piece-medium': toUnitValue(entry.piece_medium_g),
+  'piece-large': toUnitValue(entry.piece_large_g),
 })
 
 const PRODUCE_ALIASES = buildFoodAliases(PRODUCE_MEASUREMENTS)
