@@ -64,9 +64,30 @@ export async function GET(request: NextRequest) {
 
     const getSearchTokens = (value: string) => normalizeForMatch(value).split(' ').filter(Boolean)
 
+    const DESCRIPTOR_TOKENS = new Set([
+      'raw',
+      'fresh',
+      'cooked',
+      'uncooked',
+      'frozen',
+      'pasteurized',
+      'pasteurised',
+      'boiled',
+      'baked',
+      'roasted',
+      'fried',
+      'grilled',
+      'steamed',
+      'sauteed',
+      'smoked',
+      'dried',
+    ])
+
     const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
       // Ignore 1-letter tokens so "art" does not match "Bartlett" via "t".
-      const queryTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+      const rawTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+      const filteredTokens = rawTokens.filter((token) => !DESCRIPTOR_TOKENS.has(token))
+      const queryTokens = filteredTokens.length > 0 ? filteredTokens : rawTokens
       const nameTokens = getSearchTokens(name).filter((token) => token.length >= 2)
       if (queryTokens.length === 0 || nameTokens.length === 0) return false
       const tokenMatches = (token: string, word: string) => {
@@ -165,25 +186,6 @@ export async function GET(request: NextRequest) {
       const hasFat = fat !== null && fat !== undefined && Number.isFinite(Number(fat))
       return hasCalories && hasProtein && hasCarbs && hasFat
     }
-
-    const DESCRIPTOR_TOKENS = new Set([
-      'raw',
-      'fresh',
-      'cooked',
-      'uncooked',
-      'frozen',
-      'pasteurized',
-      'pasteurised',
-      'boiled',
-      'baked',
-      'roasted',
-      'fried',
-      'grilled',
-      'steamed',
-      'sauteed',
-      'smoked',
-      'dried',
-    ])
 
     const scoreNameMatch = (name: any) => {
       if (!queryNorm) return 0
