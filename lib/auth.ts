@@ -7,6 +7,7 @@ import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
 import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
 import { getSessionRevokedAt } from '@/lib/session-revocation'
+import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
 import bcrypt from 'bcryptjs'
 
 // Initialize Resend for welcome emails
@@ -324,12 +325,14 @@ export const authOptions: NextAuthOptions = {
           let isNewUser = false
           if (!dbUser) {
             console.log('👤 Creating Google user:', user.email)
+            await ensureFreeCreditColumns()
             dbUser = await prisma.user.create({
               data: {
                 email: user.email!.toLowerCase(),
                 name: user.name || user.email!.split('@')[0],
                 image: user.image,
-                emailVerified: new Date() // Google users are auto-verified
+                emailVerified: new Date(), // Google users are auto-verified
+                ...NEW_USER_FREE_CREDITS,
               }
             })
             isNewUser = true

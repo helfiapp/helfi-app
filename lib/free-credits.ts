@@ -50,6 +50,25 @@ const FREE_CREDIT_FIELDS: Record<FreeCreditType, keyof any> = {
   VOICE_CHAT: 'freeVoiceChatRemaining',
 };
 
+export const EXTRA_FREE_CREDITS = {
+  freeSymptomChatRemaining: 2,
+  freeMedicalChatRemaining: 2,
+  freeInsightsChatRemaining: 2,
+  freeVoiceChatRemaining: 2,
+  freeFoodReanalysisRemaining: 2,
+  freeInteractionReanalysisRemaining: 2,
+};
+
+export const NEW_USER_FREE_CREDITS = {
+  freeFoodAnalysisRemaining: 5,
+  freeSymptomAnalysisRemaining: 2,
+  freeMedicalAnalysisRemaining: 2,
+  freeInteractionAnalysisRemaining: 2,
+  freeHealthIntakeRemaining: 1,
+  freeInsightsUpdateRemaining: 3,
+  ...EXTRA_FREE_CREDITS,
+};
+
 export async function ensureFreeCreditColumns() {
   try {
     await prisma.$executeRawUnsafe(`
@@ -132,6 +151,7 @@ export async function getFreeCreditsStatus(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
+      createdAt: true,
       freeFoodAnalysisRemaining: true,
       freeFoodReanalysisRemaining: true,
       freeSymptomAnalysisRemaining: true,
@@ -166,17 +186,45 @@ export async function getFreeCreditsStatus(userId: string) {
   }
 
   const food = (user as any).freeFoodAnalysisRemaining ?? 0;
-  const foodReanalysis = (user as any).freeFoodReanalysisRemaining ?? 0;
+  let foodReanalysis = (user as any).freeFoodReanalysisRemaining ?? 0;
   const symptom = (user as any).freeSymptomAnalysisRemaining ?? 0;
-  const symptomChat = (user as any).freeSymptomChatRemaining ?? 0;
+  let symptomChat = (user as any).freeSymptomChatRemaining ?? 0;
   const medical = (user as any).freeMedicalAnalysisRemaining ?? 0;
-  const medicalChat = (user as any).freeMedicalChatRemaining ?? 0;
+  let medicalChat = (user as any).freeMedicalChatRemaining ?? 0;
   const interaction = (user as any).freeInteractionAnalysisRemaining ?? 0;
-  const interactionReanalysis = (user as any).freeInteractionReanalysisRemaining ?? 0;
+  let interactionReanalysis = (user as any).freeInteractionReanalysisRemaining ?? 0;
   const healthIntake = (user as any).freeHealthIntakeRemaining ?? 0;
   const insights = (user as any).freeInsightsUpdateRemaining ?? 0;
-  const insightsChat = (user as any).freeInsightsChatRemaining ?? 0;
-  const voiceChat = (user as any).freeVoiceChatRemaining ?? 0;
+  let insightsChat = (user as any).freeInsightsChatRemaining ?? 0;
+  let voiceChat = (user as any).freeVoiceChatRemaining ?? 0;
+
+  const extrasTotal =
+    symptomChat +
+    medicalChat +
+    insightsChat +
+    voiceChat +
+    foodReanalysis +
+    interactionReanalysis;
+
+  const createdAt = (user as any).createdAt ? new Date((user as any).createdAt).getTime() : 0;
+  const isRecentAccount = createdAt > 0 && Date.now() - createdAt <= 7 * 24 * 60 * 60 * 1000;
+
+  if (extrasTotal === 0 && isRecentAccount) {
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: EXTRA_FREE_CREDITS as any,
+      });
+      symptomChat = EXTRA_FREE_CREDITS.freeSymptomChatRemaining;
+      medicalChat = EXTRA_FREE_CREDITS.freeMedicalChatRemaining;
+      insightsChat = EXTRA_FREE_CREDITS.freeInsightsChatRemaining;
+      voiceChat = EXTRA_FREE_CREDITS.freeVoiceChatRemaining;
+      foodReanalysis = EXTRA_FREE_CREDITS.freeFoodReanalysisRemaining;
+      interactionReanalysis = EXTRA_FREE_CREDITS.freeInteractionReanalysisRemaining;
+    } catch (error) {
+      console.warn('Failed to backfill free credits:', error);
+    }
+  }
 
   return {
     food,

@@ -7,6 +7,7 @@ import { precomputeIssueSectionsForUser, precomputeQuickSectionsForUser } from '
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { computeHydrationGoal } from '@/lib/hydration-goal'
+import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
 
 const normalizeTimingList = (timing: any) => {
   if (Array.isArray(timing)) {
@@ -717,10 +718,12 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       console.log('🔨 Creating new user for:', userEmail)
+      await ensureFreeCreditColumns()
       user = await prisma.user.create({
         data: {
           email: userEmail,
           name: userEmail.split('@')[0],
+          ...NEW_USER_FREE_CREDITS,
         }
       })
       console.log('✅ Created new user with ID:', user.id)

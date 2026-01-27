@@ -17,7 +17,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { lookupFoodNutrition, searchFatSecretFoods } from '@/lib/food-data';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
-import { hasFreeCredits, consumeFreeCredit, type FreeCreditType } from '@/lib/free-credits';
+import { hasFreeCredits, consumeFreeCredit, type FreeCreditType, ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits';
 import crypto from 'crypto';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { normalizeDiscreteItems, summarizeDiscreteItemsForLog } from '@/lib/food-normalization';
@@ -2288,11 +2288,13 @@ export async function POST(req: NextRequest) {
         if (existing) return existing;
 
         console.warn('⚠️ Food analyzer could not find user record. Auto-creating placeholder record for', normalizedEmail);
+        await ensureFreeCreditColumns();
         await prisma.user.create({
           data: {
             email: normalizedEmail,
             name: session?.user?.name || normalizedEmail.split('@')[0],
             emailVerified: new Date(),
+            ...NEW_USER_FREE_CREDITS,
           },
         });
 
