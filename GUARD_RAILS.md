@@ -388,6 +388,14 @@ If this breaks again, restore these rules exactly.
 - Commit: `aa00b3e1` (prevent sync overwrite during edits)
 - Date: 2026‑01‑13
 
+### 2.8 Supplement + Medication Photo Retention (Jan 2026 – Locked)
+
+- Photos uploaded for supplements and medications are **temporary**.
+- After interaction analysis completes, **delete the photos** from storage and clear image URLs from the database and backups.
+- Users can re‑upload new photos later if they need to update the information.
+
+**Last stable deployment:** `75ef4f02` (2026‑01‑27)
+
 **Copy‑Paste Restore Checklist (no guesswork):**
 1) Open `app/onboarding/page.tsx`.
 2) Confirm these constants exist:
