@@ -4788,11 +4788,16 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const [supplementsToSave, setSupplementsToSave] = useState<any[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const prevEditingIndexRef = useRef<number | null>(null);
   
   // Populate form fields when editing starts
   useEffect(() => {
+    const prevEditingIndex = prevEditingIndexRef.current;
+    const editingChanged = prevEditingIndex !== editingIndex;
+    prevEditingIndexRef.current = editingIndex;
     if (editingIndex !== null && editingIndex >= 0 && editingIndex < supplements.length) {
       const supplement = supplements[editingIndex];
       if (!supplement) {
@@ -4864,7 +4869,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       } else {
         setPhotoSelectedDays([]);
       }
-    } else if (editingIndex === null) {
+    } else if (editingChanged && editingIndex === null) {
       // Clear form when not editing
       clearPhotoForm();
     }
@@ -4994,6 +4999,61 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
   const dosageUnits = ['mg', 'mcg', 'g', 'IU', 'capsules', 'tablets', 'drops', 'ml', 'tsp', 'tbsp'];
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const timingId = (time: string) => `photo-timing-${time.toLowerCase().replace(/\s+/g, '-')}`;
+
+  const parseSupplementImages = (raw: any) => {
+    if (!raw) return { frontUrl: null as string | null, backUrl: null as string | null };
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (trimmed.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed && (parsed.front || parsed.back)) {
+            return {
+              frontUrl: parsed.front || null,
+              backUrl: parsed.back || null,
+            };
+          }
+        } catch {
+          // fall through to treat as a direct URL
+        }
+      }
+      return { frontUrl: trimmed || null, backUrl: null };
+    }
+    if (typeof raw === 'object') {
+      return { frontUrl: raw.front || null, backUrl: raw.back || null };
+    }
+    return { frontUrl: null, backUrl: null };
+  };
+
+  const buildSupplementImageValue = (frontUrl: string | null, backUrl: string | null) => {
+    if (!frontUrl && !backUrl) return null;
+    if (backUrl) {
+      const payload: { front?: string; back?: string } = {};
+      if (frontUrl) payload.front = frontUrl;
+      payload.back = backUrl;
+      return JSON.stringify(payload);
+    }
+    return frontUrl;
+  };
+
+  const uploadSupplementImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch('/api/upload-supplement-image', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.error || 'Upload failed');
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!data?.imageUrl) {
+      throw new Error('Upload failed');
+    }
+    return data.imageUrl as string;
+  };
 
   const toggleTiming = (time: string, isPhoto: boolean = false) => {
     const currentTiming = isPhoto ? photoTiming : timing;
@@ -5034,6 +5094,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const addSupplement = async () => {
     const currentDate = new Date().toISOString();
     const isEditing = editingIndex !== null;
+    const existingImages = isEditing ? parseSupplementImages(supplements[editingIndex]?.imageUrl) : { frontUrl: null, backUrl: null };
     
     // For new supplements, require both images. For editing, images are optional.
     const hasRequiredData = isEditing 
@@ -5041,6 +5102,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       : (frontImage && backImage && photoDosage && photoTiming.length > 0);
     
     if (hasRequiredData) {
+      setIsUploadingImages(true);
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
         const timeSpecificDosage = photoTimingDosages[time];
@@ -5054,6 +5116,23 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       
       // Only analyze image if it's a new supplement or if new images are provided
       let supplementName = isEditing ? supplements[editingIndex].name : 'Analyzing...';
+      let frontUrl = existingImages.frontUrl;
+      let backUrl = existingImages.backUrl;
+      
+      // Upload images (front + back) if provided
+      try {
+        if (frontImage) {
+          frontUrl = await uploadSupplementImage(frontImage);
+        }
+        if (backImage) {
+          backUrl = await uploadSupplementImage(backImage);
+        }
+      } catch (error) {
+        console.error('Error uploading supplement images:', error);
+        alert('Photo upload failed. Please try again.');
+        setIsUploadingImages(false);
+        return;
+      }
       
       if (!isEditing || (frontImage && backImage)) {
         // CRITICAL FIX: Analyze image to extract supplement name instead of using filename
@@ -5079,10 +5158,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
         }
       }
 
+      const imageUrl = buildSupplementImageValue(frontUrl, backUrl);
       const supplementData = { 
         id: isEditing ? supplements[editingIndex].id : Date.now().toString(),
         // Persist existing saved image URL if any (no re-upload required for edits)
-        imageUrl: isEditing ? (supplements[editingIndex].imageUrl || null) : null,
+        imageUrl: imageUrl,
         method: 'photo',
         name: supplementName,
         dosage: `${photoDosage} ${photoDosageUnit}`,
@@ -5128,6 +5208,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       }
       
       clearPhotoForm();
+      setIsUploadingImages(false);
     }
   };
   
@@ -5268,14 +5349,17 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && (supplements[editingIndex]?.imageUrl) && (
+              {editingIndex !== null && (() => {
+                const editingImages = parseSupplementImages(supplements[editingIndex]?.imageUrl);
+                if (!editingImages.frontUrl) return null;
+                return (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {supplements[editingIndex].imageUrl ? (
+                        {editingImages.frontUrl ? (
                           <img 
-                            src={supplements[editingIndex].imageUrl} 
+                            src={editingImages.frontUrl} 
                             alt="Front" 
                             className="w-full h-full object-cover"
                           />
@@ -5287,15 +5371,17 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500">{supplements[editingIndex].imageUrl}</div>
+                        <div className="text-xs text-gray-500">{editingImages.frontUrl}</div>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        // Mark image for deletion by setting to null
+                        // Remove front image only
                         const updatedSupplements = supplements.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, imageUrl: null } : item
+                          index === editingIndex
+                            ? { ...item, imageUrl: buildSupplementImageValue(null, parseSupplementImages(item.imageUrl).backUrl) }
+                            : item
                         );
                         setSupplements(updatedSupplements);
                       }}
@@ -5305,7 +5391,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                     </button>
                   </div>
                 </div>
-              )}
+                );
+              })()}
               <div className="relative">
                 <input
                   type="file"
@@ -5348,14 +5435,17 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Back of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && (supplements[editingIndex]?.imageUrl) && (
+              {editingIndex !== null && (() => {
+                const editingImages = parseSupplementImages(supplements[editingIndex]?.imageUrl);
+                if (!editingImages.backUrl) return null;
+                return (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {supplements[editingIndex].imageUrl ? (
+                        {editingImages.backUrl ? (
                           <img 
-                            src={supplements[editingIndex].imageUrl} 
+                            src={editingImages.backUrl} 
                             alt="Back" 
                             className="w-full h-full object-cover"
                           />
@@ -5367,15 +5457,17 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500">{supplements[editingIndex].imageUrl}</div>
+                        <div className="text-xs text-gray-500">{editingImages.backUrl}</div>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        // Mark image for deletion by setting to null
+                        // Remove back image only
                         const updatedSupplements = supplements.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, imageUrl: null } : item
+                          index === editingIndex
+                            ? { ...item, imageUrl: buildSupplementImageValue(parseSupplementImages(item.imageUrl).frontUrl, null) }
+                            : item
                         );
                         setSupplements(updatedSupplements);
                       }}
@@ -5385,7 +5477,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                     </button>
                   </div>
                 </div>
-              )}
+                );
+              })()}
               <div className="relative">
                 <input
                   type="file"
@@ -5515,9 +5608,9 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                       checked={photoTiming.includes(time)}
                       onChange={() => toggleTiming(time, true)}
                       className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                      id={`photo-timing-${time}`}
+                      id={timingId(time)}
                     />
-                    <label htmlFor={`photo-timing-${time}`} className="flex-1 cursor-pointer">
+                    <label htmlFor={timingId(time)} className="flex-1 cursor-pointer">
                       <span className="text-gray-700">{time}</span>
                     </label>
                     {photoTiming.includes(time) && (
@@ -5567,12 +5660,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addSupplement}
               disabled={
+                isUploadingImages ||
                 editingIndex !== null 
                   ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
                   : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
               }
             >
-              {editingIndex !== null ? 'Update Supplement' : 'Add Supplement'}
+              {isUploadingImages ? 'Uploading photos...' : (editingIndex !== null ? 'Update Supplement' : 'Add Supplement')}
             </button>
           </div>
 
@@ -5590,7 +5684,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                       <div>
                         <div className="font-medium">📷 {s.name}</div>
                         <div className="text-sm text-gray-600">
-                          Photos: Front {s.backImage ? '+ Back' : 'only'}
+                          {(() => {
+                            const parsedImages = parseSupplementImages(s.imageUrl);
+                            if (parsedImages.frontUrl && parsedImages.backUrl) return 'Photos: Front + Back';
+                            if (parsedImages.frontUrl) return 'Photos: Front only';
+                            return 'Photos: Not saved';
+                          })()}
                         </div>
                         <div className="text-sm text-gray-600">{s.dosage} - {Array.isArray(s.timing) ? s.timing.join(', ') : s.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {s.scheduleInfo}</div>
@@ -8838,6 +8937,17 @@ export default function Onboarding() {
     };
   }, []);
 
+  const handleHeaderMenuNav = useCallback((path: string) => {
+    return (event?: React.MouseEvent) => {
+      event?.preventDefault();
+      setDropdownOpen(false);
+      try {
+        triggerInsightsUpdateOnExitRef.current('header-menu');
+      } catch {}
+      window.location.assign(path);
+    };
+  }, []);
+
   // Refresh UsageMeter when credits are updated elsewhere
   useEffect(() => {
     const handler = () => setUsageMeterRefresh((v) => v + 1);
@@ -8944,18 +9054,18 @@ export default function Onboarding() {
                         <div className="text-xs text-gray-500 dark:text-gray-400">{session?.user?.email || 'user@email.com'}</div>
                       </div>
                     </div>
-                    <Link href="/profile" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Profile</Link>
-                    <Link href="/account" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Account Settings</Link>
-                    <Link href="/profile/image" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Upload/Change Profile Photo</Link>
-                    <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Subscription & Billing</Link>
+                    <Link href="/profile" onClick={handleHeaderMenuNav('/profile')} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Profile</Link>
+                    <Link href="/account" onClick={handleHeaderMenuNav('/account')} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Account Settings</Link>
+                    <Link href="/profile/image" onClick={handleHeaderMenuNav('/profile/image')} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Upload/Change Profile Photo</Link>
+                    <Link href="/billing" onClick={handleHeaderMenuNav('/billing')} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Subscription & Billing</Link>
                     {affiliateMenu && (
-                      <Link href={affiliateMenu.href} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <Link href={affiliateMenu.href} onClick={handleHeaderMenuNav(affiliateMenu.href)} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
                         {affiliateMenu.label}
                       </Link>
                     )}
-                    <Link href="/notifications" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
-                    <Link href="/privacy" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Privacy Settings</Link>
-                    <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>
+                    <Link href="/notifications" onClick={handleHeaderMenuNav('/notifications')} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
+                    <Link href="/privacy" onClick={handleHeaderMenuNav('/privacy')} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Privacy Settings</Link>
+                    <Link href="/help" onClick={handleHeaderMenuNav('/help')} className="block px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>
                     <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
                     <button
                       onClick={() => signOut()}
