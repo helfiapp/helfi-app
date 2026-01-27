@@ -5048,7 +5048,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
   const dosageUnits = ['mg', 'mcg', 'g', 'IU', 'capsules', 'tablets', 'drops', 'ml', 'tsp', 'tbsp'];
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const timingId = (time: string) => `med-photo-timing-${time.toLowerCase().replace(/\s+/g, '-')}`;
   const timingId = (time: string) => `photo-timing-${time.toLowerCase().replace(/\s+/g, '-')}`;
 
   const uploadSupplementImage = async (file: File) => {
@@ -6691,9 +6690,9 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                       checked={photoTiming.includes(time)}
                       onChange={() => toggleTiming(time, true)}
                       className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                      id={timingId(time)}
+                      id={`med-photo-timing-${time.toLowerCase().replace(/\s+/g, '-')}`}
                     />
-                    <label htmlFor={timingId(time)} className="flex-1 cursor-pointer">
+                    <label htmlFor={`med-photo-timing-${time.toLowerCase().replace(/\s+/g, '-')}`} className="flex-1 cursor-pointer">
                       <span className="text-gray-700">{time}</span>
                     </label>
                     {photoTiming.includes(time) && (
