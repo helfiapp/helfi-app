@@ -5129,7 +5129,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
       // Only analyze image if it's a new supplement or if new images are provided
-      let supplementName = isEditing ? supplements[editingIndex].name : 'Analyzing...';
+      let supplementName = isEditing ? supplements[editingIndex].name : 'Supplement added';
       let frontUrl = existingImages.frontUrl;
       let backUrl = existingImages.backUrl;
       
@@ -5715,7 +5715,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   <div className="flex-1">
                     {s.method === 'photo' ? (
                       <div>
-                        <div className="font-medium">📷 {s.name}</div>
+                        <div className="font-medium">📷 {s.name === 'Analyzing...' ? 'Supplement added' : s.name}</div>
                         <div className="text-sm text-gray-600">
                           {(() => {
                             const parsedImages = parseImageValue(s.imageUrl);
@@ -6182,7 +6182,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
       // Only analyze image if it's a new medication or if new images are provided
-      let medicationName = isEditing ? medications[editingIndex].name : 'Analyzing...';
+      let medicationName = isEditing ? medications[editingIndex].name : 'Medication added';
       let frontUrl = existingImages.frontUrl;
       let backUrl = existingImages.backUrl;
 
@@ -6765,7 +6765,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   <div className="flex-1">
                     {m.method === 'photo' ? (
                       <div>
-                        <div className="font-medium">💊 {m.name}</div>
+                        <div className="font-medium">💊 {m.name === 'Analyzing...' ? 'Medication added' : m.name}</div>
                         <div className="text-sm text-gray-600">
                           {(() => {
                             const parsedImages = parseImageValue(m.imageUrl);
