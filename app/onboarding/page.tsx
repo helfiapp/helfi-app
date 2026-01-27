@@ -5104,24 +5104,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     }
   };
 
-  const uploadMedicationImage = async (file: File) => {
-    const formData = new FormData();
-    formData.append('image', file);
-    const response = await fetch('/api/upload-medication-image', {
-      method: 'POST',
-      body: formData,
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData?.error || 'Upload failed');
-    }
-    const data = await response.json().catch(() => ({}));
-    if (!data?.imageUrl) {
-      throw new Error('Upload failed');
-    }
-    return data.imageUrl as string;
-  };
-
   const addSupplement = async () => {
     const currentDate = new Date().toISOString();
     const isEditing = editingIndex !== null;
@@ -6155,6 +6137,24 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
         setSelectedDays([]);
       }
     }
+  };
+
+  const uploadMedicationImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch('/api/upload-medication-image', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.error || 'Upload failed');
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!data?.imageUrl) {
+      throw new Error('Upload failed');
+    }
+    return data.imageUrl as string;
   };
 
   const addMedication = async () => {
