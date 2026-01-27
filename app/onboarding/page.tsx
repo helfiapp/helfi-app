@@ -4844,7 +4844,17 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const getDisplayName = (name: any, fallback: string) => {
+    const safe = String(name || '').trim();
+    if (!safe) return fallback;
+    return safe.toLowerCase() === 'analyzing...' ? fallback : safe;
+  };
   const prevEditingIndexRef = useRef<number | null>(null);
+  const getDisplayName = (name: any, fallback: string) => {
+    const safe = String(name || '').trim();
+    if (!safe) return fallback;
+    return safe.toLowerCase() === 'analyzing...' ? fallback : safe;
+  };
   
   // Populate form fields when editing starts
   useEffect(() => {
@@ -5715,7 +5725,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   <div className="flex-1">
                     {s.method === 'photo' ? (
                       <div>
-                        <div className="font-medium">📷 {s.name === 'Analyzing...' ? 'Supplement added' : s.name}</div>
+                        <div className="font-medium">📷 {getDisplayName(s.name, 'Supplement added')}</div>
                         <div className="text-sm text-gray-600">
                           {(() => {
                             const parsedImages = parseImageValue(s.imageUrl);
@@ -5740,7 +5750,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                       </div>
                     ) : (
                       <div>
-                        <div className="font-medium">{s.name}</div>
+                        <div className="font-medium">{getDisplayName(s.name, 'Supplement added')}</div>
                         <div className="text-sm text-gray-600">{s.dosage} - {Array.isArray(s.timing) ? s.timing.join(', ') : s.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {s.scheduleInfo}</div>
                         {s.dateAdded && (
@@ -6765,7 +6775,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   <div className="flex-1">
                     {m.method === 'photo' ? (
                       <div>
-                        <div className="font-medium">💊 {m.name === 'Analyzing...' ? 'Medication added' : m.name}</div>
+                        <div className="font-medium">💊 {getDisplayName(m.name, 'Medication added')}</div>
                         <div className="text-sm text-gray-600">
                           {(() => {
                             const parsedImages = parseImageValue(m.imageUrl);
@@ -6790,7 +6800,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                       </div>
                     ) : (
                       <div>
-                        <div className="font-medium">{m.name}</div>
+                        <div className="font-medium">{getDisplayName(m.name, 'Medication added')}</div>
                         <div className="text-sm text-gray-600">{m.dosage} - {Array.isArray(m.timing) ? m.timing.join(', ') : m.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {m.scheduleInfo}</div>
                         {m.dateAdded && (
