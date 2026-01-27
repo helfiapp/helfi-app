@@ -10,6 +10,9 @@ import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { logAIUsage } from '@/lib/ai-usage-logger';
 import { isSubscriptionActive } from '@/lib/subscription-utils';
 import { logServerCall } from '@/lib/server-call-tracker';
+import { del } from '@vercel/blob';
+import { v2 as cloudinary } from 'cloudinary';
+import { extractBlobPathWithPrefixes } from '@/lib/blob-paths';
 
 // Lazily initialize OpenAI to avoid build-time env requirements
 function getOpenAIClient() {
@@ -18,6 +21,236 @@ function getOpenAIClient() {
   }
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
+
+const BLOB_PATH_PREFIXES = ['supplement-images/', 'medication-images/'];
+
+const blobToken =
+  process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
+
+if (blobToken && !process.env.BLOB_READ_WRITE_TOKEN) {
+  process.env.BLOB_READ_WRITE_TOKEN = blobToken;
+}
+
+const hasBlobToken = Boolean(blobToken);
+
+const hasCloudinaryConfig = Boolean(
+  process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+);
+
+if (hasCloudinaryConfig) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME?.trim(),
+    api_key: process.env.CLOUDINARY_API_KEY?.trim(),
+    api_secret: process.env.CLOUDINARY_API_SECRET?.trim(),
+  });
+}
+
+type CloudinaryResourceType = 'image' | 'video' | 'raw';
+type CloudinaryAsset = { publicId: string; resourceType: CloudinaryResourceType };
+
+const isCloudinaryUrl = (value: string) => value.includes('cloudinary.com');
+
+const parseCloudinaryAsset = (url: string): CloudinaryAsset | null => {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.includes('cloudinary.com')) return null;
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const uploadIndex = parts.findIndex((part) => part === 'upload');
+    if (uploadIndex <= 0) return null;
+    const resourceType = parts[uploadIndex - 1] as CloudinaryResourceType;
+    const afterUpload = parts.slice(uploadIndex + 1);
+    const versionIndex = afterUpload.findIndex((part) => /^v\\d+$/.test(part));
+    const publicParts = versionIndex >= 0 ? afterUpload.slice(versionIndex + 1) : afterUpload;
+    if (!publicParts.length) return null;
+    const publicIdWithExt = publicParts.join('/');
+    const publicId = publicIdWithExt.replace(/\\.[^/.]+$/, '');
+    if (!publicId) return null;
+    const normalized: CloudinaryResourceType =
+      resourceType === 'video' || resourceType === 'raw' ? resourceType : 'image';
+    return { publicId, resourceType: normalized };
+  } catch {
+    return null;
+  }
+};
+
+const addCloudinaryAsset = (targets: Map<string, CloudinaryAsset>, asset: CloudinaryAsset | null) => {
+  if (!asset?.publicId) return;
+  const key = `${asset.resourceType}:${asset.publicId}`;
+  if (!targets.has(key)) {
+    targets.set(key, asset);
+  }
+};
+
+const addBlobTarget = (targets: Set<string>, value?: string | null) => {
+  if (!value) return;
+  const path = extractBlobPathWithPrefixes(value, BLOB_PATH_PREFIXES);
+  if (path) {
+    targets.add(path);
+  }
+};
+
+const parseImageUrls = (raw: any): string[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((entry) => String(entry || '').trim()).filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((entry) => String(entry || '').trim()).filter(Boolean);
+        }
+        if (parsed && (parsed.front || parsed.back)) {
+          return [parsed.front, parsed.back].map((entry) => String(entry || '').trim()).filter(Boolean);
+        }
+      } catch {
+        // fall through to treat as a direct URL
+      }
+    }
+    return [trimmed];
+  }
+  if (typeof raw === 'object') {
+    const urls: string[] = [];
+    const front = (raw as any).front || (raw as any).frontUrl;
+    const back = (raw as any).back || (raw as any).backUrl;
+    const url = (raw as any).url || (raw as any).imageUrl;
+    if (front) urls.push(String(front).trim());
+    if (back) urls.push(String(back).trim());
+    if (url) urls.push(String(url).trim());
+    return urls.filter(Boolean);
+  }
+  return [];
+};
+
+const stripImageFields = (items: any[]) => {
+  if (!Array.isArray(items)) return items;
+  return items.map((item) => {
+    if (!item || typeof item !== 'object') return item;
+    const { imageUrl, frontImage, backImage, ...rest } = item as any;
+    return rest;
+  });
+};
+
+const deleteCloudinaryAssets = async (assets: CloudinaryAsset[]) => {
+  if (!assets.length || !hasCloudinaryConfig) return 0;
+  let deleted = 0;
+  for (const asset of assets) {
+    const result = await cloudinary.uploader.destroy(asset.publicId, {
+      resource_type: asset.resourceType,
+      invalidate: true,
+    });
+    if (result?.result === 'ok' || result?.result === 'not found') {
+      deleted += 1;
+    }
+  }
+  return deleted;
+};
+
+const deleteBlobTargets = async (targets: string[]) => {
+  if (!targets.length || !hasBlobToken) return 0;
+  await del(targets);
+  return targets.length;
+};
+
+const cleanupInteractionImages = async (params: {
+  userId: string;
+  supplements: any[];
+  medications: any[];
+}) => {
+  const blobTargets = new Set<string>();
+  const cloudinaryAssets = new Map<string, CloudinaryAsset>();
+  const imageUrls: string[] = [];
+
+  params.supplements.forEach((supp: any) => {
+    imageUrls.push(...parseImageUrls(supp?.imageUrl));
+  });
+  params.medications.forEach((med: any) => {
+    imageUrls.push(...parseImageUrls(med?.imageUrl));
+  });
+
+  imageUrls.forEach((url) => {
+    if (!url) return;
+    addBlobTarget(blobTargets, url);
+    if (isCloudinaryUrl(url)) {
+      addCloudinaryAsset(cloudinaryAssets, parseCloudinaryAsset(url));
+    }
+  });
+
+  const files = await prisma.file.findMany({
+    where: {
+      uploadedById: params.userId,
+      usage: { in: ['SUPPLEMENT_IMAGE', 'MEDICATION_IMAGE'] },
+    },
+    select: {
+      id: true,
+      cloudinaryId: true,
+      cloudinaryUrl: true,
+      secureUrl: true,
+    },
+  });
+
+  const fileIds = files.map((file) => file.id);
+
+  files.forEach((file) => {
+    addBlobTarget(blobTargets, file.cloudinaryId || undefined);
+    addBlobTarget(blobTargets, file.cloudinaryUrl || undefined);
+    addBlobTarget(blobTargets, file.secureUrl || undefined);
+
+    const cloudinaryUrl = file.secureUrl || file.cloudinaryUrl;
+    if (cloudinaryUrl && isCloudinaryUrl(cloudinaryUrl)) {
+      addCloudinaryAsset(cloudinaryAssets, parseCloudinaryAsset(cloudinaryUrl));
+      return;
+    }
+
+    if (file.cloudinaryId && !extractBlobPathWithPrefixes(file.cloudinaryId, BLOB_PATH_PREFIXES)) {
+      addCloudinaryAsset(cloudinaryAssets, { publicId: file.cloudinaryId, resourceType: 'image' });
+    }
+  });
+
+  if (cloudinaryAssets.size > 0) {
+    await deleteCloudinaryAssets(Array.from(cloudinaryAssets.values()));
+  }
+  if (blobTargets.size > 0) {
+    await deleteBlobTargets(Array.from(blobTargets.values()));
+  }
+  if (fileIds.length > 0) {
+    await prisma.file.deleteMany({ where: { id: { in: fileIds } } });
+  }
+
+  await prisma.supplement.updateMany({
+    where: { userId: params.userId },
+    data: { imageUrl: null },
+  });
+  await prisma.medication.updateMany({
+    where: { userId: params.userId },
+    data: { imageUrl: null },
+  });
+
+  const backupNames = ['__SUPPLEMENTS_BACKUP_DATA__', '__SUPPLEMENTS_EMERGENCY_BACKUP__'];
+  for (const name of backupNames) {
+    const record = await prisma.healthGoal.findFirst({
+      where: { userId: params.userId, name },
+    });
+    if (!record?.category) continue;
+    try {
+      const parsed = JSON.parse(record.category);
+      if (parsed && Array.isArray(parsed.supplements)) {
+        parsed.supplements = stripImageFields(parsed.supplements);
+        await prisma.healthGoal.update({
+          where: { id: record.id },
+          data: { category: JSON.stringify(parsed) },
+        });
+      }
+    } catch {
+      // ignore backup parse errors
+    }
+  }
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,8 +261,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { supplements, medications, analysisName, reanalysis } = await request.json();
+    const supplementsList = Array.isArray(supplements) ? supplements : [];
+    const medicationsList = Array.isArray(medications) ? medications : [];
 
-    if (!supplements || !medications) {
+    if (!Array.isArray(supplements) || !Array.isArray(medications)) {
       return NextResponse.json({ error: 'Missing supplements or medications data' }, { status: 400 });
     }
 
@@ -111,14 +346,14 @@ export async function POST(request: NextRequest) {
     // Plan/trial gating removed – wallet pre-check governs access (trial counters still updated later)
 
     // Prepare the data for OpenAI analysis
-    const supplementList = (supplements as any[]).map((s: any) => ({
+    const supplementList = (supplementsList as any[]).map((s: any) => ({
       name: s.name,
       dosage: s.dosage,
       timing: Array.isArray(s.timing) ? s.timing.join(', ') : s.timing,
       schedule: s.scheduleInfo
     }));
 
-    const medicationList = (medications as any[]).map((m: any) => ({
+    const medicationList = (medicationsList as any[]).map((m: any) => ({
       name: m.name,
       dosage: m.dosage,
       timing: Array.isArray(m.timing) ? m.timing.join(', ') : m.timing,
@@ -277,12 +512,15 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
 
     // Add metadata
     analysis.analysisDate = new Date().toISOString();
-    analysis.supplementCount = supplements.length;
-    analysis.medicationCount = medications.length;
+    analysis.supplementCount = supplementsList.length;
+    analysis.medicationCount = medicationsList.length;
 
     // Generate analysis name if not provided
     const defaultAnalysisName = analysisName || 
-      `Analysis ${new Date().toLocaleDateString()} - ${supplements.length} supplements, ${medications.length} medications`;
+      `Analysis ${new Date().toLocaleDateString()} - ${supplementsList.length} supplements, ${medicationsList.length} medications`;
+
+    const cleanedSupplements = stripImageFields(supplementsList);
+    const cleanedMedications = stripImageFields(medicationsList);
 
     // Save analysis to database
     const savedAnalysis = await prisma.interactionAnalysis.create({
@@ -290,13 +528,23 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
         userId: user.id,
         analysisName: defaultAnalysisName,
         overallRisk: analysis.overallRisk,
-        supplementCount: supplements.length,
-        medicationCount: medications.length,
+        supplementCount: supplementsList.length,
+        medicationCount: medicationsList.length,
         analysisData: analysis,
-        supplementsAnalyzed: supplements,
-        medicationsAnalyzed: medications,
+        supplementsAnalyzed: cleanedSupplements,
+        medicationsAnalyzed: cleanedMedications,
       }
     });
+
+    try {
+      await cleanupInteractionImages({
+        userId: user.id,
+        supplements: supplementsList,
+        medications: medicationsList,
+      });
+    } catch (cleanupError) {
+      console.warn('⚠️ Failed to clean up interaction photos:', cleanupError);
+    }
 
     // Charge wallet and update counters (skip if allowed via free use)
     if (!allowViaFreeUse) {

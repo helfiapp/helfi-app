@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
           cloudinary.uploader.upload_stream(
             {
               resource_type: 'image',
-              folder: 'helfi/supplement-images',
-              public_id: `supplement_${session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`,
+              folder: 'helfi/medication-images',
+              public_id: `medication_${session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`,
               transformation: [
                 { width: 1600, height: 1600, crop: 'limit' },
                 { quality: 'auto', fetch_format: 'auto' },
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
             secureUrl: cloudinaryResult.secure_url,
             uploadedById: user.id,
             fileType: 'IMAGE',
-            usage: 'SUPPLEMENT_IMAGE',
+            usage: 'MEDICATION_IMAGE',
             isPublic: false,
             metadata: {
               width: cloudinaryResult.width,
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     const blob = await put(
-      `supplement-images/${user.id}/${Date.now()}-${imageFile.name}`,
+      `medication-images/${user.id}/${Date.now()}-${imageFile.name}`,
       buffer,
       {
         access: 'public',
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
         secureUrl: blob.url,
         uploadedById: user.id,
         fileType: 'IMAGE',
-        usage: 'SUPPLEMENT_IMAGE',
+        usage: 'MEDICATION_IMAGE',
         isPublic: true,
         metadata: {
           originalSize: imageFile.size,

@@ -93,6 +93,53 @@ const dedupeItems = (items: any[]) => {
   return result
 }
 
+const areItemsEquivalent = (left: any[], right: any[]) => {
+  if (!Array.isArray(left) || !Array.isArray(right)) return false
+  if (left.length !== right.length) return false
+  const leftKeys = left.map(buildItemKey).sort()
+  const rightKeys = right.map(buildItemKey).sort()
+  for (let i = 0; i < leftKeys.length; i += 1) {
+    if (leftKeys[i] !== rightKeys[i]) return false
+  }
+  return true
+}
+
+const parseImageValue = (raw: any) => {
+  if (!raw) return { frontUrl: null as string | null, backUrl: null as string | null }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (parsed && (parsed.front || parsed.back)) {
+          return {
+            frontUrl: parsed.front || null,
+            backUrl: parsed.back || null,
+          }
+        }
+      } catch {
+        // fall through to treat as a direct URL
+      }
+    }
+    return { frontUrl: trimmed || null, backUrl: null }
+  }
+  if (typeof raw === 'object') {
+    return { frontUrl: raw.front || null, backUrl: raw.back || null }
+  }
+  return { frontUrl: null, backUrl: null }
+}
+
+const buildImageValue = (frontUrl: string | null, backUrl: string | null) => {
+  if (!frontUrl && !backUrl) return null
+  if (backUrl) {
+    const payload: { front?: string; back?: string } = {}
+    if (frontUrl) payload.front = frontUrl
+    payload.back = backUrl
+    return JSON.stringify(payload)
+  }
+  return frontUrl
+}
+
 const sanitizeUserDataPayload = (payload: any, options?: { forceStamp?: boolean }) => {
   if (!payload || typeof payload !== 'object') return payload;
   // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
@@ -4754,9 +4801,14 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   
   // Fix data loading race condition - update supplements when initial data loads
   useEffect(() => {
-    if (initial?.supplements) {
-      setSupplements(dedupeItems(initial.supplements));
-    }
+    if (!initial?.supplements) return;
+    setSupplements((prev: any[]) => {
+      const next = dedupeItems(initial.supplements);
+      if (!Array.isArray(prev) || prev.length === 0) return next;
+      if (next.length < prev.length) return prev;
+      if (!areItemsEquivalent(prev, next)) return next;
+      return prev;
+    });
   }, [initial?.supplements]);
   useEffect(() => {
     if (onPartialSave) {
@@ -4996,43 +5048,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
   const dosageUnits = ['mg', 'mcg', 'g', 'IU', 'capsules', 'tablets', 'drops', 'ml', 'tsp', 'tbsp'];
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const timingId = (time: string) => `med-photo-timing-${time.toLowerCase().replace(/\s+/g, '-')}`;
   const timingId = (time: string) => `photo-timing-${time.toLowerCase().replace(/\s+/g, '-')}`;
-
-  const parseSupplementImages = (raw: any) => {
-    if (!raw) return { frontUrl: null as string | null, backUrl: null as string | null };
-    if (typeof raw === 'string') {
-      const trimmed = raw.trim();
-      if (trimmed.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(trimmed);
-          if (parsed && (parsed.front || parsed.back)) {
-            return {
-              frontUrl: parsed.front || null,
-              backUrl: parsed.back || null,
-            };
-          }
-        } catch {
-          // fall through to treat as a direct URL
-        }
-      }
-      return { frontUrl: trimmed || null, backUrl: null };
-    }
-    if (typeof raw === 'object') {
-      return { frontUrl: raw.front || null, backUrl: raw.back || null };
-    }
-    return { frontUrl: null, backUrl: null };
-  };
-
-  const buildSupplementImageValue = (frontUrl: string | null, backUrl: string | null) => {
-    if (!frontUrl && !backUrl) return null;
-    if (backUrl) {
-      const payload: { front?: string; back?: string } = {};
-      if (frontUrl) payload.front = frontUrl;
-      payload.back = backUrl;
-      return JSON.stringify(payload);
-    }
-    return frontUrl;
-  };
 
   const uploadSupplementImage = async (file: File) => {
     const formData = new FormData();
@@ -5088,10 +5105,28 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     }
   };
 
+  const uploadMedicationImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch('/api/upload-medication-image', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.error || 'Upload failed');
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!data?.imageUrl) {
+      throw new Error('Upload failed');
+    }
+    return data.imageUrl as string;
+  };
+
   const addSupplement = async () => {
     const currentDate = new Date().toISOString();
     const isEditing = editingIndex !== null;
-    const existingImages = isEditing ? parseSupplementImages(supplements[editingIndex]?.imageUrl) : { frontUrl: null, backUrl: null };
+    const existingImages = isEditing ? parseImageValue(supplements[editingIndex]?.imageUrl) : { frontUrl: null, backUrl: null };
     setUploadError(null);
     
     // For new supplements, require both images. For editing, images are optional.
@@ -5156,7 +5191,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
         }
       }
 
-      const imageUrl = buildSupplementImageValue(frontUrl, backUrl);
+      const imageUrl = buildImageValue(frontUrl, backUrl);
       const supplementData = { 
         id: isEditing ? supplements[editingIndex].id : Date.now().toString(),
         // Persist existing saved image URL if any (no re-upload required for edits)
@@ -5282,6 +5317,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     setPhotoTimingDosageUnits({});
     setPhotoDosageSchedule('daily');
     setPhotoSelectedDays([]);
+    setUploadError(null);
   };
 
   const editSupplement = (index: number) => {
@@ -5349,7 +5385,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 Front of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               {editingIndex !== null && (() => {
-                const editingImages = parseSupplementImages(supplements[editingIndex]?.imageUrl);
+                const editingImages = parseImageValue(supplements[editingIndex]?.imageUrl);
                 if (!editingImages.frontUrl) return null;
                 return (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
@@ -5379,7 +5415,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                         // Remove front image only
                         const updatedSupplements = supplements.map((item: any, index: number) => 
                           index === editingIndex
-                            ? { ...item, imageUrl: buildSupplementImageValue(null, parseSupplementImages(item.imageUrl).backUrl) }
+                            ? { ...item, imageUrl: buildImageValue(null, parseImageValue(item.imageUrl).backUrl) }
                             : item
                         );
                         setSupplements(updatedSupplements);
@@ -5441,7 +5477,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 Back of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               {editingIndex !== null && (() => {
-                const editingImages = parseSupplementImages(supplements[editingIndex]?.imageUrl);
+                const editingImages = parseImageValue(supplements[editingIndex]?.imageUrl);
                 if (!editingImages.backUrl) return null;
                 return (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
@@ -5471,7 +5507,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                         // Remove back image only
                         const updatedSupplements = supplements.map((item: any, index: number) => 
                           index === editingIndex
-                            ? { ...item, imageUrl: buildSupplementImageValue(parseSupplementImages(item.imageUrl).frontUrl, null) }
+                            ? { ...item, imageUrl: buildImageValue(parseImageValue(item.imageUrl).frontUrl, null) }
                             : item
                         );
                         setSupplements(updatedSupplements);
@@ -5688,7 +5724,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
 
         {/* Added Supplements List */}
         {supplements.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-6" id="supplements-list">
             <h3 className="text-lg font-semibold mb-3">Added Supplements ({supplements.length})</h3>
             <div className="space-y-2">
               {supplements
@@ -5701,7 +5737,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                         <div className="font-medium">📷 {s.name}</div>
                         <div className="text-sm text-gray-600">
                           {(() => {
-                            const parsedImages = parseSupplementImages(s.imageUrl);
+                            const parsedImages = parseImageValue(s.imageUrl);
                             if (parsedImages.frontUrl && parsedImages.backUrl) return 'Photos: Front + Back';
                             if (parsedImages.frontUrl) return 'Photos: Front only';
                             return 'Photos: Not saved';
@@ -5872,9 +5908,14 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
   
   // Fix data loading race condition - update medications when initial data loads
   useEffect(() => {
-    if (initial?.medications) {
-      setMedications(dedupeItems(initial.medications));
-    }
+    if (!initial?.medications) return;
+    setMedications((prev: any[]) => {
+      const next = dedupeItems(initial.medications);
+      if (!Array.isArray(prev) || prev.length === 0) return next;
+      if (next.length < prev.length) return prev;
+      if (!areItemsEquivalent(prev, next)) return next;
+      return prev;
+    });
   }, [initial?.medications]);
   
   const [name, setName] = useState('');
@@ -5910,6 +5951,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
   const [medicationsToSave, setMedicationsToSave] = useState<any[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   
@@ -6018,10 +6061,6 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
         
         if (warning) {
           setImageQualityWarning(prev => ({ ...prev, [type]: warning }));
-          // Show alert
-          setTimeout(() => {
-            alert(`⚠️ Image Quality Warning\n\n${warning}\n\nPlease take a clearer image for better accuracy.`);
-          }, 100);
         } else {
           setImageQualityWarning(prev => {
             const updated = { ...prev };
@@ -6122,6 +6161,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
   const addMedication = async () => {
     const currentDate = new Date().toISOString();
     const isEditing = editingIndex !== null;
+    const existingImages = isEditing ? parseImageValue(medications[editingIndex]?.imageUrl) : { frontUrl: null, backUrl: null };
+    setUploadError(null);
     
     // For new medications, require both images. For editing, images are optional.
     const hasRequiredData = isEditing 
@@ -6129,6 +6170,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       : (frontImage && backImage && photoDosage && photoTiming.length > 0);
     
     if (hasRequiredData) {
+      setIsUploadingImages(true);
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
         const timeSpecificDosage = photoTimingDosages[time];
@@ -6142,6 +6184,23 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       
       // Only analyze image if it's a new medication or if new images are provided
       let medicationName = isEditing ? medications[editingIndex].name : 'Analyzing...';
+      let frontUrl = existingImages.frontUrl;
+      let backUrl = existingImages.backUrl;
+
+      // Upload images (front + back) if provided
+      try {
+        if (frontImage) {
+          frontUrl = await uploadMedicationImage(frontImage);
+        }
+        if (backImage) {
+          backUrl = await uploadMedicationImage(backImage);
+        }
+      } catch (error) {
+        console.error('Error uploading medication images:', error);
+        setUploadError(error instanceof Error ? error.message : 'Photo upload failed. Please try again.');
+        setIsUploadingImages(false);
+        return;
+      }
       
       if (!isEditing || (frontImage && backImage)) {
         // CRITICAL FIX: Analyze image to extract medication name instead of using filename
@@ -6167,9 +6226,10 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
         }
       }
 
+      const imageUrl = buildImageValue(frontUrl, backUrl);
       const medicationData = { 
         id: isEditing ? medications[editingIndex].id : Date.now().toString(),
-        imageUrl: isEditing ? (medications[editingIndex].imageUrl || null) : null,
+        imageUrl: imageUrl,
         method: 'photo',
         name: medicationName,
         dosage: `${photoDosage} ${photoDosageUnit}`,
@@ -6215,6 +6275,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       }
       
       clearMedPhotoForm();
+      setUploadError(null);
+      setIsUploadingImages(false);
     }
   };
   
@@ -6292,6 +6354,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
     setPhotoTimingDosageUnits({});
     setPhotoDosageSchedule('daily');
     setPhotoSelectedDays([]);
+    setUploadError(null);
+    setIsUploadingImages(false);
   };
 
   const editMedication = (index: number) => {
@@ -6358,14 +6422,17 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && (medications[editingIndex]?.imageUrl) && (
+              {editingIndex !== null && (() => {
+                const editingImages = parseImageValue(medications[editingIndex]?.imageUrl);
+                if (!editingImages.frontUrl) return null;
+                return (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {medications[editingIndex].imageUrl ? (
+                        {editingImages.frontUrl ? (
                           <img 
-                            src={medications[editingIndex].imageUrl} 
+                            src={editingImages.frontUrl} 
                             alt="Front" 
                             className="w-full h-full object-cover"
                           />
@@ -6377,15 +6444,16 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500">{medications[editingIndex].imageUrl}</div>
+                        <div className="text-xs text-gray-500">{editingImages.frontUrl}</div>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        // Mark image for deletion by setting to null
                         const updatedMedications = medications.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, imageUrl: null } : item
+                          index === editingIndex
+                            ? { ...item, imageUrl: buildImageValue(null, parseImageValue(item.imageUrl).backUrl) }
+                            : item
                         );
                         setMedications(updatedMedications);
                       }}
@@ -6395,7 +6463,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                     </button>
                   </div>
                 </div>
-              )}
+                );
+              })()}
               <div className="relative">
                 <input
                   type="file"
@@ -6404,6 +6473,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     setFrontImage(file);
+                    setUploadError(null);
                     // Validate image quality
                     if (file) {
                       validateImageQuality(file, 'front');
@@ -6432,20 +6502,28 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   )}
                 </label>
               </div>
+              {imageQualityWarning.front && (
+                <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  {imageQualityWarning.front}
+                </div>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Back of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && (medications[editingIndex]?.imageUrl) && (
+              {editingIndex !== null && (() => {
+                const editingImages = parseImageValue(medications[editingIndex]?.imageUrl);
+                if (!editingImages.backUrl) return null;
+                return (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {medications[editingIndex].imageUrl ? (
+                        {editingImages.backUrl ? (
                           <img 
-                            src={medications[editingIndex].imageUrl} 
+                            src={editingImages.backUrl} 
                             alt="Back" 
                             className="w-full h-full object-cover"
                           />
@@ -6457,15 +6535,16 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500">{medications[editingIndex].imageUrl}</div>
+                        <div className="text-xs text-gray-500">{editingImages.backUrl}</div>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        // Mark image for deletion by setting to null
                         const updatedMedications = medications.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, imageUrl: null } : item
+                          index === editingIndex
+                            ? { ...item, imageUrl: buildImageValue(parseImageValue(item.imageUrl).frontUrl, null) }
+                            : item
                         );
                         setMedications(updatedMedications);
                       }}
@@ -6475,7 +6554,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                     </button>
                   </div>
                 </div>
-              )}
+                );
+              })()}
               <div className="relative">
                 <input
                   type="file"
@@ -6484,6 +6564,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     setBackImage(file);
+                    setUploadError(null);
                     // Validate image quality
                     if (file) {
                       validateImageQuality(file, 'back');
@@ -6512,6 +6593,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   )}
                 </label>
               </div>
+              {imageQualityWarning.back && (
+                <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  {imageQualityWarning.back}
+                </div>
+              )}
             </div>
 
             <div>
@@ -6605,9 +6691,9 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                       checked={photoTiming.includes(time)}
                       onChange={() => toggleTiming(time, true)}
                       className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                      id={`photo-timing-${time}`}
+                      id={timingId(time)}
                     />
-                    <label htmlFor={`photo-timing-${time}`} className="flex-1 cursor-pointer">
+                    <label htmlFor={timingId(time)} className="flex-1 cursor-pointer">
                       <span className="text-gray-700">{time}</span>
                     </label>
                     {photoTiming.includes(time) && (
@@ -6653,13 +6739,19 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addMedication}
               disabled={
+                isUploadingImages ||
                 editingIndex !== null 
                   ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
                   : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
               }
             >
-              {editingIndex !== null ? 'Update Medication' : 'Add Medication'}
+              {isUploadingImages ? 'Uploading photos...' : (editingIndex !== null ? 'Update Medication' : 'Add Medication')}
             </button>
+            {uploadError && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {uploadError}
+              </div>
+            )}
           </div>
 
         {/* Added Medications List */}
@@ -6676,7 +6768,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                       <div>
                         <div className="font-medium">💊 {m.name}</div>
                         <div className="text-sm text-gray-600">
-                          Photos: Front {m.backImage ? '+ Back' : 'only'}
+                          {(() => {
+                            const parsedImages = parseImageValue(m.imageUrl);
+                            if (parsedImages.frontUrl && parsedImages.backUrl) return 'Photos: Front + Back';
+                            if (parsedImages.frontUrl) return 'Photos: Front only';
+                            return 'Photos: Not saved';
+                          })()}
                         </div>
                         <div className="text-sm text-gray-600">{m.dosage} - {Array.isArray(m.timing) ? m.timing.join(', ') : m.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {m.scheduleInfo}</div>
