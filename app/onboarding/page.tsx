@@ -4849,6 +4849,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     if (!safe) return fallback;
     return safe.toLowerCase() === 'analyzing...' ? fallback : safe;
   };
+  const getDisplayName = (name: any, fallback: string) => {
+    const safe = String(name || '').trim();
+    if (!safe) return fallback;
+    return safe.toLowerCase() === 'analyzing...' ? fallback : safe;
+  };
   const prevEditingIndexRef = useRef<number | null>(null);
   
   // Populate form fields when editing starts
