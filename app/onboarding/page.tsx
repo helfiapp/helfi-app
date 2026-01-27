@@ -140,6 +140,12 @@ const buildImageValue = (frontUrl: string | null, backUrl: string | null) => {
   return frontUrl
 }
 
+const getDisplayName = (name: any, fallback: string) => {
+  const safe = String(name || '').trim()
+  if (!safe) return fallback
+  return safe.toLowerCase() === 'analyzing...' ? fallback : safe
+}
+
 const sanitizeUserDataPayload = (payload: any, options?: { forceStamp?: boolean }) => {
   if (!payload || typeof payload !== 'object') return payload;
   // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
@@ -4844,16 +4850,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
-  const getDisplayName = (name: any, fallback: string) => {
-    const safe = String(name || '').trim();
-    if (!safe) return fallback;
-    return safe.toLowerCase() === 'analyzing...' ? fallback : safe;
-  };
-  const getDisplayName = (name: any, fallback: string) => {
-    const safe = String(name || '').trim();
-    if (!safe) return fallback;
-    return safe.toLowerCase() === 'analyzing...' ? fallback : safe;
-  };
   const prevEditingIndexRef = useRef<number | null>(null);
   
   // Populate form fields when editing starts
