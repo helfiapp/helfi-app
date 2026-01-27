@@ -4789,6 +4789,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   const prevEditingIndexRef = useRef<number | null>(null);
@@ -4901,10 +4902,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
         
         if (warning) {
           setImageQualityWarning(prev => ({ ...prev, [type]: warning }));
-          // Show alert
-          setTimeout(() => {
-            alert(`⚠️ Image Quality Warning\n\n${warning}\n\nPlease take a clearer image for better accuracy.`);
-          }, 100);
         } else {
           setImageQualityWarning(prev => {
             const updated = { ...prev };
@@ -5095,6 +5092,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     const currentDate = new Date().toISOString();
     const isEditing = editingIndex !== null;
     const existingImages = isEditing ? parseSupplementImages(supplements[editingIndex]?.imageUrl) : { frontUrl: null, backUrl: null };
+    setUploadError(null);
     
     // For new supplements, require both images. For editing, images are optional.
     const hasRequiredData = isEditing 
@@ -5129,7 +5127,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
         }
       } catch (error) {
         console.error('Error uploading supplement images:', error);
-        alert('Photo upload failed. Please try again.');
+        setUploadError(error instanceof Error ? error.message : 'Photo upload failed. Please try again.');
         setIsUploadingImages(false);
         return;
       }
@@ -5208,6 +5206,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       }
       
       clearPhotoForm();
+      setUploadError(null);
       setIsUploadingImages(false);
     }
   };
@@ -5401,6 +5400,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     setFrontImage(file);
+                    setUploadError(null);
                     // Validate image quality
                     if (file) {
                       validateImageQuality(file, 'front');
@@ -5429,6 +5429,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   )}
                 </label>
               </div>
+              {imageQualityWarning.front && (
+                <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  {imageQualityWarning.front}
+                </div>
+              )}
             </div>
 
             <div>
@@ -5487,6 +5492,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     setBackImage(file);
+                    setUploadError(null);
                     // Validate image quality
                     if (file) {
                       validateImageQuality(file, 'back');
@@ -5515,6 +5521,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   )}
                 </label>
               </div>
+              {imageQualityWarning.back && (
+                <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  {imageQualityWarning.back}
+                </div>
+              )}
             </div>
 
             <div>
@@ -5668,6 +5679,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
             >
               {isUploadingImages ? 'Uploading photos...' : (editingIndex !== null ? 'Update Supplement' : 'Add Supplement')}
             </button>
+            {uploadError && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {uploadError}
+              </div>
+            )}
           </div>
 
         {/* Added Supplements List */}
