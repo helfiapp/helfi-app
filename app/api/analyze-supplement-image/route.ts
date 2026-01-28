@@ -6,7 +6,8 @@ import { logAiUsageEvent } from '@/lib/ai-usage-logger';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { getImageMetadata } from '@/lib/image-metadata';
 import { prisma } from '@/lib/prisma';
-import { CreditManager } from '@/lib/credit-system';
+import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
+import { hasFreeCredits, consumeFreeCredit, type FreeCreditType } from '@/lib/free-credits';
 import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 
@@ -76,16 +77,27 @@ CRITICAL INSTRUCTIONS:
 3. If brand is not visible, return only the product name.
 4. Do NOT include dosage, size, "capsules", "tablets", or marketing claims.
 5. If it's a medication and both brand + generic are visible, return "Brand (Generic)" or "Generic (Brand)".
-6. If you can't clearly identify it, return "Unknown Supplement".
+6. If you are not 100% sure, still return your BEST GUESS.
+7. Only return "Unknown Supplement" if the label is unreadable.
 
 Return only the final name string, no extra text.`;
 
     const model = "gpt-4o";
     const cm = new CreditManager(user.id);
-    const wallet = await cm.getWalletStatus();
-    const maxTokens = capMaxTokensToBudget(model, promptText, 50, wallet.totalAvailableCents);
-    if (maxTokens <= 0) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+    const freeType: FreeCreditType = 'INTERACTION_ANALYSIS';
+    const hasFree = await hasFreeCredits(user.id, freeType);
+    let usedFree = false;
+    let maxTokens = 50;
+    if (hasFree) {
+      const consumed = await consumeFreeCredit(user.id, freeType);
+      usedFree = consumed;
+    }
+    if (!usedFree) {
+      const wallet = await cm.getWalletStatus();
+      maxTokens = capMaxTokensToBudget(model, promptText, 50, wallet.totalAvailableCents);
+      if (maxTokens <= 0) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
     }
 
     const wrapped = await chatCompletionWithCost(openai, {
@@ -109,9 +121,11 @@ Return only the final name string, no extra text.`;
       temperature: 0.1
     } as any);
 
-    const ok = await cm.chargeCents(wrapped.costCents);
-    if (!ok) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+    if (!usedFree) {
+      const ok = await cm.chargeCents(wrapped.costCents);
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
     }
 
     // Persist usage (vision)
@@ -124,7 +138,7 @@ Return only the final name string, no extra text.`;
       model,
       promptTokens: wrapped.promptTokens,
       completionTokens: wrapped.completionTokens,
-      costCents: wrapped.costCents,
+      costCents: usedFree ? 0 : wrapped.costCents,
       image: {
         width: meta.width,
         height: meta.height,

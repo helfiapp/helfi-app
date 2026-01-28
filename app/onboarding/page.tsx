@@ -170,8 +170,9 @@ const isPlaceholderName = (name: any) => {
   ]).has(normalized)
 }
 
-const compressImageFile = async (file: File, maxDim = 1600, quality = 0.75): Promise<File> => {
+const compressImageFile = async (file: File, maxDim = 1800, quality = 0.82): Promise<File> => {
   if (!file || !file.type.startsWith('image/')) return file
+  if (file.size <= 900_000) return file
   try {
     const bitmap = await createImageBitmap(file)
     const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height))
@@ -191,6 +192,22 @@ const compressImageFile = async (file: File, maxDim = 1600, quality = 0.75): Pro
   } catch {
     return file
   }
+}
+
+const analyzeLabelName = async (file: File) => {
+  const formData = new FormData()
+  formData.append('image', file)
+  const response = await fetch('/api/analyze-supplement-image', {
+    method: 'POST',
+    body: formData
+  })
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const message = errorData?.error || 'Name scan failed'
+    throw new Error(message)
+  }
+  const result = await response.json().catch(() => ({}))
+  return result?.supplementName as string | undefined
 }
 
 const sanitizeUserDataPayload = (payload: any, options?: { forceStamp?: boolean }) => {
@@ -5192,34 +5209,21 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       if (!isEditing || (frontForUpload && backForUpload)) {
         if (frontForUpload) {
           try {
-            const formData = new FormData();
-            formData.append('image', frontForUpload);
-            const visionResponse = await fetch('/api/analyze-supplement-image', {
-              method: 'POST',
-              body: formData
-            });
-            if (visionResponse.ok) {
-              const visionResult = await visionResponse.json();
-              supplementName = visionResult.supplementName || supplementName;
-            }
+            const result = await analyzeLabelName(frontForUpload)
+            if (result) supplementName = result
           } catch (error) {
-            console.error('Error analyzing supplement image:', error);
+            console.error('Error analyzing supplement image:', error)
+            setUploadError(error instanceof Error ? error.message : 'Name scan failed. Please try again.')
+            setIsUploadingImages(false)
+            return
           }
         }
         if (isPlaceholderName(supplementName) && backForUpload) {
           try {
-            const formData = new FormData();
-            formData.append('image', backForUpload);
-            const visionResponse = await fetch('/api/analyze-supplement-image', {
-              method: 'POST',
-              body: formData
-            });
-            if (visionResponse.ok) {
-              const visionResult = await visionResponse.json();
-              supplementName = visionResult.supplementName || supplementName;
-            }
+            const result = await analyzeLabelName(backForUpload)
+            if (result) supplementName = result
           } catch (error) {
-            console.error('Error analyzing supplement image (back):', error);
+            console.error('Error analyzing supplement image (back):', error)
           }
         }
       }
@@ -6273,38 +6277,21 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       if (!isEditing || (frontForUpload && backForUpload)) {
         if (frontForUpload) {
           try {
-            const formData = new FormData();
-            formData.append('image', frontForUpload);
-            
-            const visionResponse = await fetch('/api/analyze-supplement-image', {
-              method: 'POST',
-              body: formData
-            });
-            
-            if (visionResponse.ok) {
-              const visionResult = await visionResponse.json();
-              medicationName = visionResult.supplementName || medicationName;
-            }
+            const result = await analyzeLabelName(frontForUpload)
+            if (result) medicationName = result
           } catch (error) {
-            console.error('Error analyzing medication image:', error);
+            console.error('Error analyzing medication image:', error)
+            setUploadError(error instanceof Error ? error.message : 'Name scan failed. Please try again.')
+            setIsUploadingImages(false)
+            return
           }
         }
         if (isPlaceholderName(medicationName) && backForUpload) {
           try {
-            const formData = new FormData();
-            formData.append('image', backForUpload);
-            
-            const visionResponse = await fetch('/api/analyze-supplement-image', {
-              method: 'POST',
-              body: formData
-            });
-            
-            if (visionResponse.ok) {
-              const visionResult = await visionResponse.json();
-              medicationName = visionResult.supplementName || medicationName;
-            }
+            const result = await analyzeLabelName(backForUpload)
+            if (result) medicationName = result
           } catch (error) {
-            console.error('Error analyzing medication image (back):', error);
+            console.error('Error analyzing medication image (back):', error)
           }
         }
       }
