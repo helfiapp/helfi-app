@@ -451,7 +451,7 @@ If this breaks again, restore these rules exactly.
    - `/api/supplement-search` must return `{ results: [{ name, source }] }`
    - `/api/medication-search` must return `{ results: [{ name, source }] }`
 
-**Last stable deployment:** `271aef89` (2026‑01‑28)
+**Last stable deployment:** `959189e1` (2026‑01‑28)
 
 **Copy‑Paste Restore Checklist (no guesswork):**
 1) Open `app/onboarding/page.tsx`.
