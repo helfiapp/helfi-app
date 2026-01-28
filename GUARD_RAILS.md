@@ -404,6 +404,7 @@ If this breaks again, restore these rules exactly.
 - The label scan must return **brand + product name** (not “Analyzing…” or “Unknown”).
 - Uploads must stay **fast** (client‑side compression + parallel uploads).
 - **Same flow** must be used for supplements **and** medications.
+- Manual **predictive typing** must be available and must update Health Report the same way.
 
 **Why locked:**
 - This flow broke multiple times. If it regresses, users can’t finish Health Setup.
@@ -411,6 +412,8 @@ If this breaks again, restore these rules exactly.
 **Source of truth files:**
 - `app/onboarding/page.tsx`
 - `app/api/analyze-supplement-image/route.ts`
+- `app/api/supplement-search/route.ts`
+- `app/api/medication-search/route.ts`
 
 ### Required behavior (must keep)
 1) **Scan name first, then upload**
@@ -422,6 +425,10 @@ If this breaks again, restore these rules exactly.
    - Upload front + back **in parallel**.
 3) **Same logic for meds and supplements**
    - Both use the same label scan and compression helpers.
+4) **Predictive typing**
+   - Typing shows suggestions after 2+ letters.
+   - Supplements use **DSLD** API.
+   - Medications use **RxNorm**, with **openFDA** fallback.
 
 ### Restore checklist (copy‑paste)
 1) Shared helpers at top of `app/onboarding/page.tsx`:
@@ -440,6 +447,9 @@ If this breaks again, restore these rules exactly.
    - Must return a best‑guess name (only “Unknown Supplement” if unreadable).
 5) Credits:
    - Label scan must use free credits so free users can complete setup.
+6) Predictive search routes:
+   - `/api/supplement-search` must return `{ results: [{ name, source }] }`
+   - `/api/medication-search` must return `{ results: [{ name, source }] }`
 
 **Last stable deployment:** `271aef89` (2026‑01‑28)
 

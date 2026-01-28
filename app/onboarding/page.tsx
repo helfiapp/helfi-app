@@ -156,6 +156,24 @@ const getDisplayName = (name: any, fallback: string) => {
   return safe
 }
 
+const formatManualName = (raw: string) => {
+  if (!raw) return ''
+  let text = raw.replace(/\s+/g, ' ').trim()
+  text = text.replace(/\s*-\s*/g, ' - ')
+  if (!text) return ''
+  return text
+    .split(' ')
+    .map((token) => {
+      if (!token) return ''
+      if (/[0-9]/.test(token)) return token.toUpperCase()
+      const upper = token.toUpperCase()
+      if (upper.length <= 3) return upper
+      return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase()
+    })
+    .join(' ')
+    .trim()
+}
+
 const isPlaceholderName = (name: any) => {
   const safe = String(name || '').trim()
   if (!safe) return true
@@ -4885,8 +4903,53 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       onPartialSave({ supplements });
     }
   }, [supplements, onPartialSave]);
+
+  useEffect(() => {
+    if (uploadMethod !== 'manual') {
+      setNameSuggestions([]);
+      setNameLoading(false);
+      setNameError(null);
+      return;
+    }
+    if (nameSearchTimerRef.current) {
+      clearTimeout(nameSearchTimerRef.current);
+    }
+    const query = name.trim();
+    if (query.length < 2) {
+      setNameSuggestions([]);
+      setNameLoading(false);
+      setNameError(null);
+      return;
+    }
+    nameSearchTimerRef.current = setTimeout(async () => {
+      try {
+        setNameLoading(true);
+        setNameError(null);
+        const response = await fetch(`/api/supplement-search?q=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error('Search failed');
+        const data = await response.json().catch(() => ({}));
+        setNameSuggestions(Array.isArray(data?.results) ? data.results : []);
+      } catch (error) {
+        console.error('Supplement search failed:', error);
+        setNameError('Search failed. Please try again.');
+      } finally {
+        setNameLoading(false);
+      }
+    }, 300);
+    return () => {
+      if (nameSearchTimerRef.current) clearTimeout(nameSearchTimerRef.current);
+    };
+  }, [name, uploadMethod]);
   
   const [name, setName] = useState('');
+  const [nameSuggestions, setNameSuggestions] = useState<{ name: string; source: string }[]>([]);
+  const [nameLoading, setNameLoading] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const nameSearchTimerRef = useRef<any>(null);
+  const [nameSuggestions, setNameSuggestions] = useState<{ name: string; source: string }[]>([]);
+  const [nameLoading, setNameLoading] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const nameSearchTimerRef = useRef<any>(null);
   const [dosage, setDosage] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
   const [timing, setTiming] = useState<string[]>([]);
@@ -4933,8 +4996,17 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       // Clear any existing form state first
       setFrontImage(null);
       setBackImage(null);
-      // Always use photo-style fields in the UI, regardless of stored method
-      setUploadMethod('photo');
+      const isManualItem = supplement.method === 'manual' || !supplement.imageUrl;
+      setUploadMethod(isManualItem ? 'manual' : 'photo');
+      if (isManualItem) {
+        setName(supplement.name || '');
+        setNameSuggestions([]);
+        setNameError(null);
+      } else {
+        setName('');
+        setNameSuggestions([]);
+        setNameError(null);
+      }
       
       const dosageStr = supplement.dosage || '';
       const dosageParts = dosageStr.split(' ');
@@ -4995,6 +5067,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     } else if (editingChanged && editingIndex === null) {
       // Clear form when not editing
       clearPhotoForm();
+      clearForm();
     }
   }, [editingIndex, supplements]);
 
@@ -5083,8 +5156,10 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
 
   const handleUploadMethodChange = (method: 'manual' | 'photo') => {
     setUploadMethod(method);
-    // Clear any existing data when switching methods
     if (method === 'manual') {
+      setName('');
+      setNameSuggestions([]);
+      setNameError(null);
       setFrontImage(null);
       setBackImage(null);
       setPhotoDosage('');
@@ -5096,6 +5171,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       setPhotoSelectedDays([]);
     } else {
       setName('');
+      setNameSuggestions([]);
+      setNameError(null);
       setDosage('');
       setDosageUnit('mg');
       setTiming([]);
@@ -5105,6 +5182,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       setSelectedDays([]);
     }
   };
+
+  
   
   // For photo upload method
   const [photoDosage, setPhotoDosage] = useState('');
@@ -5178,12 +5257,16 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     const currentDate = new Date().toISOString();
     const isEditing = editingIndex !== null;
     const existingImages = isEditing ? parseImageValue(supplements[editingIndex]?.imageUrl) : { frontUrl: null, backUrl: null };
+    const isManual = uploadMethod === 'manual';
+    const formattedManualName = formatManualName(name);
     setUploadError(null);
     
     // For new supplements, require both images. For editing, images are optional.
     const hasRequiredData = isEditing 
-      ? (photoDosage && photoTiming.length > 0)
-      : (frontImage && backImage && photoDosage && photoTiming.length > 0);
+      ? (photoDosage && photoTiming.length > 0 && (photoDosageSchedule === 'specific' ? photoSelectedDays.length > 0 : true) && (isManual ? formattedManualName.length > 0 : true))
+      : isManual
+        ? (formattedManualName && photoDosage && photoTiming.length > 0 && (photoDosageSchedule === 'specific' ? photoSelectedDays.length > 0 : true))
+        : (frontImage && backImage && photoDosage && photoTiming.length > 0 && (photoDosageSchedule === 'specific' ? photoSelectedDays.length > 0 : true));
     
     if (hasRequiredData) {
       setIsUploadingImages(true);
@@ -5198,6 +5281,61 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
+      if (isManual) {
+        const finalName = formattedManualName;
+        if (!finalName) {
+          setUploadError('Please enter the brand + product name.');
+          setIsUploadingImages(false);
+          return;
+        }
+        const supplementData = { 
+          id: isEditing ? supplements[editingIndex].id : Date.now().toString(),
+          imageUrl: null,
+          method: 'manual',
+          name: finalName,
+          dosage: `${photoDosage} ${photoDosageUnit}`,
+          timing: timingWithDosages,
+          scheduleInfo: scheduleInfo,
+          dateAdded: isEditing ? supplements[editingIndex].dateAdded : currentDate
+        };
+
+        if (editingIndex !== null) {
+          const updatedSupplements = dedupeItems(supplements.map((item: any, index: number) => 
+            index === editingIndex ? supplementData : item
+          ));
+          setSupplements(updatedSupplements);
+          setSupplementsToSave(updatedSupplements);
+          setEditingIndex(null);
+          
+          try {
+            const response = await fetch('/api/user-data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(sanitizeUserDataPayload({ supplements: updatedSupplements }))
+            });
+            if (response.ok) {
+              setHasUnsavedChanges(true);
+            } else {
+              console.error('Failed to save supplement edit');
+            }
+          } catch (error) {
+            console.error('Error saving supplement edit:', error);
+          }
+        } else {
+          setSupplements((prev: any[]) => {
+            const updatedSupplements = dedupeItems([...prev, supplementData]);
+            setSupplementsToSave(updatedSupplements);
+            setHasUnsavedChanges(true);
+            return updatedSupplements;
+          });
+        }
+
+        clearForm();
+        setUploadError(null);
+        setIsUploadingImages(false);
+        return;
+      }
+
       // Only analyze image if it's a new supplement or if new images are provided
       let supplementName = isEditing ? supplements[editingIndex].name : 'Unknown Supplement';
       let frontUrl = existingImages.frontUrl;
@@ -5364,6 +5502,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
 
   const clearForm = () => {
     setName(''); 
+    setNameSuggestions([]);
+    setNameError(null);
     setDosage(''); 
     setDosageUnit('mg');
     setTiming([]); 
@@ -5434,6 +5574,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 onClick={() => {
                   setEditingIndex(null);
                   clearPhotoForm();
+                  clearForm();
+                  setUploadMethod('photo');
                 }}
                 className="ml-auto text-blue-600 hover:text-blue-800 text-sm"
               >
@@ -5442,9 +5584,71 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
             </div>
           </div>
         )}
-        <p className="mb-6 text-gray-600">Add photos of both the front and back of your supplement bottles/packets to get accurate AI guidance on interactions and optimizations.</p>
+        <p className="mb-6 text-gray-600">Add photos of both the front and back of your supplement bottles/packets, or type the brand + product name.</p>
+
+        <div className="mb-4">
+          <div className="flex w-full rounded-lg border border-gray-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => handleUploadMethodChange('photo')}
+              className={`flex-1 px-4 py-2 text-sm font-medium ${uploadMethod === 'photo' ? 'bg-helfi-green text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              Use photos
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUploadMethodChange('manual')}
+              className={`flex-1 px-4 py-2 text-sm font-medium ${uploadMethod === 'manual' ? 'bg-helfi-green text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              Type name
+            </button>
+          </div>
+        </div>
+
+        {uploadMethod === 'manual' && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brand + product name *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setUploadError(null);
+              }}
+              onBlur={() => setName(formatManualName(name))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-helfi-green"
+              placeholder="e.g., Thorne - Magnesium Bisglycinate"
+            />
+            <div className="mt-1 text-xs text-gray-500">We’ll auto‑capitalize and clean formatting.</div>
+            {nameLoading && (
+              <div className="mt-2 text-xs text-gray-500">Searching…</div>
+            )}
+            {nameError && (
+              <div className="mt-2 text-xs text-red-600">{nameError}</div>
+            )}
+            {nameSuggestions.length > 0 && (
+              <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm max-h-56 overflow-y-auto">
+                {nameSuggestions.map((item, idx) => (
+                  <button
+                    key={`${item.name}-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      setName(formatManualName(item.name));
+                      setNameSuggestions([]);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
+                  >
+                    <span>{item.name}</span>
+                    <span className="text-xs text-gray-400 uppercase">{item.source}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         
-        {/* Photo Upload Method - Only Option */}
+        {/* Photo Upload Method */}
+        {uploadMethod === 'photo' && (
         <div className="mb-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -5630,6 +5834,9 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
               )}
             </div>
 
+        </div>
+        )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Dosage *
@@ -5774,9 +5981,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
               onClick={addSupplement}
               disabled={
                 isUploadingImages ||
-                editingIndex !== null 
-                  ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
-                  : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                (uploadMethod === 'manual'
+                  ? (!formatManualName(name) || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                  : (editingIndex !== null 
+                    ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                    : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                  )
+                )
               }
             >
               {isUploadingImages ? 'Uploading photos...' : (editingIndex !== null ? 'Update Supplement' : 'Add Supplement')}
@@ -6021,6 +6232,43 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+
+  useEffect(() => {
+    if (uploadMethod !== 'manual') {
+      setNameSuggestions([]);
+      setNameLoading(false);
+      setNameError(null);
+      return;
+    }
+    if (nameSearchTimerRef.current) {
+      clearTimeout(nameSearchTimerRef.current);
+    }
+    const query = name.trim();
+    if (query.length < 2) {
+      setNameSuggestions([]);
+      setNameLoading(false);
+      setNameError(null);
+      return;
+    }
+    nameSearchTimerRef.current = setTimeout(async () => {
+      try {
+        setNameLoading(true);
+        setNameError(null);
+        const response = await fetch(`/api/medication-search?q=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error('Search failed');
+        const data = await response.json().catch(() => ({}));
+        setNameSuggestions(Array.isArray(data?.results) ? data.results : []);
+      } catch (error) {
+        console.error('Medication search failed:', error);
+        setNameError('Search failed. Please try again.');
+      } finally {
+        setNameLoading(false);
+      }
+    }, 300);
+    return () => {
+      if (nameSearchTimerRef.current) clearTimeout(nameSearchTimerRef.current);
+    };
+  }, [name, uploadMethod]);
   
   // Populate form fields when editing starts
   useEffect(() => {
@@ -6036,8 +6284,17 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       // Clear any existing form state first
       setFrontImage(null);
       setBackImage(null);
-      // Always use photo-style fields in the UI, regardless of stored method
-      setUploadMethod('photo');
+      const isManualItem = medication.method === 'manual' || !medication.imageUrl;
+      setUploadMethod(isManualItem ? 'manual' : 'photo');
+      if (isManualItem) {
+        setName(medication.name || '');
+        setNameSuggestions([]);
+        setNameError(null);
+      } else {
+        setName('');
+        setNameSuggestions([]);
+        setNameError(null);
+      }
       
       const dosageStr = medication.dosage || '';
       const dosageParts = dosageStr.split(' ');
@@ -6098,6 +6355,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
     } else if (editingIndex === null) {
       // Clear form when not editing
       clearMedPhotoForm();
+      clearMedForm();
     }
   }, [editingIndex, medications]);
 
@@ -6246,12 +6504,16 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
     const currentDate = new Date().toISOString();
     const isEditing = editingIndex !== null;
     const existingImages = isEditing ? parseImageValue(medications[editingIndex]?.imageUrl) : { frontUrl: null, backUrl: null };
+    const isManual = uploadMethod === 'manual';
+    const formattedManualName = formatManualName(name);
     setUploadError(null);
     
     // For new medications, require both images. For editing, images are optional.
     const hasRequiredData = isEditing 
-      ? (photoDosage && photoTiming.length > 0)
-      : (frontImage && backImage && photoDosage && photoTiming.length > 0);
+      ? (photoDosage && photoTiming.length > 0 && (photoDosageSchedule === 'specific' ? photoSelectedDays.length > 0 : true) && (isManual ? formattedManualName.length > 0 : true))
+      : isManual
+        ? (formattedManualName && photoDosage && photoTiming.length > 0 && (photoDosageSchedule === 'specific' ? photoSelectedDays.length > 0 : true))
+        : (frontImage && backImage && photoDosage && photoTiming.length > 0 && (photoDosageSchedule === 'specific' ? photoSelectedDays.length > 0 : true));
     
     if (hasRequiredData) {
       setIsUploadingImages(true);
@@ -6266,6 +6528,61 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
+      if (isManual) {
+        const finalName = formattedManualName;
+        if (!finalName) {
+          setUploadError('Please enter the brand + product name.');
+          setIsUploadingImages(false);
+          return;
+        }
+        const medicationData = { 
+          id: isEditing ? medications[editingIndex].id : Date.now().toString(),
+          imageUrl: null,
+          method: 'manual',
+          name: finalName,
+          dosage: `${photoDosage} ${photoDosageUnit}`,
+          timing: timingWithDosages,
+          scheduleInfo: scheduleInfo,
+          dateAdded: isEditing ? medications[editingIndex].dateAdded : currentDate
+        };
+
+        if (editingIndex !== null) {
+          const updatedMedications = dedupeItems(medications.map((item: any, index: number) => 
+            index === editingIndex ? medicationData : item
+          ));
+          setMedications(updatedMedications);
+          setMedicationsToSave(updatedMedications);
+          setEditingIndex(null);
+          
+          try {
+            const response = await fetch('/api/user-data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(sanitizeUserDataPayload({ medications: updatedMedications }))
+            });
+            if (response.ok) {
+              setHasUnsavedChanges(true);
+            } else {
+              console.error('Failed to save medication edit');
+            }
+          } catch (error) {
+            console.error('Error saving medication edit:', error);
+          }
+        } else {
+          setMedications((prev: any[]) => {
+            const updatedMedications = dedupeItems([...prev, medicationData]);
+            setMedicationsToSave(updatedMedications);
+            setHasUnsavedChanges(true);
+            return updatedMedications;
+          });
+        }
+
+        clearMedForm();
+        setUploadError(null);
+        setIsUploadingImages(false);
+        return;
+      }
+
       // Only analyze image if it's a new medication or if new images are provided
       let medicationName = isEditing ? medications[editingIndex].name : 'Unknown Medication';
       let frontUrl = existingImages.frontUrl;
@@ -6434,6 +6751,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
 
   const clearMedForm = () => {
     setName(''); 
+    setNameSuggestions([]);
+    setNameError(null);
     setDosage(''); 
     setDosageUnit('mg');
     setTiming([]); 
@@ -6505,6 +6824,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                 onClick={() => {
                   setEditingIndex(null);
                   clearMedPhotoForm();
+                  clearMedForm();
+                  setUploadMethod('photo');
                 }}
                 className="ml-auto text-blue-600 hover:text-blue-800 text-sm"
               >
@@ -6513,9 +6834,71 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
             </div>
           </div>
         )}
-        <p className="mb-6 text-gray-600">Upload photos of both the front and back of your medication bottles/packets to check for supplement-medication interactions.</p>
+        <p className="mb-6 text-gray-600">Upload photos of both the front and back of your medication bottles/packets, or type the brand + product name.</p>
+
+        <div className="mb-4">
+          <div className="flex w-full rounded-lg border border-gray-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => handleUploadMethodChange('photo')}
+              className={`flex-1 px-4 py-2 text-sm font-medium ${uploadMethod === 'photo' ? 'bg-helfi-green text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              Use photos
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUploadMethodChange('manual')}
+              className={`flex-1 px-4 py-2 text-sm font-medium ${uploadMethod === 'manual' ? 'bg-helfi-green text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              Type name
+            </button>
+          </div>
+        </div>
+
+        {uploadMethod === 'manual' && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Brand + product name *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setUploadError(null);
+              }}
+              onBlur={() => setName(formatManualName(name))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-helfi-green"
+              placeholder="e.g., Zoloft (Sertraline)"
+            />
+            <div className="mt-1 text-xs text-gray-500">We’ll auto‑capitalize and clean formatting.</div>
+            {nameLoading && (
+              <div className="mt-2 text-xs text-gray-500">Searching…</div>
+            )}
+            {nameError && (
+              <div className="mt-2 text-xs text-red-600">{nameError}</div>
+            )}
+            {nameSuggestions.length > 0 && (
+              <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm max-h-56 overflow-y-auto">
+                {nameSuggestions.map((item, idx) => (
+                  <button
+                    key={`${item.name}-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      setName(formatManualName(item.name));
+                      setNameSuggestions([]);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
+                  >
+                    <span>{item.name}</span>
+                    <span className="text-xs text-gray-400 uppercase">{item.source}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         
-        {/* Photo Upload Method - Only Option */}
+        {/* Photo Upload Method */}
+        {uploadMethod === 'photo' && (
         <div className="mb-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -6699,6 +7082,9 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
               )}
             </div>
 
+        </div>
+        )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Dosage *
@@ -6839,9 +7225,13 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
               onClick={addMedication}
               disabled={
                 isUploadingImages ||
-                editingIndex !== null 
-                  ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
-                  : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                (uploadMethod === 'manual'
+                  ? (!formatManualName(name) || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                  : (editingIndex !== null 
+                    ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                    : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                  )
+                )
               }
             >
               {isUploadingImages ? 'Uploading photos...' : (editingIndex !== null ? 'Update Medication' : 'Add Medication')}
