@@ -4909,6 +4909,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const [nameLoading, setNameLoading] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const nameSearchTimerRef = useRef<any>(null);
+  const [dosage, setDosage] = useState('');
+  const [dosageUnit, setDosageUnit] = useState('mg');
+  const [timing, setTiming] = useState<string[]>([]);
+  const [timingDosages, setTimingDosages] = useState<{[key: string]: string}>({});
+  const [timingDosageUnits, setTimingDosageUnits] = useState<{[key: string]: string}>({});
+  const [frontImage, setFrontImage] = useState<File | null>(null);
+  const [backImage, setBackImage] = useState<File | null>(null);
+  const [uploadMethod, setUploadMethod] = useState<'manual' | 'photo'>('photo');
+
   useEffect(() => {
     if (uploadMethod !== 'manual') {
       setNameSuggestions([]);
@@ -4945,14 +4954,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       if (nameSearchTimerRef.current) clearTimeout(nameSearchTimerRef.current);
     };
   }, [name, uploadMethod]);
-  const [dosage, setDosage] = useState('');
-  const [dosageUnit, setDosageUnit] = useState('mg');
-  const [timing, setTiming] = useState<string[]>([]);
-  const [timingDosages, setTimingDosages] = useState<{[key: string]: string}>({});
-  const [timingDosageUnits, setTimingDosageUnits] = useState<{[key: string]: string}>({});
-  const [frontImage, setFrontImage] = useState<File | null>(null);
-  const [backImage, setBackImage] = useState<File | null>(null);
-  const [uploadMethod, setUploadMethod] = useState<'manual' | 'photo'>('photo');
   
   // New dosing schedule states
   const [dosageSchedule, setDosageSchedule] = useState<'daily' | 'specific'>('daily');
