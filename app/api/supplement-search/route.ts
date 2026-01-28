@@ -54,12 +54,27 @@ export async function GET(request: NextRequest) {
       query
     )}&from=0&size=10&sort_by=_score&sort_order=desc`
 
-    const response = await fetch(url, { headers: { Accept: 'application/json' } })
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'helfi/1.0 (+https://helfi.ai)',
+      },
+      cache: 'no-store',
+    })
     if (!response.ok) {
+      console.warn('DSLD search failed:', response.status)
       return NextResponse.json({ results: [] })
     }
 
-    const data = await response.json().catch(() => ({}))
+    const text = await response.text()
+    const data = (() => {
+      try {
+        return JSON.parse(text)
+      } catch {
+        console.warn('DSLD returned non-JSON payload')
+        return {}
+      }
+    })()
     const hits = Array.isArray(data?.hits) ? data.hits : data?.hits?.hits
     const results = (Array.isArray(hits) ? hits : [])
       .map((hit: any) => {

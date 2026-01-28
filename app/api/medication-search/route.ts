@@ -49,7 +49,13 @@ export async function GET(request: NextRequest) {
       const rxUrl = `https://rxnav.nlm.nih.gov/REST/approximateTerm.json?term=${encodeURIComponent(
         query
       )}&maxEntries=10`
-      const rxResponse = await fetch(rxUrl, { headers: { Accept: 'application/json' } })
+      const rxResponse = await fetch(rxUrl, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'helfi/1.0 (+https://helfi.ai)',
+        },
+        cache: 'no-store',
+      })
       if (rxResponse.ok) {
         const rxData = await rxResponse.json().catch(() => ({}))
         const candidates = rxData?.approximateGroup?.candidate
@@ -74,7 +80,13 @@ export async function GET(request: NextRequest) {
         const fdaUrl = `https://api.fda.gov/drug/label.json?search=${encodeURIComponent(
           search
         )}&limit=10`
-        const fdaResponse = await fetch(fdaUrl, { headers: { Accept: 'application/json' } })
+        const fdaResponse = await fetch(fdaUrl, {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'helfi/1.0 (+https://helfi.ai)',
+          },
+          cache: 'no-store',
+        })
         if (fdaResponse.ok) {
           const fdaData = await fdaResponse.json().catch(() => ({}))
           const fdaResults = Array.isArray(fdaData?.results) ? fdaData.results : []
