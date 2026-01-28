@@ -156,6 +156,43 @@ const getDisplayName = (name: any, fallback: string) => {
   return safe
 }
 
+const isPlaceholderName = (name: any) => {
+  const safe = String(name || '').trim()
+  if (!safe) return true
+  const normalized = safe.toLowerCase()
+  return new Set([
+    'analyzing...',
+    'supplement added',
+    'medication added',
+    'unknown supplement',
+    'unknown medication',
+    'analysis error'
+  ]).has(normalized)
+}
+
+const compressImageFile = async (file: File, maxDim = 1600, quality = 0.75): Promise<File> => {
+  if (!file || !file.type.startsWith('image/')) return file
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height))
+    const targetW = Math.max(1, Math.round(bitmap.width * scale))
+    const targetH = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = targetW
+    canvas.height = targetH
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+    ctx.drawImage(bitmap, 0, 0, targetW, targetH)
+    const blob: Blob | null = await new Promise(resolve => {
+      canvas.toBlob(resolve, 'image/jpeg', quality)
+    })
+    if (!blob) return file
+    return new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' })
+  } catch {
+    return file
+  }
+}
+
 const sanitizeUserDataPayload = (payload: any, options?: { forceStamp?: boolean }) => {
   if (!payload || typeof payload !== 'object') return payload;
   // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
@@ -5149,35 +5186,18 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       let frontUrl = existingImages.frontUrl;
       let backUrl = existingImages.backUrl;
       
-      // Upload images (front + back) if provided
-      try {
-        if (frontImage) {
-          frontUrl = await uploadSupplementImage(frontImage);
-        }
-        if (backImage) {
-          backUrl = await uploadSupplementImage(backImage);
-        }
-      } catch (error) {
-        console.error('Error uploading supplement images:', error);
-        setUploadError(error instanceof Error ? error.message : 'Photo upload failed. Please try again.');
-        setIsUploadingImages(false);
-        return;
-      }
-      
-      if (!isEditing || (frontImage && backImage)) {
-        // CRITICAL FIX: Analyze image to extract supplement name instead of using filename
-        if (frontImage) {
+      const frontForUpload = frontImage ? await compressImageFile(frontImage) : null;
+      const backForUpload = backImage ? await compressImageFile(backImage) : null;
+
+      if (!isEditing || (frontForUpload && backForUpload)) {
+        if (frontForUpload) {
           try {
-            // Create FormData for image analysis
             const formData = new FormData();
-            formData.append('image', frontImage);
-            
-            // Call vision API to extract supplement name
+            formData.append('image', frontForUpload);
             const visionResponse = await fetch('/api/analyze-supplement-image', {
               method: 'POST',
               body: formData
             });
-            
             if (visionResponse.ok) {
               const visionResult = await visionResponse.json();
               supplementName = visionResult.supplementName || supplementName;
@@ -5186,6 +5206,51 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
             console.error('Error analyzing supplement image:', error);
           }
         }
+        if (isPlaceholderName(supplementName) && backForUpload) {
+          try {
+            const formData = new FormData();
+            formData.append('image', backForUpload);
+            const visionResponse = await fetch('/api/analyze-supplement-image', {
+              method: 'POST',
+              body: formData
+            });
+            if (visionResponse.ok) {
+              const visionResult = await visionResponse.json();
+              supplementName = visionResult.supplementName || supplementName;
+            }
+          } catch (error) {
+            console.error('Error analyzing supplement image (back):', error);
+          }
+        }
+      }
+
+      if (isPlaceholderName(supplementName)) {
+        setUploadError('We could not read the brand + supplement name. Please take a clearer front label photo.');
+        setIsUploadingImages(false);
+        return;
+      }
+
+      try {
+        if (frontForUpload && backForUpload) {
+          const [frontUploaded, backUploaded] = await Promise.all([
+            uploadSupplementImage(frontForUpload),
+            uploadSupplementImage(backForUpload),
+          ]);
+          frontUrl = frontUploaded;
+          backUrl = backUploaded;
+        } else {
+          if (frontForUpload) {
+            frontUrl = await uploadSupplementImage(frontForUpload);
+          }
+          if (backForUpload) {
+            backUrl = await uploadSupplementImage(backForUpload);
+          }
+        }
+      } catch (error) {
+        console.error('Error uploading supplement images:', error);
+        setUploadError(error instanceof Error ? error.message : 'Photo upload failed. Please try again.');
+        setIsUploadingImages(false);
+        return;
       }
 
       const imageUrl = buildImageValue(frontUrl, backUrl);
@@ -6202,30 +6267,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       let frontUrl = existingImages.frontUrl;
       let backUrl = existingImages.backUrl;
 
-      // Upload images (front + back) if provided
-      try {
-        if (frontImage) {
-          frontUrl = await uploadMedicationImage(frontImage);
-        }
-        if (backImage) {
-          backUrl = await uploadMedicationImage(backImage);
-        }
-      } catch (error) {
-        console.error('Error uploading medication images:', error);
-        setUploadError(error instanceof Error ? error.message : 'Photo upload failed. Please try again.');
-        setIsUploadingImages(false);
-        return;
-      }
-      
-      if (!isEditing || (frontImage && backImage)) {
-        // CRITICAL FIX: Analyze image to extract medication name instead of using filename
-        if (frontImage) {
+      const frontForUpload = frontImage ? await compressImageFile(frontImage) : null;
+      const backForUpload = backImage ? await compressImageFile(backImage) : null;
+
+      if (!isEditing || (frontForUpload && backForUpload)) {
+        if (frontForUpload) {
           try {
-            // Create FormData for image analysis
             const formData = new FormData();
-            formData.append('image', frontImage);
+            formData.append('image', frontForUpload);
             
-            // Call vision API to extract medication name
             const visionResponse = await fetch('/api/analyze-supplement-image', {
               method: 'POST',
               body: formData
@@ -6239,6 +6289,53 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
             console.error('Error analyzing medication image:', error);
           }
         }
+        if (isPlaceholderName(medicationName) && backForUpload) {
+          try {
+            const formData = new FormData();
+            formData.append('image', backForUpload);
+            
+            const visionResponse = await fetch('/api/analyze-supplement-image', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (visionResponse.ok) {
+              const visionResult = await visionResponse.json();
+              medicationName = visionResult.supplementName || medicationName;
+            }
+          } catch (error) {
+            console.error('Error analyzing medication image (back):', error);
+          }
+        }
+      }
+
+      if (isPlaceholderName(medicationName)) {
+        setUploadError('We could not read the brand + medication name. Please take a clearer front label photo.');
+        setIsUploadingImages(false);
+        return;
+      }
+
+      try {
+        if (frontForUpload && backForUpload) {
+          const [frontUploaded, backUploaded] = await Promise.all([
+            uploadMedicationImage(frontForUpload),
+            uploadMedicationImage(backForUpload),
+          ]);
+          frontUrl = frontUploaded;
+          backUrl = backUploaded;
+        } else {
+          if (frontForUpload) {
+            frontUrl = await uploadMedicationImage(frontForUpload);
+          }
+          if (backForUpload) {
+            backUrl = await uploadMedicationImage(backForUpload);
+          }
+        }
+      } catch (error) {
+        console.error('Error uploading medication images:', error);
+        setUploadError(error instanceof Error ? error.message : 'Photo upload failed. Please try again.');
+        setIsUploadingImages(false);
+        return;
       }
 
       const imageUrl = buildImageValue(frontUrl, backUrl);
