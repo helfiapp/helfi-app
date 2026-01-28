@@ -411,6 +411,8 @@ If this breaks again, restore these rules exactly.
 **Source of truth files:**
 - `app/onboarding/page.tsx`
 - `app/api/analyze-supplement-image/route.ts`
+- `app/api/supplement-search/route.ts`
+- `app/api/medication-search/route.ts`
 
 ### Required behavior (must keep)
 1) **Scan name first, then upload**
@@ -422,6 +424,15 @@ If this breaks again, restore these rules exactly.
    - Upload front + back **in parallel**.
 3) **Same logic for meds and supplements**
    - Both use the same label scan and compression helpers.
+4) **Predictive typing**
+   - Typing shows suggestions after 2+ letters.
+   - Supplements use **DSLD** API.
+   - Medications use **RxNorm**, with **openFDA** fallback.
+5) **Manual entry stays usable**
+   - Users can switch between **Use photos** and **Type name** at any time.
+   - Manual mode must **not** require photo uploads.
+   - Manual names are auto‑cleaned (extra spaces removed, proper capitalization).
+   - Manual saves still flag for Health Report updates (same as photo flow).
 
 ### Restore checklist (copy‑paste)
 1) Shared helpers at top of `app/onboarding/page.tsx`:
@@ -440,6 +451,13 @@ If this breaks again, restore these rules exactly.
    - Must return a best‑guess name (only “Unknown Supplement” if unreadable).
 5) Credits:
    - Label scan must use free credits so free users can complete setup.
+6) Predictive search routes:
+   - `/api/supplement-search` must return `{ results: [{ name, source }] }`
+   - `/api/medication-search` must return `{ results: [{ name, source }] }`
+7) Manual typing UX:
+   - Suggestions show as a clickable list under the input.
+   - Picking a suggestion fills the input and clears the list.
+   - Errors show “Search failed. Please try again.”
 
 **Last stable deployment:** `271aef89` (2026‑01‑28)
 
