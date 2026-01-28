@@ -396,6 +396,53 @@ If this breaks again, restore these rules exactly.
 
 **Last stable deployment:** `75ef4f02` (2026‑01‑27)
 
+---
+
+## 2.9 Supplements + Medications: Brand + Name Scan + Fast Uploads (Jan 2026 – Locked)
+
+**What this protects:**
+- The label scan must return **brand + product name** (not “Analyzing…” or “Unknown”).
+- Uploads must stay **fast** (client‑side compression + parallel uploads).
+- **Same flow** must be used for supplements **and** medications.
+
+**Why locked:**
+- This flow broke multiple times. If it regresses, users can’t finish Health Setup.
+
+**Source of truth files:**
+- `app/onboarding/page.tsx`
+- `app/api/analyze-supplement-image/route.ts`
+
+### Required behavior (must keep)
+1) **Scan name first, then upload**
+   - Scan the front image **before** uploading.
+   - If the front fails, try the back image.
+   - If still missing, stop and show a clear error.
+2) **Speed**
+   - Compress **only large images** on device (small images stay original).
+   - Upload front + back **in parallel**.
+3) **Same logic for meds and supplements**
+   - Both use the same label scan and compression helpers.
+
+### Restore checklist (copy‑paste)
+1) Shared helpers at top of `app/onboarding/page.tsx`:
+   - `getDisplayName(...)` filters “unknown/analyzing” placeholders.
+   - `isPlaceholderName(...)` detects unreadable names.
+   - `compressImageFile(...)` **skips** compression if `file.size <= 900_000`.
+   - `analyzeLabelName(...)` calls `/api/analyze-supplement-image`.
+2) Supplements add flow:
+   - Scan front first, then back if needed.
+   - If still placeholder, **block save** and show error.
+   - Upload front + back with `Promise.all` when both exist.
+3) Medications add flow:
+   - Same steps as supplements, same helpers.
+4) Scanner prompt in `app/api/analyze-supplement-image/route.ts`:
+   - Must request **Brand + Product**.
+   - Must return a best‑guess name (only “Unknown Supplement” if unreadable).
+5) Credits:
+   - Label scan must use free credits so free users can complete setup.
+
+**Last stable deployment:** `271aef89` (2026‑01‑28)
+
 **Copy‑Paste Restore Checklist (no guesswork):**
 1) Open `app/onboarding/page.tsx`.
 2) Confirm these constants exist:
