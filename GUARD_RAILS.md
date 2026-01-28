@@ -459,7 +459,7 @@ If this breaks again, restore these rules exactly.
    - Picking a suggestion fills the input and clears the list.
    - Errors show “Search failed. Please try again.”
 
-**Last stable deployment:** `271aef89` (2026‑01‑28)
+**Last stable deployment:** `387bf169` (2026‑01‑29)
 
 **Copy‑Paste Restore Checklist (no guesswork):**
 1) Open `app/onboarding/page.tsx`.
