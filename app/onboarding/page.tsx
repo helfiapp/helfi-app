@@ -143,7 +143,17 @@ const buildImageValue = (frontUrl: string | null, backUrl: string | null) => {
 const getDisplayName = (name: any, fallback: string) => {
   const safe = String(name || '').trim()
   if (!safe) return fallback
-  return safe.toLowerCase() === 'analyzing...' ? fallback : safe
+  const normalized = safe.toLowerCase()
+  const placeholders = new Set([
+    'analyzing...',
+    'supplement added',
+    'medication added',
+    'unknown supplement',
+    'unknown medication',
+    'analysis error'
+  ])
+  if (placeholders.has(normalized)) return fallback
+  return safe
 }
 
 const sanitizeUserDataPayload = (payload: any, options?: { forceStamp?: boolean }) => {
@@ -5135,7 +5145,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
       // Only analyze image if it's a new supplement or if new images are provided
-      let supplementName = isEditing ? supplements[editingIndex].name : 'Supplement added';
+      let supplementName = isEditing ? supplements[editingIndex].name : 'Unknown Supplement';
       let frontUrl = existingImages.frontUrl;
       let backUrl = existingImages.backUrl;
       
@@ -5721,7 +5731,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   <div className="flex-1">
                     {s.method === 'photo' ? (
                       <div>
-                        <div className="font-medium">📷 {getDisplayName(s.name, 'Supplement added')}</div>
+                        <div className="font-medium">📷 {getDisplayName(s.name, 'Name missing (edit to re-upload)')}</div>
                         <div className="text-sm text-gray-600">
                           {(() => {
                             const parsedImages = parseImageValue(s.imageUrl);
@@ -5746,7 +5756,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                       </div>
                     ) : (
                       <div>
-                        <div className="font-medium">{getDisplayName(s.name, 'Supplement added')}</div>
+                        <div className="font-medium">{getDisplayName(s.name, 'Name missing (edit to re-upload)')}</div>
                         <div className="text-sm text-gray-600">{s.dosage} - {Array.isArray(s.timing) ? s.timing.join(', ') : s.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {s.scheduleInfo}</div>
                         {s.dateAdded && (
@@ -6188,7 +6198,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
       // Only analyze image if it's a new medication or if new images are provided
-      let medicationName = isEditing ? medications[editingIndex].name : 'Medication added';
+      let medicationName = isEditing ? medications[editingIndex].name : 'Unknown Medication';
       let frontUrl = existingImages.frontUrl;
       let backUrl = existingImages.backUrl;
 
@@ -6771,7 +6781,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   <div className="flex-1">
                     {m.method === 'photo' ? (
                       <div>
-                        <div className="font-medium">💊 {getDisplayName(m.name, 'Medication added')}</div>
+                        <div className="font-medium">💊 {getDisplayName(m.name, 'Name missing (edit to re-upload)')}</div>
                         <div className="text-sm text-gray-600">
                           {(() => {
                             const parsedImages = parseImageValue(m.imageUrl);
@@ -6796,7 +6806,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                       </div>
                     ) : (
                       <div>
-                        <div className="font-medium">{getDisplayName(m.name, 'Medication added')}</div>
+                        <div className="font-medium">{getDisplayName(m.name, 'Name missing (edit to re-upload)')}</div>
                         <div className="text-sm text-gray-600">{m.dosage} - {Array.isArray(m.timing) ? m.timing.join(', ') : m.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {m.scheduleInfo}</div>
                         {m.dateAdded && (
