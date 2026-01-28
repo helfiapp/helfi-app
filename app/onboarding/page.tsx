@@ -174,6 +174,45 @@ const formatManualName = (raw: string) => {
     .trim()
 }
 
+const buildSupplementNameFromDsld = (source: any) => {
+  const brand =
+    source?.brandName ||
+    source?.brand_name ||
+    source?.brand ||
+    source?.manufacturer ||
+    null
+  const product =
+    source?.fullName ||
+    source?.productName ||
+    source?.product_name ||
+    source?.labelName ||
+    source?.label_name ||
+    source?.supplementName ||
+    source?.supplement_name ||
+    null
+  if (brand && product) return `${brand} - ${product}`
+  return product || brand || null
+}
+
+const parseDsldSuggestions = (data: any) => {
+  const hits = Array.isArray(data?.hits) ? data.hits : data?.hits?.hits
+  const items = (Array.isArray(hits) ? hits : [])
+    .map((hit: any) => {
+      const source = hit?._source || hit?.source || hit || {}
+      const name = buildSupplementNameFromDsld(source)
+      if (!name) return null
+      return { name, source: 'dsld' }
+    })
+    .filter(Boolean) as { name: string; source: string }[]
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = item.name.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 const isPlaceholderName = (name: any) => {
   const safe = String(name || '').trim()
   if (!safe) return true
@@ -4939,10 +4978,26 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       try {
         setNameLoading(true);
         setNameError(null);
-        const response = await fetch(`/api/supplement-search?q=${encodeURIComponent(query)}`);
-        if (!response.ok) throw new Error('Search failed');
-        const data = await response.json().catch(() => ({}));
-        setNameSuggestions(Array.isArray(data?.results) ? data.results : []);
+        const dsldUrl = `https://api.ods.od.nih.gov/dsld/v9/search-filter?q=${encodeURIComponent(query)}&from=0&size=10&sort_by=_score&sort_order=desc`;
+        let suggestions: { name: string; source: string }[] = [];
+        try {
+          const dsldResponse = await fetch(dsldUrl);
+          if (dsldResponse.ok) {
+            const dsldData = await dsldResponse.json().catch(() => ({}));
+            suggestions = parseDsldSuggestions(dsldData);
+          }
+        } catch (dsldError) {
+          console.warn('DSLD direct search failed:', dsldError);
+        }
+
+        if (suggestions.length === 0) {
+          const response = await fetch(`/api/supplement-search?q=${encodeURIComponent(query)}`);
+          if (!response.ok) throw new Error('Search failed');
+          const data = await response.json().catch(() => ({}));
+          suggestions = Array.isArray(data?.results) ? data.results : [];
+        }
+
+        setNameSuggestions(suggestions);
       } catch (error) {
         console.error('Supplement search failed:', error);
         setNameError('Search failed. Please try again.');
