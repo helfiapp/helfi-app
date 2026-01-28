@@ -429,6 +429,11 @@ If this breaks again, restore these rules exactly.
    - Typing shows suggestions after 2+ letters.
    - Supplements use **DSLD** API.
    - Medications use **RxNorm**, with **openFDA** fallback.
+5) **Manual entry stays usable**
+   - Users can switch between **Use photos** and **Type name** at any time.
+   - Manual mode must **not** require photo uploads.
+   - Manual names are auto‑cleaned (extra spaces removed, proper capitalization).
+   - Manual saves still flag for Health Report updates (same as photo flow).
 
 ### Restore checklist (copy‑paste)
 1) Shared helpers at top of `app/onboarding/page.tsx`:
@@ -450,6 +455,10 @@ If this breaks again, restore these rules exactly.
 6) Predictive search routes:
    - `/api/supplement-search` must return `{ results: [{ name, source }] }`
    - `/api/medication-search` must return `{ results: [{ name, source }] }`
+7) Manual typing UX:
+   - Suggestions show as a clickable list under the input.
+   - Picking a suggestion fills the input and clears the list.
+   - Errors show “Search failed. Please try again.”
 
 **Last stable deployment:** `959189e1` (2026‑01‑28)
 

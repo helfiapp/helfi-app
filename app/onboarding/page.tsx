@@ -4904,6 +4904,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     }
   }, [supplements, onPartialSave]);
 
+  const [name, setName] = useState('');
+  const [nameSuggestions, setNameSuggestions] = useState<{ name: string; source: string }[]>([]);
+  const [nameLoading, setNameLoading] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const nameSearchTimerRef = useRef<any>(null);
   useEffect(() => {
     if (uploadMethod !== 'manual') {
       setNameSuggestions([]);
@@ -4940,16 +4945,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       if (nameSearchTimerRef.current) clearTimeout(nameSearchTimerRef.current);
     };
   }, [name, uploadMethod]);
-  
-  const [name, setName] = useState('');
-  const [nameSuggestions, setNameSuggestions] = useState<{ name: string; source: string }[]>([]);
-  const [nameLoading, setNameLoading] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
-  const nameSearchTimerRef = useRef<any>(null);
-  const [nameSuggestions, setNameSuggestions] = useState<{ name: string; source: string }[]>([]);
-  const [nameLoading, setNameLoading] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
-  const nameSearchTimerRef = useRef<any>(null);
   const [dosage, setDosage] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
   const [timing, setTiming] = useState<string[]>([]);
@@ -5156,6 +5151,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
 
   const handleUploadMethodChange = (method: 'manual' | 'photo') => {
     setUploadMethod(method);
+    setUploadError(null);
     if (method === 'manual') {
       setName('');
       setNameSuggestions([]);
@@ -5648,8 +5644,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
         )}
         
         {/* Photo Upload Method */}
-        {uploadMethod === 'photo' && (
-        <div className="mb-6 space-y-4">
+        {uploadMethod === 'photo' ? (
+          <div className="mb-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
@@ -5834,8 +5830,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
               )}
             </div>
 
-        </div>
-        )}
+          </div>
+        ) : null}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -6160,7 +6156,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
             Next
           </button>
         </div>
-      </div>
       
       {/* Update Insights Popup */}
       <UpdateInsightsPopup
@@ -6196,6 +6191,10 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
   }, [initial?.medications]);
   
   const [name, setName] = useState('');
+  const [nameSuggestions, setNameSuggestions] = useState<{ name: string; source: string }[]>([]);
+  const [nameLoading, setNameLoading] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const nameSearchTimerRef = useRef<any>(null);
   const [dosage, setDosage] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
   const [timing, setTiming] = useState<string[]>([]);
@@ -6441,6 +6440,36 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
     };
     checkExistingAnalysis();
   }, []);
+
+  const handleUploadMethodChange = (method: 'manual' | 'photo') => {
+    setUploadMethod(method);
+    setUploadError(null);
+    if (method === 'manual') {
+      setName('');
+      setNameSuggestions([]);
+      setNameError(null);
+      setFrontImage(null);
+      setBackImage(null);
+      setPhotoDosage('');
+      setPhotoDosageUnit('mg');
+      setPhotoTiming([]);
+      setPhotoTimingDosages({});
+      setPhotoTimingDosageUnits({});
+      setPhotoDosageSchedule('daily');
+      setPhotoSelectedDays([]);
+    } else {
+      setName('');
+      setNameSuggestions([]);
+      setNameError(null);
+      setDosage('');
+      setDosageUnit('mg');
+      setTiming([]);
+      setTimingDosages({});
+      setTimingDosageUnits({});
+      setDosageSchedule('daily');
+      setSelectedDays([]);
+    }
+  };
 
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
   const dosageUnits = ['mg', 'mcg', 'g', 'IU', 'capsules', 'tablets', 'drops', 'ml', 'tsp', 'tbsp'];
@@ -7408,7 +7437,6 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
             Back
           </button>
         </div>
-      </div>
       
       {/* Update Insights Popup */}
       <UpdateInsightsPopup
