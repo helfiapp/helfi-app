@@ -6,7 +6,8 @@ import { logAiUsageEvent } from '@/lib/ai-usage-logger';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { getImageMetadata } from '@/lib/image-metadata';
 import { prisma } from '@/lib/prisma';
-import { CreditManager } from '@/lib/credit-system';
+import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
+import { hasFreeCredits, consumeFreeCredit, type FreeCreditType } from '@/lib/free-credits';
 import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 
@@ -68,32 +69,35 @@ export async function POST(req: NextRequest) {
     if (!openai) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
-    const promptText = `Analyze this supplement/medication bottle or package image and extract the main product name. 
+    const promptText = `Analyze this supplement or medication bottle/package image and extract the BRAND + PRODUCT NAME.
 
 CRITICAL INSTRUCTIONS:
-1. Look for the PRIMARY product name on the label (e.g., "Vitamin E", "Magnesium", "Omega-3", "Ibuprofen")
-2. Ignore brand names, dosage amounts, and marketing text
-3. Return ONLY the supplement/medication name, nothing else
-4. If you can't clearly identify the product name, return "Unknown Supplement"
-5. Be specific - if it says "Vitamin E 400 IU", return "Vitamin E"
-6. If it's a medication, return the generic name if visible
+1. Return the brand AND the product name if both are visible.
+2. Format: "Brand - Product" (example: "Thorne - Magnesium Bisglycinate").
+3. If brand is not visible, return only the product name.
+4. Do NOT include dosage, size, "capsules", "tablets", or marketing claims.
+5. If it's a medication and both brand + generic are visible, return "Brand (Generic)" or "Generic (Brand)".
+6. If you are not 100% sure, still return your BEST GUESS.
+7. Only return "Unknown Supplement" if the label is unreadable.
 
-Examples of good responses:
-- "Vitamin E"
-- "Magnesium"
-- "Omega-3"
-- "Multivitamin"
-- "Ibuprofen"
-- "Fish Oil"
-
-Return only the product name, no explanations or additional text.`;
+Return only the final name string, no extra text.`;
 
     const model = "gpt-4o";
     const cm = new CreditManager(user.id);
-    const wallet = await cm.getWalletStatus();
-    const maxTokens = capMaxTokensToBudget(model, promptText, 50, wallet.totalAvailableCents);
-    if (maxTokens <= 0) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+    const freeType: FreeCreditType = 'INTERACTION_ANALYSIS';
+    const hasFree = await hasFreeCredits(user.id, freeType);
+    let usedFree = false;
+    let maxTokens = 50;
+    if (hasFree) {
+      const consumed = await consumeFreeCredit(user.id, freeType);
+      usedFree = consumed;
+    }
+    if (!usedFree) {
+      const wallet = await cm.getWalletStatus();
+      maxTokens = capMaxTokensToBudget(model, promptText, 50, wallet.totalAvailableCents);
+      if (maxTokens <= 0) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
     }
 
     const wrapped = await chatCompletionWithCost(openai, {
@@ -117,9 +121,11 @@ Return only the product name, no explanations or additional text.`;
       temperature: 0.1
     } as any);
 
-    const ok = await cm.chargeCents(wrapped.costCents);
-    if (!ok) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+    if (!usedFree) {
+      const ok = await cm.chargeCents(wrapped.costCents);
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
     }
 
     // Persist usage (vision)
@@ -132,7 +138,7 @@ Return only the product name, no explanations or additional text.`;
       model,
       promptTokens: wrapped.promptTokens,
       completionTokens: wrapped.completionTokens,
-      costCents: wrapped.costCents,
+      costCents: usedFree ? 0 : wrapped.costCents,
       image: {
         width: meta.width,
         height: meta.height,
@@ -142,13 +148,18 @@ Return only the product name, no explanations or additional text.`;
       success: true,
     }).catch(() => {});
 
-    const supplementName = wrapped.completion.choices?.[0]?.message?.content?.trim() || 'Unknown Supplement';
+    const rawName = wrapped.completion.choices?.[0]?.message?.content?.trim() || 'Unknown Supplement';
+    const cleanedName = rawName
+      .replace(/^[`"']+/, '')
+      .replace(/[`"']+$/, '')
+      .split('\n')[0]
+      ?.trim() || 'Unknown Supplement';
     
-    console.log('Extracted supplement name:', supplementName);
+    console.log('Extracted supplement name:', cleanedName);
 
     return NextResponse.json({
       success: true,
-      supplementName: supplementName
+      supplementName: cleanedName
     });
 
   } catch (error) {

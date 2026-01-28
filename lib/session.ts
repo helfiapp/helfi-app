@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 import crypto from 'crypto'
+import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
 
 // Custom session interface
 export interface CustomSession {
@@ -29,11 +30,13 @@ export async function createSession(email: string, name?: string, image?: string
     })
     
     if (!user) {
+      await ensureFreeCreditColumns()
       user = await prisma.user.create({
         data: {
           email,
           name: name || email.split('@')[0],
           image: image || null,
+          ...NEW_USER_FREE_CREDITS,
         }
       })
     }

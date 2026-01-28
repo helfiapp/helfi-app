@@ -3,6 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import UsageMeter from '@/components/UsageMeter'
+import {
+  DEFAULT_UNIT_GRAMS,
+  MeasurementUnit,
+  convertAmount,
+  formatUnitLabel as formatMeasurementUnitLabel,
+  getAllowedUnitsForFood,
+  getFoodUnitGrams,
+} from '@/lib/food/measurement-units'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 type SearchKind = 'packaged' | 'single'
@@ -406,6 +414,137 @@ const parseServingGrams = (label?: string | null) => {
   return Number.isFinite(grams) ? grams : null
 }
 
+const parseServingQuantity = (value: string): number | null => {
+  const trimmed = value.trim()
+  const mixed = trimmed.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/)
+  if (mixed) {
+    const whole = Number(mixed[1])
+    const num = Number(mixed[2])
+    const den = Number(mixed[3])
+    if (Number.isFinite(whole) && Number.isFinite(num) && Number.isFinite(den) && den > 0) {
+      return whole + num / den
+    }
+  }
+  const frac = trimmed.match(/^(\d+)\s*\/\s*(\d+)$/)
+  if (frac) {
+    const num = Number(frac[1])
+    const den = Number(frac[2])
+    if (Number.isFinite(num) && Number.isFinite(den) && den > 0) return num / den
+  }
+  const num = parseFloat(trimmed)
+  return Number.isFinite(num) ? num : null
+}
+
+const parseServingUnitMeta = (label: string) => {
+  const normalized = String(label || '').trim()
+  if (!normalized) return null
+  const numberToken = normalized.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
+  if (!numberToken) return null
+  const quantity = parseServingQuantity(numberToken[0])
+  if (!quantity || quantity <= 0) return null
+  const unitLabel = normalized.replace(numberToken[0], '').trim().replace(/^of\s+/i, '').trim()
+  return { quantity, unitLabel }
+}
+
+const parseServingBase = (servingSize: any): { amount: number | null; unit: MeasurementUnit | null } => {
+  const raw = String(servingSize || '').trim()
+  if (!raw) return { amount: null, unit: null }
+
+  const paren = raw.match(/\(([^)]*)\)/)
+  const target = paren?.[1] ? paren[1] : raw
+
+  const parseAmount = (value: string): number | null => parseServingQuantity(value)
+
+  const match = target.match(
+    /(\d+(?:\.\d+)?(?:\s+\d+\s*\/\s*\d+)?|\d+\s*\/\s*\d+)\s*(g|grams?|ml|mL|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?|cup|cups?|pinch|pinches|handful|handfuls|piece|pieces|slice|slices|serving|servings)/i,
+  )
+  if (!match) return { amount: null, unit: null }
+  const amount = parseAmount(match[1])
+  if (!amount || !Number.isFinite(amount) || amount <= 0) return { amount: null, unit: null }
+  const unitRaw = String(match[2] || '').toLowerCase()
+
+  if (unitRaw.startsWith('g')) return { amount, unit: 'g' }
+  if (unitRaw === 'ml' || unitRaw === 'ml'.toLowerCase() || unitRaw === 'mL'.toLowerCase()) return { amount, unit: 'ml' }
+  if (unitRaw.startsWith('oz') || unitRaw.startsWith('ounce')) return { amount, unit: 'oz' }
+  if (unitRaw.startsWith('tsp') || unitRaw.startsWith('teaspoon')) return { amount, unit: 'tsp' }
+  if (unitRaw.startsWith('tbsp') || unitRaw.startsWith('tablespoon')) return { amount, unit: 'tbsp' }
+  if (unitRaw.startsWith('pinch')) return { amount, unit: 'pinch' }
+  if (unitRaw.startsWith('handful')) return { amount, unit: 'handful' }
+  if (unitRaw.startsWith('piece')) return { amount, unit: 'piece' }
+  if (unitRaw.startsWith('slice')) return { amount, unit: 'slice' }
+  if (unitRaw.startsWith('serving')) return { amount, unit: 'serving' }
+  if (unitRaw.startsWith('cup')) return { amount, unit: 'cup' }
+  return { amount: null, unit: null }
+}
+
+const DISCRETE_UNIT_TERMS = [
+  'egg',
+  'eggs',
+  'piece',
+  'pieces',
+  'slice',
+  'slices',
+  'bacon',
+  'rasher',
+  'rashers',
+  'strip',
+  'strips',
+  'sausage',
+  'sausages',
+  'link',
+  'links',
+  'patty',
+  'pattie',
+  'nugget',
+  'nuggets',
+  'wing',
+  'wings',
+  'meatball',
+  'meatballs',
+  'bar',
+  'stick',
+  'cookie',
+  'biscuit',
+  'cracker',
+  'pancake',
+  'scoop',
+  'banana',
+  'apple',
+  'tomato',
+  'potato',
+  'onion',
+  'carrot',
+  'zucchini',
+  'courgette',
+  'bun',
+  'roll',
+  'sandwich',
+  'burger',
+]
+
+const isDiscreteUnitLabel = (label: string) => {
+  const l = (label || '').toLowerCase().trim()
+  if (!l) return false
+  return DISCRETE_UNIT_TERMS.some((term) => l.includes(term))
+}
+
+const extractPieceGramsFromLabel = (label: string) => {
+  const meta = parseServingUnitMeta(label)
+  if (!meta || !isDiscreteUnitLabel(meta.unitLabel)) return null
+  const parsed = parseServingBase(label)
+  if (!parsed.amount || parsed.unit !== 'g') return null
+  if (meta.quantity <= 0) return null
+  return parsed.amount / meta.quantity
+}
+
+const normalizeLegacyBaseUnit = (amount: number | null, unit: MeasurementUnit | null) => {
+  if (!amount || !unit) return { amount, unit }
+  if (unit === 'serving') return { amount: amount * DEFAULT_UNIT_GRAMS.serving, unit: 'g' as MeasurementUnit }
+  if (unit === 'slice') return { amount: amount * DEFAULT_UNIT_GRAMS.slice, unit: 'g' as MeasurementUnit }
+  if (unit === 'handful') return { amount: amount * DEFAULT_UNIT_GRAMS.handful, unit: 'g' as MeasurementUnit }
+  return { amount, unit }
+}
+
 const MEAT_TOKENS = [
   'beef',
   'ground',
@@ -549,6 +688,12 @@ export default function AddIngredientClient() {
   const [brandSuggestions, setBrandSuggestions] = useState<NormalizedFoodItem[]>([])
   const [photoLoading, setPhotoLoading] = useState(false)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
+  const [adjustItem, setAdjustItem] = useState<NormalizedFoodItem | null>(null)
+  const [adjustAmountInput, setAdjustAmountInput] = useState<string>('1')
+  const [adjustUnit, setAdjustUnit] = useState<MeasurementUnit>('g')
+  const [adjustBase, setAdjustBase] = useState<{ amount: number | null; unit: MeasurementUnit | null } | null>(null)
+  const [adjustPieceGrams, setAdjustPieceGrams] = useState<number | null>(null)
+  const [adjustSaving, setAdjustSaving] = useState(false)
   const prefillAppliedRef = useRef(false)
 
   const abortRef = useRef<AbortController | null>(null)
@@ -1004,7 +1149,22 @@ export default function AddIngredientClient() {
     return data
   }
 
-  const addFromSearchResult = async (r: NormalizedFoodItem) => {
+  const computeServingsFromAmount = (
+    amount: number,
+    unit: MeasurementUnit,
+    base: { amount: number | null; unit: MeasurementUnit | null } | null,
+    pieceGrams: number | null,
+    foodName: string,
+  ) => {
+    if (!base?.amount || !base?.unit) return 1
+    if (!Number.isFinite(amount) || amount <= 0) return 1
+    const foodUnitGrams = getFoodUnitGrams(foodName)
+    const inBase = convertAmount(amount, unit, base.unit, base.amount, base.unit, pieceGrams, foodUnitGrams)
+    const servings = base.amount > 0 ? inBase / base.amount : 0
+    return round3(Math.max(0, servings || 0))
+  }
+
+  const openAdjustModalForItem = async (r: NormalizedFoodItem) => {
     if (!r) return
     setError(null)
     triggerHaptic(10)
@@ -1021,32 +1181,87 @@ export default function AddIngredientClient() {
       }
       const upgraded = await loadServingOverride(target)
       const resolvedTarget = upgraded || target
-      let final = resolvedTarget
-      if (!hasMacroData(final)) {
+      if (!hasMacroData(resolvedTarget)) {
         setError('This item has no nutrition data. Please choose another result.')
         return
       }
-      const baseItem = {
-        name: String(final.name || 'Food'),
-        brand: final.brand ?? null,
-        serving_size: String(final.serving_size || '1 serving'),
-        calories: safeNumber(final.calories),
-        protein_g: safeNumber(final.protein_g),
-        carbs_g: safeNumber(final.carbs_g),
-        fat_g: safeNumber(final.fat_g),
-        fiber_g: safeNumber(final.fiber_g),
-        sugar_g: safeNumber(final.sugar_g),
+
+      const baseItem: NormalizedFoodItem = {
+        source: resolvedTarget.source,
+        id: resolvedTarget.id,
+        name: String(resolvedTarget.name || 'Food'),
+        brand: resolvedTarget.brand ?? null,
+        serving_size: String(resolvedTarget.serving_size || '1 serving'),
+        calories: safeNumber(resolvedTarget.calories),
+        protein_g: safeNumber(resolvedTarget.protein_g),
+        carbs_g: safeNumber(resolvedTarget.carbs_g),
+        fat_g: safeNumber(resolvedTarget.fat_g),
+        fiber_g: safeNumber(resolvedTarget.fiber_g),
+        sugar_g: safeNumber(resolvedTarget.sugar_g),
         servings: 1,
       }
 
-      const item = drinkOverride ? applyDrinkAmountOverrideToItem(baseItem, drinkOverride) : baseItem
+      const parsedBase = parseServingBase(baseItem.serving_size)
+      const fallbackGrams = parseServingGrams(baseItem.serving_size)
+      const base = normalizeLegacyBaseUnit(
+        parsedBase.amount && parsedBase.unit ? parsedBase.amount : fallbackGrams || 100,
+        parsedBase.amount && parsedBase.unit ? parsedBase.unit : 'g',
+      )
+      const pieceGrams = extractPieceGramsFromLabel(baseItem.serving_size || '')
+
+      const allowedUnits = getAllowedUnitsForFood(baseItem.name, pieceGrams)
+      const baseUnitAllowed =
+        base.unit && allowedUnits.includes(base.unit) ? (base.unit as MeasurementUnit) : null
+      let nextUnit = baseUnitAllowed || allowedUnits[0] || 'g'
+      let nextAmount = base.amount && base.amount > 0 ? base.amount : 1
+
+      if (drinkOverride) {
+        if (drinkOverride.unit === 'ml' || drinkOverride.unit === 'oz') {
+          nextUnit = drinkOverride.unit
+          nextAmount = drinkOverride.amount
+        } else if (drinkOverride.unit === 'l') {
+          nextUnit = 'ml'
+          nextAmount = drinkOverride.amount * 1000
+        }
+      }
+
+      setAdjustItem(baseItem)
+      setAdjustBase(base)
+      setAdjustPieceGrams(pieceGrams)
+      setAdjustUnit(nextUnit)
+      setAdjustAmountInput(formatNumber(nextAmount))
+    } finally {
+      setAddingId(null)
+    }
+  }
+
+  const confirmAdjustAdd = async () => {
+    if (!adjustItem) return
+    if (adjustSaving) return
+    setAdjustSaving(true)
+    setError(null)
+    try {
+      const amount = Number(adjustAmountInput)
+      const unit = adjustUnit
+      const base = adjustBase || { amount: 100, unit: 'g' }
+      const pieceGrams = adjustPieceGrams
+      const servings = computeServingsFromAmount(amount, unit, base, pieceGrams, adjustItem.name || '')
+      const finalServings = Number.isFinite(servings) && servings > 0 ? servings : 1
+
+      const item = {
+        ...adjustItem,
+        servings: finalServings,
+        weightAmount: Number.isFinite(amount) ? amount : null,
+        weightUnit: unit,
+      }
+
       const nutrition = {
-        calories: Math.round(Number(item.calories || 0)),
-        protein: round3(Number(item.protein_g || 0)),
-        carbs: round3(Number(item.carbs_g || 0)),
-        fat: round3(Number(item.fat_g || 0)),
-        fiber: round3(Number(item.fiber_g || 0)),
-        sugar: round3(Number(item.sugar_g || 0)),
+        calories: Math.round(Number(item.calories || 0) * finalServings),
+        protein: round3(Number(item.protein_g || 0) * finalServings),
+        carbs: round3(Number(item.carbs_g || 0) * finalServings),
+        fat: round3(Number(item.fat_g || 0) * finalServings),
+        fiber: round3(Number(item.fiber_g || 0) * finalServings),
+        sugar: round3(Number(item.sugar_g || 0) * finalServings),
         ...(drinkMeta ? drinkMeta : {}),
       }
 
@@ -1073,12 +1288,18 @@ export default function AddIngredientClient() {
           )
         }
       } catch {}
+      setAdjustItem(null)
       router.push('/food')
     } catch (e: any) {
       setError(e?.message || 'Could not add that ingredient. Please try again.')
     } finally {
-      setAddingId(null)
+      setAdjustSaving(false)
     }
+  }
+
+  const addFromSearchResult = async (r: NormalizedFoodItem) => {
+    if (!r) return
+    await openAdjustModalForItem(r)
   }
 
   const addByPhoto = async (file: File) => {
@@ -1446,6 +1667,139 @@ export default function AddIngredientClient() {
           </div>
         </div>
       </div>
+
+      {adjustItem && (
+        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <div className="text-base font-semibold text-gray-900">Adjust ingredient</div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (adjustSaving) return
+                  setAdjustItem(null)
+                }}
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
+                aria-label="Close"
+              >
+                <span aria-hidden>✕</span>
+              </button>
+            </div>
+            <div className="px-4 py-4 space-y-4">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">{adjustItem.name}</div>
+                {adjustItem.brand && <div className="text-xs text-gray-500">{adjustItem.brand}</div>}
+              </div>
+
+              {(() => {
+                const pieceGrams = adjustPieceGrams
+                const unitOptions = getAllowedUnitsForFood(adjustItem.name, pieceGrams)
+                const safeUnit = unitOptions.includes(adjustUnit) ? adjustUnit : unitOptions[0] || 'g'
+                const amountNumber = Number(adjustAmountInput)
+                const servings = computeServingsFromAmount(
+                  Number.isFinite(amountNumber) ? amountNumber : 0,
+                  safeUnit,
+                  adjustBase,
+                  pieceGrams,
+                  adjustItem.name || '',
+                )
+                const calories = round3(Number(adjustItem.calories || 0) * servings)
+                const protein = round3(Number(adjustItem.protein_g || 0) * servings)
+                const carbs = round3(Number(adjustItem.carbs_g || 0) * servings)
+                const fat = round3(Number(adjustItem.fat_g || 0) * servings)
+                const fiber = round3(Number(adjustItem.fiber_g || 0) * servings)
+                const sugar = round3(Number(adjustItem.sugar_g || 0) * servings)
+
+                return (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          value={adjustAmountInput}
+                          onChange={(e) => setAdjustAmountInput(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                        <select
+                          value={safeUnit}
+                          onChange={(e) => {
+                            const nextUnit = e.target.value as MeasurementUnit
+                            const currentAmount = Number(adjustAmountInput)
+                            if (Number.isFinite(currentAmount)) {
+                              const foodUnitGrams = getFoodUnitGrams(adjustItem.name)
+                              const converted = convertAmount(
+                                currentAmount,
+                                safeUnit,
+                                nextUnit,
+                                adjustBase?.amount ?? null,
+                                adjustBase?.unit ?? null,
+                                pieceGrams,
+                                foodUnitGrams,
+                              )
+                              if (Number.isFinite(converted)) setAdjustAmountInput(formatNumber(converted))
+                            }
+                            setAdjustUnit(nextUnit)
+                          }}
+                          className="w-36 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                          {unitOptions.map((unit) => (
+                            <option key={unit} value={unit}>
+                              {formatMeasurementUnitLabel(unit, adjustItem.name, pieceGrams)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">Servings: {formatNumber(servings || 1)}</div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                      <div className="rounded-lg border border-gray-200 px-2 py-2">
+                        Calories: <span className="font-semibold text-gray-900">{Math.round(calories)}</span>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 px-2 py-2">
+                        Protein: <span className="font-semibold text-gray-900">{formatNumber(protein)} g</span>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 px-2 py-2">
+                        Carbs: <span className="font-semibold text-gray-900">{formatNumber(carbs)} g</span>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 px-2 py-2">
+                        Fat: <span className="font-semibold text-gray-900">{formatNumber(fat)} g</span>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 px-2 py-2">
+                        Fibre: <span className="font-semibold text-gray-900">{formatNumber(fiber)} g</span>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 px-2 py-2">
+                        Sugar: <span className="font-semibold text-gray-900">{formatNumber(sugar)} g</span>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+            <div className="border-t border-gray-200 px-4 py-3 flex gap-2">
+              <button
+                type="button"
+                disabled={adjustSaving}
+                onClick={confirmAdjustAdd}
+                className="flex-1 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {adjustSaving ? 'Adding…' : 'Add to diary'}
+              </button>
+              <button
+                type="button"
+                disabled={adjustSaving}
+                onClick={() => setAdjustItem(null)}
+                className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

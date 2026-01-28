@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
-import { ensureFreeCreditColumns } from '@/lib/free-credits'
+import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
 import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
 
 // This API route uses dynamic data and should not be statically generated
@@ -127,18 +127,7 @@ export async function POST(request: NextRequest) {
         name: email.split('@')[0],
         emailVerified: null, // CRITICAL: User is NOT verified
         passwordHash,
-        freeFoodAnalysisRemaining: 5,
-        freeSymptomAnalysisRemaining: 2,
-        freeMedicalAnalysisRemaining: 2,
-        freeInteractionAnalysisRemaining: 2,
-        freeHealthIntakeRemaining: 1,
-        freeInsightsUpdateRemaining: 3,
-        freeSymptomChatRemaining: 2,
-        freeMedicalChatRemaining: 2,
-        freeInsightsChatRemaining: 2,
-        freeVoiceChatRemaining: 2,
-        freeFoodReanalysisRemaining: 2,
-        freeInteractionReanalysisRemaining: 2,
+        ...NEW_USER_FREE_CREDITS,
       } as any
     })
 

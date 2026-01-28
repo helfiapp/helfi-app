@@ -42,6 +42,13 @@ import { SolidMacroRing } from '@/components/SolidMacroRing'
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets'
 import { DEFAULT_HEALTH_CHECK_SETTINGS, normalizeHealthCheckSettings } from '@/lib/food-health-check-settings'
 import { readAppHiddenAt } from '@/lib/app-visibility'
+import {
+  DEFAULT_UNIT_GRAMS,
+  MeasurementUnit,
+  formatUnitLabel as formatMeasurementUnitLabel,
+  getAllowedUnitsForFood,
+  getFoodUnitGrams,
+} from '@/lib/food/measurement-units'
 
 const NUTRIENT_DISPLAY_ORDER: Array<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'> = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']
 
@@ -63,21 +70,7 @@ const ITEM_NUTRIENT_META = [
   { key: 'sugar', field: 'sugar_g', label: 'Sugar', unit: 'g', valueClass: 'text-rose-600', labelClass: 'text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/10', border: 'border-rose-100 dark:border-rose-900/20' },
 ] as const
 
-type WeightUnit =
-  | 'g'
-  | 'ml'
-  | 'oz'
-  | 'tsp'
-  | 'tbsp'
-  | 'quarter-cup'
-  | 'half-cup'
-  | 'three-quarter-cup'
-  | 'cup'
-  | 'pinch'
-  | 'handful'
-  | 'piece'
-  | 'slice'
-  | 'serving'
+type WeightUnit = MeasurementUnit
 
 const DEFAULT_SERVING_GRAMS = 100
 
@@ -94,6 +87,9 @@ const WEIGHT_UNIT_LABELS: Record<WeightUnit, string> = {
   pinch: 'pinch',
   handful: 'handful',
   piece: 'piece',
+  'piece-small': 'small piece',
+  'piece-medium': 'medium piece',
+  'piece-large': 'large piece',
   slice: 'slice',
   serving: 'serving',
 }
@@ -110,14 +106,21 @@ const WEIGHT_UNIT_OPTIONS: Array<{ value: WeightUnit; label: string }> = [
   { value: 'cup', label: WEIGHT_UNIT_LABELS.cup },
   { value: 'pinch', label: WEIGHT_UNIT_LABELS.pinch },
   { value: 'piece', label: WEIGHT_UNIT_LABELS.piece },
+  { value: 'piece-small', label: WEIGHT_UNIT_LABELS['piece-small'] },
+  { value: 'piece-medium', label: WEIGHT_UNIT_LABELS['piece-medium'] },
+  { value: 'piece-large', label: WEIGHT_UNIT_LABELS['piece-large'] },
 ]
 
-const getWeightUnitOptions = (current?: WeightUnit, pieceAvailable?: boolean) => {
-  let options = WEIGHT_UNIT_OPTIONS
-  if (!pieceAvailable) options = options.filter((option) => option.value !== 'piece')
+const getWeightUnitOptions = (item?: any, current?: WeightUnit, pieceGrams?: number | null) => {
+  const name = String(item?.name || item?.food || '').trim()
+  const baseUnits = getAllowedUnitsForFood(name, pieceGrams)
+  const options = baseUnits.map((unit) => ({
+    value: unit as WeightUnit,
+    label: formatMeasurementUnitLabel(unit, name, pieceGrams || null),
+  }))
   if (!current) return options
   if (options.some((option) => option.value === current)) return options
-  const label = WEIGHT_UNIT_LABELS[current] || current
+  const label = formatMeasurementUnitLabel(current, name, pieceGrams || null) || WEIGHT_UNIT_LABELS[current] || current
   return [...options, { value: current, label }]
 }
 
@@ -134,6 +137,9 @@ const WEIGHT_UNIT_TO_GRAMS: Record<WeightUnit, number> = {
   pinch: 0.3,
   handful: 30,
   piece: 100,
+  'piece-small': DEFAULT_UNIT_GRAMS['piece-small'],
+  'piece-medium': DEFAULT_UNIT_GRAMS['piece-medium'],
+  'piece-large': DEFAULT_UNIT_GRAMS['piece-large'],
   slice: 30,
   serving: DEFAULT_SERVING_GRAMS,
 }
@@ -142,6 +148,9 @@ const normalizeWeightUnit = (value: any): WeightUnit => {
   const raw = String(value || '').trim().toLowerCase()
   if (!raw) return 'g'
   if (raw === 'cups') return 'cup'
+  if (raw === 'small piece' || raw === 'piece small') return 'piece-small'
+  if (raw === 'medium piece' || raw === 'piece medium') return 'piece-medium'
+  if (raw === 'large piece' || raw === 'piece large') return 'piece-large'
   if (raw === 'tablespoon' || raw === 'tablespoons') return 'tbsp'
   if (raw === 'teaspoon' || raw === 'teaspoons') return 'tsp'
   if (raw === 'servings') return 'serving'
@@ -154,6 +163,7 @@ const getWeightInputStep = (unit: WeightUnit) => {
   if (unit === 'tsp' || unit === 'tbsp') return 0.1
   if (unit === 'quarter-cup' || unit === 'half-cup' || unit === 'three-quarter-cup' || unit === 'cup') return 0.1
   if (unit === 'pinch' || unit === 'handful') return 0.1
+  if (unit === 'piece' || unit === 'piece-small' || unit === 'piece-medium' || unit === 'piece-large') return 1
   return 1
 }
 
@@ -9830,10 +9840,13 @@ const applyStructuredItems = (
   }
 
   const getUnitGramsForItem = (unit: WeightUnit, item: any, baseGrams: number | null) => {
+    const foodUnitGrams = getFoodUnitGrams(item?.name || item?.food || '')
+    const override = foodUnitGrams?.[unit]
+    if (Number.isFinite(Number(override)) && Number(override) > 0) return Number(override)
     if (unit === 'serving') {
       return baseGrams && baseGrams > 0 ? baseGrams : WEIGHT_UNIT_TO_GRAMS.serving
     }
-    if (unit === 'piece' || unit === 'slice') {
+    if (unit === 'piece' || unit === 'piece-small' || unit === 'piece-medium' || unit === 'piece-large' || unit === 'slice') {
       const pieceGrams = getPieceGramsForItem(item, baseGrams)
       if (pieceGrams && pieceGrams > 0) return pieceGrams
       return null
@@ -19769,7 +19782,7 @@ Please add nutritional information manually if needed.`);
                                       className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none"
                                       style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
                                     >
-                                      {getWeightUnitOptions(weightUnit, pieceAvailable).map((option) => (
+                                      {getWeightUnitOptions(item, weightUnit, pieceGrams).map((option) => (
                                         <option key={option.value} value={option.value}>
                                           {option.label}
                                         </option>
@@ -20268,7 +20281,7 @@ Please add nutritional information manually if needed.`);
                                 onChange={(e) => updateItemField(editingItemIndex, 'weightUnit', e.target.value)}
                                 className="w-24 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               >
-                                {getWeightUnitOptions(unit, pieceAvailable).map((option) => (
+                                {getWeightUnitOptions(item, unit, pieceGrams).map((option) => (
                                   <option key={option.value} value={option.value}>
                                     {option.label}
                                   </option>
