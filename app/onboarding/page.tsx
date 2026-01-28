@@ -156,6 +156,24 @@ const getDisplayName = (name: any, fallback: string) => {
   return safe
 }
 
+const formatManualName = (raw: string) => {
+  if (!raw) return ''
+  let text = raw.replace(/\s+/g, ' ').trim()
+  text = text.replace(/\s*-\s*/g, ' - ')
+  if (!text) return ''
+  return text
+    .split(' ')
+    .map((token) => {
+      if (!token) return ''
+      if (/[0-9]/.test(token)) return token.toUpperCase()
+      const upper = token.toUpperCase()
+      if (upper.length <= 3) return upper
+      return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase()
+    })
+    .join(' ')
+    .trim()
+}
+
 const isPlaceholderName = (name: any) => {
   const safe = String(name || '').trim()
   if (!safe) return true
