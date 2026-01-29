@@ -474,16 +474,21 @@ const compressImageFile = async (file: File, maxDim = 1800, quality = 0.82): Pro
   }
 }
 
-const analyzeLabelName = async (file: File) => {
+const analyzeLabelName = async (
+  file: File,
+  options?: { scanType?: 'supplement' | 'medication'; scanId?: string }
+) => {
   const formData = new FormData()
   formData.append('image', file)
+  if (options?.scanType) formData.append('scanType', options.scanType)
+  if (options?.scanId) formData.append('scanId', options.scanId)
   const response = await fetch('/api/analyze-supplement-image', {
     method: 'POST',
     body: formData
   })
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
-    const message = errorData?.error || 'Name scan failed'
+    const message = errorData?.message || errorData?.error || 'Name scan failed'
     throw new Error(message)
   }
   const result = await response.json().catch(() => ({}))
@@ -5688,11 +5693,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       
       const frontForUpload = frontImage ? await compressImageFile(frontImage) : null;
       const backForUpload = backImage ? await compressImageFile(backImage) : null;
+      const scanId = `supp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
       if (!isEditing || (frontForUpload && backForUpload)) {
         if (frontForUpload) {
           try {
-            const result = await analyzeLabelName(frontForUpload)
+            const result = await analyzeLabelName(frontForUpload, { scanType: 'supplement', scanId })
             if (result) supplementName = result
           } catch (error) {
             console.error('Error analyzing supplement image:', error)
@@ -5703,7 +5709,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
         }
         if (isPlaceholderName(supplementName) && backForUpload) {
           try {
-            const result = await analyzeLabelName(backForUpload)
+            const result = await analyzeLabelName(backForUpload, { scanType: 'supplement', scanId })
             if (result) supplementName = result
           } catch (error) {
             console.error('Error analyzing supplement image (back):', error)
@@ -6968,11 +6974,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
 
       const frontForUpload = frontImage ? await compressImageFile(frontImage) : null;
       const backForUpload = backImage ? await compressImageFile(backImage) : null;
+      const scanId = `med-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
       if (!isEditing || (frontForUpload && backForUpload)) {
         if (frontForUpload) {
           try {
-            const result = await analyzeLabelName(frontForUpload)
+            const result = await analyzeLabelName(frontForUpload, { scanType: 'medication', scanId })
             if (result) medicationName = result
           } catch (error) {
             console.error('Error analyzing medication image:', error)
@@ -6983,7 +6990,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
         }
         if (isPlaceholderName(medicationName) && backForUpload) {
           try {
-            const result = await analyzeLabelName(backForUpload)
+            const result = await analyzeLabelName(backForUpload, { scanType: 'medication', scanId })
             if (result) medicationName = result
           } catch (error) {
             console.error('Error analyzing medication image (back):', error)

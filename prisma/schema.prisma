@@ -52,6 +52,8 @@ model User {
   freeSymptomAnalysisRemaining    Int @default(2) // 2 free symptom analyses
   freeMedicalAnalysisRemaining    Int @default(2) // 2 free medical image analyses
   freeInteractionAnalysisRemaining Int @default(2) // 2 free supplement/medication interaction analyses
+  freeSupplementImageRemaining    Int @default(10) // 10 free supplement photo name scans
+  freeMedicationImageRemaining    Int @default(10) // 10 free medication photo name scans
   freeHealthIntakeRemaining       Int @default(1) // 1 free full health intake analysis (on page 11 complete)
   freeInsightsUpdateRemaining     Int @default(3) // 3 free insights updates (when changing health setup)
   freeSymptomChatRemaining        Int @default(0) // Free symptom follow-up chats (granted on signup)

@@ -30,6 +30,8 @@ export type FreeCreditType =
   | 'MEDICAL_CHAT'
   | 'INTERACTION_ANALYSIS'
   | 'INTERACTION_REANALYSIS'
+  | 'SUPPLEMENT_IMAGE'
+  | 'MEDICATION_IMAGE'
   | 'HEALTH_INTAKE'
   | 'INSIGHTS_UPDATE'
   | 'INSIGHTS_CHAT'
@@ -44,6 +46,8 @@ const FREE_CREDIT_FIELDS: Record<FreeCreditType, keyof any> = {
   MEDICAL_CHAT: 'freeMedicalChatRemaining',
   INTERACTION_ANALYSIS: 'freeInteractionAnalysisRemaining',
   INTERACTION_REANALYSIS: 'freeInteractionReanalysisRemaining',
+  SUPPLEMENT_IMAGE: 'freeSupplementImageRemaining',
+  MEDICATION_IMAGE: 'freeMedicationImageRemaining',
   HEALTH_INTAKE: 'freeHealthIntakeRemaining',
   INSIGHTS_UPDATE: 'freeInsightsUpdateRemaining',
   INSIGHTS_CHAT: 'freeInsightsChatRemaining',
@@ -64,6 +68,8 @@ export const NEW_USER_FREE_CREDITS = {
   freeSymptomAnalysisRemaining: 2,
   freeMedicalAnalysisRemaining: 2,
   freeInteractionAnalysisRemaining: 2,
+  freeSupplementImageRemaining: 10,
+  freeMedicationImageRemaining: 10,
   freeHealthIntakeRemaining: 1,
   freeInsightsUpdateRemaining: 3,
   ...EXTRA_FREE_CREDITS,
@@ -78,7 +84,9 @@ export async function ensureFreeCreditColumns() {
         ADD COLUMN IF NOT EXISTS "freeInsightsChatRemaining" INT DEFAULT 0,
         ADD COLUMN IF NOT EXISTS "freeVoiceChatRemaining" INT DEFAULT 0,
         ADD COLUMN IF NOT EXISTS "freeFoodReanalysisRemaining" INT DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS "freeInteractionReanalysisRemaining" INT DEFAULT 0
+        ADD COLUMN IF NOT EXISTS "freeInteractionReanalysisRemaining" INT DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "freeSupplementImageRemaining" INT DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "freeMedicationImageRemaining" INT DEFAULT 0
     `)
   } catch (error) {
     console.warn('Failed to ensure free credit columns:', error)
@@ -160,6 +168,8 @@ export async function getFreeCreditsStatus(userId: string) {
       freeMedicalChatRemaining: true,
       freeInteractionAnalysisRemaining: true,
       freeInteractionReanalysisRemaining: true,
+      freeSupplementImageRemaining: true,
+      freeMedicationImageRemaining: true,
       freeHealthIntakeRemaining: true,
       freeInsightsUpdateRemaining: true,
       freeInsightsChatRemaining: true,
@@ -177,6 +187,8 @@ export async function getFreeCreditsStatus(userId: string) {
       medicalChat: 0,
       interaction: 0,
       interactionReanalysis: 0,
+      supplementImage: 0,
+      medicationImage: 0,
       healthIntake: 0,
       insights: 0,
       insightsChat: 0,
@@ -193,6 +205,8 @@ export async function getFreeCreditsStatus(userId: string) {
   let medicalChat = (user as any).freeMedicalChatRemaining ?? 0;
   const interaction = (user as any).freeInteractionAnalysisRemaining ?? 0;
   let interactionReanalysis = (user as any).freeInteractionReanalysisRemaining ?? 0;
+  const supplementImage = (user as any).freeSupplementImageRemaining ?? 0;
+  const medicationImage = (user as any).freeMedicationImageRemaining ?? 0;
   const healthIntake = (user as any).freeHealthIntakeRemaining ?? 0;
   const insights = (user as any).freeInsightsUpdateRemaining ?? 0;
   let insightsChat = (user as any).freeInsightsChatRemaining ?? 0;
@@ -235,6 +249,8 @@ export async function getFreeCreditsStatus(userId: string) {
     medicalChat,
     interaction,
     interactionReanalysis,
+    supplementImage,
+    medicationImage,
     healthIntake,
     insights,
     insightsChat,
@@ -248,6 +264,8 @@ export async function getFreeCreditsStatus(userId: string) {
       medicalChat +
       interaction +
       interactionReanalysis +
+      supplementImage +
+      medicationImage +
       healthIntake +
       insights +
       insightsChat +

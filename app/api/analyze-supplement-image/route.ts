@@ -7,7 +7,7 @@ import { consumeRateLimit } from '@/lib/rate-limit';
 import { getImageMetadata } from '@/lib/image-metadata';
 import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
-import { hasFreeCredits, consumeFreeCredit, type FreeCreditType } from '@/lib/free-credits';
+import { hasFreeCredits, consumeFreeCredit, ensureFreeCreditColumns, type FreeCreditType } from '@/lib/free-credits';
 import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 
@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const imageFile = formData.get('image') as File;
+    const scanType = String(formData.get('scanType') || 'supplement').toLowerCase();
+    const scanId = String(formData.get('scanId') || '').trim();
 
     if (!imageFile) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 });
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest) {
       size: imageFile.size
     });
 
+    await ensureFreeCreditColumns();
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: { subscription: true, creditTopUps: true },
@@ -84,19 +87,67 @@ Return only the final name string, no extra text.`;
 
     const model = "gpt-4o";
     const cm = new CreditManager(user.id);
-    const freeType: FreeCreditType = 'INTERACTION_ANALYSIS';
-    const hasFree = await hasFreeCredits(user.id, freeType);
-    let usedFree = false;
+    const freeType: FreeCreditType = scanType === 'medication' ? 'MEDICATION_IMAGE' : 'SUPPLEMENT_IMAGE';
     let maxTokens = 50;
-    if (hasFree) {
-      const consumed = await consumeFreeCredit(user.id, freeType);
-      usedFree = consumed;
+
+    // If this scanId was already charged once (front/back pair), skip charging again.
+    let skipCharge = false;
+    if (scanId) {
+      const prior = await prisma.aIUsageEvent.findFirst({
+        where: {
+          scanId,
+          feature: scanType === 'medication' ? 'medications:image-name' : 'supplements:image-name',
+        },
+        select: { id: true },
+      });
+      if (prior) skipCharge = true;
     }
-    if (!usedFree) {
-      const wallet = await cm.getWalletStatus();
-      maxTokens = capMaxTokensToBudget(model, promptText, 50, wallet.totalAvailableCents);
-      if (maxTokens <= 0) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+
+    let usedFree = false;
+    if (!skipCharge) {
+      // If user hasn't used photo scans yet, grant the initial free batch (10).
+      const supplementField = (user as any).freeSupplementImageRemaining ?? 0;
+      const medicationField = (user as any).freeMedicationImageRemaining ?? 0;
+      if (scanType === 'supplement' && supplementField <= 0) {
+        const usedCount = await prisma.supplement.count({
+          where: { userId: user.id, imageUrl: { not: null } },
+        });
+        if (usedCount === 0) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { freeSupplementImageRemaining: 10 } as any,
+          });
+        }
+      }
+      if (scanType === 'medication' && medicationField <= 0) {
+        const usedCount = await prisma.medication.count({
+          where: { userId: user.id, imageUrl: { not: null } },
+        });
+        if (usedCount === 0) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { freeMedicationImageRemaining: 10 } as any,
+          });
+        }
+      }
+
+      const hasFree = await hasFreeCredits(user.id, freeType);
+      if (hasFree) {
+        const consumed = await consumeFreeCredit(user.id, freeType);
+        usedFree = consumed;
+      }
+      if (!usedFree) {
+        const wallet = await cm.getWalletStatus();
+        maxTokens = capMaxTokensToBudget(model, promptText, 50, wallet.totalAvailableCents);
+        if (maxTokens <= 0) {
+          return NextResponse.json(
+            {
+              error: 'Insufficient credits',
+              message: 'Free photo scans used up. Please upgrade or buy credits in Billing to add more.',
+            },
+            { status: 402 }
+          );
+        }
       }
     }
 
@@ -121,24 +172,30 @@ Return only the final name string, no extra text.`;
       temperature: 0.1
     } as any);
 
-    if (!usedFree) {
+    if (!usedFree && !skipCharge) {
       const ok = await cm.chargeCents(wrapped.costCents);
       if (!ok) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+        return NextResponse.json(
+          {
+            error: 'Insufficient credits',
+            message: 'Free photo scans used up. Please upgrade or buy credits in Billing to add more.',
+          },
+          { status: 402 }
+        );
       }
     }
 
     // Persist usage (vision)
     logAiUsageEvent({
-      feature: 'supplements:image-name',
+      feature: scanType === 'medication' ? 'medications:image-name' : 'supplements:image-name',
       endpoint: '/api/analyze-supplement-image',
       userId: user.id,
       userLabel: user.email || (clientIp ? `ip:${clientIp}` : null),
-      scanId: `supplement-${Date.now()}`,
+      scanId: scanId || `supplement-${Date.now()}`,
       model,
       promptTokens: wrapped.promptTokens,
       completionTokens: wrapped.completionTokens,
-      costCents: usedFree ? 0 : wrapped.costCents,
+      costCents: usedFree || skipCharge ? 0 : wrapped.costCents,
       image: {
         width: meta.width,
         height: meta.height,
