@@ -299,7 +299,7 @@ const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { r
     if (token.length >= 4 && word.includes(token)) return true
     if (singular.length >= 4 && word.includes(singular)) return true
     // For full words (4+ chars), also allow if word contains the token
-    if (word.length >= 4 && token.includes(word)) return true
+    if (word.length >= 4 && token.includes(word) && token.length - word.length <= 1) return true
     return false
   }
   const requireFirstWord = options?.requireFirstWord ?? false

@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
         if (singular !== token && singular.startsWith(word)) return true
         if (token.length >= 4 && word.includes(token)) return true
         if (singular.length >= 4 && word.includes(singular)) return true
-        if (word.length >= 4 && token.includes(word)) return true
+        if (word.length >= 4 && token.includes(word) && token.length - word.length <= 1) return true
         return false
       }
       if (queryTokens.length === 1) return nameTokens.some((word) => tokenMatches(queryTokens[0], word))
