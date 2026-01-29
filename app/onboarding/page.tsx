@@ -194,6 +194,45 @@ const buildSupplementNameFromDsld = (source: any) => {
   return product || brand || null
 }
 
+const normalizeSearchText = (value: string) => {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+const buildBrandSuggestionsFromDsld = (data: any, rawQuery: string) => {
+  const query = normalizeSearchText(rawQuery)
+  if (!query) return [] as { name: string; source: string }[]
+  const hits = Array.isArray(data?.hits) ? data.hits : data?.hits?.hits
+  const seen = new Set<string>()
+  const results: { name: string; source: string }[] = []
+  const items = Array.isArray(hits) ? hits : []
+  items.forEach((hit: any) => {
+    const source = hit?._source || hit?.source || hit || {}
+    const brand =
+      source?.brandName ||
+      source?.brand_name ||
+      source?.brand ||
+      source?.manufacturer ||
+      ''
+    const cleaned = String(brand || '').trim()
+    if (!cleaned) return
+    const normalized = normalizeSearchText(cleaned)
+    if (!normalized) return
+    const matches =
+      normalized.startsWith(query) ||
+      normalized.split(' ').some((word) => word.startsWith(query)) ||
+      query.split(' ').every((word) => normalized.includes(word))
+    if (!matches) return
+    const key = normalized
+    if (seen.has(key)) return
+    seen.add(key)
+    results.push({ name: `${cleaned} -`, source: 'brand' })
+  })
+  return results
+}
+
 const parseDsldSuggestions = (data: any) => {
   const hits = Array.isArray(data?.hits) ? data.hits : data?.hits?.hits
   const items = (Array.isArray(hits) ? hits : [])
@@ -4984,7 +5023,9 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
           const dsldResponse = await fetch(dsldUrl);
           if (dsldResponse.ok) {
             const dsldData = await dsldResponse.json().catch(() => ({}));
-            suggestions = parseDsldSuggestions(dsldData);
+            const brandSuggestions = buildBrandSuggestionsFromDsld(dsldData, query);
+            const productSuggestions = parseDsldSuggestions(dsldData);
+            suggestions = [...brandSuggestions, ...productSuggestions];
           }
         } catch (dsldError) {
           console.warn('DSLD direct search failed:', dsldError);
