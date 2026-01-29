@@ -6103,15 +6103,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                         <img
                           src={frontPreviewUrl}
                           alt="Front preview"
-                          className="h-24 w-full rounded-lg border border-gray-200 object-contain sm:h-20 sm:w-28"
+                          className="h-32 w-full rounded-lg border border-gray-200 object-contain sm:h-28 sm:w-40"
                         />
                       )}
-                      <div className="flex w-full items-center justify-between gap-3 text-sm text-gray-600">
+                      <div className="flex w-full items-center gap-2 text-sm text-gray-600">
                         <div className="flex items-center gap-2 text-green-700">
                           <span className="text-xl leading-none">✓</span>
                           <span className="font-medium">Selected</span>
                         </div>
-                        <div className="truncate text-right">{frontImage.name}</div>
+                        <div className="truncate">{frontImage.name}</div>
                       </div>
                     </div>
                   ) : (
@@ -6207,15 +6207,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                         <img
                           src={backPreviewUrl}
                           alt="Back preview"
-                          className="h-24 w-full rounded-lg border border-gray-200 object-contain sm:h-20 sm:w-28"
+                          className="h-32 w-full rounded-lg border border-gray-200 object-contain sm:h-28 sm:w-40"
                         />
                       )}
-                      <div className="flex w-full items-center justify-between gap-3 text-sm text-gray-600">
+                      <div className="flex w-full items-center gap-2 text-sm text-gray-600">
                         <div className="flex items-center gap-2 text-green-700">
                           <span className="text-xl leading-none">✓</span>
                           <span className="font-medium">Selected</span>
                         </div>
-                        <div className="truncate text-right">{backImage.name}</div>
+                        <div className="truncate">{backImage.name}</div>
                       </div>
                     </div>
                   ) : (
@@ -7434,15 +7434,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                         <img
                           src={frontPreviewUrl}
                           alt="Front preview"
-                          className="h-24 w-full rounded-lg border border-gray-200 object-contain sm:h-20 sm:w-28"
+                          className="h-32 w-full rounded-lg border border-gray-200 object-contain sm:h-28 sm:w-40"
                         />
                       )}
-                      <div className="flex w-full items-center justify-between gap-3 text-sm text-gray-600">
+                      <div className="flex w-full items-center gap-2 text-sm text-gray-600">
                         <div className="flex items-center gap-2 text-green-700">
                           <span className="text-xl leading-none">✓</span>
                           <span className="font-medium">Selected</span>
                         </div>
-                        <div className="truncate text-right">{frontImage.name}</div>
+                        <div className="truncate">{frontImage.name}</div>
                       </div>
                     </div>
                   ) : (
@@ -7537,15 +7537,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                         <img
                           src={backPreviewUrl}
                           alt="Back preview"
-                          className="h-24 w-full rounded-lg border border-gray-200 object-contain sm:h-20 sm:w-28"
+                          className="h-32 w-full rounded-lg border border-gray-200 object-contain sm:h-28 sm:w-40"
                         />
                       )}
-                      <div className="flex w-full items-center justify-between gap-3 text-sm text-gray-600">
+                      <div className="flex w-full items-center gap-2 text-sm text-gray-600">
                         <div className="flex items-center gap-2 text-green-700">
                           <span className="text-xl leading-none">✓</span>
                           <span className="font-medium">Selected</span>
                         </div>
-                        <div className="truncate text-right">{backImage.name}</div>
+                        <div className="truncate">{backImage.name}</div>
                       </div>
                     </div>
                   ) : (
