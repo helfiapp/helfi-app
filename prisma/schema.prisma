@@ -74,6 +74,7 @@ model User {
   waterLogs           WaterLog[]
   exerciseLogs        ExerciseLog[]
   exerciseEntries     ExerciseEntry[]
+  supplementCatalogs  SupplementCatalog[]
   subscription        Subscription?
   affiliate           Affiliate?             @relation("AffiliateUser")
   affiliateApplications AffiliateApplication[] @relation("AffiliateApplicationUser")
