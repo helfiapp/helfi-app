@@ -112,10 +112,11 @@ Return only the final name string, no extra text.`;
         const usedCount = await prisma.supplement.count({
           where: { userId: user.id, imageUrl: { not: null } },
         });
-        if (usedCount === 0) {
+        const remaining = Math.max(0, 10 - usedCount);
+        if (remaining > 0) {
           await prisma.user.update({
             where: { id: user.id },
-            data: { freeSupplementImageRemaining: 10 } as any,
+            data: { freeSupplementImageRemaining: remaining } as any,
           });
         }
       }
@@ -123,10 +124,11 @@ Return only the final name string, no extra text.`;
         const usedCount = await prisma.medication.count({
           where: { userId: user.id, imageUrl: { not: null } },
         });
-        if (usedCount === 0) {
+        const remaining = Math.max(0, 10 - usedCount);
+        if (remaining > 0) {
           await prisma.user.update({
             where: { id: user.id },
-            data: { freeMedicationImageRemaining: 10 } as any,
+            data: { freeMedicationImageRemaining: remaining } as any,
           });
         }
       }
