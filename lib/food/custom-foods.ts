@@ -76,8 +76,9 @@ const isOneEditAway = (a: string, b: string) => {
   return true
 }
 
-const nameMatchesQuery = (name: string, query: string) => {
+const nameMatchesQuery = (name: string, query: string, options?: { allowTypo?: boolean }) => {
   const normalizedQuery = normalizeText(query)
+  if (!normalizedQuery) return false
   if (normalizedQuery.length === 1) {
     const nameTokens = getTokens(name)
     return nameTokens.some((word) => word.startsWith(normalizedQuery))
@@ -91,18 +92,14 @@ const nameMatchesQuery = (name: string, query: string) => {
     if (!token || !word) return false
     const matchToken = (value: string) => {
       if (word.startsWith(value)) return true
-      if (value.length >= 2 && value.startsWith(word) && value.length - word.length <= 1) return true
-      if (value.length >= 3 && word.length >= 3 && isOneEditAway(value, word)) return true
-      if (value.length >= 2) {
-        const prefixSame = word.slice(0, value.length)
-        if (prefixSame && isOneEditAway(value, prefixSame)) return true
-        const prefixLonger = word.slice(0, value.length + 1)
-        if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
-        if (value.length >= 4) {
-          const prefixShorter = word.slice(0, value.length - 1)
-          if (prefixShorter && isOneEditAway(value, prefixShorter)) return true
-        }
-      }
+      const singularWord = singularizeToken(word)
+      if (singularWord !== word && singularWord.startsWith(value)) return true
+      const allowTypo = (options?.allowTypo ?? true) && value.length >= 3 && value[0] === word[0]
+      if (!allowTypo) return false
+      const prefixSame = word.slice(0, value.length)
+      if (prefixSame && isOneEditAway(value, prefixSame)) return true
+      const prefixLonger = word.slice(0, value.length + 1)
+      if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
       return false
     }
     if (matchToken(token)) return true
@@ -211,9 +208,10 @@ export const searchCustomFoodMacros = (query: string, limit = 10): CustomFoodMac
   if (!q) return []
   const items = loadCustomFoods()
   if (items.length === 0) return []
-  const matches = items
-    .filter((item) => nameMatchesQuery(item.name, q))
-    .sort((a, b) => normalizeText(a.name).localeCompare(normalizeText(b.name)))
+  const prefixMatches = items.filter((item) => nameMatchesQuery(item.name, q, { allowTypo: false }))
+  const matches = (prefixMatches.length > 0 ? prefixMatches : items.filter((item) => nameMatchesQuery(item.name, q, { allowTypo: true }))).sort(
+    (a, b) => normalizeText(a.name).localeCompare(normalizeText(b.name)),
+  )
   if (matches.length === 0) return []
   return matches.slice(0, Math.max(1, limit))
 }

@@ -6456,31 +6456,32 @@ export default function FoodDiary() {
     return true
   }
 
-  const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { requireFirstWord?: boolean }) => {
+  const nameMatchesSearchQuery = (
+    name: string,
+    searchQuery: string,
+    options?: { requireFirstWord?: boolean; allowTypo?: boolean },
+  ) => {
     const normalizedQuery = normalizeSearchToken(searchQuery)
     const nameTokens = getSearchTokens(name)
+    if (!normalizedQuery) return false
     if (normalizedQuery.length === 1) {
       return nameTokens.some((word) => word.startsWith(normalizedQuery))
     }
     const queryTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
-    const filteredNameTokens = nameTokens.filter((token) => token.length >= 2)
+    const filteredNameTokens = nameTokens.filter((token) => token.length >= 1)
     if (queryTokens.length === 0 || filteredNameTokens.length === 0) return false
     const tokenMatches = (token: string, word: string) => {
       if (!token || !word) return false
       const matchToken = (value: string) => {
         if (word.startsWith(value)) return true
-        if (value.length >= 2 && value.startsWith(word) && value.length - word.length <= 1) return true
-        if (value.length >= 3 && word.length >= 3 && isOneEditAway(value, word)) return true
-        if (value.length >= 2) {
-          const prefixSame = word.slice(0, value.length)
-          if (prefixSame && isOneEditAway(value, prefixSame)) return true
-          const prefixLonger = word.slice(0, value.length + 1)
-          if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
-          if (value.length >= 4) {
-            const prefixShorter = word.slice(0, value.length - 1)
-            if (prefixShorter && isOneEditAway(value, prefixShorter)) return true
-          }
-        }
+        const singularWord = singularizeToken(word)
+        if (singularWord !== word && singularWord.startsWith(value)) return true
+        const allowTypo = (options?.allowTypo ?? true) && value.length >= 3 && value[0] === word[0]
+        if (!allowTypo) return false
+        const prefixSame = word.slice(0, value.length)
+        if (prefixSame && isOneEditAway(value, prefixSame)) return true
+        const prefixLonger = word.slice(0, value.length + 1)
+        if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
         return false
       }
       if (matchToken(token)) return true
@@ -6496,10 +6497,23 @@ export default function FoodDiary() {
     return queryTokens.every((token) => filteredNameTokens.some((word) => tokenMatches(token, word)))
   }
 
-  const itemMatchesSearchQuery = (item: any, searchQuery: string, kind: 'packaged' | 'single') => {
-    if (kind === 'single') return nameMatchesSearchQuery(item?.name || '', searchQuery, { requireFirstWord: false })
+  const itemMatchesSearchQuery = (
+    item: any,
+    searchQuery: string,
+    kind: 'packaged' | 'single',
+    options?: { allowTypo?: boolean },
+  ) => {
+    if (kind === 'single')
+      return nameMatchesSearchQuery(item?.name || '', searchQuery, { requireFirstWord: false, allowTypo: options?.allowTypo })
     const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-    return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false })
+    return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false, allowTypo: options?.allowTypo })
+  }
+
+  const filterItemsForQuery = (items: any[], searchQuery: string, kind: 'packaged' | 'single') => {
+    if (!Array.isArray(items) || items.length === 0) return []
+    const prefixMatches = items.filter((item) => itemMatchesSearchQuery(item, searchQuery, kind, { allowTypo: false }))
+    if (prefixMatches.length > 0) return prefixMatches
+    return items.filter((item) => itemMatchesSearchQuery(item, searchQuery, kind, { allowTypo: true }))
   }
 
   const GENERIC_FOOD_TOKENS = new Set([
@@ -6716,7 +6730,7 @@ export default function FoodDiary() {
     const cached = cache.get(buildOfficialSearchCacheKey(mode))
     if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
     const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
-    const filtered = hasToken ? cached.items.filter((item: any) => itemMatchesSearchQuery(item, q, mode)) : cached.items
+    const filtered = hasToken ? filterItemsForQuery(cached.items, q, mode) : cached.items
     return filtered.slice(0, 20)
   }
 
@@ -6858,7 +6872,7 @@ export default function FoodDiary() {
           if (quick.res.ok && officialSearchSeqRef.current === seq) {
             const quickData = await quick.res.json().catch(() => ({} as any))
             const quickItems = Array.isArray(quickData?.items) ? quickData.items : []
-            const quickFiltered = hasToken ? quickItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : quickItems
+            const quickFiltered = hasToken ? filterItemsForQuery(quickItems, query, mode) : quickItems
             if (quickFiltered.length > 0 && officialSearchSeqRef.current === seq) {
               const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, immediateBrands) : quickFiltered
               setOfficialResults(quickMerged)
@@ -6919,7 +6933,7 @@ export default function FoodDiary() {
         }
       }
 
-      const filteredItems = hasToken ? baseItems.filter((item: any) => itemMatchesSearchQuery(item, query, mode)) : baseItems
+      const filteredItems = hasToken ? filterItemsForQuery(baseItems, query, mode) : baseItems
       const finalItems = mode === 'single' && filteredItems.length === 0 && baseItems.length > 0 ? baseItems : filteredItems
 
       const merged = finalItems

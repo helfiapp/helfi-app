@@ -119,33 +119,30 @@ export async function GET(request: NextRequest) {
       'dried',
     ])
 
-    const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
+    const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { allowTypo?: boolean }) => {
       const normalizedQuery = normalizeForMatch(searchQuery)
       const nameTokens = getSearchTokens(name)
+      if (!normalizedQuery) return false
       if (normalizedQuery.length === 1) {
         return nameTokens.some((word) => word.startsWith(normalizedQuery))
       }
       const rawTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
       const filteredTokens = rawTokens.filter((token) => !DESCRIPTOR_TOKENS.has(token))
       const queryTokens = filteredTokens.length > 0 ? filteredTokens : rawTokens
-      const filteredNameTokens = nameTokens.filter((token) => token.length >= 2)
+      const filteredNameTokens = nameTokens.filter((token) => token.length >= 1)
       if (queryTokens.length === 0 || filteredNameTokens.length === 0) return false
       const tokenMatches = (token: string, word: string) => {
         if (!token || !word) return false
         const matchToken = (value: string) => {
           if (word.startsWith(value)) return true
-          if (value.length >= 2 && value.startsWith(word) && value.length - word.length <= 1) return true
-          if (value.length >= 3 && word.length >= 3 && isOneEditAway(value, word)) return true
-          if (value.length >= 2) {
-            const prefixSame = word.slice(0, value.length)
-            if (prefixSame && isOneEditAway(value, prefixSame)) return true
-            const prefixLonger = word.slice(0, value.length + 1)
-            if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
-            if (value.length >= 4) {
-              const prefixShorter = word.slice(0, value.length - 1)
-              if (prefixShorter && isOneEditAway(value, prefixShorter)) return true
-            }
-          }
+          const singularWord = singularizeToken(word)
+          if (singularWord !== word && singularWord.startsWith(value)) return true
+          const allowTypo = (options?.allowTypo ?? true) && value.length >= 3 && value[0] === word[0]
+          if (!allowTypo) return false
+          const prefixSame = word.slice(0, value.length)
+          if (prefixSame && isOneEditAway(value, prefixSame)) return true
+          const prefixLonger = word.slice(0, value.length + 1)
+          if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
           return false
         }
         if (matchToken(token)) return true
@@ -155,6 +152,13 @@ export async function GET(request: NextRequest) {
       }
       if (queryTokens.length === 1) return filteredNameTokens.some((word) => tokenMatches(queryTokens[0], word))
       return queryTokens.every((token) => filteredNameTokens.some((word) => tokenMatches(token, word)))
+    }
+
+    const filterItemsByQuery = (items: any[], searchQuery: string, getText: (item: any) => string) => {
+      if (!Array.isArray(items) || items.length === 0) return []
+      const prefixMatches = items.filter((item) => nameMatchesSearchQuery(getText(item), searchQuery, { allowTypo: false }))
+      if (prefixMatches.length > 0) return prefixMatches
+      return items.filter((item) => nameMatchesSearchQuery(getText(item), searchQuery, { allowTypo: true }))
     }
 
     type CustomPackagedItem = {
@@ -191,11 +195,15 @@ export async function GET(request: NextRequest) {
 
     const getCustomPackagedMatches = (value: string) => {
       if (!value) return []
-      return CUSTOM_PACKAGED_ITEMS.filter((item) => {
-        if (nameMatchesSearchQuery(item.name, value)) return true
-        const aliases = Array.isArray(item.aliases) ? item.aliases : []
-        return aliases.some((alias) => nameMatchesSearchQuery(alias, value))
-      }).map((item) => {
+      const buildMatches = (allowTypo: boolean) =>
+        CUSTOM_PACKAGED_ITEMS.filter((item) => {
+          if (nameMatchesSearchQuery(item.name, value, { allowTypo })) return true
+          const aliases = Array.isArray(item.aliases) ? item.aliases : []
+          return aliases.some((alias) => nameMatchesSearchQuery(alias, value, { allowTypo }))
+        })
+      const prefixMatches = buildMatches(false)
+      const matches = prefixMatches.length > 0 ? prefixMatches : buildMatches(true)
+      return matches.map((item) => {
         const { aliases, ...rest } = item
         return rest
       })
@@ -407,7 +415,7 @@ export async function GET(request: NextRequest) {
         return true
       })
 
-      const filtered = deduped.filter((item) => nameMatchesSearchQuery(item?.name || '', value))
+      const filtered = filterItemsByQuery(deduped, value, (item) => item?.name || '')
       return sortByNameAsc(filtered).slice(0, limit)
     }
 
@@ -625,9 +633,9 @@ export async function GET(request: NextRequest) {
           customPackagedApplied = true
         } else {
           const localPackaged = await searchLocalPreferred(query, 'packaged')
-          const localPackagedFiltered = localPackaged.filter((item) => {
+          const localPackagedFiltered = filterItemsByQuery(localPackaged, query, (item) => {
             const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-            return nameMatchesSearchQuery(combined || item?.name || '', query)
+            return combined || item?.name || ''
           })
           if (localPackagedFiltered.length > 0) {
             items = sortByNameAsc(localPackagedFiltered).slice(0, limit)
@@ -699,7 +707,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (kindMode === 'single' && Array.isArray(items) && items.length > 0) {
-      const filtered = items.filter((item) => nameMatchesSearchQuery(item?.name || '', query))
+      const filtered = filterItemsByQuery(items, query, (item) => item?.name || '')
       items = filtered.length > 0 ? filtered : []
     }
 
