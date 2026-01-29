@@ -6093,32 +6093,35 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 />
                 <label
                   htmlFor="front-image"
-                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`flex w-full min-h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
                     frontImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
                   }`}
                 >
                   {frontImage ? (
-                    <div className="text-center">
-                      <div className="text-green-600 text-2xl mb-1">✓</div>
-                      <div className="text-sm text-gray-600">{frontImage.name}</div>
+                    <div className="flex w-full flex-col gap-3 p-3 sm:flex-row sm:items-center">
+                      {frontPreviewUrl && (
+                        <img
+                          src={frontPreviewUrl}
+                          alt="Front preview"
+                          className="h-24 w-full rounded-lg border border-gray-200 object-contain sm:h-20 sm:w-28"
+                        />
+                      )}
+                      <div className="flex w-full items-center justify-between gap-3 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-green-700">
+                          <span className="text-xl leading-none">✓</span>
+                          <span className="font-medium">Selected</span>
+                        </div>
+                        <div className="truncate text-right">{frontImage.name}</div>
+                      </div>
                     </div>
                   ) : (
-                    <div className="text-center">
+                    <div className="m-auto text-center">
                       <div className="text-gray-400 text-2xl mb-1">📷</div>
                       <div className="text-sm text-gray-600">Tap to take photo</div>
                     </div>
                   )}
                 </label>
               </div>
-              {frontPreviewUrl && (
-                <div className="mt-2">
-                  <img
-                    src={frontPreviewUrl}
-                    alt="Front preview"
-                    className="w-full max-h-48 object-contain rounded-lg border border-gray-200"
-                  />
-                </div>
-              )}
               {imageQualityWarning.front && (
                 <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   {imageQualityWarning.front}
@@ -6194,32 +6197,35 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 />
                 <label
                   htmlFor="back-image"
-                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`flex w-full min-h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
                     backImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
                   }`}
                 >
                   {backImage ? (
-                    <div className="text-center">
-                      <div className="text-green-600 text-2xl mb-1">✓</div>
-                      <div className="text-sm text-gray-600">{backImage.name}</div>
+                    <div className="flex w-full flex-col gap-3 p-3 sm:flex-row sm:items-center">
+                      {backPreviewUrl && (
+                        <img
+                          src={backPreviewUrl}
+                          alt="Back preview"
+                          className="h-24 w-full rounded-lg border border-gray-200 object-contain sm:h-20 sm:w-28"
+                        />
+                      )}
+                      <div className="flex w-full items-center justify-between gap-3 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-green-700">
+                          <span className="text-xl leading-none">✓</span>
+                          <span className="font-medium">Selected</span>
+                        </div>
+                        <div className="truncate text-right">{backImage.name}</div>
+                      </div>
                     </div>
                   ) : (
-                    <div className="text-center">
+                    <div className="m-auto text-center">
                       <div className="text-gray-400 text-2xl mb-1">📷</div>
                       <div className="text-sm text-gray-600">Tap to take photo</div>
                     </div>
                   )}
                 </label>
               </div>
-              {backPreviewUrl && (
-                <div className="mt-2">
-                  <img
-                    src={backPreviewUrl}
-                    alt="Back preview"
-                    className="w-full max-h-48 object-contain rounded-lg border border-gray-200"
-                  />
-                </div>
-              )}
               {imageQualityWarning.back && (
                 <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   {imageQualityWarning.back}
@@ -7418,32 +7424,35 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                 />
                 <label
                   htmlFor="med-front-image"
-                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`flex w-full min-h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
                     frontImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
                   }`}
                 >
                   {frontImage ? (
-                    <div className="text-center">
-                      <div className="text-green-600 text-2xl mb-1">✓</div>
-                      <div className="text-sm text-gray-600">{frontImage.name}</div>
+                    <div className="flex w-full flex-col gap-3 p-3 sm:flex-row sm:items-center">
+                      {frontPreviewUrl && (
+                        <img
+                          src={frontPreviewUrl}
+                          alt="Front preview"
+                          className="h-24 w-full rounded-lg border border-gray-200 object-contain sm:h-20 sm:w-28"
+                        />
+                      )}
+                      <div className="flex w-full items-center justify-between gap-3 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-green-700">
+                          <span className="text-xl leading-none">✓</span>
+                          <span className="font-medium">Selected</span>
+                        </div>
+                        <div className="truncate text-right">{frontImage.name}</div>
+                      </div>
                     </div>
                   ) : (
-                    <div className="text-center">
+                    <div className="m-auto text-center">
                       <div className="text-gray-400 text-2xl mb-1">📷</div>
                       <div className="text-sm text-gray-600">Tap to take photo</div>
                     </div>
                   )}
                 </label>
               </div>
-              {frontPreviewUrl && (
-                <div className="mt-2">
-                  <img
-                    src={frontPreviewUrl}
-                    alt="Front preview"
-                    className="w-full max-h-48 object-contain rounded-lg border border-gray-200"
-                  />
-                </div>
-              )}
               {imageQualityWarning.front && (
                 <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   {imageQualityWarning.front}
@@ -7518,32 +7527,35 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                 />
                 <label
                   htmlFor="med-back-image"
-                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`flex w-full min-h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
                     backImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
                   }`}
                 >
                   {backImage ? (
-                    <div className="text-center">
-                      <div className="text-green-600 text-2xl mb-1">✓</div>
-                      <div className="text-sm text-gray-600">{backImage.name}</div>
+                    <div className="flex w-full flex-col gap-3 p-3 sm:flex-row sm:items-center">
+                      {backPreviewUrl && (
+                        <img
+                          src={backPreviewUrl}
+                          alt="Back preview"
+                          className="h-24 w-full rounded-lg border border-gray-200 object-contain sm:h-20 sm:w-28"
+                        />
+                      )}
+                      <div className="flex w-full items-center justify-between gap-3 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-green-700">
+                          <span className="text-xl leading-none">✓</span>
+                          <span className="font-medium">Selected</span>
+                        </div>
+                        <div className="truncate text-right">{backImage.name}</div>
+                      </div>
                     </div>
                   ) : (
-                    <div className="text-center">
+                    <div className="m-auto text-center">
                       <div className="text-gray-400 text-2xl mb-1">📷</div>
                       <div className="text-sm text-gray-600">Tap to take photo</div>
                     </div>
                   )}
                 </label>
               </div>
-              {backPreviewUrl && (
-                <div className="mt-2">
-                  <img
-                    src={backPreviewUrl}
-                    alt="Back preview"
-                    className="w-full max-h-48 object-contain rounded-lg border border-gray-200"
-                  />
-                </div>
-              )}
               {imageQualityWarning.back && (
                 <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   {imageQualityWarning.back}
