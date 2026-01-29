@@ -5183,7 +5183,29 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const [timingDosageUnits, setTimingDosageUnits] = useState<{[key: string]: string}>({});
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
+  const [frontPreviewUrl, setFrontPreviewUrl] = useState<string | null>(null);
+  const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
   const [uploadMethod, setUploadMethod] = useState<'manual' | 'photo'>('photo');
+
+  useEffect(() => {
+    if (!frontImage) {
+      setFrontPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(frontImage);
+    setFrontPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [frontImage]);
+
+  useEffect(() => {
+    if (!backImage) {
+      setBackPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(backImage);
+    setBackPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [backImage]);
 
   useEffect(() => {
     if (uploadMethod !== 'manual') {
@@ -5867,6 +5889,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const clearPhotoForm = () => {
     setFrontImage(null); 
     setBackImage(null); 
+    setFrontPreviewUrl(null);
+    setBackPreviewUrl(null);
     setPhotoDosage(''); 
     setPhotoDosageUnit('mg');
     setPhotoTiming([]); 
@@ -6086,6 +6110,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   )}
                 </label>
               </div>
+              {frontPreviewUrl && (
+                <div className="mt-2">
+                  <img
+                    src={frontPreviewUrl}
+                    alt="Front preview"
+                    className="w-full max-h-48 object-contain rounded-lg border border-gray-200"
+                  />
+                </div>
+              )}
               {imageQualityWarning.front && (
                 <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   {imageQualityWarning.front}
@@ -6178,6 +6211,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   )}
                 </label>
               </div>
+              {backPreviewUrl && (
+                <div className="mt-2">
+                  <img
+                    src={backPreviewUrl}
+                    alt="Back preview"
+                    className="w-full max-h-48 object-contain rounded-lg border border-gray-200"
+                  />
+                </div>
+              )}
               {imageQualityWarning.back && (
                 <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   {imageQualityWarning.back}
@@ -6557,8 +6599,30 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
   const [timingDosageUnits, setTimingDosageUnits] = useState<{[key: string]: string}>({});
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
+  const [frontPreviewUrl, setFrontPreviewUrl] = useState<string | null>(null);
+  const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
   const [uploadMethod, setUploadMethod] = useState<'manual' | 'photo'>('photo');
   
+  useEffect(() => {
+    if (!frontImage) {
+      setFrontPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(frontImage);
+    setFrontPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [frontImage]);
+
+  useEffect(() => {
+    if (!backImage) {
+      setBackPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(backImage);
+    setBackPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [backImage]);
+
   // New dosing schedule states
   const [dosageSchedule, setDosageSchedule] = useState<'daily' | 'specific'>('daily');
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -7150,6 +7214,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
   const clearMedPhotoForm = () => {
     setFrontImage(null); 
     setBackImage(null); 
+    setFrontPreviewUrl(null);
+    setBackPreviewUrl(null);
     setPhotoDosage(''); 
     setPhotoDosageUnit('mg');
     setPhotoTiming([]); 
@@ -7369,6 +7435,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   )}
                 </label>
               </div>
+              {frontPreviewUrl && (
+                <div className="mt-2">
+                  <img
+                    src={frontPreviewUrl}
+                    alt="Front preview"
+                    className="w-full max-h-48 object-contain rounded-lg border border-gray-200"
+                  />
+                </div>
+              )}
               {imageQualityWarning.front && (
                 <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   {imageQualityWarning.front}
@@ -7460,6 +7535,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   )}
                 </label>
               </div>
+              {backPreviewUrl && (
+                <div className="mt-2">
+                  <img
+                    src={backPreviewUrl}
+                    alt="Back preview"
+                    className="w-full max-h-48 object-contain rounded-lg border border-gray-200"
+                  />
+                </div>
+              )}
               {imageQualityWarning.back && (
                 <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   {imageQualityWarning.back}
