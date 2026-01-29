@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { searchOpenFoodFactsByQuery, searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition, searchLocalFoods } from '@/lib/food-data'
+import { searchCustomFoodMacros } from '@/lib/food/custom-foods'
 import { prisma } from '@/lib/prisma'
 
 let usdaHealthCache: { count: number | null; checkedAt: number } = { count: null, checkedAt: 0 }
@@ -173,6 +174,43 @@ export async function GET(request: NextRequest) {
     const queryFirstToken = queryTokens[0] || ''
     const customPackagedMatches = kindMode === 'packaged' ? getCustomPackagedMatches(query) : []
     let customPackagedApplied = false
+
+    const toCustomFoodItems = (value: string) => {
+      if (kindMode !== 'single') return []
+      const matches = searchCustomFoodMacros(value, limit)
+      if (!matches.length) return []
+      const items = matches.map((item) => ({
+        source: 'usda',
+        id: `custom:${normalizeForCompact(item.name) || normalizeForMatch(item.name)}`,
+        name: item.name,
+        brand: null,
+        serving_size: '100 g',
+        calories: item.calories,
+        protein_g: item.protein_g,
+        carbs_g: item.carbs_g,
+        fat_g: item.fat_g,
+        fiber_g: item.fiber_g,
+        sugar_g: item.sugar_g,
+        __custom: true,
+      }))
+      return items
+    }
+
+    const mergeCustomFoods = (list: any[], custom: any[]) => {
+      if (!Array.isArray(custom) || custom.length === 0) return list
+      const seen = new Set<string>()
+      const merged: any[] = []
+      const add = (item: any) => {
+        const key = `${normalizeForMatch(item?.name)}|${normalizeForMatch(item?.brand)}`
+        if (!key || key === '|') return
+        if (seen.has(key)) return
+        seen.add(key)
+        merged.push(item)
+      }
+      custom.forEach(add)
+      list.forEach(add)
+      return merged
+    }
 
     const hasMacroData = (item: any) => {
       if (!item) return false
@@ -351,7 +389,7 @@ export async function GET(request: NextRequest) {
       })
 
       const filtered = deduped.filter((item) => nameMatchesSearchQuery(item?.name || '', value))
-      return (filtered.length > 0 ? filtered : deduped).slice(0, limit)
+      return (filtered.length > 0 ? filtered : []).slice(0, limit)
     }
 
     if (source === 'auto' || !source) {
@@ -509,12 +547,15 @@ export async function GET(request: NextRequest) {
         return score
       }
 
+      const customItems = resolvedKind === 'single' ? toCustomFoodItems(query) : []
       const localItems = resolvedKind === 'single' ? await searchLocalPreferred(query, resolvedKind) : []
-      if (resolvedKind === 'single' && localItems.length > 0) {
-        items = [...localItems].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
+      if (resolvedKind === 'single' && (customItems.length > 0 || localItems.length > 0)) {
+        const combined = mergeCustomFoods(localItems, customItems)
+        items = [...combined].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
         actualSource = 'auto'
       } else if (resolvedKind === 'single') {
-        items = await searchUsdaSingleFood(query)
+        const usdaItems = await searchUsdaSingleFood(query)
+        items = mergeCustomFoods(usdaItems, customItems)
         actualSource = 'usda'
       } else {
         const perSource = Math.min(Math.max(limit, 10), 25)
@@ -579,9 +620,10 @@ export async function GET(request: NextRequest) {
       items = await searchOpenFoodFactsByQuery(query, { pageSize: limit })
     } else if (source === 'usda') {
       const resolvedKind = kind === 'packaged' ? 'packaged' : 'single'
+      const customItems = resolvedKind === 'single' ? toCustomFoodItems(query) : []
       const localItems = await searchLocalPreferred(query, resolvedKind)
-      if (localItems.length > 0) {
-        items = localItems
+      if (localItems.length > 0 || customItems.length > 0) {
+        items = mergeCustomFoods(localItems, customItems)
         actualSource = 'usda'
       } else if (localOnly) {
         items = []
@@ -589,7 +631,8 @@ export async function GET(request: NextRequest) {
       } else {
         const dataType = resolvedKind === 'packaged' ? 'all' : 'generic'
         if (resolvedKind !== 'packaged') {
-          items = await searchUsdaSingleFood(query)
+          const usdaItems = await searchUsdaSingleFood(query)
+          items = mergeCustomFoods(usdaItems, customItems)
         } else {
           const remote = await searchUsdaFoods(query, { pageSize: limit, dataType })
           items = remote
@@ -606,6 +649,11 @@ export async function GET(request: NextRequest) {
 
     if (kindMode === 'packaged' && customPackagedMatches.length > 0 && !customPackagedApplied) {
       items = mergeCustomPackagedMatches(items, customPackagedMatches)
+    }
+
+    if (kindMode === 'single' && Array.isArray(items) && items.length > 0) {
+      const filtered = items.filter((item) => nameMatchesSearchQuery(item?.name || '', query))
+      items = filtered.length > 0 ? filtered : []
     }
 
     if (Array.isArray(items) && items.length > 0) {

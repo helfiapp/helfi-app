@@ -5592,7 +5592,7 @@ export default function FoodDiary() {
       (entry?.nutrition && typeof entry.nutrition === 'object' ? (entry.nutrition as any).__portionScale : null) ??
       (entry?.total && typeof entry.total === 'object' ? (entry.total as any).__portionScale : null)
     const parsed = Number(raw)
-    if (!Number.isFinite(parsed) || parsed <= 0 || parsed >= 1) return null
+    if (!Number.isFinite(parsed) || parsed <= 0) return null
     return parsed
   }
 

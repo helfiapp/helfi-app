@@ -1034,12 +1034,21 @@ const computeServingsFromAmount = (item: BuilderItem) => {
 
 const computeItemTotals = (item: BuilderItem) => {
   const servings = computeServingsFromAmount(item)
+  const protein = macroOrZero(item.protein_g)
+  const carbs = macroOrZero(item.carbs_g)
+  const fat = macroOrZero(item.fat_g)
+  const fiber = macroOrZero(item.fiber_g)
+  let calories = macroOrZero(item.calories)
+  if (!Number.isFinite(calories) || calories <= 0) {
+    const macroEnergy = protein * 4 + carbs * 4 + fat * 9
+    calories = Number.isFinite(macroEnergy) && macroEnergy > 0 ? macroEnergy : 0
+  }
   return {
-    calories: macroOrZero(item.calories) * servings,
-    protein: macroOrZero(item.protein_g) * servings,
-    carbs: macroOrZero(item.carbs_g) * servings,
-    fat: macroOrZero(item.fat_g) * servings,
-    fiber: macroOrZero(item.fiber_g) * servings,
+    calories: calories * servings,
+    protein: protein * servings,
+    carbs: carbs * servings,
+    fat: fat * servings,
+    fiber: fiber * servings,
     sugar: macroOrZero(item.sugar_g) * servings,
   }
 }

@@ -1307,11 +1307,13 @@ Guard rail:
 - Do not clamp `portionScale` to 1.0 for saved meals. Portions can be **less than or greater than** 1.
 - Keep `__portionScale` on saved meals so the diary can scale totals later.
 - Daily totals must apply `applyPortionScaleToTotals(...)` when `__portionScale` exists.
+- `getEntryPortionScale` in `app/food/page.tsx` must allow values **greater than 1**. Do not ignore or clamp them.
 
 Restore steps if broken:
 1. In `MealBuilderClient`, restore `portionScale` calculation and make sure totals for save are multiplied by it.
 2. Ensure saved meals keep `__portionScale` in their totals.
 3. In `app/food/page.tsx`, apply `applyPortionScaleToTotals(...)` when calculating entry totals.
+4. In `app/food/page.tsx`, ensure `getEntryPortionScale` accepts values above 1 (not just below 1).
 
 Fix commit: `0347b9c7` (2026-01-23)  
 Last stable deployment: `0347b9c7` (2026-01-23)

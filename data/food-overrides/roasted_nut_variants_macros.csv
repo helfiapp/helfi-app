@@ -1,0 +1,33 @@
+food,per_100g_kcal,protein_g,carbs_g,fat_g,fibre_g,sugar_g,roast_type,salted
+Almonds (dry roasted),602.2,21.2,21.2,50.9,12.5,4.3,dry_roasted,False
+"Almonds (dry roasted, salted)",602.2,21.2,21.2,50.9,12.5,4.3,dry_roasted,True
+Almonds (oil roasted),648.5,21.2,21.0,55.9,12.5,4.3,oil_roasted,False
+"Almonds (oil roasted, salted)",648.5,21.2,21.0,55.9,12.5,4.3,oil_roasted,True
+Brazil nuts (dry roasted),685.4,14.3,11.5,68.4,7.5,2.3,dry_roasted,False
+"Brazil nuts (dry roasted, salted)",685.4,14.3,11.5,68.4,7.5,2.3,dry_roasted,True
+Brazil nuts (oil roasted),738.1,14.3,11.3,75.2,7.5,2.2,oil_roasted,False
+"Brazil nuts (oil roasted, salted)",738.1,14.3,11.3,75.2,7.5,2.2,oil_roasted,True
+Cashews (dry roasted),575.1,18.2,29.6,44.8,3.3,5.8,dry_roasted,False
+"Cashews (dry roasted, salted)",575.1,18.2,29.6,44.8,3.3,5.8,dry_roasted,True
+Cashews (oil roasted),619.4,18.2,29.3,49.2,3.3,5.7,oil_roasted,False
+"Cashews (oil roasted, salted)",619.4,18.2,29.3,49.2,3.3,5.7,oil_roasted,True
+Hazelnuts (dry roasted),653.1,15.0,16.4,62.0,9.7,4.2,dry_roasted,False
+"Hazelnuts (dry roasted, salted)",653.1,15.0,16.4,62.0,9.7,4.2,dry_roasted,True
+Hazelnuts (oil roasted),703.4,15.0,16.2,68.1,9.7,4.2,oil_roasted,False
+"Hazelnuts (oil roasted, salted)",703.4,15.0,16.2,68.1,9.7,4.2,oil_roasted,True
+Macadamia nuts (dry roasted),746.7,7.9,13.5,77.3,8.6,4.5,dry_roasted,False
+"Macadamia nuts (dry roasted, salted)",746.7,7.9,13.5,77.3,8.6,4.5,dry_roasted,True
+Macadamia nuts (oil roasted),804.2,7.9,13.4,84.9,8.6,4.5,oil_roasted,False
+"Macadamia nuts (oil roasted, salted)",804.2,7.9,13.4,84.9,8.6,4.5,oil_roasted,True
+Peanuts (dry roasted),589.7,25.8,15.8,50.2,8.5,4.6,dry_roasted,False
+"Peanuts (dry roasted, salted)",589.7,25.8,15.8,50.2,8.5,4.6,dry_roasted,True
+Peanuts (oil roasted),635.0,25.8,15.6,55.1,8.5,4.6,oil_roasted,False
+"Peanuts (oil roasted, salted)",635.0,25.8,15.6,55.1,8.5,4.6,oil_roasted,True
+Pistachios (dry roasted),584.5,20.2,26.9,46.3,10.3,7.5,dry_roasted,False
+"Pistachios (dry roasted, salted)",584.5,20.2,26.9,46.3,10.3,7.5,dry_roasted,True
+Pistachios (oil roasted),629.4,20.2,26.7,50.8,10.3,7.5,oil_roasted,False
+"Pistachios (oil roasted, salted)",629.4,20.2,26.7,50.8,10.3,7.5,oil_roasted,True
+Walnuts (dry roasted),680.2,15.2,13.4,66.5,6.7,2.5,dry_roasted,False
+"Walnuts (dry roasted, salted)",680.2,15.2,13.4,66.5,6.7,2.5,dry_roasted,True
+Walnuts (oil roasted),732.5,15.2,13.3,73.0,6.7,2.5,oil_roasted,False
+"Walnuts (oil roasted, salted)",732.5,15.2,13.3,73.0,6.7,2.5,oil_roasted,True
