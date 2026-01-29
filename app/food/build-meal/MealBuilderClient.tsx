@@ -257,6 +257,8 @@ const MEASUREMENT_LIST_SUGGESTIONS: Array<{ name: string; serving_size?: string;
   })),
 ]
 
+const ENABLE_SINGLE_SUGGESTIONS = false
+
 const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
   'McDonald\'s',
   'KFC',
@@ -284,30 +286,76 @@ const getLastSearchToken = (searchQuery: string) => {
   return tokens.length > 0 ? tokens[tokens.length - 1] : ''
 }
 
+const isOneEditAway = (a: string, b: string) => {
+  const lenA = a.length
+  const lenB = b.length
+  if (Math.abs(lenA - lenB) > 1) return false
+  if (lenA === lenB) {
+    let mismatches = 0
+    for (let i = 0; i < lenA; i += 1) {
+      if (a[i] !== b[i]) {
+        mismatches += 1
+        if (mismatches > 1) return false
+      }
+    }
+    return mismatches <= 1
+  }
+  const shorter = lenA < lenB ? a : b
+  const longer = lenA < lenB ? b : a
+  let i = 0
+  let j = 0
+  let edits = 0
+  while (i < shorter.length && j < longer.length) {
+    if (shorter[i] === longer[j]) {
+      i += 1
+      j += 1
+      continue
+    }
+    edits += 1
+    if (edits > 1) return false
+    j += 1
+  }
+  return true
+}
+
 const nameMatchesSearchQuery = (name: string, searchQuery: string, options?: { requireFirstWord?: boolean }) => {
-  // Ignore 1-letter tokens so "art" does not match "Bartlett" via "t".
+  const normalizedQuery = normalizeSearchToken(searchQuery)
+  const nameTokens = getSearchTokens(name)
+  if (normalizedQuery.length === 1) {
+    return nameTokens.some((word) => word.startsWith(normalizedQuery))
+  }
   const queryTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
-  const nameTokens = getSearchTokens(name).filter((token) => token.length >= 2)
-  if (queryTokens.length === 0 || nameTokens.length === 0) return false
+  const filteredNameTokens = nameTokens.filter((token) => token.length >= 2)
+  if (queryTokens.length === 0 || filteredNameTokens.length === 0) return false
   const tokenMatches = (token: string, word: string) => {
     if (!token || !word) return false
-    if (word.startsWith(token)) return true
-    if (word.length >= 2 && token.startsWith(word)) return true // Also match if the query token starts with the word
+    const matchToken = (value: string) => {
+      if (word.startsWith(value)) return true
+      if (value.length >= 2 && value.startsWith(word) && value.length - word.length <= 1) return true
+      if (value.length >= 3 && word.length >= 3 && isOneEditAway(value, word)) return true
+      if (value.length >= 2) {
+        const prefixSame = word.slice(0, value.length)
+        if (prefixSame && isOneEditAway(value, prefixSame)) return true
+        const prefixLonger = word.slice(0, value.length + 1)
+        if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
+        if (value.length >= 4) {
+          const prefixShorter = word.slice(0, value.length - 1)
+          if (prefixShorter && isOneEditAway(value, prefixShorter)) return true
+        }
+      }
+      return false
+    }
+    if (matchToken(token)) return true
     const singular = singularizeToken(token)
-    if (singular !== token && word.startsWith(singular)) return true
-    if (singular !== token && singular.startsWith(word)) return true
-    if (token.length >= 4 && word.includes(token)) return true
-    if (singular.length >= 4 && word.includes(singular)) return true
-    // For full words (4+ chars), also allow if word contains the token
-    if (word.length >= 4 && token.includes(word) && token.length - word.length <= 1) return true
+    if (singular !== token && matchToken(singular)) return true
     return false
   }
   const requireFirstWord = options?.requireFirstWord ?? false
   if (requireFirstWord) {
-    if (!queryTokens.some((token) => tokenMatches(token, nameTokens[0]))) return false
+    if (!queryTokens.some((token) => tokenMatches(token, filteredNameTokens[0]))) return false
   }
-  if (queryTokens.length === 1) return nameTokens.some((word) => tokenMatches(queryTokens[0], word))
-  return queryTokens.every((token) => nameTokens.some((word) => tokenMatches(token, word)))
+  if (queryTokens.length === 1) return filteredNameTokens.some((word) => tokenMatches(queryTokens[0], word))
+  return queryTokens.every((token) => filteredNameTokens.some((word) => tokenMatches(token, word)))
 }
 
 const itemMatchesSearchQuery = (item: NormalizedFoodItem, searchQuery: string, kind: 'packaged' | 'single') => {
@@ -397,6 +445,7 @@ const buildBrandSuggestions = (names: string[], searchQuery: string): Normalized
 }
 
 const buildInstantSuggestions = (searchQuery: string): NormalizedFoodItem[] => {
+  if (!ENABLE_SINGLE_SUGGESTIONS) return []
   const tokens = getSearchTokens(searchQuery)
   if (!tokens.some((token) => token.length >= 2)) return []
   const normalizedQuery = normalizeSearchToken(searchQuery)
@@ -440,8 +489,8 @@ const mergeBrandSuggestions = (items: NormalizedFoodItem[], suggestions: Normali
     seen.add(key)
     merged.push(item)
   }
-  suggestions.forEach(add)
   items.forEach(add)
+  suggestions.forEach(add)
   return merged
 }
 
@@ -454,7 +503,7 @@ const getCachedSearchResults = (
 ) => {
   const cached = cache.get(buildSearchCacheKey(kind))
   if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
-  const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+  const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
   const filtered = hasToken ? cached.items.filter((item) => itemMatchesSearchQuery(item, q, kind)) : cached.items
   return filtered.slice(0, 20)
 }
@@ -1591,7 +1640,7 @@ export default function MealBuilderClient() {
 
   const fetchBrandSuggestions = async (searchQuery: string) => {
     const prefix = getBrandMatchTokens(searchQuery)[0] || ''
-    if (prefix.length < 2) return []
+    if (prefix.length < 1) return []
     try {
       const res = await fetch(`/api/food-brands?startsWith=${encodeURIComponent(prefix)}`, { method: 'GET' })
       if (!res.ok) return []
@@ -1622,10 +1671,10 @@ export default function MealBuilderClient() {
       const allowBrandSuggestions = kind === 'packaged' && shouldShowBrandSuggestions(q)
       if (kind === 'packaged') {
         const quickQuery = getQuickPackagedQuery(q)
-        if (quickQuery.length >= 2) {
+        if (quickQuery.length >= 1) {
           const quickItems = await fetchSearchItems(quickQuery, { kindOverride: 'packaged', sourceOverride: 'usda', localOnly: true })
           if (seqRef.current === seq && quickItems.length > 0) {
-            const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+            const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
             const quickFiltered = hasToken ? quickItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : quickItems
             const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current) : quickFiltered
             const quickWithSuggestions =
@@ -1643,16 +1692,16 @@ export default function MealBuilderClient() {
       let nextItems = await fetchSearchItems(q)
       if (seqRef.current !== seq) return
       const rawItems = nextItems
-      const hasToken = getSearchTokens(q).some((token) => token.length >= 2)
+      const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
       let filteredItems = hasToken ? nextItems.filter((item: NormalizedFoodItem) => itemMatchesSearchQuery(item, q, kind)) : nextItems
       if (kind === 'single' && filteredItems.length === 0 && rawItems.length > 0) {
-        const tokenCount = getSearchTokens(q).filter((token) => token.length >= 2).length
+        const tokenCount = getSearchTokens(q).filter((token) => token.length >= 1).length
         if (tokenCount <= 1) filteredItems = rawItems
       }
       if (filteredItems.length === 0 && kind === 'single') {
         try {
           const lastWord = getLastSearchToken(q)
-          if (lastWord && lastWord !== q && lastWord.length >= 2) {
+          if (lastWord && lastWord !== q && lastWord.length >= 1) {
             const fallbackItems = await fetchSearchItems(lastWord)
             if (seqRef.current === seq) {
               const fallbackFiltered =
@@ -1691,7 +1740,7 @@ export default function MealBuilderClient() {
       window.clearTimeout(searchDebounceRef.current)
       searchDebounceRef.current = null
     }
-    if (q.length < 2) {
+    if (q.length < 1) {
       seqRef.current += 1
       setResults([])
       setSearchLoading(false)
@@ -1735,7 +1784,7 @@ export default function MealBuilderClient() {
       setBrandSuggestions([])
       return
     }
-    if (q.length < 2) {
+    if (q.length < 1) {
       brandSeqRef.current += 1
       setBrandSuggestions([])
       return

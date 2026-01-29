@@ -44,37 +44,75 @@ const singularizeToken = (value: string) => {
 
 const getTokens = (value: string) => normalizeText(value).split(' ').filter(Boolean)
 
+const isOneEditAway = (a: string, b: string) => {
+  const lenA = a.length
+  const lenB = b.length
+  if (Math.abs(lenA - lenB) > 1) return false
+  if (lenA === lenB) {
+    let mismatches = 0
+    for (let i = 0; i < lenA; i += 1) {
+      if (a[i] !== b[i]) {
+        mismatches += 1
+        if (mismatches > 1) return false
+      }
+    }
+    return mismatches <= 1
+  }
+  const shorter = lenA < lenB ? a : b
+  const longer = lenA < lenB ? b : a
+  let i = 0
+  let j = 0
+  let edits = 0
+  while (i < shorter.length && j < longer.length) {
+    if (shorter[i] === longer[j]) {
+      i += 1
+      j += 1
+      continue
+    }
+    edits += 1
+    if (edits > 1) return false
+    j += 1
+  }
+  return true
+}
+
 const nameMatchesQuery = (name: string, query: string) => {
+  const normalizedQuery = normalizeText(query)
+  if (normalizedQuery.length === 1) {
+    const nameTokens = getTokens(name)
+    return nameTokens.some((word) => word.startsWith(normalizedQuery))
+  }
+
   const queryTokens = getTokens(query).filter((token) => token.length >= 2)
-  const nameTokens = getTokens(name).filter((token) => token.length >= 2)
+  const nameTokens = getTokens(name)
   if (queryTokens.length === 0 || nameTokens.length === 0) return false
 
   const tokenMatches = (token: string, word: string) => {
     if (!token || !word) return false
-    if (word.startsWith(token)) return true
-    if (word.length >= 2 && token.startsWith(word)) return true
+    const matchToken = (value: string) => {
+      if (word.startsWith(value)) return true
+      if (value.length >= 2 && value.startsWith(word) && value.length - word.length <= 1) return true
+      if (value.length >= 3 && word.length >= 3 && isOneEditAway(value, word)) return true
+      if (value.length >= 2) {
+        const prefixSame = word.slice(0, value.length)
+        if (prefixSame && isOneEditAway(value, prefixSame)) return true
+        const prefixLonger = word.slice(0, value.length + 1)
+        if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
+        if (value.length >= 4) {
+          const prefixShorter = word.slice(0, value.length - 1)
+          if (prefixShorter && isOneEditAway(value, prefixShorter)) return true
+        }
+      }
+      return false
+    }
+    if (matchToken(token)) return true
     const singular = singularizeToken(token)
-    if (singular !== token && word.startsWith(singular)) return true
-    if (singular !== token && singular.startsWith(word)) return true
-    if (token.length >= 4 && word.includes(token)) return true
-    if (singular.length >= 4 && word.includes(singular)) return true
-    if (word.length >= 4 && token.includes(word) && token.length - word.length <= 1) return true
+    if (singular !== token && matchToken(singular)) return true
     return false
   }
 
   if (queryTokens.length === 1) return nameTokens.some((word) => tokenMatches(queryTokens[0], word))
   return queryTokens.every((token) => nameTokens.some((word) => tokenMatches(token, word)))
-}
-
-const scoreMatch = (name: string, query: string) => {
-  const nameNorm = normalizeText(name)
-  const queryNorm = normalizeText(query)
-  if (!nameNorm || !queryNorm) return 0
-  if (nameNorm === queryNorm) return 1000
-  if (nameNorm.startsWith(queryNorm)) return 850
-  if (nameNorm.includes(queryNorm)) return 700
-  if (nameMatchesQuery(name, query)) return 500
-  return 0
 }
 
 const parseCsvLine = (line: string) => {
@@ -174,10 +212,8 @@ export const searchCustomFoodMacros = (query: string, limit = 10): CustomFoodMac
   const items = loadCustomFoods()
   if (items.length === 0) return []
   const matches = items
-    .map((item) => ({ item, score: scoreMatch(item.name, q) }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map((entry) => entry.item)
+    .filter((item) => nameMatchesQuery(item.name, q))
+    .sort((a, b) => normalizeText(a.name).localeCompare(normalizeText(b.name)))
   if (matches.length === 0) return []
   return matches.slice(0, Math.max(1, limit))
 }

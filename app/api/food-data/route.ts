@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
 
     const normalizeForCompact = (value: any) => normalizeForMatch(value).replace(/\s+/g, '')
 
+    const sortByNameAsc = (list: any[]) =>
+      [...list].sort((a, b) => normalizeForMatch(a?.name).localeCompare(normalizeForMatch(b?.name)))
+
     const singularizeToken = (value: string) => {
       const lower = value.toLowerCase()
       if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
@@ -64,6 +67,38 @@ export async function GET(request: NextRequest) {
     }
 
     const getSearchTokens = (value: string) => normalizeForMatch(value).split(' ').filter(Boolean)
+
+    const isOneEditAway = (a: string, b: string) => {
+      const lenA = a.length
+      const lenB = b.length
+      if (Math.abs(lenA - lenB) > 1) return false
+      if (lenA === lenB) {
+        let mismatches = 0
+        for (let i = 0; i < lenA; i += 1) {
+          if (a[i] !== b[i]) {
+            mismatches += 1
+            if (mismatches > 1) return false
+          }
+        }
+        return mismatches <= 1
+      }
+      const shorter = lenA < lenB ? a : b
+      const longer = lenA < lenB ? b : a
+      let i = 0
+      let j = 0
+      let edits = 0
+      while (i < shorter.length && j < longer.length) {
+        if (shorter[i] === longer[j]) {
+          i += 1
+          j += 1
+          continue
+        }
+        edits += 1
+        if (edits > 1) return false
+        j += 1
+      }
+      return true
+    }
 
     const DESCRIPTOR_TOKENS = new Set([
       'raw',
@@ -85,26 +120,41 @@ export async function GET(request: NextRequest) {
     ])
 
     const nameMatchesSearchQuery = (name: string, searchQuery: string) => {
-      // Ignore 1-letter tokens so "art" does not match "Bartlett" via "t".
+      const normalizedQuery = normalizeForMatch(searchQuery)
+      const nameTokens = getSearchTokens(name)
+      if (normalizedQuery.length === 1) {
+        return nameTokens.some((word) => word.startsWith(normalizedQuery))
+      }
       const rawTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
       const filteredTokens = rawTokens.filter((token) => !DESCRIPTOR_TOKENS.has(token))
       const queryTokens = filteredTokens.length > 0 ? filteredTokens : rawTokens
-      const nameTokens = getSearchTokens(name).filter((token) => token.length >= 2)
-      if (queryTokens.length === 0 || nameTokens.length === 0) return false
+      const filteredNameTokens = nameTokens.filter((token) => token.length >= 2)
+      if (queryTokens.length === 0 || filteredNameTokens.length === 0) return false
       const tokenMatches = (token: string, word: string) => {
         if (!token || !word) return false
-        if (word.startsWith(token)) return true
-        if (word.length >= 2 && token.startsWith(word)) return true
+        const matchToken = (value: string) => {
+          if (word.startsWith(value)) return true
+          if (value.length >= 2 && value.startsWith(word) && value.length - word.length <= 1) return true
+          if (value.length >= 3 && word.length >= 3 && isOneEditAway(value, word)) return true
+          if (value.length >= 2) {
+            const prefixSame = word.slice(0, value.length)
+            if (prefixSame && isOneEditAway(value, prefixSame)) return true
+            const prefixLonger = word.slice(0, value.length + 1)
+            if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
+            if (value.length >= 4) {
+              const prefixShorter = word.slice(0, value.length - 1)
+              if (prefixShorter && isOneEditAway(value, prefixShorter)) return true
+            }
+          }
+          return false
+        }
+        if (matchToken(token)) return true
         const singular = singularizeToken(token)
-        if (singular !== token && word.startsWith(singular)) return true
-        if (singular !== token && singular.startsWith(word)) return true
-        if (token.length >= 4 && word.includes(token)) return true
-        if (singular.length >= 4 && word.includes(singular)) return true
-        if (word.length >= 4 && token.includes(word) && token.length - word.length <= 1) return true
+        if (singular !== token && matchToken(singular)) return true
         return false
       }
-      if (queryTokens.length === 1) return nameTokens.some((word) => tokenMatches(queryTokens[0], word))
-      return queryTokens.every((token) => nameTokens.some((word) => tokenMatches(token, word)))
+      if (queryTokens.length === 1) return filteredNameTokens.some((word) => tokenMatches(queryTokens[0], word))
+      return queryTokens.every((token) => filteredNameTokens.some((word) => tokenMatches(token, word)))
     }
 
     type CustomPackagedItem = {
@@ -151,22 +201,6 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const mergeCustomPackagedMatches = (list: any[], custom: any[]) => {
-      if (!Array.isArray(custom) || custom.length === 0) return list
-      const seen = new Set<string>()
-      const merged: any[] = []
-      const add = (item: any) => {
-        const key = `${normalizeForMatch(item?.name)}|${normalizeForMatch(item?.brand)}`
-        if (!key || key === '|') return
-        if (seen.has(key)) return
-        seen.add(key)
-        merged.push(item)
-      }
-      custom.forEach(add)
-      list.forEach(add)
-      return merged
-    }
-
     const queryNorm = normalizeForMatch(query)
     const queryCompact = normalizeForCompact(query)
     const queryTokens = queryNorm ? queryNorm.split(' ').filter(Boolean) : []
@@ -194,22 +228,6 @@ export async function GET(request: NextRequest) {
         __custom: true,
       }))
       return items
-    }
-
-    const mergeCustomFoods = (list: any[], custom: any[]) => {
-      if (!Array.isArray(custom) || custom.length === 0) return list
-      const seen = new Set<string>()
-      const merged: any[] = []
-      const add = (item: any) => {
-        const key = `${normalizeForMatch(item?.name)}|${normalizeForMatch(item?.brand)}`
-        if (!key || key === '|') return
-        if (seen.has(key)) return
-        seen.add(key)
-        merged.push(item)
-      }
-      custom.forEach(add)
-      list.forEach(add)
-      return merged
     }
 
     const hasMacroData = (item: any) => {
@@ -370,7 +388,8 @@ export async function GET(request: NextRequest) {
     const searchLocalPreferred = async (value: string, resolvedKind: 'packaged' | 'single') => {
       if (!value) return []
       if (resolvedKind === 'packaged') {
-        return await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'], mode: 'prefix' })
+        const localPackaged = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'], mode: 'prefix' })
+        return sortByNameAsc(localPackaged).slice(0, limit)
       }
       const [foundation, legacy, branded] = await Promise.all([
         searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] }),
@@ -389,7 +408,7 @@ export async function GET(request: NextRequest) {
       })
 
       const filtered = deduped.filter((item) => nameMatchesSearchQuery(item?.name || '', value))
-      return (filtered.length > 0 ? filtered : []).slice(0, limit)
+      return sortByNameAsc(filtered).slice(0, limit)
     }
 
     if (source === 'auto' || !source) {
@@ -549,14 +568,18 @@ export async function GET(request: NextRequest) {
 
       const customItems = resolvedKind === 'single' ? toCustomFoodItems(query) : []
       const localItems = resolvedKind === 'single' ? await searchLocalPreferred(query, resolvedKind) : []
-      if (resolvedKind === 'single' && (customItems.length > 0 || localItems.length > 0)) {
-        const combined = mergeCustomFoods(localItems, customItems)
-        items = [...combined].sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
-        actualSource = 'auto'
-      } else if (resolvedKind === 'single') {
-        const usdaItems = await searchUsdaSingleFood(query)
-        items = mergeCustomFoods(usdaItems, customItems)
-        actualSource = 'usda'
+      if (resolvedKind === 'single') {
+        if (customItems.length > 0) {
+          items = sortByNameAsc(customItems).slice(0, limit)
+          actualSource = 'auto'
+        } else if (localItems.length > 0) {
+          items = sortByNameAsc(localItems).slice(0, limit)
+          actualSource = 'auto'
+        } else {
+          const usdaItems = await searchUsdaSingleFood(query)
+          items = sortByNameAsc(usdaItems).slice(0, limit)
+          actualSource = 'usda'
+        }
       } else {
         const perSource = Math.min(Math.max(limit, 10), 25)
 
@@ -596,24 +619,28 @@ export async function GET(request: NextRequest) {
           return await fetchForQuery(compactQuery)
         }
 
-        if (isRestaurantQuery) {
-          const pooled = await fetchExternalPool()
-          items = pooled.slice(0, limit)
+        if (customPackagedMatches.length > 0) {
+          items = sortByNameAsc(customPackagedMatches).slice(0, limit)
           actualSource = 'auto'
+          customPackagedApplied = true
         } else {
           const localPackaged = await searchLocalPreferred(query, 'packaged')
           const localPackagedFiltered = localPackaged.filter((item) => {
             const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
             return nameMatchesSearchQuery(combined || item?.name || '', query)
           })
-          const minLocalOnly = 5
-          const pooled = localPackagedFiltered.length < minLocalOnly ? await fetchExternalPool() : []
-          const combined = dedupe([...localPackagedFiltered, ...pooled])
-          const combinedWithCustom =
-            customPackagedMatches.length > 0 ? mergeCustomPackagedMatches(combined, customPackagedMatches) : combined
-          items = combinedWithCustom.sort((a, b) => scoreItem(b) - scoreItem(a)).slice(0, limit)
-          actualSource = 'auto'
-          customPackagedApplied = customPackagedMatches.length > 0
+          if (localPackagedFiltered.length > 0) {
+            items = sortByNameAsc(localPackagedFiltered).slice(0, limit)
+            actualSource = 'auto'
+          } else if (isRestaurantQuery) {
+            const pooled = await fetchExternalPool()
+            items = sortByNameAsc(pooled).slice(0, limit)
+            actualSource = 'auto'
+          } else {
+            const pooled = await fetchExternalPool()
+            items = sortByNameAsc(pooled).slice(0, limit)
+            actualSource = 'auto'
+          }
         }
       }
     } else if (source === 'openfoodfacts') {
@@ -622,20 +649,37 @@ export async function GET(request: NextRequest) {
       const resolvedKind = kind === 'packaged' ? 'packaged' : 'single'
       const customItems = resolvedKind === 'single' ? toCustomFoodItems(query) : []
       const localItems = await searchLocalPreferred(query, resolvedKind)
-      if (localItems.length > 0 || customItems.length > 0) {
-        items = mergeCustomFoods(localItems, customItems)
-        actualSource = 'usda'
-      } else if (localOnly) {
-        items = []
-        actualSource = 'usda'
-      } else {
-        const dataType = resolvedKind === 'packaged' ? 'all' : 'generic'
-        if (resolvedKind !== 'packaged') {
-          const usdaItems = await searchUsdaSingleFood(query)
-          items = mergeCustomFoods(usdaItems, customItems)
+      if (resolvedKind === 'single') {
+        if (customItems.length > 0) {
+          items = sortByNameAsc(customItems).slice(0, limit)
+          actualSource = 'usda'
+        } else if (localItems.length > 0) {
+          items = sortByNameAsc(localItems).slice(0, limit)
+          actualSource = 'usda'
+        } else if (localOnly) {
+          items = []
+          actualSource = 'usda'
         } else {
+          const usdaItems = await searchUsdaSingleFood(query)
+          items = sortByNameAsc(usdaItems).slice(0, limit)
+          actualSource = 'usda'
+        }
+      } else {
+        if (customPackagedMatches.length > 0) {
+          items = sortByNameAsc(customPackagedMatches).slice(0, limit)
+          actualSource = 'usda'
+          customPackagedApplied = true
+        } else if (localItems.length > 0) {
+          items = sortByNameAsc(localItems).slice(0, limit)
+          actualSource = 'usda'
+        } else if (localOnly) {
+          items = []
+          actualSource = 'usda'
+        } else {
+          const dataType = resolvedKind === 'packaged' ? 'all' : 'generic'
           const remote = await searchUsdaFoods(query, { pageSize: limit, dataType })
-          items = remote
+          items = sortByNameAsc(remote).slice(0, limit)
+          actualSource = 'usda'
         }
       }
     } else if (source === 'fatsecret') {
@@ -648,7 +692,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (kindMode === 'packaged' && customPackagedMatches.length > 0 && !customPackagedApplied) {
-      items = mergeCustomPackagedMatches(items, customPackagedMatches)
+      if (!Array.isArray(items) || items.length === 0) {
+        items = sortByNameAsc(customPackagedMatches).slice(0, limit)
+        customPackagedApplied = true
+      }
     }
 
     if (kindMode === 'single' && Array.isArray(items) && items.length > 0) {
@@ -661,9 +708,8 @@ export async function GET(request: NextRequest) {
       items = filtered
     }
 
-    // For non-auto sources, apply the same name-match ranking so exact matches come first.
-    if (actualSource !== 'auto' && Array.isArray(items) && items.length > 1) {
-      items = [...items].sort((a, b) => scoreItemName(b) - scoreItemName(a))
+    if (Array.isArray(items) && items.length > 1) {
+      items = sortByNameAsc(items).slice(0, limit)
     }
 
     return NextResponse.json({ success: true, source: actualSource, items })
