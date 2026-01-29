@@ -39,6 +39,36 @@ const dedupeItems = (items: any[]) => {
   return result
 }
 
+const splitSupplementName = (rawName: string) => {
+  const cleaned = String(rawName || '').trim()
+  if (!cleaned) return { brand: null as string | null, product: null as string | null }
+  const parts = cleaned.split(' - ').map((part) => part.trim()).filter(Boolean)
+  if (parts.length >= 2) {
+    const brand = parts[0] || null
+    const product = parts.slice(1).join(' - ').trim() || null
+    return { brand, product }
+  }
+  return { brand: null, product: cleaned }
+}
+
+const buildSupplementCatalogRows = (supplements: any[], userId: string) => {
+  if (!Array.isArray(supplements)) return []
+  return supplements
+    .filter((supp: any) => supp && supp.name && (supp.method === 'photo' || supp.imageUrl))
+    .map((supp: any) => {
+      const { brand, product } = splitSupplementName(supp.name)
+      return {
+        userId,
+        brand,
+        product,
+        fullName: String(supp.name || '').trim(),
+        dosage: String(supp.dosage || '').trim(),
+        source: 'photo',
+      }
+    })
+    .filter((row) => row.fullName)
+}
+
 export async function GET(request: NextRequest) {
   try {
     console.log('=== GET /api/user-data DEBUG START ===')
@@ -1335,6 +1365,20 @@ export async function POST(request: NextRequest) {
           })
         ])
         console.log('✅ Replaced supplements via bulk operation:', dedupedSupplements.length)
+
+        // Store photo-based supplements in the catalog for future search
+        try {
+          const catalogRows = buildSupplementCatalogRows(dedupedSupplements, user.id)
+          if (catalogRows.length > 0) {
+            await prisma.supplementCatalog.createMany({
+              data: catalogRows,
+              skipDuplicates: true,
+            })
+            console.log('📚 Stored supplement catalog entries:', catalogRows.length)
+          }
+        } catch (catalogError) {
+          console.error('❌ Failed to store supplement catalog entries:', catalogError)
+        }
         
         // BACKUP: Also store supplements as JSON in health goals as failsafe
         try {
