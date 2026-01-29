@@ -194,6 +194,16 @@ const buildSupplementNameFromDsld = (source: any) => {
   return product || brand || null
 }
 
+const extractDsldBrand = (source: any) => {
+  return (
+    source?.brandName ||
+    source?.brand_name ||
+    source?.brand ||
+    source?.manufacturer ||
+    ''
+  )
+}
+
 const COMMON_SUPPLEMENT_BRANDS = [
   'NOW Foods',
   'Thorne',
@@ -240,11 +250,38 @@ const COMMON_SUPPLEMENT_BRANDS = [
   'Klaire Labs',
 ]
 
+const BRAND_ALIASES: Record<string, string> = {
+  'now foods': 'now',
+  'now': 'now',
+}
+
 const normalizeSearchText = (value: string) => {
   return String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
+}
+
+const getBrandMatch = (rawQuery: string) => {
+  const query = normalizeSearchText(rawQuery)
+  if (!query) return null
+  let best: { display: string; normalized: string } | null = null
+  COMMON_SUPPLEMENT_BRANDS.forEach((brand) => {
+    const normalized = normalizeSearchText(brand)
+    if (!normalized) return
+    const starts = normalized.startsWith(query)
+    const tokenStarts = normalized.split(' ').some((word) => word.startsWith(query))
+    const containsAll = query.split(' ').every((word) => normalized.includes(word))
+    if (!starts && !tokenStarts && !containsAll) return
+    if (!best || normalized.length > best.normalized.length) {
+      best = { display: brand, normalized }
+    }
+  })
+  return best
+}
+
+const getBrandKey = (normalizedBrand: string) => {
+  return BRAND_ALIASES[normalizedBrand] || normalizedBrand
 }
 
 const buildBrandSuggestionsFromList = (rawQuery: string) => {
@@ -321,9 +358,10 @@ const parseDsldSuggestions = (data: any) => {
       const source = hit?._source || hit?.source || hit || {}
       const name = buildSupplementNameFromDsld(source)
       if (!name) return null
-      return { name, source: 'dsld' }
+      const brand = extractDsldBrand(source)
+      return { name, source: 'dsld', brand }
     })
-    .filter(Boolean) as { name: string; source: string }[]
+    .filter(Boolean) as { name: string; source: string; brand?: string }[]
   const seen = new Set<string>()
   return items.filter((item) => {
     const key = item.name.toLowerCase()
@@ -331,6 +369,46 @@ const parseDsldSuggestions = (data: any) => {
     seen.add(key)
     return true
   })
+}
+
+const filterSuggestionsByBrand = (
+  items: { name: string; source: string; brand?: string }[],
+  brandKey: string,
+) => {
+  const key = normalizeSearchText(brandKey)
+  if (!key) return []
+  const keyTokens = key.split(' ').filter(Boolean)
+  return items.filter((item) => {
+    const normalizedBrand = normalizeSearchText(item.brand || '')
+    if (!normalizedBrand) return false
+    if (normalizedBrand === key) return true
+    return keyTokens.every((token) => normalizedBrand.includes(token))
+  })
+}
+
+const filterSuggestionsByRemainder = (
+  items: { name: string; source: string; brand?: string }[],
+  remainder: string,
+) => {
+  const normalized = normalizeSearchText(remainder)
+  if (!normalized) return items
+  const tokens = normalized.split(' ').filter(Boolean)
+  return items.filter((item) => {
+    const label = normalizeSearchText(item.name || '')
+    if (!label) return false
+    return tokens.every(
+      (token) =>
+        label.includes(token) || label.split(' ').some((word) => word.startsWith(token)),
+    )
+  })
+}
+
+const getRemainderAfterBrand = (rawQuery: string, brandNormalized: string) => {
+  const query = normalizeSearchText(rawQuery)
+  if (!query || !brandNormalized) return ''
+  if (!query.startsWith(brandNormalized)) return ''
+  const remainder = query.slice(brandNormalized.length).trim()
+  return remainder
 }
 
 const isPlaceholderName = (name: any) => {
@@ -5098,21 +5176,58 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       try {
         setNameLoading(true);
         setNameError(null);
-        const dsldUrl = `https://api.ods.od.nih.gov/dsld/v9/search-filter?q=${encodeURIComponent(query)}&from=0&size=10&sort_by=_score&sort_order=desc`;
+        const brandMatch = getBrandMatch(query);
+        const brandKey = brandMatch ? getBrandKey(brandMatch.normalized) : '';
+        const remainder = brandMatch ? getRemainderAfterBrand(query, brandMatch.normalized) : '';
+        const dsldQueries = brandMatch
+          ? Array.from(
+              new Set([brandMatch.display, brandKey, query].filter(Boolean)),
+            )
+          : [query];
         let suggestions: { name: string; source: string }[] = [];
         const listSuggestions = buildBrandSuggestionsFromList(query);
         try {
-          const dsldResponse = await fetch(dsldUrl);
-          if (dsldResponse.ok) {
-            const dsldData = await dsldResponse.json().catch(() => ({}));
-            const brandSuggestions = buildBrandSuggestionsFromDsld(dsldData, query);
-            const productSuggestions = parseDsldSuggestions(dsldData);
+          const dsldResults = await Promise.all(
+            dsldQueries.map(async (q) => {
+              const dsldUrl = `https://api.ods.od.nih.gov/dsld/v9/search-filter?q=${encodeURIComponent(q)}&from=0&size=10&sort_by=_score&sort_order=desc`;
+              const dsldResponse = await fetch(dsldUrl);
+              if (!dsldResponse.ok) return null;
+              return dsldResponse.json().catch(() => ({}));
+            }),
+          );
+          const dsldData = dsldResults.filter(Boolean);
+          const brandSuggestions = dsldData.flatMap((entry) =>
+            buildBrandSuggestionsFromDsld(entry, query),
+          );
+          const productSuggestions = dedupeSuggestions(
+            dsldData.flatMap((entry) => parseDsldSuggestions(entry)),
+          );
+
+          if (brandMatch) {
+            let filtered = filterSuggestionsByBrand(
+              productSuggestions as { name: string; source: string; brand?: string }[],
+              brandKey,
+            );
+            filtered = filterSuggestionsByRemainder(
+              filtered as { name: string; source: string; brand?: string }[],
+              remainder,
+            );
+            const brandOnly = listSuggestions.filter((item) =>
+              normalizeSearchText(item.name).startsWith(brandMatch.normalized),
+            );
+            suggestions = dedupeSuggestions([
+              ...brandOnly,
+              ...filtered,
+            ]);
+          } else {
             suggestions = dedupeSuggestions([
               ...listSuggestions,
               ...brandSuggestions,
               ...productSuggestions,
             ]);
-          } else if (listSuggestions.length > 0) {
+          }
+
+          if (suggestions.length === 0 && listSuggestions.length > 0) {
             suggestions = listSuggestions;
           }
         } catch (dsldError) {
