@@ -379,12 +379,14 @@ const filterSuggestionsByBrand = (
 ) => {
   const key = normalizeSearchText(brandKey)
   if (!key) return []
-  const keyTokens = key.split(' ').filter(Boolean)
   return items.filter((item) => {
     const normalizedBrand = normalizeSearchText(item.brand || '')
     if (!normalizedBrand) return false
+    if (key.length <= 3) return normalizedBrand === key
     if (normalizedBrand === key) return true
-    return keyTokens.every((token) => normalizedBrand.includes(token))
+    if (normalizedBrand.startsWith(`${key} `)) return true
+    if (key.startsWith(`${normalizedBrand} `)) return true
+    return false
   })
 }
 
