@@ -772,7 +772,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (Array.isArray(items) && items.length > 1) {
-      items = sortByNameAsc(items).slice(0, limit)
+      if (kindMode !== 'single') {
+        items = sortByNameAsc(items).slice(0, limit)
+      } else {
+        items = items.slice(0, limit)
+      }
     }
 
     return NextResponse.json({ success: true, source: actualSource, items })
