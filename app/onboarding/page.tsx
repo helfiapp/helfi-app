@@ -5206,6 +5206,18 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
         const remainder = brandMatch ? getRemainderAfterBrand(query, brandMatch.normalized) : '';
         let suggestions: { name: string; source: string }[] = [];
         const listSuggestions = buildBrandSuggestionsFromList(query);
+        let catalogSuggestions: { name: string; source: string }[] = [];
+        try {
+          const catalogResponse = await fetch(`/api/supplement-catalog-search?q=${encodeURIComponent(query)}`);
+          if (catalogResponse.ok) {
+            const catalogData = await catalogResponse.json().catch(() => ({}));
+            if (Array.isArray(catalogData?.results)) {
+              catalogSuggestions = catalogData.results;
+            }
+          }
+        } catch (catalogError) {
+          console.warn('Catalog search failed:', catalogError);
+        }
         try {
           if (brandMatch) {
             const brandQueries = Array.from(
@@ -5238,6 +5250,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
             );
             suggestions = dedupeSuggestions([
               ...brandOnly,
+              ...catalogSuggestions,
               ...filteredProducts,
             ]);
             if (suggestions.length === 0 && listSuggestions.length > 0) {
@@ -5251,6 +5264,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
               const brandSuggestions = buildBrandSuggestionsFromDsld(dsldData, query);
               const productSuggestions = parseDsldSuggestions(dsldData);
               suggestions = dedupeSuggestions([
+                ...catalogSuggestions,
                 ...listSuggestions,
                 ...brandSuggestions,
                 ...productSuggestions,
@@ -5261,8 +5275,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
           }
         } catch (dsldError) {
           console.warn('DSLD direct search failed:', dsldError);
-          if (listSuggestions.length > 0) {
-            suggestions = listSuggestions;
+          if (listSuggestions.length > 0 || catalogSuggestions.length > 0) {
+            suggestions = dedupeSuggestions([
+              ...catalogSuggestions,
+              ...listSuggestions,
+            ]);
           }
         }
 
