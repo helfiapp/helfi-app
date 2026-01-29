@@ -6033,42 +6033,31 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 const editingImages = parseImageValue(supplements[editingIndex]?.imageUrl);
                 if (!editingImages.frontUrl) return null;
                 return (
-                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {editingImages.frontUrl ? (
-                          <img 
-                            src={editingImages.frontUrl} 
-                            alt="Front" 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500 break-all">{editingImages.frontUrl}</div>
-                      </div>
+                <div className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+                    <img
+                      src={editingImages.frontUrl}
+                      alt="Front"
+                      className="h-36 w-full rounded-lg border border-gray-200 object-contain sm:h-36 sm:w-56"
+                    />
+                    <div className="flex w-full items-center justify-between text-sm text-gray-600">
+                      <span className="font-medium text-gray-700">Current image</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Remove front image only
+                          const updatedSupplements = supplements.map((item: any, index: number) => 
+                            index === editingIndex
+                              ? { ...item, imageUrl: buildImageValue(null, parseImageValue(item.imageUrl).backUrl) }
+                              : item
+                          );
+                          setSupplements(updatedSupplements);
+                        }}
+                        className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                      >
+                        Delete
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Remove front image only
-                        const updatedSupplements = supplements.map((item: any, index: number) => 
-                          index === editingIndex
-                            ? { ...item, imageUrl: buildImageValue(null, parseImageValue(item.imageUrl).backUrl) }
-                            : item
-                        );
-                        setSupplements(updatedSupplements);
-                      }}
-                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors flex-shrink-0"
-                    >
-                      Delete
-                    </button>
                   </div>
                 </div>
                 );
@@ -6137,42 +6126,31 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 const editingImages = parseImageValue(supplements[editingIndex]?.imageUrl);
                 if (!editingImages.backUrl) return null;
                 return (
-                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {editingImages.backUrl ? (
-                          <img 
-                            src={editingImages.backUrl} 
-                            alt="Back" 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500 break-all">{editingImages.backUrl}</div>
-                      </div>
+                <div className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+                    <img
+                      src={editingImages.backUrl}
+                      alt="Back"
+                      className="h-36 w-full rounded-lg border border-gray-200 object-contain sm:h-36 sm:w-56"
+                    />
+                    <div className="flex w-full items-center justify-between text-sm text-gray-600">
+                      <span className="font-medium text-gray-700">Current image</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Remove back image only
+                          const updatedSupplements = supplements.map((item: any, index: number) => 
+                            index === editingIndex
+                              ? { ...item, imageUrl: buildImageValue(parseImageValue(item.imageUrl).frontUrl, null) }
+                              : item
+                          );
+                          setSupplements(updatedSupplements);
+                        }}
+                        className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                      >
+                        Delete
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Remove back image only
-                        const updatedSupplements = supplements.map((item: any, index: number) => 
-                          index === editingIndex
-                            ? { ...item, imageUrl: buildImageValue(parseImageValue(item.imageUrl).frontUrl, null) }
-                            : item
-                        );
-                        setSupplements(updatedSupplements);
-                      }}
-                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors flex-shrink-0"
-                    >
-                      Delete
-                    </button>
                   </div>
                 </div>
                 );
@@ -7365,41 +7343,30 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                 const editingImages = parseImageValue(medications[editingIndex]?.imageUrl);
                 if (!editingImages.frontUrl) return null;
                 return (
-                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {editingImages.frontUrl ? (
-                          <img 
-                            src={editingImages.frontUrl} 
-                            alt="Front" 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500 break-all">{editingImages.frontUrl}</div>
-                      </div>
+                <div className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+                    <img
+                      src={editingImages.frontUrl}
+                      alt="Front"
+                      className="h-36 w-full rounded-lg border border-gray-200 object-contain sm:h-36 sm:w-56"
+                    />
+                    <div className="flex w-full items-center justify-between text-sm text-gray-600">
+                      <span className="font-medium text-gray-700">Current image</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updatedMedications = medications.map((item: any, index: number) => 
+                            index === editingIndex
+                              ? { ...item, imageUrl: buildImageValue(null, parseImageValue(item.imageUrl).backUrl) }
+                              : item
+                          );
+                          setMedications(updatedMedications);
+                        }}
+                        className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                      >
+                        Delete
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedMedications = medications.map((item: any, index: number) => 
-                          index === editingIndex
-                            ? { ...item, imageUrl: buildImageValue(null, parseImageValue(item.imageUrl).backUrl) }
-                            : item
-                        );
-                        setMedications(updatedMedications);
-                      }}
-                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors flex-shrink-0"
-                    >
-                      Delete
-                    </button>
                   </div>
                 </div>
                 );
@@ -7468,41 +7435,30 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                 const editingImages = parseImageValue(medications[editingIndex]?.imageUrl);
                 if (!editingImages.backUrl) return null;
                 return (
-                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {editingImages.backUrl ? (
-                          <img 
-                            src={editingImages.backUrl} 
-                            alt="Back" 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500 break-all">{editingImages.backUrl}</div>
-                      </div>
+                <div className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+                    <img
+                      src={editingImages.backUrl}
+                      alt="Back"
+                      className="h-36 w-full rounded-lg border border-gray-200 object-contain sm:h-36 sm:w-56"
+                    />
+                    <div className="flex w-full items-center justify-between text-sm text-gray-600">
+                      <span className="font-medium text-gray-700">Current image</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updatedMedications = medications.map((item: any, index: number) => 
+                            index === editingIndex
+                              ? { ...item, imageUrl: buildImageValue(parseImageValue(item.imageUrl).frontUrl, null) }
+                              : item
+                          );
+                          setMedications(updatedMedications);
+                        }}
+                        className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                      >
+                        Delete
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedMedications = medications.map((item: any, index: number) => 
-                          index === editingIndex
-                            ? { ...item, imageUrl: buildImageValue(parseImageValue(item.imageUrl).frontUrl, null) }
-                            : item
-                        );
-                        setMedications(updatedMedications);
-                      }}
-                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors flex-shrink-0"
-                    >
-                      Delete
-                    </button>
                   </div>
                 </div>
                 );
