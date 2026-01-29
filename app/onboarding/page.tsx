@@ -262,10 +262,12 @@ const normalizeSearchText = (value: string) => {
     .trim()
 }
 
-const getBrandMatch = (rawQuery: string) => {
+type BrandMatch = { display: string; normalized: string }
+
+const getBrandMatch = (rawQuery: string): BrandMatch | null => {
   const query = normalizeSearchText(rawQuery)
   if (!query) return null
-  let best: { display: string; normalized: string } | null = null
+  let best: BrandMatch | null = null
   COMMON_SUPPLEMENT_BRANDS.forEach((brand) => {
     const normalized = normalizeSearchText(brand)
     if (!normalized) return
