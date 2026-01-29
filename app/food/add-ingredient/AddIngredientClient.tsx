@@ -315,10 +315,16 @@ const itemMatchesSearchQuery = (
   return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false, allowTypo: options?.allowTypo })
 }
 
-const filterItemsForQuery = (items: NormalizedFoodItem[], searchQuery: string, kind: SearchKind) => {
+const filterItemsForQuery = (
+  items: NormalizedFoodItem[],
+  searchQuery: string,
+  kind: SearchKind,
+  options?: { allowTypoFallback?: boolean },
+) => {
   if (!Array.isArray(items) || items.length === 0) return []
   const prefixMatches = items.filter((item) => itemMatchesSearchQuery(item, searchQuery, kind, { allowTypo: false }))
   if (prefixMatches.length > 0) return prefixMatches
+  if (options?.allowTypoFallback === false) return []
   return items.filter((item) => itemMatchesSearchQuery(item, searchQuery, kind, { allowTypo: true }))
 }
 
@@ -463,7 +469,7 @@ const getCachedSearchResults = (
   const cached = cache.get(buildSearchCacheKey(kind, source))
   if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
   const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
-  const filtered = hasToken ? filterItemsForQuery(cached.items, q, kind) : cached.items
+  const filtered = hasToken ? filterItemsForQuery(cached.items, q, kind, { allowTypoFallback: false }) : cached.items
   return filtered.slice(0, 20)
 }
 
@@ -1099,7 +1105,7 @@ export default function AddIngredientClient() {
           if (quick.res.ok && seqRef.current === seq) {
             const quickItems = Array.isArray(quick.data?.items) ? quick.data.items : []
             const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
-            const quickFiltered = hasToken ? filterItemsForQuery(quickItems, q, k) : quickItems
+            const quickFiltered = hasToken ? filterItemsForQuery(quickItems, q, k, { allowTypoFallback: false }) : quickItems
             const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current) : quickFiltered
             if (seqRef.current === seq && quickMerged.length > 0) {
               setResults(quickMerged)
@@ -1136,7 +1142,7 @@ export default function AddIngredientClient() {
         }
       }
       const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
-      const filteredResults = hasToken ? filterItemsForQuery(baseResults, q, k) : baseResults
+      const filteredResults = hasToken ? filterItemsForQuery(baseResults, q, k, { allowTypoFallback: true }) : baseResults
       const finalResults = k === 'single' && filteredResults.length === 0 && baseResults.length > 0 ? baseResults : filteredResults
       const merged =
         k === 'packaged'

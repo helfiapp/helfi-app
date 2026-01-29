@@ -371,10 +371,16 @@ const itemMatchesSearchQuery = (
   return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false, allowTypo: options?.allowTypo })
 }
 
-const filterItemsForQuery = (items: NormalizedFoodItem[], searchQuery: string, kind: 'packaged' | 'single') => {
+const filterItemsForQuery = (
+  items: NormalizedFoodItem[],
+  searchQuery: string,
+  kind: 'packaged' | 'single',
+  options?: { allowTypoFallback?: boolean },
+) => {
   if (!Array.isArray(items) || items.length === 0) return []
   const prefixMatches = items.filter((item) => itemMatchesSearchQuery(item, searchQuery, kind, { allowTypo: false }))
   if (prefixMatches.length > 0) return prefixMatches
+  if (options?.allowTypoFallback === false) return []
   return items.filter((item) => itemMatchesSearchQuery(item, searchQuery, kind, { allowTypo: true }))
 }
 
@@ -518,7 +524,7 @@ const getCachedSearchResults = (
   const cached = cache.get(buildSearchCacheKey(kind))
   if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
   const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
-  const filtered = hasToken ? filterItemsForQuery(cached.items, q, kind) : cached.items
+  const filtered = hasToken ? filterItemsForQuery(cached.items, q, kind, { allowTypoFallback: false }) : cached.items
   return filtered.slice(0, 20)
 }
 
@@ -1689,7 +1695,7 @@ export default function MealBuilderClient() {
           const quickItems = await fetchSearchItems(quickQuery, { kindOverride: 'packaged', sourceOverride: 'usda', localOnly: true })
           if (seqRef.current === seq && quickItems.length > 0) {
             const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
-            const quickFiltered = hasToken ? filterItemsForQuery(quickItems, q, kind) : quickItems
+            const quickFiltered = hasToken ? filterItemsForQuery(quickItems, q, kind, { allowTypoFallback: false }) : quickItems
             const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current) : quickFiltered
             const quickWithSuggestions =
               allowBrandSuggestions || kind !== 'packaged' ? quickMerged : mergeSearchSuggestions(quickMerged, q)
@@ -1707,7 +1713,7 @@ export default function MealBuilderClient() {
       if (seqRef.current !== seq) return
       const rawItems = nextItems
       const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
-      let filteredItems = hasToken ? filterItemsForQuery(nextItems, q, kind) : nextItems
+      let filteredItems = hasToken ? filterItemsForQuery(nextItems, q, kind, { allowTypoFallback: true }) : nextItems
       if (kind === 'single' && filteredItems.length === 0 && rawItems.length > 0) {
         const tokenCount = getSearchTokens(q).filter((token) => token.length >= 1).length
         if (tokenCount <= 1) filteredItems = rawItems
@@ -1720,7 +1726,7 @@ export default function MealBuilderClient() {
             if (seqRef.current === seq) {
               const fallbackFiltered =
                 hasToken && fallbackItems.length > 0
-                  ? filterItemsForQuery(fallbackItems, lastWord, kind)
+                  ? filterItemsForQuery(fallbackItems, lastWord, kind, { allowTypoFallback: false })
                   : fallbackItems
               filteredItems = fallbackFiltered.length > 0 ? fallbackFiltered : fallbackItems
             }

@@ -203,15 +203,20 @@ const loadCustomFoods = () => {
   return items
 }
 
-export const searchCustomFoodMacros = (query: string, limit = 10): CustomFoodMacro[] => {
+export const searchCustomFoodMacros = (
+  query: string,
+  limit = 10,
+  options?: { allowTypo?: boolean },
+): CustomFoodMacro[] => {
   const q = String(query || '').trim()
   if (!q) return []
   const items = loadCustomFoods()
   if (items.length === 0) return []
   const prefixMatches = items.filter((item) => nameMatchesQuery(item.name, q, { allowTypo: false }))
-  const matches = (prefixMatches.length > 0 ? prefixMatches : items.filter((item) => nameMatchesQuery(item.name, q, { allowTypo: true }))).sort(
-    (a, b) => normalizeText(a.name).localeCompare(normalizeText(b.name)),
-  )
+  const allowTypo = options?.allowTypo ?? true
+  const matches = (
+    prefixMatches.length > 0 || !allowTypo ? prefixMatches : items.filter((item) => nameMatchesQuery(item.name, q, { allowTypo: true }))
+  ).sort((a, b) => normalizeText(a.name).localeCompare(normalizeText(b.name)))
   if (matches.length === 0) return []
   return matches.slice(0, Math.max(1, limit))
 }

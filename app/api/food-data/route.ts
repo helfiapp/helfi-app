@@ -154,10 +154,16 @@ export async function GET(request: NextRequest) {
       return queryTokens.every((token) => filteredNameTokens.some((word) => tokenMatches(token, word)))
     }
 
-    const filterItemsByQuery = (items: any[], searchQuery: string, getText: (item: any) => string) => {
+    const filterItemsByQuery = (
+      items: any[],
+      searchQuery: string,
+      getText: (item: any) => string,
+      allowTypoFallback = true,
+    ) => {
       if (!Array.isArray(items) || items.length === 0) return []
       const prefixMatches = items.filter((item) => nameMatchesSearchQuery(getText(item), searchQuery, { allowTypo: false }))
       if (prefixMatches.length > 0) return prefixMatches
+      if (!allowTypoFallback) return []
       return items.filter((item) => nameMatchesSearchQuery(getText(item), searchQuery, { allowTypo: true }))
     }
 
@@ -217,9 +223,9 @@ export async function GET(request: NextRequest) {
     const customPackagedMatches = kindMode === 'packaged' ? getCustomPackagedMatches(query) : []
     let customPackagedApplied = false
 
-    const toCustomFoodItems = (value: string) => {
+    const toCustomFoodItems = (value: string, options?: { allowTypo?: boolean }) => {
       if (kindMode !== 'single') return []
-      const matches = searchCustomFoodMacros(value, limit)
+      const matches = searchCustomFoodMacros(value, limit, options)
       if (!matches.length) return []
       const items = matches.map((item) => ({
         source: 'usda',
@@ -236,6 +242,62 @@ export async function GET(request: NextRequest) {
         __custom: true,
       }))
       return items
+    }
+
+    const buildSingleFoodResults = async (value: string) => {
+      const customPrefix = toCustomFoodItems(value, { allowTypo: false })
+
+      const [foundation, legacy, branded] = await Promise.all([
+        searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] }),
+        searchLocalFoods(value, { pageSize: limit, sources: ['usda_sr_legacy'] }),
+        searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] }),
+      ])
+
+      const combinedMain = [...foundation, ...legacy]
+      const dedupe = (list: any[]) => {
+        const seen = new Set<string>()
+        return list.filter((item) => {
+          const key = `${normalizeForMatch(item?.name)}|${normalizeForMatch(item?.brand)}`
+          if (!key || key === '|') return false
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+      }
+
+      const mainDeduped = dedupe(combinedMain)
+      const brandedDeduped = dedupe(branded)
+
+      const mainPrefix = filterItemsByQuery(mainDeduped, value, (item) => item?.name || '', false)
+      const brandedPrefix = filterItemsByQuery(brandedDeduped, value, (item) => item?.name || '', false)
+
+      const hasPrefixMatches = customPrefix.length > 0 || mainPrefix.length > 0 || brandedPrefix.length > 0
+
+      const customFinal = hasPrefixMatches ? customPrefix : toCustomFoodItems(value, { allowTypo: true })
+      const mainFinal = hasPrefixMatches
+        ? mainPrefix
+        : filterItemsByQuery(mainDeduped, value, (item) => item?.name || '', true)
+      const brandedFinal = hasPrefixMatches
+        ? brandedPrefix
+        : filterItemsByQuery(brandedDeduped, value, (item) => item?.name || '', true)
+
+      const sortedCustom = sortByNameAsc(customFinal)
+      const sortedMain = sortByNameAsc(mainFinal)
+      const sortedBranded = sortByNameAsc(brandedFinal)
+
+      const combined: any[] = []
+      const pushGroup = (group: any[]) => {
+        for (const item of group) {
+          if (combined.length >= limit) return
+          combined.push(item)
+        }
+      }
+
+      pushGroup(sortedCustom)
+      pushGroup(sortedMain)
+      pushGroup(sortedBranded)
+
+      return combined
     }
 
     const hasMacroData = (item: any) => {
@@ -574,14 +636,10 @@ export async function GET(request: NextRequest) {
         return score
       }
 
-      const customItems = resolvedKind === 'single' ? toCustomFoodItems(query) : []
-      const localItems = resolvedKind === 'single' ? await searchLocalPreferred(query, resolvedKind) : []
       if (resolvedKind === 'single') {
-        if (customItems.length > 0) {
-          items = sortByNameAsc(customItems).slice(0, limit)
-          actualSource = 'auto'
-        } else if (localItems.length > 0) {
-          items = sortByNameAsc(localItems).slice(0, limit)
+        const combined = await buildSingleFoodResults(query)
+        if (combined.length > 0) {
+          items = combined
           actualSource = 'auto'
         } else {
           const usdaItems = await searchUsdaSingleFood(query)
@@ -655,14 +713,10 @@ export async function GET(request: NextRequest) {
       items = await searchOpenFoodFactsByQuery(query, { pageSize: limit })
     } else if (source === 'usda') {
       const resolvedKind = kind === 'packaged' ? 'packaged' : 'single'
-      const customItems = resolvedKind === 'single' ? toCustomFoodItems(query) : []
-      const localItems = await searchLocalPreferred(query, resolvedKind)
       if (resolvedKind === 'single') {
-        if (customItems.length > 0) {
-          items = sortByNameAsc(customItems).slice(0, limit)
-          actualSource = 'usda'
-        } else if (localItems.length > 0) {
-          items = sortByNameAsc(localItems).slice(0, limit)
+        const combined = await buildSingleFoodResults(query)
+        if (combined.length > 0) {
+          items = combined
           actualSource = 'usda'
         } else if (localOnly) {
           items = []
@@ -673,6 +727,7 @@ export async function GET(request: NextRequest) {
           actualSource = 'usda'
         }
       } else {
+        const localItems = await searchLocalPreferred(query, resolvedKind)
         if (customPackagedMatches.length > 0) {
           items = sortByNameAsc(customPackagedMatches).slice(0, limit)
           actualSource = 'usda'

@@ -6509,10 +6509,16 @@ export default function FoodDiary() {
     return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false, allowTypo: options?.allowTypo })
   }
 
-  const filterItemsForQuery = (items: any[], searchQuery: string, kind: 'packaged' | 'single') => {
+  const filterItemsForQuery = (
+    items: any[],
+    searchQuery: string,
+    kind: 'packaged' | 'single',
+    options?: { allowTypoFallback?: boolean },
+  ) => {
     if (!Array.isArray(items) || items.length === 0) return []
     const prefixMatches = items.filter((item) => itemMatchesSearchQuery(item, searchQuery, kind, { allowTypo: false }))
     if (prefixMatches.length > 0) return prefixMatches
+    if (options?.allowTypoFallback === false) return []
     return items.filter((item) => itemMatchesSearchQuery(item, searchQuery, kind, { allowTypo: true }))
   }
 
@@ -6730,7 +6736,7 @@ export default function FoodDiary() {
     const cached = cache.get(buildOfficialSearchCacheKey(mode))
     if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return []
     const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
-    const filtered = hasToken ? filterItemsForQuery(cached.items, q, mode) : cached.items
+    const filtered = hasToken ? filterItemsForQuery(cached.items, q, mode, { allowTypoFallback: false }) : cached.items
     return filtered.slice(0, 20)
   }
 
@@ -6872,7 +6878,7 @@ export default function FoodDiary() {
           if (quick.res.ok && officialSearchSeqRef.current === seq) {
             const quickData = await quick.res.json().catch(() => ({} as any))
             const quickItems = Array.isArray(quickData?.items) ? quickData.items : []
-            const quickFiltered = hasToken ? filterItemsForQuery(quickItems, query, mode) : quickItems
+            const quickFiltered = hasToken ? filterItemsForQuery(quickItems, query, mode, { allowTypoFallback: false }) : quickItems
             if (quickFiltered.length > 0 && officialSearchSeqRef.current === seq) {
               const quickMerged = allowBrandSuggestions ? mergeBrandSuggestions(quickFiltered, immediateBrands) : quickFiltered
               setOfficialResults(quickMerged)
@@ -6933,7 +6939,7 @@ export default function FoodDiary() {
         }
       }
 
-      const filteredItems = hasToken ? filterItemsForQuery(baseItems, query, mode) : baseItems
+      const filteredItems = hasToken ? filterItemsForQuery(baseItems, query, mode, { allowTypoFallback: true }) : baseItems
       const finalItems = mode === 'single' && filteredItems.length === 0 && baseItems.length > 0 ? baseItems : filteredItems
 
       const merged = finalItems
