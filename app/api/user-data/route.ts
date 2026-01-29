@@ -8,6 +8,7 @@ import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-servi
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { computeHydrationGoal } from '@/lib/hydration-goal'
 import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
+import { ensureSupplementCatalogSchema } from '@/lib/supplement-catalog-db'
 
 const normalizeTimingList = (timing: any) => {
   if (Array.isArray(timing)) {
@@ -1370,6 +1371,7 @@ export async function POST(request: NextRequest) {
         try {
           const catalogRows = buildSupplementCatalogRows(dedupedSupplements, user.id)
           if (catalogRows.length > 0) {
+            await ensureSupplementCatalogSchema()
             await prisma.supplementCatalog.createMany({
               data: catalogRows,
               skipDuplicates: true,

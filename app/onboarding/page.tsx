@@ -386,6 +386,14 @@ const parseDsldBrandProducts = (data: any) => {
   return items
 }
 
+const fetchDsldBrandProducts = async (query: string, size = 25) => {
+  const brandUrl = `https://api.ods.od.nih.gov/dsld/v9/brand-products?q=${encodeURIComponent(query)}&from=0&size=${size}`
+  const brandResponse = await fetch(brandUrl)
+  if (!brandResponse.ok) return [] as { name: string; source: string; brand?: string }[]
+  const brandData = await brandResponse.json().catch(() => ({}))
+  return parseDsldBrandProducts(brandData)
+}
+
 const filterSuggestionsByBrand = (
   items: { name: string; source: string; brand?: string }[],
   brandKey: string,
@@ -5203,22 +5211,28 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
             const brandQueries = Array.from(
               new Set([brandMatch.display, brandKey].filter(Boolean)),
             );
-            const brandResults = await Promise.all(
-              brandQueries.map(async (q) => {
-                const brandUrl = `https://api.ods.od.nih.gov/dsld/v9/brand-products?q=${encodeURIComponent(q)}&from=0&size=25`;
-                const brandResponse = await fetch(brandUrl);
-                if (!brandResponse.ok) return null;
-                return brandResponse.json().catch(() => ({}));
-              }),
+            const baseResults = await Promise.all(
+              brandQueries.map((q) => fetchDsldBrandProducts(q, 25)),
             );
-            const brandData = brandResults.filter(Boolean);
-            const brandProducts = dedupeSuggestions(
-              brandData.flatMap((entry) => parseDsldBrandProducts(entry)),
-            );
-            const filteredProducts = filterSuggestionsByRemainder(
-              brandProducts as { name: string; source: string; brand?: string }[],
+            const baseProducts = dedupeSuggestions(baseResults.flat());
+            let filteredProducts = filterSuggestionsByRemainder(
+              baseProducts as { name: string; source: string; brand?: string }[],
               remainder,
             );
+
+            if (remainder && filteredProducts.length < 3) {
+              const expandedResults = await Promise.all(
+                brandQueries.map((q) => fetchDsldBrandProducts(q, 200)),
+              );
+              const expandedProducts = dedupeSuggestions(expandedResults.flat());
+              const expandedFiltered = filterSuggestionsByRemainder(
+                expandedProducts as { name: string; source: string; brand?: string }[],
+                remainder,
+              );
+              if (expandedFiltered.length > 0) {
+                filteredProducts = expandedFiltered;
+              }
+            }
             const brandOnly = listSuggestions.filter((item) =>
               normalizeSearchText(item.name).startsWith(brandMatch.normalized),
             );
