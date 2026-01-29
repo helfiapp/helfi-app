@@ -194,11 +194,80 @@ const buildSupplementNameFromDsld = (source: any) => {
   return product || brand || null
 }
 
+const COMMON_SUPPLEMENT_BRANDS = [
+  'NOW Foods',
+  'Thorne',
+  'Life Extension',
+  'Nature Made',
+  'Nature\'s Bounty',
+  'Garden of Life',
+  'Nordic Naturals',
+  'Solgar',
+  'Kirkland Signature',
+  'Pure Encapsulations',
+  'Jarrow Formulas',
+  'Doctor\'s Best',
+  'Nature\'s Way',
+  'Gaia Herbs',
+  'Metagenics',
+  'Designs for Health',
+  'Solaray',
+  'Source Naturals',
+  'MegaFood',
+  'Swanson',
+  'Country Life',
+  'Vitacost',
+  'GNC',
+  'Optimum Nutrition',
+  'MuscleTech',
+  'MyProtein',
+  'Ritual',
+  'SmartyPants',
+  'Olly',
+  'HUM Nutrition',
+  'MaryRuth\'s',
+  'Bluebonnet',
+  'Kal',
+  'New Chapter',
+  'Rainbow Light',
+  'Vital Proteins',
+  'Sports Research',
+  'Youtheory',
+  'Integrative Therapeutics',
+  'Carlson',
+  'Carlson Labs',
+  'Trace Minerals Research',
+  'Klaire Labs',
+]
+
 const normalizeSearchText = (value: string) => {
   return String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
+}
+
+const buildBrandSuggestionsFromList = (rawQuery: string) => {
+  const query = normalizeSearchText(rawQuery)
+  if (!query) return [] as { name: string; source: string }[]
+  const firstToken = query.split(' ')[0] || query
+  const results: { name: string; source: string }[] = []
+  const seen = new Set<string>()
+  COMMON_SUPPLEMENT_BRANDS.forEach((brand) => {
+    const normalized = normalizeSearchText(brand)
+    if (!normalized) return
+    const matches =
+      normalized.startsWith(query) ||
+      normalized.startsWith(firstToken) ||
+      normalized.split(' ').some((word) => word.startsWith(query)) ||
+      query.split(' ').every((word) => normalized.includes(word))
+    if (!matches) return
+    const key = normalized
+    if (seen.has(key)) return
+    seen.add(key)
+    results.push({ name: `${brand} -`, source: 'brand' })
+  })
+  return results
 }
 
 const buildBrandSuggestionsFromDsld = (data: any, rawQuery: string) => {
@@ -229,6 +298,18 @@ const buildBrandSuggestionsFromDsld = (data: any, rawQuery: string) => {
     if (seen.has(key)) return
     seen.add(key)
     results.push({ name: `${cleaned} -`, source: 'brand' })
+  })
+  return results
+}
+
+const dedupeSuggestions = (items: { name: string; source: string }[]) => {
+  const seen = new Set<string>()
+  const results: { name: string; source: string }[] = []
+  items.forEach((item) => {
+    const key = String(item.name || '').toLowerCase()
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    results.push(item)
   })
   return results
 }
@@ -5019,16 +5100,26 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
         setNameError(null);
         const dsldUrl = `https://api.ods.od.nih.gov/dsld/v9/search-filter?q=${encodeURIComponent(query)}&from=0&size=10&sort_by=_score&sort_order=desc`;
         let suggestions: { name: string; source: string }[] = [];
+        const listSuggestions = buildBrandSuggestionsFromList(query);
         try {
           const dsldResponse = await fetch(dsldUrl);
           if (dsldResponse.ok) {
             const dsldData = await dsldResponse.json().catch(() => ({}));
             const brandSuggestions = buildBrandSuggestionsFromDsld(dsldData, query);
             const productSuggestions = parseDsldSuggestions(dsldData);
-            suggestions = [...brandSuggestions, ...productSuggestions];
+            suggestions = dedupeSuggestions([
+              ...listSuggestions,
+              ...brandSuggestions,
+              ...productSuggestions,
+            ]);
+          } else if (listSuggestions.length > 0) {
+            suggestions = listSuggestions;
           }
         } catch (dsldError) {
           console.warn('DSLD direct search failed:', dsldError);
+          if (listSuggestions.length > 0) {
+            suggestions = listSuggestions;
+          }
         }
 
         if (suggestions.length === 0) {
