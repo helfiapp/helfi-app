@@ -6093,7 +6093,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 />
                 <label
                   htmlFor="front-image"
-                  className={`flex w-full min-h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`flex w-full min-h-36 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
                     frontImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
                   }`}
                 >
@@ -6103,11 +6103,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                         <img
                           src={frontPreviewUrl}
                           alt="Front preview"
-                          className="h-32 w-full rounded-lg border border-gray-200 object-contain sm:h-28 sm:w-40"
+                          className="h-36 w-full rounded-lg border border-gray-200 object-contain sm:h-36 sm:w-56"
                         />
                       )}
-                      <div className="flex w-full items-center gap-2 text-sm text-gray-600">
-                        <div className="flex items-center gap-2 text-green-700">
+                      <div className="flex w-full items-center gap-1 text-sm text-gray-600">
+                        <div className="flex items-center gap-1 text-green-700">
                           <span className="text-xl leading-none">✓</span>
                           <span className="font-medium">Selected</span>
                         </div>
@@ -6197,7 +6197,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 />
                 <label
                   htmlFor="back-image"
-                  className={`flex w-full min-h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`flex w-full min-h-36 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
                     backImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
                   }`}
                 >
@@ -6207,11 +6207,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                         <img
                           src={backPreviewUrl}
                           alt="Back preview"
-                          className="h-32 w-full rounded-lg border border-gray-200 object-contain sm:h-28 sm:w-40"
+                          className="h-36 w-full rounded-lg border border-gray-200 object-contain sm:h-36 sm:w-56"
                         />
                       )}
-                      <div className="flex w-full items-center gap-2 text-sm text-gray-600">
-                        <div className="flex items-center gap-2 text-green-700">
+                      <div className="flex w-full items-center gap-1 text-sm text-gray-600">
+                        <div className="flex items-center gap-1 text-green-700">
                           <span className="text-xl leading-none">✓</span>
                           <span className="font-medium">Selected</span>
                         </div>
@@ -7424,7 +7424,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                 />
                 <label
                   htmlFor="med-front-image"
-                  className={`flex w-full min-h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`flex w-full min-h-36 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
                     frontImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
                   }`}
                 >
@@ -7434,11 +7434,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                         <img
                           src={frontPreviewUrl}
                           alt="Front preview"
-                          className="h-32 w-full rounded-lg border border-gray-200 object-contain sm:h-28 sm:w-40"
+                          className="h-36 w-full rounded-lg border border-gray-200 object-contain sm:h-36 sm:w-56"
                         />
                       )}
-                      <div className="flex w-full items-center gap-2 text-sm text-gray-600">
-                        <div className="flex items-center gap-2 text-green-700">
+                      <div className="flex w-full items-center gap-1 text-sm text-gray-600">
+                        <div className="flex items-center gap-1 text-green-700">
                           <span className="text-xl leading-none">✓</span>
                           <span className="font-medium">Selected</span>
                         </div>
@@ -7527,7 +7527,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                 />
                 <label
                   htmlFor="med-back-image"
-                  className={`flex w-full min-h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`flex w-full min-h-36 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
                     backImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
                   }`}
                 >
@@ -7537,11 +7537,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                         <img
                           src={backPreviewUrl}
                           alt="Back preview"
-                          className="h-32 w-full rounded-lg border border-gray-200 object-contain sm:h-28 sm:w-40"
+                          className="h-36 w-full rounded-lg border border-gray-200 object-contain sm:h-36 sm:w-56"
                         />
                       )}
-                      <div className="flex w-full items-center gap-2 text-sm text-gray-600">
-                        <div className="flex items-center gap-2 text-green-700">
+                      <div className="flex w-full items-center gap-1 text-sm text-gray-600">
+                        <div className="flex items-center gap-1 text-green-700">
                           <span className="text-xl leading-none">✓</span>
                           <span className="font-medium">Selected</span>
                         </div>
