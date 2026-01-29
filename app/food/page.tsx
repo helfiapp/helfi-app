@@ -17599,7 +17599,9 @@ Please add nutritional information manually if needed.`);
                             {isBrandSuggestion
                               ? 'Brand list'
                               : `Source: ${
-                                  r.source === 'usda'
+                                  Boolean((r as any)?.__custom) || String((r as any)?.id || '').startsWith('custom:')
+                                    ? 'Custom list'
+                                    : r.source === 'usda'
                                     ? 'USDA FoodData Central'
                                     : r.source === 'openfoodfacts'
                                     ? 'OpenFoodFacts'
@@ -20618,7 +20620,9 @@ Please add nutritional information manually if needed.`);
                                       {isBrandSuggestion
                                         ? 'Brand list'
                                         : `Source: ${
-                                            r.source === 'usda'
+                                            Boolean((r as any)?.__custom) || String((r as any)?.id || '').startsWith('custom:')
+                                              ? 'Custom list'
+                                              : r.source === 'usda'
                                               ? 'USDA FoodData Central'
                                               : r.source === 'openfoodfacts'
                                               ? 'OpenFoodFacts'

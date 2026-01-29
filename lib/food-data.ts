@@ -129,12 +129,10 @@ export async function searchLocalFoods(
       if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
       return value
     }
-    const rawTokens = normalizePrefixToken(q)
-      .split(' ')
-      .filter(Boolean)
-      .filter((token) => token.length >= 2)
+    const normalizedQuery = normalizePrefixToken(q)
+    const rawTokens = normalizedQuery.split(' ').filter(Boolean)
     const toTitleCase = (value: string) => value.replace(/\b([a-z])/g, (match) => match.toUpperCase())
-    const prefixTokens = rawTokens.length > 0 ? rawTokens.slice(0, 3) : [q]
+    const prefixTokens = rawTokens.length > 0 ? rawTokens.slice(0, 3) : [normalizedQuery || q]
     const tokenSet = new Set<string>()
     const addTokenVariants = (value: string) => {
       if (!value) return
@@ -153,15 +151,40 @@ export async function searchLocalFoods(
       { brand: { startsWith: token } },
     ])
     const prefixFilter = prefixConditions.length > 0 ? { OR: prefixConditions } : null
-    const allowContains = mode !== 'prefix' && q.length >= 4
-    const containsFilter = allowContains
-      ? {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' as const } },
-            { brand: { contains: q, mode: 'insensitive' as const } },
-          ],
-        }
-      : null
+
+    // Word-prefix matching for USDA names like: "Squash, summer, zucchini, raw".
+    // We keep DB search broad enough to find later words, then callers can still
+    // apply strict "prefix only" filtering.
+    const buildWordPrefixPatterns = (token: string) => {
+      const t = String(token || '').trim()
+      if (!t) return []
+      const patterns = new Set<string>()
+      patterns.add(` ${t}`)
+      patterns.add(`, ${t}`)
+      patterns.add(`(${t}`)
+      patterns.add(`-${t}`)
+      patterns.add(`/${t}`)
+      return Array.from(patterns)
+    }
+
+    const allowContains = mode !== 'prefix' && normalizedQuery.length >= 1
+    const containsConditions = allowContains
+      ? prefixTokens.flatMap((token) => {
+          const base = singularizeToken(token)
+          const tokens = base && base !== token ? [token, base] : [token]
+          const patterns = tokens.flatMap((t) => buildWordPrefixPatterns(t))
+          // Brand values usually don't have commas, so also allow a plain contains
+          // fallback for brand matching.
+          const brandTokens = tokens.filter((t) => String(t || '').trim().length >= 2)
+          return [
+            ...patterns.map((pattern) => ({ name: { contains: pattern, mode: 'insensitive' as const } })),
+            ...patterns.map((pattern) => ({ brand: { contains: pattern, mode: 'insensitive' as const } })),
+            ...brandTokens.map((t) => ({ brand: { contains: t, mode: 'insensitive' as const } })),
+          ]
+        })
+      : []
+
+    const containsFilter = containsConditions.length > 0 ? { OR: containsConditions } : null
     const buildWhere = (filter: any, excludeIds?: string[]) => {
       const clauses = []
       if (sourceFilter) clauses.push(sourceFilter)
@@ -175,15 +198,17 @@ export async function searchLocalFoods(
     const prefixRows = await prisma.foodLibraryItem.findMany({
       where: buildWhere(prefixFilter),
       take: pageSize,
+      orderBy: { name: 'asc' },
     })
 
     const remaining = Math.max(0, pageSize - prefixRows.length)
     const prefixIds = prefixRows.map((row) => row.id)
     const containsRows =
-      remaining > 0 && mode !== 'prefix' && prefixRows.length === 0 && containsFilter
+      remaining > 0 && mode !== 'prefix' && containsFilter
         ? await prisma.foodLibraryItem.findMany({
             where: buildWhere(containsFilter, prefixIds),
             take: remaining,
+            orderBy: { name: 'asc' },
           })
         : []
 

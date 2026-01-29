@@ -29,6 +29,7 @@ type NormalizedFoodItem = {
   fat_g?: number | null
   fiber_g?: number | null
   sugar_g?: number | null
+  __custom?: boolean
 }
 
 type DrinkOverrideItem = Omit<NormalizedFoodItem, 'source' | 'id'> & {
@@ -1659,7 +1660,15 @@ export default function AddIngredientClient() {
                         <div className="mt-1 text-[11px] text-gray-400">
                           {isBrandSuggestion
                             ? 'Brand list'
-                            : `Source: ${r.source === 'usda' ? 'USDA' : r.source === 'fatsecret' ? 'FatSecret' : 'Open Food Facts'}`}
+                            : `Source: ${
+                                (r as any)?.__custom || String((r as any)?.id || '').startsWith('custom:')
+                                  ? 'Custom list'
+                                  : r.source === 'usda'
+                                  ? 'USDA'
+                                  : r.source === 'fatsecret'
+                                  ? 'FatSecret'
+                                  : 'Open Food Facts'
+                              }`}
                         </div>
                       </div>
                       <button
