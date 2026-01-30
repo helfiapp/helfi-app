@@ -1573,7 +1573,7 @@ export default function AddIngredientClient() {
                   kind === 'packaged' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
                 } disabled:opacity-60`}
               >
-                Packaged
+                Packaged/Fast-foods
               </button>
               <button
                 type="button"

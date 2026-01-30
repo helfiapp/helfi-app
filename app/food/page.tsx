@@ -17492,7 +17492,7 @@ Please add nutritional information manually if needed.`);
                             : 'bg-white text-gray-700 border-gray-300'
                         } disabled:opacity-60`}
                       >
-                        Packaged
+                        Packaged/Fast-foods
                       </button>
                       <button
                         type="button"
@@ -20512,7 +20512,7 @@ Please add nutritional information manually if needed.`);
                                   : 'bg-white text-gray-700 border-gray-300'
                               } disabled:opacity-60`}
                             >
-                              Packaged
+                              Packaged/Fast-foods
                             </button>
                             <button
                               type="button"
