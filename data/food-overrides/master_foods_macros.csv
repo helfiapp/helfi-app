@@ -397,3 +397,12 @@ Zucchini (chopped),17,1.21,3.11,0.32,1,2.5,usda,"Squash, summer, zucchini, inclu
 Egg,143,12.56,0.72,9.51,0,0.37,usda,"Egg, whole, raw, fresh"
 Eggs,143,12.56,0.72,9.51,0,0.37,usda,"Egg, whole, raw, fresh"
 Salmon,208,20.42,0,12.35,0,0,usda,"Fish, salmon, Atlantic, farmed, raw"
+Ketchup,102,1.2,23.2,0.1,0,22.8,override,
+Tomato sauce,102,1.2,23.2,0.1,0,22.8,override,
+BBQ sauce,177,0.4,42.0,0.4,0,40.0,override,
+Barbecue sauce,177,0.4,42.0,0.4,0,40.0,override,
+Soy sauce,53,6.3,7.6,0.04,0.8,0.7,override,
+Olive oil,884,0,0,100.0,0,0,override,
+Coconut oil,892,0,0,100.0,0,0,override,
+Coconut milk (canned),230,4.6,8.4,23.8,0,3.3,override,
+Greek yogurt,130,10.0,9.0,5.0,0,9.0,override,
