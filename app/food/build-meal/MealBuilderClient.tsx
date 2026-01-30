@@ -1608,8 +1608,10 @@ export default function MealBuilderClient() {
     [portionAmountInput, portionUnit, totalRecipeWeightGForScale],
   )
 
-  // Use saved portion scale if editing existing entry to ensure calories match front page display
-  // The front page uses the saved scale, so we must use it too for consistency
+  // GUARD RAIL: Calorie consistency between edit page and front page
+  // When editing an existing entry, we MUST use the saved __portionScale from the entry
+  // Do NOT recalculate from portion input - the front page uses saved scale, so we must match it
+  // See GUARD_RAILS.md section 3.14 for details
   const [savedPortionScale, setSavedPortionScale] = useState<number | null>(null)
   
   useEffect(() => {
@@ -1655,7 +1657,10 @@ export default function MealBuilderClient() {
     }
   }, [sourceLogId, editFavoriteId, userData])
 
-  // Use saved portion scale when editing existing entry, otherwise use computed scale
+  // GUARD RAIL: Use saved portion scale when editing to match front page calories
+  // The front page applies saved __portionScale, so edit page must use it too
+  // Only use computed scale for new entries (not editing)
+  // See GUARD_RAILS.md section 3.14 for details
   const portionScale = useMemo(() => {
     // If we have a saved scale and we're editing an existing entry, use saved scale to match front page
     if (savedPortionScale !== null && (sourceLogId || editFavoriteId)) {
@@ -2238,6 +2243,9 @@ export default function MealBuilderClient() {
     return items.some((it: any) => looksLikeMealBuilderCreatedItemId(it?.id))
   }
 
+  // GUARD RAIL: Single ingredient favorites must NOT appear in Custom tab
+  // Only multi-item meals created via "Build a Meal" should be custom meals
+  // See GUARD_RAILS.md section 3.14 for details
   const isCustomMealFavorite = (fav: any) => {
     if (!fav) return false
     // Single ingredient favorites should NEVER be considered custom meals

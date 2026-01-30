@@ -12854,6 +12854,10 @@ Please add nutritional information manually if needed.`);
     return { favorite: created, nextFavorites, changed: true }
   }
 
+  // GUARD RAIL: Single ingredient favorites must NOT appear in Custom tab
+  // Only multi-item meals created via "Build a Meal" should be custom meals
+  // Single ingredients favorited from ingredient list should only appear in Favorites tab
+  // See GUARD_RAILS.md section 3.14 for details
   const isCustomMealFavorite = (fav: any) => {
     if (!fav) return false
     // Single ingredient favorites should NEVER be considered custom meals
@@ -14533,8 +14537,10 @@ Please add nutritional information manually if needed.`);
         ? JSON.parse(JSON.stringify(source.items))
         : null
     const sourceMethod = String(source?.method || 'text').toLowerCase()
-    // Single ingredient entries should NEVER be marked as custom meals
+    // GUARD RAIL: Single ingredient entries should NEVER be marked as custom meals
     // Only multi-item meals created via "Build a Meal" should be custom meals
+    // Single ingredients favorited from ingredient list should only appear in Favorites tab
+    // See GUARD_RAILS.md section 3.14 for details
     const isSingleIngredient = !clonedItems || clonedItems.length === 0 || clonedItems.length === 1
     const inferredCustomMeal =
       !isSingleIngredient && (

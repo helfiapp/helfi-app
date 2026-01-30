@@ -1320,6 +1320,75 @@ Last stable deployment: `0347b9c7` (2026-01-23)
 
 ---
 
+### 3.14 Food Diary Edit Page Calorie Consistency & Macro Validation (Jan 2026 – Locked)
+
+**Protected files:**
+- `app/food/build-meal/MealBuilderClient.tsx`
+- `app/food/page.tsx`
+
+**Problem this prevents:**
+- Edit page showing different calories than the front page (e.g., 278 kcal vs 282 kcal)
+- Negative macro values appearing in meal totals (e.g., "-0.965 g" carbs)
+
+**Guard rails:**
+
+1. **Calorie Consistency:**
+   - When editing an existing entry (`sourceLogId` or `editFavoriteId` exists), the edit page MUST use the saved `__portionScale` from the entry's nutrition data
+   - Do NOT recalculate portion scale from the portion input field when editing - use the saved scale directly
+   - The `savedPortionScale` state must be fetched via `useEffect` when loading an entry for editing
+   - The `portionScale` useMemo must prioritize `savedPortionScale` over `computedPortionScale` when editing
+   - This ensures the edit page matches the front page, which also uses the saved `__portionScale`
+
+2. **Macro Validation:**
+   - The `macroOrZero` function MUST clamp all values to >= 0: `Math.max(0, num)`
+   - The `applyPortionScaleToTotals` function MUST clamp all macros to >= 0 after scaling
+   - Never allow negative macros to be displayed or saved, even if source data contains negative values
+
+3. **Favorites Tab Filtering:**
+   - The Favorites tab must show ALL favorites, regardless of whether they're custom meals
+   - Do NOT filter out custom meals from the Favorites tab (`favoriteMeals.filter(...)`)
+   - The Custom tab filters for custom meals separately using `isCustomMealFavorite`
+
+4. **Single Ingredient Favorites:**
+   - Single ingredient entries (1 item or 0 items) must NEVER be marked as custom meals
+   - In `saveFavoriteFromEntry`, check `isSingleIngredient` and set `inferredCustomMeal = false` for single ingredients
+   - In `isCustomMealFavorite`, check item count first - if single ingredient, return `false` immediately
+   - Only multi-item meals created via "Build a Meal" should appear in the Custom tab
+
+**Restore steps if broken:**
+
+1. **Calorie discrepancy:**
+   - In `MealBuilderClient.tsx`, ensure `savedPortionScale` state is set via `useEffect` when `sourceLogId` or `editFavoriteId` exists
+   - Fetch saved scale from entry's `nutrients.__portionScale` or favorite's `nutrition.__portionScale`
+   - In `portionScale` useMemo, return `savedPortionScale` when editing, not `computedPortionScale`
+   - Verify `getEntryTotals` in `app/food/page.tsx` applies `__portionScale` correctly
+
+2. **Negative macros:**
+   - In `macroOrZero` function, add `Math.max(0, num)` to clamp values
+   - In `applyPortionScaleToTotals`, add `Math.max(0, ...)` around all macro calculations
+   - Ensure rounding doesn't introduce negative values
+
+3. **Favorites tab:**
+   - Remove any filter that excludes custom meals from `favoriteMeals` array
+   - Ensure `favoriteMeals` includes all favorites without filtering
+
+4. **Single ingredient in Custom tab:**
+   - In `saveFavoriteFromEntry`, add check: `const isSingleIngredient = !clonedItems || clonedItems.length === 0 || clonedItems.length === 1`
+   - Set `inferredCustomMeal = false` if `isSingleIngredient` is true
+   - In `isCustomMealFavorite`, check item count first and return `false` for single ingredients
+
+**Key code locations:**
+- `app/food/build-meal/MealBuilderClient.tsx` line ~1086: `macroOrZero` function
+- `app/food/build-meal/MealBuilderClient.tsx` line ~1185: `applyPortionScaleToTotals` function
+- `app/food/build-meal/MealBuilderClient.tsx` line ~1616-1660: `savedPortionScale` state and `portionScale` useMemo
+- `app/food/page.tsx` line ~12857: `isCustomMealFavorite` function
+- `app/food/page.tsx` line ~14536: `saveFavoriteFromEntry` function
+
+Fix commits: `9fc8e6f1`, `27f72314` (2026-01-30)  
+Last stable deployment: `27f72314` (2026-01-30)
+
+---
+
 ## 4. Macros Progress Bars & Remaining Calories Ring (Locked)
 
 The macros progress bars and remaining calories ring in the Food Diary are now working perfectly and must **not be changed** unless the user explicitly requests modifications.
