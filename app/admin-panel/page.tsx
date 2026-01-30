@@ -5613,12 +5613,13 @@ The Helfi Team`,
                     </div>
                     <button
                       onClick={() => {
-                        setManagementAuthError(false)
-                        loadUserManagement(userSearch, userFilter, currentPage)
+                        // Refresh the page to reload token from storage
+                        // If token is expired, user will be redirected to login
+                        window.location.reload()
                       }}
                       className="ml-4 bg-yellow-400 text-yellow-900 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
                     >
-                      Retry
+                      Refresh Page
                     </button>
                   </div>
                 </div>
@@ -5674,12 +5675,12 @@ The Helfi Team`,
                               </p>
                               <button
                                 onClick={() => {
-                                  setManagementAuthError(false)
-                                  loadUserManagement(userSearch, userFilter, currentPage)
+                                  // Refresh the page to reload token from storage
+                                  window.location.reload()
                                 }}
                                 className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
                               >
-                                Retry Load
+                                Refresh Page
                               </button>
                             </div>
                           </td>
