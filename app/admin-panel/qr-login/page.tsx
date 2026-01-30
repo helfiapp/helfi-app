@@ -24,11 +24,39 @@ function QRLoginContent() {
     setStatus('approving')
     setError('')
     try {
+      // First, try to refresh the token if it's expired
+      let tokenToUse = adminToken
+      try {
+        const refreshResponse = await fetch('/api/admin/refresh-token', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`
+          }
+        })
+        
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          tokenToUse = refreshData.token
+          // Update stored token
+          sessionStorage.setItem('adminToken', refreshData.token)
+          sessionStorage.setItem('adminUser', JSON.stringify(refreshData.admin))
+          try {
+            localStorage.setItem('adminToken', refreshData.token)
+            localStorage.setItem('adminUser', JSON.stringify(refreshData.admin))
+          } catch (storageError) {
+            console.warn('Unable to persist refreshed token', storageError)
+          }
+        }
+      } catch (refreshError) {
+        // If refresh fails, continue with original token
+        console.warn('Token refresh failed, using original token:', refreshError)
+      }
+
       const response = await fetch('/api/admin/qr-login/approve', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`
+          Authorization: `Bearer ${tokenToUse}`
         },
         body: JSON.stringify({ token: tokenFromUrl })
       })
@@ -36,6 +64,39 @@ function QRLoginContent() {
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
         if (response.status === 401) {
+          // Token is invalid - try refresh one more time before giving up
+          try {
+            const lastRefresh = await fetch('/api/admin/refresh-token', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${adminToken}`
+              }
+            })
+            if (lastRefresh.ok) {
+              const refreshData = await lastRefresh.json()
+              // Retry with refreshed token
+              const retryResponse = await fetch('/api/admin/qr-login/approve', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${refreshData.token}`
+                },
+                body: JSON.stringify({ token: tokenFromUrl })
+              })
+              if (retryResponse.ok) {
+                sessionStorage.setItem('adminToken', refreshData.token)
+                sessionStorage.setItem('adminUser', JSON.stringify(refreshData.admin))
+                try {
+                  localStorage.setItem('adminToken', refreshData.token)
+                  localStorage.setItem('adminUser', JSON.stringify(refreshData.admin))
+                } catch {}
+                setStatus('approved')
+                return
+              }
+            }
+          } catch {}
+          
+          // If all refresh attempts fail, clear and require login
           sessionStorage.removeItem('adminToken')
           sessionStorage.removeItem('adminUser')
           try {
@@ -70,8 +131,41 @@ function QRLoginContent() {
     const existingToken =
       sessionStorage.getItem('adminToken') ||
       (typeof window !== 'undefined' ? localStorage.getItem('adminToken') : null)
+    
     if (existingToken) {
-      void approveLogin(existingToken)
+      // Try to refresh token first if it might be expired
+      const refreshAndApprove = async () => {
+        try {
+          const refreshResponse = await fetch('/api/admin/refresh-token', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${existingToken}`
+            }
+          })
+          
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json()
+            // Update stored token with refreshed one
+            sessionStorage.setItem('adminToken', refreshData.token)
+            sessionStorage.setItem('adminUser', JSON.stringify(refreshData.admin))
+            try {
+              localStorage.setItem('adminToken', refreshData.token)
+              localStorage.setItem('adminUser', JSON.stringify(refreshData.admin))
+            } catch {}
+            // Use refreshed token for approval
+            await approveLogin(refreshData.token)
+          } else {
+            // Token can't be refreshed, try with original (might still be valid)
+            await approveLogin(existingToken)
+          }
+        } catch (refreshError) {
+          // Refresh failed, try with original token
+          console.warn('Token refresh attempt failed, using original token:', refreshError)
+          await approveLogin(existingToken)
+        }
+      }
+      
+      void refreshAndApprove()
     } else {
       setStatus('needs-login')
     }
