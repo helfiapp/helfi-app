@@ -116,6 +116,7 @@ export default function AdminPanel() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [isLoadingManagement, setIsLoadingManagement] = useState(false)
+  const [managementAuthError, setManagementAuthError] = useState(false)
   const [actionInFlight, setActionInFlight] = useState<Record<string, boolean>>({})
   const actionInFlightRef = useRef<Record<string, boolean>>({})
 
@@ -1072,9 +1073,21 @@ https://www.helfi.ai`)
         setManagedUsers(result.users || [])
         setTotalPages(result.pagination?.pages || 1)
         setCurrentPage(result.pagination?.page || 1)
+        setManagementAuthError(false) // Clear auth error on success
+      } else if (response.status === 401) {
+        // Authentication error - don't clear users, just set error flag
+        console.warn('Admin authentication expired. Please refresh the page.')
+        setManagementAuthError(true)
+        // Keep existing users in state - don't clear them
+      } else {
+        // Other errors - log but don't clear users
+        console.error('Error loading user management:', response.status, response.statusText)
+        setManagementAuthError(false)
+        // Keep existing users in state
       }
     } catch (error) {
       console.error('Error loading user management:', error)
+      // Network errors - keep existing users in state
     }
     setIsLoadingManagement(false)
   }
@@ -5623,10 +5636,29 @@ The Helfi Team`,
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {managedUsers.length === 0 ? (
+                      {managedUsers.length === 0 && !managementAuthError ? (
                         <tr>
                           <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                             No users found.
+                          </td>
+                        </tr>
+                      ) : managementAuthError && managedUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-4 text-center">
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 inline-block">
+                              <p className="text-yellow-800 text-sm mb-2">
+                                <strong>Authentication expired.</strong> Please refresh the page or click "Refresh Data" to reload users.
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setManagementAuthError(false)
+                                  loadUserManagement(userSearch, userFilter, currentPage)
+                                }}
+                                className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
+                              >
+                                Retry Load
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ) : (

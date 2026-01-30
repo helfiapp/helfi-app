@@ -6382,7 +6382,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                   <div className="flex gap-2 mt-3">
                     <a
                       href="/billing"
-                      className="flex-1 text-center text-xs font-medium text-white bg-red-600 rounded px-3 py-2 hover:bg-red-700 transition-colors"
+                      className="flex-1 text-center text-xs font-medium text-white bg-helfi-green rounded px-3 py-2 hover:bg-helfi-green/90 transition-colors"
                     >
                       Upgrade Plan
                     </a>
@@ -7706,7 +7706,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                   <div className="flex gap-2 mt-3">
                     <a
                       href="/billing"
-                      className="flex-1 text-center text-xs font-medium text-white bg-red-600 rounded px-3 py-2 hover:bg-red-700 transition-colors"
+                      className="flex-1 text-center text-xs font-medium text-white bg-helfi-green rounded px-3 py-2 hover:bg-helfi-green/90 transition-colors"
                     >
                       Upgrade Plan
                     </a>
