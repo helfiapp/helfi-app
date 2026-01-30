@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin user not found or inactive' }, { status: 404 })
     }
 
-    // Create JWT token for the mobile session
+    // Create JWT token for the mobile session - extended to 7 days
     const jwtToken = jwt.sign(
       {
         adminId: adminUser.id,
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
         role: adminUser.role
       },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '7d' }
     )
 
     // Remove QR token (one-time use)

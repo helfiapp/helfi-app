@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       data: { lastLogin: new Date() }
     })
 
-    // Create JWT token
+    // Create JWT token - extended to 7 days for admin convenience
     const token = jwt.sign(
       { 
         adminId: adminUser.id, 
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         role: adminUser.role 
       },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '7d' }
     )
 
     return NextResponse.json({

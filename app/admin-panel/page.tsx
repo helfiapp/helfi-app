@@ -5612,14 +5612,40 @@ The Helfi Team`,
                       </p>
                     </div>
                     <button
-                      onClick={() => {
-                        // Refresh the page to reload token from storage
-                        // If token is expired, user will be redirected to login
-                        window.location.reload()
+                      onClick={async () => {
+                        try {
+                          // Try to refresh the token first
+                          const storedToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || adminToken
+                          if (storedToken) {
+                            const refreshResponse = await fetch('/api/admin/refresh-token', {
+                              method: 'POST',
+                              headers: {
+                                'Authorization': `Bearer ${storedToken}`
+                              }
+                            })
+                            
+                            if (refreshResponse.ok) {
+                              const refreshData = await refreshResponse.json()
+                              // Update stored token
+                              sessionStorage.setItem('adminToken', refreshData.token)
+                              localStorage.setItem('adminToken', refreshData.token)
+                              setAdminToken(refreshData.token)
+                              setAdminUser(refreshData.admin)
+                              // Clear error and retry loading users
+                              setManagementAuthError(false)
+                              await loadUserManagement(userSearch, userFilter, currentPage, refreshData.token)
+                              return
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Token refresh failed:', error)
+                        }
+                        // If refresh fails, redirect to login
+                        router.push('/admin-panel')
                       }}
                       className="ml-4 bg-yellow-400 text-yellow-900 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
                     >
-                      Refresh Page
+                      Refresh Token
                     </button>
                   </div>
                 </div>
@@ -5674,13 +5700,40 @@ The Helfi Team`,
                                 <strong>Authentication expired.</strong> Please refresh the page or click "Refresh Data" to reload users.
                               </p>
                               <button
-                                onClick={() => {
-                                  // Refresh the page to reload token from storage
-                                  window.location.reload()
+                                onClick={async () => {
+                                  try {
+                                    // Try to refresh the token first
+                                    const storedToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || adminToken
+                                    if (storedToken) {
+                                      const refreshResponse = await fetch('/api/admin/refresh-token', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Authorization': `Bearer ${storedToken}`
+                                        }
+                                      })
+                                      
+                                      if (refreshResponse.ok) {
+                                        const refreshData = await refreshResponse.json()
+                                        // Update stored token
+                                        sessionStorage.setItem('adminToken', refreshData.token)
+                                        localStorage.setItem('adminToken', refreshData.token)
+                                        setAdminToken(refreshData.token)
+                                        setAdminUser(refreshData.admin)
+                                        // Clear error and retry loading users
+                                        setManagementAuthError(false)
+                                        await loadUserManagement(userSearch, userFilter, currentPage, refreshData.token)
+                                        return
+                                      }
+                                    }
+                                  } catch (error) {
+                                    console.error('Token refresh failed:', error)
+                                  }
+                                  // If refresh fails, redirect to login
+                                  router.push('/admin-panel')
                                 }}
                                 className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded text-sm font-medium hover:bg-yellow-500 transition-colors"
                               >
-                                Refresh Page
+                                Refresh Token
                               </button>
                             </div>
                           </td>

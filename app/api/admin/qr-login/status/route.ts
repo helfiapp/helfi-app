@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         role: adminUser.role
       },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '7d' }
     )
 
     await prisma.adminQrLogin.delete({ where: { token } })
