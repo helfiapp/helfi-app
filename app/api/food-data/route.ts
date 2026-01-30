@@ -365,7 +365,7 @@ export async function GET(request: NextRequest) {
       const matches = searchCustomFoodMacros(value, limit, options)
       if (!matches.length) return []
       const items = matches.map((item) => ({
-        source: 'usda',
+        source: 'usda' as const,
         id: `custom:${normalizeForCompact(item.name) || normalizeForMatch(item.name)}`,
         name: item.name,
         brand: null,

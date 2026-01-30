@@ -1130,14 +1130,19 @@ export default function AddIngredientClient() {
       if (seqRef.current !== seq) return
       let baseResults = Array.isArray(data?.items) ? data.items : []
       if (k === 'single') {
-        baseResults = baseResults.filter((item: NormalizedFoodItem) => item?.source === 'usda')
+        // Include USDA foods and custom foods (marked with __custom flag)
+        baseResults = baseResults.filter((item: NormalizedFoodItem) => 
+          item?.source === 'usda' || (item as any)?.__custom === true
+        )
         if (baseResults.length === 0) {
           const fallback = buildSingleFoodFallback(q)
           if (fallback) {
             const retry = await fetchItems(fallback)
             if (retry.res.ok) {
               const retryItems = Array.isArray(retry.data?.items) ? retry.data.items : []
-              baseResults = retryItems.filter((item: NormalizedFoodItem) => item?.source === 'usda')
+              baseResults = retryItems.filter((item: NormalizedFoodItem) => 
+                item?.source === 'usda' || (item as any)?.__custom === true
+              )
             }
           }
         }
