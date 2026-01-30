@@ -70,11 +70,59 @@ function stripParentheses(value) {
     .trim()
 }
 
+function extractParentheticalTerms(value) {
+  const raw = String(value || '')
+  const matches = Array.from(raw.matchAll(/\(([^)]*)\)/g)).map((m) => String(m[1] || '').trim()).filter(Boolean)
+  const terms = []
+  for (const m of matches) {
+    m.split(/[\/,]/g)
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .forEach((v) => terms.push(v))
+  }
+  return terms
+}
+
+function extractSlashParts(value) {
+  const raw = String(value || '')
+  if (!raw.includes('/')) return []
+  return raw
+    .split('/')
+    .map((v) => v.trim())
+    .filter(Boolean)
+}
+
 function pickFallbackQuery(value) {
   const tokens = getCoreTokens(value)
   if (tokens.length === 0) return null
   // Longest token tends to be most specific.
   return tokens.sort((a, b) => b.length - a.length)[0] || null
+}
+
+function normalizeCommonSpelling(value) {
+  return String(value || '')
+    .replace(/\byoghurt\b/gi, 'yogurt')
+    .replace(/\bchilli\b/gi, 'chili')
+    .replace(/\bbeetroot\b/gi, 'beet')
+    .trim()
+}
+
+function getExtraSynonymQueries(name) {
+  const n = normalizeText(name)
+  const list = []
+  if (n.includes('aubergine')) list.push('eggplant')
+  if (n.includes('bok choy')) list.push('pak choi', 'cabbage chinese pak choi')
+  if (n.includes('choy sum')) list.push('choysum', 'chinese flowering cabbage')
+  if (n.includes('broccolini')) list.push('broccoli raab', 'broccoli')
+  if (n.includes('daikon')) list.push('radish daikon', 'radish')
+  if (n.includes('sultanas')) list.push('raisins')
+  if (n.includes('silverbeet')) list.push('swiss chard', 'chard')
+  if (n.includes('skyr')) list.push('skyr', 'yogurt skyr')
+  if (n.includes('greek yoghurt') || n.includes('greek yogurt')) list.push('yogurt greek', 'greek yogurt')
+  if (n.includes('pitaya')) list.push('dragon fruit')
+  if (n.includes('dragon fruit')) list.push('pitaya')
+  if (n.includes('pomelo')) list.push('grapefruit')
+  return list
 }
 
 function parseCsvLine(line) {
@@ -247,39 +295,53 @@ async function fetchBestUsdaMacros(searchQuery, displayName) {
   url.searchParams.set('limit', '50')
   url.searchParams.set('localOnly', '1')
 
-  const res = await fetch(url.toString(), { method: 'GET' })
-  if (!res.ok) return null
-  const data = await res.json().catch(() => null)
-  const items = Array.isArray(data?.items) ? data.items : []
-  const candidates = items
-    .filter((it) => it && it.source === 'usda')
-    .filter((it) => !it.__custom)
-    .filter((it) => it.calories != null && it.protein_g != null && it.carbs_g != null && it.fat_g != null)
-    .filter((it) => !it.brand)
+  let lastErr = null
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const res = await fetch(url.toString(), { method: 'GET' })
+      if (!res.ok) {
+        lastErr = new Error(`HTTP ${res.status}`)
+      } else {
+        const data = await res.json().catch(() => null)
+        const items = Array.isArray(data?.items) ? data.items : []
+        const candidates = items
+          .filter((it) => it && it.source === 'usda')
+          .filter((it) => !it.__custom)
+          .filter((it) => it.calories != null && it.protein_g != null && it.carbs_g != null && it.fat_g != null)
+          .filter((it) => !it.brand)
 
-  if (candidates.length === 0) return null
+        if (candidates.length === 0) return null
 
-  let best = candidates[0]
-  let bestScore = scoreUsdaCandidate(best.name, displayName)
-  for (const it of candidates.slice(1)) {
-    const s = scoreUsdaCandidate(it.name, displayName)
-    if (s > bestScore) {
-      best = it
-      bestScore = s
+        let best = candidates[0]
+        let bestScore = scoreUsdaCandidate(best.name, displayName)
+        for (const it of candidates.slice(1)) {
+          const s = scoreUsdaCandidate(it.name, displayName)
+          if (s > bestScore) {
+            best = it
+            bestScore = s
+          }
+        }
+
+        return {
+          name: displayName,
+          calories: toNumber(best.calories),
+          protein_g: toNumber(best.protein_g),
+          carbs_g: toNumber(best.carbs_g),
+          fat_g: toNumber(best.fat_g),
+          fiber_g: toNumber(best.fiber_g),
+          sugar_g: toNumber(best.sugar_g),
+          source: 'usda',
+          usda_name: best.name,
+        }
+      }
+    } catch (err) {
+      lastErr = err
     }
+    const wait = 200 * (attempt + 1)
+    await new Promise((r) => setTimeout(r, wait))
   }
-
-  return {
-    name: displayName,
-    calories: toNumber(best.calories),
-    protein_g: toNumber(best.protein_g),
-    carbs_g: toNumber(best.carbs_g),
-    fat_g: toNumber(best.fat_g),
-    fiber_g: toNumber(best.fiber_g),
-    sugar_g: toNumber(best.sugar_g),
-    source: 'usda',
-    usda_name: best.name,
-  }
+  if (lastErr) return null
+  return null
 }
 
 async function main() {
@@ -333,11 +395,21 @@ async function main() {
         results.push(override)
       } else {
         const attempts = []
-        attempts.push(String(name || '').trim())
-        const stripped = stripParentheses(name)
-        if (stripped && stripped.toLowerCase() !== String(name || '').trim().toLowerCase()) attempts.push(stripped)
+        const rawName = String(name || '').trim()
+        attempts.push(rawName)
+        const normalizedSpelling = normalizeCommonSpelling(rawName)
+        if (normalizedSpelling && normalizedSpelling.toLowerCase() !== rawName.toLowerCase()) attempts.push(normalizedSpelling)
+
+        extractSlashParts(rawName).forEach((part) => attempts.push(part))
+
+        const stripped = stripParentheses(rawName)
+        if (stripped && stripped.toLowerCase() !== rawName.toLowerCase()) attempts.push(stripped)
+        extractParentheticalTerms(rawName).forEach((term) => attempts.push(term))
+
         const fallback = pickFallbackQuery(name)
         if (fallback) attempts.push(fallback)
+        getExtraSynonymQueries(rawName).forEach((q) => attempts.push(q))
+
         const uniqueAttempts = Array.from(new Set(attempts.map((v) => String(v || '').trim()).filter(Boolean)))
 
         let found = null

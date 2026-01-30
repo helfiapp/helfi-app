@@ -13,7 +13,9 @@ export type CustomFoodMacro = {
 }
 
 const DATA_DIR = path.join(process.cwd(), 'data', 'food-overrides')
-const SOURCE_FILES = ['nuts_legumes_macros.csv', 'roasted_nut_variants_macros.csv']
+// Master list generated from the existing "food-import" CSVs + USDA macros (auto-filled).
+// See: scripts/generate-master-food-macros.mjs
+const SOURCE_FILES = ['master_foods_macros.csv']
 
 let cachedItems: CustomFoodMacro[] | null = null
 
