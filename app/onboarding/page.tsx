@@ -5435,12 +5435,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       } else {
         setPhotoSelectedDays([]);
       }
-    } else if (editingChanged && editingIndex === null) {
-      // Clear form when not editing
+    } else if (editingChanged && editingIndex === null && prevEditingIndex !== null) {
+      // Only clear form when transitioning from editing to not editing (not when supplements change)
       clearPhotoForm();
       clearForm();
     }
-  }, [editingIndex, supplements]);
+  }, [editingIndex]); // Removed supplements from dependencies to prevent form clearing when adding new supplements
 
   // Validate image quality
   const validateImageQuality = async (file: File, type: 'front' | 'back') => {
@@ -6376,8 +6376,24 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
               {isUploadingImages ? 'Uploading photos...' : (editingIndex !== null ? 'Update Supplement' : 'Add Supplement')}
             </button>
             {uploadError && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {uploadError}
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <p className="mb-2">{uploadError}</p>
+                {(uploadError.includes('Free photo scans used up') || uploadError.includes('upgrade') || uploadError.includes('billing')) && (
+                  <div className="flex gap-2 mt-3">
+                    <a
+                      href="/billing"
+                      className="flex-1 text-center text-xs font-medium text-white bg-red-600 rounded px-3 py-2 hover:bg-red-700 transition-colors"
+                    >
+                      Upgrade Plan
+                    </a>
+                    <a
+                      href="/billing"
+                      className="flex-1 text-center text-xs font-medium text-red-800 bg-white border border-red-300 rounded px-3 py-2 hover:bg-red-50 transition-colors"
+                    >
+                      Buy Credits
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -6678,8 +6694,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
     };
   }, [name, uploadMethod]);
   
+  const prevMedEditingIndexRef = useRef<number | null>(null);
   // Populate form fields when editing starts
   useEffect(() => {
+    const prevEditingIndex = prevMedEditingIndexRef.current;
+    const editingChanged = prevEditingIndex !== editingIndex;
+    prevMedEditingIndexRef.current = editingIndex;
     if (editingIndex !== null && editingIndex >= 0 && editingIndex < medications.length) {
       const medication = medications[editingIndex];
       if (!medication) {
@@ -6760,12 +6780,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       } else {
         setPhotoSelectedDays([]);
       }
-    } else if (editingIndex === null) {
-      // Clear form when not editing
+    } else if (editingChanged && editingIndex === null && prevEditingIndex !== null) {
+      // Only clear form when transitioning from editing to not editing (not when medications change)
       clearMedPhotoForm();
       clearMedForm();
     }
-  }, [editingIndex, medications]);
+  }, [editingIndex]); // Removed medications from dependencies to prevent form clearing when adding new medications
 
   // Validate image quality
   const validateImageQuality = async (file: File, type: 'front' | 'back') => {
@@ -7680,8 +7700,24 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
               {isUploadingImages ? 'Uploading photos...' : (editingIndex !== null ? 'Update Medication' : 'Add Medication')}
             </button>
             {uploadError && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {uploadError}
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <p className="mb-2">{uploadError}</p>
+                {(uploadError.includes('Free photo scans used up') || uploadError.includes('upgrade') || uploadError.includes('billing')) && (
+                  <div className="flex gap-2 mt-3">
+                    <a
+                      href="/billing"
+                      className="flex-1 text-center text-xs font-medium text-white bg-red-600 rounded px-3 py-2 hover:bg-red-700 transition-colors"
+                    >
+                      Upgrade Plan
+                    </a>
+                    <a
+                      href="/billing"
+                      className="flex-1 text-center text-xs font-medium text-red-800 bg-white border border-red-300 rounded px-3 py-2 hover:bg-red-50 transition-colors"
+                    >
+                      Buy Credits
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </div>
