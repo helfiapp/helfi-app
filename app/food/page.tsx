@@ -12772,8 +12772,16 @@ Please add nutritional information manually if needed.`);
 
   const isMealBuilderDiaryEntry = (entry: any) => {
     if (!entry) return false
+    // Only consider it a meal builder entry if it has multiple items OR was explicitly created via meal builder
+    // Single ingredient entries from search should not be considered custom meals
     const items = Array.isArray(entry?.items) ? entry.items : null
     if (!items || items.length === 0) return false
+    // Check if it was explicitly created via meal builder (has meal-builder method or customMeal flag)
+    const method = String(entry?.method || '').toLowerCase()
+    if (method === 'meal-builder' || method === 'combined' || entry?.customMeal === true) return true
+    // Only consider multi-item entries with meal builder IDs as custom meals
+    // Single ingredient entries from search (even with usda/openfoodfacts IDs) are not custom meals
+    if (items.length === 1) return false
     return items.some((it: any) => looksLikeMealBuilderCreatedItemId(it?.id))
   }
 
