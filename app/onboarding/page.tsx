@@ -5567,7 +5567,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   const [photoSelectedDays, setPhotoSelectedDays] = useState<string[]>([]);
 
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
-  const dosageUnits = ['mg', 'mcg', 'g', 'IU', 'capsules', 'tablets', 'drops', 'ml', 'tsp', 'tbsp'];
+  const dosageUnits = ['mg', 'mcg', 'g', 'IU', 'FUs', 'capsules', 'tablets', 'drops', 'ml', 'tsp', 'tbsp'];
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const timingId = (time: string) => `photo-timing-${time.toLowerCase().replace(/\s+/g, '-')}`;
 
