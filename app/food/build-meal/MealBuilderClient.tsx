@@ -1083,7 +1083,10 @@ const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
   return unit
 }
 
-const macroOrZero = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+const macroOrZero = (v: any) => {
+  const num = typeof v === 'number' && Number.isFinite(v) ? v : 0
+  return Math.max(0, num) // Clamp to >= 0 to prevent negative macros
+}
 
 const computeServingsFromAmount = (item: BuilderItem) => {
   const baseAmount = item.__baseAmount
@@ -1185,12 +1188,12 @@ const applyPortionScaleToTotals = (
 ) => {
   if (!Number.isFinite(scale) || scale <= 0 || scale === 1) return totals
   return {
-    calories: totals.calories * scale,
-    protein: totals.protein * scale,
-    carbs: totals.carbs * scale,
-    fat: totals.fat * scale,
-    fiber: totals.fiber * scale,
-    sugar: totals.sugar * scale,
+    calories: Math.max(0, Math.round(totals.calories * scale)),
+    protein: Math.max(0, Math.round(totals.protein * scale * 10) / 10),
+    carbs: Math.max(0, Math.round(totals.carbs * scale * 10) / 10),
+    fat: Math.max(0, Math.round(totals.fat * scale * 10) / 10),
+    fiber: Math.max(0, Math.round(totals.fiber * scale * 10) / 10),
+    sugar: Math.max(0, Math.round(totals.sugar * scale * 10) / 10),
   }
 }
 
@@ -1461,7 +1464,6 @@ export default function MealBuilderClient() {
       editFavoriteIsCustomRef.current = false
       initialItemsSignatureRef.current = ''
       initialPortionTotalWeightRef.current = null
-      savedPortionScaleRef.current = null
       return
     }
     if (loadedFavoriteId === editFavoriteId) return
@@ -1474,13 +1476,6 @@ export default function MealBuilderClient() {
     const favoriteTotals = (fav as any)?.nutrition || (fav as any)?.total || null
     applySavedPortion(favoriteTotals)
     initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(favoriteTotals)
-    // Store saved portion scale for consistent calorie display
-    if (favoriteTotals && typeof favoriteTotals === 'object') {
-      const scale = Number((favoriteTotals as any).__portionScale)
-      savedPortionScaleRef.current = Number.isFinite(scale) && scale > 0 ? scale : null
-    } else {
-      savedPortionScaleRef.current = null
-    }
 
     const favItems = parseFavoriteItems(fav)
     editFavoriteSourceItemsRef.current = favItems ? JSON.parse(JSON.stringify(favItems)) : null
@@ -1519,7 +1514,6 @@ export default function MealBuilderClient() {
       if (!editFavoriteId) {
         initialItemsSignatureRef.current = ''
         initialPortionTotalWeightRef.current = null
-        savedPortionScaleRef.current = null
       }
       return
     }
@@ -1550,13 +1544,6 @@ export default function MealBuilderClient() {
         const logTotals = (log as any)?.nutrients || null
         if (!cancelled) applySavedPortion(logTotals)
         initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(logTotals)
-        // Store saved portion scale for consistent calorie display
-        if (!cancelled && logTotals && typeof logTotals === 'object') {
-          const scale = Number((logTotals as any).__portionScale)
-          savedPortionScaleRef.current = Number.isFinite(scale) && scale > 0 ? scale : null
-        } else {
-          savedPortionScaleRef.current = null
-        }
 
         const rawItems = Array.isArray(log?.items) ? log.items : null
         if (!cancelled && rawItems && rawItems.length > 0) {
@@ -1613,8 +1600,6 @@ export default function MealBuilderClient() {
     return saved
   }, [items, totalRecipeWeightG])
 
-  // Get saved portion scale from the entry being edited (if any) - stored when loading entry
-  const savedPortionScaleRef = useRef<number | null>(null)
 
   // Guard rail: portionScale must allow values above 1 to scale larger-than-recipe servings.
   // See GUARD_RAILS.md section "Build a Meal portion scaling".
@@ -1624,22 +1609,60 @@ export default function MealBuilderClient() {
   )
 
   // Use saved portion scale if editing existing entry to ensure calories match front page display
-  // Only use computed scale if user has manually changed the portion input
-  const portionScale = useMemo(() => {
-    // If we have a saved scale and we're editing an existing entry, prefer saved scale for consistency
-    if (savedPortionScaleRef.current !== null && (sourceLogId || editFavoriteId)) {
-      const saved = savedPortionScaleRef.current
-      const computed = computedPortionScale
-      // Use saved scale if it's close to computed (within 1% tolerance) to ensure front page and edit page match
-      // This handles cases where portion input might be slightly different but scale should be the same
-      if (Math.abs(saved - computed) / Math.max(saved, computed, 1) < 0.01) {
-        return saved
+  // The front page uses the saved scale, so we must use it too for consistency
+  const [savedPortionScale, setSavedPortionScale] = useState<number | null>(null)
+  
+  useEffect(() => {
+    if (sourceLogId && !editFavoriteId) {
+      // When editing a diary entry, fetch and store the saved portion scale
+      const fetchSavedScale = async () => {
+        try {
+          const res = await fetch(`/api/food-log?id=${encodeURIComponent(sourceLogId)}`, { method: 'GET' })
+          const data = await res.json().catch(() => ({} as any))
+          if (res.ok && data?.log) {
+            const logTotals = (data.log as any)?.nutrients || null
+            if (logTotals && typeof logTotals === 'object') {
+              const scale = Number((logTotals as any).__portionScale)
+              setSavedPortionScale(Number.isFinite(scale) && scale > 0 ? scale : null)
+            } else {
+              setSavedPortionScale(null)
+            }
+          } else {
+            setSavedPortionScale(null)
+          }
+        } catch {
+          setSavedPortionScale(null)
+        }
       }
-      // If computed is significantly different, user may have changed portion, so use computed
-      return computed
+      fetchSavedScale()
+    } else if (editFavoriteId) {
+      // When editing a favorite, get saved portion scale from favorite data
+      const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+      const fav = favorites.find((f: any) => String(f?.id || '') === editFavoriteId) || null
+      if (fav) {
+        const favoriteTotals = (fav as any)?.nutrition || (fav as any)?.total || null
+        if (favoriteTotals && typeof favoriteTotals === 'object') {
+          const scale = Number((favoriteTotals as any).__portionScale)
+          setSavedPortionScale(Number.isFinite(scale) && scale > 0 ? scale : null)
+        } else {
+          setSavedPortionScale(null)
+        }
+      } else {
+        setSavedPortionScale(null)
+      }
+    } else {
+      setSavedPortionScale(null)
+    }
+  }, [sourceLogId, editFavoriteId, userData])
+
+  // Use saved portion scale when editing existing entry, otherwise use computed scale
+  const portionScale = useMemo(() => {
+    // If we have a saved scale and we're editing an existing entry, use saved scale to match front page
+    if (savedPortionScale !== null && (sourceLogId || editFavoriteId)) {
+      return savedPortionScale
     }
     return computedPortionScale
-  }, [computedPortionScale, sourceLogId, editFavoriteId])
+  }, [savedPortionScale, computedPortionScale, sourceLogId, editFavoriteId])
 
   const mealTotals = useMemo(
     () => applyPortionScaleToTotals(baseMealTotals, portionScale),
