@@ -12856,6 +12856,12 @@ Please add nutritional information manually if needed.`);
 
   const isCustomMealFavorite = (fav: any) => {
     if (!fav) return false
+    // Single ingredient favorites should NEVER be considered custom meals
+    // Only multi-item meals created via "Build a Meal" should be custom meals
+    const items = parseFavoriteItems(fav)
+    const isSingleIngredient = !items || items.length === 0 || items.length === 1
+    if (isSingleIngredient) return false
+    
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
@@ -14527,12 +14533,17 @@ Please add nutritional information manually if needed.`);
         ? JSON.parse(JSON.stringify(source.items))
         : null
     const sourceMethod = String(source?.method || 'text').toLowerCase()
+    // Single ingredient entries should NEVER be marked as custom meals
+    // Only multi-item meals created via "Build a Meal" should be custom meals
+    const isSingleIngredient = !clonedItems || clonedItems.length === 0 || clonedItems.length === 1
     const inferredCustomMeal =
-      opts?.forceCustomMeal === true ||
-      source?.customMeal === true ||
-      sourceMethod === 'combined' ||
-      sourceMethod === 'meal-builder' ||
-      isMealBuilderDiaryEntry(source)
+      !isSingleIngredient && (
+        opts?.forceCustomMeal === true ||
+        source?.customMeal === true ||
+        sourceMethod === 'combined' ||
+        sourceMethod === 'meal-builder' ||
+        isMealBuilderDiaryEntry(source)
+      )
 
     const id = `fav-${Date.now()}`
     const favoritePayload = {

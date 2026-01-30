@@ -2240,6 +2240,12 @@ export default function MealBuilderClient() {
 
   const isCustomMealFavorite = (fav: any) => {
     if (!fav) return false
+    // Single ingredient favorites should NEVER be considered custom meals
+    // Only multi-item meals created via "Build a Meal" should be custom meals
+    const items = parseFavoriteItems(fav)
+    const isSingleIngredient = !items || items.length === 0 || items.length === 1
+    if (isSingleIngredient) return false
+    
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
