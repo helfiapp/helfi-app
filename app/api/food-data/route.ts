@@ -562,13 +562,36 @@ export async function GET(request: NextRequest) {
 
     const getCustomPackagedMatches = (value: string) => {
       if (!value) return []
+      
+      // For packaged foods, be more lenient - check if query tokens appear in name or brand+name
+      const queryTokens = getSearchTokens(value).filter((t) => t.length >= 2)
+      const normalizedQuery = normalizeForMatch(value)
+      
       const buildMatches = (allowTypo: boolean) =>
         CUSTOM_PACKAGED_ITEMS.filter((item) => {
+          const name = item.name || ''
+          const brand = item.brand || ''
+          const brandName = brand ? `${brand} ${name}` : name
+          const normalizedBrandName = normalizeForMatch(brandName)
+          const normalizedName = normalizeForMatch(name)
+          const normalizedBrand = normalizeForMatch(brand)
+          
+          // For multi-word queries, check if all tokens appear somewhere (more lenient)
+          if (queryTokens.length > 1) {
+            const allTokensMatch = queryTokens.every((token) => 
+              normalizedBrandName.includes(token) || 
+              normalizedName.includes(token) ||
+              (brand && normalizedBrand.includes(token))
+            )
+            if (allTokensMatch) return true
+          }
+          
           // Check name
-          if (nameMatchesSearchQuery(item.name, value, { allowTypo })) return true
+          if (nameMatchesSearchQuery(name, value, { allowTypo })) return true
           // Check brand + name combination
-          const brandName = [item.brand, item.name].filter(Boolean).join(' ')
           if (brandName && nameMatchesSearchQuery(brandName, value, { allowTypo })) return true
+          // Check brand alone (if query matches brand)
+          if (brand && normalizedBrand.includes(normalizedQuery)) return true
           // Check aliases
           const aliases = Array.isArray(item.aliases) ? item.aliases : []
           return aliases.some((alias) => nameMatchesSearchQuery(alias, value, { allowTypo }))
