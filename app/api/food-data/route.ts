@@ -49,45 +49,75 @@ export async function GET(request: NextRequest) {
       [...list].sort((a, b) => normalizeForMatch(a?.name).localeCompare(normalizeForMatch(b?.name)))
 
     // "Alphabetical hierarchy" (Google-Maps-like feel):
-    // When the query matches a later word (e.g. "Black-eyed peas" matches "pea"),
-    // sort as if the matching word is the start (so "Peanuts..." comes before "...peas...").
-    const buildAlphabeticalHierarchyKey = (name: any, searchQuery: string) => {
-      const n = normalizeForMatch(name)
-      if (!n) return ''
-      const q = normalizeForMatch(searchQuery)
-      if (!q) return n
-
-      const queryTokens = getSearchTokens(searchQuery)
-      const queryFirst = queryTokens[0] || q
-      const qSingular = singularizeToken(queryFirst)
-      const queryCandidates = Array.from(new Set([queryFirst, qSingular].filter(Boolean)))
-      if (queryCandidates.length === 0) return n
-
-      const nameTokens = getSearchTokens(String(name || ''))
-      let matchedWord: string | null = null
-      for (const word of nameTokens) {
-        if (!word) continue
-        const wordSingular = singularizeToken(word)
-        for (const candidate of queryCandidates) {
-          if (word.startsWith(candidate)) {
-            matchedWord = word
-            break
-          }
-          if (wordSingular && wordSingular !== word && wordSingular.startsWith(candidate)) {
-            matchedWord = wordSingular
-            break
-          }
-        }
-        if (matchedWord) break
-      }
-
-      return matchedWord ? `${matchedWord} ${n}` : n
-    }
-
+    // 1) Prefer items whose FIRST word matches what you typed.
+    // 2) Then prefer items where the matching word is closest (egg beats eggplant).
+    // 3) If the match is in a later word (Black-eyed peas), sort by that word.
     const sortByAlphabeticalHierarchyAsc = (list: any[], searchQuery: string) => {
       const stableNameKey = (it: any) => normalizeForMatch(it?.name)
-      const hierarchyKey = (it: any) => buildAlphabeticalHierarchyKey(it?.name, searchQuery)
-      return [...list].sort((a, b) => hierarchyKey(a).localeCompare(hierarchyKey(b)) || stableNameKey(a).localeCompare(stableNameKey(b)))
+      const queryNorm = normalizeForMatch(searchQuery)
+      const queryTokens = getSearchTokens(searchQuery)
+      const queryFirstRaw = queryTokens[0] || queryNorm
+      const queryFirst = singularizeToken(queryFirstRaw)
+      const queryAlt = singularizeToken(queryFirstRaw)
+      const queryCandidates = Array.from(new Set([queryFirstRaw, queryFirst, queryAlt].filter(Boolean)))
+      const minCandidateLen = queryCandidates.length > 0 ? Math.min(...queryCandidates.map((t) => t.length)) : 0
+
+      const getMatchMeta = (name: any) => {
+        const normalizedName = normalizeForMatch(name)
+        const nameTokens = getSearchTokens(String(name || ''))
+        let matchIndex = Number.POSITIVE_INFINITY
+        let matchedWord = ''
+        let matchedCandidateLen = minCandidateLen || 0
+
+        for (let i = 0; i < nameTokens.length; i += 1) {
+          const word = nameTokens[i]
+          if (!word) continue
+          const wordSingular = singularizeToken(word)
+          for (const candidate of queryCandidates) {
+            if (!candidate) continue
+            if (word.startsWith(candidate)) {
+              matchIndex = i
+              matchedWord = word
+              matchedCandidateLen = candidate.length
+              break
+            }
+            if (wordSingular && wordSingular !== word && wordSingular.startsWith(candidate)) {
+              matchIndex = i
+              matchedWord = wordSingular
+              matchedCandidateLen = candidate.length
+              break
+            }
+          }
+          if (matchIndex !== Number.POSITIVE_INFINITY) break
+        }
+
+        const isFirstWordMatch = matchIndex === 0
+        const exactWordMatch = queryCandidates.some((c) => c === matchedWord || c === singularizeToken(matchedWord))
+        const wordDelta = matchedWord ? Math.max(0, matchedWord.length - matchedCandidateLen) : 999
+        const hierarchyKey = matchedWord ? `${matchedWord} ${normalizedName}` : normalizedName
+
+        return { matchIndex, isFirstWordMatch, exactWordMatch, wordDelta, hierarchyKey, stable: normalizedName }
+      }
+
+      return [...list].sort((a, b) => {
+        const aMeta = getMatchMeta(a?.name)
+        const bMeta = getMatchMeta(b?.name)
+
+        // 1) First-word matches should always win (E.g. "Eggplant" before "Aubergine (eggplant)").
+        if (aMeta.isFirstWordMatch !== bMeta.isFirstWordMatch) return aMeta.isFirstWordMatch ? -1 : 1
+
+        // 2) Earlier word match wins (if both are non-first).
+        if (aMeta.matchIndex !== bMeta.matchIndex) return aMeta.matchIndex - bMeta.matchIndex
+
+        // 3) Exact word match wins ("egg" beats "eggplant").
+        if (aMeta.exactWordMatch !== bMeta.exactWordMatch) return aMeta.exactWordMatch ? -1 : 1
+
+        // 4) Closer match wins (shorter extension after the typed prefix).
+        if (aMeta.wordDelta !== bMeta.wordDelta) return aMeta.wordDelta - bMeta.wordDelta
+
+        // 5) Alphabetical within the hierarchy.
+        return aMeta.hierarchyKey.localeCompare(bMeta.hierarchyKey) || aMeta.stable.localeCompare(bMeta.stable)
+      })
     }
 
     const singularizeToken = (value: string) => {
