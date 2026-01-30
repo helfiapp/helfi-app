@@ -48,6 +48,48 @@ export async function GET(request: NextRequest) {
     const sortByNameAsc = (list: any[]) =>
       [...list].sort((a, b) => normalizeForMatch(a?.name).localeCompare(normalizeForMatch(b?.name)))
 
+    // "Alphabetical hierarchy" (Google-Maps-like feel):
+    // When the query matches a later word (e.g. "Black-eyed peas" matches "pea"),
+    // sort as if the matching word is the start (so "Peanuts..." comes before "...peas...").
+    const buildAlphabeticalHierarchyKey = (name: any, searchQuery: string) => {
+      const n = normalizeForMatch(name)
+      if (!n) return ''
+      const q = normalizeForMatch(searchQuery)
+      if (!q) return n
+
+      const queryTokens = getSearchTokens(searchQuery)
+      const queryFirst = queryTokens[0] || q
+      const qSingular = singularizeToken(queryFirst)
+      const queryCandidates = Array.from(new Set([queryFirst, qSingular].filter(Boolean)))
+      if (queryCandidates.length === 0) return n
+
+      const nameTokens = getSearchTokens(String(name || ''))
+      let matchedWord: string | null = null
+      for (const word of nameTokens) {
+        if (!word) continue
+        const wordSingular = singularizeToken(word)
+        for (const candidate of queryCandidates) {
+          if (word.startsWith(candidate)) {
+            matchedWord = word
+            break
+          }
+          if (wordSingular && wordSingular !== word && wordSingular.startsWith(candidate)) {
+            matchedWord = wordSingular
+            break
+          }
+        }
+        if (matchedWord) break
+      }
+
+      return matchedWord ? `${matchedWord} ${n}` : n
+    }
+
+    const sortByAlphabeticalHierarchyAsc = (list: any[], searchQuery: string) => {
+      const stableNameKey = (it: any) => normalizeForMatch(it?.name)
+      const hierarchyKey = (it: any) => buildAlphabeticalHierarchyKey(it?.name, searchQuery)
+      return [...list].sort((a, b) => hierarchyKey(a).localeCompare(hierarchyKey(b)) || stableNameKey(a).localeCompare(stableNameKey(b)))
+    }
+
     const singularizeToken = (value: string) => {
       const lower = value.toLowerCase()
       if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
@@ -281,9 +323,9 @@ export async function GET(request: NextRequest) {
         ? brandedPrefix
         : filterItemsByQuery(brandedDeduped, value, (item) => item?.name || '', true)
 
-      const sortedCustom = sortByNameAsc(customFinal)
-      const sortedMain = sortByNameAsc(mainFinal)
-      const sortedBranded = sortByNameAsc(brandedFinal)
+      const sortedCustom = sortByAlphabeticalHierarchyAsc(customFinal, value)
+      const sortedMain = sortByAlphabeticalHierarchyAsc(mainFinal, value)
+      const sortedBranded = sortByAlphabeticalHierarchyAsc(brandedFinal, value)
 
       const combined: any[] = []
       const pushGroup = (group: any[]) => {
@@ -643,7 +685,7 @@ export async function GET(request: NextRequest) {
           actualSource = 'auto'
         } else {
           const usdaItems = await searchUsdaSingleFood(query)
-          items = sortByNameAsc(usdaItems).slice(0, limit)
+          items = sortByAlphabeticalHierarchyAsc(usdaItems, query).slice(0, limit)
           actualSource = 'usda'
         }
       } else {
@@ -723,7 +765,7 @@ export async function GET(request: NextRequest) {
           actualSource = 'usda'
         } else {
           const usdaItems = await searchUsdaSingleFood(query)
-          items = sortByNameAsc(usdaItems).slice(0, limit)
+          items = sortByAlphabeticalHierarchyAsc(usdaItems, query).slice(0, limit)
           actualSource = 'usda'
         }
       } else {
