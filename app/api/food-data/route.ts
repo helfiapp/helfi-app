@@ -520,19 +520,90 @@ export async function GET(request: NextRequest) {
           const brand = brandMatch ? brandMatch[1] : null
           const cleanName = brandMatch ? name.replace(/\s*\([^)]+\)$/, '').trim() : name
           
+          // Define typical serving sizes (in grams) for common items
+          // If not specified, default to 100g
+          const getServingSize = (itemName: string): { sizeGrams: number; servingLabel: string } => {
+            const lowerName = itemName.toLowerCase()
+            
+            // Meals
+            if (lowerName.includes('mcsmart meal')) return { sizeGrams: 616, servingLabel: '1 meal' }
+            if (lowerName.includes('fish & chips') || lowerName.includes('fish and chips')) return { sizeGrams: 400, servingLabel: '1 serve' }
+            
+            // Burgers
+            if (lowerName.includes('big mac')) return { sizeGrams: 215, servingLabel: '1 burger' }
+            if (lowerName.includes('quarter pounder')) return { sizeGrams: 200, servingLabel: '1 burger' }
+            if (lowerName.includes('cheeseburger') && !lowerName.includes('double')) return { sizeGrams: 119, servingLabel: '1 burger' }
+            if (lowerName.includes('hamburger') && !lowerName.includes('double')) return { sizeGrams: 105, servingLabel: '1 burger' }
+            if (lowerName.includes('mcdouble')) return { sizeGrams: 155, servingLabel: '1 burger' }
+            if (lowerName.includes('mcdouble')) return { sizeGrams: 155, servingLabel: '1 burger' }
+            
+            // Fish items
+            if (lowerName.includes('battered') && (lowerName.includes('fish') || lowerName.includes('flake') || lowerName.includes('snapper') || lowerName.includes('cod') || lowerName.includes('barramundi') || lowerName.includes('flathead'))) {
+              return { sizeGrams: 150, servingLabel: '1 piece' }
+            }
+            if (lowerName.includes('filet-o-fish')) return { sizeGrams: 142, servingLabel: '1 burger' }
+            
+            // Chicken items
+            if (lowerName.includes('mcnuggets')) return { sizeGrams: 100, servingLabel: '4 pieces' }
+            if (lowerName.includes('mccrispy')) return { sizeGrams: 200, servingLabel: '1 sandwich' }
+            if (lowerName.includes('mcchicken')) return { sizeGrams: 153, servingLabel: '1 sandwich' }
+            
+            // Sides
+            if (lowerName.includes('french fries') || lowerName.includes('chips')) {
+              if (lowerName.includes('small')) return { sizeGrams: 80, servingLabel: '1 small' }
+              if (lowerName.includes('medium')) return { sizeGrams: 110, servingLabel: '1 medium' }
+              if (lowerName.includes('large')) return { sizeGrams: 150, servingLabel: '1 large' }
+              return { sizeGrams: 100, servingLabel: '1 serve' }
+            }
+            if (lowerName.includes('hash brown')) return { sizeGrams: 52, servingLabel: '1 piece' }
+            if (lowerName.includes('apple pie')) return { sizeGrams: 80, servingLabel: '1 pie' }
+            
+            // Desserts
+            if (lowerName.includes('mcflurry')) return { sizeGrams: 360, servingLabel: '1 regular' }
+            
+            // Fish & chip shop items
+            if (lowerName.includes('dim sim')) return { sizeGrams: 50, servingLabel: '1 piece' }
+            if (lowerName.includes('potato cake') || lowerName.includes('potato scallop')) return { sizeGrams: 75, servingLabel: '1 piece' }
+            if (lowerName.includes('calamari rings')) return { sizeGrams: 100, servingLabel: '1 serve' }
+            if (lowerName.includes('scallops') && lowerName.includes('battered')) return { sizeGrams: 100, servingLabel: '1 serve' }
+            if (lowerName.includes('prawns') && lowerName.includes('battered')) return { sizeGrams: 100, servingLabel: '1 serve' }
+            if (lowerName.includes('fish cake')) return { sizeGrams: 100, servingLabel: '1 piece' }
+            if (lowerName.includes('chiko roll')) return { sizeGrams: 160, servingLabel: '1 roll' }
+            if (lowerName.includes('spring roll')) return { sizeGrams: 50, servingLabel: '1 roll' }
+            if (lowerName.includes('corn jack')) return { sizeGrams: 100, servingLabel: '1 piece' }
+            if (lowerName.includes('onion rings')) return { sizeGrams: 91, servingLabel: '1 small serve' }
+            if (lowerName.includes('mushy peas')) return { sizeGrams: 100, servingLabel: '1 serve' }
+            if (lowerName.includes('curry sauce') || lowerName.includes('gravy') || lowerName.includes('tartare sauce')) return { sizeGrams: 50, servingLabel: '1 serve' }
+            
+            // Default to 100g
+            return { sizeGrams: 100, servingLabel: '100 g' }
+          }
+          
+          const servingInfo = getServingSize(name)
+          const multiplier = servingInfo.sizeGrams / 100
+          
+          // Add aliases for better matching
+          const aliases: string[] = []
+          if (cleanName.toLowerCase().includes('flake')) {
+            aliases.push('flake', 'fish and chip shop flake', 'fish & chip shop flake')
+          }
+          if (cleanName.toLowerCase().includes('mcsmart')) {
+            aliases.push('mcsmart', 'mc smart')
+          }
+          
           items.push({
             id: `custom:fast-food-${normalizeForCompact(name)}`,
             name: cleanName,
             brand: brand,
-            serving_size: '100 g',
-            calories: Math.round(calories),
-            protein_g: Math.round(protein * 10) / 10,
-            carbs_g: Math.round(carbs * 10) / 10,
-            fat_g: Math.round(fat * 10) / 10,
-            fiber_g: fiber > 0 ? Math.round(fiber * 10) / 10 : null,
-            sugar_g: sugar > 0 ? Math.round(sugar * 10) / 10 : null,
+            serving_size: servingInfo.servingLabel,
+            calories: Math.round(calories * multiplier),
+            protein_g: Math.round(protein * multiplier * 10) / 10,
+            carbs_g: Math.round(carbs * multiplier * 10) / 10,
+            fat_g: Math.round(fat * multiplier * 10) / 10,
+            fiber_g: fiber > 0 ? Math.round(fiber * multiplier * 10) / 10 : null,
+            sugar_g: sugar > 0 ? Math.round(sugar * multiplier * 10) / 10 : null,
             source: 'openfoodfacts',
-            aliases: [],
+            aliases: aliases,
           })
         }
         return items
