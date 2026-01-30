@@ -384,10 +384,11 @@ export async function GET(request: NextRequest) {
     const buildSingleFoodResults = async (value: string) => {
       const customPrefix = toCustomFoodItems(value, { allowTypo: false })
 
-      const [foundation, legacy, branded] = await Promise.all([
+      // For single foods: only use foundation and legacy (simple foods), NOT branded (product foods)
+      // Branded/product foods should only appear for packaged searches
+      const [foundation, legacy] = await Promise.all([
         searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] }),
         searchLocalFoods(value, { pageSize: limit, sources: ['usda_sr_legacy'] }),
-        searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'] }),
       ])
 
       const combinedMain = [...foundation, ...legacy]
@@ -403,24 +404,18 @@ export async function GET(request: NextRequest) {
       }
 
       const mainDeduped = dedupe(combinedMain)
-      const brandedDeduped = dedupe(branded)
 
       const mainPrefix = filterItemsByQuery(mainDeduped, value, (item) => item?.name || '', false)
-      const brandedPrefix = filterItemsByQuery(brandedDeduped, value, (item) => item?.name || '', false)
 
-      const hasPrefixMatches = customPrefix.length > 0 || mainPrefix.length > 0 || brandedPrefix.length > 0
+      const hasPrefixMatches = customPrefix.length > 0 || mainPrefix.length > 0
 
       const customFinal = hasPrefixMatches ? customPrefix : toCustomFoodItems(value, { allowTypo: true })
       const mainFinal = hasPrefixMatches
         ? mainPrefix
         : filterItemsByQuery(mainDeduped, value, (item) => item?.name || '', true)
-      const brandedFinal = hasPrefixMatches
-        ? brandedPrefix
-        : filterItemsByQuery(brandedDeduped, value, (item) => item?.name || '', true)
 
       const sortedCustom = sortByAlphabeticalHierarchyAsc(customFinal, value)
       const sortedMain = sortByAlphabeticalHierarchyAsc(mainFinal, value)
-      const sortedBranded = sortByAlphabeticalHierarchyAsc(brandedFinal, value)
 
       const combined: any[] = []
       const pushGroup = (group: any[]) => {
@@ -430,9 +425,10 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Custom list first, then simple foods (foundation + legacy)
+      // Branded/product foods are excluded from single food searches
       pushGroup(sortedCustom)
       pushGroup(sortedMain)
-      pushGroup(sortedBranded)
 
       return combined
     }
