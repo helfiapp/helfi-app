@@ -1,89 +1,203 @@
 food,per_100g_kcal,protein_g,carbs_g,fat_g,fibre_g,sugar_g
 Big Mac (McDonald's),265,11.8,20.1,15.0,0,0
+Cheeseburger (McDonald's),263,12.9,27.7,11.8,0,0
+Hamburger (McDonald's),250,12.0,26.0,10.0,0,0
+Double Cheeseburger (McDonald's),280,18.0,20.0,15.0,0,0
 Quarter Pounder with Cheese (McDonald's),237,14.3,20.0,10.0,0,0
+Double Quarter Pounder with Cheese (McDonald's),280,18.0,20.0,16.0,0,0
 McDouble (McDonald's),250,15.0,22.0,11.0,0,0
 McChicken (McDonald's),250,12.0,25.0,10.0,0,0
 Filet-O-Fish (McDonald's),250,12.0,25.0,10.0,0,0
+McNuggets (McDonald's),250,15.0,15.0,13.0,0,0
+McCrispy (McDonald's),250,18.0,25.0,10.0,0,0
+French Fries (McDonald's),320,3.5,42.0,15.0,0,0
+Hash Browns (McDonald's),320,3.0,30.0,20.0,0,0
+Apple Pie (McDonald's),280,3.0,35.0,14.0,0,0
+McFlurry OREO (McDonald's),116,2.7,18.2,3.6,0,0
+McFlurry M&M (McDonald's),177,4.0,26.8,6.5,0,0
+Egg McMuffin (McDonald's),250,14.0,25.0,10.0,0,0
+Sausage McMuffin (McDonald's),300,12.0,20.0,18.0,0,0
+Sausage McMuffin with Egg (McDonald's),290,13.0,20.0,17.0,0,0
+Hotcakes (McDonald's),230,5.0,40.0,6.0,0,0
 Whopper (Burger King),233,10.8,18.6,12.9,0,0
 Whopper with Cheese (Burger King),245,12.0,19.0,14.0,0,0
-Chicken Sandwich (Burger King),220,15.0,20.0,8.0,0,0
+Double Whopper (Burger King),236,14.3,14.6,16.0,0,0
+Double Whopper with Cheese (Burger King),266,14.5,13.5,17.1,0,0
+Whopper Jr. (Burger King),207,7.8,21.4,10.1,0,0
+Hamburger (Burger King),224,11.0,20.0,9.0,0,0
+Cheeseburger (Burger King),235,11.4,25.3,9.6,0,0
+Double Cheeseburger (Burger King),280,18.0,22.0,15.0,0,0
+Bacon King (Burger King),300,20.0,20.0,18.0,0,0
+Original Chicken Sandwich (Burger King),250,18.0,22.0,10.0,0,0
+Chicken Fries (Burger King),242,16.3,13.3,13.5,0,0
+Chicken Nuggets (Burger King),250,15.0,15.0,13.0,0,0
+French Fries (Burger King),330,4.0,45.0,15.0,0,0
+Onion Rings (Burger King),416,3.8,43.6,25.3,0,0
 KFC Classic Twister,210,10.1,20.7,9.7,0,0
 KFC Crispy Twister,220,9.6,20.0,10.0,0,0
-KFC Original Recipe Chicken,250,20.0,8.0,15.0,0,0
-KFC Extra Crispy Chicken,280,18.0,12.0,18.0,0,0
+KFC Original Recipe Chicken Breast,250,20.0,8.0,15.0,0,0
+KFC Original Recipe Chicken Drumstick,200,15.0,6.0,12.0,0,0
+KFC Original Recipe Chicken Thigh,250,18.0,8.0,17.0,0,0
+KFC Original Recipe Chicken Wing,200,12.0,4.0,14.0,0,0
+KFC Extra Crispy Chicken Breast,300,22.0,12.0,18.0,0,0
+KFC Extra Crispy Chicken Drumstick,220,12.0,6.0,15.0,0,0
+KFC Extra Crispy Chicken Thigh,280,20.0,9.0,20.0,0,0
+KFC Kentucky Grilled Chicken Breast,210,38.0,0.0,7.0,0,0
+KFC Kentucky Grilled Chicken Drumstick,160,17.0,0.0,6.0,0,0
 KFC Popcorn Chicken,280,18.0,15.0,16.0,0,0
+KFC Chicken Tenders,250,18.0,12.0,14.0,0,0
+KFC Mac & Cheese,480,30.0,42.0,22.0,0,0
+KFC Coleslaw,170,1.0,14.0,12.0,0,0
+KFC Mashed Potatoes with Gravy,200,4.0,27.0,6.0,0,0
+KFC Potato Wedges,320,5.0,40.0,15.0,0,0
 Subway 6" Oven Roasted Turkey,123,9.1,18.3,1.8,0,0
 Subway 6" Grilled Chicken,129,11.2,17.2,2.1,0,0
 Subway 6" Meatball Marinara,218,9.5,24.6,9.5,0,0
 Subway 6" Veggie Delite,136,6.2,24.7,1.9,0,0
 Subway 6" Tuna,200,12.0,20.0,8.0,0,0
+Subway 6" Black Forest Ham,128,9.5,21.0,2.5,0,0
+Subway 6" Turkey Breast,123,10.0,20.0,1.8,0,0
+Subway 6" Roast Beef,150,12.0,20.0,4.0,0,0
+Subway 6" Subway Club,150,12.0,20.0,4.5,0,0
+Subway 6" Sweet Onion Teriyaki Chicken,215,14.5,27.5,5.5,0,0
+Subway 6" Chicken & Bacon Ranch,290,17.5,22.0,14.5,0,0
+Subway 6" B.M.T.,280,13.5,22.5,15.0,0,0
+Subway 6" Italian B.M.T.,280,13.5,22.5,15.0,0,0
+Subway Wrap Honey Mustard Chicken,325,23.0,28.5,13.5,0,0
+Subway Wrap Turkey Bacon Avocado,410,24.0,29.5,22.0,0,0
 Taco Bell Crunchy Taco,218,8.0,12.0,13.0,0,0
 Taco Bell Soft Taco,196,9.0,15.0,10.0,0,0
 Taco Bell Bean Burrito,189,6.0,30.0,4.0,0,0
 Taco Bell Beef Burrito Supreme,170,8.5,17.0,6.0,0,0
 Taco Bell Crunchwrap Supreme,207,8.0,18.0,10.0,0,0
 Taco Bell Chicken Quesadilla,287,14.0,20.0,15.0,0,0
+Taco Bell Beefy 5-Layer Burrito,222,8.9,22.2,8.9,0,0
+Taco Bell Cheesy Gordita Crunch,230,10.0,20.0,12.0,0,0
+Taco Bell Mexican Pizza,204,9.5,17.0,10.2,0,0
+Taco Bell Nachos BellGrande,241,5.6,20.0,12.9,0,0
+Taco Bell Cheesy Fiesta Potatoes,200,4.0,25.0,9.0,0,0
+Taco Bell Cinnamon Twists,500,4.0,60.0,25.0,0,0
 Wendy's Single,224,12.5,16.5,13.0,0,0
 Wendy's Double,252,19.3,14.0,15.8,0,0
+Wendy's Triple,290,24.7,14.0,20.3,0,0
 Wendy's Baconator,286,22.5,13.6,18.9,0,0
-Wendy's Grilled Chicken Sandwich,198,14.7,16.2,7.4,0,0
-Wendy's Chicken Nuggets (4pc),224,23.5,9.4,10.0,0,0
+Wendy's Big Bacon Classic,252,18.0,15.5,15.6,0,0
+Wendy's Jr. Hamburger,250,13.0,22.0,11.0,0,0
+Wendy's Jr. Cheeseburger,260,14.0,22.0,12.0,0,0
+Wendy's Spicy Chicken Sandwich,250,13.5,22.0,11.0,0,0
+Wendy's Classic Chicken Sandwich,245,13.5,22.0,10.5,0,0
+Wendy's Grilled Chicken Sandwich,185,17.0,16.2,5.0,0,0
+Wendy's Chicken Nuggets (10pc),225,11.0,12.0,14.5,0,0
+Wendy's Natural-Cut Fries,300,2.0,38.0,15.0,0,0
+Wendy's Bacon & Cheese Baked Potato,220,8.5,30.0,6.5,0,0
+Wendy's Small Chili,280,16.0,20.0,10.0,0,0
 Chick-fil-A Chicken Sandwich,220,18.0,20.0,8.0,0,0
+Chick-fil-A Deluxe Chicken Sandwich,230,18.0,22.0,9.0,0,0
+Chick-fil-A Spicy Chicken Sandwich,230,19.0,22.0,8.0,0,0
+Chick-fil-A Spicy Deluxe Chicken Sandwich,240,19.0,24.0,9.0,0,0
+Chick-fil-A Grilled Chicken Sandwich,180,22.0,18.0,4.0,0,0
 Chick-fil-A Chicken Nuggets (12pc),224,23.5,9.4,10.0,0,0
 Chick-fil-A Grilled Chicken Nuggets,76,14.7,0.6,1.8,0,0
-Chick-fil-A Spicy Chicken Sandwich,230,19.0,22.0,8.0,0,0
+Chick-fil-A Spicy Chicken Deluxe Sandwich,240,19.0,24.0,9.0,0,0
+Chick-fil-A Waffle Potato Fries,300,4.0,40.0,14.0,0,0
+Chick-fil-A Mac & Cheese,200,8.0,20.0,9.0,0,0
 Five Guys Hamburger,250,17.8,10.4,15.0,0,0
 Five Guys Cheeseburger,260,19.0,10.4,16.0,0,0
 Five Guys Bacon Burger,270,20.0,10.4,17.0,0,0
+Five Guys Bacon Cheeseburger,280,21.0,10.4,18.0,0,0
 Five Guys Little Hamburger,280,20.0,11.0,18.0,0,0
 Five Guys Little Cheeseburger,290,21.0,11.0,19.0,0,0
+Five Guys Little Bacon Burger,300,22.0,11.0,20.0,0,0
+Five Guys Little Bacon Cheeseburger,310,23.0,11.0,21.0,0,0
+Five Guys Hot Dog,220,12.0,18.0,10.0,0,0
+Five Guys Cheese Dog,230,13.0,18.0,11.0,0,0
+Five Guys Bacon Dog,240,13.0,18.0,12.0,0,0
+Five Guys Bacon Cheese Dog,250,14.0,18.0,13.0,0,0
+Five Guys Fries (Regular),320,4.0,40.0,15.0,0,0
 Domino's Cheese Pizza (per 100g),284,14.9,38.2,8.0,0,0
 Domino's Pepperoni Pizza (per 100g),295,16.5,33.1,10.7,0,0
+Domino's Meat Lovers Pizza (per 100g),310,18.0,32.0,14.0,0,0
+Domino's Veggie Pizza (per 100g),270,12.0,36.0,9.0,0,0
+Domino's Hawaiian Pizza (per 100g),280,14.0,35.0,10.0,0,0
 Pizza Hut Cheese Pizza (per 100g),270,12.0,35.0,10.0,0,0
 Pizza Hut Pepperoni Pizza (per 100g),280,13.0,34.0,11.0,0,0
+Pizza Hut Meat Lovers Pizza (per 100g),300,15.0,33.0,14.0,0,0
+Pizza Hut Supreme Pizza (per 100g),290,14.0,34.0,12.0,0,0
 Starbucks Everything Bagel,265,9.8,51.0,2.5,0,0
 Starbucks Chocolate Croissant,375,6.3,42.5,22.5,0,0
 Starbucks Impossible Breakfast Sandwich,280,14.0,24.0,14.7,0,0
 Starbucks Bacon & Gouda Sandwich,250,15.0,22.0,10.0,0,0
 Starbucks Turkey & Provolone Sandwich,200,14.0,20.0,6.0,0,0
+Starbucks Sausage & Cheddar Sandwich,300,16.0,24.0,15.0,0,0
+Starbucks Spinach & Feta Wrap,220,12.0,25.0,8.0,0,0
 Arby's Roast Beef Sandwich,200,15.0,20.0,6.0,0,0
 Arby's Classic Beef 'n Cheddar,240,16.0,22.0,9.0,0,0
 Arby's Chicken Sandwich,220,16.0,20.0,8.0,0,0
+Arby's French Dip,220,16.0,22.0,7.0,0,0
+Arby's Reuben,250,18.0,24.0,10.0,0,0
+Arby's Curly Fries,320,4.0,40.0,15.0,0,0
+Arby's Mozzarella Sticks,280,12.0,22.0,16.0,0,0
 Dunkin' Donuts Bacon, Egg & Cheese Sandwich,250,14.0,22.0,10.0,0,0
 Dunkin' Donuts Sausage, Egg & Cheese Sandwich,280,15.0,20.0,15.0,0,0
 Dunkin' Donuts Turkey Sausage Sandwich,200,12.0,20.0,7.0,0,0
+Dunkin' Donuts Wake-Up Wrap,200,10.0,15.0,10.0,0,0
+Dunkin' Donuts Bagel with Cream Cheese,280,10.0,50.0,4.0,0,0
 Popeyes Chicken Sandwich,250,18.0,20.0,12.0,0,0
 Popeyes Spicy Chicken Sandwich,260,19.0,20.0,13.0,0,0
 Popeyes Chicken Tenders (3pc),220,18.0,12.0,12.0,0,0
+Popeyes Spicy Tenders (3pc),230,19.0,13.0,13.0,0,0
+Popeyes Cajun Fries,320,4.0,40.0,15.0,0,0
+Popeyes Red Beans & Rice,150,5.0,25.0,3.0,0,0
 Chipotle Burrito Bowl (Chicken),180,18.0,20.0,4.0,0,0
 Chipotle Burrito Bowl (Steak),200,20.0,20.0,6.0,0,0
+Chipotle Burrito Bowl (Barbacoa),190,19.0,20.0,5.0,0,0
+Chipotle Burrito Bowl (Carnitas),200,18.0,20.0,6.0,0,0
+Chipotle Burrito Bowl (Vegetarian),160,8.0,25.0,4.0,0,0
 Chipotle Burrito (Chicken),220,16.0,30.0,6.0,0,0
 Chipotle Burrito (Steak),240,18.0,30.0,8.0,0,0
-Chipotle Bowl (Vegetarian),160,8.0,25.0,4.0,0,0
+Chipotle Bowl (Chicken),180,18.0,20.0,4.0,0,0
+Chipotle Bowl (Steak),200,20.0,20.0,6.0,0,0
 Panera Bread Turkey Sandwich,180,12.0,22.0,4.0,0,0
 Panera Bread Chicken Sandwich,200,16.0,22.0,6.0,0,0
 Panera Bread Mediterranean Veggie Sandwich,220,10.0,35.0,6.0,0,0
+Panera Bread Bacon Turkey Bravo,250,18.0,28.0,8.0,0,0
+Panera Bread Chipotle Chicken Avocado Melt,280,20.0,30.0,10.0,0,0
 Shake Shack ShackBurger,280,18.0,22.0,15.0,0,0
 Shake Shack Cheeseburger,290,19.0,22.0,16.0,0,0
 Shake Shack Chicken Shack,250,18.0,20.0,10.0,0,0
+Shake Shack SmokeShack,300,20.0,22.0,18.0,0,0
+Shake Shack 'Shroom Burger,280,12.0,30.0,12.0,0,0
+Shake Shack Fries,320,4.0,40.0,15.0,0,0
 In-N-Out Burger Double-Double,300,20.0,20.0,18.0,0,0
 In-N-Out Burger Cheeseburger,280,18.0,20.0,16.0,0,0
 In-N-Out Burger Hamburger,260,16.0,20.0,14.0,0,0
+In-N-Out Burger Animal Style Burger,310,20.0,22.0,19.0,0,0
+In-N-Out Burger Fries,320,4.0,40.0,15.0,0,0
 Jack in the Box Jumbo Jack,250,15.0,25.0,10.0,0,0
 Jack in the Box Ultimate Cheeseburger,280,17.0,25.0,13.0,0,0
 Jack in the Box Chicken Sandwich,240,16.0,22.0,9.0,0,0
+Jack in the Box Spicy Chicken Sandwich,250,17.0,23.0,10.0,0,0
+Jack in the Box Tiny Tacos (5pc),280,12.0,20.0,16.0,0,0
+Jack in the Box Curly Fries,320,4.0,40.0,15.0,0,0
 Carl's Jr. Famous Star Burger,270,17.0,24.0,13.0,0,0
 Carl's Jr. Western Bacon Cheeseburger,290,18.0,25.0,15.0,0,0
 Carl's Jr. Chicken Sandwich,250,16.0,22.0,10.0,0,0
+Carl's Jr. Double Western Bacon Cheeseburger,320,22.0,25.0,18.0,0,0
+Carl's Jr. Natural-Cut Fries,320,4.0,40.0,15.0,0,0
 White Castle Slider,200,10.0,18.0,10.0,0,0
 White Castle Cheese Slider,220,11.0,18.0,12.0,0,0
 White Castle Chicken Ring Slider,230,12.0,20.0,11.0,0,0
+White Castle Onion Rings,350,4.0,40.0,18.0,0,0
 Dairy Queen GrillBurger,250,15.0,22.0,11.0,0,0
 Dairy Queen Double GrillBurger,280,18.0,22.0,15.0,0,0
 Dairy Queen Chicken Strip Basket,240,16.0,20.0,10.0,0,0
+Dairy Queen Onion Rings,350,4.0,40.0,18.0,0,0
 Sonic Drive-In Sonic Burger,260,16.0,24.0,11.0,0,0
 Sonic Drive-In Cheeseburger,270,17.0,24.0,12.0,0,0
 Sonic Drive-In Chicken Sandwich,250,16.0,22.0,10.0,0,0
+Sonic Drive-In Jumbo Popcorn Chicken,280,18.0,15.0,16.0,0,0
+Sonic Drive-In Tater Tots,320,4.0,35.0,18.0,0,0
 Hardee's Thickburger,280,18.0,22.0,15.0,0,0
 Hardee's Frisco Burger,290,19.0,23.0,16.0,0,0
 Hardee's Chicken Fillet Sandwich,250,17.0,22.0,10.0,0,0
+Hardee's Natural-Cut Fries,320,4.0,40.0,15.0,0,0
