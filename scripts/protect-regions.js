@@ -171,7 +171,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'food', 'add-ingredient', 'AddIngredientClient.tsx'),
     startMarker: 'PROTECTED: ADD_INGREDIENT_SEARCH START',
     endMarker: 'PROTECTED: ADD_INGREDIENT_SEARCH END',
-    expectedHash: 'a4c8141714f079a93912d05471a9d2c8af39a6fe18872c39cb21c0325d6484ca',
+    expectedHash: 'f07df75bcd62e4e2f69cabc5fea6742778066e66d48c61bb1546e0347da7f6fe',
     allowEnvVar: 'ALLOW_ADD_INGREDIENT_SEARCH_EDIT',
     description: 'Add Ingredient standalone search UI',
   });
@@ -179,7 +179,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
     startMarker: 'PROTECTED: ADD_INGREDIENT_MODAL_SEARCH START',
     endMarker: 'PROTECTED: ADD_INGREDIENT_MODAL_SEARCH END',
-    expectedHash: 'f9a078f07be03a8992834dd0cd61cc9fd80b1184b15e98b60a45cb97173169d1',
+    expectedHash: '2d56018cf817445bb2a505bc63138c70c6ab68058b70291920b73254b0f5cbe2',
     allowEnvVar: 'ALLOW_ADD_INGREDIENT_MODAL_SEARCH_EDIT',
     description: 'Add Ingredient modal search UI',
   });
