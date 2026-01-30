@@ -179,7 +179,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
     startMarker: 'PROTECTED: ADD_INGREDIENT_MODAL_SEARCH START',
     endMarker: 'PROTECTED: ADD_INGREDIENT_MODAL_SEARCH END',
-    expectedHash: '2d56018cf817445bb2a505bc63138c70c6ab68058b70291920b73254b0f5cbe2',
+    expectedHash: '21c98a9b508e7da62c874e52920ce90382dc5ef91608084a34ee71376e5a0615',
     allowEnvVar: 'ALLOW_ADD_INGREDIENT_MODAL_SEARCH_EDIT',
     description: 'Add Ingredient modal search UI',
   });
