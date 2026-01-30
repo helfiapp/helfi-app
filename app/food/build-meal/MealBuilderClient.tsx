@@ -1194,6 +1194,19 @@ const applyPortionScaleToTotals = (
   }
 }
 
+const buildItemsSignature = (items: BuilderItem[] | null | undefined) => {
+  if (!Array.isArray(items) || items.length === 0) return ''
+  const parts = items.map((it) => {
+    const id = typeof it?.id === 'string' ? it.id : ''
+    const name = String(it?.name || '').trim().toLowerCase()
+    const amount = Number.isFinite(Number(it?.__amount)) ? String(round3(Number(it.__amount))) : ''
+    const unit = typeof it?.__unit === 'string' ? it.__unit : ''
+    const serving = String(it?.serving_size || '').trim().toLowerCase()
+    return [id, name, amount, unit, serving].filter(Boolean).join('~')
+  })
+  return parts.filter(Boolean).sort().join('|')
+}
+
 const sanitizeMealTitle = (v: string) => v.replace(/\s+/g, ' ').trim()
 
 const buildDefaultMealName = (items: BuilderItem[]) => {
@@ -1267,6 +1280,8 @@ export default function MealBuilderClient() {
   const manualBarcodeEditedRef = useRef(false)
   const manualBarcodeWasClearedOnFocusRef = useRef(false)
   const barcodeScannerRef = useRef<any>(null)
+  const initialItemsSignatureRef = useRef<string>('')
+  const initialPortionTotalWeightRef = useRef<number | null>(null)
 
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoritesSearch, setFavoritesSearch] = useState('')
@@ -1298,6 +1313,13 @@ export default function MealBuilderClient() {
         setPortionAmountInput(String(Math.round(grams)))
       }
     }
+  }
+
+  const getSavedPortionTotalWeightG = (source: any) => {
+    if (!source || typeof source !== 'object') return null
+    const raw = (source as any).__portionTotalWeightG
+    const value = Number(raw)
+    return Number.isFinite(value) && value > 0 ? value : null
   }
 
   useEffect(() => {
@@ -1437,6 +1459,8 @@ export default function MealBuilderClient() {
     if (!editFavoriteId) {
       editFavoriteSourceItemsRef.current = null
       editFavoriteIsCustomRef.current = false
+      initialItemsSignatureRef.current = ''
+      initialPortionTotalWeightRef.current = null
       return
     }
     if (loadedFavoriteId === editFavoriteId) return
@@ -1446,7 +1470,9 @@ export default function MealBuilderClient() {
 
     const label = normalizeMealLabel(fav?.label || fav?.description || '').trim()
     if (label) setMealName(label)
-    applySavedPortion((fav as any)?.nutrition || (fav as any)?.total || null)
+    const favoriteTotals = (fav as any)?.nutrition || (fav as any)?.total || null
+    applySavedPortion(favoriteTotals)
+    initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(favoriteTotals)
 
     const favItems = parseFavoriteItems(fav)
     editFavoriteSourceItemsRef.current = favItems ? JSON.parse(JSON.stringify(favItems)) : null
@@ -1455,6 +1481,7 @@ export default function MealBuilderClient() {
       const converted = convertToBuilderItems(favItems)
       setItems(converted)
       setExpandedId(null)
+      initialItemsSignatureRef.current = buildItemsSignature(converted)
     } else {
       const total = (fav as any)?.total || (fav as any)?.nutrition || null
       const fallbackItem = {
@@ -1471,6 +1498,7 @@ export default function MealBuilderClient() {
       const converted = convertToBuilderItems([fallbackItem])
       setItems(converted)
       setExpandedId(null)
+      initialItemsSignatureRef.current = buildItemsSignature(converted)
     }
 
     setLoadedFavoriteId(editFavoriteId)
@@ -1479,7 +1507,13 @@ export default function MealBuilderClient() {
 
   useEffect(() => {
     // Editing mode (diary): load a FoodLog row directly when a Build-a-meal diary entry is edited.
-    if (!sourceLogId) return
+    if (!sourceLogId) {
+      if (!editFavoriteId) {
+        initialItemsSignatureRef.current = ''
+        initialPortionTotalWeightRef.current = null
+      }
+      return
+    }
     if (editFavoriteId) return
     if (loadedFavoriteId === `log:${sourceLogId}`) return
 
@@ -1504,13 +1538,16 @@ export default function MealBuilderClient() {
 
         const label = normalizeMealLabel(log?.description || log?.name || '').trim()
         if (!cancelled && label) setMealName(label)
-        if (!cancelled) applySavedPortion((log as any)?.nutrients || null)
+        const logTotals = (log as any)?.nutrients || null
+        if (!cancelled) applySavedPortion(logTotals)
+        initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(logTotals)
 
         const rawItems = Array.isArray(log?.items) ? log.items : null
         if (!cancelled && rawItems && rawItems.length > 0) {
           const converted = convertToBuilderItems(rawItems)
           setItems(converted)
           setExpandedId(null)
+          initialItemsSignatureRef.current = buildItemsSignature(converted)
         }
 
         if (!cancelled) setLoadedFavoriteId(`log:${sourceLogId}`)
@@ -1550,12 +1587,21 @@ export default function MealBuilderClient() {
   }, [items])
 
   const totalRecipeWeightG = useMemo(() => computeTotalRecipeWeightG(items), [items])
+  const totalRecipeWeightGForScale = useMemo(() => {
+    const saved = initialPortionTotalWeightRef.current
+    if (!saved || !Number.isFinite(saved) || saved <= 0) return totalRecipeWeightG
+    const initialSig = initialItemsSignatureRef.current
+    if (!initialSig) return totalRecipeWeightG
+    const currentSig = buildItemsSignature(items)
+    if (!currentSig || currentSig !== initialSig) return totalRecipeWeightG
+    return saved
+  }, [items, totalRecipeWeightG])
 
   // Guard rail: portionScale must allow values above 1 to scale larger-than-recipe servings.
   // See GUARD_RAILS.md section "Build a Meal portion scaling".
   const portionScale = useMemo(
-    () => computePortionScale(portionAmountInput, portionUnit, totalRecipeWeightG),
-    [portionAmountInput, portionUnit, totalRecipeWeightG],
+    () => computePortionScale(portionAmountInput, portionUnit, totalRecipeWeightGForScale),
+    [portionAmountInput, portionUnit, totalRecipeWeightGForScale],
   )
 
   const mealTotals = useMemo(

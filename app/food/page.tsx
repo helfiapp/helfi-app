@@ -12754,9 +12754,7 @@ Please add nutritional information manually if needed.`);
     // Examples:
     // - usda:12345:1734567890123
     // - openfoodfacts:0123456789:1734567890123
-    // - ai:1734567890123:deadbeef
     if (/^(openfoodfacts|usda|fatsecret):[^:]+:\d{9,}$/i.test(id)) return true
-    if (/^ai:\d{9,}:[0-9a-f]+$/i.test(id)) return true
     // Build-a-meal editor assigns local ids like: edit:1734567890123:deadbeef
     if (/^edit:\d{9,}:[0-9a-f]+$/i.test(id)) return true
     return false
