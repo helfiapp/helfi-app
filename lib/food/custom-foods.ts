@@ -78,40 +78,101 @@ const isOneEditAway = (a: string, b: string) => {
   return true
 }
 
+// Strip parentheses and their content to prevent synonym matching
+const stripParentheses = (text: string) => {
+  return text.replace(/\s*\([^)]*\)/g, '').trim()
+}
+
 const nameMatchesQuery = (name: string, query: string, options?: { allowTypo?: boolean }) => {
   const normalizedQuery = normalizeText(query)
   if (!normalizedQuery) return false
+
+  // Strip parentheses from name to prevent matching via synonyms
+  const nameWithoutParentheses = stripParentheses(name)
+  const nameTokens = getTokens(nameWithoutParentheses)
+
   if (normalizedQuery.length === 1) {
-    const nameTokens = getTokens(name)
-    return nameTokens.some((word) => word.startsWith(normalizedQuery))
+    // Single letter: first word must start with it
+    if (nameTokens.length === 0) return false
+    const firstWord = nameTokens[0]
+    return firstWord.startsWith(normalizedQuery)
   }
 
   const queryTokens = getTokens(query).filter((token) => token.length >= 2)
-  const nameTokens = getTokens(name)
-  if (queryTokens.length === 0 || nameTokens.length === 0) return false
+  const filteredNameTokens = nameTokens.filter((token) => token.length >= 1)
+  if (queryTokens.length === 0 || filteredNameTokens.length === 0) return false
 
-  const tokenMatches = (token: string, word: string) => {
-    if (!token || !word) return false
-    const matchToken = (value: string) => {
-      if (word.startsWith(value)) return true
-      const singularWord = singularizeToken(word)
-      if (singularWord !== word && singularWord.startsWith(value)) return true
-      const allowTypo = (options?.allowTypo ?? true) && value.length >= 3 && value[0] === word[0]
-      if (!allowTypo) return false
-      const prefixSame = word.slice(0, value.length)
-      if (prefixSame && isOneEditAway(value, prefixSame)) return true
-      const prefixLonger = word.slice(0, value.length + 1)
-      if (prefixLonger && isOneEditAway(value, prefixLonger)) return true
-      return false
+  // For single-word queries: FIRST word must match (strict prefix matching)
+  if (queryTokens.length === 1) {
+    const queryToken = queryTokens[0]
+    const firstWord = filteredNameTokens[0]
+    if (!firstWord) return false
+
+    // Exact word match (egg = egg, eggs = eggs)
+    if (firstWord === queryToken) return true
+    
+    // Singular/plural exact matches only (eggs = egg, but NOT eggs = eggplant)
+    const firstWordSingular = singularizeToken(firstWord)
+    const querySingular = singularizeToken(queryToken)
+    
+    // Exact singular match: "eggs" matches "egg" exactly, "egg" matches "eggs" exactly
+    if (firstWordSingular === querySingular) {
+      // Both are the same after singularization - this is an exact match
+      return true
     }
-    if (matchToken(token)) return true
-    const singular = singularizeToken(token)
-    if (singular !== token && matchToken(singular)) return true
+
+    // Prefix match: first word must START with the FULL query token
+    // This allows "egg" to match "eggplant" but NOT "eggs" to match "eggplant"
+    // (because "eggplant" doesn't start with "eggs", only with "egg")
+    if (firstWord.startsWith(queryToken)) return true
+
+    // Typo tolerance: only if first letter matches and it's a prefix match
+    const allowTypo = (options?.allowTypo ?? true) && queryToken.length >= 3 && queryToken[0] === firstWord[0]
+    if (allowTypo) {
+      const prefixSame = firstWord.slice(0, queryToken.length)
+      if (prefixSame && isOneEditAway(queryToken, prefixSame)) return true
+      const prefixLonger = firstWord.slice(0, queryToken.length + 1)
+      if (prefixLonger && isOneEditAway(queryToken, prefixLonger)) return true
+    }
+
     return false
   }
 
-  if (queryTokens.length === 1) return nameTokens.some((word) => tokenMatches(queryTokens[0], word))
-  return queryTokens.every((token) => nameTokens.some((word) => tokenMatches(token, word)))
+  // Multi-word queries: first query token must match first name word, then all tokens must match
+  const firstQueryToken = queryTokens[0]
+  const firstNameWord = filteredNameTokens[0]
+  if (!firstNameWord) return false
+
+  // First word must match first token
+  const firstWordMatches = (() => {
+    if (firstNameWord === firstQueryToken) return true
+    const firstNameSingular = singularizeToken(firstNameWord)
+    const firstQuerySingular = singularizeToken(firstQueryToken)
+    if (firstNameSingular === firstQuerySingular) return true
+    if (firstNameWord.startsWith(firstQueryToken)) return true
+    if (firstNameSingular !== firstNameWord && firstNameSingular.startsWith(firstQueryToken)) return true
+    if (firstQuerySingular !== firstQueryToken && firstNameWord.startsWith(firstQuerySingular)) return true
+    return false
+  })()
+
+  if (!firstWordMatches) return false
+
+  // All remaining query tokens must match somewhere in the name
+  const remainingQueryTokens = queryTokens.slice(1)
+  if (remainingQueryTokens.length === 0) return true
+
+  const tokenMatches = (token: string, word: string) => {
+    if (!token || !word) return false
+    if (word.startsWith(token)) return true
+    const singularWord = singularizeToken(word)
+    if (singularWord !== word && singularWord.startsWith(token)) return true
+    const singularToken = singularizeToken(token)
+    if (singularToken !== token && word.startsWith(singularToken)) return true
+    if (singularToken !== token && singularWord !== word && singularWord.startsWith(singularToken)) return true
+    return false
+  }
+
+  return remainingQueryTokens.every((token) => filteredNameTokens.some((word) => tokenMatches(token, word)))
 }
 
 const parseCsvLine = (line: string) => {
