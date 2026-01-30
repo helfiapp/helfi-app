@@ -1461,6 +1461,7 @@ export default function MealBuilderClient() {
       editFavoriteIsCustomRef.current = false
       initialItemsSignatureRef.current = ''
       initialPortionTotalWeightRef.current = null
+      savedPortionScaleRef.current = null
       return
     }
     if (loadedFavoriteId === editFavoriteId) return
@@ -1473,6 +1474,13 @@ export default function MealBuilderClient() {
     const favoriteTotals = (fav as any)?.nutrition || (fav as any)?.total || null
     applySavedPortion(favoriteTotals)
     initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(favoriteTotals)
+    // Store saved portion scale for consistent calorie display
+    if (favoriteTotals && typeof favoriteTotals === 'object') {
+      const scale = Number((favoriteTotals as any).__portionScale)
+      savedPortionScaleRef.current = Number.isFinite(scale) && scale > 0 ? scale : null
+    } else {
+      savedPortionScaleRef.current = null
+    }
 
     const favItems = parseFavoriteItems(fav)
     editFavoriteSourceItemsRef.current = favItems ? JSON.parse(JSON.stringify(favItems)) : null
@@ -1511,6 +1519,7 @@ export default function MealBuilderClient() {
       if (!editFavoriteId) {
         initialItemsSignatureRef.current = ''
         initialPortionTotalWeightRef.current = null
+        savedPortionScaleRef.current = null
       }
       return
     }
@@ -1541,6 +1550,13 @@ export default function MealBuilderClient() {
         const logTotals = (log as any)?.nutrients || null
         if (!cancelled) applySavedPortion(logTotals)
         initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(logTotals)
+        // Store saved portion scale for consistent calorie display
+        if (!cancelled && logTotals && typeof logTotals === 'object') {
+          const scale = Number((logTotals as any).__portionScale)
+          savedPortionScaleRef.current = Number.isFinite(scale) && scale > 0 ? scale : null
+        } else {
+          savedPortionScaleRef.current = null
+        }
 
         const rawItems = Array.isArray(log?.items) ? log.items : null
         if (!cancelled && rawItems && rawItems.length > 0) {
@@ -1597,12 +1613,33 @@ export default function MealBuilderClient() {
     return saved
   }, [items, totalRecipeWeightG])
 
+  // Get saved portion scale from the entry being edited (if any) - stored when loading entry
+  const savedPortionScaleRef = useRef<number | null>(null)
+
   // Guard rail: portionScale must allow values above 1 to scale larger-than-recipe servings.
   // See GUARD_RAILS.md section "Build a Meal portion scaling".
-  const portionScale = useMemo(
+  const computedPortionScale = useMemo(
     () => computePortionScale(portionAmountInput, portionUnit, totalRecipeWeightGForScale),
     [portionAmountInput, portionUnit, totalRecipeWeightGForScale],
   )
+
+  // Use saved portion scale if editing existing entry to ensure calories match front page display
+  // Only use computed scale if user has manually changed the portion input
+  const portionScale = useMemo(() => {
+    // If we have a saved scale and we're editing an existing entry, prefer saved scale for consistency
+    if (savedPortionScaleRef.current !== null && (sourceLogId || editFavoriteId)) {
+      const saved = savedPortionScaleRef.current
+      const computed = computedPortionScale
+      // Use saved scale if it's close to computed (within 1% tolerance) to ensure front page and edit page match
+      // This handles cases where portion input might be slightly different but scale should be the same
+      if (Math.abs(saved - computed) / Math.max(saved, computed, 1) < 0.01) {
+        return saved
+      }
+      // If computed is significantly different, user may have changed portion, so use computed
+      return computed
+    }
+    return computedPortionScale
+  }, [computedPortionScale, sourceLogId, editFavoriteId])
 
   const mealTotals = useMemo(
     () => applyPortionScaleToTotals(baseMealTotals, portionScale),
@@ -3125,7 +3162,7 @@ export default function MealBuilderClient() {
                   let data: any[] = []
                   if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
                   if (favoritesActiveTab === 'favorites')
-                    data = sortList(favoriteMeals.filter((m: any) => !isCustomMealFavorite(m?.favorite)).filter(filterBySearch))
+                    data = sortList(favoriteMeals.filter(filterBySearch))
                   if (favoritesActiveTab === 'custom') data = sortList(customMeals.filter(filterBySearch))
 
                   if (data.length === 0) {

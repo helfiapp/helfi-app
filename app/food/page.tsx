@@ -24847,7 +24847,7 @@ Please add nutritional information manually if needed.`);
                   let data: any[] = []
                   if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
                   if (favoritesActiveTab === 'favorites')
-                    data = sortList(favoriteMeals.filter((m: any) => !isCustomMealFavorite(m?.favorite)).filter(filterBySearch))
+                    data = sortList(favoriteMeals.filter(filterBySearch))
                   if (favoritesActiveTab === 'custom') data = sortList(customMeals.filter(filterBySearch))
 
                   const favoriteKeySet = new Set<string>()
