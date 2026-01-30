@@ -149,6 +149,9 @@ export async function GET(request: NextRequest) {
         const brandTokens = brand ? getSearchTokens(brand) : []
         const nameTokens = name ? getSearchTokens(name) : []
         
+        // Calculate simplicity score: fewer words in product name = simpler = better
+        const simplicityScore = nameTokens.length // Lower is better
+        
         // Check brand tokens first
         for (let i = 0; i < brandTokens.length; i += 1) {
           const word = brandTokens[i]
@@ -205,7 +208,7 @@ export async function GET(request: NextRequest) {
         const wordDelta = matchedWord ? Math.max(0, matchedWord.length - matchedCandidateLen) : 999
         const hierarchyKey = matchedWord ? `${matchedWord} ${normalizedCombined}` : normalizedCombined
 
-        return { matchIndex, isFirstWordMatch, exactWordMatch, wordDelta, hierarchyKey, stable: normalizedCombined, isBrandMatch }
+        return { matchIndex, isFirstWordMatch, exactWordMatch, wordDelta, hierarchyKey, stable: normalizedCombined, isBrandMatch, simplicityScore }
       }
 
       return [...list].sort((a, b) => {
@@ -226,10 +229,13 @@ export async function GET(request: NextRequest) {
         // 4) Exact word match wins
         if (aMeta.exactWordMatch !== bMeta.exactWordMatch) return aMeta.exactWordMatch ? -1 : 1
 
-        // 5) Closer match wins (shorter extension after the typed prefix)
+        // 5) Simpler names win (fewer words in product name)
+        if (aMeta.simplicityScore !== bMeta.simplicityScore) return aMeta.simplicityScore - bMeta.simplicityScore
+
+        // 6) Closer match wins (shorter extension after the typed prefix)
         if (aMeta.wordDelta !== bMeta.wordDelta) return aMeta.wordDelta - bMeta.wordDelta
 
-        // 6) Alphabetical within the hierarchy
+        // 7) Alphabetical within the hierarchy
         return aMeta.hierarchyKey.localeCompare(bMeta.hierarchyKey) || aMeta.stable.localeCompare(bMeta.stable)
       })
     }
@@ -480,6 +486,72 @@ export async function GET(request: NextRequest) {
     }
 
     // Load fast food items from CSV
+    const loadBeverageItems = (): CustomPackagedItem[] => {
+      const beverageFile = path.join(process.cwd(), 'data', 'food-overrides', 'beverages_macros.csv')
+      if (!fs.existsSync(beverageFile)) return []
+      
+      try {
+        const content = fs.readFileSync(beverageFile, 'utf8')
+        const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0)
+        if (lines.length < 2) return []
+        
+        const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase())
+        const foodIndex = headers.indexOf('food')
+        const caloriesIndex = headers.indexOf('per_100g_kcal')
+        const proteinIndex = headers.indexOf('protein_g')
+        const carbsIndex = headers.indexOf('carbs_g')
+        const fatIndex = headers.indexOf('fat_g')
+        const fiberIndex = headers.indexOf('fibre_g') >= 0 ? headers.indexOf('fibre_g') : headers.indexOf('fiber_g')
+        const sugarIndex = headers.indexOf('sugar_g')
+        
+        if (foodIndex < 0 || caloriesIndex < 0 || proteinIndex < 0 || carbsIndex < 0 || fatIndex < 0) return []
+        
+        const items: CustomPackagedItem[] = []
+        for (let i = 1; i < lines.length; i++) {
+          const cells = parseCsvLine(lines[i])
+          const name = cells[foodIndex] || ''
+          if (!name) continue
+          
+          const calories = Number(cells[caloriesIndex])
+          const protein = Number(cells[proteinIndex])
+          const carbs = Number(cells[carbsIndex])
+          const fat = Number(cells[fatIndex])
+          const fiber = fiberIndex >= 0 ? Number(cells[fiberIndex] || 0) : 0
+          const sugar = sugarIndex >= 0 ? Number(cells[sugarIndex] || 0) : 0
+          
+          if (!Number.isFinite(calories) || !Number.isFinite(protein) || !Number.isFinite(carbs) || !Number.isFinite(fat)) continue
+          
+          // Extract brand from name if present (e.g., "Coke Zero (Coca-Cola)" -> brand: "Coca-Cola")
+          const brandMatch = name.match(/\(([^)]+)\)$/)
+          const brand = brandMatch ? brandMatch[1] : null
+          const cleanName = brandMatch ? name.replace(/\s*\([^)]+\)$/, '').trim() : name
+          
+          // Beverages are typically 100ml servings, but we'll use 250ml (standard can/bottle) as default
+          const servingSizeGrams = 250 // 250ml = 250g for water-based beverages
+          const multiplier = servingSizeGrams / 100
+          
+          items.push({
+            id: `custom:beverage-${normalizeForCompact(name)}`,
+            name: cleanName,
+            brand: brand,
+            serving_size: `1 serve (${servingSizeGrams} ml)`,
+            calories: Math.round(calories * multiplier),
+            protein_g: Math.round(protein * multiplier * 10) / 10,
+            carbs_g: Math.round(carbs * multiplier * 10) / 10,
+            fat_g: Math.round(fat * multiplier * 10) / 10,
+            fiber_g: fiber > 0 ? Math.round(fiber * multiplier * 10) / 10 : null,
+            sugar_g: sugar > 0 ? Math.round(sugar * multiplier * 10) / 10 : null,
+            source: 'openfoodfacts',
+            aliases: [],
+          })
+        }
+        return items
+      } catch (err) {
+        console.warn('Failed to load beverage items:', err)
+        return []
+      }
+    }
+
     const loadFastFoodItems = (): CustomPackagedItem[] => {
       const fastFoodFile = path.join(process.cwd(), 'data', 'food-overrides', 'fast_food_macros.csv')
       if (!fs.existsSync(fastFoodFile)) return []
@@ -526,7 +598,7 @@ export async function GET(request: NextRequest) {
             const lowerName = itemName.toLowerCase()
             
             // Meals
-            if (lowerName.includes('mcsmart meal')) return { sizeGrams: 616, servingLabel: '1 meal' }
+            if (lowerName.includes('mcsmart meal')) return { sizeGrams: 490, servingLabel: '1 meal' }
             if (lowerName.includes('fish & chips') || lowerName.includes('fish and chips')) return { sizeGrams: 400, servingLabel: '1 serve' }
             
             // Burgers
@@ -634,6 +706,7 @@ export async function GET(request: NextRequest) {
         source: 'openfoodfacts',
         aliases: ['burger with the lot', 'burger with lot', 'fish and chip shop burger', 'fish & chip shop burger'],
       },
+      ...loadBeverageItems(),
       ...loadFastFoodItems(),
     ]
 

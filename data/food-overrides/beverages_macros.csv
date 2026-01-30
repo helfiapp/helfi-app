@@ -1,0 +1,71 @@
+food,per_100g_kcal,protein_g,carbs_g,fat_g,fibre_g,sugar_g
+Coke Zero (Coca-Cola),0,0,0,0,0,0
+Coca-Cola (Coca-Cola),42,0,10.6,0,0,10.6
+Diet Coke (Coca-Cola),0,0,0,0,0,0
+Coca-Cola Zero Sugar (Coca-Cola),0,0,0,0,0,0
+Coca-Cola Cherry (Coca-Cola),42,0,10.6,0,0,10.6
+Coca-Cola Vanilla (Coca-Cola),42,0,10.6,0,0,10.6
+Coca-Cola Cherry Zero (Coca-Cola),0,0,0,0,0,0
+Coca-Cola Vanilla Zero (Coca-Cola),0,0,0,0,0,0
+Sprite (Coca-Cola),38,0,9.6,0,0,9.6
+Sprite Zero (Coca-Cola),0,0,0,0,0,0
+Sprite Lemonade (Coca-Cola),38,0,9.6,0,0,9.6
+Fanta Orange (Coca-Cola),45,0,11.2,0,0,11.2
+Fanta Strawberry (Coca-Cola),45,0,11.2,0,0,11.2
+Fanta Lemon (Coca-Cola),45,0,11.2,0,0,11.2
+Fanta Grape (Coca-Cola),45,0,11.2,0,0,11.2
+Fanta Zero Orange (Coca-Cola),0,0,0,0,0,0
+Pepsi (PepsiCo),42,0,10.6,0,0,10.6
+Pepsi Zero (PepsiCo),0,0,0,0,0,0
+Diet Pepsi (PepsiCo),0,0,0,0,0,0
+Pepsi Max (PepsiCo),0,0,0,0,0,0
+Mountain Dew (PepsiCo),46,0,11.5,0,0,11.5
+Mountain Dew Zero (PepsiCo),0,0,0,0,0,0
+Diet Mountain Dew (PepsiCo),0,0,0,0,0,0
+7UP (PepsiCo),38,0,9.6,0,0,9.6
+7UP Zero (PepsiCo),0,0,0,0,0,0
+Dr Pepper (Dr Pepper),42,0,10.6,0,0,10.6
+Dr Pepper Zero (Dr Pepper),0,0,0,0,0,0
+Diet Dr Pepper (Dr Pepper),0,0,0,0,0,0
+Schweppes Lemonade (Schweppes),38,0,9.6,0,0,9.6
+Schweppes Ginger Ale (Schweppes),38,0,9.6,0,0,9.6
+Schweppes Tonic Water (Schweppes),34,0,8.5,0,0,8.5
+Schweppes Soda Water (Schweppes),0,0,0,0,0,0
+Red Bull (Red Bull),45,0,11,0,0,11
+Red Bull Sugar Free (Red Bull),0,0,0,0,0,0
+Monster Energy (Monster),47,0,11.8,0,0,11.8
+Monster Zero Sugar (Monster),0,0,0,0,0,0
+Gatorade (PepsiCo),24,0,6,0,0,6
+Gatorade Zero (PepsiCo),0,0,0,0,0,0
+Powerade (Coca-Cola),19,0,4.8,0,0,4.8
+Powerade Zero (Coca-Cola),0,0,0,0,0,0
+Lipton Iced Tea (PepsiCo),30,0,7.5,0,0,7.5
+Lipton Iced Tea Zero (PepsiCo),0,0,0,0,0,0
+Nestea (Coca-Cola),30,0,7.5,0,0,7.5
+Nestea Zero (Coca-Cola),0,0,0,0,0,0
+Aquarius (Coca-Cola),20,0,5,0,0,5
+Vitamin Water (Coca-Cola),20,0,5,0,0,5
+Vitamin Water Zero (Coca-Cola),0,0,0,0,0,0
+Minute Maid Orange (Coca-Cola),45,0,11.2,0,0,11.2
+Minute Maid Apple (Coca-Cola),45,0,11.2,0,0,11.2
+Minute Maid Lemonade (Coca-Cola),45,0,11.2,0,0,11.2
+Simply Orange (Coca-Cola),45,0,11.2,0,0,11.2
+Simply Apple (Coca-Cola),45,0,11.2,0,0,11.2
+Simply Lemonade (Coca-Cola),45,0,11.2,0,0,11.2
+Ocean Spray Cranberry (Ocean Spray),45,0,11.2,0,0,11.2
+Ocean Spray Cranberry Light (Ocean Spray),0,0,0,0,0,0
+Tropicana Orange (PepsiCo),45,0,11.2,0,0,11.2
+Tropicana Apple (PepsiCo),45,0,11.2,0,0,11.2
+Tropicana Orange Light (PepsiCo),0,0,0,0,0,0
+Nudie Orange Juice (Nudie),45,0,11.2,0,0,11.2
+Nudie Apple Juice (Nudie),45,0,11.2,0,0,11.2
+Berri Orange Juice (Berri),45,0,11.2,0,0,11.2
+Berri Apple Juice (Berri),45,0,11.2,0,0,11.2
+V Energy Drink (Frucor),45,0,11,0,0,11
+V Sugar Free (Frucor),0,0,0,0,0,0
+Mother Energy Drink (Coca-Cola),47,0,11.8,0,0,11.8
+Mother Sugar Free (Coca-Cola),0,0,0,0,0,0
+Rockstar Energy (PepsiCo),47,0,11.8,0,0,11.8
+Rockstar Zero Sugar (PepsiCo),0,0,0,0,0,0
+Coca-Cola No Sugar (Coca-Cola),0,0,0,0,0,0
+Pepsi No Sugar (PepsiCo),0,0,0,0,0,0
