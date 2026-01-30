@@ -6235,7 +6235,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                 />
                 <select
                   value={photoDosageUnit}
-                  onChange={e => setPhotoDosageUnit(e.target.value)}
+                  onChange={e => {
+                    e.stopPropagation();
+                    setPhotoDosageUnit(e.target.value);
+                  }}
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}
                   className="w-24 rounded-lg border border-gray-300 px-2 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
                 >
                   {dosageUnits.map(unit => (
@@ -6317,7 +6322,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                       <span className="text-gray-700">{time}</span>
                     </label>
                     {photoTiming.includes(time) && (
-                      <div className="flex space-x-1">
+                      <div className="flex space-x-1" onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
                         <input
                           type="text"
                           inputMode="numeric" placeholder="Amount"
@@ -6329,15 +6334,20 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                               [time]: e.target.value
                             }));
                           }}
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={e => e.stopPropagation()}
                         />
                         <select
                           value={photoTimingDosageUnits[time] || photoDosageUnit}
                           onChange={(e) => {
+                            e.stopPropagation();
                             setPhotoTimingDosageUnits(prev => ({
                               ...prev,
                               [time]: e.target.value
                             }));
                           }}
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={e => e.stopPropagation()}
                           className="w-24 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         >
                           {dosageUnits.map(unit => (
@@ -6678,10 +6688,30 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       try {
         setNameLoading(true);
         setNameError(null);
-        const response = await fetch(`/api/medication-search?q=${encodeURIComponent(query)}`);
-        if (!response.ok) throw new Error('Search failed');
-        const data = await response.json().catch(() => ({}));
-        setNameSuggestions(Array.isArray(data?.results) ? data.results : []);
+        // Search both external APIs and user-uploaded catalog
+        const [externalResponse, catalogResponse] = await Promise.all([
+          fetch(`/api/medication-search?q=${encodeURIComponent(query)}`),
+          fetch(`/api/medication-catalog-search?q=${encodeURIComponent(query)}`).catch(() => null)
+        ]);
+        
+        const externalData = externalResponse.ok ? await externalResponse.json().catch(() => ({})) : {};
+        const catalogData = catalogResponse?.ok ? await catalogResponse.json().catch(() => ({})) : {};
+        
+        // Combine results: catalog first (user-uploaded), then external APIs
+        const catalogResults = Array.isArray(catalogData?.results) ? catalogData.results : [];
+        const externalResults = Array.isArray(externalData?.results) ? externalData.results : [];
+        const combined = [...catalogResults, ...externalResults];
+        
+        // Dedupe by name
+        const seen = new Set<string>();
+        const deduped = combined.filter((item: any) => {
+          const name = String(item?.name || '').trim().toLowerCase();
+          if (!name || seen.has(name)) return false;
+          seen.add(name);
+          return true;
+        });
+        
+        setNameSuggestions(deduped);
       } catch (error) {
         console.error('Medication search failed:', error);
         setNameError('Search failed. Please try again.');
@@ -7563,7 +7593,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                 />
                 <select
                   value={photoDosageUnit}
-                  onChange={e => setPhotoDosageUnit(e.target.value)}
+                  onChange={e => {
+                    e.stopPropagation();
+                    setPhotoDosageUnit(e.target.value);
+                  }}
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}
                   className="w-24 rounded-lg border border-gray-300 px-2 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
                 >
                   {dosageUnits.map(unit => (
@@ -7645,7 +7680,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                       <span className="text-gray-700">{time}</span>
                     </label>
                     {photoTiming.includes(time) && (
-                      <div className="flex space-x-1">
+                      <div className="flex space-x-1" onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
                         <input
                           type="text"
                           inputMode="numeric" placeholder="Amount"
@@ -7657,15 +7692,20 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                               [time]: e.target.value
                             }));
                           }}
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={e => e.stopPropagation()}
                         />
                         <select
                           value={photoTimingDosageUnits[time] || photoDosageUnit}
                           onChange={(e) => {
+                            e.stopPropagation();
                             setPhotoTimingDosageUnits(prev => ({
                               ...prev,
                               [time]: e.target.value
                             }));
                           }}
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={e => e.stopPropagation()}
                           className="w-24 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         >
                           {dosageUnits.map(unit => (

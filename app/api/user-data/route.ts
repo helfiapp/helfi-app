@@ -9,6 +9,7 @@ import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { computeHydrationGoal } from '@/lib/hydration-goal'
 import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
 import { ensureSupplementCatalogSchema } from '@/lib/supplement-catalog-db'
+import { ensureMedicationCatalogSchema } from '@/lib/medication-catalog-db'
 
 const normalizeTimingList = (timing: any) => {
   if (Array.isArray(timing)) {
@@ -55,19 +56,71 @@ const splitSupplementName = (rawName: string) => {
 const buildSupplementCatalogRows = (supplements: any[], userId: string) => {
   if (!Array.isArray(supplements)) return []
   return supplements
-    .filter((supp: any) => supp && supp.name && (supp.method === 'photo' || supp.imageUrl))
+    .filter((supp: any) => supp && supp.name && String(supp.name || '').trim().length > 0)
     .map((supp: any) => {
       const { brand, product } = splitSupplementName(supp.name)
+      const isPhoto = supp.method === 'photo' || !!supp.imageUrl
       return {
         userId,
         brand,
         product,
         fullName: String(supp.name || '').trim(),
         dosage: String(supp.dosage || '').trim(),
-        source: 'photo',
+        source: isPhoto ? 'photo' : 'manual',
       }
     })
-    .filter((row) => row.fullName)
+    .filter((row) => row.fullName && !isPlaceholderName(row.fullName))
+}
+
+const isPlaceholderName = (value: string) => {
+  const safe = String(value || '').trim().toLowerCase()
+  return new Set([
+    'analyzing...',
+    'supplement added',
+    'unknown supplement',
+    'analysis error',
+    'unknown medication',
+    'medication added',
+  ]).has(safe)
+}
+
+const splitMedicationName = (rawName: string) => {
+  const cleaned = String(rawName || '').trim()
+  if (!cleaned) return { brand: null as string | null, product: null as string | null }
+  // Medications might be "Brand (Generic)" or "Generic (Brand)" format
+  if (cleaned.includes('(') && cleaned.includes(')')) {
+    const match = cleaned.match(/^(.+?)\s*\((.+?)\)$/)
+    if (match) {
+      return { brand: match[1].trim() || null, product: match[2].trim() || null }
+    }
+  }
+  // Try "Brand - Product" format
+  const parts = cleaned.split(' - ').map((part) => part.trim()).filter(Boolean)
+  if (parts.length >= 2) {
+    const brand = parts[0] || null
+    const product = parts.slice(1).join(' - ').trim() || null
+    return { brand, product }
+  }
+  return { brand: null, product: cleaned }
+}
+
+const buildMedicationCatalogRows = (medications: any[], userId: string) => {
+  if (!Array.isArray(medications)) return []
+  return medications
+    .filter((med: any) => med && med.name && String(med.name || '').trim().length > 0)
+    .map((med: any) => {
+      const { brand, product } = splitMedicationName(med.name)
+      const isPhoto = !!med.imageUrl
+      return {
+        userId,
+        brand,
+        product,
+        fullName: String(med.name || '').trim(),
+        dosage: String(med.dosage || '').trim(),
+        source: isPhoto ? 'photo' : 'manual',
+      }
+    })
+    .filter((row) => row.fullName && !isPlaceholderName(row.fullName))
 }
 
 export async function GET(request: NextRequest) {
@@ -605,6 +658,69 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('GET /api/user-data - Returning onboarding data for user')
+
+    // Backfill: Add existing supplements and medications to catalog (one-time, non-blocking)
+    // This ensures all existing user data is searchable
+    if (user.supplements.length > 0 || user.medications.length > 0) {
+      // Run in background - don't block the response
+      Promise.all([
+        (async () => {
+          try {
+            // Transform Prisma supplement format to catalog format
+            // Note: Prisma Supplement model doesn't have 'method' field, infer from imageUrl
+            const supplementsForCatalog = user.supplements.map((supp: any) => ({
+              name: supp.name,
+              dosage: supp.dosage || '',
+              method: (supp as any).method || (supp.imageUrl ? 'photo' : 'manual'),
+              imageUrl: supp.imageUrl || null
+            }))
+            const supplementRows = buildSupplementCatalogRows(supplementsForCatalog, user.id)
+            if (supplementRows.length > 0) {
+              await ensureSupplementCatalogSchema()
+              await prisma.supplementCatalog.createMany({
+                data: supplementRows,
+                skipDuplicates: true,
+              })
+              console.log('📚 Backfilled supplement catalog entries:', supplementRows.length)
+            }
+          } catch (error) {
+            console.warn('Backfill supplement catalog failed (non-blocking):', error)
+          }
+        })(),
+        (async () => {
+          try {
+            // Transform Prisma medication format to catalog format
+            const medicationsForCatalog = user.medications.map((med: any) => ({
+              name: med.name,
+              dosage: med.dosage || '',
+              imageUrl: med.imageUrl || null
+            }))
+            const medicationRows = buildMedicationCatalogRows(medicationsForCatalog, user.id)
+            if (medicationRows.length > 0) {
+              await ensureMedicationCatalogSchema()
+              for (const row of medicationRows) {
+                await prisma.$executeRawUnsafe(`
+                  INSERT INTO "MedicationCatalog" ("id", "userId", "brand", "product", "fullName", "dosage", "source", "createdAt", "updatedAt")
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                  ON CONFLICT ("userId", "fullName", "dosage", "source") DO NOTHING
+                `,
+                  `med-cat-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                  row.userId || null,
+                  row.brand || null,
+                  row.product || null,
+                  row.fullName,
+                  row.dosage || '',
+                  row.source
+                )
+              }
+              console.log('📚 Backfilled medication catalog entries:', medicationRows.length)
+            }
+          } catch (error) {
+            console.warn('Backfill medication catalog failed (non-blocking):', error)
+          }
+        })()
+      ]).catch(() => {}) // Don't let backfill errors affect the response
+    }
 
     // Debug: Log transformed data being returned
     console.log('GET /api/user-data - Transformed onboarding data:', {
@@ -1367,7 +1483,7 @@ export async function POST(request: NextRequest) {
         ])
         console.log('✅ Replaced supplements via bulk operation:', dedupedSupplements.length)
 
-        // Store photo-based supplements in the catalog for future search
+        // Store supplements (both photo and manual) in the catalog for future search
         try {
           const catalogRows = buildSupplementCatalogRows(dedupedSupplements, user.id)
           if (catalogRows.length > 0) {
@@ -1481,6 +1597,36 @@ export async function POST(request: NextRequest) {
           })
         ])
         console.log('✅ Replaced medications via bulk operation:', dedupedMeds.length)
+
+        // Store medications (both photo and manual) in the catalog for future search
+        try {
+          const catalogRows = buildMedicationCatalogRows(dedupedMeds, user.id)
+          if (catalogRows.length > 0) {
+            await ensureMedicationCatalogSchema()
+            // Use raw SQL since MedicationCatalog is created dynamically
+            for (const row of catalogRows) {
+              await prisma.$executeRawUnsafe(`
+                INSERT INTO "MedicationCatalog" ("id", "userId", "brand", "product", "fullName", "dosage", "source", "createdAt", "updatedAt")
+                VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT ("userId", "fullName", "dosage", "source") DO UPDATE SET
+                  "updatedAt" = CURRENT_TIMESTAMP,
+                  "brand" = EXCLUDED."brand",
+                  "product" = EXCLUDED."product"
+              `,
+                `med-cat-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                row.userId || null,
+                row.brand || null,
+                row.product || null,
+                row.fullName,
+                row.dosage || '',
+                row.source
+              )
+            }
+            console.log('📚 Stored medication catalog entries:', catalogRows.length)
+          }
+        } catch (catalogError) {
+          console.error('❌ Failed to store medication catalog entries:', catalogError)
+        }
       } else {
         console.log('ℹ️ No medications to update')
       }
