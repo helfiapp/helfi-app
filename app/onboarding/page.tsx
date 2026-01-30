@@ -5815,6 +5815,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
           setHasUnsavedChanges(true);
           return updatedSupplements;
         });
+        // Refresh credits counter if photos were used (credits consumed during image analysis)
+        if (!isManual) {
+          try {
+            window.dispatchEvent(new Event('credits:refresh'));
+          } catch {}
+        }
       }
       
       clearPhotoForm();
@@ -6332,7 +6338,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
                               [time]: e.target.value
                             }));
                           }}
-                          className="w-16 px-1 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         >
                           {dosageUnits.map(unit => (
                             <option key={unit} value={unit}>{unit}</option>
@@ -7640,7 +7646,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
                               [time]: e.target.value
                             }));
                           }}
-                          className="w-16 px-1 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         >
                           {dosageUnits.map(unit => (
                             <option key={unit} value={unit}>{unit}</option>
