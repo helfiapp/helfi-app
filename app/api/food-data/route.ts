@@ -410,6 +410,24 @@ export async function GET(request: NextRequest) {
       allowTypoFallback = true,
     ) => {
       if (!Array.isArray(items) || items.length === 0) return []
+      
+      // For packaged foods, be more lenient - allow partial matches
+      const isPackaged = kindMode === 'packaged'
+      
+      if (isPackaged) {
+        // For packaged foods, check if query tokens appear anywhere in brand+name
+        const queryTokens = getSearchTokens(searchQuery).filter((t) => t.length >= 2)
+        if (queryTokens.length > 0) {
+          const matches = items.filter((item) => {
+            const text = getText(item)
+            const normalizedText = normalizeForMatch(text)
+            // Check if all query tokens appear in the text (more lenient for packaged)
+            return queryTokens.every((token) => normalizedText.includes(token))
+          })
+          if (matches.length > 0) return matches
+        }
+      }
+      
       const prefixMatches = items.filter((item) => nameMatchesSearchQuery(getText(item), searchQuery, { allowTypo: false }))
       if (prefixMatches.length > 0) return prefixMatches
       if (!allowTypoFallback) return []
@@ -930,28 +948,35 @@ export async function GET(request: NextRequest) {
           return await fetchForQuery(compactQuery)
         }
 
+        // For packaged foods, always query OpenFoodFacts and FatSecret first (they have fast food items)
+        // Then merge with local USDA branded items
+        const [localPackaged, externalPool] = await Promise.all([
+          searchLocalPreferred(query, 'packaged'),
+          fetchExternalPool(),
+        ])
+
+        // Combine external (OpenFoodFacts/FatSecret) with local USDA branded
+        const allPackaged = [...externalPool, ...localPackaged]
+        
+        // Filter to only items that match the query
+        const filtered = filterItemsByQuery(allPackaged, query, (item) => {
+          const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+          return combined || item?.name || ''
+        })
+
+        // Custom packaged items take precedence
         if (customPackagedMatches.length > 0) {
-          items = sortPackagedByAlphabeticalHierarchyAsc(customPackagedMatches, query).slice(0, limit)
+          const combined = [...customPackagedMatches, ...filtered]
+          items = sortPackagedByAlphabeticalHierarchyAsc(combined, query).slice(0, limit)
           actualSource = 'auto'
           customPackagedApplied = true
+        } else if (filtered.length > 0) {
+          items = sortPackagedByAlphabeticalHierarchyAsc(filtered, query).slice(0, limit)
+          actualSource = 'auto'
         } else {
-          const localPackaged = await searchLocalPreferred(query, 'packaged')
-          const localPackagedFiltered = filterItemsByQuery(localPackaged, query, (item) => {
-            const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-            return combined || item?.name || ''
-          })
-          if (localPackagedFiltered.length > 0) {
-            items = sortPackagedByAlphabeticalHierarchyAsc(localPackagedFiltered, query).slice(0, limit)
-            actualSource = 'auto'
-          } else if (isRestaurantQuery) {
-            const pooled = await fetchExternalPool()
-            items = sortPackagedByAlphabeticalHierarchyAsc(pooled, query).slice(0, limit)
-            actualSource = 'auto'
-          } else {
-            const pooled = await fetchExternalPool()
-            items = sortPackagedByAlphabeticalHierarchyAsc(pooled, query).slice(0, limit)
-            actualSource = 'auto'
-          }
+          // If no matches, still try external pool without filtering (might have partial matches)
+          items = sortPackagedByAlphabeticalHierarchyAsc(externalPool, query).slice(0, limit)
+          actualSource = 'auto'
         }
       }
     } else if (source === 'openfoodfacts') {
