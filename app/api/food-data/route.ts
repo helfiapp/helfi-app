@@ -1238,8 +1238,11 @@ export async function GET(request: NextRequest) {
 
         // Custom packaged items take precedence
         if (customPackagedMatches.length > 0) {
-          const combined = [...customPackagedMatches, ...filtered]
-          items = sortPackagedByAlphabeticalHierarchyAsc(combined, query).slice(0, limit)
+          // Prioritize custom items: sort them first, then add others
+          const sortedCustom = sortPackagedByAlphabeticalHierarchyAsc(customPackagedMatches, query)
+          const sortedOthers = sortPackagedByAlphabeticalHierarchyAsc(filtered, query)
+          // Custom items always come first
+          items = [...sortedCustom, ...sortedOthers].slice(0, limit)
           actualSource = 'auto'
           customPackagedApplied = true
         } else if (filtered.length > 0) {
