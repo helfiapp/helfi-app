@@ -582,6 +582,12 @@ export async function GET(request: NextRequest) {
           const servingInfo = getServingSize(name)
           const multiplier = servingInfo.sizeGrams / 100
           
+          // Format serving size to include weight so modal can parse it correctly
+          // Format: "1 meal (616 g)" or "1 burger (215 g)" etc.
+          const servingSizeLabel = servingInfo.sizeGrams !== 100 
+            ? `${servingInfo.servingLabel} (${servingInfo.sizeGrams} g)`
+            : servingInfo.servingLabel
+          
           // Add aliases for better matching
           const aliases: string[] = []
           if (cleanName.toLowerCase().includes('flake')) {
@@ -595,7 +601,7 @@ export async function GET(request: NextRequest) {
             id: `custom:fast-food-${normalizeForCompact(name)}`,
             name: cleanName,
             brand: brand,
-            serving_size: servingInfo.servingLabel,
+            serving_size: servingSizeLabel,
             calories: Math.round(calories * multiplier),
             protein_g: Math.round(protein * multiplier * 10) / 10,
             carbs_g: Math.round(carbs * multiplier * 10) / 10,
