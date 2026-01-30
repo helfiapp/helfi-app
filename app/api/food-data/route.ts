@@ -120,6 +120,118 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Alphabetical hierarchy for packaged foods (considers brand + name)
+    const sortPackagedByAlphabeticalHierarchyAsc = (list: any[], searchQuery: string) => {
+      const queryNorm = normalizeForMatch(searchQuery)
+      const queryTokens = getSearchTokens(searchQuery)
+      const queryFirstRaw = queryTokens[0] || queryNorm
+      const queryFirst = singularizeToken(queryFirstRaw)
+      const queryAlt = singularizeToken(queryFirstRaw)
+      const queryCandidates = Array.from(new Set([queryFirstRaw, queryFirst, queryAlt].filter(Boolean)))
+      const minCandidateLen = queryCandidates.length > 0 ? Math.min(...queryCandidates.map((t) => t.length)) : 0
+
+      const getMatchMeta = (item: any) => {
+        // For packaged foods, consider both brand and name
+        const brand = String(item?.brand || '').trim()
+        const name = String(item?.name || '').trim()
+        const combined = [brand, name].filter(Boolean).join(' ')
+        const normalizedCombined = normalizeForMatch(combined)
+        const combinedTokens = getSearchTokens(combined)
+        
+        let matchIndex = Number.POSITIVE_INFINITY
+        let matchedWord = ''
+        let matchedCandidateLen = minCandidateLen || 0
+        let isBrandMatch = false
+
+        // Check brand first, then name
+        const brandTokens = brand ? getSearchTokens(brand) : []
+        const nameTokens = name ? getSearchTokens(name) : []
+        
+        // Check brand tokens first
+        for (let i = 0; i < brandTokens.length; i += 1) {
+          const word = brandTokens[i]
+          if (!word) continue
+          const wordSingular = singularizeToken(word)
+          for (const candidate of queryCandidates) {
+            if (!candidate) continue
+            if (word.startsWith(candidate)) {
+              matchIndex = i
+              matchedWord = word
+              matchedCandidateLen = candidate.length
+              isBrandMatch = true
+              break
+            }
+            if (wordSingular && wordSingular !== word && wordSingular.startsWith(candidate)) {
+              matchIndex = i
+              matchedWord = wordSingular
+              matchedCandidateLen = candidate.length
+              isBrandMatch = true
+              break
+            }
+          }
+          if (matchIndex !== Number.POSITIVE_INFINITY) break
+        }
+
+        // If no brand match, check name tokens
+        if (matchIndex === Number.POSITIVE_INFINITY) {
+          const nameStartIndex = brandTokens.length
+          for (let i = 0; i < nameTokens.length; i += 1) {
+            const word = nameTokens[i]
+            if (!word) continue
+            const wordSingular = singularizeToken(word)
+            for (const candidate of queryCandidates) {
+              if (!candidate) continue
+              if (word.startsWith(candidate)) {
+                matchIndex = nameStartIndex + i
+                matchedWord = word
+                matchedCandidateLen = candidate.length
+                break
+              }
+              if (wordSingular && wordSingular !== word && wordSingular.startsWith(candidate)) {
+                matchIndex = nameStartIndex + i
+                matchedWord = wordSingular
+                matchedCandidateLen = candidate.length
+                break
+              }
+            }
+            if (matchIndex !== Number.POSITIVE_INFINITY) break
+          }
+        }
+
+        const isFirstWordMatch = matchIndex === 0
+        const exactWordMatch = queryCandidates.some((c) => c === matchedWord || c === singularizeToken(matchedWord))
+        const wordDelta = matchedWord ? Math.max(0, matchedWord.length - matchedCandidateLen) : 999
+        const hierarchyKey = matchedWord ? `${matchedWord} ${normalizedCombined}` : normalizedCombined
+
+        return { matchIndex, isFirstWordMatch, exactWordMatch, wordDelta, hierarchyKey, stable: normalizedCombined, isBrandMatch }
+      }
+
+      return [...list].sort((a, b) => {
+        const aMeta = getMatchMeta(a)
+        const bMeta = getMatchMeta(b)
+
+        // 1) First-word matches should always win
+        if (aMeta.isFirstWordMatch !== bMeta.isFirstWordMatch) return aMeta.isFirstWordMatch ? -1 : 1
+
+        // 2) Brand matches come before name matches (if both are first word)
+        if (aMeta.isFirstWordMatch && bMeta.isFirstWordMatch) {
+          if (aMeta.isBrandMatch !== bMeta.isBrandMatch) return aMeta.isBrandMatch ? -1 : 1
+        }
+
+        // 3) Earlier word match wins (if both are non-first)
+        if (aMeta.matchIndex !== bMeta.matchIndex) return aMeta.matchIndex - bMeta.matchIndex
+
+        // 4) Exact word match wins
+        if (aMeta.exactWordMatch !== bMeta.exactWordMatch) return aMeta.exactWordMatch ? -1 : 1
+
+        // 5) Closer match wins (shorter extension after the typed prefix)
+        if (aMeta.wordDelta !== bMeta.wordDelta) return aMeta.wordDelta - bMeta.wordDelta
+
+        // 6) Alphabetical within the hierarchy
+        return aMeta.hierarchyKey.localeCompare(bMeta.hierarchyKey) || aMeta.stable.localeCompare(bMeta.stable)
+      })
+    }
+
     const singularizeToken = (value: string) => {
       const lower = value.toLowerCase()
       if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
@@ -592,7 +704,7 @@ export async function GET(request: NextRequest) {
       if (!value) return []
       if (resolvedKind === 'packaged') {
         const localPackaged = await searchLocalFoods(value, { pageSize: limit, sources: ['usda_branded'], mode: 'prefix' })
-        return sortByNameAsc(localPackaged).slice(0, limit)
+        return sortPackagedByAlphabeticalHierarchyAsc(localPackaged, value).slice(0, limit)
       }
       const [foundation, legacy, branded] = await Promise.all([
         searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] }),
@@ -819,7 +931,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (customPackagedMatches.length > 0) {
-          items = sortByNameAsc(customPackagedMatches).slice(0, limit)
+          items = sortPackagedByAlphabeticalHierarchyAsc(customPackagedMatches, query).slice(0, limit)
           actualSource = 'auto'
           customPackagedApplied = true
         } else {
@@ -829,15 +941,15 @@ export async function GET(request: NextRequest) {
             return combined || item?.name || ''
           })
           if (localPackagedFiltered.length > 0) {
-            items = sortByNameAsc(localPackagedFiltered).slice(0, limit)
+            items = sortPackagedByAlphabeticalHierarchyAsc(localPackagedFiltered, query).slice(0, limit)
             actualSource = 'auto'
           } else if (isRestaurantQuery) {
             const pooled = await fetchExternalPool()
-            items = sortByNameAsc(pooled).slice(0, limit)
+            items = sortPackagedByAlphabeticalHierarchyAsc(pooled, query).slice(0, limit)
             actualSource = 'auto'
           } else {
             const pooled = await fetchExternalPool()
-            items = sortByNameAsc(pooled).slice(0, limit)
+            items = sortPackagedByAlphabeticalHierarchyAsc(pooled, query).slice(0, limit)
             actualSource = 'auto'
           }
         }
@@ -862,11 +974,11 @@ export async function GET(request: NextRequest) {
       } else {
         const localItems = await searchLocalPreferred(query, resolvedKind)
         if (customPackagedMatches.length > 0) {
-          items = sortByNameAsc(customPackagedMatches).slice(0, limit)
+          items = sortPackagedByAlphabeticalHierarchyAsc(customPackagedMatches, query).slice(0, limit)
           actualSource = 'usda'
           customPackagedApplied = true
         } else if (localItems.length > 0) {
-          items = sortByNameAsc(localItems).slice(0, limit)
+          items = sortPackagedByAlphabeticalHierarchyAsc(localItems, query).slice(0, limit)
           actualSource = 'usda'
         } else if (localOnly) {
           items = []
@@ -874,7 +986,7 @@ export async function GET(request: NextRequest) {
         } else {
           const dataType = resolvedKind === 'packaged' ? 'all' : 'generic'
           const remote = await searchUsdaFoods(query, { pageSize: limit, dataType })
-          items = sortByNameAsc(remote).slice(0, limit)
+          items = sortPackagedByAlphabeticalHierarchyAsc(remote, query).slice(0, limit)
           actualSource = 'usda'
         }
       }
@@ -889,7 +1001,7 @@ export async function GET(request: NextRequest) {
 
     if (kindMode === 'packaged' && customPackagedMatches.length > 0 && !customPackagedApplied) {
       if (!Array.isArray(items) || items.length === 0) {
-        items = sortByNameAsc(customPackagedMatches).slice(0, limit)
+        items = sortPackagedByAlphabeticalHierarchyAsc(customPackagedMatches, query).slice(0, limit)
         customPackagedApplied = true
       }
     }
@@ -906,7 +1018,7 @@ export async function GET(request: NextRequest) {
 
     if (Array.isArray(items) && items.length > 1) {
       if (kindMode !== 'single') {
-        items = sortByNameAsc(items).slice(0, limit)
+        items = sortPackagedByAlphabeticalHierarchyAsc(items, query).slice(0, limit)
       } else {
         items = items.slice(0, limit)
       }
