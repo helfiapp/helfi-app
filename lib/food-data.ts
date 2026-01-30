@@ -133,24 +133,7 @@ export async function searchLocalFoods(
     const rawTokens = normalizedQuery.split(' ').filter(Boolean)
     const toTitleCase = (value: string) => value.replace(/\b([a-z])/g, (match) => match.toUpperCase())
     const prefixTokens = rawTokens.length > 0 ? rawTokens.slice(0, 3) : [normalizedQuery || q]
-    const tokenSet = new Set<string>()
-    const addTokenVariants = (value: string) => {
-      if (!value) return
-      tokenSet.add(value)
-      tokenSet.add(value.toUpperCase())
-      tokenSet.add(toTitleCase(value))
-    }
-    for (const token of prefixTokens) {
-      const singular = singularizeToken(token)
-      addTokenVariants(token)
-      if (singular && singular !== token) addTokenVariants(singular)
-    }
     const sourceFilter = sources ? { source: { in: sources } } : null
-    const prefixConditions = Array.from(tokenSet).flatMap((token) => [
-      { name: { startsWith: token } },
-      { brand: { startsWith: token } },
-    ])
-    const prefixFilter = prefixConditions.length > 0 ? { OR: prefixConditions } : null
 
     // Word-prefix matching for USDA names like: "Squash, summer, zucchini, raw".
     // We keep DB search broad enough to find later words, then callers can still
@@ -167,19 +150,66 @@ export async function searchLocalFoods(
       return Array.from(patterns)
     }
 
-    const allowContains = mode !== 'prefix' && normalizedQuery.length >= 1
+    const buildTokenVariants = (token: string) => {
+      const base = singularizeToken(token)
+      const tokens = base && base !== token ? [token, base] : [token]
+      const variants = new Set<string>()
+      const add = (v: string) => {
+        const t = String(v || '').trim()
+        if (!t) return
+        variants.add(t)
+        variants.add(t.toUpperCase())
+        variants.add(toTitleCase(t))
+      }
+      tokens.forEach(add)
+      return Array.from(variants)
+    }
+
+    // For multi-word searches, require all words to match somewhere (AND),
+    // otherwise big generic words like "potato" can crowd out "sweet potato".
+    const isMultiToken = mode !== 'prefix' && prefixTokens.length > 1
+
+    const prefixFilter = (() => {
+      if (prefixTokens.length === 0) return null
+      if (!isMultiToken) {
+        const tokenSet = new Set<string>()
+        for (const token of prefixTokens) {
+          buildTokenVariants(token).forEach((v) => tokenSet.add(v))
+        }
+        const prefixConditions = Array.from(tokenSet).flatMap((token) => [
+          { name: { startsWith: token } },
+          { brand: { startsWith: token } },
+        ])
+        return prefixConditions.length > 0 ? { OR: prefixConditions } : null
+      }
+      const tokenClauses = prefixTokens.map((token) => {
+        const variants = buildTokenVariants(token)
+        const patterns = variants.flatMap((v) => buildWordPrefixPatterns(v))
+        const brandTokens = variants.filter((v) => String(v || '').trim().length >= 2)
+        const conditions = [
+          ...variants.map((v) => ({ name: { startsWith: v } })),
+          ...variants.map((v) => ({ brand: { startsWith: v } })),
+          ...patterns.map((pattern) => ({ name: { contains: pattern, mode: 'insensitive' as const } })),
+          ...patterns.map((pattern) => ({ brand: { contains: pattern, mode: 'insensitive' as const } })),
+          ...brandTokens.map((v) => ({ brand: { contains: v, mode: 'insensitive' as const } })),
+        ]
+        return conditions.length > 0 ? { OR: conditions } : {}
+      })
+      return tokenClauses.length > 0 ? { AND: tokenClauses } : null
+    })()
+
+    // Single-token searches still need a second pass to match later words
+    // like "zuc" → "Squash, summer, zucchini...".
+    const allowContains = !isMultiToken && mode !== 'prefix' && normalizedQuery.length >= 1
     const containsConditions = allowContains
       ? prefixTokens.flatMap((token) => {
-          const base = singularizeToken(token)
-          const tokens = base && base !== token ? [token, base] : [token]
-          const patterns = tokens.flatMap((t) => buildWordPrefixPatterns(t))
-          // Brand values usually don't have commas, so also allow a plain contains
-          // fallback for brand matching.
-          const brandTokens = tokens.filter((t) => String(t || '').trim().length >= 2)
+          const variants = buildTokenVariants(token)
+          const patterns = variants.flatMap((v) => buildWordPrefixPatterns(v))
+          const brandTokens = variants.filter((v) => String(v || '').trim().length >= 2)
           return [
             ...patterns.map((pattern) => ({ name: { contains: pattern, mode: 'insensitive' as const } })),
             ...patterns.map((pattern) => ({ brand: { contains: pattern, mode: 'insensitive' as const } })),
-            ...brandTokens.map((t) => ({ brand: { contains: t, mode: 'insensitive' as const } })),
+            ...brandTokens.map((v) => ({ brand: { contains: v, mode: 'insensitive' as const } })),
           ]
         })
       : []
