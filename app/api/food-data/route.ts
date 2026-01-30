@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { searchOpenFoodFactsByQuery, searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition, searchLocalFoods } from '@/lib/food-data'
 import { searchCustomFoodMacros } from '@/lib/food/custom-foods'
 import { prisma } from '@/lib/prisma'
+import fs from 'fs'
+import path from 'path'
 
 let usdaHealthCache: { count: number | null; checkedAt: number } = { count: null, checkedAt: 0 }
 
@@ -449,6 +451,97 @@ export async function GET(request: NextRequest) {
       aliases?: string[]
     }
 
+    // Parse CSV line handling quoted fields
+    const parseCsvLine = (line: string): string[] => {
+      const cells: string[] = []
+      let current = ''
+      let inQuotes = false
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i]
+        if (ch === '"') {
+          const next = line[i + 1]
+          if (inQuotes && next === '"') {
+            current += '"'
+            i += 1
+            continue
+          }
+          inQuotes = !inQuotes
+          continue
+        }
+        if (ch === ',' && !inQuotes) {
+          cells.push(current)
+          current = ''
+          continue
+        }
+        current += ch
+      }
+      cells.push(current)
+      return cells.map((cell) => cell.trim())
+    }
+
+    // Load fast food items from CSV
+    const loadFastFoodItems = (): CustomPackagedItem[] => {
+      const fastFoodFile = path.join(process.cwd(), 'data', 'food-overrides', 'fast_food_macros.csv')
+      if (!fs.existsSync(fastFoodFile)) return []
+      
+      try {
+        const content = fs.readFileSync(fastFoodFile, 'utf8')
+        const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0)
+        if (lines.length < 2) return []
+        
+        const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase())
+        const foodIndex = headers.indexOf('food')
+        const caloriesIndex = headers.indexOf('per_100g_kcal')
+        const proteinIndex = headers.indexOf('protein_g')
+        const carbsIndex = headers.indexOf('carbs_g')
+        const fatIndex = headers.indexOf('fat_g')
+        const fiberIndex = headers.indexOf('fibre_g') >= 0 ? headers.indexOf('fibre_g') : headers.indexOf('fiber_g')
+        const sugarIndex = headers.indexOf('sugar_g')
+        
+        if (foodIndex < 0 || caloriesIndex < 0 || proteinIndex < 0 || carbsIndex < 0 || fatIndex < 0) return []
+        
+        const items: CustomPackagedItem[] = []
+        for (let i = 1; i < lines.length; i++) {
+          const cells = parseCsvLine(lines[i])
+          const name = cells[foodIndex] || ''
+          if (!name) continue
+          
+          const calories = Number(cells[caloriesIndex])
+          const protein = Number(cells[proteinIndex])
+          const carbs = Number(cells[carbsIndex])
+          const fat = Number(cells[fatIndex])
+          const fiber = fiberIndex >= 0 ? Number(cells[fiberIndex] || 0) : 0
+          const sugar = sugarIndex >= 0 ? Number(cells[sugarIndex] || 0) : 0
+          
+          if (!Number.isFinite(calories) || !Number.isFinite(protein) || !Number.isFinite(carbs) || !Number.isFinite(fat)) continue
+          
+          // Extract brand from name if present (e.g., "Big Mac (McDonald's)" -> brand: "McDonald's")
+          const brandMatch = name.match(/\(([^)]+)\)$/)
+          const brand = brandMatch ? brandMatch[1] : null
+          const cleanName = brandMatch ? name.replace(/\s*\([^)]+\)$/, '').trim() : name
+          
+          items.push({
+            id: `custom:fast-food-${normalizeForCompact(name)}`,
+            name: cleanName,
+            brand: brand,
+            serving_size: '100 g',
+            calories: Math.round(calories),
+            protein_g: Math.round(protein * 10) / 10,
+            carbs_g: Math.round(carbs * 10) / 10,
+            fat_g: Math.round(fat * 10) / 10,
+            fiber_g: fiber > 0 ? Math.round(fiber * 10) / 10 : null,
+            sugar_g: sugar > 0 ? Math.round(sugar * 10) / 10 : null,
+            source: 'openfoodfacts',
+            aliases: [],
+          })
+        }
+        return items
+      } catch (err) {
+        console.warn('Failed to load fast food items:', err)
+        return []
+      }
+    }
+
     const CUSTOM_PACKAGED_ITEMS: CustomPackagedItem[] = [
       {
         id: 'custom:burger-with-the-lot',
@@ -464,13 +557,19 @@ export async function GET(request: NextRequest) {
         source: 'openfoodfacts',
         aliases: ['burger with the lot', 'burger with lot', 'fish and chip shop burger', 'fish & chip shop burger'],
       },
+      ...loadFastFoodItems(),
     ]
 
     const getCustomPackagedMatches = (value: string) => {
       if (!value) return []
       const buildMatches = (allowTypo: boolean) =>
         CUSTOM_PACKAGED_ITEMS.filter((item) => {
+          // Check name
           if (nameMatchesSearchQuery(item.name, value, { allowTypo })) return true
+          // Check brand + name combination
+          const brandName = [item.brand, item.name].filter(Boolean).join(' ')
+          if (brandName && nameMatchesSearchQuery(brandName, value, { allowTypo })) return true
+          // Check aliases
           const aliases = Array.isArray(item.aliases) ? item.aliases : []
           return aliases.some((alias) => nameMatchesSearchQuery(alias, value, { allowTypo }))
         })

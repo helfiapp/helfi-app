@@ -15,8 +15,8 @@ export type CustomFoodMacro = {
 const DATA_DIR = path.join(process.cwd(), 'data', 'food-overrides')
 // Master list generated from the existing "food-import" CSVs + USDA macros (auto-filled).
 // See: scripts/generate-master-food-macros.mjs
-// Custom CSV files with macros are included directly (meat_seafood_protein_macros.csv, etc.)
-const SOURCE_FILES = ['master_foods_macros.csv', 'meat_seafood_protein_macros.csv']
+// Custom CSV files with macros are included directly (meat_seafood_protein_macros.csv, fast_food_macros.csv, etc.)
+const SOURCE_FILES = ['master_foods_macros.csv', 'meat_seafood_protein_macros.csv', 'fast_food_macros.csv']
 
 let cachedItems: CustomFoodMacro[] | null = null
 
