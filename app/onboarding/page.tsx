@@ -8457,6 +8457,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
   const [showAnalysisHistory, setShowAnalysisHistory] = useState(false); // Default collapsed as requested
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [didFreshAnalysis, setDidFreshAnalysis] = useState(false);
+  const [showAllSupplements, setShowAllSupplements] = useState(false);
+  const [showAllMedications, setShowAllMedications] = useState(false);
 
   useEffect(() => {
     // Load previous analyses and show the last one (no auto-analysis)
@@ -8658,6 +8660,28 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
       default: return '⚪';
     }
   };
+
+  const SUMMARY_LIST_LIMIT = 6;
+  const summarySupplementNames = Array.from(
+    new Set(
+      (initial?.supplements || [])
+        .map((supp: any) => String(supp?.name || '').trim())
+        .filter(Boolean)
+    )
+  ) as string[];
+  const summaryMedicationNames = Array.from(
+    new Set(
+      (initial?.medications || [])
+        .map((med: any) => String(med?.name || '').trim())
+        .filter(Boolean)
+    )
+  ) as string[];
+  const visibleSupplementNames = showAllSupplements
+    ? summarySupplementNames
+    : summarySupplementNames.slice(0, SUMMARY_LIST_LIMIT);
+  const visibleMedicationNames = showAllMedications
+    ? summaryMedicationNames
+    : summaryMedicationNames.slice(0, SUMMARY_LIST_LIMIT);
 
   // Helper to create a safe, predictable slug from names for unique/stable IDs
   const toSlug = (value: string | undefined) => {
@@ -8867,28 +8891,69 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
         {/* Summary */}
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
           <h3 className="font-semibold text-blue-900 mb-2">Summary</h3>
-          <p className="text-blue-800">
-            {analysisResult.summary || (() => {
-              // Generate summary with actual supplement and medication names
-              const currentSupplements = initial?.supplements || [];
-              const currentMedications = initial?.medications || [];
-              const supplementNames = currentSupplements.map((s: any) => s.name).join(', ');
-              const medicationNames = currentMedications.map((m: any) => m.name).join(', ');
-              
-              let summaryText = 'Analysis completed for ';
-              if (supplementNames && medicationNames) {
-                summaryText += `${supplementNames} and ${medicationNames}`;
-              } else if (supplementNames) {
-                summaryText += supplementNames;
-              } else if (medicationNames) {
-                summaryText += medicationNames;
-              } else {
-                summaryText += 'no supplements or medications';
-              }
-              summaryText += `. Overall risk level: ${analysisResult.overallRisk || 'unknown'}.`;
-              return summaryText;
-            })()}
+          <p className="text-blue-800 text-sm mb-3">
+            We analyzed the items below.
           </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="bg-white/70 border border-blue-100 rounded-md p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-blue-900">Supplements</span>
+                <span className="text-xs text-blue-700">{summarySupplementNames.length} total</span>
+              </div>
+              {visibleSupplementNames.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {visibleSupplementNames.map((name: string) => (
+                    <span
+                      key={`supp-summary-${name}`}
+                      className="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-blue-700">None added</div>
+              )}
+              {summarySupplementNames.length > SUMMARY_LIST_LIMIT && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllSupplements((prev) => !prev)}
+                  className="mt-2 text-xs font-medium text-blue-700 hover:text-blue-900"
+                >
+                  {showAllSupplements ? 'Show less' : `Show all (${summarySupplementNames.length})`}
+                </button>
+              )}
+            </div>
+            <div className="bg-white/70 border border-blue-100 rounded-md p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-blue-900">Medications</span>
+                <span className="text-xs text-blue-700">{summaryMedicationNames.length} total</span>
+              </div>
+              {visibleMedicationNames.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {visibleMedicationNames.map((name: string) => (
+                    <span
+                      key={`med-summary-${name}`}
+                      className="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-blue-700">None added</div>
+              )}
+              {summaryMedicationNames.length > SUMMARY_LIST_LIMIT && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllMedications((prev) => !prev)}
+                  className="mt-2 text-xs font-medium text-blue-700 hover:text-blue-900"
+                >
+                  {showAllMedications ? 'Show less' : `Show all (${summaryMedicationNames.length})`}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Interactions - Show green checkmark for no dangerous interactions or accordion for interactions */}
