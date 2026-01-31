@@ -2962,121 +2962,127 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     )
   }
 
+  const navItems = [
+    { id: 'overview', label: 'Overview', desc: 'Key metrics', icon: '📊' },
+    { id: 'usage', label: 'AI Usage', desc: 'Vision costs', icon: '💰' },
+    { id: 'practitioners', label: 'Practitioners', desc: 'Directory reviews', icon: '🧑‍⚕️' },
+    { id: 'affiliates', label: 'Affiliates', desc: 'Applications & payouts', icon: '🤝' },
+    { id: 'events', label: 'Events', desc: 'Raw data', icon: '📋' },
+    { id: 'insights', label: 'AI Insights', desc: 'OpenAI analysis', icon: '🤖' },
+    { id: 'waitlist', label: 'Waitlist', desc: 'Signups', icon: '📧' },
+    { id: 'partner-outreach', label: 'Partners', desc: 'Outreach list', icon: '📮' },
+    { id: 'users', label: 'Users', desc: 'User stats', icon: '👥' },
+    { id: 'management', label: 'User Management', desc: 'Manage users', icon: '🛠️' },
+    { id: 'templates', label: 'Templates', desc: 'Email templates', icon: '📝' },
+    { id: 'tickets', label: 'Support', desc: 'Customer support', icon: '🎫' },
+    { id: 'settings', label: 'Settings', desc: 'QR Login & Notifications', icon: '⚙️' }
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center">
-            <Image
-              src="/mobile-assets/LOGOS/helfi-01-01.png"
-              alt="Helfi Logo"
-              width={40}
-              height={40}
-              className="mr-3"
-            />
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900">Helfi Analytics Dashboard</h1>
-              <p className="text-xs sm:text-sm text-gray-600">Real-time user behavior insights</p>
+    <div className="min-h-screen bg-gray-50 md:flex">
+      {/* Left Menu */}
+      <aside className="hidden md:flex md:flex-col md:w-64 bg-gray-900 text-white">
+        <div className="px-5 py-5 border-b border-gray-800">
+          <div className="text-lg font-semibold tracking-wide">Admin Panel</div>
+        </div>
+        <nav className="flex-1 overflow-y-auto py-3">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => handleTabChange(item.id)}
+              className={`w-full px-5 py-3 text-left text-sm flex items-start gap-3 transition-colors ${
+                activeTab === item.id
+                  ? 'bg-gray-800 text-white'
+                  : 'text-white hover:bg-gray-800'
+              }`}
+            >
+              <span className="text-base leading-5">{item.icon}</span>
+              <span className="flex flex-col">
+                <span className="font-medium">{item.label}</span>
+                    <span className={`text-xs ${activeTab === item.id ? 'text-gray-300' : 'text-gray-400'}`}>
+                  {item.desc}
+                </span>
+              </span>
+            </button>
+          ))}
+        </nav>
+        <div className="p-4 border-t border-gray-800">
+          <button
+            onClick={handleLogout}
+            className="w-full bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+          >
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      <div className="flex-1 min-w-0">
+        {/* Header */}
+        <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              {/* Mobile menu toggle */}
+              <button
+                onClick={() => setMobileMenuOpen(v => !v)}
+                className="md:hidden inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-2 text-xs"
+                aria-label="Open menu"
+              >
+                ☰
+              </button>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900">Admin Panel</h1>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <button
+                onClick={refreshData}
+                className="shrink-0 bg-emerald-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors text-xs sm:text-sm"
+              >
+                🔄 <span className="hidden sm:inline">Refresh Data</span>
+                <span className="sm:hidden">Refresh</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="md:hidden shrink-0 bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors text-xs sm:text-sm"
+              >
+                🚪 <span className="hidden sm:inline">Logout</span>
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            {/* Mobile menu toggle */}
-            <button
-              onClick={() => setMobileMenuOpen(v => !v)}
-              className="sm:hidden mr-1 inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-2 text-xs"
-              aria-label="Open menu"
-            >
-              ☰
-            </button>
-            <button
-              onClick={refreshData}
-              className="shrink-0 bg-emerald-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors text-xs sm:text-sm"
-            >
-              🔄 <span className="hidden sm:inline">Refresh Data</span>
-              <span className="sm:hidden">Refresh</span>
-            </button>
+        </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-gray-900 text-white border-b border-gray-800 px-3 py-3 z-30">
+            <div className="grid grid-cols-1 gap-2">
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    handleTabChange(item.id)
+                    setMobileMenuOpen(false)
+                  }}
+                  className={`w-full px-4 py-3 text-left rounded-lg text-sm flex items-center gap-3 transition-colors ${
+                    activeTab === item.id ? 'bg-gray-800 text-white' : 'text-white hover:bg-gray-800'
+                  }`}
+                >
+                  <span className="text-base">{item.icon}</span>
+                  <span className="flex flex-col">
+                    <span className="font-medium">{item.label}</span>
+                    <span className="text-xs text-gray-400">{item.desc}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
             <button
               onClick={handleLogout}
-              className="shrink-0 bg-gray-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-xs sm:text-sm"
+              className="mt-3 w-full bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
             >
-              🚪 <span className="hidden sm:inline">Logout</span>
+              Logout
             </button>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Mobile Menu (only essential sections) */}
-      {mobileMenuOpen && (
-        <div className="sm:hidden bg-white border-b border-gray-200 px-4 py-2 z-30">
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { id: 'overview', label: 'Overview' },
-              { id: 'usage', label: 'AI Usage' },
-              { id: 'practitioners', label: 'Practitioners' },
-              { id: 'affiliates', label: 'Affiliates' },
-              { id: 'waitlist', label: 'Waitlist' },
-              { id: 'partner-outreach', label: 'Partners' },
-              { id: 'users', label: 'Users' },
-              { id: 'settings', label: 'Settings' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  handleTabChange(item.id)
-                  setMobileMenuOpen(false)
-                }}
-                className={`w-full py-2 rounded-lg border text-sm ${
-                  activeTab === item.id ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-700'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Navigation Tabs */}
-      <div className="hidden md:block bg-white border-b border-gray-200">
-        <div className="px-4 sm:px-6">
-          <nav className="flex space-x-4 md:space-x-8 overflow-x-auto whitespace-nowrap no-scrollbar -mx-4 px-4">
-            {[
-              { id: 'overview', label: '📊 Overview', desc: 'Key metrics' },
-              { id: 'usage', label: '💰 AI Usage', desc: 'Vision costs' },
-              { id: 'practitioners', label: '🧑‍⚕️ Practitioners', desc: 'Directory reviews' },
-              { id: 'affiliates', label: '🤝 Affiliates', desc: 'Applications & payouts' },
-              { id: 'events', label: '📋 Events', desc: 'Raw data' },
-              { id: 'insights', label: '🤖 AI Insights', desc: 'OpenAI analysis' },
-              { id: 'waitlist', label: '📧 Waitlist', desc: 'Signups' },
-              { id: 'partner-outreach', label: '📮 Partners', desc: 'Outreach list' },
-              { id: 'users', label: '👥 Users', desc: 'User stats' },
-              { id: 'management', label: '🛠️ User Management', desc: 'Manage users' },
-              { id: 'templates', label: '📝 Templates', desc: 'Email templates' },
-              { id: 'tickets', label: '🎫 Support', desc: 'Customer support' },
-              { id: 'settings', label: '⚙️ Settings', desc: 'QR Login & Notifications' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs sm:text-sm min-w-fit ${
-                  activeTab === tab.id
-                    ? 'border-emerald-500 text-emerald-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex flex-col items-center">
-                  <span>{tab.label}</span>
-                  <span className="text-[10px] sm:text-xs text-gray-400">{tab.desc}</span>
-                </div>
-              </button>
-            ))}
-          </nav>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="px-4 sm:px-6 py-4 sm:py-6">
+        {/* Content */}
+        <div className="px-4 sm:px-6 py-4 sm:py-6">
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Quick Stats */}
@@ -6913,6 +6919,7 @@ The Helfi Team`,
           </div>
         )}
       </div>
+    </div>
     </div>
   )
 }
