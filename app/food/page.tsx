@@ -20300,11 +20300,27 @@ Please add nutritional information manually if needed.`);
                         <input
                           type="text"
                           value={analyzedItems[editingItemIndex]?.name || ''}
-                          onChange={(e) => updateItemField(editingItemIndex, 'name', e.target.value)}
+                          onChange={(e) => {
+                            // Don't trim during typing - preserve spaces
+                            const newValue = e.target.value;
+                            const itemsCopy = [...analyzedItems];
+                            if (itemsCopy[editingItemIndex]) {
+                              itemsCopy[editingItemIndex].name = newValue;
+                              setAnalyzedItems(itemsCopy);
+                            }
+                          }}
                           onKeyDown={(e) => {
-                            // Allow spacebar to work normally
-                            if (e.key === ' ') {
+                            // Ensure spacebar works normally - don't let anything prevent it
+                            if (e.key === ' ' || e.keyCode === 32) {
                               e.stopPropagation();
+                              // Don't prevent default - allow spacebar to insert space
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Only trim on blur (when user finishes editing)
+                            const trimmed = e.target.value.trim();
+                            if (trimmed !== e.target.value) {
+                              updateItemField(editingItemIndex, 'name', trimmed);
                             }
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
