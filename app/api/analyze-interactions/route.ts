@@ -451,7 +451,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       messages: [
         {
           role: "system",
-          content: "You are a clinical pharmacist with expertise in drug-supplement interactions. Provide accurate, evidence-based analysis while being appropriately cautious about medical advice."
+          content: "You are a clinical pharmacist with expertise in drug-supplement interactions. Provide accurate, evidence-based analysis while being appropriately cautious about medical advice. Return ONLY valid JSON."
         },
         {
           role: "user",
@@ -460,6 +460,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       ],
       temperature: 0.3,
       max_tokens: maxTokens,
+      response_format: { type: "json_object" },
     } as any);
 
     const analysisText = wrapped.completion.choices[0].message.content;
