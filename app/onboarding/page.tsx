@@ -6678,61 +6678,52 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       try {
         setNameLoading(true);
         setNameError(null);
-        console.log('Starting medication search for:', query);
+        let suggestions: { name: string; source: string }[] = [];
         
-        // Search both external APIs and user-uploaded catalog
-        const [externalResponse, catalogResponse] = await Promise.all([
-          fetch(`/api/medication-search?q=${encodeURIComponent(query)}`).catch(err => {
-            console.error('External medication search fetch error:', err);
-            return { ok: false, json: async () => ({}) };
-          }),
-          fetch(`/api/medication-catalog-search?q=${encodeURIComponent(query)}`).catch(err => {
-            console.warn('Catalog medication search fetch error:', err);
-            return null;
-          })
-        ]);
+        // First try catalog search (user-uploaded medications)
+        let catalogSuggestions: { name: string; source: string }[] = [];
+        try {
+          const catalogResponse = await fetch(`/api/medication-catalog-search?q=${encodeURIComponent(query)}`);
+          if (catalogResponse.ok) {
+            const catalogData = await catalogResponse.json().catch(() => ({}));
+            if (Array.isArray(catalogData?.results)) {
+              catalogSuggestions = catalogData.results;
+            }
+          }
+        } catch (catalogError) {
+          console.warn('Catalog search failed:', catalogError);
+        }
         
-        console.log('External response status:', externalResponse.ok);
-        console.log('Catalog response:', catalogResponse ? (catalogResponse.ok ? 'ok' : 'failed') : 'null');
+        // Then try external medication search API
+        try {
+          const response = await fetch(`/api/medication-search?q=${encodeURIComponent(query)}`);
+          if (response.ok) {
+            const data = await response.json().catch(() => ({}));
+            const externalResults = Array.isArray(data?.results) ? data.results : [];
+            suggestions = [...catalogSuggestions, ...externalResults];
+          } else if (catalogSuggestions.length > 0) {
+            suggestions = catalogSuggestions;
+          }
+        } catch (error) {
+          console.warn('External medication search failed:', error);
+          if (catalogSuggestions.length > 0) {
+            suggestions = catalogSuggestions;
+          }
+        }
         
-        const externalData = externalResponse.ok ? await externalResponse.json().catch((err) => {
-          console.error('Failed to parse external response:', err);
-          return {};
-        }) : {};
-        const catalogData = catalogResponse?.ok ? await catalogResponse.json().catch((err) => {
-          console.error('Failed to parse catalog response:', err);
-          return {};
-        }) : {};
-        
-        console.log('External data:', externalData);
-        console.log('Catalog data:', catalogData);
-        
-        // Combine results: catalog first (user-uploaded), then external APIs
-        const catalogResults = Array.isArray(catalogData?.results) ? catalogData.results : [];
-        const externalResults = Array.isArray(externalData?.results) ? externalData.results : [];
-        const combined = [...catalogResults, ...externalResults];
-        
-        console.log('Combined results before dedupe:', combined.length, combined);
-        
-        // Dedupe by name
+        // Dedupe suggestions
         const seen = new Set<string>();
-        const deduped = combined.filter((item: any) => {
-          const itemName = String(item?.name || '').trim();
-          const normalizedName = itemName.toLowerCase();
-          if (!itemName || seen.has(normalizedName)) return false;
-          seen.add(normalizedName);
+        const deduped = suggestions.filter((item) => {
+          const key = item.name.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
           return true;
-        }).map((item: any) => ({
-          name: String(item?.name || '').trim(),
-          source: String(item?.source || 'unknown')
-        }));
+        });
         
-        console.log('Medication search results after dedupe:', { query, count: deduped.length, deduped });
         setNameSuggestions(deduped);
       } catch (error) {
         console.error('Medication search failed:', error);
         setNameError('Search failed. Please try again.');
-        setNameSuggestions([]);
       } finally {
         setNameLoading(false);
       }
