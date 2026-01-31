@@ -6578,7 +6578,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   );
 }
 
-function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequestAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void, onRequestAnalysis?: () => void }) {
+function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequestAnalysis, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void, onRequestAnalysis?: () => void, onPartialSave?: (data: any) => void }) {
   const [medications, setMedications] = useState(initial?.medications || []);
   
   // Fix data loading race condition - update medications when initial data loads
@@ -6592,6 +6592,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       return prev;
     });
   }, [initial?.medications]);
+
+  useEffect(() => {
+    if (!onPartialSave) return;
+    onPartialSave({ medications });
+  }, [medications, onPartialSave]);
   
   const [name, setName] = useState('');
   const [nameSuggestions, setNameSuggestions] = useState<{ name: string; source: string }[]>([]);
@@ -10366,7 +10371,7 @@ export default function Onboarding() {
               goToStep(7);
             }
           }} />}
-          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} onRequestAnalysis={() => setAnalysisRequestId((prev) => prev + 1)} onNavigateToAnalysis={(data?: any) => {
+          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onRequestAnalysis={() => setAnalysisRequestId((prev) => prev + 1)} onNavigateToAnalysis={(data?: any) => {
             // REAL FIX: Use flushSync to ensure state updates complete before navigation
             if (data) {
               flushSync(() => {
