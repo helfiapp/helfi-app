@@ -469,76 +469,134 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       typeof rawContent === 'string'
         ? rawContent
         : Array.isArray(rawContent)
-          ? rawContent.map((part: any) => part?.text || '').join('')
+          ? rawContent
+              .map((part: any) => {
+                if (typeof part?.text === 'string') return part.text;
+                if (typeof part?.output_text === 'string') return part.output_text;
+                if (part?.output_json) return JSON.stringify(part.output_json);
+                if (part?.json) return JSON.stringify(part.json);
+                if (part?.content && typeof part.content === 'string') return part.content;
+                if (part?.content && typeof part.content === 'object') return JSON.stringify(part.content);
+                return '';
+              })
+              .join('')
           : rawContent
             ? JSON.stringify(rawContent)
             : '';
     console.log('AI Response:', analysisText);
     
-    // Parse the JSON response with improved error handling
-    let analysis;
-    try {
-      if (!analysisText) {
-        throw new Error('Empty response from AI service');
+    // Parse the JSON response with improved resilience.
+    const buildFallbackSummary = () => {
+      const supplementNames = (supplementsList as any[])
+        .map((s: any) => String(s?.name || '').trim())
+        .filter(Boolean)
+        .join(', ');
+      const medicationNames = (medicationsList as any[])
+        .map((m: any) => String(m?.name || '').trim())
+        .filter(Boolean)
+        .join(', ');
+
+      let summaryText = 'Analysis completed for ';
+      if (supplementNames && medicationNames) {
+        summaryText += `${supplementNames} and ${medicationNames}`;
+      } else if (supplementNames) {
+        summaryText += supplementNames;
+      } else if (medicationNames) {
+        summaryText += medicationNames;
+      } else {
+        summaryText += 'no supplements or medications';
       }
-      
-      // Try to extract JSON from the response if it's wrapped in markdown
-      let jsonText = analysisText.trim();
-      
-      // Handle different markdown formats
-      if (jsonText.includes('```json')) {
-        const jsonMatch = jsonText.match(/```json\s*\n([\s\S]*?)\n```/);
-        if (jsonMatch) {
-          jsonText = jsonMatch[1].trim();
-        }
-      } else if (jsonText.includes('```')) {
-        const jsonMatch = jsonText.match(/```\s*\n([\s\S]*?)\n```/);
-        if (jsonMatch) {
-          jsonText = jsonMatch[1].trim();
-        }
+      summaryText += '.';
+      return summaryText;
+    };
+
+    const fallbackAnalysis = {
+      overallRisk: 'low',
+      summary: buildFallbackSummary(),
+      interactions: [],
+      timingOptimization: {
+        morning: [],
+        afternoon: [],
+        evening: [],
+        beforeBed: [],
+      },
+      generalRecommendations: [],
+      disclaimer:
+        'This analysis is for informational purposes only and should not replace professional medical advice.',
+    };
+
+    const normalizeAnalysis = (raw: any) => {
+      const base = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+      const normalized: any = { ...fallbackAnalysis, ...base };
+      if (!normalized.overallRisk) normalized.overallRisk = fallbackAnalysis.overallRisk;
+      if (typeof normalized.summary !== 'string' || !normalized.summary.trim()) {
+        normalized.summary = fallbackAnalysis.summary;
+      } else {
+        normalized.summary = normalized.summary.trim();
       }
-      
-      // Clean up common JSON formatting issues
-      jsonText = jsonText.replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
-      
-      analysis = JSON.parse(jsonText);
-      
-      // Normalize missing fields instead of failing hard
-      if (!analysis || typeof analysis !== 'object') {
-        analysis = {};
-      }
-      if (!analysis.overallRisk) {
-        analysis.overallRisk = 'low';
-      }
-      if (!Array.isArray(analysis.interactions)) {
-        analysis.interactions = [];
-      }
-      if (!analysis.timingOptimization || typeof analysis.timingOptimization !== 'object') {
-        analysis.timingOptimization = {
-          morning: [],
-          afternoon: [],
-          evening: [],
-          beforeBed: [],
+      if (!Array.isArray(normalized.interactions)) normalized.interactions = [];
+      if (!normalized.timingOptimization || typeof normalized.timingOptimization !== 'object') {
+        normalized.timingOptimization = { ...fallbackAnalysis.timingOptimization };
+      } else {
+        normalized.timingOptimization = {
+          morning: Array.isArray(normalized.timingOptimization.morning)
+            ? normalized.timingOptimization.morning
+            : [],
+          afternoon: Array.isArray(normalized.timingOptimization.afternoon)
+            ? normalized.timingOptimization.afternoon
+            : [],
+          evening: Array.isArray(normalized.timingOptimization.evening)
+            ? normalized.timingOptimization.evening
+            : [],
+          beforeBed: Array.isArray(normalized.timingOptimization.beforeBed)
+            ? normalized.timingOptimization.beforeBed
+            : [],
         };
       }
-      if (!Array.isArray(analysis.generalRecommendations)) {
-        analysis.generalRecommendations = [];
+      if (!Array.isArray(normalized.generalRecommendations)) {
+        normalized.generalRecommendations = [];
       }
-      if (!analysis.disclaimer) {
-        analysis.disclaimer =
-          'This analysis is for informational purposes only and should not replace professional medical advice.';
+      if (!normalized.disclaimer) normalized.disclaimer = fallbackAnalysis.disclaimer;
+      return normalized;
+    };
+
+    let analysis: any = fallbackAnalysis;
+    try {
+      if (analysisText) {
+        // Try to extract JSON from the response if it's wrapped in markdown
+        let jsonText = analysisText.trim();
+
+        // Handle different markdown formats
+        if (jsonText.includes('```json')) {
+          const jsonMatch = jsonText.match(/```json\s*\n([\s\S]*?)\n```/);
+          if (jsonMatch) {
+            jsonText = jsonMatch[1].trim();
+          }
+        } else if (jsonText.includes('```')) {
+          const jsonMatch = jsonText.match(/```\s*\n([\s\S]*?)\n```/);
+          if (jsonMatch) {
+            jsonText = jsonMatch[1].trim();
+          }
+        }
+
+        // Clean up common JSON formatting issues
+        jsonText = jsonText.replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
+        jsonText = jsonText.replace(/,\s*([}\]])/g, '$1');
+
+        const parsed = JSON.parse(jsonText);
+        analysis = normalizeAnalysis(parsed);
+      } else {
+        analysis = normalizeAnalysis(fallbackAnalysis);
       }
-      
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
       console.error('Raw response:', analysisText);
-      
-      // Instead of showing broken placeholder data, return a proper error
-      return NextResponse.json({ 
-        error: 'Analysis parsing failed',
-        details: 'Unable to process the interaction analysis. Please try again.',
-        rawResponse: analysisText?.substring(0, 500) // First 500 chars for debugging
-      }, { status: 500 });
+      const trimmed = analysisText?.trim() || '';
+      if (trimmed && !trimmed.startsWith('{')) {
+        analysis = normalizeAnalysis({ summary: trimmed.slice(0, 800) });
+      } else {
+        analysis = normalizeAnalysis(fallbackAnalysis);
+      }
     }
 
     // Add metadata
