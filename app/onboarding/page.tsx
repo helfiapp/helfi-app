@@ -6688,19 +6688,41 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
       try {
         setNameLoading(true);
         setNameError(null);
+        console.log('Starting medication search for:', query);
+        
         // Search both external APIs and user-uploaded catalog
         const [externalResponse, catalogResponse] = await Promise.all([
-          fetch(`/api/medication-search?q=${encodeURIComponent(query)}`),
-          fetch(`/api/medication-catalog-search?q=${encodeURIComponent(query)}`).catch(() => null)
+          fetch(`/api/medication-search?q=${encodeURIComponent(query)}`).catch(err => {
+            console.error('External medication search fetch error:', err);
+            return { ok: false, json: async () => ({}) };
+          }),
+          fetch(`/api/medication-catalog-search?q=${encodeURIComponent(query)}`).catch(err => {
+            console.warn('Catalog medication search fetch error:', err);
+            return null;
+          })
         ]);
         
-        const externalData = externalResponse.ok ? await externalResponse.json().catch(() => ({})) : {};
-        const catalogData = catalogResponse?.ok ? await catalogResponse.json().catch(() => ({})) : {};
+        console.log('External response status:', externalResponse.ok);
+        console.log('Catalog response:', catalogResponse ? (catalogResponse.ok ? 'ok' : 'failed') : 'null');
+        
+        const externalData = externalResponse.ok ? await externalResponse.json().catch((err) => {
+          console.error('Failed to parse external response:', err);
+          return {};
+        }) : {};
+        const catalogData = catalogResponse?.ok ? await catalogResponse.json().catch((err) => {
+          console.error('Failed to parse catalog response:', err);
+          return {};
+        }) : {};
+        
+        console.log('External data:', externalData);
+        console.log('Catalog data:', catalogData);
         
         // Combine results: catalog first (user-uploaded), then external APIs
         const catalogResults = Array.isArray(catalogData?.results) ? catalogData.results : [];
         const externalResults = Array.isArray(externalData?.results) ? externalData.results : [];
         const combined = [...catalogResults, ...externalResults];
+        
+        console.log('Combined results before dedupe:', combined.length, combined);
         
         // Dedupe by name
         const seen = new Set<string>();
@@ -6715,7 +6737,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
           source: String(item?.source || 'unknown')
         }));
         
-        console.log('Medication search results:', { query, deduped });
+        console.log('Medication search results after dedupe:', { query, count: deduped.length, deduped });
         setNameSuggestions(deduped);
       } catch (error) {
         console.error('Medication search failed:', error);

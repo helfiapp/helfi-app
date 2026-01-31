@@ -49,20 +49,26 @@ export async function GET(request: NextRequest) {
       const rxUrl = `https://rxnav.nlm.nih.gov/REST/approximateTerm.json?term=${encodeURIComponent(
         query
       )}&maxEntries=10`
-      const rxResponse = await fetch(rxUrl, { headers: { Accept: 'application/json' } })
+      const rxResponse = await fetch(rxUrl, { 
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+      })
       if (rxResponse.ok) {
         const rxData = await rxResponse.json().catch(() => ({}))
         const candidates = rxData?.approximateGroup?.candidate
         const list = Array.isArray(candidates) ? candidates : candidates ? [candidates] : []
         list.forEach((c: any) => {
           const name = String(c?.name || '').trim()
-          if (name) {
+          if (name && name.length > 0) {
             results.push({ name, source: 'rxnorm' })
           }
         })
+        console.log(`RxNorm search for "${query}": found ${results.length} results`)
+      } else {
+        console.warn(`RxNorm search failed with status ${rxResponse.status}`)
       }
     } catch (error) {
-      console.warn('RxNorm search failed:', error)
+      console.error('RxNorm search error:', error)
     }
 
     // openFDA fallback
@@ -74,7 +80,10 @@ export async function GET(request: NextRequest) {
         const fdaUrl = `https://api.fda.gov/drug/label.json?search=${encodeURIComponent(
           search
         )}&limit=10`
-        const fdaResponse = await fetch(fdaUrl, { headers: { Accept: 'application/json' } })
+        const fdaResponse = await fetch(fdaUrl, { 
+          headers: { Accept: 'application/json' },
+          cache: 'no-store'
+        })
         if (fdaResponse.ok) {
           const fdaData = await fdaResponse.json().catch(() => ({}))
           const fdaResults = Array.isArray(fdaData?.results) ? fdaData.results : []
@@ -82,17 +91,21 @@ export async function GET(request: NextRequest) {
             const brand = item?.openfda?.brand_name?.[0] || ''
             const generic = item?.openfda?.generic_name?.[0] || ''
             const name = brand && generic ? `${brand} (${generic})` : brand || generic
-            if (name) {
+            if (name && name.length > 0) {
               results.push({ name, source: 'openfda' })
             }
           })
+          console.log(`openFDA search for "${query}": found ${fdaResults.length} results`)
+        } else {
+          console.warn(`openFDA search failed with status ${fdaResponse.status}`)
         }
       } catch (error) {
-        console.warn('openFDA search failed:', error)
+        console.error('openFDA search error:', error)
       }
     }
 
     const payload = { results: dedupeNames(results).slice(0, 10) }
+    console.log(`Medication search for "${query}": returning ${payload.results.length} results`)
     setCached(cacheKey, payload)
     return NextResponse.json(payload)
   } catch (error) {
