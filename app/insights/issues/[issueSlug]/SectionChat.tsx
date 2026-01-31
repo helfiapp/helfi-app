@@ -969,7 +969,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           <div className="relative bg-gradient-to-t from-[#f6f8f7] via-[#f6f8f7]/95 to-transparent pt-8 pb-6">
             <div className="mx-auto max-w-3xl px-4">
               <div className="flex flex-wrap gap-4 text-[11px] text-gray-500 mb-3">
-                <span>AI replies use credits (billed at 2× OpenAI cost). Cost depends on length.</span>
+                <span>AI replies use credits (billed at 2× model cost). Cost depends on length.</span>
                 {currentCharge && (
                   <span>
                     {currentCharge.covered ? 'Estimated' : 'Charged'}{' '}

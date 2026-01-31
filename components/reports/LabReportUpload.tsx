@@ -244,7 +244,7 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
             Upload Laboratory Report
           </h1>
           <p className="text-sm text-gray-600 mb-4">
-            Processing uses AI credits (2× OpenAI cost). Typical: 6–10 credits depending on file length and extraction.
+            Processing uses AI credits (2× model cost). Typical: 6–10 credits depending on file length and extraction.
           </p>
         </>
       )}

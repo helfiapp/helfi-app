@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     const openai = getOpenAIClient()
-    if (!openai) return NextResponse.json({ error: 'OpenAI not configured' }, { status: 500 })
+    if (!openai) return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
 
     const messages = buildBenchmarkMessages(imageUrl)
 

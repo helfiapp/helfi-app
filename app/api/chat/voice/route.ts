@@ -563,7 +563,7 @@ export async function POST(req: NextRequest) {
 
     const openai = getOpenAIClient()
     if (!openai) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+      return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
     }
 
     const user = await prisma.user.findUnique({

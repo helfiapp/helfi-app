@@ -345,7 +345,7 @@ export async function POST(request: NextRequest) {
 
     // Plan/trial gating removed – wallet pre-check governs access (trial counters still updated later)
 
-    // Prepare the data for OpenAI analysis
+    // Prepare the data for AI analysis
     const supplementList = (supplementsList as any[]).map((s: any) => ({
       name: s.name,
       dosage: s.dosage,
@@ -413,7 +413,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
 
     const openai = getOpenAIClient();
     if (!openai) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+      return NextResponse.json({ error: 'AI service not configured' }, { status: 500 });
     }
 
     const model = "gpt-5.2";

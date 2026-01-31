@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
     .join('\n')
 
   if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+    return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
   }
 
   const cm = new CreditManager(user.id)

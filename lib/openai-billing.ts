@@ -31,7 +31,7 @@ const parseUsdAmount = (value: any): number | null => {
   if (typeof value === 'string') {
     const trimmed = value.trim()
     if (!trimmed) return null
-    // OpenAI cost export sometimes uses stringified numerics like "0E-6176".
+    // AI cost export sometimes uses stringified numerics like "0E-6176".
     const n = Number(trimmed)
     return Number.isFinite(n) ? n : null
   }
@@ -239,7 +239,7 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
   const usageSingle = await tryCall('usage_single', `https://api.openai.com/v1/usage?date=${endDate}`, 'usage', false)
   if (usageSingle) return usageSingle
 
-  errors.push('OpenAI usage totals unavailable for this account; falling back to Helfi logs + rate card estimates.')
+  errors.push('AI usage totals unavailable for this account; falling back to Helfi logs + rate card estimates.')
 
   // If everything failed, return error
   return {
@@ -255,7 +255,7 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
   }
 }
 
-// Helper to compute cost at OpenAI rate card for a batch of tokens.
+// Helper to compute cost at provider rate card for a batch of tokens.
 export function computeCostCentsFromTokens(model: string, promptTokens: number, completionTokens: number): number {
   return openaiCostCentsForTokens(model || 'gpt-4o', {
     promptTokens,

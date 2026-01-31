@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
     // Use OpenAI client (GPT-4o vision) via metered wrapper
     const openai = getOpenAIClient();
     if (!openai) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+      return NextResponse.json({ error: 'AI service not configured' }, { status: 500 });
     }
     
     // Immediate pre-charge (2 credits) before calling the model (skip for free trial)

@@ -1,4 +1,4 @@
-// Centralized cost metering for OpenAI usage.
+// Centralized cost metering for AI usage.
 // Prices are in cents per 1,000 tokens. Defaults reflect public pricing circa mid‑2024/2025.
 // You can override any value by setting an env var like:
 // HELFI_PRICE_GPT4O_INPUT_CENTS_PER_1K, HELFI_PRICE_GPT4O_OUTPUT_CENTS_PER_1K, etc.
@@ -8,13 +8,13 @@ type ModelPrices = {
   outputCentsPer1k: number;
 };
 
-// Global markup multiplier to apply to all computed costs (e.g., 2 = 2x OpenAI cost).
+// Global markup multiplier to apply to all computed costs (e.g., 2 = 2x AI cost).
 // Default is 2x per user request.
 const BILLING_MARKUP_MULTIPLIER = (() => {
   const v = process.env.HELFI_BILLING_MARKUP_MULTIPLIER;
   const n = Number(v);
   if (Number.isFinite(n) && n > 0) return n;
-  return 2; // default: double the OpenAI cost to cover service margin
+  return 2; // default: double the AI cost to cover service margin
 })();
 
 const envNumber = (key: string, fallback: number): number => {
@@ -96,7 +96,7 @@ export function getModelPriceInfo(model: string): ModelPrices {
   return getModelPrices(model);
 }
 
-// Raw OpenAI cost (no markup). Useful for reporting true spend against the vendor bill.
+// Raw AI cost (no markup). Useful for reporting true spend against the vendor bill.
 export function openaiCostCentsForTokens(model: string, usage: TokenUsage): number {
   const { inputCentsPer1k, outputCentsPer1k } = getModelPrices(model);
   const inCost = (usage.promptTokens / 1000) * inputCentsPer1k;

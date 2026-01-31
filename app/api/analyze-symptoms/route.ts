@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     // Basic dependencies
     const openai = getOpenAIClient()
     if (!openai) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+      return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
     }
 
     // Fetch user
@@ -187,7 +187,7 @@ Return two parts:
 
     const content = wrapped.completion.choices?.[0]?.message?.content || ''
     if (!content) {
-      return NextResponse.json({ error: 'No analysis received from OpenAI' }, { status: 500 })
+      return NextResponse.json({ error: 'No analysis received from AI service' }, { status: 500 })
     }
 
     // Try to extract structured JSON block
@@ -290,10 +290,10 @@ Return two parts:
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('insufficient_quota')) {
-        return NextResponse.json({ error: 'OpenAI API quota exceeded. Please check your billing.' }, { status: 429 })
+        return NextResponse.json({ error: 'AI service quota exceeded. Please check your billing.' }, { status: 429 })
       }
       if (error.message.includes('invalid_api_key')) {
-        return NextResponse.json({ error: 'Invalid OpenAI API key. Please check your configuration.' }, { status: 401 })
+        return NextResponse.json({ error: 'Invalid AI service key. Please check your configuration.' }, { status: 401 })
       }
     }
     return NextResponse.json({ error: 'Failed to analyze symptoms' }, { status: 500 })

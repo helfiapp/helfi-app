@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   const contentType = req.headers.get('content-type') || ''
   const openai = getOpenAIClient()
-  if (!openai) return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+  if (!openai) return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
 
   const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown'
   const rateKey = (session.user as any)?.id ? `user:${(session.user as any)?.id}` : `ip:${clientIp}`

@@ -2968,7 +2968,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     { id: 'practitioners', label: 'Practitioners', desc: 'Directory reviews', icon: '🧑‍⚕️' },
     { id: 'affiliates', label: 'Affiliates', desc: 'Applications & payouts', icon: '🤝' },
     { id: 'events', label: 'Events', desc: 'Raw data', icon: '📋' },
-    { id: 'insights', label: 'AI Insights', desc: 'OpenAI analysis', icon: '🤖' },
+    { id: 'insights', label: 'AI Insights', desc: 'AI analysis', icon: '🤖' },
     { id: 'waitlist', label: 'Waitlist', desc: 'Signups', icon: '📧' },
     { id: 'partner-outreach', label: 'Partners', desc: 'Outreach list', icon: '📮' },
     { id: 'users', label: 'Users', desc: 'User stats', icon: '👥' },
@@ -3506,9 +3506,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 <div className="bg-white rounded-lg shadow p-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div>
-                      <div className="font-semibold text-gray-900">Vendor totals (OpenAI)</div>
+                      <div className="font-semibold text-gray-900">Vendor totals (AI provider)</div>
                       <div className="text-xs text-gray-500">
-                        This is the “invoice truth” if OpenAI exposes totals for your account via API. If not, we fall back to Helfi logs below.
+                        This is the “invoice truth” if your AI provider exposes totals for your account via API. If not, we fall back to Helfi logs below.
                       </div>
                     </div>
                     <div className="text-xs text-gray-500">
@@ -3566,7 +3566,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     <div className="text-2xl font-bold text-blue-600">
                       ${((Number(visionUsage?.totals?.rangeCostCentsFromLogs || 0) || 0) / 100).toFixed(2)}
                     </div>
-                    <div className="text-[11px] text-gray-500">From Helfi logs + OpenAI rate card</div>
+                    <div className="text-[11px] text-gray-500">From Helfi logs + provider rate card</div>
                   </div>
                   <div className="bg-white rounded-lg shadow p-4">
                     <div className="text-xs text-gray-500 uppercase">Tokens (P/C)</div>
@@ -3582,7 +3582,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                       ).toLocaleString()}
                     </div>
                     <div className="text-[11px] text-gray-500">
-                      {visionUsage?.billing?.range?.tokenTotals ? 'From OpenAI usage API' : 'From Helfi logs (best-effort)'}
+                      {visionUsage?.billing?.range?.tokenTotals ? 'From provider usage API' : 'From Helfi logs (best-effort)'}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg shadow p-4">
@@ -3614,7 +3614,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   </summary>
                   <div className="p-4 space-y-4">
                     <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-3 text-sm">
-                      Costs use Helfi request logs + OpenAI rate card (no markup). If a feature can't be mapped cleanly you'll see “Not available yet”.
+                      Costs use Helfi request logs + provider rate card (no markup). If a feature can't be mapped cleanly you'll see “Not available yet”.
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -3909,7 +3909,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   </div>
 
                   <div className="text-xs text-gray-500">
-                    Credits are cents. “Billed credits” includes Helfi markup; “Vendor $” is raw estimated OpenAI cost for the same tokens.
+                    Credits are cents. “Billed credits” includes Helfi markup; “Vendor $” is raw estimated provider cost for the same tokens.
                   </div>
                 </div>
               )}
@@ -4600,7 +4600,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">AI-Powered Insights</h3>
-                <p className="text-sm text-gray-600">OpenAI analysis of user behavior patterns</p>
+                <p className="text-sm text-gray-600">AI analysis of user behavior patterns</p>
               </div>
               <button
                 onClick={loadAiInsights}
@@ -4614,7 +4614,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             {loadingInsights ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                <span className="ml-3 text-gray-600">OpenAI is analyzing your user data...</span>
+                <span className="ml-3 text-gray-600">AI is analyzing your user data...</span>
               </div>
             ) : aiInsights ? (
               <div className="prose max-w-none">

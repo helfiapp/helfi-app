@@ -245,7 +245,7 @@ Keep response concise but actionable for app developers.
     
     const openai = getOpenAI()
     if (!openai) {
-      return "OpenAI API key not configured. Cannot generate AI insights."
+      return "AI service not configured. Cannot generate AI insights."
     }
     
     const response: any = await runChatCompletionWithLogging(openai, {
@@ -259,7 +259,7 @@ Keep response concise but actionable for app developers.
     
   } catch (error) {
     console.error('OpenAI Insights Error:', error)
-    return "Error generating AI insights. Please check OpenAI API configuration."
+    return "Error generating AI insights. Please check AI service configuration."
   }
 }
 

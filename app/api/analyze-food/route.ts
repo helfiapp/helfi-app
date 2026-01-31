@@ -2362,9 +2362,9 @@ export async function POST(req: NextRequest) {
     
     // Check if API key is configured
     if (!process.env.OPENAI_API_KEY) {
-      console.log('❌ OpenAI API key not configured');
+      console.log('❌ AI service not configured');
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
+        { error: 'AI service not configured' },
         { status: 500 }
       );
     }
@@ -2915,7 +2915,7 @@ CRITICAL REQUIREMENTS:
     if (!openai) {
       console.log('❌ Failed to create OpenAI client');
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
+        { error: 'AI service not configured' },
         { status: 500 }
       );
     }
@@ -4811,13 +4811,13 @@ CRITICAL REQUIREMENTS:
       
       if (error.message.includes('insufficient_quota')) {
         return NextResponse.json(
-          { error: 'OpenAI API quota exceeded. Please check your billing.' },
+          { error: 'AI service quota exceeded. Please check your billing.' },
           { status: 429 }
         );
       }
       if (error.message.includes('invalid_api_key')) {
         return NextResponse.json(
-          { error: 'Invalid OpenAI API key. Please check your configuration.' },
+          { error: 'Invalid AI service key. Please check your configuration.' },
           { status: 401 }
         );
       }
