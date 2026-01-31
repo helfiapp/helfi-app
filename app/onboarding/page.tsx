@@ -6705,16 +6705,22 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
         // Dedupe by name
         const seen = new Set<string>();
         const deduped = combined.filter((item: any) => {
-          const name = String(item?.name || '').trim().toLowerCase();
-          if (!name || seen.has(name)) return false;
-          seen.add(name);
+          const itemName = String(item?.name || '').trim();
+          const normalizedName = itemName.toLowerCase();
+          if (!itemName || seen.has(normalizedName)) return false;
+          seen.add(normalizedName);
           return true;
-        });
+        }).map((item: any) => ({
+          name: String(item?.name || '').trim(),
+          source: String(item?.source || 'unknown')
+        }));
         
+        console.log('Medication search results:', { query, deduped });
         setNameSuggestions(deduped);
       } catch (error) {
         console.error('Medication search failed:', error);
         setNameError('Search failed. Please try again.');
+        setNameSuggestions([]);
       } finally {
         setNameLoading(false);
       }
