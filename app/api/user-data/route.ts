@@ -9,6 +9,7 @@ import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { computeHydrationGoal } from '@/lib/hydration-goal'
 import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
 import { ensureSupplementCatalogSchema } from '@/lib/supplement-catalog-db'
+import { ensureMedicationCatalogSchema } from '@/lib/medication-catalog-db'
 
 const normalizeTimingList = (timing: any) => {
   if (Array.isArray(timing)) {
@@ -52,22 +53,74 @@ const splitSupplementName = (rawName: string) => {
   return { brand: null, product: cleaned }
 }
 
+const isPlaceholderName = (value: string) => {
+  const safe = String(value || '').trim().toLowerCase()
+  return new Set([
+    'analyzing...',
+    'supplement added',
+    'unknown supplement',
+    'analysis error',
+    'unknown medication',
+    'medication added',
+  ]).has(safe)
+}
+
+const splitMedicationName = (rawName: string) => {
+  const cleaned = String(rawName || '').trim()
+  if (!cleaned) return { brand: null as string | null, product: null as string | null }
+  // Medications might be "Brand (Generic)" or "Generic (Brand)" format
+  if (cleaned.includes('(') && cleaned.includes(')')) {
+    const match = cleaned.match(/^(.+?)\s*\((.+?)\)$/)
+    if (match) {
+      return { brand: match[1].trim() || null, product: match[2].trim() || null }
+    }
+  }
+  // Try "Brand - Product" format
+  const parts = cleaned.split(' - ').map((part) => part.trim()).filter(Boolean)
+  if (parts.length >= 2) {
+    const brand = parts[0] || null
+    const product = parts.slice(1).join(' - ').trim() || null
+    return { brand, product }
+  }
+  return { brand: null, product: cleaned }
+}
+
 const buildSupplementCatalogRows = (supplements: any[], userId: string) => {
   if (!Array.isArray(supplements)) return []
   return supplements
-    .filter((supp: any) => supp && supp.name && (supp.method === 'photo' || supp.imageUrl))
+    .filter((supp: any) => supp && supp.name && String(supp.name || '').trim().length > 0)
     .map((supp: any) => {
       const { brand, product } = splitSupplementName(supp.name)
+      const isPhoto = supp.method === 'photo' || !!supp.imageUrl
       return {
         userId,
         brand,
         product,
         fullName: String(supp.name || '').trim(),
         dosage: String(supp.dosage || '').trim(),
-        source: 'photo',
+        source: isPhoto ? 'photo' : 'manual',
       }
     })
-    .filter((row) => row.fullName)
+    .filter((row) => row.fullName && !isPlaceholderName(row.fullName))
+}
+
+const buildMedicationCatalogRows = (medications: any[], userId: string) => {
+  if (!Array.isArray(medications)) return []
+  return medications
+    .filter((med: any) => med && med.name && String(med.name || '').trim().length > 0)
+    .map((med: any) => {
+      const { brand, product } = splitMedicationName(med.name)
+      const isPhoto = !!med.imageUrl
+      return {
+        userId,
+        brand,
+        product,
+        fullName: String(med.name || '').trim(),
+        dosage: String(med.dosage || '').trim(),
+        source: isPhoto ? 'photo' : 'manual',
+      }
+    })
+    .filter((row) => row.fullName && !isPlaceholderName(row.fullName))
 }
 
 export async function GET(request: NextRequest) {
@@ -1481,6 +1534,32 @@ export async function POST(request: NextRequest) {
           })
         ])
         console.log('✅ Replaced medications via bulk operation:', dedupedMeds.length)
+
+        // Store medications in the catalog for future search (both photo and manual entries)
+        try {
+          await ensureMedicationCatalogSchema()
+          const catalogRows = buildMedicationCatalogRows(dedupedMeds, user.id)
+          if (catalogRows.length > 0) {
+            for (const row of catalogRows) {
+              await prisma.$executeRawUnsafe(`
+                INSERT INTO "MedicationCatalog" ("id", "userId", "brand", "product", "fullName", "dosage", "source", "createdAt", "updatedAt")
+                VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT ("userId", "fullName", "dosage", "source") DO NOTHING
+              `,
+                `med-cat-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                row.userId || null,
+                row.brand || null,
+                row.product || null,
+                row.fullName,
+                row.dosage || '',
+                row.source
+              )
+            }
+            console.log('📚 Stored medication catalog entries:', catalogRows.length)
+          }
+        } catch (catalogError) {
+          console.error('❌ Failed to store medication catalog entries:', catalogError)
+        }
       } else {
         console.log('ℹ️ No medications to update')
       }
