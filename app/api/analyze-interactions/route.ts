@@ -446,31 +446,50 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     }
 
-    const wrapped = await chatCompletionWithCost(openai, {
-      model,
-      messages: [
-        {
-          role: "system",
-          content: "You are a clinical pharmacist with expertise in drug-supplement interactions. Provide accurate, evidence-based analysis while being appropriately cautious about medical advice. Return ONLY valid JSON."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: maxTokens,
-      response_format: { type: "json_object" },
-    } as any);
+    const buildCompletionParams = (useJsonFormat: boolean) => {
+      const params: any = {
+        model,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a clinical pharmacist with expertise in drug-supplement interactions. Provide accurate, evidence-based analysis while being appropriately cautious about medical advice. Return ONLY valid JSON.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: maxTokens,
+      };
+      if (useJsonFormat) {
+        params.response_format = { type: "json_object" };
+      }
+      return params;
+    };
+
+    let wrapped;
+    try {
+      wrapped = await chatCompletionWithCost(openai, buildCompletionParams(true));
+    } catch (error) {
+      const message = String((error as any)?.message || '');
+      const canRetry = /response_format|json_object|invalid.*response|unsupported/i.test(message);
+      if (!canRetry) {
+        throw error;
+      }
+      console.warn('[interaction-analysis] JSON response format failed, retrying without it.');
+      wrapped = await chatCompletionWithCost(openai, buildCompletionParams(false));
+    }
 
     const analysisText = wrapped.completion.choices[0].message.content;
-    console.log('OpenAI Response:', analysisText);
+    console.log('AI Response:', analysisText);
     
     // Parse the JSON response with improved error handling
     let analysis;
     try {
       if (!analysisText) {
-        throw new Error('Empty response from OpenAI');
+        throw new Error('Empty response from AI service');
       }
       
       // Try to extract JSON from the response if it's wrapped in markdown
@@ -500,7 +519,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
       
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response:', parseError);
+      console.error('Failed to parse AI response:', parseError);
       console.error('Raw response:', analysisText);
       
       // Instead of showing broken placeholder data, return a proper error
