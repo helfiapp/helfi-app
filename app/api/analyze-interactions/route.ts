@@ -416,7 +416,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
 
-    const model = reanalysis ? "gpt-4o-mini" : "gpt-4";
+    const model = "gpt-5.2";
 
     let maxTokens = 2000;
     // Wallet pre-check (skip if allowed via free use)
