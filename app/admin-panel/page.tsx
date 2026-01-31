@@ -3545,7 +3545,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                           : 'Not supported'}
                       </div>
                       <div className="text-[11px] text-gray-500">
-                        Endpoint: {visionUsage?.keyStatus?.baseUrl || 'api.openai.com'}
+                        Endpoint: {visionUsage?.keyStatus?.baseUrl ? 'Configured' : 'Unavailable'}
                       </div>
                     </div>
                   </div>

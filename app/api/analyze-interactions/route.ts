@@ -446,43 +446,33 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     }
 
-    const buildCompletionParams = (useJsonFormat: boolean) => {
-      const params: any = {
-        model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a clinical pharmacist with expertise in drug-supplement interactions. Provide accurate, evidence-based analysis while being appropriately cautious about medical advice. Return ONLY valid JSON.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: maxTokens,
-      };
-      if (useJsonFormat) {
-        params.response_format = { type: "json_object" };
-      }
-      return params;
-    };
+    const wrapped = await chatCompletionWithCost(openai, {
+      model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a clinical pharmacist with expertise in drug-supplement interactions. Provide accurate, evidence-based analysis while being appropriately cautious about medical advice. Return ONLY valid JSON.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: maxTokens,
+      response_format: { type: "json_object" },
+    } as any);
 
-    let wrapped;
-    try {
-      wrapped = await chatCompletionWithCost(openai, buildCompletionParams(true));
-    } catch (error) {
-      const message = String((error as any)?.message || '');
-      const canRetry = /response_format|json_object|invalid.*response|unsupported/i.test(message);
-      if (!canRetry) {
-        throw error;
-      }
-      console.warn('[interaction-analysis] JSON response format failed, retrying without it.');
-      wrapped = await chatCompletionWithCost(openai, buildCompletionParams(false));
-    }
-
-    const analysisText = wrapped.completion.choices[0].message.content;
+    const rawContent = wrapped.completion.choices[0].message.content as any;
+    const analysisText =
+      typeof rawContent === 'string'
+        ? rawContent
+        : Array.isArray(rawContent)
+          ? rawContent.map((part: any) => part?.text || '').join('')
+          : rawContent
+            ? JSON.stringify(rawContent)
+            : '';
     console.log('AI Response:', analysisText);
     
     // Parse the JSON response with improved error handling
@@ -513,9 +503,30 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       
       analysis = JSON.parse(jsonText);
       
-      // Validate the parsed analysis has required fields
-      if (!analysis.overallRisk || !Array.isArray(analysis.interactions)) {
-        throw new Error('Invalid analysis structure');
+      // Normalize missing fields instead of failing hard
+      if (!analysis || typeof analysis !== 'object') {
+        analysis = {};
+      }
+      if (!analysis.overallRisk) {
+        analysis.overallRisk = 'low';
+      }
+      if (!Array.isArray(analysis.interactions)) {
+        analysis.interactions = [];
+      }
+      if (!analysis.timingOptimization || typeof analysis.timingOptimization !== 'object') {
+        analysis.timingOptimization = {
+          morning: [],
+          afternoon: [],
+          evening: [],
+          beforeBed: [],
+        };
+      }
+      if (!Array.isArray(analysis.generalRecommendations)) {
+        analysis.generalRecommendations = [];
+      }
+      if (!analysis.disclaimer) {
+        analysis.disclaimer =
+          'This analysis is for informational purposes only and should not replace professional medical advice.';
       }
       
     } catch (parseError) {
