@@ -1956,6 +1956,29 @@ If reminder taps open the wrong page OR the inbox does not clear after a complet
 
 Fix commit: `b93a187e` (2026-01-24)
 
+### 14.2 Check-in Reminder Delivery Parity (Feb 2026 – Locked)
+
+**Goal:** Check-in reminders must be delivered the same way as mood reminders.  
+If mood reminders are working, check-in reminders must work too.
+
+**Why this is locked:**
+- Both reminder types look the same in Settings.
+- Users should never have one working while the other silently fails.
+
+**Required behavior (must not change):**
+1) Check-in reminders must have a reliable server timer that runs every 5 minutes.  
+2) The timer must call `/api/push/scheduler` so check-in reminders are sent on time.  
+3) This must stay in `vercel.json` so it cannot be lost by accident.
+
+**Restore steps if it breaks:**
+1) Open `vercel.json` and confirm this exact cron entry exists:
+   - Path: `/api/push/scheduler`
+   - Schedule: `*/5 * * * *`
+2) Re-deploy and wait until the deployment status is **READY**.
+3) Set two check-in reminders, wait for the next scheduled time, and confirm the alert shows.
+
+**Last stable deployment:** (fill after deploy)
+
 ### Medium and low priority fixes that must stay locked
 - Session lifetime must not be multi-year, and admin logout/revoke must remain available.
 - No fallback default secrets in production. Missing secrets must be flagged, not silently replaced.
