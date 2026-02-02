@@ -9305,6 +9305,11 @@ export default function Onboarding() {
   const goalIntensityTouchedRef = useRef(false);
   const birthdateTouchedRef = useRef(false);
 
+  const markUnsavedChanges = useCallback(() => {
+    setHasGlobalUnsavedChanges(true);
+    exitUpdateTriggeredRef.current = false;
+  }, []);
+
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
   useEffect(() => {
     hasGlobalUnsavedChangesRef.current = hasGlobalUnsavedChanges;
@@ -9915,16 +9920,16 @@ export default function Onboarding() {
         if (allowAutosave) {
           try {
             if (formBaselineRef.current && onboardingGuardSnapshotJson(next) !== formBaselineRef.current) {
-              setHasGlobalUnsavedChanges(true);
+              markUnsavedChanges();
             }
           } catch {
-            setHasGlobalUnsavedChanges(true);
+            markUnsavedChanges();
           }
         }
         return next;
       });
     },
-    [debouncedSave, allowAutosave],
+    [debouncedSave, allowAutosave, markUnsavedChanges],
   );
 
   const userDataSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -10001,10 +10006,10 @@ export default function Onboarding() {
       try {
         const canonical = onboardingGuardSnapshotJson(updatedForm);
         if (!formBaselineRef.current || canonical !== formBaselineRef.current) {
-          setHasGlobalUnsavedChanges(true);
+          markUnsavedChanges();
         }
       } catch {
-        setHasGlobalUnsavedChanges(true);
+        markUnsavedChanges();
       }
       
       // Re-enabled debounced save with safer mechanism
@@ -10416,10 +10421,10 @@ export default function Onboarding() {
         {/* Content */}
         <div className="flex-1 px-4 py-2 pb-20">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} onPartialSave={persistForm} />}
-          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} serverHydrationKey={serverHydrationKey} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
-          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
-          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
-          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} serverHydrationKey={serverHydrationKey} onUnsavedChange={markUnsavedChanges} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={markUnsavedChanges} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={markUnsavedChanges} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={markUnsavedChanges} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onNavigateToAnalysis={(data?: any) => {
             // REAL FIX: Use flushSync to ensure state updates complete before navigation
             if (data) {
