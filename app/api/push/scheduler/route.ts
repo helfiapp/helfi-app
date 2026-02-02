@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { createInboxNotification } from '@/lib/notification-inbox'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { ensureCheckinTables } from '@/app/api/checkins/_db'
 
 // Force dynamic execution - prevent caching for cron jobs
 export const dynamic = 'force-dynamic'
@@ -53,6 +54,8 @@ export async function POST(req: NextRequest) {
   if (process.env.QSTASH_TOKEN) {
     return NextResponse.json({ skipped: 'qstash_enabled' })
   }
+
+  await ensureCheckinTables()
 
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
   const privateKey = process.env.VAPID_PRIVATE_KEY || ''

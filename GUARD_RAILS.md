@@ -1969,15 +1969,20 @@ If mood reminders are working, check-in reminders must work too.
 1) Check-in reminders must have a reliable server timer that runs every 5 minutes.  
 2) The timer must call `/api/push/scheduler` so check-in reminders are sent on time.  
 3) This must stay in `vercel.json` so it cannot be lost by accident.
+4) Check-in reminders must always have a delivery log table available (`ReminderDeliveryLog`).
+   Missing this table breaks check-in reminders even when mood reminders work.
 
 **Restore steps if it breaks:**
 1) Open `vercel.json` and confirm this exact cron entry exists:
    - Path: `/api/push/scheduler`
    - Schedule: `*/5 * * * *`
-2) Re-deploy and wait until the deployment status is **READY**.
-3) Set two check-in reminders, wait for the next scheduled time, and confirm the alert shows.
+2) Confirm the check-in tables are created on every reminder send:
+   - Ensure `ensureCheckinTables()` exists in `app/api/checkins/_db.ts`.
+   - Ensure both `/api/push/dispatch` and `/api/push/scheduler` call it.
+3) Re-deploy and wait until the deployment status is **READY**.
+4) Set two check-in reminders, wait for the next scheduled time, and confirm the alert shows.
 
-**Last stable deployment:** `5a203fb7` (2026-02-01)
+**Last stable deployment:** (fill after deploy)
 
 ### Medium and low priority fixes that must stay locked
 - Session lifetime must not be multi-year, and admin logout/revoke must remain available.

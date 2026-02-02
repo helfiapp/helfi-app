@@ -6,6 +6,7 @@ import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEn
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 import { createInboxNotification } from '@/lib/notification-inbox'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { ensureCheckinTables } from '@/app/api/checkins/_db'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,8 @@ export async function POST(req: NextRequest) {
     if (!userId || !reminderTime || !timezone) {
       return NextResponse.json({ error: 'invalid_payload' }, { status: 400 })
     }
+
+    await ensureCheckinTables()
 
     // Ensure subscription exists
     // await prisma.$executeRawUnsafe(`
