@@ -524,7 +524,7 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
 2) In `app/api/user-data/route.ts`, ensure saving goals also updates `CheckinIssues`.  
 3) Re‑deploy and confirm Health Setup goals stay correct after a refresh.
 
-**Last stable deployment:** (fill after deploy)
+**Last stable deployment:** `edaf0abf` (2026-02-02)
 
 ## 3. Water Intake + Exercise Logging (Jan 2026 – Locked)
 
