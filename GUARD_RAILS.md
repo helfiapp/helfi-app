@@ -1982,7 +1982,7 @@ If mood reminders are working, check-in reminders must work too.
 3) Re-deploy and wait until the deployment status is **READY**.
 4) Set two check-in reminders, wait for the next scheduled time, and confirm the alert shows.
 
-**Last stable deployment:** (fill after deploy)
+**Last stable deployment:** `36b0d743` (2026-02-02)
 
 ### Medium and low priority fixes that must stay locked
 - Session lifetime must not be multi-year, and admin logout/revoke must remain available.
