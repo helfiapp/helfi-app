@@ -9812,15 +9812,31 @@ export default function Onboarding() {
     }
   }, []);
 
+  const warmCacheTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warmCachePendingRef = useRef<any>(null);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!hasMeaningfulCacheData(form)) return;
-    try {
-      sessionStorage.setItem('onboarding:warmForm', JSON.stringify(form));
-      localStorage.setItem('onboarding:durableForm', JSON.stringify(form));
-    } catch (e) {
-      console.warn('Warm form cache write failed', e);
+    warmCachePendingRef.current = form;
+    if (warmCacheTimerRef.current) {
+      clearTimeout(warmCacheTimerRef.current);
     }
+    warmCacheTimerRef.current = setTimeout(() => {
+      const nextForm = warmCachePendingRef.current;
+      warmCachePendingRef.current = null;
+      try {
+        sessionStorage.setItem('onboarding:warmForm', JSON.stringify(nextForm));
+        localStorage.setItem('onboarding:durableForm', JSON.stringify(nextForm));
+      } catch (e) {
+        console.warn('Warm form cache write failed', e);
+      }
+    }, 500);
+    return () => {
+      if (warmCacheTimerRef.current) {
+        clearTimeout(warmCacheTimerRef.current);
+        warmCacheTimerRef.current = null;
+      }
+    };
   }, [form, hasMeaningfulCacheData]);
 
   // If the user is incomplete, show the health-setup modal only on step 1.
@@ -9911,13 +9927,29 @@ export default function Onboarding() {
     [debouncedSave, allowAutosave],
   );
 
+  const userDataSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userDataSyncPendingRef = useRef<any>(null);
   useEffect(() => {
     if (!allowAutosave) return;
-    try {
-      updateUserData(sanitizeUserDataPayload(form));
-    } catch {
-      // Ignore
+    userDataSyncPendingRef.current = form;
+    if (userDataSyncTimerRef.current) {
+      clearTimeout(userDataSyncTimerRef.current);
     }
+    userDataSyncTimerRef.current = setTimeout(() => {
+      const nextForm = userDataSyncPendingRef.current;
+      userDataSyncPendingRef.current = null;
+      try {
+        updateUserData(sanitizeUserDataPayload(nextForm));
+      } catch {
+        // Ignore
+      }
+    }, 300);
+    return () => {
+      if (userDataSyncTimerRef.current) {
+        clearTimeout(userDataSyncTimerRef.current);
+        userDataSyncTimerRef.current = null;
+      }
+    };
   }, [allowAutosave, form, updateUserData]);
 
   // Once autosave is allowed (after data load), push current form to backend to avoid blanks
