@@ -9307,7 +9307,13 @@ export default function Onboarding() {
 
   const markUnsavedChanges = useCallback(() => {
     setHasGlobalUnsavedChanges(true);
+    hasGlobalUnsavedChangesRef.current = true;
     exitUpdateTriggeredRef.current = false;
+    try {
+      (window as any).__helfiOnboardingHasUnsavedChanges = true;
+    } catch {
+      // ignore
+    }
   }, []);
 
   // Expose unsaved state globally so the desktop sidebar can respect it while on Health Setup.
