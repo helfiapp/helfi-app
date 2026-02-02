@@ -4507,19 +4507,6 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
   // Get all available goals (custom + default)
   const allAvailableGoals = [...customGoals, ...defaultGoals];
 
-  // If user has previously saved issues, prefill selections from server
-  React.useEffect(() => {
-    try {
-      fetch('/api/checkins/issues', { cache: 'no-store' as any, credentials: 'same-origin' as any })
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          const names: string[] = Array.isArray(data?.issues) ? data.issues.map((i: any) => String(i.name || '')) : []
-          const unique = Array.from(new Set(names.filter(Boolean)))
-          if (unique.length) setGoals(unique)
-        }).catch(() => {})
-    } catch {}
-  }, [])
-
   // Filter suggestions based on search term
   const getSuggestions = () => {
     if (!searchTerm.trim()) return [];
@@ -4549,16 +4536,6 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
     setShowSuggestions(true);
     setSelectedSuggestionIndex(-1);
   };
-
-  const loadSaved = () => {
-    fetch('/api/checkins/issues', { cache: 'no-store' as any, credentials: 'same-origin' as any })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        const names: string[] = Array.isArray(data?.issues) ? data.issues.map((i: any) => String(i.name || '')) : []
-        const unique = Array.from(new Set(names.filter(Boolean)))
-        if (unique.length) setGoals(unique)
-      }).catch(() => {})
-  }
 
   const handleSearchFocus = () => {
     setShowSuggestions(true);
@@ -4693,9 +4670,7 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
         <p className="mb-6 text-gray-600">
           Search and select the areas you'd like to focus on. You can add custom concerns too! 🎯
         </p>
-        <div className="mb-4">
-          <button onClick={loadSaved} className="text-sm text-helfi-green underline">Load saved choices</button>
-        </div>
+        <div className="mb-4" />
         
         {/* Selected Goals as Chips */}
         {goals.length > 0 && (

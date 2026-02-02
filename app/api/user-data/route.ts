@@ -991,6 +991,49 @@ export async function POST(request: NextRequest) {
           }
         }
         console.log('✅ Updated health goals successfully')
+        // Keep CheckinIssues in sync with saved goals (so check-ins always match goals)
+        try {
+          await prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS CheckinIssues (
+              id TEXT PRIMARY KEY,
+              userId TEXT NOT NULL,
+              name TEXT NOT NULL,
+              polarity TEXT NOT NULL,
+              UNIQUE (userId, name)
+            )
+          `)
+          await prisma.$executeRawUnsafe(`
+            DELETE FROM CheckinIssues a
+            USING CheckinIssues b
+            WHERE a.id > b.id AND a.userId = b.userId AND a.name = b.name
+          `).catch(() => {})
+          await prisma.$executeRawUnsafe(`
+            CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
+          `).catch(() => {})
+          const safeGoals = data.goals.map((g: any) => String(g || '').trim()).filter(Boolean)
+          if (safeGoals.length === 0) {
+            await prisma.$executeRawUnsafe(`DELETE FROM CheckinIssues WHERE userId = $1`, user.id)
+          } else {
+            const placeholders = safeGoals.map((_, idx) => `$${idx + 2}`).join(',')
+            await prisma.$executeRawUnsafe(
+              `DELETE FROM CheckinIssues WHERE userId = $1 AND name NOT IN (${placeholders})`,
+              user.id, ...safeGoals
+            )
+            for (const issueName of safeGoals) {
+              const polarity = /pain|ache|anxiety|depress|fatigue|nausea|bloat|insomnia|brain fog|headache|migraine|cramp|stress|itch|rash|acne|diarrh|constipat|gas|heartburn/i.test(issueName)
+                ? 'negative'
+                : 'positive'
+              const id = crypto.randomUUID()
+              await prisma.$queryRawUnsafe(
+                `INSERT INTO CheckinIssues (id, userId, name, polarity) VALUES ($1,$2,$3,$4)
+                 ON CONFLICT (userId, name) DO UPDATE SET polarity=EXCLUDED.polarity`,
+                id, user.id, issueName, polarity
+              )
+            }
+          }
+        } catch (error) {
+          console.error('❌ Failed to sync CheckinIssues from goals:', error)
+        }
       } else {
         console.log('ℹ️ No health goals to update')
       }

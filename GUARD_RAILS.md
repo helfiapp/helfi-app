@@ -505,6 +505,27 @@ If this breaks again, restore these rules exactly.
 
 ---
 
+## 2.10 Health Goals ↔ Check-in Issues Sync (Feb 2026 – Locked)
+
+**Goal:** Health goals must never be replaced by old check‑in issues.  
+Check‑ins must always mirror the current health goals.
+
+**What broke:**  
+The Health Goals step was loading the check‑in issue list and auto‑saving it back as goals.  
+This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with unrelated items.
+
+**Required behavior (must not change):**
+1) The Health Goals screen must never pull goal data from `/api/checkins/issues`.  
+2) Saving goals must sync the Check‑in Issues table to match those goals.  
+3) If goals change, check‑ins must reflect the new goals automatically.
+
+**Restore steps if it breaks:**
+1) In `app/onboarding/page.tsx`, remove any fetch that loads `/api/checkins/issues` into goals.  
+2) In `app/api/user-data/route.ts`, ensure saving goals also updates `CheckinIssues`.  
+3) Re‑deploy and confirm Health Setup goals stay correct after a refresh.
+
+**Last stable deployment:** (fill after deploy)
+
 ## 3. Water Intake + Exercise Logging (Jan 2026 – Locked)
 
 **Primary scope:**
