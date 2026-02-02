@@ -1014,7 +1014,7 @@ export async function POST(request: NextRequest) {
           if (safeGoals.length === 0) {
             await prisma.$executeRawUnsafe(`DELETE FROM CheckinIssues WHERE userId = $1`, user.id)
           } else {
-            const placeholders = safeGoals.map((_: string, idx) => `$${idx + 2}`).join(',')
+            const placeholders = safeGoals.map((_: string, idx: number) => `$${idx + 2}`).join(',')
             await prisma.$executeRawUnsafe(
               `DELETE FROM CheckinIssues WHERE userId = $1 AND name NOT IN (${placeholders})`,
               user.id, ...safeGoals
