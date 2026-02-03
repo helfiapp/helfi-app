@@ -833,7 +833,17 @@ function slugifyGoal(name: string) {
   return (name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')
 }
 
-function fireAndForgetInsightsRegen(changeTypes: InsightChangeType[], goalNames?: string[]) {
+type FireAndForgetRegenOptions = {
+  onSuccess?: (data: any) => void;
+  onError?: (data: any) => void;
+  onComplete?: () => void;
+};
+
+function fireAndForgetInsightsRegen(
+  changeTypes: InsightChangeType[],
+  goalNames?: string[],
+  options?: FireAndForgetRegenOptions,
+) {
   const unique = Array.from(new Set(changeTypes || [])).filter(Boolean) as InsightChangeType[];
   if (!unique.length) return;
   
@@ -843,7 +853,7 @@ function fireAndForgetInsightsRegen(changeTypes: InsightChangeType[], goalNames?
   const goalSlugs = Array.isArray(goalNames) ? Array.from(new Set(goalNames.map(slugifyGoal).filter(Boolean))) : undefined;
   
   // Show background status
-  showGlobalRegenStatus(true, 'Updating insights in background… it’s safe to navigate elsewhere.');
+  showGlobalRegenStatus(true, 'Updating insights… You can keep using the app.');
   
   // Fire the request but don't await it
   fetch('/api/insights/regenerate-targeted', {
@@ -861,21 +871,27 @@ function fireAndForgetInsightsRegen(changeTypes: InsightChangeType[], goalNames?
         
         if (data.background) {
           // Still processing in background on server
-          showGlobalRegenStatus(true, 'Insights still updating...');
+          showGlobalRegenStatus(true, 'Still finishing your insights...');
           // Clear status after a delay
           setTimeout(() => showGlobalRegenStatus(false), 5000);
         } else {
           // Completed successfully
           showGlobalRegenStatus(false);
         }
+        options?.onSuccess?.(data);
       } else {
         console.warn('Background insights regen failed:', data?.message);
         showGlobalRegenStatus(false);
+        options?.onError?.(data);
       }
     })
     .catch((error) => {
       console.warn('Background insights regen error:', error);
       showGlobalRegenStatus(false);
+      options?.onError?.(error);
+    })
+    .finally(() => {
+      options?.onComplete?.();
     });
 }
 
@@ -9292,6 +9308,8 @@ export default function Onboarding() {
   const pendingNavigationRef = useRef<(() => void) | null>(null);
   const exitUpdateTriggeredRef = useRef(false);
   const triggerInsightsUpdateOnExitRef = useRef<(reason: string) => void>(() => {});
+  const backgroundRegenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastBackgroundRegenSnapshotRef = useRef<string>('');
   const sidebarHandlersRef = useRef<Array<{ el: HTMLAnchorElement; handler: (event: Event) => void }> | null>(null);
   const loadUserDataRef = useRef<
     (options?: { preserveUnsaved?: boolean; timeoutMs?: number }) => Promise<any>
@@ -9458,6 +9476,73 @@ export default function Onboarding() {
       formBaselineRef.current = '';
       formBaselineInitializedRef.current = false;
     }
+  }, []);
+
+  const scheduleBackgroundInsightsRegen = useCallback(
+    (sourceForm?: any) => {
+      if (!AUTO_UPDATE_INSIGHTS_ON_EXIT) return;
+      if (backgroundRegenTimerRef.current) {
+        clearTimeout(backgroundRegenTimerRef.current);
+      }
+
+      backgroundRegenTimerRef.current = setTimeout(() => {
+        backgroundRegenTimerRef.current = null;
+        if (!formBaselineInitializedRef.current) return;
+        const baselineSnapshot = formBaselineRef.current;
+        if (!baselineSnapshot) return;
+        if (exitUpdateTriggeredRef.current) return;
+
+        const candidateForm = formRef.current || sourceForm || {};
+        let candidateSnapshot = '';
+        try {
+          candidateSnapshot = onboardingGuardSnapshotJson(candidateForm);
+        } catch {
+          return;
+        }
+        if (!candidateSnapshot || candidateSnapshot === lastBackgroundRegenSnapshotRef.current) return;
+
+        const changeTypes = detectChangedInsightTypes(baselineSnapshot, candidateForm);
+        if (!changeTypes.length) return;
+
+        const regenSnapshot = candidateSnapshot;
+        lastBackgroundRegenSnapshotRef.current = regenSnapshot;
+        exitUpdateTriggeredRef.current = true;
+
+        fireAndForgetInsightsRegen(changeTypes, undefined, {
+          onSuccess: () => {
+            try {
+              const latestForm = formRef.current || candidateForm || {};
+              const latestSnapshot = onboardingGuardSnapshotJson(latestForm);
+              if (latestSnapshot === regenSnapshot) {
+                setHasGlobalUnsavedChanges(false);
+                hasGlobalUnsavedChangesRef.current = false;
+                try {
+                  (window as any).__helfiOnboardingHasUnsavedChanges = false;
+                } catch {
+                  // ignore
+                }
+                syncFormBaseline(latestForm);
+              }
+            } catch {
+              // ignore
+            }
+          },
+          onError: () => {
+            exitUpdateTriggeredRef.current = false;
+          },
+        });
+      }, 1200);
+    },
+    [syncFormBaseline],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (backgroundRegenTimerRef.current) {
+        clearTimeout(backgroundRegenTimerRef.current);
+        backgroundRegenTimerRef.current = null;
+      }
+    };
   }, []);
 
   const triggerInsightsUpdateOnExit = useCallback((reason: string) => {
@@ -9891,6 +9976,7 @@ export default function Onboarding() {
 
         if (response.ok) {
           console.log('Progress auto-saved to database');
+          scheduleBackgroundInsightsRegen(nextPayload);
         } else {
           console.warn('Failed to auto-save progress:', response.status, response.statusText);
         }
@@ -9899,7 +9985,7 @@ export default function Onboarding() {
       }
     }
     saveInFlightRef.current = false;
-  }, []);
+  }, [scheduleBackgroundInsightsRegen]);
 
   const persistForm = useCallback(
     (partial: any) => {
@@ -10609,13 +10695,13 @@ export default function Onboarding() {
 
         {/* Background Regen Status Indicator */}
         {backgroundRegenStatus.isRegenerating && (
-          <div className="fixed bottom-20 md:bottom-4 left-1/2 transform -translate-x-1/2 z-50 animate-in fade-in duration-300 pointer-events-none">
-            <div className="bg-gray-900 text-white px-4 py-2 rounded-full shadow-lg flex items-center space-x-2">
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in duration-300 pointer-events-none">
+            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-gradient-to-r from-slate-900/90 to-slate-800/90 px-4 py-2.5 text-sm text-white shadow-[0_10px_30px_rgba(0,0,0,0.25)] backdrop-blur max-w-[90vw]">
+              <svg className="h-4 w-4 animate-spin text-emerald-200/90" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span className="text-sm font-medium">{backgroundRegenStatus.message || 'Updating insights...'}</span>
+              <span className="font-medium leading-snug">{backgroundRegenStatus.message || 'Updating insights...'}</span>
             </div>
           </div>
         )}

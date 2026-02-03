@@ -17,6 +17,7 @@ protected areas listed below.
 - Warm + durable caching keeps onboarding fields (including birthdate) loaded immediately; do not strip this cache.
 - Leave the current per-step targeted update buttons as-is; do not change when the popup appears or how it blocks navigation.
 - Auto-update on exit must **re-arm** after new edits. If a user makes more changes later in the same session, background update must still run when they leave.
+- Background insights refresh must also trigger after a successful autosave (debounced) so users see the “Updating insights…” toast even if they stay on the page. Do not remove this fallback.
 - Pending request for the next agent (do not implement without explicit user approval): force per-step insights regeneration to always call the model and charge tokens (no cache reuse). Only the edited step’s change type should be regenerated; do NOT switch to full “regen all sections,” and keep the current guards/prompt behaviour intact.
 
 Restore steps if background updates stop after the first exit:
