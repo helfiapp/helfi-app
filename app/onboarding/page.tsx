@@ -9529,6 +9529,7 @@ export default function Onboarding() {
           },
           onError: () => {
             exitUpdateTriggeredRef.current = false;
+            lastBackgroundRegenSnapshotRef.current = '';
           },
         });
       }, 1200);
