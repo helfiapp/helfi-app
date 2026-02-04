@@ -39,6 +39,9 @@ export default function CheckInPage() {
   useEffect(() => {
     const CACHE_KEY = 'checkins:today:cache'
     const CACHE_TTL_MS = 5 * 60_000
+    const forceBlank =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('new') === '1'
 
     const readCache = (): TodayCache | null => {
       if (typeof window === 'undefined') return null
@@ -62,18 +65,18 @@ export default function CheckInPage() {
       }
     }
 
-    const cached = readCache()
-    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    const cached = forceBlank ? null : readCache()
+    const cacheFresh = cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS
+    if (cached && cacheFresh) {
       setIssues(cached.issues || [])
       setRatings(cached.ratings || {})
       setNotes(cached.notes || {})
       setNa(cached.na || {})
       setLoading(false)
-      return
     }
 
     // Load actual issues if API is available
-    setLoading(true)
+    if (!cacheFresh) setLoading(true)
     fetch('/api/checkins/today', { cache: 'no-store' as any })
       .then(r => r.json())
       .then((data) => {
@@ -91,19 +94,25 @@ export default function CheckInPage() {
             setIssues(unique)
           }
         }
-        if (Array.isArray(data?.ratings)) {
+        if (!forceBlank && Array.isArray(data?.ratings)) {
           const map: Record<string, number | null> = {}
           for (const r of data.ratings) map[r.issueId] = r.value
           nextRatings = map
           setRatings(map)
+        } else if (forceBlank) {
+          setRatings({})
+          setNotes({})
+          setNa({})
         }
-        writeCache({
-          issues: nextIssues,
-          ratings: nextRatings,
-          notes: {},
-          na: {},
-          fetchedAt: Date.now(),
-        })
+        if (!forceBlank) {
+          writeCache({
+            issues: nextIssues,
+            ratings: nextRatings,
+            notes: {},
+            na: {},
+            fetchedAt: Date.now(),
+          })
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false))

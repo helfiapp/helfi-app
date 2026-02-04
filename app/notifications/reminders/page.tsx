@@ -278,35 +278,46 @@ export default function ReminderSettingsPage() {
   }, [moodCacheKey, moodSaving, moodEnabled, moodFrequency, moodTime1, moodTime2, moodTime3, moodTime4, moodTimezone])
 
   useEffect(() => {
+    const applyCheckins = (data: any, options?: { setSnapshot?: boolean }) => {
+      if (!data) return
+      const enabled = typeof data.enabled === 'boolean' ? data.enabled : true
+      const time1 = normalizeTime(data.time1 || '12:30', '12:30')
+      const time2 = normalizeTime(data.time2 || '18:30', '18:30')
+      const time3 = normalizeTime(data.time3 || '21:30', '21:30')
+      const time4 = normalizeTime(data.time4 || '09:00', '09:00')
+      const timezone = String(data.timezone || 'Australia/Melbourne')
+      const maxFreq = Number(data.maxFrequency) || 1
+      const frequency = Math.min(Math.max(1, Number(data.frequency) || 1), maxFreq)
+
+      if (options?.setSnapshot) {
+        const snapshot = JSON.stringify({ enabled, time1, time2, time3, time4, timezone, frequency })
+        checkinsSnapshotRef.current = snapshot
+        checkinsDirtyRef.current = false
+        setCheckinsUnsaved(false)
+      }
+
+      setCheckinsEnabled(enabled)
+      setCheckinsTime1(time1)
+      setCheckinsTime2(time2)
+      setCheckinsTime3(time3)
+      setCheckinsTime4(time4)
+      setCheckinsTz(timezone)
+      setCheckinsMaxFrequency(maxFreq)
+      setCheckinsFrequency(frequency)
+    }
+
     const cached = checkinsCacheKey ? readClientCache<any>(checkinsCacheKey) : null
     if (cached?.data) {
-      const data = cached.data
-      if (typeof data.enabled === 'boolean') setCheckinsEnabled(data.enabled)
-      if (data.time1) setCheckinsTime1(normalizeTime(data.time1, '12:30'))
-      if (data.time2) setCheckinsTime2(normalizeTime(data.time2, '18:30'))
-      if (data.time3) setCheckinsTime3(normalizeTime(data.time3, '21:30'))
-      if (data.time4) setCheckinsTime4(normalizeTime(data.time4, '09:00'))
-      if (data.timezone) setCheckinsTz(String(data.timezone))
-      if (data.frequency !== undefined) setCheckinsFrequency(Number(data.frequency) || 1)
-      if (data.maxFrequency !== undefined) setCheckinsMaxFrequency(Number(data.maxFrequency) || 1)
+      applyCheckins(cached.data)
       setCheckinsLoading(false)
     }
-    if (cached && isCacheFresh(cached, CHECKINS_CACHE_TTL_MS)) return
 
     ;(async () => {
       try {
         const res = await fetch('/api/checkins/settings', { cache: 'no-store' as any })
         if (res.ok) {
           const data = await res.json()
-          if (typeof data.enabled === 'boolean') setCheckinsEnabled(data.enabled)
-          setCheckinsTime1(normalizeTime(data.time1 || '12:30', '12:30'))
-          setCheckinsTime2(normalizeTime(data.time2 || '18:30', '18:30'))
-          setCheckinsTime3(normalizeTime(data.time3 || '21:30', '21:30'))
-          setCheckinsTime4(normalizeTime(data.time4 || '09:00', '09:00'))
-          setCheckinsTz(String(data.timezone || 'Australia/Melbourne'))
-          const maxFreq = Number(data.maxFrequency) || 1
-          setCheckinsMaxFrequency(maxFreq)
-          setCheckinsFrequency(Math.min(Math.max(1, Number(data.frequency) || 1), maxFreq))
+          applyCheckins(data, { setSnapshot: true })
           if (checkinsCacheKey) writeClientCache(checkinsCacheKey, data)
         }
       } catch {}
@@ -315,35 +326,46 @@ export default function ReminderSettingsPage() {
   }, [checkinsCacheKey])
 
   useEffect(() => {
+    const applyMood = (data: any, options?: { setSnapshot?: boolean }) => {
+      if (!data) return
+      const enabled = !!data.enabled
+      const time1 = normalizeTime(data.time1 || '20:00', '20:00')
+      const time2 = normalizeTime(data.time2 || '12:00', '12:00')
+      const time3 = normalizeTime(data.time3 || '18:00', '18:00')
+      const time4 = normalizeTime(data.time4 || '09:00', '09:00')
+      const timezone = (data.timezone && String(data.timezone).trim()) || deviceTimezone || 'UTC'
+      const maxFreq = Number(data.maxFrequency) || 1
+      const frequency = Math.min(Math.max(1, Number(data.frequency) || 1), maxFreq)
+
+      if (options?.setSnapshot) {
+        const snapshot = JSON.stringify({ enabled, frequency, time1, time2, time3, time4, timezone })
+        moodSnapshotRef.current = snapshot
+        moodDirtyRef.current = false
+        setMoodUnsaved(false)
+      }
+
+      setMoodEnabled(enabled)
+      setMoodTime1(time1)
+      setMoodTime2(time2)
+      setMoodTime3(time3)
+      setMoodTime4(time4)
+      setMoodTimezone(timezone)
+      setMoodMaxFrequency(maxFreq)
+      setMoodFrequency(frequency)
+    }
+
     const cached = moodCacheKey ? readClientCache<any>(moodCacheKey) : null
     if (cached?.data) {
-      const data = cached.data
-      setMoodEnabled(!!data.enabled)
-      setMoodFrequency(Number(data.frequency) || 1)
-      setMoodTime1(normalizeTime(data.time1 || '20:00', '20:00'))
-      setMoodTime2(normalizeTime(data.time2 || '12:00', '12:00'))
-      setMoodTime3(normalizeTime(data.time3 || '18:00', '18:00'))
-      setMoodTime4(normalizeTime(data.time4 || '09:00', '09:00'))
-      setMoodTimezone((data.timezone && String(data.timezone).trim()) || deviceTimezone || 'UTC')
-      if (data.maxFrequency !== undefined) setMoodMaxFrequency(Number(data.maxFrequency) || 1)
+      applyMood(cached.data)
       setMoodLoading(false)
     }
-    if (cached && isCacheFresh(cached, MOOD_CACHE_TTL_MS)) return
 
     ;(async () => {
       try {
         const res = await fetch('/api/mood/reminders', { cache: 'no-store' as any })
         if (res.ok) {
           const data = await res.json()
-          setMoodEnabled(!!data.enabled)
-          setMoodTime1(normalizeTime(data.time1 || '20:00', '20:00'))
-          setMoodTime2(normalizeTime(data.time2 || '12:00', '12:00'))
-          setMoodTime3(normalizeTime(data.time3 || '18:00', '18:00'))
-          setMoodTime4(normalizeTime(data.time4 || '09:00', '09:00'))
-          setMoodTimezone((data.timezone && String(data.timezone).trim()) || deviceTimezone || 'UTC')
-          const maxFreq = Number(data.maxFrequency) || 1
-          setMoodMaxFrequency(maxFreq)
-          setMoodFrequency(Math.min(Math.max(1, Number(data.frequency) || 1), maxFreq))
+          applyMood(data, { setSnapshot: true })
           if (moodCacheKey) writeClientCache(moodCacheKey, data)
         }
       } catch {}
