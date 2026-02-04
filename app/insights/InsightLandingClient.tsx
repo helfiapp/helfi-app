@@ -311,6 +311,12 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         )
         return
       }
+      const hasSchedule = Boolean(data?.nextReportDueAt || data?.reportsEnabledAt)
+      if (!hasSchedule) {
+        setCreateReportError(true)
+        setCreateReportMessage('We could not set the weekly schedule. Please try again in a minute.')
+        return
+      }
       setWeeklyStatus((prev: any) => {
         const safePrev = prev || {}
         return {

@@ -132,6 +132,15 @@ function readRowValue(row: any, key: string) {
   return row[lower]
 }
 
+function normalizeBool(value: unknown): boolean | null {
+  if (value === true || value === false) return value
+  if (value === 1 || value === '1') return true
+  if (value === 0 || value === '0') return false
+  if (value === 't' || value === 'true' || value === 'TRUE') return true
+  if (value === 'f' || value === 'false' || value === 'FALSE') return false
+  return null
+}
+
 function normalizeReportRow(row: any): WeeklyReportRecord | null {
   if (!row) return null
   const periodStart = readRowValue(row, 'periodStart')
@@ -179,7 +188,8 @@ function normalizeStateRow(row: any): WeeklyReportState | null {
   const lastAttemptAt = readRowValue(row, 'lastAttemptAt')
   const reportsEnabledAt = readRowValue(row, 'reportsEnabledAt')
   const reportsEnabledRaw = readRowValue(row, 'reportsEnabled')
-  const reportsEnabled = reportsEnabledRaw !== undefined ? Boolean(reportsEnabledRaw) : nextReportDueAt != null
+  const parsed = normalizeBool(reportsEnabledRaw)
+  const reportsEnabled = parsed !== null ? parsed : nextReportDueAt != null
   return {
     userId: readRowValue(row, 'userId'),
     onboardingCompletedAt: onboardingCompletedAt ? new Date(onboardingCompletedAt).toISOString() : null,
@@ -285,13 +295,37 @@ export async function setWeeklyReportsEnabled(
   const now = new Date()
   const scheduleFrom = options?.scheduleFrom ?? now
   const existing = await getWeeklyReportState(userId)
-  const nextDueAt = enabled ? getNextDueAt(scheduleFrom).toISOString() : null
-  return upsertWeeklyReportState(userId, {
+  const nextDueAt = enabled ? getNextDueAt(scheduleFrom) : null
+  const nextDueIso = nextDueAt ? nextDueAt.toISOString() : null
+  const updated = await upsertWeeklyReportState(userId, {
     onboardingCompletedAt: existing?.onboardingCompletedAt ?? now.toISOString(),
     reportsEnabledAt: enabled ? now.toISOString() : existing?.reportsEnabledAt ?? null,
-    nextReportDueAt: nextDueAt,
+    nextReportDueAt: nextDueIso,
     lastStatus: enabled ? 'scheduled' : 'disabled',
   })
+  if (!enabled) {
+    return updated
+  }
+  if (updated?.nextReportDueAt) {
+    return updated
+  }
+  try {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO WeeklyHealthReportState (userId, nextReportDueAt, reportsEnabled, reportsEnabledAt, lastStatus)
+       VALUES ($1, $2, TRUE, $3, 'scheduled')
+       ON CONFLICT (userId)
+       DO UPDATE SET nextReportDueAt = EXCLUDED.nextReportDueAt,
+                    reportsEnabled = TRUE,
+                    reportsEnabledAt = COALESCE(WeeklyHealthReportState.reportsEnabledAt, EXCLUDED.reportsEnabledAt),
+                    lastStatus = 'scheduled'`,
+      userId,
+      nextDueIso,
+      now.toISOString()
+    )
+  } catch (error) {
+    console.warn('[weekly-report] Failed to force schedule', error)
+  }
+  return getWeeklyReportState(userId)
 }
 
 export async function createWeeklyReportRecord(params: {
