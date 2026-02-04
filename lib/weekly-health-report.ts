@@ -243,18 +243,32 @@ export async function upsertWeeklyReportState(
       `DELETE FROM WeeklyHealthReportState WHERE userId = $1`,
       merged.userId
     )
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus, reportsEnabled, reportsEnabledAt)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      merged.userId,
-      merged.onboardingCompletedAt,
-      merged.nextReportDueAt,
-      merged.lastReportAt,
-      merged.lastAttemptAt,
-      merged.lastStatus,
-      merged.reportsEnabled,
-      merged.reportsEnabledAt
-    )
+    try {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus, reportsEnabled, reportsEnabledAt)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        merged.userId,
+        merged.onboardingCompletedAt,
+        merged.nextReportDueAt,
+        merged.lastReportAt,
+        merged.lastAttemptAt,
+        merged.lastStatus,
+        merged.reportsEnabled,
+        merged.reportsEnabledAt
+      )
+    } catch (error) {
+      console.warn('[weekly-report] Insert failed with reportsEnabled columns, retrying basic insert', error)
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        merged.userId,
+        merged.onboardingCompletedAt,
+        merged.nextReportDueAt,
+        merged.lastReportAt,
+        merged.lastAttemptAt,
+        merged.lastStatus
+      )
+    }
     return merged
   } catch (error) {
     console.warn('[weekly-report] Failed to upsert state', error)
