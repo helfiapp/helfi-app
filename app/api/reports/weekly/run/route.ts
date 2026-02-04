@@ -1256,6 +1256,126 @@ function shrinkModelPayload(payload: any, maxChars: number) {
   return { payload: slimmed, json: slimJson, size: slimJson.length }
 }
 
+function buildMinimalModelPayload(payload: any) {
+  const limit = (list: any, max: number) => (Array.isArray(list) ? list.slice(0, max) : [])
+  return {
+    periodStart: payload.periodStart,
+    periodEnd: payload.periodEnd,
+    timezone: payload.timezone,
+    profile: payload.profile,
+    goals: limit(payload.goals, 5),
+    issues: limit(payload.issues, 5),
+    healthSituations: clipText(payload.healthSituations || '', 280),
+    allergies: limit(payload.allergies, 4),
+    diabetesType: payload.diabetesType,
+    supplements: limit(payload.supplements, 6),
+    medications: limit(payload.medications, 6),
+    sectionSignals: payload.sectionSignals,
+    nutritionSummary: payload.nutritionSummary
+      ? {
+          dailyAverages: payload.nutritionSummary.dailyAverages,
+          topFoods: limit(payload.nutritionSummary.topFoods, 3),
+          daysWithLogs: payload.nutritionSummary.daysWithLogs,
+        }
+      : null,
+    hydrationSummary: payload.hydrationSummary
+      ? {
+          dailyAverageMl: payload.hydrationSummary.dailyAverageMl,
+          daysWithLogs: payload.hydrationSummary.daysWithLogs,
+        }
+      : null,
+    exerciseSummary: payload.exerciseSummary
+      ? {
+          totalMinutes: payload.exerciseSummary.totalMinutes,
+          sessions: payload.exerciseSummary.sessions,
+          daysActive: payload.exerciseSummary.daysActive,
+        }
+      : null,
+    moodSummary: payload.moodSummary
+      ? {
+          averageMood: payload.moodSummary.averageMood,
+          entries: payload.moodSummary.entries,
+          daysWithLogs: payload.moodSummary.daysWithLogs,
+        }
+      : null,
+    symptomSummary: payload.symptomSummary
+      ? {
+          entries: payload.symptomSummary.entries,
+          uniqueSymptoms: payload.symptomSummary.uniqueSymptoms,
+          topSymptoms: limit(payload.symptomSummary.topSymptoms, 3),
+        }
+      : null,
+    checkinSummary: payload.checkinSummary
+      ? {
+          goals: limit(payload.checkinSummary.goals, 3),
+          notes: limit(payload.checkinSummary.notes, 2),
+        }
+      : null,
+    labHighlights: limit(payload.labHighlights, 3),
+    labTrends: limit(payload.labTrends, 2),
+    journalHighlights: limit(payload.journalHighlights, 2),
+    talkToAi: payload.talkToAi
+      ? {
+          userMessageCount: payload.talkToAi.userMessageCount,
+          activeDays: payload.talkToAi.activeDays,
+          topics: limit(payload.talkToAi.topics, 2),
+          highlights: limit(payload.talkToAi.highlights, 1),
+        }
+      : null,
+    insightCandidates: limit(payload.insightCandidates, 12),
+    trendSignals: limit(payload.trendSignals, 4),
+    riskFlags: limit(payload.riskFlags, 4),
+    dataFlags: payload.dataFlags,
+    coverage: payload.coverage,
+  }
+}
+
+function buildUltraMinimalModelPayload(payload: any) {
+  const limit = (list: any, max: number) => (Array.isArray(list) ? list.slice(0, max) : [])
+  return {
+    periodStart: payload.periodStart,
+    periodEnd: payload.periodEnd,
+    timezone: payload.timezone,
+    goals: limit(payload.goals, 4),
+    issues: limit(payload.issues, 4),
+    healthSituations: clipText(payload.healthSituations || '', 200),
+    supplements: limit(payload.supplements, 4),
+    medications: limit(payload.medications, 4),
+    insightCandidates: limit(payload.insightCandidates, 10),
+    riskFlags: limit(payload.riskFlags, 3),
+    journalHighlights: limit(payload.journalHighlights, 1),
+    talkToAi: payload.talkToAi
+      ? {
+          userMessageCount: payload.talkToAi.userMessageCount,
+          topics: limit(payload.talkToAi.topics, 1),
+        }
+      : null,
+    coverage: payload.coverage,
+  }
+}
+
+function prepareModelPayload(payload: any, maxChars: number) {
+  const originalJson = safeJsonStringify(payload)
+  if (originalJson.length <= maxChars) {
+    return { payload, json: originalJson, size: originalJson.length, stage: 'full' as const }
+  }
+
+  const slimmed = shrinkModelPayload(payload, maxChars)
+  if (slimmed.size <= maxChars) {
+    return { ...slimmed, stage: 'slim' as const }
+  }
+
+  const minimalPayload = buildMinimalModelPayload(payload)
+  const minimalJson = safeJsonStringify(minimalPayload)
+  if (minimalJson.length <= maxChars) {
+    return { payload: minimalPayload, json: minimalJson, size: minimalJson.length, stage: 'minimal' as const }
+  }
+
+  const ultraPayload = buildUltraMinimalModelPayload(payload)
+  const ultraJson = safeJsonStringify(ultraPayload)
+  return { payload: ultraPayload, json: ultraJson, size: ultraJson.length, stage: 'ultra' as const }
+}
+
 function buildTalkToAiSummary(
   messages: Array<{ role: string; content: string; createdAt: Date }>
 ) {
@@ -2772,9 +2892,10 @@ export async function POST(request: NextRequest) {
   })
   const MAX_LLM_CONTEXT_CHARS = 120000
   const modelInput = buildModelInput({ ...reportSignals, coverage })
-  const modelPayload = shrinkModelPayload(modelInput, MAX_LLM_CONTEXT_CHARS)
-  const llmPayloadJson = modelPayload.json
-  const llmPayloadSize = modelPayload.size
+  const preparedPayload = prepareModelPayload(modelInput, MAX_LLM_CONTEXT_CHARS)
+  const llmPayloadJson = preparedPayload.json
+  const llmPayloadSize = preparedPayload.size
+  const llmPayloadStage = preparedPayload.stage
 
   const rawModel = String(process.env.OPENAI_WEEKLY_REPORT_MODEL || '').trim()
   const model = rawModel.toLowerCase().includes('gpt-5.2') ? rawModel : 'gpt-5.2-chat-latest'
@@ -2885,6 +3006,7 @@ ${llmPayloadJson}
     console.warn('[weekly-report] LLM payload too large', {
       size: llmPayloadSize,
       max: MAX_LLM_CONTEXT_CHARS,
+      stage: llmPayloadStage,
     })
   }
 
@@ -2965,6 +3087,7 @@ ${llmPayloadJson}
         llmChargeCents: chargeCents,
         llmPayloadSize,
         llmPayloadMax: MAX_LLM_CONTEXT_CHARS,
+        llmPayloadStage,
         lockedReason: 'insufficient_credits',
       },
       report: null,
@@ -3001,6 +3124,7 @@ ${llmPayloadJson}
       llmChargeCents: chargeCents,
       llmPayloadSize,
       llmPayloadMax: MAX_LLM_CONTEXT_CHARS,
+      llmPayloadStage,
       ...(chargeFailed ? { chargeSkipped: true } : {}),
     },
     report: reportPayload,
