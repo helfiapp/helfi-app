@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete } from '@/lib/weekly-health-report'
+import { CreditManager } from '@/lib/credit-system'
 import { prisma } from '@/lib/prisma'
 
 export async function GET() {
@@ -70,6 +71,21 @@ export async function GET() {
       (lastShownAt === 0 || now - lastShownAt >= 24 * 60 * 60 * 1000)
   )
 
+  let hasPaidAccess = false
+  let hasPlan = false
+  let hasCredits = false
+  let totalAvailableCents = 0
+  try {
+    const cm = new CreditManager(session.user.id)
+    const wallet = await cm.getWalletStatus()
+    totalAvailableCents = Number(wallet?.totalAvailableCents ?? 0)
+    hasCredits = Number.isFinite(totalAvailableCents) && totalAvailableCents > 0
+    hasPlan = Boolean(wallet?.plan)
+    hasPaidAccess = hasPlan || hasCredits
+  } catch {
+    hasPaidAccess = false
+  }
+
   return NextResponse.json({
     reportId: latest?.id ?? null,
     status: latest?.status ?? null,
@@ -84,5 +100,9 @@ export async function GET() {
     lastReportAt: state?.lastReportAt ?? null,
     reportsEnabled: state?.reportsEnabled ?? false,
     reportsEnabledAt: state?.reportsEnabledAt ?? null,
+    hasPaidAccess,
+    hasPlan,
+    hasCredits,
+    totalAvailableCents,
   })
 }

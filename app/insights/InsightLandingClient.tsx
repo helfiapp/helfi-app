@@ -24,6 +24,10 @@ interface InsightsLandingClientProps {
     nextReportDueAt?: string | null
     reportsEnabled?: boolean
     reportsEnabledAt?: string | null
+    hasPaidAccess?: boolean
+    hasPlan?: boolean
+    hasCredits?: boolean
+    totalAvailableCents?: number
   } | null
 }
 
@@ -53,7 +57,11 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   } | null>(null)
   const lastLoaded = generatedAt
   const isReportRunning = weeklyStatus?.status === 'RUNNING'
-  const reportsEnabled = weeklyStatus?.reportsEnabled ?? false
+  const reportsEnabled =
+    Boolean(weeklyStatus?.reportsEnabled) ||
+    Boolean(weeklyStatus?.reportsEnabledAt) ||
+    Boolean(weeklyStatus?.nextReportDueAt)
+  const hasPaidAccess = Boolean(weeklyStatus?.hasPaidAccess)
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
@@ -86,6 +94,18 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       mounted = false
     }
   }, [initialWeeklyStatus])
+
+  const refreshWeeklyStatus = async () => {
+    try {
+      const res = await fetch('/api/reports/weekly/status', { method: 'GET' })
+      if (!res.ok) return
+      const data = await res.json().catch(() => null)
+      if (!data) return
+      setWeeklyStatus(data)
+    } catch {
+      // ignore
+    }
+  }
 
   useEffect(() => {
     const dueRaw = weeklyStatus?.nextReportDueAt
@@ -298,6 +318,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
           status: data?.reportsEnabled ? safePrev?.status ?? 'scheduled' : safePrev?.status ?? null,
         }
       })
+      refreshWeeklyStatus()
       setCreateReportError(false)
       setCreateReportMessage('Weekly reports are on. We will start your first one now.')
     } catch {
@@ -405,6 +426,11 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     Weekly reports are off by default. Turn them on to get a full, data-driven report each week. Reports
                     use credits based on how much you log.
+                  </div>
+                )}
+                {reportsEnabled && !weeklyStatus?.nextReportDueAt && (
+                  <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    Weekly reports are on. We are setting up your first schedule now.
                   </div>
                 )}
                 {reportsEnabled && weeklyStatus?.reportReady && (
@@ -519,12 +545,14 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   >
                     {toggleReportsStatus === 'saving' ? 'Turning on…' : 'Turn on weekly reports'}
                   </button>
-                  <Link
-                    href="/billing"
-                    className="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
-                  >
-                    Upgrade for reports
-                  </Link>
+                  {!hasPaidAccess && (
+                    <Link
+                      href="/billing"
+                      className="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                    >
+                      Upgrade for reports
+                    </Link>
+                  )}
                 </>
               )}
               {reportsEnabled && canManualReport && (

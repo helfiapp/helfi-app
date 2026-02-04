@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
 import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete } from '@/lib/weekly-health-report'
+import { CreditManager } from '@/lib/credit-system'
 import InsightsLandingClient from './InsightLandingClient'
 
 export default async function InsightsPage() {
@@ -63,6 +64,20 @@ export default async function InsightsPage() {
   const latestReport = await getLatestWeeklyReport(session.user.id)
   const reportReady = latestReport?.status === 'READY'
   const reportLocked = latestReport?.status === 'LOCKED'
+  let hasPaidAccess = false
+  let hasPlan = false
+  let hasCredits = false
+  let totalAvailableCents = 0
+  try {
+    const cm = new CreditManager(session.user.id)
+    const wallet = await cm.getWalletStatus()
+    totalAvailableCents = Number(wallet?.totalAvailableCents ?? 0)
+    hasCredits = Number.isFinite(totalAvailableCents) && totalAvailableCents > 0
+    hasPlan = Boolean(wallet?.plan)
+    hasPaidAccess = hasPlan || hasCredits
+  } catch {
+    hasPaidAccess = false
+  }
 
   return (
     <InsightsLandingClient
@@ -82,6 +97,10 @@ export default async function InsightsPage() {
         nextReportDueAt: weeklyState?.nextReportDueAt ?? null,
         reportsEnabled: weeklyState?.reportsEnabled ?? false,
         reportsEnabledAt: weeklyState?.reportsEnabledAt ?? null,
+        hasPaidAccess,
+        hasPlan,
+        hasCredits,
+        totalAvailableCents,
       }}
     />
   )
