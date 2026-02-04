@@ -75,6 +75,7 @@ export default function ReminderSettingsPage() {
   })
   const checkinsDirtyRef = useRef(false)
   const checkinsCacheKey = session?.user?.email ? `checkins-settings:${session.user.email}` : ''
+  const checkinsStickyKey = session?.user?.email ? `checkins-settings-sticky:${session.user.email}` : ''
 
   const deviceTimezone = useMemo(() => {
     try {
@@ -226,6 +227,11 @@ export default function ReminderSettingsPage() {
         if (checkinsCacheKey) {
           writeClientCache(checkinsCacheKey, payload)
         }
+        if (checkinsStickyKey) {
+          try {
+            localStorage.setItem(checkinsStickyKey, JSON.stringify(payload))
+          } catch {}
+        }
         if (!options?.silent) alert('Check-in reminders saved.')
       } else {
         const data = await res.json().catch(() => ({}))
@@ -236,7 +242,7 @@ export default function ReminderSettingsPage() {
     } finally {
       if (!options?.silent) setCheckinsSaving(false)
     }
-  }, [checkinsCacheKey, checkinsSaving, checkinsEnabled, checkinsTime1, checkinsTime2, checkinsTime3, checkinsTime4, checkinsTz, checkinsFrequency])
+  }, [checkinsCacheKey, checkinsStickyKey, checkinsSaving, checkinsEnabled, checkinsTime1, checkinsTime2, checkinsTime3, checkinsTime4, checkinsTz, checkinsFrequency])
 
   const saveMood = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: typeof moodRef.current }) => {
     if (moodSaving && !options?.silent) return
@@ -306,6 +312,17 @@ export default function ReminderSettingsPage() {
       setCheckinsFrequency(frequency)
     }
 
+    if (checkinsStickyKey) {
+      try {
+        const raw = localStorage.getItem(checkinsStickyKey)
+        if (raw) {
+          const sticky = JSON.parse(raw)
+          applyCheckins(sticky)
+          setCheckinsLoading(false)
+        }
+      } catch {}
+    }
+
     const cached = checkinsCacheKey ? readClientCache<any>(checkinsCacheKey) : null
     if (cached?.data) {
       applyCheckins(cached.data)
@@ -319,11 +336,16 @@ export default function ReminderSettingsPage() {
           const data = await res.json()
           applyCheckins(data, { setSnapshot: true })
           if (checkinsCacheKey) writeClientCache(checkinsCacheKey, data)
+          if (checkinsStickyKey) {
+            try {
+              localStorage.setItem(checkinsStickyKey, JSON.stringify(data))
+            } catch {}
+          }
         }
       } catch {}
       setCheckinsLoading(false)
     })()
-  }, [checkinsCacheKey])
+  }, [checkinsCacheKey, checkinsStickyKey])
 
   useEffect(() => {
     const applyMood = (data: any, options?: { setSnapshot?: boolean }) => {
