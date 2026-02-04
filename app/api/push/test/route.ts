@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   const payload = JSON.stringify({
     title: 'Helfi test notification',
     body: 'Push is working. Tap to open your daily check‑in.',
-    url: '/check-in'
+    url: '/check-in?new=1'
   })
 
   try {

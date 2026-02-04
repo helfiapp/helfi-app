@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   const payload = JSON.stringify({
     title: 'Time for your Helfi check‑in',
     body: 'Rate your selected issues for today in under a minute.',
-    url: '/check-in'
+    url: '/check-in?new=1'
   })
   try {
     const { sent, errors, goneEndpoints } = await sendToSubscriptions(subscriptions, (sub) =>
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       title: 'Time for your Helfi check-in',
       body: 'Rate your selected issues for today in under a minute.',
-      url: '/check-in',
+      url: '/check-in?new=1',
       type: 'checkin_reminder',
       source: 'push',
       eventKey: `checkin:manual:${Date.now()}`,
