@@ -65,6 +65,22 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     Boolean(weeklyStatus?.reportsEnabledAt) ||
     Boolean(weeklyStatus?.nextReportDueAt)
   const hasPaidAccess = Boolean(weeklyStatus?.hasPaidAccess)
+  const mergeWeeklyStatus = (prev: any, incoming: any) => {
+    if (!incoming) return prev
+    const safePrev = prev || {}
+    const incomingHasSchedule = Boolean(incoming?.nextReportDueAt || incoming?.reportsEnabledAt)
+    const prevHasSchedule = Boolean(safePrev?.nextReportDueAt || safePrev?.reportsEnabledAt)
+    if (!incomingHasSchedule && prevHasSchedule) {
+      return {
+        ...safePrev,
+        ...incoming,
+        nextReportDueAt: safePrev.nextReportDueAt ?? null,
+        reportsEnabledAt: safePrev.reportsEnabledAt ?? null,
+        reportsEnabled: safePrev.reportsEnabled ?? incoming.reportsEnabled ?? false,
+      }
+    }
+    return { ...safePrev, ...incoming }
+  }
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
@@ -90,7 +106,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!mounted || !data) return
-        setWeeklyStatus(data)
+        setWeeklyStatus((prev: any) => mergeWeeklyStatus(prev, data))
         setLastStatusResponse(data)
       })
       .catch(() => {})
@@ -113,7 +129,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       if (!res.ok) return
       const data = await res.json().catch(() => null)
       if (!data) return
-      setWeeklyStatus(data)
+      setWeeklyStatus((prev: any) => mergeWeeklyStatus(prev, data))
       setLastStatusResponse(data)
     } catch {
       // ignore

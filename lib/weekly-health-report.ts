@@ -250,7 +250,7 @@ export async function upsertWeeklyReportState(
                       lastAttemptAt = EXCLUDED.lastAttemptAt,
                       lastStatus = EXCLUDED.lastStatus,
                       reportsEnabled = EXCLUDED.reportsEnabled,
-                      reportsEnabledAt = COALESCE(WeeklyHealthReportState.reportsEnabledAt, EXCLUDED.reportsEnabledAt)`,
+                      reportsEnabledAt = EXCLUDED.reportsEnabledAt`,
         merged.userId,
         merged.onboardingCompletedAt,
         merged.nextReportDueAt,
