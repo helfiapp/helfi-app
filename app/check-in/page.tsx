@@ -269,7 +269,7 @@ export default function CheckInPage() {
                 const params = new URLSearchParams(window.location.search || '')
                 // If ?new= is present, show only those newly added issues
                 const onlyNew = params.get('new')
-                if (onlyNew) {
+                if (onlyNew && onlyNew !== '1') {
                   const set = new Set(onlyNew.split('|').map(s => s.toLowerCase()))
                   return set.has((it.name || '').toLowerCase())
                 }
