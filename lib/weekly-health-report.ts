@@ -335,21 +335,31 @@ export async function setWeeklyReportsEnabled(
   }
   try {
     await prisma.$executeRawUnsafe(
-      `INSERT INTO WeeklyHealthReportState (userId, nextReportDueAt, reportsEnabled, reportsEnabledAt, lastStatus)
-       VALUES ($1, $2, TRUE, $3, 'scheduled')
+      `INSERT INTO WeeklyHealthReportState (userId, nextReportDueAt, lastStatus)
+       VALUES ($1, $2, 'scheduled')
        ON CONFLICT (userId)
        DO UPDATE SET nextReportDueAt = EXCLUDED.nextReportDueAt,
-                    reportsEnabled = TRUE,
-                    reportsEnabledAt = COALESCE(WeeklyHealthReportState.reportsEnabledAt, EXCLUDED.reportsEnabledAt),
                     lastStatus = 'scheduled'`,
       userId,
-      nextDueIso,
-      now.toISOString()
+      nextDueIso
     )
   } catch (error) {
     console.warn('[weekly-report] Failed to force schedule', error)
   }
-  return getWeeklyReportState(userId)
+  const refreshed = await getWeeklyReportState(userId)
+  if (refreshed?.nextReportDueAt) {
+    return refreshed
+  }
+  return {
+    userId,
+    onboardingCompletedAt: existing?.onboardingCompletedAt ?? now.toISOString(),
+    nextReportDueAt: nextDueIso,
+    lastReportAt: existing?.lastReportAt ?? null,
+    lastAttemptAt: existing?.lastAttemptAt ?? null,
+    lastStatus: 'scheduled',
+    reportsEnabled: true,
+    reportsEnabledAt: now.toISOString(),
+  }
 }
 
 export async function createWeeklyReportRecord(params: {
