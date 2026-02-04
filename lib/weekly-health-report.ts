@@ -239,14 +239,18 @@ export async function upsertWeeklyReportState(
   }
 
   try {
-    await prisma.$executeRawUnsafe(
-      `DELETE FROM WeeklyHealthReportState WHERE userId = $1`,
-      merged.userId
-    )
     try {
       await prisma.$executeRawUnsafe(
         `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus, reportsEnabled, reportsEnabledAt)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (userId)
+         DO UPDATE SET onboardingCompletedAt = EXCLUDED.onboardingCompletedAt,
+                      nextReportDueAt = EXCLUDED.nextReportDueAt,
+                      lastReportAt = EXCLUDED.lastReportAt,
+                      lastAttemptAt = EXCLUDED.lastAttemptAt,
+                      lastStatus = EXCLUDED.lastStatus,
+                      reportsEnabled = EXCLUDED.reportsEnabled,
+                      reportsEnabledAt = COALESCE(WeeklyHealthReportState.reportsEnabledAt, EXCLUDED.reportsEnabledAt)`,
         merged.userId,
         merged.onboardingCompletedAt,
         merged.nextReportDueAt,
@@ -257,10 +261,16 @@ export async function upsertWeeklyReportState(
         merged.reportsEnabledAt
       )
     } catch (error) {
-      console.warn('[weekly-report] Insert failed with reportsEnabled columns, retrying basic insert', error)
+      console.warn('[weekly-report] Upsert failed with reportsEnabled columns, retrying basic upsert', error)
       await prisma.$executeRawUnsafe(
         `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (userId)
+         DO UPDATE SET onboardingCompletedAt = EXCLUDED.onboardingCompletedAt,
+                      nextReportDueAt = EXCLUDED.nextReportDueAt,
+                      lastReportAt = EXCLUDED.lastReportAt,
+                      lastAttemptAt = EXCLUDED.lastAttemptAt,
+                      lastStatus = EXCLUDED.lastStatus`,
         merged.userId,
         merged.onboardingCompletedAt,
         merged.nextReportDueAt,
