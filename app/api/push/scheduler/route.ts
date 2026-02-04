@@ -51,8 +51,10 @@ export async function POST(req: NextRequest) {
   
   console.log('[SCHEDULER] ✅ Authorized - proceeding with notification check')
 
+  // QStash may be enabled, but we still run the cron as a safety net.
+  // This prevents late or missed check-in reminders if QStash is delayed.
   if (process.env.QSTASH_TOKEN) {
-    return NextResponse.json({ skipped: 'qstash_enabled' })
+    console.log('[SCHEDULER] QStash enabled; running cron fallback for check-ins')
   }
 
   await ensureCheckinTables()
