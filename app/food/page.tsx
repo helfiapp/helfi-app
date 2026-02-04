@@ -13012,8 +13012,13 @@ Please add nutritional information manually if needed.`);
     const serverEntries =
       Array.isArray(favoritesAllServerEntries) && favoritesAllServerEntries.length > 0 ? favoritesAllServerEntries : null
     const history = collectHistoryMeals(serverEntries ? { baseEntries: serverEntries } : undefined)
+    const resolveFavoriteLabel = (fav: any) => {
+      const raw = (fav?.label || fav?.description || 'Favorite meal').toString()
+      const applied = applyFoodNameOverride(raw, fav)
+      return applied || favoriteDisplayLabel(fav) || normalizeMealLabel(raw) || raw || 'Favorite meal'
+    }
     const buildFavoriteFallbackId = (fav: any, index?: number) => {
-      const labelRaw = favoriteDisplayLabel(fav) || fav?.label || fav?.description || 'favorite'
+      const labelRaw = resolveFavoriteLabel(fav) || favoriteDisplayLabel(fav) || fav?.label || fav?.description || 'favorite'
       const labelKey = normalizeFoodName(normalizeMealLabel(labelRaw))
       const created = resolveFavoriteCreatedAtMs(fav)
       const sourceId = fav?.sourceId ? String(fav.sourceId) : ''
@@ -13301,10 +13306,7 @@ Please add nutritional information manually if needed.`);
     const allMealsWithFavorites = [...allMealsUnique]
     ;(favorites || []).forEach((fav: any) => {
       const favId = fav?.id ? String(fav.id).trim() : ''
-      const label =
-        applyFoodNameOverride(fav?.label || fav?.description || 'Favorite meal') ||
-        favoriteDisplayLabel(fav) ||
-        normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal')
+      const label = resolveFavoriteLabel(fav)
       const labelKey = normalizeFoodName(String(label || '').trim())
       if (favId && usedFavoriteIds.has(favId)) return
       if (labelKey && usedLabels.has(labelKey)) return
@@ -13323,7 +13325,7 @@ Please add nutritional information manually if needed.`);
 
     const favoriteMeals = (favorites || []).map((fav: any, index: number) => ({
       id: fav?.id || buildFavoriteFallbackId(fav, index),
-      label: applyFoodNameOverride(fav?.label || fav?.description || 'Favorite meal') || favoriteDisplayLabel(fav) || normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal'),
+      label: resolveFavoriteLabel(fav),
       favorite: fav,
       createdAt: resolveFavoriteCreatedAtMs(fav),
       sortPriority: 1,
@@ -14518,17 +14520,18 @@ Please add nutritional information manually if needed.`);
     opts?: { labelOverride?: string; forceCustomMeal?: boolean },
   ): { favorite: any; nextFavorites: any[] } | null => {
     if (!source) return null
+    const rawSourceLabel = (source?.description || source?.label || '').toString()
+    const displaySourceLabel = applyFoodNameOverride(rawSourceLabel, source) || rawSourceLabel
     const sourceLabelForAlias = (() => {
-      const raw = source?.description || source?.label || ''
-      const cleaned = normalizeMealLabel(raw) || String(raw || '').trim()
+      const cleaned = normalizeMealLabel(rawSourceLabel) || String(rawSourceLabel || '').trim()
       return cleaned
     })()
     const cleanLabel = (() => {
       const raw =
         typeof opts?.labelOverride === 'string' && opts.labelOverride.trim().length > 0
           ? opts.labelOverride
-          : extractBaseMealDescription(source.description || '') ||
-            (source.description || 'Favorite meal').split('\n')[0].split('Calories:')[0].trim()
+          : extractBaseMealDescription(displaySourceLabel || '') ||
+            (displaySourceLabel || 'Favorite meal').split('\n')[0].split('Calories:')[0].trim()
       return normalizeMealLabel(raw) || raw || 'Favorite meal'
     })()
 
@@ -14755,14 +14758,15 @@ Please add nutritional information manually if needed.`);
       entry?.dbId ||
       entry?.id ||
       ''
-    const nameKey = normalizeFoodName(normalizeMealLabel(entry?.description || entry?.label || ''))
+    const displayLabel = applyFoodNameOverride(entry?.description || entry?.label || '', entry)
+    const nameKey = normalizeFoodName(normalizeMealLabel(displayLabel || entry?.description || entry?.label || ''))
     const list = Array.isArray(favorites) ? favorites : []
     return list.some((fav: any) => {
       const favSourceId = fav?.sourceId ? String(fav.sourceId) : ''
       if (sourceId && favSourceId && String(sourceId) === favSourceId) return true
-      const favLabel = normalizeFoodName(
-        normalizeMealLabel(favoriteDisplayLabel(fav) || fav?.label || fav?.description || ''),
-      )
+      const favRaw = favoriteDisplayLabel(fav) || fav?.label || fav?.description || ''
+      const favDisplay = applyFoodNameOverride(favRaw, fav) || favRaw
+      const favLabel = normalizeFoodName(normalizeMealLabel(favDisplay || ''))
       if (nameKey && favLabel && nameKey === favLabel) return true
       return false
     })
@@ -14875,7 +14879,11 @@ Please add nutritional information manually if needed.`);
       favorite.items && Array.isArray(favorite.items) && favorite.items.length > 0
         ? JSON.parse(JSON.stringify(favorite.items))
         : null
-    const baseDescription = favorite.label || favorite.description || 'Favorite meal'
+    const baseDescription =
+      applyFoodNameOverride(favorite.label || favorite.description || 'Favorite meal', favorite) ||
+      favorite.label ||
+      favorite.description ||
+      'Favorite meal'
     const favoriteId = typeof favorite?.id === 'string' ? favorite.id.trim() : ''
     const origin = (() => {
       const m = String(favorite?.method || '').toLowerCase()
@@ -15076,7 +15084,7 @@ Please add nutritional information manually if needed.`);
     if (!favId) return
     const existing = (Array.isArray(favorites) ? favorites : []).find((f: any) => String(f?.id || '') === favId) || null
     if (!existing) return
-    const current = applyFoodNameOverride(favoriteDisplayLabel(existing) || 'Favorite') || 'Favorite'
+    const current = applyFoodNameOverride(favoriteDisplayLabel(existing) || 'Favorite', existing) || 'Favorite'
     openRenameModal(current, (nextName) => {
       const cleaned = normalizeMealLabel(nextName) || nextName
       try {
