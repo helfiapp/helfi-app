@@ -108,18 +108,21 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   }
 
   useEffect(() => {
+    const periodMs = 7 * 24 * 60 * 60 * 1000
     const dueRaw = weeklyStatus?.nextReportDueAt
-    if (!dueRaw) {
-      setCountdown(null)
-      return
+    const enabledAtRaw = weeklyStatus?.reportsEnabledAt
+    let dueAt = dueRaw ? new Date(dueRaw).getTime() : Number.NaN
+    if (Number.isNaN(dueAt) && enabledAtRaw) {
+      const enabledAt = new Date(enabledAtRaw).getTime()
+      if (!Number.isNaN(enabledAt)) {
+        dueAt = enabledAt + periodMs
+      }
     }
-    let dueAt = new Date(dueRaw).getTime()
     if (Number.isNaN(dueAt)) {
       setCountdown(null)
       return
     }
 
-    const periodMs = 7 * 24 * 60 * 60 * 1000
     const now = Date.now()
     if (dueAt <= now) {
       dueAt = now + periodMs
@@ -150,7 +153,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [weeklyStatus?.nextReportDueAt])
+  }, [weeklyStatus?.nextReportDueAt, weeklyStatus?.reportsEnabledAt])
 
   useEffect(() => {
     return () => {
@@ -386,11 +389,16 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     return new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
   }
   const padTime = (value: number) => String(value).padStart(2, '0')
+  const dueDateFallbackMs = weeklyStatus?.reportsEnabledAt
+    ? new Date(weeklyStatus.reportsEnabledAt).getTime() + 7 * 24 * 60 * 60 * 1000
+    : null
   const dueDateLabel = countdown?.dueAtMs
     ? formatDateForLocale(countdown.dueAtMs)
-    : formatDateForLocale(weeklyStatus?.nextReportDueAt || '')
-    ? new Date(weeklyStatus.nextReportDueAt).toLocaleDateString()
-    : null
+    : weeklyStatus?.nextReportDueAt
+      ? formatDateForLocale(weeklyStatus.nextReportDueAt)
+      : dueDateFallbackMs
+        ? formatDateForLocale(dueDateFallbackMs)
+        : null
 
   return (
     <div className="min-h-screen bg-gray-50" aria-busy={isNavigating}>
@@ -428,7 +436,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                     use credits based on how much you log.
                   </div>
                 )}
-                {reportsEnabled && !weeklyStatus?.nextReportDueAt && (
+                {reportsEnabled && !countdown && (
                   <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                     Weekly reports are on. We are setting up your first schedule now.
                   </div>
@@ -442,7 +450,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   </p>
                 )}
               </div>
-              {reportsEnabled && weeklyStatus?.nextReportDueAt && countdown && (
+              {reportsEnabled && countdown && (
                 <div className="space-y-4">
                   <div className="flex items-end justify-between">
                     <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
