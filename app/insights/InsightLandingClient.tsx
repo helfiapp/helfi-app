@@ -42,9 +42,6 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const [createReportMessage, setCreateReportMessage] = useState<string | null>(null)
   const [createReportError, setCreateReportError] = useState(false)
   const [toggleReportsStatus, setToggleReportsStatus] = useState<'idle' | 'saving' | 'error'>('idle')
-  const [showWeeklyDebug, setShowWeeklyDebug] = useState(false)
-  const [lastWeeklyResponse, setLastWeeklyResponse] = useState<any>(null)
-  const [lastStatusResponse, setLastStatusResponse] = useState<any>(null)
   const [progressPercent, setProgressPercent] = useState(0)
   const [progressStage, setProgressStage] = useState('Getting your data')
   const [progressActive, setProgressActive] = useState(false)
@@ -107,7 +104,6 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       .then((data) => {
         if (!mounted || !data) return
         setWeeklyStatus((prev: any) => mergeWeeklyStatus(prev, data))
-        setLastStatusResponse(data)
       })
       .catch(() => {})
     return () => {
@@ -115,14 +111,6 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     }
   }, [initialWeeklyStatus])
 
-  useEffect(() => {
-    try {
-      const host = window.location.hostname
-      setShowWeeklyDebug(host.includes('stg.') || host.includes('vercel.app'))
-    } catch {
-      setShowWeeklyDebug(false)
-    }
-  }, [])
   const refreshWeeklyStatus = async () => {
     try {
       const res = await fetch('/api/reports/weekly/status', { method: 'GET' })
@@ -130,7 +118,6 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       const data = await res.json().catch(() => null)
       if (!data) return
       setWeeklyStatus((prev: any) => mergeWeeklyStatus(prev, data))
-      setLastStatusResponse(data)
     } catch {
       // ignore
     }
@@ -330,7 +317,6 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         body: JSON.stringify({ enabled: true }),
       })
       const data = await res.json().catch(() => ({}))
-      setLastWeeklyResponse(data)
       if (!res.ok) {
         const needsUpgrade = res.status === 402
         setCreateReportError(true)
@@ -637,22 +623,6 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
               }`}
             >
               {createReportMessage}
-            </div>
-          )}
-          {showWeeklyDebug && (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700">
-              <div className="font-semibold mb-2">Weekly report debug (staging only)</div>
-              <pre className="whitespace-pre-wrap break-words">
-                {JSON.stringify(
-                  {
-                    weeklyStatus,
-                    lastWeeklyResponse,
-                    lastStatusResponse,
-                  },
-                  null,
-                  2
-                )}
-              </pre>
             </div>
           )}
         </section>
