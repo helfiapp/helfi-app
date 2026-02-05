@@ -353,6 +353,10 @@ model FoodMissingReport {
   query       String?
   source      String?
   notes       String?
+  status      FoodMissingStatus @default(PENDING)
+  matchedCustomFoodId String?
+  processedAt DateTime?
+  processedNote String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -361,6 +365,14 @@ model FoodMissingReport {
   @@index([createdAt])
   @@index([country])
   @@index([kind])
+  @@index([status])
+}
+
+enum FoodMissingStatus {
+  PENDING
+  MATCHED
+  ADDED
+  FAILED
 }
 
 model ExerciseLog {

@@ -25,6 +25,14 @@
       "schedule": "0 7 * * 1"
     },
     {
+      "path": "/api/cron/fast-food-menu-sync",
+      "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/food-missing-auto-add",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/push/scheduler",
       "schedule": "*/5 * * * *"
     }
