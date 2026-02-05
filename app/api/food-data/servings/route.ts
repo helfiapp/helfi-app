@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchFatSecretServingOptions, fetchUsdaServingOptions } from '@/lib/food-data'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,6 +15,14 @@ export async function GET(request: NextRequest) {
         { success: false, error: 'Missing required parameters: source, id' },
         { status: 400 },
       )
+    }
+
+    const normalizedId = id.startsWith('custom:') ? id.slice('custom:'.length) : id
+
+    if (source === 'custom' || id.startsWith('custom:')) {
+      const item = await prisma.customFoodItem.findUnique({ where: { id: normalizedId } })
+      const options = Array.isArray(item?.servingOptions) ? item?.servingOptions : []
+      return NextResponse.json({ success: true, source: 'custom', options })
     }
 
     if (source === 'usda') {

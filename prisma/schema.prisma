@@ -313,6 +313,29 @@ model FoodLibraryItem {
   @@unique([source, fdcId])
 }
 
+model CustomFoodItem {
+  id              String          @id @default(cuid())
+  key             String          @unique
+  name            String
+  brand           String?
+  kind            CustomFoodKind  @default(SINGLE)
+  group           String?
+  caloriesPer100g Float?
+  proteinPer100g  Float?
+  carbsPer100g    Float?
+  fatPer100g      Float?
+  fiberPer100g    Float?
+  sugarPer100g    Float?
+  aliases         String[]        @default([])
+  servingOptions  Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([name])
+  @@index([brand])
+  @@index([kind])
+}
+
 model ExerciseLog {
   id        String   @id @default(cuid())
   userId    String
@@ -370,6 +393,12 @@ enum ExerciseSource {
   MANUAL
   FITBIT
   GARMIN
+}
+
+enum CustomFoodKind {
+  SINGLE
+  PACKAGED
+  FAST_FOOD
 }
 
 model AIUsageEvent {

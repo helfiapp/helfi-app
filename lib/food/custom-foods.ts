@@ -1,8 +1,8 @@
 import 'server-only'
-import fs from 'fs'
-import path from 'path'
+import { prisma } from '@/lib/prisma'
 
 export type CustomFoodMacro = {
+  id?: string
   name: string
   calories: number | null
   protein_g: number | null
@@ -10,15 +10,15 @@ export type CustomFoodMacro = {
   fat_g: number | null
   fiber_g: number | null
   sugar_g: number | null
+  brand?: string | null
+  kind?: 'SINGLE' | 'PACKAGED' | 'FAST_FOOD'
+  aliases?: string[]
+  servingOptions?: any[] | null
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'food-overrides')
-// Master list generated from the existing "food-import" CSVs + USDA macros (auto-filled).
-// See: scripts/generate-master-food-macros.mjs
-// Custom CSV files with macros are included directly (meat_seafood_protein_macros.csv, fast_food_macros.csv, etc.)
-const SOURCE_FILES = ['master_foods_macros.csv', 'meat_seafood_protein_macros.csv', 'fast_food_macros.csv']
-
 let cachedItems: CustomFoodMacro[] | null = null
+let cacheLoadedAt = 0
+const CACHE_TTL_MS = 5 * 60 * 1000
 
 const normalizeText = (value: string) =>
   String(value || '')
@@ -176,111 +176,60 @@ const nameMatchesQuery = (name: string, query: string, options?: { allowTypo?: b
   return remainingQueryTokens.every((token) => filteredNameTokens.some((word) => tokenMatches(token, word)))
 }
 
-const parseCsvLine = (line: string) => {
-  const cells: string[] = []
-  let current = ''
-  let inQuotes = false
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i]
-    if (ch === '"') {
-      const next = line[i + 1]
-      if (inQuotes && next === '"') {
-        current += '"'
-        i += 1
-        continue
-      }
-      inQuotes = !inQuotes
-      continue
+const loadCustomFoods = async () => {
+  if (cachedItems && Date.now() - cacheLoadedAt < CACHE_TTL_MS) return cachedItems
+  const rows = await prisma.customFoodItem.findMany()
+  const items: CustomFoodMacro[] = rows.map((row) => {
+    const servingOptions = Array.isArray(row.servingOptions) ? row.servingOptions : null
+    return {
+      id: row.id,
+      name: row.name,
+      brand: row.brand ?? null,
+      kind: row.kind as CustomFoodMacro['kind'],
+      calories: row.caloriesPer100g ?? null,
+      protein_g: row.proteinPer100g ?? null,
+      carbs_g: row.carbsPer100g ?? null,
+      fat_g: row.fatPer100g ?? null,
+      fiber_g: row.fiberPer100g ?? null,
+      sugar_g: row.sugarPer100g ?? null,
+      aliases: Array.isArray(row.aliases) ? row.aliases : [],
+      servingOptions,
     }
-    if (ch === ',' && !inQuotes) {
-      cells.push(current)
-      current = ''
-      continue
-    }
-    current += ch
-  }
-  cells.push(current)
-  return cells.map((cell) => cell.trim())
-}
-
-const parseCsv = (text: string) => {
-  const rows = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-  if (rows.length === 0) return { headers: [] as string[], records: [] as string[][] }
-  const headers = parseCsvLine(rows[0]).map((header) => header.toLowerCase())
-  const records = rows.slice(1).map((line) => parseCsvLine(line))
-  return { headers, records }
-}
-
-const toNumber = (value: string | undefined | null) => {
-  if (value == null) return null
-  const num = Number(String(value).trim())
-  return Number.isFinite(num) ? num : null
-}
-
-const loadCustomFoods = () => {
-  if (cachedItems) return cachedItems
-  const items: CustomFoodMacro[] = []
-
-  for (const fileName of SOURCE_FILES) {
-    const filePath = path.join(DATA_DIR, fileName)
-    if (!fs.existsSync(filePath)) continue
-    const content = fs.readFileSync(filePath, 'utf8')
-    const parsed = parseCsv(content)
-    const headerIndex = new Map<string, number>()
-    parsed.headers.forEach((header, index) => headerIndex.set(header, index))
-
-    const get = (row: string[], key: string) => {
-      const idx = headerIndex.get(key)
-      if (idx == null) return ''
-      return row[idx] ?? ''
-    }
-
-    const fiberKey = headerIndex.has('fiber_g') ? 'fiber_g' : 'fibre_g'
-
-    for (const row of parsed.records) {
-      const name = String(get(row, 'food') || '').trim()
-      if (!name) continue
-      const calories = toNumber(get(row, 'per_100g_kcal'))
-      const protein = toNumber(get(row, 'protein_g'))
-      const carbs = toNumber(get(row, 'carbs_g'))
-      const fat = toNumber(get(row, 'fat_g'))
-      const fiber = toNumber(get(row, fiberKey))
-      const sugar = toNumber(get(row, 'sugar_g'))
-      if (calories == null || protein == null || carbs == null || fat == null) continue
-
-      items.push({
-        name,
-        calories,
-        protein_g: protein,
-        carbs_g: carbs,
-        fat_g: fat,
-        fiber_g: fiber,
-        sugar_g: sugar,
-      })
-    }
-  }
-
+  })
   cachedItems = items
+  cacheLoadedAt = Date.now()
   return items
 }
 
-export const searchCustomFoodMacros = (
+export const searchCustomFoodMacros = async (
   query: string,
   limit = 10,
   options?: { allowTypo?: boolean },
-): CustomFoodMacro[] => {
+): Promise<CustomFoodMacro[]> => {
   const q = String(query || '').trim()
   if (!q) return []
-  const items = loadCustomFoods()
+  const items = (await loadCustomFoods()).filter(
+    (item) => item.kind === 'SINGLE' || item.kind === 'FAST_FOOD' || !item.kind,
+  )
   if (items.length === 0) return []
-  const prefixMatches = items.filter((item) => nameMatchesQuery(item.name, q, { allowTypo: false }))
+
   const allowTypo = options?.allowTypo ?? true
-  const matches = (
-    prefixMatches.length > 0 || !allowTypo ? prefixMatches : items.filter((item) => nameMatchesQuery(item.name, q, { allowTypo: true }))
-  ).sort((a, b) => normalizeText(a.name).localeCompare(normalizeText(b.name)))
+  const matchesQuery = (item: CustomFoodMacro, strict: boolean) => {
+    const allow = strict ? false : allowTypo
+    if (nameMatchesQuery(item.name, q, { allowTypo: allow })) return true
+    if (item.brand && nameMatchesQuery(`${item.brand} ${item.name}`, q, { allowTypo: allow })) return true
+    const aliases = Array.isArray(item.aliases) ? item.aliases : []
+    return aliases.some((alias) => nameMatchesQuery(String(alias || ''), q, { allowTypo: allow }))
+  }
+
+  const prefixMatches = items.filter((item) => matchesQuery(item, true))
+  const base = prefixMatches.length > 0 || !allowTypo ? prefixMatches : items.filter((item) => matchesQuery(item, false))
+  const matches = base.sort((a, b) => normalizeText(a.name).localeCompare(normalizeText(b.name)))
   if (matches.length === 0) return []
   return matches.slice(0, Math.max(1, limit))
+}
+
+export const getCustomPackagedItems = async (): Promise<CustomFoodMacro[]> => {
+  const items = await loadCustomFoods()
+  return items.filter((item) => item.kind === 'PACKAGED' || item.kind === 'FAST_FOOD')
 }

@@ -1952,7 +1952,7 @@ export default function MealBuilderClient() {
 
   const loadServingOptionsForItem = async (item: BuilderItem) => {
     if (!item?.__source || !item?.__sourceId) return null
-    if (item.__source !== 'usda' && item.__source !== 'fatsecret') return null
+    if (item.__source !== 'usda' && item.__source !== 'fatsecret' && item.__source !== 'custom') return null
     const key = `${item.__source}:${item.__sourceId}`
     const cached = servingOptionsCacheRef.current.get(key)
     if (cached) return cached

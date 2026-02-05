@@ -5977,7 +5977,11 @@ export default function FoodDiary() {
     if (resolved?.id) newItem.dbId = resolved.id
     newItem.dbLocked = true
 
-    if (newItem?.dbSource && newItem?.dbId && (newItem.dbSource === 'usda' || newItem.dbSource === 'fatsecret')) {
+    if (
+      newItem?.dbSource &&
+      newItem?.dbId &&
+      (newItem.dbSource === 'usda' || newItem.dbSource === 'fatsecret' || newItem.dbSource === 'custom')
+    ) {
       try {
         const params = new URLSearchParams({ source: newItem.dbSource, id: String(newItem.dbId) })
         const res = await fetch(`/api/food-data/servings?${params.toString()}`, { method: 'GET' })
