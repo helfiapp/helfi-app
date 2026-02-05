@@ -292,7 +292,7 @@ const importRows = async () => {
         fiberPer100g: payload.fiberPer100g,
         sugarPer100g: payload.sugarPer100g,
         aliases: payload.aliases,
-        servingOptions: payload.servingOptions ?? undefined,
+        servingOptions: payload.servingOptions === undefined ? undefined : payload.servingOptions,
       },
       update: {
         name: payload.name,
@@ -306,7 +306,7 @@ const importRows = async () => {
         fiberPer100g: payload.fiberPer100g,
         sugarPer100g: payload.sugarPer100g,
         aliases: payload.aliases,
-        servingOptions: payload.servingOptions ?? undefined,
+        servingOptions: payload.servingOptions === undefined ? undefined : payload.servingOptions,
       },
     })
   }
@@ -329,7 +329,6 @@ const importRows = async () => {
   }
 
   for (const row of beverageRows) {
-    const options = buildServingOptions(row, 250, '1 serve', 'ml')
     await upsertItem({
       name: row.name,
       brand: row.brand,
@@ -342,14 +341,11 @@ const importRows = async () => {
       fiberPer100g: row.fiber_g,
       sugarPer100g: row.sugar_g,
       aliases: buildAliases(row.name, row.brand),
-      servingOptions: options,
+      servingOptions: null,
     })
   }
 
   for (const row of fastFoodRows) {
-    const originalName = row.brand ? `${row.name} (${row.brand})` : row.name
-    const servingInfo = getFastFoodServingSize(originalName)
-    const options = buildServingOptions(row, servingInfo.sizeGrams, servingInfo.servingLabel, 'g')
     const aliases = buildAliases(row.name, row.brand)
     if (row.name.toLowerCase().includes('flake')) {
       aliases.push('flake', 'fish and chip shop flake', 'fish & chip shop flake')
@@ -369,7 +365,7 @@ const importRows = async () => {
       fiberPer100g: row.fiber_g,
       sugarPer100g: row.sugar_g,
       aliases: Array.from(new Set(aliases)),
-      servingOptions: options,
+      servingOptions: null,
     })
   }
 
