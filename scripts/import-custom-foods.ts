@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import fs from 'fs'
 import path from 'path'
@@ -92,6 +93,12 @@ const parseBrand = (name: string) => {
   const brand = match ? String(match[1]).trim() : null
   const cleanName = match ? name.replace(/\s*\([^)]+\)$/, '').trim() : name.trim()
   return { brand, cleanName }
+}
+
+const toJsonInput = (value: any[] | null | undefined) => {
+  if (value === undefined) return undefined
+  if (value === null) return Prisma.DbNull
+  return value
 }
 
 const buildAliases = (name: string, brand: string | null) => {
@@ -292,7 +299,7 @@ const importRows = async () => {
         fiberPer100g: payload.fiberPer100g,
         sugarPer100g: payload.sugarPer100g,
         aliases: payload.aliases,
-        servingOptions: payload.servingOptions === undefined ? undefined : payload.servingOptions,
+        servingOptions: toJsonInput(payload.servingOptions),
       },
       update: {
         name: payload.name,
@@ -306,7 +313,7 @@ const importRows = async () => {
         fiberPer100g: payload.fiberPer100g,
         sugarPer100g: payload.sugarPer100g,
         aliases: payload.aliases,
-        servingOptions: payload.servingOptions === undefined ? undefined : payload.servingOptions,
+        servingOptions: toJsonInput(payload.servingOptions),
       },
     })
   }
