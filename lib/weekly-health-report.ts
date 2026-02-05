@@ -227,6 +227,12 @@ export async function upsertWeeklyReportState(
   await ensureWeeklyReportTables()
   const existing = await getWeeklyReportState(userId)
   const nextReportDueAt = updates.nextReportDueAt ?? existing?.nextReportDueAt ?? null
+  const resolvedReportsEnabled =
+    updates.reportsEnabled !== undefined
+      ? updates.reportsEnabled
+      : existing?.reportsEnabled !== undefined
+        ? existing.reportsEnabled
+        : nextReportDueAt != null
   const merged: WeeklyReportState = {
     userId,
     onboardingCompletedAt: updates.onboardingCompletedAt ?? existing?.onboardingCompletedAt ?? null,
@@ -234,7 +240,7 @@ export async function upsertWeeklyReportState(
     lastReportAt: updates.lastReportAt ?? existing?.lastReportAt ?? null,
     lastAttemptAt: updates.lastAttemptAt ?? existing?.lastAttemptAt ?? null,
     lastStatus: updates.lastStatus ?? existing?.lastStatus ?? null,
-    reportsEnabled: nextReportDueAt != null,
+    reportsEnabled: resolvedReportsEnabled,
     reportsEnabledAt: updates.reportsEnabledAt ?? existing?.reportsEnabledAt ?? null,
   }
 
@@ -323,6 +329,7 @@ export async function setWeeklyReportsEnabled(
   const nextDueIso = nextDueAt ? nextDueAt.toISOString() : null
   const updated = await upsertWeeklyReportState(userId, {
     onboardingCompletedAt: existing?.onboardingCompletedAt ?? now.toISOString(),
+    reportsEnabled: enabled,
     reportsEnabledAt: enabled ? now.toISOString() : existing?.reportsEnabledAt ?? null,
     nextReportDueAt: nextDueIso,
     lastStatus: enabled ? 'scheduled' : 'disabled',
