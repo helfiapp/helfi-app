@@ -93,6 +93,7 @@ model User {
   garminWebhookLogs   GarminWebhookLog[]
   foodAnalysisFeedback FoodAnalysisFeedback[]
   medicalImageAnalyses MedicalImageAnalysis[]
+  foodMissingReports  FoodMissingReport[]
 
   // File relationships (PHASE 2 addition)
   uploadedFiles File[] @relation("UploadedFiles")
