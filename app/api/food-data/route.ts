@@ -2,10 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { searchOpenFoodFactsByQuery, searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition, searchLocalFoods } from '@/lib/food-data'
-import { searchCustomFoodMacros } from '@/lib/food/custom-foods'
+import { searchCustomFoodMacros, getCustomPackagedItems } from '@/lib/food/custom-foods'
 import { prisma } from '@/lib/prisma'
-import fs from 'fs'
-import path from 'path'
 
 let usdaHealthCache: { count: number | null; checkedAt: number } = { count: null, checkedAt: 0 }
 
@@ -27,6 +25,10 @@ export async function GET(request: NextRequest) {
     const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : NaN
     const limit = Number.isFinite(limitParsed) ? Math.min(Math.max(limitParsed, 1), 50) : 20
     const kindMode = kind === 'packaged' ? 'packaged' : 'single'
+    const countryParam = (searchParams.get('country') || '').trim().toUpperCase()
+    const headerCountry =
+      (request.headers.get('x-vercel-ip-country') || request.headers.get('cf-ipcountry') || '').trim().toUpperCase()
+    const resolvedCountry = countryParam || headerCountry || ''
 
     if (!query) {
       return NextResponse.json(
@@ -446,6 +448,7 @@ export async function GET(request: NextRequest) {
       id: string
       name: string
       brand?: string | null
+      kind?: string | null
       serving_size?: string | null
       calories?: number | null
       protein_g?: number | null
@@ -453,262 +456,50 @@ export async function GET(request: NextRequest) {
       fat_g?: number | null
       fiber_g?: number | null
       sugar_g?: number | null
-      source: 'openfoodfacts' | 'usda' | 'fatsecret'
+      source: 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom'
       aliases?: string[]
+      __custom?: boolean
     }
 
-    // Parse CSV line handling quoted fields
-    const parseCsvLine = (line: string): string[] => {
-      const cells: string[] = []
-      let current = ''
-      let inQuotes = false
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i]
-        if (ch === '"') {
-          const next = line[i + 1]
-          if (inQuotes && next === '"') {
-            current += '"'
-            i += 1
-            continue
-          }
-          inQuotes = !inQuotes
-          continue
-        }
-        if (ch === ',' && !inQuotes) {
-          cells.push(current)
-          current = ''
-          continue
-        }
-        current += ch
+    const buildCustomPackagedItems = (rows: any[]): CustomPackagedItem[] => {
+      if (!Array.isArray(rows) || rows.length === 0) return []
+      const pickDefaultOption = (options: any[]) => {
+        if (!Array.isArray(options) || options.length === 0) return null
+        return options[0]
       }
-      cells.push(current)
-      return cells.map((cell) => cell.trim())
+      return rows
+        .map((row) => {
+          const kindValue = row?.kind ? String(row.kind) : null
+          const isFastFood = kindValue === 'FAST_FOOD'
+          const options = Array.isArray(row?.servingOptions) ? row.servingOptions : []
+          if (isFastFood && options.length === 0) return null
+          const selected = pickDefaultOption(options)
+          const servingLabel =
+            (selected?.label || selected?.serving_size || row?.serving_size || '').toString().trim() ||
+            '100 g'
+          const itemId = row?.id ? String(row.id) : normalizeForCompact(`${row?.brand || ''} ${row?.name || ''}`)
+          return {
+            id: `custom:${itemId}`,
+            name: row?.name || '',
+            brand: row?.brand ?? null,
+            kind: kindValue,
+            serving_size: servingLabel,
+            calories: selected?.calories ?? row?.calories ?? null,
+            protein_g: selected?.protein_g ?? row?.protein_g ?? null,
+            carbs_g: selected?.carbs_g ?? row?.carbs_g ?? null,
+            fat_g: selected?.fat_g ?? row?.fat_g ?? null,
+            fiber_g: selected?.fiber_g ?? row?.fiber_g ?? null,
+            sugar_g: selected?.sugar_g ?? row?.sugar_g ?? null,
+            source: 'custom',
+            aliases: Array.isArray(row?.aliases) ? row.aliases : [],
+            __custom: true,
+          }
+        })
+        .filter(Boolean) as CustomPackagedItem[]
     }
 
-    // Load fast food items from CSV
-    const loadBeverageItems = (): CustomPackagedItem[] => {
-      const beverageFile = path.join(process.cwd(), 'data', 'food-overrides', 'beverages_macros.csv')
-      if (!fs.existsSync(beverageFile)) return []
-      
-      try {
-        const content = fs.readFileSync(beverageFile, 'utf8')
-        const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0)
-        if (lines.length < 2) return []
-        
-        const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase())
-        const foodIndex = headers.indexOf('food')
-        const caloriesIndex = headers.indexOf('per_100g_kcal')
-        const proteinIndex = headers.indexOf('protein_g')
-        const carbsIndex = headers.indexOf('carbs_g')
-        const fatIndex = headers.indexOf('fat_g')
-        const fiberIndex = headers.indexOf('fibre_g') >= 0 ? headers.indexOf('fibre_g') : headers.indexOf('fiber_g')
-        const sugarIndex = headers.indexOf('sugar_g')
-        
-        if (foodIndex < 0 || caloriesIndex < 0 || proteinIndex < 0 || carbsIndex < 0 || fatIndex < 0) return []
-        
-        const items: CustomPackagedItem[] = []
-        for (let i = 1; i < lines.length; i++) {
-          const cells = parseCsvLine(lines[i])
-          const name = cells[foodIndex] || ''
-          if (!name) continue
-          
-          const calories = Number(cells[caloriesIndex])
-          const protein = Number(cells[proteinIndex])
-          const carbs = Number(cells[carbsIndex])
-          const fat = Number(cells[fatIndex])
-          const fiber = fiberIndex >= 0 ? Number(cells[fiberIndex] || 0) : 0
-          const sugar = sugarIndex >= 0 ? Number(cells[sugarIndex] || 0) : 0
-          
-          if (!Number.isFinite(calories) || !Number.isFinite(protein) || !Number.isFinite(carbs) || !Number.isFinite(fat)) continue
-          
-          // Extract brand from name if present (e.g., "Coke Zero (Coca-Cola)" -> brand: "Coca-Cola")
-          const brandMatch = name.match(/\(([^)]+)\)$/)
-          const brand = brandMatch ? brandMatch[1] : null
-          const cleanName = brandMatch ? name.replace(/\s*\([^)]+\)$/, '').trim() : name
-          
-          // Beverages are typically 100ml servings, but we'll use 250ml (standard can/bottle) as default
-          const servingSizeGrams = 250 // 250ml = 250g for water-based beverages
-          const multiplier = servingSizeGrams / 100
-          
-          items.push({
-            id: `custom:beverage-${normalizeForCompact(name)}`,
-            name: cleanName,
-            brand: brand,
-            serving_size: `1 serve (${servingSizeGrams} ml)`,
-            calories: Math.round(calories * multiplier),
-            protein_g: Math.round(protein * multiplier * 10) / 10,
-            carbs_g: Math.round(carbs * multiplier * 10) / 10,
-            fat_g: Math.round(fat * multiplier * 10) / 10,
-            fiber_g: fiber > 0 ? Math.round(fiber * multiplier * 10) / 10 : null,
-            sugar_g: sugar > 0 ? Math.round(sugar * multiplier * 10) / 10 : null,
-            source: 'openfoodfacts',
-            aliases: [],
-          })
-        }
-        return items
-      } catch (err) {
-        console.warn('Failed to load beverage items:', err)
-        return []
-      }
-    }
-
-    const loadFastFoodItems = (): CustomPackagedItem[] => {
-      const fastFoodFile = path.join(process.cwd(), 'data', 'food-overrides', 'fast_food_macros.csv')
-      if (!fs.existsSync(fastFoodFile)) return []
-      
-      try {
-        const content = fs.readFileSync(fastFoodFile, 'utf8')
-        const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0)
-        if (lines.length < 2) return []
-        
-        const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase())
-        const foodIndex = headers.indexOf('food')
-        const caloriesIndex = headers.indexOf('per_100g_kcal')
-        const proteinIndex = headers.indexOf('protein_g')
-        const carbsIndex = headers.indexOf('carbs_g')
-        const fatIndex = headers.indexOf('fat_g')
-        const fiberIndex = headers.indexOf('fibre_g') >= 0 ? headers.indexOf('fibre_g') : headers.indexOf('fiber_g')
-        const sugarIndex = headers.indexOf('sugar_g')
-        
-        if (foodIndex < 0 || caloriesIndex < 0 || proteinIndex < 0 || carbsIndex < 0 || fatIndex < 0) return []
-        
-        const items: CustomPackagedItem[] = []
-        for (let i = 1; i < lines.length; i++) {
-          const cells = parseCsvLine(lines[i])
-          const name = cells[foodIndex] || ''
-          if (!name) continue
-          
-          const calories = Number(cells[caloriesIndex])
-          const protein = Number(cells[proteinIndex])
-          const carbs = Number(cells[carbsIndex])
-          const fat = Number(cells[fatIndex])
-          const fiber = fiberIndex >= 0 ? Number(cells[fiberIndex] || 0) : 0
-          const sugar = sugarIndex >= 0 ? Number(cells[sugarIndex] || 0) : 0
-          
-          if (!Number.isFinite(calories) || !Number.isFinite(protein) || !Number.isFinite(carbs) || !Number.isFinite(fat)) continue
-          
-          // Extract brand from name if present (e.g., "Big Mac (McDonald's)" -> brand: "McDonald's")
-          const brandMatch = name.match(/\(([^)]+)\)$/)
-          const brand = brandMatch ? brandMatch[1] : null
-          const cleanName = brandMatch ? name.replace(/\s*\([^)]+\)$/, '').trim() : name
-          
-          // Define typical serving sizes (in grams) for common items
-          // If not specified, default to 100g
-          const getServingSize = (itemName: string): { sizeGrams: number; servingLabel: string } => {
-            const lowerName = itemName.toLowerCase()
-            
-            // Meals
-            if (lowerName.includes('mcsmart meal')) return { sizeGrams: 490, servingLabel: '1 meal' }
-            if (lowerName.includes('fish & chips') || lowerName.includes('fish and chips')) return { sizeGrams: 400, servingLabel: '1 serve' }
-            
-            // Burgers
-            if (lowerName.includes('big mac')) return { sizeGrams: 215, servingLabel: '1 burger' }
-            if (lowerName.includes('quarter pounder')) return { sizeGrams: 200, servingLabel: '1 burger' }
-            if (lowerName.includes('cheeseburger') && !lowerName.includes('double')) return { sizeGrams: 119, servingLabel: '1 burger' }
-            if (lowerName.includes('hamburger') && !lowerName.includes('double')) return { sizeGrams: 105, servingLabel: '1 burger' }
-            if (lowerName.includes('mcdouble')) return { sizeGrams: 155, servingLabel: '1 burger' }
-            if (lowerName.includes('mcdouble')) return { sizeGrams: 155, servingLabel: '1 burger' }
-            
-            // Fish items
-            if (lowerName.includes('battered') && (lowerName.includes('fish') || lowerName.includes('flake') || lowerName.includes('snapper') || lowerName.includes('cod') || lowerName.includes('barramundi') || lowerName.includes('flathead'))) {
-              return { sizeGrams: 150, servingLabel: '1 piece' }
-            }
-            if (lowerName.includes('filet-o-fish')) return { sizeGrams: 142, servingLabel: '1 burger' }
-            
-            // Chicken items
-            if (lowerName.includes('mcnuggets')) return { sizeGrams: 100, servingLabel: '4 pieces' }
-            if (lowerName.includes('mccrispy')) return { sizeGrams: 200, servingLabel: '1 sandwich' }
-            if (lowerName.includes('mcchicken')) return { sizeGrams: 153, servingLabel: '1 sandwich' }
-            
-            // Sides
-            if (lowerName.includes('french fries') || lowerName.includes('chips')) {
-              if (lowerName.includes('small')) return { sizeGrams: 80, servingLabel: '1 small' }
-              if (lowerName.includes('medium')) return { sizeGrams: 110, servingLabel: '1 medium' }
-              if (lowerName.includes('large')) return { sizeGrams: 150, servingLabel: '1 large' }
-              return { sizeGrams: 100, servingLabel: '1 serve' }
-            }
-            if (lowerName.includes('hash brown')) return { sizeGrams: 52, servingLabel: '1 piece' }
-            if (lowerName.includes('apple pie')) return { sizeGrams: 80, servingLabel: '1 pie' }
-            
-            // Desserts
-            if (lowerName.includes('mcflurry')) return { sizeGrams: 360, servingLabel: '1 regular' }
-            
-            // Fish & chip shop items
-            if (lowerName.includes('dim sim')) return { sizeGrams: 50, servingLabel: '1 piece' }
-            if (lowerName.includes('potato cake') || lowerName.includes('potato scallop')) return { sizeGrams: 75, servingLabel: '1 piece' }
-            if (lowerName.includes('calamari rings')) return { sizeGrams: 100, servingLabel: '1 serve' }
-            if (lowerName.includes('scallops') && lowerName.includes('battered')) return { sizeGrams: 100, servingLabel: '1 serve' }
-            if (lowerName.includes('prawns') && lowerName.includes('battered')) return { sizeGrams: 100, servingLabel: '1 serve' }
-            if (lowerName.includes('fish cake')) return { sizeGrams: 100, servingLabel: '1 piece' }
-            if (lowerName.includes('chiko roll')) return { sizeGrams: 160, servingLabel: '1 roll' }
-            if (lowerName.includes('spring roll')) return { sizeGrams: 50, servingLabel: '1 roll' }
-            if (lowerName.includes('corn jack')) return { sizeGrams: 100, servingLabel: '1 piece' }
-            if (lowerName.includes('onion rings')) return { sizeGrams: 91, servingLabel: '1 small serve' }
-            if (lowerName.includes('mushy peas')) return { sizeGrams: 100, servingLabel: '1 serve' }
-            if (lowerName.includes('curry sauce') || lowerName.includes('gravy') || lowerName.includes('tartare sauce')) return { sizeGrams: 50, servingLabel: '1 serve' }
-            
-            // Default to 100g
-            return { sizeGrams: 100, servingLabel: '100 g' }
-          }
-          
-          const servingInfo = getServingSize(name)
-          const multiplier = servingInfo.sizeGrams / 100
-          
-          // Format serving size to include weight so modal can parse it correctly
-          // Format: "1 meal (616 g)" or "1 burger (215 g)" etc.
-          const servingSizeLabel = servingInfo.sizeGrams !== 100 
-            ? `${servingInfo.servingLabel} (${servingInfo.sizeGrams} g)`
-            : servingInfo.servingLabel
-          
-          // Add aliases for better matching
-          const aliases: string[] = []
-          if (cleanName.toLowerCase().includes('flake')) {
-            aliases.push('flake', 'fish and chip shop flake', 'fish & chip shop flake')
-          }
-          if (cleanName.toLowerCase().includes('mcsmart')) {
-            aliases.push('mcsmart', 'mc smart')
-          }
-          
-          items.push({
-            id: `custom:fast-food-${normalizeForCompact(name)}`,
-            name: cleanName,
-            brand: brand,
-            serving_size: servingSizeLabel,
-            calories: Math.round(calories * multiplier),
-            protein_g: Math.round(protein * multiplier * 10) / 10,
-            carbs_g: Math.round(carbs * multiplier * 10) / 10,
-            fat_g: Math.round(fat * multiplier * 10) / 10,
-            fiber_g: fiber > 0 ? Math.round(fiber * multiplier * 10) / 10 : null,
-            sugar_g: sugar > 0 ? Math.round(sugar * multiplier * 10) / 10 : null,
-            source: 'openfoodfacts',
-            aliases: aliases,
-          })
-        }
-        return items
-      } catch (err) {
-        console.warn('Failed to load fast food items:', err)
-        return []
-      }
-    }
-
-    const CUSTOM_PACKAGED_ITEMS: CustomPackagedItem[] = [
-      {
-        id: 'custom:burger-with-the-lot',
-        name: 'Burger with the lot (fish & chip shop)',
-        brand: null,
-        serving_size: '1 burger',
-        calories: 950,
-        protein_g: 44,
-        carbs_g: 72,
-        fat_g: 62,
-        fiber_g: 6.5,
-        sugar_g: 16,
-        source: 'openfoodfacts',
-        aliases: ['burger with the lot', 'burger with lot', 'fish and chip shop burger', 'fish & chip shop burger'],
-      },
-      ...loadBeverageItems(),
-      ...loadFastFoodItems(),
-    ]
+    const customPackagedItems =
+      kindMode === 'packaged' ? buildCustomPackagedItems(await getCustomPackagedItems(resolvedCountry)) : []
 
     const getCustomPackagedMatches = (value: string) => {
       if (!value) return []
@@ -718,7 +509,7 @@ export async function GET(request: NextRequest) {
       const normalizedQuery = normalizeForMatch(value)
       
       const buildMatches = (allowTypo: boolean) =>
-        CUSTOM_PACKAGED_ITEMS.filter((item) => {
+        customPackagedItems.filter((item) => {
           const name = item.name || ''
           const brand = item.brand || ''
           const brandName = brand ? `${brand} ${name}` : name
@@ -762,15 +553,15 @@ export async function GET(request: NextRequest) {
     const customPackagedMatches = kindMode === 'packaged' ? getCustomPackagedMatches(query) : []
     let customPackagedApplied = false
 
-    const toCustomFoodItems = (value: string, options?: { allowTypo?: boolean }) => {
+    const toCustomFoodItems = async (value: string, options?: { allowTypo?: boolean }) => {
       if (kindMode !== 'single') return []
-      const matches = searchCustomFoodMacros(value, limit, options)
+      const matches = await searchCustomFoodMacros(value, limit, { ...options, country: resolvedCountry })
       if (!matches.length) return []
       const items = matches.map((item) => ({
-        source: 'usda' as const,
-        id: `custom:${normalizeForCompact(item.name) || normalizeForMatch(item.name)}`,
+        source: 'custom' as const,
+        id: `custom:${item.id || normalizeForCompact(item.name) || normalizeForMatch(item.name)}`,
         name: item.name,
-        brand: null,
+        brand: item.brand ?? null,
         serving_size: '100 g',
         calories: item.calories,
         protein_g: item.protein_g,
@@ -784,7 +575,7 @@ export async function GET(request: NextRequest) {
     }
 
     const buildSingleFoodResults = async (value: string) => {
-      const customPrefix = toCustomFoodItems(value, { allowTypo: false })
+      const customPrefix = await toCustomFoodItems(value, { allowTypo: false })
 
       // For single foods: only use foundation and legacy (simple foods), NOT branded (product foods)
       // Branded/product foods should only appear for packaged searches
@@ -811,7 +602,7 @@ export async function GET(request: NextRequest) {
 
       const hasPrefixMatches = customPrefix.length > 0 || mainPrefix.length > 0
 
-      const customFinal = hasPrefixMatches ? customPrefix : toCustomFoodItems(value, { allowTypo: true })
+      const customFinal = hasPrefixMatches ? customPrefix : await toCustomFoodItems(value, { allowTypo: true })
       const mainFinal = hasPrefixMatches
         ? mainPrefix
         : filterItemsByQuery(mainDeduped, value, (item) => item?.name || '', true)
@@ -1151,6 +942,7 @@ export async function GET(request: NextRequest) {
       const scoreItem = (it: any) => {
         let score = 0
         score += scoreItemName(it)
+        if (it?.source === 'custom') score += 8
         if (it?.source === 'usda') score += 4
         if (it?.source === 'fatsecret') score += isMealQuery ? 6 : 2
         if (it?.source === 'openfoodfacts') score += 1
@@ -1220,38 +1012,36 @@ export async function GET(request: NextRequest) {
           return await fetchForQuery(compactQuery)
         }
 
-        // For packaged foods, always query OpenFoodFacts and FatSecret first (they have fast food items)
-        // Then merge with local USDA branded items
-        const [localPackaged, externalPool] = await Promise.all([
-          searchLocalPreferred(query, 'packaged'),
-          fetchExternalPool(),
-        ])
+        const localPackaged = await searchLocalPreferred(query, 'packaged')
 
-        // Combine external (OpenFoodFacts/FatSecret) with local USDA branded
-        const allPackaged = [...externalPool, ...localPackaged]
-        
-        // Filter to only items that match the query
-        const filtered = filterItemsByQuery(allPackaged, query, (item) => {
-          const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-          return combined || item?.name || ''
-        })
-
-        // Custom packaged items take precedence
+        // If we already have custom packaged matches, return them immediately and skip slow external calls.
         if (customPackagedMatches.length > 0) {
-          // Prioritize custom items: sort them first, then add others
+          const localFiltered = filterItemsByQuery(localPackaged, query, (item) => {
+            const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+            return combined || item?.name || ''
+          })
           const sortedCustom = sortPackagedByAlphabeticalHierarchyAsc(customPackagedMatches, query)
-          const sortedOthers = sortPackagedByAlphabeticalHierarchyAsc(filtered, query)
-          // Custom items always come first
+          const sortedOthers = sortPackagedByAlphabeticalHierarchyAsc(localFiltered, query)
           items = [...sortedCustom, ...sortedOthers].slice(0, limit)
           actualSource = 'auto'
           customPackagedApplied = true
-        } else if (filtered.length > 0) {
-          items = sortPackagedByAlphabeticalHierarchyAsc(filtered, query).slice(0, limit)
-          actualSource = 'auto'
         } else {
-          // If no matches, still try external pool without filtering (might have partial matches)
-          items = sortPackagedByAlphabeticalHierarchyAsc(externalPool, query).slice(0, limit)
-          actualSource = 'auto'
+          // For packaged foods, query OpenFoodFacts and FatSecret, then merge with local USDA branded items
+          const externalPool = await fetchExternalPool()
+          const allPackaged = [...externalPool, ...localPackaged]
+          const filtered = filterItemsByQuery(allPackaged, query, (item) => {
+            const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+            return combined || item?.name || ''
+          })
+
+          if (filtered.length > 0) {
+            items = sortPackagedByAlphabeticalHierarchyAsc(filtered, query).slice(0, limit)
+            actualSource = 'auto'
+          } else {
+            // If no matches, still try external pool without filtering (might have partial matches)
+            items = sortPackagedByAlphabeticalHierarchyAsc(externalPool, query).slice(0, limit)
+            actualSource = 'auto'
+          }
         }
       }
     } else if (source === 'openfoodfacts') {

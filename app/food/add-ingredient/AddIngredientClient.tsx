@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
+import MissingFoodReport from '@/components/food/MissingFoodReport'
 import {
   DEFAULT_UNIT_GRAMS,
   MeasurementUnit,
@@ -17,7 +19,7 @@ type SearchKind = 'packaged' | 'single'
 type SearchSource = 'auto' | 'usda' | 'openfoodfacts'
 
 type NormalizedFoodItem = {
-  source: 'openfoodfacts' | 'usda' | 'fatsecret'
+  source: 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom'
   id: string
   name: string
   brand?: string | null
@@ -727,6 +729,7 @@ const buildMeatFatLabel = (item: NormalizedFoodItem, queryText: string) => {
 export default function AddIngredientClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { userData } = useUserData()
 
   const selectedDate = searchParams.get('date') || buildTodayIso()
   const category = normalizeCategory(searchParams.get('category'))
@@ -1067,6 +1070,7 @@ export default function AddIngredientClient() {
     const source = sourceOverride ?? sourceChoice
     const k = kindOverride ?? kind
     const cacheKey = buildSearchCacheKey(k, source)
+    const userCountry = String(userData?.country || '').trim()
     if (!q) {
       setError('Please type a food name to search.')
       return
@@ -1092,6 +1096,7 @@ export default function AddIngredientClient() {
           kind: k,
           limit: '20',
         })
+        if (userCountry) params.set('country', userCountry)
         if (options?.localOnly) params.set('localOnly', '1')
         const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET', signal: controller.signal })
         const data = await res.json().catch(() => ({}))
@@ -1699,6 +1704,14 @@ export default function AddIngredientClient() {
             )}
           </div>
           {/* PROTECTED: ADD_INGREDIENT_SEARCH END */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
+            <MissingFoodReport
+              defaultQuery={query}
+              kind={kind}
+              country={userData?.country || ''}
+              source="add-ingredient"
+            />
+          </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-2">
             <div className="text-sm font-semibold text-gray-900">Or use AI photo analysis</div>

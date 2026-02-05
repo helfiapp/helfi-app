@@ -190,6 +190,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    const headerCountry =
+      (request.headers.get('x-vercel-ip-country') || request.headers.get('cf-ipcountry') || '').trim().toUpperCase()
+    if (headerCountry && !user.country) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { country: headerCountry },
+        })
+        user.country = headerCountry
+      } catch (error) {
+        console.error('Failed to store user country:', error)
+      }
+    }
+
     console.log('GET /api/user-data - Loading data for user:', userEmail)
 
     // Debug: Log actual user data from database
@@ -620,6 +634,7 @@ export async function GET(request: NextRequest) {
         imageUrl: med.imageUrl || null
       }))),
       profileImage: user.image || null,
+      country: user.country || headerCountry || '',
       todaysFoods: normalizedTodaysFoods,
       favorites,
       foodLibrary,

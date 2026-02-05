@@ -30,6 +30,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import MissingFoodReport from '@/components/food/MissingFoodReport'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
@@ -2518,6 +2519,11 @@ export default function FoodDiary() {
   const isAnalysisRoute = pathname === '/food/analysis'
   const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
   const { userData, profileImage, updateUserData, refreshData } = useUserData()
+  const userCountry = String(userData?.country || '').trim()
+  const applyCountryParam = (params: URLSearchParams) => {
+    if (userCountry) params.set('country', userCountry)
+    return params
+  }
   const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
   const initialDeviceStatus = useMemo(() => readDeviceStatusSnapshot(userCacheKey), [userCacheKey])
   const initialFavoritesAllSnapshot = useMemo(() => readFavoritesAllSnapshot(userCacheKey), [userCacheKey])
@@ -4860,12 +4866,12 @@ export default function FoodDiary() {
       let results: any[] = []
       for (const q of uniqueQueries) {
         try {
-          const params = new URLSearchParams({
+          const params = applyCountryParam(new URLSearchParams({
             source: 'auto',
             q,
             kind: 'single',
             limit: '10',
-          })
+          }))
           const res = await fetch(`/api/food-data?${params.toString()}`, { signal: controller.signal })
           if (!res.ok) continue
           const data = await res.json()
@@ -5864,12 +5870,12 @@ export default function FoodDiary() {
     const lookup = String((item as any).__searchQuery || item.name || '').trim()
     if (!lookup) return null
     try {
-      const params = new URLSearchParams({
+      const params = applyCountryParam(new URLSearchParams({
         source: 'usda',
         q: lookup,
         kind: 'single',
         limit: '20',
-      })
+      }))
       const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
       if (!res.ok) return null
       const data = await res.json().catch(() => ({}))
@@ -5911,12 +5917,12 @@ export default function FoodDiary() {
     const trimmed = String(lookup || '').trim()
     if (!trimmed) return null
     try {
-      const usdaParams = new URLSearchParams({
+      const usdaParams = applyCountryParam(new URLSearchParams({
         source: 'usda',
         q: trimmed,
         kind: 'single',
         limit: '20',
-      })
+      }))
       usdaParams.set('localOnly', '1')
       const usdaRes = await fetch(`/api/food-data?${usdaParams.toString()}`, { method: 'GET' })
       if (usdaRes.ok) {
@@ -5925,12 +5931,12 @@ export default function FoodDiary() {
         const match = pickBestMacroMatch(items, trimmed)
         if (match) return match
       }
-      const packagedParams = new URLSearchParams({
+      const packagedParams = applyCountryParam(new URLSearchParams({
         source: 'auto',
         q: trimmed,
         kind: 'packaged',
         limit: '20',
-      })
+      }))
       const packagedRes = await fetch(`/api/food-data?${packagedParams.toString()}`, { method: 'GET' })
       if (!packagedRes.ok) return null
       const packagedData = await packagedRes.json().catch(() => ({}))
@@ -5977,7 +5983,11 @@ export default function FoodDiary() {
     if (resolved?.id) newItem.dbId = resolved.id
     newItem.dbLocked = true
 
-    if (newItem?.dbSource && newItem?.dbId && (newItem.dbSource === 'usda' || newItem.dbSource === 'fatsecret')) {
+    if (
+      newItem?.dbSource &&
+      newItem?.dbId &&
+      (newItem.dbSource === 'usda' || newItem.dbSource === 'fatsecret' || newItem.dbSource === 'custom')
+    ) {
       try {
         const params = new URLSearchParams({ source: newItem.dbSource, id: String(newItem.dbId) })
         const res = await fetch(`/api/food-data/servings?${params.toString()}`, { method: 'GET' })
@@ -6856,12 +6866,12 @@ export default function FoodDiary() {
     try {
       const sourceParam = mode === 'single' ? 'usda' : 'auto'
       const fetchItems = async (searchQuery: string, options?: { sourceParam?: string; localOnly?: boolean }) => {
-        const params = new URLSearchParams({
+        const params = applyCountryParam(new URLSearchParams({
           source: options?.sourceParam ?? sourceParam,
           q: searchQuery,
           kind: mode,
           limit: '20',
-        })
+        }))
         if (options?.localOnly) params.set('localOnly', '1')
         const url = `/api/food-data?${params.toString()}`
         const res = await fetch(url, {
@@ -8304,11 +8314,11 @@ const applyStructuredItems = (
               continue
             }
           }
-          const params = new URLSearchParams({
+          const params = applyCountryParam(new URLSearchParams({
             source: 'usda',
             q: name,
             kind: 'single',
-          })
+          }))
           const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
           if (!res.ok) continue
           const data = await res.json()
@@ -17684,6 +17694,14 @@ Please add nutritional information manually if needed.`);
                   </div>
                 )}
                   {/* PROTECTED: ADD_INGREDIENT_MODAL_SEARCH END */}
+                <div className="mt-4 rounded-xl border border-gray-200 bg-white p-3">
+                  <MissingFoodReport
+                    defaultQuery={officialSearchQuery}
+                    kind={officialSource}
+                    country={userCountry}
+                    source="food-modal"
+                  />
+                </div>
                 <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
                   <div className="text-sm font-medium text-gray-900">
                     Or use AI photo analysis
