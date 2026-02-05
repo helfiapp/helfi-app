@@ -6,7 +6,7 @@ APP TODO LIST (FOR YOU, NO CODING)
 4. ✅ Assets received in `public/mobile-assets/`: static splash (`STATIC SPLASH.png`), animated splash (`ANIMATED SPLASH.mp4`), logo (`HELFI TRANSPARENT.png`), and favicon/icon source (`FAVICON.png`).
 5. Screenshots: hold off for now; we will take them once the app sections are final.
 6. ☐ Create a Google Play developer account (one-time fee). After it is ready, add me as a user with access so I can handle setup.
-7. ☐ Create an Apple Developer account (annual fee). After it is ready, add me as an admin so I can handle setup and signing.
+7. ✅ Create an Apple Developer account (annual fee). Next: add me as an admin so I can handle setup and signing.
 8. ☐ If you prefer, I can manage the Firebase/notifications setup so you do not have to touch it. Just create the account and give me access (or invite me to your Google account project) and I will handle the details.
 9. ☐ Decide if the app will collect data like email, name, or health info. Tell me what you collect so I can fill in the store compliance answers.
 10. ☐ Decide if you want push notifications on launch. If yes, confirm what types (reminders, updates, marketing) so I can configure them correctly.
