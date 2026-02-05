@@ -823,6 +823,8 @@ function buildInsightCandidates(params: {
   correlationSignals: any
   lateMealImpact: any
   checkinSummary: any
+  supplements: Array<{ name?: string | null; dosage?: string | null; timing?: string | null }>
+  medications: Array<{ name?: string | null; dosage?: string | null; timing?: string | null }>
   labHighlights: Array<any>
   labTrends: Array<any>
   moodRange: number | null
@@ -861,6 +863,21 @@ function buildInsightCandidates(params: {
   const timezone = params.timezone || 'UTC'
   const dailyStats = Array.isArray(params.dailyStats) ? params.dailyStats : []
   const dailyMap = new Map(dailyStats.map((row) => [row.date, row]))
+  const supplements = Array.isArray(params.supplements) ? params.supplements : []
+  const medications = Array.isArray(params.medications) ? params.medications : []
+  const labHighlights = Array.isArray(params.labHighlights) ? params.labHighlights : []
+  const labTrends = Array.isArray(params.labTrends) ? params.labTrends : []
+
+  const formatDateShort = (value?: string | null) => {
+    if (!value) return ''
+    return String(value).slice(0, 10)
+  }
+  const joinNames = (list: Array<{ name?: string | null }>, max = 4) =>
+    list
+      .map((item) => String(item?.name || '').trim())
+      .filter(Boolean)
+      .slice(0, max)
+      .join(', ')
 
   if (nutritionSignals.avgProtein && nutritionSignals.avgProtein < 70) {
     add({
@@ -996,6 +1013,85 @@ function buildInsightCandidates(params: {
       title: 'Late meals link to more symptoms',
       evidence: `Symptoms averaged ${lateMealImpact.lateSymptomAvg} on late-meal days vs ${lateMealImpact.otherSymptomAvg} on other days.`,
       action: 'Shift the last meal earlier and watch symptoms.',
+    })
+  }
+
+  if (supplements.length) {
+    const list = joinNames(supplements, 5)
+    if (list) {
+      add({
+        section: 'supplements',
+        bucket: 'working',
+        title: 'Supplements logged',
+        evidence: `Supplements listed this week: ${list}.`,
+        action: 'Keep timing consistent so we can link changes to mood or symptoms.',
+      })
+    }
+    const missingTiming = supplements.filter((s) => s?.name && !s?.timing)
+    const missingList = joinNames(missingTiming, 4)
+    if (missingList) {
+      add({
+        section: 'supplements',
+        bucket: 'suggested',
+        title: 'Supplement timing missing',
+        evidence: `Timing is missing for ${missingList}.`,
+        action: 'Add morning/afternoon/evening so we can spot patterns.',
+      })
+    }
+  }
+
+  if (medications.length) {
+    const list = joinNames(medications, 5)
+    if (list) {
+      add({
+        section: 'medications',
+        bucket: 'working',
+        title: 'Medications logged',
+        evidence: `Medications listed this week: ${list}.`,
+        action: 'Keep timing consistent and note any symptom changes.',
+      })
+    }
+    const missingTiming = medications.filter((m) => m?.name && !m?.timing)
+    const missingList = joinNames(missingTiming, 4)
+    if (missingList) {
+      add({
+        section: 'medications',
+        bucket: 'suggested',
+        title: 'Medication timing missing',
+        evidence: `Timing is missing for ${missingList}.`,
+        action: 'Add timing so we can compare with symptoms and sleep.',
+      })
+    }
+  }
+
+  const outOfRangeLabs = labHighlights.filter((item) => item?.status === 'above' || item?.status === 'below')
+  if (outOfRangeLabs.length) {
+    const lab = outOfRangeLabs[0]
+    const direction = lab?.status === 'above' ? 'above' : 'below'
+    add({
+      section: 'labs',
+      bucket: 'suggested',
+      title: `${lab?.name || 'Lab marker'} ${direction} range`,
+      evidence: `${lab?.name || 'Marker'} was ${lab?.value ?? ''}${lab?.unit ? ` ${lab.unit}` : ''} on ${formatDateShort(lab?.latestDate) || 'the latest test'}.`,
+      action: 'Discuss this with a clinician before changing supplements or medications.',
+    })
+  } else if (labHighlights.length) {
+    const lab = labHighlights[0]
+    add({
+      section: 'labs',
+      bucket: 'working',
+      title: 'Latest lab value captured',
+      evidence: `${lab?.name || 'Marker'} was ${lab?.value ?? ''}${lab?.unit ? ` ${lab.unit}` : ''} on ${formatDateShort(lab?.latestDate) || 'the latest test'}.`,
+      action: 'Keep labs updated so trends stay clear.',
+    })
+  } else if (labTrends.length) {
+    const lab = labTrends[0]
+    add({
+      section: 'labs',
+      bucket: 'working',
+      title: 'Lab trend tracked',
+      evidence: `${lab?.name || 'Marker'} moved ${lab?.direction || 'flat'} between ${formatDateShort(lab?.previousDate)} and ${formatDateShort(lab?.latestDate)}.`,
+      action: 'Share this trend with your clinician if needed.',
     })
   }
 
@@ -1178,6 +1274,7 @@ function buildModelInput(reportSignals: any) {
     supplements: sliceList(reportSignals.supplements, 10),
     medications: sliceList(reportSignals.medications, 10),
     sectionSignals: reportSignals.sectionSignals,
+    nutritionSignals: reportSignals.nutritionSignals,
     nutritionSummary: reportSignals.nutritionSummary
       ? {
           dailyAverages: reportSignals.nutritionSummary.dailyAverages,
@@ -1194,6 +1291,8 @@ function buildModelInput(reportSignals: any) {
           dailyTotals: sliceList(reportSignals.hydrationSummary.dailyTotals, 7),
         }
       : null,
+    mealTimingSummary: reportSignals.mealTimingSummary,
+    timeOfDayNutrition: sliceList(reportSignals.timeOfDayNutrition, 4),
     foodHighlights: trimFoodHighlights(reportSignals.foodHighlights),
     foodLogSample: trimFoodLogSample(reportSignals.foodLogSample || []),
     exerciseSummary: reportSignals.exerciseSummary,
@@ -1270,7 +1369,9 @@ function buildMinimalModelPayload(payload: any) {
     diabetesType: payload.diabetesType,
     supplements: limit(payload.supplements, 6),
     medications: limit(payload.medications, 6),
+    nutritionSignals: payload.nutritionSignals,
     sectionSignals: payload.sectionSignals,
+    mealTimingSummary: payload.mealTimingSummary,
     nutritionSummary: payload.nutritionSummary
       ? {
           dailyAverages: payload.nutritionSummary.dailyAverages,
@@ -1944,6 +2045,11 @@ function buildFallbackReport(context: any) {
   const gaps: Array<{ name: string; reason: string }> = []
   const candidates = Array.isArray(context?.insightCandidates) ? context.insightCandidates : []
   const riskFlags = Array.isArray(context?.riskFlags) ? context.riskFlags : []
+  const dataFlags = context?.dataFlags || {}
+  const correlationSignals = context?.correlationSignals || {}
+  const nutritionSignals = context?.nutritionSignals || {}
+  const mealTimingSummary = context?.mealTimingSummary || {}
+  const timeOfDayNutrition = Array.isArray(context?.timeOfDayNutrition) ? context.timeOfDayNutrition : []
   const nutritionSummary = context?.nutritionSummary || {}
   const hydrationSummary = context?.hydrationSummary || {}
   const exerciseSummary = context?.exerciseSummary || {}
@@ -1966,6 +2072,13 @@ function buildFallbackReport(context: any) {
     sections[section][bucket].push({ name: name || 'Insight', reason: reason || '' })
   }
 
+  const sectionHasItems = (section: ReportSectionKey) =>
+    sections[section].working.length + sections[section].suggested.length + sections[section].avoid.length > 0
+
+  const formatList = (items: string[], max = 4) => items.filter(Boolean).slice(0, max).join(', ')
+  const formatDateList = (items: Array<{ date?: string }>, max = 3) =>
+    items.map((item) => item?.date || '').filter(Boolean).slice(0, max).join(', ')
+
   for (const candidate of candidates) {
     const section = candidate.section as ReportSectionKey
     if (!REPORT_SECTIONS.includes(section)) continue
@@ -1981,6 +2094,45 @@ function buildFallbackReport(context: any) {
   focus.forEach((item: any) => gaps.push({ name: item.title, reason: [item.evidence, item.action].filter(Boolean).join('\n') }))
   if (gaps.length < 3 && riskFlags.length) {
     riskFlags.slice(0, 3 - gaps.length).forEach((flag: any) => gaps.push(flag))
+  }
+  if (!wins.length) {
+    if (correlationSignals?.hydrationMood?.diff > 0) {
+      wins.push({
+        name: 'Hydration matched better mood',
+        reason: `Mood was higher on better-hydrated days (${correlationSignals.hydrationMood.highAvg} vs ${correlationSignals.hydrationMood.lowAvg}).`,
+      })
+    } else if (correlationSignals?.exerciseMood?.diff > 0) {
+      wins.push({
+        name: 'Movement matched better mood',
+        reason: `Mood was higher on more active days (${correlationSignals.exerciseMood.highAvg} vs ${correlationSignals.exerciseMood.lowAvg}).`,
+      })
+    } else if ((checkinSummary?.goals || []).length) {
+      const topGoal = checkinSummary.goals[0]
+      if (topGoal?.goal) {
+        wins.push({
+          name: 'Check-ins recorded',
+          reason: `You tracked ${topGoal.goal} this week, giving us a baseline to measure against.`,
+        })
+      }
+    }
+  }
+  if (!gaps.length) {
+    if ((dataFlags.lowHydrationDays || []).length) {
+      gaps.push({
+        name: 'Hydration dips',
+        reason: `Lower hydration showed up on ${formatDateList(dataFlags.lowHydrationDays, 3)}.`,
+      })
+    } else if ((dataFlags.lowActivityDays || []).length) {
+      gaps.push({
+        name: 'Lower activity days',
+        reason: `Movement dropped on ${formatDateList(dataFlags.lowActivityDays, 3)}.`,
+      })
+    } else if ((dataFlags.symptomHeavyDays || []).length) {
+      gaps.push({
+        name: 'Symptom-heavy days',
+        reason: `Symptoms spiked on ${formatDateList(dataFlags.symptomHeavyDays, 3)}.`,
+      })
+    }
   }
 
   if (!sections.nutrition.working.length && nutritionSummary?.dailyAverages?.calories) {
@@ -2041,6 +2193,94 @@ function buildFallbackReport(context: any) {
       name: m.name,
       reason: 'Listed in your current routine.',
     }))
+  }
+  if (!sectionHasItems('nutrition') && nutritionSummary?.dailyAverages?.calories) {
+    const topFoods = Array.isArray(nutritionSummary?.topFoods)
+      ? formatList(nutritionSummary.topFoods.map((f: any) => f.name || '').filter(Boolean), 4)
+      : ''
+    addItem(
+      'nutrition',
+      'working',
+      'Daily nutrition snapshot',
+      `Average daily intake was about ${nutritionSummary.dailyAverages.calories} kcal with ${nutritionSummary.dailyAverages.protein_g}g protein. ${topFoods ? `Top foods: ${topFoods}.` : ''}`.trim()
+    )
+  }
+  if (!sections.nutrition.avoid.length && (dataFlags.sugarSpikes || []).length) {
+    const days = formatDateList(dataFlags.sugarSpikes, 3)
+    addItem(
+      'nutrition',
+      'avoid',
+      'Sugar spike days',
+      `Higher sugar days showed up on ${days}. Swap one sweet item for protein + fiber on those days.`
+    )
+  }
+  if (!sectionHasItems('hydration') && hydrationSummary?.dailyAverageMl) {
+    addItem(
+      'hydration',
+      'working',
+      'Hydration baseline',
+      `Average water was about ${Math.round(hydrationSummary.dailyAverageMl)} ml per day across ${hydrationSummary.daysWithLogs || 0} days.`
+    )
+  }
+  if (!sections.hydration.suggested.length && (dataFlags.lowHydrationDays || []).length) {
+    const days = formatDateList(dataFlags.lowHydrationDays, 3)
+    addItem(
+      'hydration',
+      'suggested',
+      'Low hydration days',
+      `Lower intake showed up on ${days}. Add a bottle earlier in the day and compare how you feel.`
+    )
+  }
+  if (!sectionHasItems('exercise') && exerciseSummary?.totalMinutes) {
+    const topActivities = Array.isArray(exerciseSummary?.topActivities)
+      ? formatList(exerciseSummary.topActivities.map((a: any) => a.name || '').filter(Boolean), 3)
+      : ''
+    addItem(
+      'exercise',
+      'working',
+      'Movement summary',
+      `You logged about ${exerciseSummary.totalMinutes} minutes across ${exerciseSummary.sessions} sessions. ${topActivities ? `Top activities: ${topActivities}.` : ''}`.trim()
+    )
+  }
+  if (!sectionHasItems('mood') && moodSummary?.averageMood != null) {
+    addItem(
+      'mood',
+      'working',
+      'Mood average',
+      `Average mood was about ${moodSummary.averageMood} across ${moodSummary.entries || 0} entries.`
+    )
+  }
+  if (!sectionHasItems('symptoms') && symptomSummary?.topSymptoms?.length) {
+    const topSymptoms = formatList(symptomSummary.topSymptoms.map((s: any) => s.name || '').filter(Boolean), 4)
+    addItem('symptoms', 'working', 'Most common symptoms', `Most common symptoms this week: ${topSymptoms}.`)
+  }
+  if (!sectionHasItems('supplements') && supplements.length) {
+    const list = formatList(supplements.map((s: any) => s.name || '').filter(Boolean), 5)
+    addItem('supplements', 'working', 'Supplements logged', `Supplements listed: ${list}.`)
+  }
+  if (!sectionHasItems('medications') && medications.length) {
+    const list = formatList(medications.map((m: any) => m.name || '').filter(Boolean), 5)
+    addItem('medications', 'working', 'Medications logged', `Medications listed: ${list}.`)
+  }
+  if (!sectionHasItems('labs') && (labHighlights.length || labTrends.length)) {
+    const first = labHighlights[0] || labTrends[0]
+    addItem(
+      'labs',
+      'working',
+      'Latest lab markers',
+      first?.name ? `${first.name} has a recent result in your labs.` : 'Recent lab values were captured.'
+    )
+  }
+  if (!sectionHasItems('lifestyle')) {
+    if ((mealTimingSummary.lateMealDays || []).length) {
+      const days = mealTimingSummary.lateMealDays.slice(0, 3).join(', ')
+      addItem('lifestyle', 'avoid', 'Late meals', `Late meals showed up on ${days}. Try an earlier dinner on those days.`)
+    } else if ((mealTimingSummary.lateSnackDays || []).length) {
+      const days = mealTimingSummary.lateSnackDays.slice(0, 3).join(', ')
+      addItem('lifestyle', 'suggested', 'Late snacks', `Late snacks showed up on ${days}. Keep them lighter and protein-based.`)
+    } else if (timeOfDayNutrition.length) {
+      addItem('lifestyle', 'working', 'Meal timing logged', 'Meal timing data is available for this week.')
+    }
   }
   if (!sections.overview.working.length && checkinSummary?.goals?.length) {
     const topGoals = checkinSummary.goals.map((g: any) => g.goal).filter(Boolean).slice(0, 2)
@@ -2757,6 +2997,8 @@ export async function POST(request: NextRequest) {
     correlationSignals,
     lateMealImpact,
     checkinSummary,
+    supplements: user.supplements || [],
+    medications: user.medications || [],
     labHighlights,
     labTrends,
     moodRange,
@@ -2952,6 +3194,9 @@ Rules:
 - Do not list raw log counts or repeat "you logged X entries" unless it directly supports a pattern or gap.
 - Avoid telling the user to "keep logging" unless a section has no usable data.
 - If sectionSignals show data for a section, include 2-3 items in "working" or "suggested" when there is enough data; otherwise include at least 1.
+- If supplements are listed, include at least one item in the supplements section that names the supplement(s).
+- If medications are listed, include at least one item in the medications section that names the medication(s).
+- If labHighlights or labTrends exist, include at least one labs item that names the marker and its latest value/date.
 - Only include "avoid" items when dataFlags show spikes/low days or symptom-heavy days.
 - If a section truly has no data, leave its arrays empty.
 - If you cannot support a win or gap with data, leave that list empty.
