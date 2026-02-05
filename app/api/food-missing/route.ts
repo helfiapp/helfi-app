@@ -54,7 +54,7 @@ async function sendMissingFoodEmail(payload: {
               <p style="margin: 0; font-size: 14px;"><strong>Notes:</strong></p>
               <p style="margin: 6px 0 0 0; font-size: 14px; color: #4b5563;">${payload.notes || '—'}</p>
             </div>
-            ${getEmailFooter({ recipientEmail: supportEmail, emailType: 'missing-food' })}
+            ${getEmailFooter({ recipientEmail: supportEmail, emailType: 'support' })}
           </div>
         </div>
       `,
