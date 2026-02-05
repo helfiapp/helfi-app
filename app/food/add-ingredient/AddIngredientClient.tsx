@@ -17,7 +17,7 @@ type SearchKind = 'packaged' | 'single'
 type SearchSource = 'auto' | 'usda' | 'openfoodfacts'
 
 type NormalizedFoodItem = {
-  source: 'openfoodfacts' | 'usda' | 'fatsecret'
+  source: 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom'
   id: string
   name: string
   brand?: string | null

@@ -11,7 +11,7 @@ import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '@/lib/food/dairy-semi-solid-measu
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 
 type NormalizedFoodItem = {
-  source: 'openfoodfacts' | 'usda' | 'fatsecret'
+  source: 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom'
   id: string
   name: string
   brand?: string | null
