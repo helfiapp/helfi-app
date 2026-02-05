@@ -1476,6 +1476,68 @@ function buildUltraMinimalModelPayload(payload: any) {
   }
 }
 
+function buildTinyModelPayload(payload: any) {
+  const limit = (list: any, max: number) => (Array.isArray(list) ? list.slice(0, max) : [])
+  const trimCandidate = (item: any) => ({
+    section: item?.section,
+    bucket: item?.bucket,
+    title: clipText(item?.title || item?.name || '', 80),
+    evidence: clipText(item?.evidence || '', 160),
+    action: clipText(item?.action || '', 160),
+  })
+
+  return {
+    periodStart: payload.periodStart,
+    periodEnd: payload.periodEnd,
+    timezone: payload.timezone,
+    goals: limit(payload.goals, 3),
+    issues: limit(payload.issues, 3),
+    healthSituations: clipText(payload.healthSituations || '', 180),
+    supplements: limit(payload.supplements, 3),
+    medications: limit(payload.medications, 3),
+    sectionSignals: payload.sectionSignals,
+    nutritionSignals: payload.nutritionSignals,
+    mealTimingSummary: payload.mealTimingSummary
+      ? {
+          lateMealDays: limit(payload.mealTimingSummary.lateMealDays, 3),
+          lateSnackDays: limit(payload.mealTimingSummary.lateSnackDays, 3),
+        }
+      : null,
+    hydrationSummary: payload.hydrationSummary
+      ? {
+          dailyAverageMl: payload.hydrationSummary.dailyAverageMl,
+          daysWithLogs: payload.hydrationSummary.daysWithLogs,
+        }
+      : null,
+    exerciseSummary: payload.exerciseSummary
+      ? {
+          totalMinutes: payload.exerciseSummary.totalMinutes,
+          sessions: payload.exerciseSummary.sessions,
+          daysActive: payload.exerciseSummary.daysActive,
+        }
+      : null,
+    moodSummary: payload.moodSummary
+      ? {
+          averageMood: payload.moodSummary.averageMood,
+          entries: payload.moodSummary.entries,
+          daysWithLogs: payload.moodSummary.daysWithLogs,
+        }
+      : null,
+    symptomSummary: payload.symptomSummary
+      ? {
+          entries: payload.symptomSummary.entries,
+          uniqueSymptoms: payload.symptomSummary.uniqueSymptoms,
+          topSymptoms: limit(payload.symptomSummary.topSymptoms, 2),
+        }
+      : null,
+    labHighlights: limit(payload.labHighlights, 2),
+    labTrends: limit(payload.labTrends, 1),
+    insightCandidates: limit(payload.insightCandidates, 6).map(trimCandidate),
+    riskFlags: limit(payload.riskFlags, 3),
+    coverage: payload.coverage,
+  }
+}
+
 function prepareModelPayload(payload: any, maxChars: number) {
   const originalJson = safeJsonStringify(payload)
   if (originalJson.length <= maxChars) {
@@ -1495,7 +1557,13 @@ function prepareModelPayload(payload: any, maxChars: number) {
 
   const ultraPayload = buildUltraMinimalModelPayload(payload)
   const ultraJson = safeJsonStringify(ultraPayload)
-  return { payload: ultraPayload, json: ultraJson, size: ultraJson.length, stage: 'ultra' as const }
+  if (ultraJson.length <= maxChars) {
+    return { payload: ultraPayload, json: ultraJson, size: ultraJson.length, stage: 'ultra' as const }
+  }
+
+  const tinyPayload = buildTinyModelPayload(payload)
+  const tinyJson = safeJsonStringify(tinyPayload)
+  return { payload: tinyPayload, json: tinyJson, size: tinyJson.length, stage: 'tiny' as const }
 }
 
 function buildTalkToAiSummary(

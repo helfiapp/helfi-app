@@ -97,6 +97,20 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   }, [issues, router])
 
   useEffect(() => {
+    const removeDebugPanels = () => {
+      if (typeof document === 'undefined') return
+      const nodes = Array.from(document.querySelectorAll('div'))
+      nodes.forEach((node) => {
+        const text = node.textContent || ''
+        if (text.includes('Weekly report debug')) {
+          node.remove()
+        }
+      })
+    }
+    removeDebugPanels()
+  }, [])
+
+  useEffect(() => {
     if (initialWeeklyStatus) return
     let mounted = true
     fetch('/api/reports/weekly/status', { method: 'GET' })
