@@ -272,6 +272,7 @@ const importRows = async () => {
   const upsertItem = async (payload: {
     name: string
     brand: string | null
+    country?: string | null
     kind: 'SINGLE' | 'PACKAGED' | 'FAST_FOOD'
     group: string | null
     caloriesPer100g: number | null
@@ -290,6 +291,7 @@ const importRows = async () => {
         key,
         name: payload.name,
         brand: payload.brand,
+        country: payload.country ?? null,
         kind: payload.kind,
         group: payload.group,
         caloriesPer100g: payload.caloriesPer100g,
@@ -304,6 +306,7 @@ const importRows = async () => {
       update: {
         name: payload.name,
         brand: payload.brand,
+        country: payload.country ?? null,
         kind: payload.kind,
         group: payload.group,
         caloriesPer100g: payload.caloriesPer100g,

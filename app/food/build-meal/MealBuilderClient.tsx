@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
+import MissingFoodReport from '@/components/food/MissingFoodReport'
 import { DRY_FOOD_MEASUREMENTS } from '@/lib/food/dry-food-measurements'
 import { PRODUCE_MEASUREMENTS } from '@/lib/food/produce-measurements'
 import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '@/lib/food/dairy-semi-solid-measurements'
@@ -1723,12 +1724,14 @@ export default function MealBuilderClient() {
     if (!q) return []
     const kindToUse = options?.kindOverride || kind
     const sourceParam = options?.sourceOverride || 'auto'
+    const userCountry = String(userData?.country || '').trim()
     const params = new URLSearchParams({
       source: sourceParam,
       q: q,
       kind: kindToUse,
       limit: '20',
     })
+    if (userCountry) params.set('country', userCountry)
     if (options?.localOnly) params.set('localOnly', '1')
     const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
     if (!res.ok) return []
@@ -3539,6 +3542,14 @@ export default function MealBuilderClient() {
               )}
             </div>
           )}
+          <div className="pt-2">
+            <MissingFoodReport
+              defaultQuery={query}
+              kind={kind}
+              country={userData?.country || ''}
+              source="build-meal"
+            />
+          </div>
           <div className="flex gap-2">
             <button
               type="button"

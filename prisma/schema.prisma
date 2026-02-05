@@ -17,6 +17,7 @@ model User {
   gender                 Gender?
   weight                 Float?
   height                 Float?
+  country                String?
   bodyType               BodyType?
   exerciseFrequency      String?
   exerciseTypes          String[]
@@ -318,6 +319,7 @@ model CustomFoodItem {
   key             String          @unique
   name            String
   brand           String?
+  country         String?
   kind            CustomFoodKind  @default(SINGLE)
   group           String?
   caloriesPer100g Float?
@@ -333,6 +335,30 @@ model CustomFoodItem {
 
   @@index([name])
   @@index([brand])
+  @@index([country])
+  @@index([kind])
+}
+
+model FoodMissingReport {
+  id          String   @id @default(cuid())
+  userId      String?
+  userEmail   String?
+  name        String
+  brand       String?
+  chain       String?
+  size        String?
+  country     String?
+  kind        String?
+  query       String?
+  source      String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([country])
   @@index([kind])
 }
 

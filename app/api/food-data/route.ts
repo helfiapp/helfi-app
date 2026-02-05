@@ -25,6 +25,10 @@ export async function GET(request: NextRequest) {
     const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : NaN
     const limit = Number.isFinite(limitParsed) ? Math.min(Math.max(limitParsed, 1), 50) : 20
     const kindMode = kind === 'packaged' ? 'packaged' : 'single'
+    const countryParam = (searchParams.get('country') || '').trim().toUpperCase()
+    const headerCountry =
+      (request.headers.get('x-vercel-ip-country') || request.headers.get('cf-ipcountry') || '').trim().toUpperCase()
+    const resolvedCountry = countryParam || headerCountry || ''
 
     if (!query) {
       return NextResponse.json(
@@ -444,6 +448,7 @@ export async function GET(request: NextRequest) {
       id: string
       name: string
       brand?: string | null
+      kind?: string | null
       serving_size?: string | null
       calories?: number | null
       protein_g?: number | null
@@ -462,32 +467,39 @@ export async function GET(request: NextRequest) {
         if (!Array.isArray(options) || options.length === 0) return null
         return options[0]
       }
-      return rows.map((row) => {
-        const options = Array.isArray(row?.servingOptions) ? row.servingOptions : []
-        const selected = pickDefaultOption(options)
-        const servingLabel =
-          (selected?.label || selected?.serving_size || row?.serving_size || '').toString().trim() ||
-          '100 g'
-        const itemId = row?.id ? String(row.id) : normalizeForCompact(`${row?.brand || ''} ${row?.name || ''}`)
-        return {
-          id: `custom:${itemId}`,
-          name: row?.name || '',
-          brand: row?.brand ?? null,
-          serving_size: servingLabel,
-          calories: selected?.calories ?? row?.calories ?? null,
-          protein_g: selected?.protein_g ?? row?.protein_g ?? null,
-          carbs_g: selected?.carbs_g ?? row?.carbs_g ?? null,
-          fat_g: selected?.fat_g ?? row?.fat_g ?? null,
-          fiber_g: selected?.fiber_g ?? row?.fiber_g ?? null,
-          sugar_g: selected?.sugar_g ?? row?.sugar_g ?? null,
-          source: 'custom',
-          aliases: Array.isArray(row?.aliases) ? row.aliases : [],
-          __custom: true,
-        }
-      })
+      return rows
+        .map((row) => {
+          const kindValue = row?.kind ? String(row.kind) : null
+          const isFastFood = kindValue === 'FAST_FOOD'
+          const options = Array.isArray(row?.servingOptions) ? row.servingOptions : []
+          if (isFastFood && options.length === 0) return null
+          const selected = pickDefaultOption(options)
+          const servingLabel =
+            (selected?.label || selected?.serving_size || row?.serving_size || '').toString().trim() ||
+            '100 g'
+          const itemId = row?.id ? String(row.id) : normalizeForCompact(`${row?.brand || ''} ${row?.name || ''}`)
+          return {
+            id: `custom:${itemId}`,
+            name: row?.name || '',
+            brand: row?.brand ?? null,
+            kind: kindValue,
+            serving_size: servingLabel,
+            calories: selected?.calories ?? row?.calories ?? null,
+            protein_g: selected?.protein_g ?? row?.protein_g ?? null,
+            carbs_g: selected?.carbs_g ?? row?.carbs_g ?? null,
+            fat_g: selected?.fat_g ?? row?.fat_g ?? null,
+            fiber_g: selected?.fiber_g ?? row?.fiber_g ?? null,
+            sugar_g: selected?.sugar_g ?? row?.sugar_g ?? null,
+            source: 'custom',
+            aliases: Array.isArray(row?.aliases) ? row.aliases : [],
+            __custom: true,
+          }
+        })
+        .filter(Boolean) as CustomPackagedItem[]
     }
 
-    const customPackagedItems = kindMode === 'packaged' ? buildCustomPackagedItems(await getCustomPackagedItems()) : []
+    const customPackagedItems =
+      kindMode === 'packaged' ? buildCustomPackagedItems(await getCustomPackagedItems(resolvedCountry)) : []
 
     const getCustomPackagedMatches = (value: string) => {
       if (!value) return []
@@ -543,7 +555,7 @@ export async function GET(request: NextRequest) {
 
     const toCustomFoodItems = async (value: string, options?: { allowTypo?: boolean }) => {
       if (kindMode !== 'single') return []
-      const matches = await searchCustomFoodMacros(value, limit, options)
+      const matches = await searchCustomFoodMacros(value, limit, { ...options, country: resolvedCountry })
       if (!matches.length) return []
       const items = matches.map((item) => ({
         source: 'custom' as const,

@@ -11,6 +11,7 @@ export type CustomFoodMacro = {
   fiber_g: number | null
   sugar_g: number | null
   brand?: string | null
+  country?: string | null
   kind?: 'SINGLE' | 'PACKAGED' | 'FAST_FOOD'
   aliases?: string[]
   servingOptions?: any[] | null
@@ -185,6 +186,7 @@ const loadCustomFoods = async () => {
       id: row.id,
       name: row.name,
       brand: row.brand ?? null,
+      country: row.country ?? null,
       kind: row.kind as CustomFoodMacro['kind'],
       calories: row.caloriesPer100g ?? null,
       protein_g: row.proteinPer100g ?? null,
@@ -204,13 +206,17 @@ const loadCustomFoods = async () => {
 export const searchCustomFoodMacros = async (
   query: string,
   limit = 10,
-  options?: { allowTypo?: boolean },
+  options?: { allowTypo?: boolean; country?: string | null },
 ): Promise<CustomFoodMacro[]> => {
   const q = String(query || '').trim()
   if (!q) return []
-  const items = (await loadCustomFoods()).filter(
-    (item) => item.kind === 'SINGLE' || item.kind === 'FAST_FOOD' || !item.kind,
-  )
+  const matchCountry = String(options?.country || '').trim().toUpperCase()
+  const items = (await loadCustomFoods()).filter((item) => {
+    if (!(item.kind === 'SINGLE' || !item.kind)) return false
+    if (!matchCountry) return true
+    const itemCountry = String(item.country || '').trim().toUpperCase()
+    return !itemCountry || itemCountry === matchCountry
+  })
   if (items.length === 0) return []
 
   const allowTypo = options?.allowTypo ?? true
@@ -229,7 +235,13 @@ export const searchCustomFoodMacros = async (
   return matches.slice(0, Math.max(1, limit))
 }
 
-export const getCustomPackagedItems = async (): Promise<CustomFoodMacro[]> => {
+export const getCustomPackagedItems = async (country?: string | null): Promise<CustomFoodMacro[]> => {
+  const matchCountry = String(country || '').trim().toUpperCase()
   const items = await loadCustomFoods()
-  return items.filter((item) => item.kind === 'PACKAGED' || item.kind === 'FAST_FOOD')
+  return items.filter((item) => {
+    if (!(item.kind === 'PACKAGED' || item.kind === 'FAST_FOOD')) return false
+    if (!matchCountry) return true
+    const itemCountry = String(item.country || '').trim().toUpperCase()
+    return !itemCountry || itemCountry === matchCountry
+  })
 }
