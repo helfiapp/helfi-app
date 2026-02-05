@@ -1218,6 +1218,27 @@ function clipText(value: string, max = 220) {
   return `${compact.slice(0, Math.max(0, max - 3)).trim()}...`
 }
 
+function normalizeTimingValue(value: unknown) {
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+    return items.length ? items.join(', ') : null
+  }
+  if (value === null || value === undefined) return null
+  const text = String(value).trim()
+  return text.length ? text : null
+}
+
+function normalizeMedList(list: Array<any> | null | undefined) {
+  if (!Array.isArray(list)) return []
+  return list.map((item) => ({
+    name: item?.name ?? null,
+    dosage: item?.dosage ?? null,
+    timing: normalizeTimingValue(item?.timing),
+  }))
+}
+
 function buildModelInput(reportSignals: any) {
   const sliceList = (list: any, max: number) => (Array.isArray(list) ? list.slice(0, max) : [])
   const trimTopFoods = (foods: any, max: number) =>
@@ -2967,6 +2988,8 @@ export async function POST(request: NextRequest) {
     })),
     timezone
   )
+  const supplementsForReport = normalizeMedList(user.supplements)
+  const medicationsForReport = normalizeMedList(user.medications)
   const correlationSignals = {
     hydrationMood: buildCorrelation(dailyStats, 'waterMl', 'moodAvg', { minDays: 4, minDiff: 0.3 }),
     exerciseMood: buildCorrelation(dailyStats, 'exerciseMinutes', 'moodAvg', { minDays: 4, minDiff: 0.3 }),
@@ -2997,8 +3020,8 @@ export async function POST(request: NextRequest) {
     correlationSignals,
     lateMealImpact,
     checkinSummary,
-    supplements: user.supplements || [],
-    medications: user.medications || [],
+    supplements: supplementsForReport,
+    medications: medicationsForReport,
     labHighlights,
     labTrends,
     moodRange,
@@ -3025,16 +3048,8 @@ export async function POST(request: NextRequest) {
     healthSituations: healthSituations || null,
     allergies,
     diabetesType,
-    supplements: (user.supplements || []).map((s) => ({
-      name: s.name,
-      dosage: s.dosage,
-      timing: s.timing,
-    })),
-    medications: (user.medications || []).map((m) => ({
-      name: m.name,
-      dosage: m.dosage,
-      timing: m.timing,
-    })),
+    supplements: supplementsForReport,
+    medications: medicationsForReport,
     nutritionSummary,
     hydrationSummary,
     foodHighlights,
