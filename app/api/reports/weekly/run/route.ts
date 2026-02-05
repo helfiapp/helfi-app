@@ -3378,6 +3378,19 @@ ${llmPayloadJson}
   })
 
   reportPayload.sections = dedupeReportSections(sections)
+  REPORT_SECTIONS.forEach((key) => {
+    const merged = reportPayload.sections?.[key]
+    const isEmpty =
+      !merged ||
+      (merged.working?.length || 0) + (merged.suggested?.length || 0) + (merged.avoid?.length || 0) === 0
+    if (isEmpty && fallbackSections?.[key]) {
+      reportPayload.sections[key] = {
+        working: Array.isArray(fallbackSections[key].working) ? fallbackSections[key].working : [],
+        suggested: Array.isArray(fallbackSections[key].suggested) ? fallbackSections[key].suggested : [],
+        avoid: Array.isArray(fallbackSections[key].avoid) ? fallbackSections[key].avoid : [],
+      }
+    }
+  })
   reportPayload.wins = wins
   reportPayload.gaps = gaps
   if (!summaryText) {
