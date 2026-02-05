@@ -52,13 +52,47 @@ export default function ReminderSettingsPage() {
   const [isIOS, setIsIOS] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
 
-  const [checkinsEnabled, setCheckinsEnabled] = useState(true)
-  const [checkinsTime1, setCheckinsTime1] = useState('12:30')
-  const [checkinsTime2, setCheckinsTime2] = useState('18:30')
-  const [checkinsTime3, setCheckinsTime3] = useState('21:30')
-  const [checkinsTime4, setCheckinsTime4] = useState('09:00')
-  const [checkinsTz, setCheckinsTz] = useState('Australia/Melbourne')
-  const [checkinsFrequency, setCheckinsFrequency] = useState(1)
+  const checkinsStickyKeyGlobal = 'checkins-settings-sticky'
+  const readStickyCheckins = () => {
+    if (typeof window === 'undefined') return null
+    try {
+      const rawUser = checkinsStickyKey ? localStorage.getItem(checkinsStickyKey) : null
+      const rawGlobal = localStorage.getItem(checkinsStickyKeyGlobal)
+      const raw = rawUser || rawGlobal
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      return parsed && typeof parsed === 'object' ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
+  const initialCheckins = readStickyCheckins()
+  const initialCheckinsFrequency = (() => {
+    const value = Number(initialCheckins?.frequency)
+    if (!Number.isFinite(value)) return 1
+    return Math.max(1, Math.min(4, Math.round(value)))
+  })()
+
+  const [checkinsEnabled, setCheckinsEnabled] = useState(
+    typeof initialCheckins?.enabled === 'boolean' ? initialCheckins.enabled : true
+  )
+  const [checkinsTime1, setCheckinsTime1] = useState(
+    normalizeTime(initialCheckins?.time1 || '12:30', '12:30')
+  )
+  const [checkinsTime2, setCheckinsTime2] = useState(
+    normalizeTime(initialCheckins?.time2 || '18:30', '18:30')
+  )
+  const [checkinsTime3, setCheckinsTime3] = useState(
+    normalizeTime(initialCheckins?.time3 || '21:30', '21:30')
+  )
+  const [checkinsTime4, setCheckinsTime4] = useState(
+    normalizeTime(initialCheckins?.time4 || '09:00', '09:00')
+  )
+  const [checkinsTz, setCheckinsTz] = useState(
+    (initialCheckins?.timezone && String(initialCheckins.timezone).trim()) || 'Australia/Melbourne'
+  )
+  const [checkinsFrequency, setCheckinsFrequency] = useState(initialCheckinsFrequency)
   const [checkinsMaxFrequency, setCheckinsMaxFrequency] = useState(1)
   const [checkinsLoading, setCheckinsLoading] = useState(true)
   const [checkinsSaving, setCheckinsSaving] = useState(false)
@@ -75,6 +109,7 @@ export default function ReminderSettingsPage() {
   })
   const checkinsDirtyRef = useRef(false)
   const checkinsCacheKey = session?.user?.email ? `checkins-settings:${session.user.email}` : ''
+  const checkinsStickyKey = session?.user?.email ? `checkins-settings-sticky:${session.user.email}` : ''
 
   const deviceTimezone = useMemo(() => {
     try {
@@ -226,6 +261,14 @@ export default function ReminderSettingsPage() {
         if (checkinsCacheKey) {
           writeClientCache(checkinsCacheKey, payload)
         }
+        try {
+          localStorage.setItem(checkinsStickyKeyGlobal, JSON.stringify(payload))
+        } catch {}
+        if (checkinsStickyKey) {
+          try {
+            localStorage.setItem(checkinsStickyKey, JSON.stringify(payload))
+          } catch {}
+        }
         if (!options?.silent) alert('Check-in reminders saved.')
       } else {
         const data = await res.json().catch(() => ({}))
@@ -236,7 +279,7 @@ export default function ReminderSettingsPage() {
     } finally {
       if (!options?.silent) setCheckinsSaving(false)
     }
-  }, [checkinsCacheKey, checkinsSaving, checkinsEnabled, checkinsTime1, checkinsTime2, checkinsTime3, checkinsTime4, checkinsTz, checkinsFrequency])
+  }, [checkinsCacheKey, checkinsStickyKey, checkinsSaving, checkinsEnabled, checkinsTime1, checkinsTime2, checkinsTime3, checkinsTime4, checkinsTz, checkinsFrequency])
 
   const saveMood = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: typeof moodRef.current }) => {
     if (moodSaving && !options?.silent) return
@@ -306,6 +349,26 @@ export default function ReminderSettingsPage() {
       setCheckinsFrequency(frequency)
     }
 
+    try {
+      const raw = localStorage.getItem(checkinsStickyKeyGlobal)
+      if (raw) {
+        const sticky = JSON.parse(raw)
+        applyCheckins(sticky)
+        setCheckinsLoading(false)
+      }
+    } catch {}
+
+    if (checkinsStickyKey) {
+      try {
+        const raw = localStorage.getItem(checkinsStickyKey)
+        if (raw) {
+          const sticky = JSON.parse(raw)
+          applyCheckins(sticky)
+          setCheckinsLoading(false)
+        }
+      } catch {}
+    }
+
     const cached = checkinsCacheKey ? readClientCache<any>(checkinsCacheKey) : null
     if (cached?.data) {
       applyCheckins(cached.data)
@@ -319,11 +382,19 @@ export default function ReminderSettingsPage() {
           const data = await res.json()
           applyCheckins(data, { setSnapshot: true })
           if (checkinsCacheKey) writeClientCache(checkinsCacheKey, data)
+          try {
+            localStorage.setItem(checkinsStickyKeyGlobal, JSON.stringify(data))
+          } catch {}
+          if (checkinsStickyKey) {
+            try {
+              localStorage.setItem(checkinsStickyKey, JSON.stringify(data))
+            } catch {}
+          }
         }
       } catch {}
       setCheckinsLoading(false)
     })()
-  }, [checkinsCacheKey])
+  }, [checkinsCacheKey, checkinsStickyKey])
 
   useEffect(() => {
     const applyMood = (data: any, options?: { setSnapshot?: boolean }) => {
