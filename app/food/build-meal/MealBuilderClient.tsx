@@ -1377,6 +1377,22 @@ const parseFavoriteItems = (fav: any): any[] | null => {
   return null
 }
 
+const extractTotalsSignature = (totals: any) => {
+  if (!totals || typeof totals !== 'object') return null
+  const toNumber = (value: any) => {
+    const parsed = typeof value === 'string' ? parseFloat(value) : Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return {
+    calories: toNumber((totals as any).calories),
+    protein: toNumber((totals as any).protein ?? (totals as any).protein_g),
+    carbs: toNumber((totals as any).carbs ?? (totals as any).carbs_g),
+    fat: toNumber((totals as any).fat ?? (totals as any).fat_g),
+    fiber: toNumber((totals as any).fiber ?? (totals as any).fiber_g),
+    sugar: toNumber((totals as any).sugar ?? (totals as any).sugar_g),
+  }
+}
+
 const sanitizeMealTitle = (v: string) => v.replace(/\s+/g, ' ').trim()
 
 const buildDefaultMealName = (items: BuilderItem[]) => {
@@ -3115,6 +3131,7 @@ export default function MealBuilderClient() {
         }
         const previousDescription = String(existing?.description || existing?.label || '').trim()
         const previousItemsSignature = buildRawItemsSignature(parseFavoriteItems(existing))
+        const previousTotals = extractTotalsSignature(existing?.nutrition || existing?.total || null)
         const existingOrigin = (() => {
           const fromNutrition = (existing as any)?.nutrition?.__origin
           if (typeof fromNutrition === 'string' && fromNutrition.trim().length > 0) return fromNutrition
@@ -3164,6 +3181,7 @@ export default function MealBuilderClient() {
                 items: cleanedItems,
                 previousDescription,
                 previousItemsSignature,
+                previousTotals,
               }),
             })
             if (res.ok) {
@@ -3179,6 +3197,7 @@ export default function MealBuilderClient() {
                     items: cleanedItems,
                     previousDescription,
                     previousItemsSignature,
+                    previousTotals,
                   }),
                 )
               } catch {}

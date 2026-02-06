@@ -63,6 +63,38 @@ const buildItemsSignature = (items: any[] | null | undefined) => {
   return parts.filter(Boolean).sort().join('|')
 }
 
+const extractTotalsSignature = (totals: any) => {
+  if (!totals || typeof totals !== 'object') return null
+  const toNumber = (value: any) => {
+    const parsed = typeof value === 'string' ? parseFloat(value) : Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return {
+    calories: toNumber((totals as any).calories),
+    protein: toNumber((totals as any).protein ?? (totals as any).protein_g),
+    carbs: toNumber((totals as any).carbs ?? (totals as any).carbs_g),
+    fat: toNumber((totals as any).fat ?? (totals as any).fat_g),
+    fiber: toNumber((totals as any).fiber ?? (totals as any).fiber_g),
+    sugar: toNumber((totals as any).sugar ?? (totals as any).sugar_g),
+  }
+}
+
+const totalsMatch = (left: any, right: any) => {
+  const a = extractTotalsSignature(left)
+  const b = extractTotalsSignature(right)
+  if (!a || !b) return false
+  const within = (x: number | null, y: number | null, tolerance: number) => {
+    if (x === null || y === null) return false
+    return Math.abs(x - y) <= tolerance
+  }
+  return (
+    within(a.calories, b.calories, 2) &&
+    within(a.protein, b.protein, 0.2) &&
+    within(a.carbs, b.carbs, 0.2) &&
+    within(a.fat, b.fat, 0.2)
+  )
+}
+
 const getMetaFavoriteId = (nutrients: any) => {
   if (!nutrients || typeof nutrients !== 'object') return ''
   const raw = (nutrients as any).__favoriteId
@@ -125,6 +157,7 @@ export async function POST(request: NextRequest) {
     const items = body?.items
     const previousDescription = typeof body?.previousDescription === 'string' ? body.previousDescription.trim() : ''
     const previousItemsSignature = typeof body?.previousItemsSignature === 'string' ? body.previousItemsSignature.trim() : ''
+    const previousTotals = body?.previousTotals ?? null
 
     if (!favoriteId || !localDate) {
       return NextResponse.json({ error: 'Missing favoriteId or localDate' }, { status: 400 })
@@ -144,17 +177,19 @@ export async function POST(request: NextRequest) {
       const existingNutrition = (log as any)?.nutrients || null
       const existingFavoriteId = getMetaFavoriteId(existingNutrition)
       if (isManualEdited(existingNutrition)) continue
-      const logItemsSignature = buildItemsSignature((log as any)?.items || null)
+      const rawItems = (log as any)?.items || (existingNutrition as any)?.items || null
+      const logItemsSignature = buildItemsSignature(rawItems)
       const logDescription = normalizeDescription(log.description || log.name || '')
+      const logTotals = existingNutrition || null
+      const totalsMatchLegacy = previousTotals ? totalsMatch(logTotals, previousTotals) : false
       const legacyMatch =
         !existingFavoriteId &&
         normalizedPreviousDescription &&
         logDescription === normalizedPreviousDescription &&
-        previousItemsSignature &&
-        logItemsSignature === previousItemsSignature
+        ((previousItemsSignature && logItemsSignature === previousItemsSignature) || totalsMatchLegacy)
       const directMatch = existingFavoriteId && existingFavoriteId === favoriteId
       if (!directMatch && !legacyMatch) continue
-      if (previousItemsSignature && logItemsSignature && logItemsSignature !== previousItemsSignature) continue
+      if (previousItemsSignature && logItemsSignature && logItemsSignature !== previousItemsSignature && !totalsMatchLegacy) continue
 
       const resolvedDescription = description || log.description || log.name || ''
       const name = buildEntryName(resolvedDescription, log.name)

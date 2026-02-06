@@ -12542,6 +12542,7 @@ Please add nutritional information manually if needed.`);
       const localDate = String(parsed.localDate || '').trim()
       const previousDescription = String(parsed.previousDescription || '').trim()
       const previousItemsSignature = String(parsed.previousItemsSignature || '').trim()
+      const previousTotals = parsed.previousTotals || null
       if (!favoriteId || !localDate) return
 
       const normalizeSyncDescription = (value: any) =>
@@ -12564,6 +12565,36 @@ Please add nutritional information manually if needed.`);
           return [id, name, amount, unit, serving].filter(Boolean).join('~')
         })
         return parts.filter(Boolean).sort().join('|')
+      }
+      const extractTotalsSignature = (totals: any) => {
+        if (!totals || typeof totals !== 'object') return null
+        const toNumber = (value: any) => {
+          const parsed = typeof value === 'string' ? parseFloat(value) : Number(value)
+          return Number.isFinite(parsed) ? parsed : null
+        }
+        return {
+          calories: toNumber((totals as any).calories),
+          protein: toNumber((totals as any).protein ?? (totals as any).protein_g),
+          carbs: toNumber((totals as any).carbs ?? (totals as any).carbs_g),
+          fat: toNumber((totals as any).fat ?? (totals as any).fat_g),
+          fiber: toNumber((totals as any).fiber ?? (totals as any).fiber_g),
+          sugar: toNumber((totals as any).sugar ?? (totals as any).sugar_g),
+        }
+      }
+      const totalsMatch = (left: any, right: any) => {
+        const a = extractTotalsSignature(left)
+        const b = extractTotalsSignature(right)
+        if (!a || !b) return false
+        const within = (x: number | null, y: number | null, tolerance: number) => {
+          if (x === null || y === null) return false
+          return Math.abs(x - y) <= tolerance
+        }
+        return (
+          within(a.calories, b.calories, 2) &&
+          within(a.protein, b.protein, 0.2) &&
+          within(a.carbs, b.carbs, 0.2) &&
+          within(a.fat, b.fat, 0.2)
+        )
       }
 
       const mergeMeta = (base: any, existing: any) => {
@@ -12596,8 +12627,7 @@ Please add nutritional information manually if needed.`);
                 !entryFav &&
                 normalizeSyncDescription(previousDescription) &&
                 normalizedEntryDescription === normalizeSyncDescription(previousDescription) &&
-                previousItemsSignature &&
-                entryItemsSignature === previousItemsSignature
+                ((previousItemsSignature && entryItemsSignature === previousItemsSignature) || totalsMatch(entry?.nutrition, previousTotals))
               const directMatch = String(entryFav || '').trim() === favoriteId
               if (!directMatch && !legacyMatch) return entry
               const manualEdit = Boolean(
@@ -12605,7 +12635,7 @@ Please add nutritional information manually if needed.`);
                   (entry?.total && (entry.total as any).__favoriteManualEdit),
               )
               if (manualEdit) return entry
-              if (previousItemsSignature && entryItemsSignature && entryItemsSignature !== previousItemsSignature) {
+              if (previousItemsSignature && entryItemsSignature && entryItemsSignature !== previousItemsSignature && !totalsMatch(entry?.nutrition, previousTotals)) {
                 return entry
               }
               const nextNutrition = mergeMeta(parsed.nutrition ?? entry.nutrition, entry.nutrition)
