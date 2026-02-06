@@ -11,6 +11,10 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 1. The owner is not a developer or coder. Always respond in simple, easy-to-understand English and avoid technical language.
 2. Never assume technical knowledge. Explain things as if the reader is computer illiterate.
 
+## Quick Handover File
+
+After reading this file, also read `PROJECT_STATUS.md` for the current state of the project.
+
 ## Deployment Rules
 
 1. Work is never done locally. All changes must be deployed to staging at https://stg.helfi.ai unless the owner explicitly asks for live.
