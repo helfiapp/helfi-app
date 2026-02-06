@@ -412,6 +412,19 @@ If this breaks again, restore these rules exactly.
    - `healthgoal_user_visible_name_uq` on `HealthGoal(userId, name)` where name does **not** start with `__`.  
 3) Run the health‑goal dedupe script to clean existing duplicates.
 
+### 2.7.2 Global Write Safety Switch (Feb 2026 – Locked)
+
+**Purpose:** Stop repeated database writes when data hasn’t changed.
+
+**Must keep (non‑negotiable):**
+- The global write guard is attached in `lib/prisma.ts` and blocks repeat saves within a short window.  
+- It must stay enabled for all standard Prisma writes.  
+- If a save is repeated with the exact same data, it should be skipped.  
+
+**If this breaks again:**
+1) Restore `lib/prisma-write-guard.ts` and the `attachWriteGuard(prisma)` call in `lib/prisma.ts`.  
+2) Restore `lib/write-guard.ts` (table + hashing + guard logic).  
+
 ### 2.8 Supplement + Medication Photo Retention (Jan 2026 – Locked)
 
 - Photos uploaded for supplements and medications are **temporary**.

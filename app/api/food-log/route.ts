@@ -8,7 +8,7 @@ import { Prisma } from '@prisma/client'
 import { put } from '@vercel/blob'
 import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
-import { hashPayload, shouldSkipRepeatedWrite } from '@/lib/write-guard'
+import { createWriteGuard, hashPayload } from '@/lib/write-guard'
 
 const FOOD_PHOTO_PREFIX = 'food-photos'
 const FOOD_PHOTO_SCOPE = 'food-photo'
@@ -711,6 +711,7 @@ export async function POST(request: NextRequest) {
 
     if (allowDuplicate !== true) {
       try {
+        const writeGuard = createWriteGuard(prisma)
         const guardPayload = buildFoodLogGuardPayload({
           name,
           description,
@@ -721,8 +722,8 @@ export async function POST(request: NextRequest) {
           category: storedCategory,
         })
         const payloadHash = hashPayload(guardPayload)
-        const guardResult = await shouldSkipRepeatedWrite({
-          userId: user.id,
+        const guardResult = await writeGuard.readGuard({
+          ownerKey: user.id,
           scope: 'food-log:create',
           payloadHash,
           windowMs: 30 * 1000,

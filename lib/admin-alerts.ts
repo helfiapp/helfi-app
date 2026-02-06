@@ -126,3 +126,44 @@ export async function sendOwnerErrorAlertEmail(options: {
 
   console.log(`✅ [ERROR ALERT] Sent to ${recipientEmail} with ID: ${emailResponse.data?.id}`)
 }
+
+export async function sendUsageReportEmail(options: {
+  recipientEmail: string
+  subject: string
+  html: string
+}) {
+  const resend = getResendClient()
+  if (!resend) return
+
+  const recipientEmail = options.recipientEmail.trim()
+  const subject = options.subject
+
+  const emailResponse = await resend.emails.send({
+    from: 'Helfi Alerts <support@helfi.ai>',
+    to: recipientEmail,
+    subject,
+    html: options.html,
+  })
+
+  console.log(`✅ [USAGE REPORT] Sent to ${recipientEmail} with ID: ${emailResponse.data?.id}`)
+}
+
+export async function sendWriteSpikeAlertEmail(options: {
+  recipientEmail: string
+  subject: string
+  html: string
+}) {
+  const resend = getResendClient()
+  if (!resend) return
+
+  const recipientEmail = options.recipientEmail.trim()
+
+  const emailResponse = await resend.emails.send({
+    from: 'Helfi Alerts <support@helfi.ai>',
+    to: recipientEmail,
+    subject: options.subject,
+    html: options.html,
+  })
+
+  console.log(`✅ [WRITE SPIKE ALERT] Sent to ${recipientEmail} with ID: ${emailResponse.data?.id}`)
+}

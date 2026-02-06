@@ -10,7 +10,7 @@ import { computeHydrationGoal } from '@/lib/hydration-goal'
 import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
 import { ensureSupplementCatalogSchema } from '@/lib/supplement-catalog-db'
 import { ensureMedicationCatalogSchema } from '@/lib/medication-catalog-db'
-import { hashPayload, shouldSkipRepeatedWrite } from '@/lib/write-guard'
+import { createWriteGuard, hashPayload } from '@/lib/write-guard'
 
 const normalizeTimingList = (timing: any) => {
   if (Array.isArray(timing)) {
@@ -859,10 +859,11 @@ export async function POST(request: NextRequest) {
 
     if (touchesHealthSetup && !manualSync) {
       try {
+        const writeGuard = createWriteGuard(prisma)
         const guardPayload = buildWriteGuardPayload(data)
         const payloadHash = hashPayload(guardPayload)
-        const guardResult = await shouldSkipRepeatedWrite({
-          userId: user.id,
+        const guardResult = await writeGuard.readGuard({
+          ownerKey: user.id,
           scope: 'user-data:health-setup',
           payloadHash,
           windowMs: 90 * 1000,

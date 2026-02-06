@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { attachWriteGuard } from '@/lib/prisma-write-guard'
 
 // Force the USDA search to use the populated Neon database. If DATABASE_URL is
 // not set or points to an empty instance, fall back to the known populated DB.
@@ -19,6 +20,8 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient({
 })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
+attachWriteGuard(prisma)
 
 // Disconnect on process termination
 if (process.env.NODE_ENV === 'production') {
