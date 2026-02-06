@@ -7591,19 +7591,79 @@ const applyStructuredItems = (
     } else if (field === 'weightUnit') {
       const previousUnit = normalizeWeightUnit(itemsCopy[index].weightUnit)
       const normalized = normalizeWeightUnit(value)
-      // Convert weightAmount to preserve the same actual quantity when switching units
-      const currentWeight = Number.isFinite(itemsCopy[index].weightAmount) ? Number(itemsCopy[index].weightAmount) : null
-      if (currentWeight && currentWeight > 0 && normalized !== previousUnit) {
-        const baseGrams = getBaseGramsPerServing(itemsCopy[index])
-        const gramsValue = weightAmountToGrams(currentWeight, previousUnit, itemsCopy[index], baseGrams)
-        if (gramsValue !== null && gramsValue !== undefined) {
-          const converted = gramsToWeightAmount(gramsValue, normalized, itemsCopy[index], baseGrams)
-          if (converted !== null && converted !== undefined) {
-            itemsCopy[index].weightAmount = roundWeightValue(converted, normalized)
+      const isSizedPieceUnit =
+        normalized === 'egg-small' ||
+        normalized === 'egg-medium' ||
+        normalized === 'egg-large' ||
+        normalized === 'egg-extra-large' ||
+        normalized === 'piece-small' ||
+        normalized === 'piece-medium' ||
+        normalized === 'piece-large' ||
+        normalized === 'piece-extra-large'
+
+      const name = String(itemsCopy[index]?.name || itemsCopy[index]?.food || '').trim()
+      const foodUnitGrams = getFoodUnitGrams(name)
+      const targetPieceGrams =
+        foodUnitGrams && Number.isFinite(Number((foodUnitGrams as any)[normalized]))
+          ? Number((foodUnitGrams as any)[normalized])
+          : null
+
+      // For sized piece units (eggs + produce piece sizes), users expect "1" to mean "1 egg/apple/etc".
+      // That only works if the per-serving grams match the chosen sized unit.
+      if (normalized !== previousUnit && isSizedPieceUnit && targetPieceGrams && targetPieceGrams > 0) {
+        const oldBaseGrams = getBaseGramsPerServing(itemsCopy[index])
+        const ratio =
+          oldBaseGrams && oldBaseGrams > 0 && Number.isFinite(oldBaseGrams)
+            ? targetPieceGrams / oldBaseGrams
+            : null
+
+        // Scale per-serving nutrition to match the new per-serving grams.
+        if (ratio && Number.isFinite(ratio) && ratio > 0) {
+          const scaleMacro = (fieldName: string, decimals: number, isCalories = false) => {
+            const raw = Number((itemsCopy[index] as any)[fieldName])
+            if (!Number.isFinite(raw)) return
+            const scaled = raw * ratio
+            if (isCalories) {
+              ;(itemsCopy[index] as any)[fieldName] = Math.round(scaled)
+              return
+            }
+            const factor = Math.pow(10, decimals)
+            ;(itemsCopy[index] as any)[fieldName] = Math.round(scaled * factor) / factor
+          }
+          scaleMacro('calories', 0, true)
+          scaleMacro('protein_g', 1)
+          scaleMacro('carbs_g', 1)
+          scaleMacro('fat_g', 1)
+          scaleMacro('fiber_g', 1)
+          scaleMacro('sugar_g', 1)
+        }
+
+        // Lock the new per-serving weight to the sized unit.
+        itemsCopy[index].customGramsPerServing = Math.round(targetPieceGrams * 100) / 100
+        itemsCopy[index].customMlPerServing = null
+        itemsCopy[index].weightUnit = normalized
+
+        // Keep the intuitive meaning: servings 1 => weight 1 sized unit (1 egg / 1 large apple).
+        const servings =
+          Number.isFinite(Number(itemsCopy[index].servings)) && Number(itemsCopy[index].servings) > 0
+            ? Number(itemsCopy[index].servings)
+            : 1
+        itemsCopy[index].weightAmount = roundWeightValue(servings, normalized)
+      } else {
+        // Convert weightAmount to preserve the same actual quantity when switching non-sized units.
+        const currentWeight = Number.isFinite(itemsCopy[index].weightAmount) ? Number(itemsCopy[index].weightAmount) : null
+        if (currentWeight && currentWeight > 0 && normalized !== previousUnit) {
+          const baseGrams = getBaseGramsPerServing(itemsCopy[index])
+          const gramsValue = weightAmountToGrams(currentWeight, previousUnit, itemsCopy[index], baseGrams)
+          if (gramsValue !== null && gramsValue !== undefined) {
+            const converted = gramsToWeightAmount(gramsValue, normalized, itemsCopy[index], baseGrams)
+            if (converted !== null && converted !== undefined) {
+              itemsCopy[index].weightAmount = roundWeightValue(converted, normalized)
+            }
           }
         }
+        itemsCopy[index].weightUnit = normalized
       }
-      itemsCopy[index].weightUnit = normalized
       clearLabelReviewFlag()
     } else if (field === 'customGramsPerServing') {
       const clamped = clampNumber(value, 0, 5000)
