@@ -510,7 +510,8 @@ export async function getWeeklyReportByPeriod(
   await ensureWeeklyReportTables()
   try {
     const rows: any[] = await prisma.$queryRawUnsafe(
-      'SELECT * FROM WeeklyHealthReports WHERE userId = $1 AND periodStart = $2 AND periodEnd = $3 ORDER BY createdAt DESC LIMIT 1',
+      // Cast the inputs so Postgres matches DATE columns correctly (prevents duplicate reports per period).
+      'SELECT * FROM WeeklyHealthReports WHERE userId = $1 AND periodStart = $2::date AND periodEnd = $3::date ORDER BY createdAt DESC LIMIT 1',
       userId,
       periodStart,
       periodEnd
