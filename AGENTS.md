@@ -15,6 +15,13 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 
 After reading this file, also read `PROJECT_STATUS.md` for the current state of the project.
 
+## If You Are The New Gatekeeper
+
+If the owner says you are the gatekeeper:
+1. You are the only agent allowed to deploy.
+2. Check `CURRENT_ISSUES_LIVE.md` for notes from other agents before deploying.
+3. Deploy one change at a time, and verify the deployment is READY before reporting success.
+
 ## Deployment Rules
 
 1. Work is never done locally. All changes must be deployed to staging at https://stg.helfi.ai unless the owner explicitly asks for live.
