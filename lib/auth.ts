@@ -1,6 +1,7 @@
 import { type NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
+import AppleProvider from 'next-auth/providers/apple'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { getEmailFooter } from '@/lib/email-footer'
@@ -8,6 +9,7 @@ import { notifyOwner } from '@/lib/owner-notifications'
 import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
 import { getSessionRevokedAt } from '@/lib/session-revocation'
 import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
+import { getAppleClientSecret } from '@/lib/apple-client-secret'
 import bcrypt from 'bcryptjs'
 
 // Initialize Resend for welcome emails
@@ -222,7 +224,8 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  providers: [
+  providers: (() => {
+    const providers = [
     CredentialsProvider({
       name: 'credentials',
       credentials: {
@@ -296,7 +299,23 @@ export const authOptions: NextAuthOptions = {
         }
       }
     }),
-  ],
+    ]
+
+    const appleClientId = process.env.APPLE_CLIENT_ID
+    const appleClientSecret = getAppleClientSecret()
+    if (appleClientId && appleClientSecret) {
+      providers.push(
+        AppleProvider({
+          clientId: appleClientId,
+          clientSecret: appleClientSecret,
+        })
+      )
+    } else {
+      console.log('🍎 Apple sign-in not enabled (missing APPLE_* env vars).')
+    }
+
+    return providers
+  })(),
   callbacks: {
     async signIn({ user, account, profile }) {
       console.log('🔑 SignIn callback:', { 
@@ -304,56 +323,117 @@ export const authOptions: NextAuthOptions = {
         provider: account?.provider 
       })
       
-      if (account?.provider === 'google') {
+      if (account?.provider === 'google' || account?.provider === 'apple') {
         try {
-          // Ensure wallet metering columns exist (avoid column-missing errors on fresh DBs)
-          // try {
-          //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
-          // } catch (e) {
-          //   console.warn('walletMonthlyUsedCents ensure failed (safe to ignore if already exists):', e)
-          // }
-          // try {
-          //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyResetAt" TIMESTAMP(3)')
-          // } catch (e) {
-          //   console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
-          // }
-          // Find or create user for Google OAuth
-          let dbUser = await prisma.user.findUnique({
-            where: { email: user.email! }
-          })
+          const provider = account.provider
+          const providerAccountId = account.providerAccountId
+
+          let dbUser: any = null
+          if (providerAccountId) {
+            const existing = await prisma.account
+              .findUnique({
+                where: {
+                  provider_providerAccountId: {
+                    provider,
+                    providerAccountId,
+                  },
+                },
+                include: { user: true },
+              })
+              .catch(() => null)
+            if (existing?.user) {
+              dbUser = existing.user
+            }
+          }
+
+          const emailFromOAuth = (user?.email || (profile as any)?.email || null) as string | null
+          const normalizedEmail = typeof emailFromOAuth === 'string' && emailFromOAuth.length > 0
+            ? emailFromOAuth.toLowerCase()
+            : null
+
+          if (!dbUser && normalizedEmail) {
+            dbUser = await prisma.user.findUnique({
+              where: { email: normalizedEmail },
+            })
+          }
 
           let isNewUser = false
           if (!dbUser) {
-            console.log('👤 Creating Google user:', user.email)
+            if (!normalizedEmail) {
+              console.error('❌ OAuth sign-in missing email and no existing account link:', {
+                provider,
+                providerAccountId,
+              })
+              return false
+            }
+
+            console.log(`👤 Creating ${provider} user:`, normalizedEmail)
             await ensureFreeCreditColumns()
             dbUser = await prisma.user.create({
               data: {
-                email: user.email!.toLowerCase(),
-                name: user.name || user.email!.split('@')[0],
+                email: normalizedEmail,
+                name: user.name || normalizedEmail.split('@')[0],
                 image: user.image,
-                emailVerified: new Date(), // Google users are auto-verified
+                // Apple/Google identities are verified by the provider.
+                emailVerified: new Date(),
                 ...NEW_USER_FREE_CREDITS,
               }
             })
             isNewUser = true
           } else if (!dbUser.emailVerified) {
-            // Auto-verify existing users who sign in with Google
-            console.log('🔄 Auto-verifying existing Google user:', dbUser.email)
+            // Auto-verify existing users who sign in via Apple/Google
+            console.log(`🔄 Auto-verifying existing ${provider} user:`, dbUser.email)
             await prisma.user.update({
               where: { id: dbUser.id },
               data: { emailVerified: new Date() }
             })
           }
+
+          // Persist the provider account link so sign-in keeps working even if email is not returned later.
+          if (providerAccountId) {
+            await prisma.account.upsert({
+              where: {
+                provider_providerAccountId: {
+                  provider,
+                  providerAccountId,
+                },
+              },
+              update: {
+                userId: dbUser.id,
+                type: account.type || 'oauth',
+                access_token: (account as any).access_token || null,
+                refresh_token: (account as any).refresh_token || null,
+                expires_at: typeof (account as any).expires_at === 'number' ? (account as any).expires_at : null,
+                token_type: (account as any).token_type || null,
+                scope: (account as any).scope || null,
+                id_token: (account as any).id_token || null,
+                session_state: (account as any).session_state || null,
+              },
+              create: {
+                userId: dbUser.id,
+                type: account.type || 'oauth',
+                provider,
+                providerAccountId,
+                access_token: (account as any).access_token || null,
+                refresh_token: (account as any).refresh_token || null,
+                expires_at: typeof (account as any).expires_at === 'number' ? (account as any).expires_at : null,
+                token_type: (account as any).token_type || null,
+                scope: (account as any).scope || null,
+                id_token: (account as any).id_token || null,
+                session_state: (account as any).session_state || null,
+              },
+            })
+          }
           
-          // Send welcome email for new Google users (don't await to avoid blocking auth)
+          // Send welcome email for new OAuth users (don't await to avoid blocking auth)
           if (isNewUser) {
             const userName = dbUser.name || dbUser.email.split('@')[0]
-            console.log('📧 Sending welcome email to new Google user:', userName)
+            console.log(`📧 Sending welcome email to new ${provider} user:`, userName)
             sendWelcomeEmail(dbUser.email, userName).catch(error => {
-              console.error('❌ Google welcome email failed (non-blocking):', error)
+              console.error('❌ OAuth welcome email failed (non-blocking):', error)
             })
 
-            // Notify owner of new Google signup (don't await to avoid blocking auth)
+            // Notify owner of new signup (don't await to avoid blocking auth)
             notifyOwner({
               event: 'signup',
               userEmail: dbUser.email,
@@ -372,9 +452,9 @@ export const authOptions: NextAuthOptions = {
           
           // Update user ID for session
           user.id = dbUser.id
-          console.log('✅ Google user processed:', { id: dbUser.id, email: dbUser.email, isNew: isNewUser })
+          console.log('✅ OAuth user processed:', { provider, id: dbUser.id, email: dbUser.email, isNew: isNewUser })
         } catch (error) {
-          console.error('❌ Google user creation error:', error)
+          console.error('❌ OAuth user creation/link error:', error)
           return false
         }
       }

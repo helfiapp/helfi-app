@@ -1,6 +1,6 @@
 'use client'
 
-import { signIn, signOut, useSession } from 'next-auth/react'
+import { getProviders, signIn, signOut, useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState, useEffect, Suspense, useRef } from 'react'
@@ -148,6 +148,7 @@ export default function SignIn() {
   const router = useRouter()
   const { status, data: session } = useSession()
   const [loading, setLoading] = useState(false)
+  const [appleEnabled, setAppleEnabled] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
@@ -393,6 +394,22 @@ export default function SignIn() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    getProviders()
+      .then((providers) => {
+        if (cancelled) return
+        setAppleEnabled(Boolean((providers as any)?.apple))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setAppleEnabled(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const handleGoogleAuth = async () => {
     setLoading(true)
     // Check for plan parameter to preserve it through OAuth flow
@@ -412,6 +429,26 @@ export default function SignIn() {
       } catch {}
     }
     await signIn('google', { callbackUrl })
+  }
+
+  const handleAppleAuth = async () => {
+    setLoading(true)
+    const searchParams = new URLSearchParams(window.location.search)
+    const planParam = searchParams.get('plan')
+    const nextParam = sanitizeNextTarget(searchParams.get('next'))
+    const fallbackTarget = authContext === 'practitioner' ? '/practitioner?practitionerSignup=1' : '/onboarding'
+    const nextTarget = authContext === 'practitioner' && (nextParam === '/practitioner' || nextParam?.startsWith('/practitioner'))
+      ? withQueryParam(nextParam, 'practitionerSignup', '1')
+      : nextParam
+    const callbackUrl = planParam
+      ? `/auth/signin?plan=${encodeURIComponent(planParam)}`
+      : nextTarget || fallbackTarget
+    if (authContext === 'practitioner') {
+      try {
+        sessionStorage.setItem('helfi:practitionerSignup', '1')
+      } catch {}
+    }
+    await signIn('apple', { callbackUrl })
   }
 
   const persistRememberState = (remember: boolean, emailValue: string) => {
@@ -796,6 +833,22 @@ export default function SignIn() {
                 />
               </svg>
               Continue with Google
+            </button>
+
+            {/* Apple Sign In (appears once Apple setup is complete) */}
+            <button
+              onClick={handleAppleAuth}
+              disabled={loading || !appleEnabled}
+              className="w-full flex items-center justify-center gap-3 bg-black text-white px-4 py-3 rounded-lg hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              title={!appleEnabled ? 'Apple sign-in is being set up.' : undefined}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M16.365 1.43c0 1.14-.42 2.2-1.25 3.12-.9 1-2.38 1.78-3.62 1.68-.15-1.1.43-2.25 1.22-3.07.87-.92 2.39-1.62 3.65-1.73ZM20.84 17.12c-.55 1.27-.82 1.83-1.53 2.96-1 1.56-2.41 3.5-4.16 3.52-1.56.02-1.96-1.02-4.07-1.01-2.12.01-2.55 1.03-4.11.99-1.75-.03-3.09-1.78-4.09-3.34-2.78-4.36-3.07-9.47-1.36-12.1 1.22-1.88 3.15-2.98 4.96-2.98 1.84 0 2.99 1.01 4.5 1.01 1.46 0 2.35-1.01 4.48-1.01 1.61 0 3.31.88 4.53 2.39-3.98 2.18-3.33 7.87.85 9.57Z"
+                />
+              </svg>
+              {appleEnabled ? 'Continue with Apple' : 'Continue with Apple (setup in progress)'}
             </button>
 
             <div className="relative">
