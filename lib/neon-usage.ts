@@ -125,7 +125,7 @@ export function estimateDailyCostUsd(
 
   const computeCuHourUsd = parseNumber(
     process.env.NEON_COMPUTE_CU_HOUR_USD,
-    options?.computeCuHourUsd ?? 0.14
+    options?.computeCuHourUsd ?? 0.106
   )
   const storageGbMonthUsd = parseNumber(
     process.env.NEON_STORAGE_GB_MONTH_USD,
