@@ -396,6 +396,22 @@ If this breaks again, restore these rules exactly.
 - Commit: `aa00b3e1` (prevent sync overwrite during edits)
 - Date: 2026‑01‑13
 
+### 2.7.1 Health Goals Write Guard (Feb 2026 – Locked)
+
+**Purpose:** Prevent runaway database writes from Health Setup autosaves.
+
+**Must keep (non‑negotiable):**
+- Health goals must only be written when the list actually changes.
+- Do **not** delete and recreate all goals on every autosave.
+- Server must compare the incoming list with what is already saved and only add/remove what changed.
+- Visible health goals must be unique per user (DB index: `healthgoal_user_visible_name_uq`).
+
+**If this breaks again:**
+1) Restore change‑only updates in `app/api/user-data/route.ts` (no delete‑all + recreate loop).  
+2) Recreate the unique index that blocks duplicates:
+   - `healthgoal_user_visible_name_uq` on `HealthGoal(userId, name)` where name does **not** start with `__`.  
+3) Run the health‑goal dedupe script to clean existing duplicates.
+
 ### 2.8 Supplement + Medication Photo Retention (Jan 2026 – Locked)
 
 - Photos uploaded for supplements and medications are **temporary**.

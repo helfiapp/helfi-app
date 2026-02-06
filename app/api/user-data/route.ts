@@ -977,105 +977,167 @@ export async function POST(request: NextRequest) {
     }
     console.timeEnd('⏱️ Basic User Data Update')
 
-    // 2. Handle health goals - simple upsert approach
+    // 2. Handle health goals - change-only updates to avoid repeat writes
     console.time('⏱️ Health Goals Update')
     try {
-      if (data.goals && Array.isArray(data.goals) && data.goals.length > 0) {
-        console.log('🎯 Processing', data.goals.length, 'health goals')
-        
-        // Delete existing non-hidden goals (preserve hidden snapshot records like favorites/todaysFoods)
-        const deleteResult = await prisma.healthGoal.deleteMany({
+      const hasGoalsPayload = Array.isArray(data.goals)
+      const normalizedGoals = hasGoalsPayload
+        ? Array.from(
+            new Set(
+              (data.goals as any[])
+                .map((g: any) => String(g || '').trim())
+                .filter(Boolean),
+            ),
+          )
+        : []
+
+      let goalsChanged = false
+
+      if (hasGoalsPayload && normalizedGoals.length > 0) {
+        console.log('🎯 Processing', normalizedGoals.length, 'health goals')
+
+        const existingGoals = await prisma.healthGoal.findMany({
           where: {
             userId: user.id,
             NOT: { name: { startsWith: '__' } },
           },
+          select: { id: true, name: true },
         })
-        console.log('🗑️ Deleted', deleteResult.count, 'existing health goals')
-        
-        // Create new goals
-        for (const goalName of data.goals) {
-          if (goalName && typeof goalName === 'string') {
-            await prisma.healthGoal.create({
-              data: {
+        const existingNames = new Set(existingGoals.map((goal) => goal.name))
+        const incomingNames = new Set(normalizedGoals)
+
+        const toAdd = normalizedGoals.filter((name) => !existingNames.has(name))
+        const toRemove = existingGoals
+          .filter((goal) => !incomingNames.has(goal.name))
+          .map((goal) => goal.name)
+
+        goalsChanged = toAdd.length > 0 || toRemove.length > 0 || existingGoals.length !== incomingNames.size
+
+        if (!goalsChanged) {
+          console.log('ℹ️ Health goals unchanged; skipping write')
+        } else {
+          if (toRemove.length > 0) {
+            const deleteResult = await prisma.healthGoal.deleteMany({
+              where: {
+                userId: user.id,
+                name: { in: toRemove },
+              },
+            })
+            console.log('🗑️ Removed', deleteResult.count, 'health goals')
+          }
+
+          if (toAdd.length > 0) {
+            await prisma.healthGoal.createMany({
+              data: toAdd.map((goalName) => ({
                 userId: user.id,
                 name: goalName,
                 category: 'general',
                 currentRating: 5,
-              }
+              })),
+              skipDuplicates: true,
             })
+            console.log('✅ Added', toAdd.length, 'health goals')
           }
-        }
-        console.log('✅ Updated health goals successfully')
-        // Keep CheckinIssues in sync with saved goals (so check-ins always match goals)
-        try {
-          await prisma.$executeRawUnsafe(`
-            CREATE TABLE IF NOT EXISTS CheckinIssues (
-              id TEXT PRIMARY KEY,
-              userId TEXT NOT NULL,
-              name TEXT NOT NULL,
-              polarity TEXT NOT NULL,
-              UNIQUE (userId, name)
-            )
-          `)
-          await prisma.$executeRawUnsafe(`
-            DELETE FROM CheckinIssues a
-            USING CheckinIssues b
-            WHERE a.id > b.id AND a.userId = b.userId AND a.name = b.name
-          `).catch(() => {})
-          await prisma.$executeRawUnsafe(`
-            CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
-          `).catch(() => {})
-          const safeGoals = data.goals.map((g: any) => String(g || '').trim()).filter(Boolean)
-          if (safeGoals.length === 0) {
-            await prisma.$executeRawUnsafe(`DELETE FROM CheckinIssues WHERE userId = $1`, user.id)
-          } else {
-            const placeholders = safeGoals.map((_: string, idx: number) => `$${idx + 2}`).join(',')
-            await prisma.$executeRawUnsafe(
-              `DELETE FROM CheckinIssues WHERE userId = $1 AND name NOT IN (${placeholders})`,
-              user.id, ...safeGoals
-            )
-            for (const issueName of safeGoals) {
-              const polarity = /pain|ache|anxiety|depress|fatigue|nausea|bloat|insomnia|brain fog|headache|migraine|cramp|stress|itch|rash|acne|diarrh|constipat|gas|heartburn/i.test(issueName)
-                ? 'negative'
-                : 'positive'
-              const id = crypto.randomUUID()
-              await prisma.$queryRawUnsafe(
-                `INSERT INTO CheckinIssues (id, userId, name, polarity) VALUES ($1,$2,$3,$4)
-                 ON CONFLICT (userId, name) DO UPDATE SET polarity=EXCLUDED.polarity`,
-                id, user.id, issueName, polarity
+
+          // Keep CheckinIssues in sync with saved goals (so check-ins always match goals)
+          try {
+            await prisma.$executeRawUnsafe(`
+              CREATE TABLE IF NOT EXISTS CheckinIssues (
+                id TEXT PRIMARY KEY,
+                userId TEXT NOT NULL,
+                name TEXT NOT NULL,
+                polarity TEXT NOT NULL,
+                UNIQUE (userId, name)
               )
+            `)
+            await prisma.$executeRawUnsafe(`
+              DELETE FROM CheckinIssues a
+              USING CheckinIssues b
+              WHERE a.id > b.id AND a.userId = b.userId AND a.name = b.name
+            `).catch(() => {})
+            await prisma.$executeRawUnsafe(`
+              CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
+            `).catch(() => {})
+            const safeGoals = normalizedGoals
+            if (safeGoals.length === 0) {
+              await prisma.$executeRawUnsafe(`DELETE FROM CheckinIssues WHERE userId = $1`, user.id)
+            } else {
+              const placeholders = safeGoals.map((_: string, idx: number) => `$${idx + 2}`).join(',')
+              await prisma.$executeRawUnsafe(
+                `DELETE FROM CheckinIssues WHERE userId = $1 AND name NOT IN (${placeholders})`,
+                user.id, ...safeGoals,
+              )
+              for (const issueName of safeGoals) {
+                const polarity = /pain|ache|anxiety|depress|fatigue|nausea|bloat|insomnia|brain fog|headache|migraine|cramp|stress|itch|rash|acne|diarrh|constipat|gas|heartburn/i.test(
+                  issueName,
+                )
+                  ? 'negative'
+                  : 'positive'
+                const id = crypto.randomUUID()
+                await prisma.$queryRawUnsafe(
+                  `INSERT INTO CheckinIssues (id, userId, name, polarity) VALUES ($1,$2,$3,$4)
+                   ON CONFLICT (userId, name) DO UPDATE SET polarity=EXCLUDED.polarity`,
+                  id,
+                  user.id,
+                  issueName,
+                  polarity,
+                )
+              }
             }
+          } catch (error) {
+            console.error('❌ Failed to sync CheckinIssues from goals:', error)
           }
-        } catch (error) {
-          console.error('❌ Failed to sync CheckinIssues from goals:', error)
         }
+      } else if (hasGoalsPayload) {
+        console.log('ℹ️ Health goals payload empty; preserving existing goals')
       } else {
         console.log('ℹ️ No health goals to update')
       }
+
       // Persist the canonical selected issue list only when a goals array is provided
-      if (Array.isArray(data.goals)) {
-        const safeGoals = data.goals.map((g: any) => String(g || '').trim()).filter(Boolean)
+      if (hasGoalsPayload) {
+        const safeGoals = normalizedGoals
         if (safeGoals.length > 0) {
           const existingSelected = await prisma.healthGoal.findFirst({
             where: { userId: user.id, name: '__SELECTED_ISSUES__' },
             orderBy: { updatedAt: 'desc' },
           })
-          const selectedPayload = {
-            userId: user.id,
-            name: '__SELECTED_ISSUES__',
-            category: JSON.stringify(safeGoals),
-            currentRating: 0,
+          let existingList: string[] = []
+          try {
+            if (existingSelected?.category) {
+              const parsed = JSON.parse(existingSelected.category)
+              if (Array.isArray(parsed)) {
+                existingList = parsed.map((g: any) => String(g || '').trim()).filter(Boolean)
+              }
+            }
+          } catch {}
+          const existingSet = new Set(existingList)
+          const incomingSet = new Set(safeGoals)
+          const selectedChanged =
+            existingList.length !== safeGoals.length ||
+            safeGoals.some((g) => !existingSet.has(g)) ||
+            existingList.some((g) => !incomingSet.has(g))
+
+          if (!selectedChanged) {
+            console.log('ℹ️ __SELECTED_ISSUES__ unchanged; skipping write')
+          } else {
+            const selectedPayload = {
+              userId: user.id,
+              name: '__SELECTED_ISSUES__',
+              category: JSON.stringify(safeGoals),
+              currentRating: 0,
+            }
+            const selectedRecord = existingSelected
+              ? await prisma.healthGoal.update({
+                  where: { id: existingSelected.id },
+                  data: selectedPayload,
+                })
+              : await prisma.healthGoal.create({ data: selectedPayload })
+            await prisma.healthGoal.deleteMany({
+              where: { userId: user.id, name: '__SELECTED_ISSUES__', id: { not: selectedRecord.id } },
+            })
+            console.log('📝 Saved __SELECTED_ISSUES__ snapshot:', { count: safeGoals.length, goals: safeGoals })
           }
-          const selectedRecord = existingSelected
-            ? await prisma.healthGoal.update({
-                where: { id: existingSelected.id },
-                data: selectedPayload,
-              })
-            : await prisma.healthGoal.create({ data: selectedPayload })
-          await prisma.healthGoal.deleteMany({
-            where: { userId: user.id, name: '__SELECTED_ISSUES__', id: { not: selectedRecord.id } },
-          })
-          console.log('📝 Saved __SELECTED_ISSUES__ snapshot:', { count: safeGoals.length, goals: safeGoals })
         } else {
           console.log('🔒 Preserved existing __SELECTED_ISSUES__ (empty goals array received)')
         }
