@@ -248,6 +248,27 @@ export default function SignIn() {
           const data = await res.json()
           const complete = !!data.complete
           if (!complete) {
+            // Before onboarding starts, optionally encourage linking Apple login
+            // (prevents accidental "second account" issues later).
+            const shouldSkipAppleLinkPrompt = () => {
+              try {
+                if (localStorage.getItem('helfi:skipAppleLinkPrompt') === '1') return true
+                const untilRaw = localStorage.getItem('helfi:skipAppleLinkPromptUntil')
+                if (untilRaw) {
+                  const until = Number(untilRaw)
+                  if (Number.isFinite(until) && until > Date.now()) return true
+                }
+              } catch {
+                // Ignore storage errors
+              }
+              return false
+            }
+
+            if (appleEnabled && !shouldSkipAppleLinkPrompt()) {
+              router.replace('/auth/link-apple?next=/onboarding')
+              return
+            }
+
             router.replace('/onboarding')
             return
           }
@@ -273,7 +294,7 @@ export default function SignIn() {
     }
 
     void resume()
-  }, [status, router, installPromptVisible, session])
+  }, [status, router, installPromptVisible, session, appleEnabled])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
