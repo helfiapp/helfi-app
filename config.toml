@@ -1,5 +1,8 @@
 # Agent startup
 start_here = "AGENTS.md"
 ignore_files = ["AGENT_START_HERE.md", "AGENT_HANDOVER_MESSAGE.md"]
+# IMPORTANT:
+# All agents must read AGENTS.md and follow the "Only One Deployer" rule.
+# (This prevents multiple agents from accidentally deploying over each other.)
 # Google sign-in settings live in Google Cloud project:
 # "My First Project" (project id: red-charger-462015-u3).

@@ -16,6 +16,28 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 1. Work is never done locally. All changes must be deployed to staging at https://stg.helfi.ai unless the owner explicitly asks for live.
 2. If the owner asks for live, deploy to the live site.
 
+## Only One Deployer (Very Important)
+
+To prevent confusion when multiple agents work at the same time:
+
+1. Only **one** agent is allowed to deploy (push changes that trigger a Vercel deploy).
+2. All other agents must **not deploy**.
+3. If you are not the “deployment owner” agent, you must stop before any deploy step and leave handover notes (see below).
+
+**Current rule (as of Feb 6, 2026):**
+- The deployment owner is the agent working directly with the owner in this thread.
+- Other agents must only prepare changes and leave notes.
+
+## Handover Notes (Required For Non‑Deploying Agents)
+
+If you are not deploying, you must write a short note into `CURRENT_ISSUES_LIVE.md` that includes:
+1. What you changed (simple English).
+2. Which pages/features it affects.
+3. What needs testing.
+4. If you pushed code somewhere, include the branch name or PR link.
+
+Then stop. Do not deploy.
+
 ## Before You Start
 
 1. Before working on any area, read GUARD_RAILS.md and any other notes for that area so you are fully informed.
