@@ -225,7 +225,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   providers: (() => {
-    const providers = [
+    const providers: any[] = [
     CredentialsProvider({
       name: 'credentials',
       credentials: {
