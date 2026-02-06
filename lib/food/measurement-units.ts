@@ -358,7 +358,13 @@ export const getAllowedUnitsForFood = (
 export const formatUnitLabel = (unit: MeasurementUnit, name?: string | null, pieceGrams?: number | null) => {
   const foodUnitGrams = name ? getFoodUnitGrams(name) : null
   const produceUnits = name ? getProduceUnitGrams(name) : null
-  const produceName = produceUnits ? String(name || '').trim().toLowerCase() : ''
+  const normalizedProduceName = produceUnits ? normalizeFoodValue(String(name || '').trim()) : ''
+  const produceName = (() => {
+    if (!normalizedProduceName) return ''
+    // For garlic, "piece" is almost always a clove.
+    if (/\bgarlic\b/.test(normalizedProduceName) && !/\b(powder|granules?)\b/.test(normalizedProduceName)) return 'clove'
+    return normalizedProduceName
+  })()
   const unitValue = foodUnitGrams?.[unit]
   if (unit === 'g') return 'g'
   if (unit === 'ml') return 'ml'

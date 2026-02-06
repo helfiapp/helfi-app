@@ -1150,7 +1150,13 @@ const allowedUnitsForItem = (item?: BuilderItem) => {
 const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
   const foodUnitGrams = item?.name ? getFoodUnitGrams(item.name) : null
   const produceUnits = item?.name ? getProduceUnitGrams(item.name) : null
-  const produceName = produceUnits ? String(item?.name || '').trim().toLowerCase() : ''
+  const normalizedProduceName = produceUnits ? normalizeFoodValue(String(item?.name || '').trim()) : ''
+  const produceName = (() => {
+    if (!normalizedProduceName) return ''
+    // For garlic, "piece" is almost always a clove.
+    if (/\bgarlic\b/.test(normalizedProduceName) && !/\b(powder|granules?)\b/.test(normalizedProduceName)) return 'clove'
+    return normalizedProduceName
+  })()
   const unitValue = foodUnitGrams?.[unit]
   if (unit === 'g') return 'g'
   if (unit === 'tsp') return `tsp — ${Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? round3(Number(unitValue)) : 5}g`

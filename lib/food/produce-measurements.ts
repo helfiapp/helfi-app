@@ -489,9 +489,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 41.2,
     "half_cup_cooked_g": 82.5,
     "three_quarter_cup_cooked_g": 123.8,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 7,
+    "piece_medium_g": 10,
+    "piece_large_g": 12
   },
   {
     "food": "Dragon fruit",
@@ -1067,9 +1067,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 42.5,
     "half_cup_cooked_g": 85,
     "three_quarter_cup_cooked_g": 127.5,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 130,
+    "piece_medium_g": 160,
+    "piece_large_g": 190
   },
   {
     "food": "Olive",
@@ -1441,9 +1441,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 40,
     "half_cup_cooked_g": 80,
     "three_quarter_cup_cooked_g": 120,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 12,
+    "piece_medium_g": 18,
+    "piece_large_g": 25
   },
   {
     "food": "Tamarind",
@@ -1682,6 +1682,23 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "piece_small_g": 120,
     "piece_medium_g": 170,
     "piece_large_g": 230
+  },
+  {
+    "food": "Bell pepper",
+    "category": "vegetable",
+    "subtype": "nightshade",
+    "density_confidence": "medium",
+    "raw_cup_g": 150,
+    "quarter_cup_raw_g": 37.5,
+    "half_cup_raw_g": 75,
+    "three_quarter_cup_raw_g": 112.5,
+    "cooked_cup_g": 170,
+    "quarter_cup_cooked_g": 42.5,
+    "half_cup_cooked_g": 85,
+    "three_quarter_cup_cooked_g": 127.5,
+    "piece_small_g": 120,
+    "piece_medium_g": 160,
+    "piece_large_g": 200
   },
   {
     "food": "Bitter melon",
@@ -2075,6 +2092,23 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "piece_large_g": null
   },
   {
+    "food": "Corn (on the cob)",
+    "category": "vegetable",
+    "subtype": "veg_other",
+    "density_confidence": "low",
+    "raw_cup_g": 120,
+    "quarter_cup_raw_g": 30,
+    "half_cup_raw_g": 60,
+    "three_quarter_cup_raw_g": 90,
+    "cooked_cup_g": 160,
+    "quarter_cup_cooked_g": 40,
+    "half_cup_cooked_g": 80,
+    "three_quarter_cup_cooked_g": 120,
+    "piece_small_g": 90,
+    "piece_medium_g": 120,
+    "piece_large_g": 150
+  },
+  {
     "food": "Cucumber",
     "category": "vegetable",
     "subtype": "gourd",
@@ -2206,9 +2240,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 52.5,
     "half_cup_cooked_g": 105,
     "three_quarter_cup_cooked_g": 157.5,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 2,
+    "piece_medium_g": 3,
+    "piece_large_g": 4
   },
   {
     "food": "Ginger root",
@@ -2427,9 +2461,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 35,
     "half_cup_cooked_g": 70,
     "three_quarter_cup_cooked_g": 105,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 15,
+    "piece_medium_g": 20,
+    "piece_large_g": 30
   },
   {
     "food": "Mushroom (enoki)",
@@ -2444,9 +2478,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 35,
     "half_cup_cooked_g": 70,
     "three_quarter_cup_cooked_g": 105,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 10,
+    "piece_medium_g": 20,
+    "piece_large_g": 30
   },
   {
     "food": "Mushroom (oyster)",
@@ -2461,9 +2495,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 35,
     "half_cup_cooked_g": 70,
     "three_quarter_cup_cooked_g": 105,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 15,
+    "piece_medium_g": 25,
+    "piece_large_g": 40
   },
   {
     "food": "Mushroom (portobello)",
@@ -2478,9 +2512,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 35,
     "half_cup_cooked_g": 70,
     "three_quarter_cup_cooked_g": 105,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 70,
+    "piece_medium_g": 90,
+    "piece_large_g": 120
   },
   {
     "food": "Mushroom (shiitake)",
@@ -2495,9 +2529,9 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 35,
     "half_cup_cooked_g": 70,
     "three_quarter_cup_cooked_g": 105,
-    "piece_small_g": null,
-    "piece_medium_g": null,
-    "piece_large_g": null
+    "piece_small_g": 10,
+    "piece_medium_g": 15,
+    "piece_large_g": 20
   },
   {
     "food": "Mustard greens",
