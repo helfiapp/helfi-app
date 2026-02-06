@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 
@@ -33,13 +33,22 @@ const shouldSkipPrompt = () => {
 
 export default function LinkApplePage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const nextTarget = useMemo(() => sanitizeNextTarget(searchParams.get('next')), [searchParams])
   const { status } = useSession()
+  const [nextTarget, setNextTarget] = useState('/onboarding')
 
-  const [linked, setLinked] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Avoid using Next.js search params hooks here.
+    // This page must not break static export/prerender.
+    try {
+      const sp = new URLSearchParams(window.location.search)
+      setNextTarget(sanitizeNextTarget(sp.get('next')))
+    } catch {
+      setNextTarget('/onboarding')
+    }
+  }, [])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -58,7 +67,6 @@ export default function LinkApplePage() {
         if (!res.ok) throw new Error('status_failed')
         const data = await res.json()
         const isLinked = Boolean(data?.linked)
-        setLinked(isLinked)
         if (isLinked) {
           router.replace(nextTarget)
           return
@@ -146,4 +154,3 @@ export default function LinkApplePage() {
     </div>
   )
 }
-
