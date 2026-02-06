@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendUsageReportEmail } from '@/lib/admin-alerts'
-import { fetchNeonUsageSummary } from '@/lib/neon-usage'
+import { estimateDailyCostUsd, fetchNeonUsageSummary } from '@/lib/neon-usage'
 import { formatBytes, formatNumber, getActivityCounts, getSpikeCandidates } from '@/lib/usage-report'
 
 export const runtime = 'nodejs'
@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
     granularity: 'daily',
     orgId: (process.env.NEON_ORG_ID || '').trim() || undefined,
   })
+  const costEstimate = estimateDailyCostUsd(neonUsage)
 
   const usageLines = Object.entries(neonUsage?.metrics || {})
     .map(([key, value]) => {
@@ -99,15 +100,21 @@ export async function GET(request: NextRequest) {
         .join('')}</ul>`
     : '<p>No spikes detected.</p>'
 
+  const estimatedCostHtml =
+    costEstimate.estimatedDailyCostUsd !== null
+      ? `<p><strong>Estimated daily cost (approx):</strong> $${costEstimate.estimatedDailyCostUsd.toFixed(2)}</p>`
+      : '<p><strong>Estimated daily cost (approx):</strong> unavailable.</p>'
+
   const neonHtml = neonUsage
-    ? usageLines.length
-      ? `<ul>${usageLines.map((line) => `<li>${line}</li>`).join('')}</ul>`
-      : '<p>No Neon usage data found.</p>'
+    ? `${estimatedCostHtml}${
+        usageLines.length
+          ? `<ul>${usageLines.map((line) => `<li>${line}</li>`).join('')}</ul>`
+          : '<p>No Neon usage data found.</p>'
+      }`
     : '<p>Neon API key missing or invalid.</p>'
 
-  const neonNote = neonUsage?.note
-    ? `<p style="color:#b91c1c;">Note: ${neonUsage.note}</p>`
-    : ''
+  const neonNoteText = neonUsage?.note || costEstimate.note
+  const neonNote = neonNoteText ? `<p style="color:#b91c1c;">Note: ${neonNoteText}</p>` : ''
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">

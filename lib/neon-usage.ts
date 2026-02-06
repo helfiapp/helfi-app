@@ -22,11 +22,23 @@ export type NeonUsageSummary = {
   note?: string
 }
 
+export type NeonCostEstimate = {
+  estimatedDailyCostUsd: number | null
+  computeUsd?: number
+  storageUsd?: number
+  note?: string
+}
+
 const buildQuery = (params: Record<string, string | undefined>) => {
   const entries = Object.entries(params).filter(([, value]) => value)
   if (!entries.length) return ''
   const query = new URLSearchParams(entries as Array<[string, string]>).toString()
   return `?${query}`
+}
+
+const parseNumber = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
 }
 
 export async function fetchNeonUsageSummary(options: {
@@ -91,5 +103,49 @@ export async function fetchNeonUsageSummary(options: {
       metrics: {},
       note: error?.message || 'Neon API request failed',
     }
+  }
+}
+
+export function estimateDailyCostUsd(
+  usage: NeonUsageSummary | null,
+  options?: {
+    computeCuHourUsd?: number
+    storageGbMonthUsd?: number
+  }
+): NeonCostEstimate {
+  if (!usage) {
+    return { estimatedDailyCostUsd: null, note: 'Neon usage data missing.' }
+  }
+
+  const computeSeconds = Number(usage.metrics.compute_time_seconds || 0)
+  const storageBytes =
+    Number(usage.metrics.synthetic_storage_size_bytes || 0) ||
+    Number(usage.metrics.data_storage_bytes || 0) ||
+    Number(usage.metrics.logical_size_bytes || 0)
+
+  const computeCuHourUsd = parseNumber(
+    process.env.NEON_COMPUTE_CU_HOUR_USD,
+    options?.computeCuHourUsd ?? 0.14
+  )
+  const storageGbMonthUsd = parseNumber(
+    process.env.NEON_STORAGE_GB_MONTH_USD,
+    options?.storageGbMonthUsd ?? 0.35
+  )
+
+  const computeUsd = Number.isFinite(computeSeconds)
+    ? (computeSeconds / 3600) * computeCuHourUsd
+    : 0
+  const storageUsd = Number.isFinite(storageBytes)
+    ? (storageBytes / (1024 ** 3)) * (storageGbMonthUsd / 30)
+    : 0
+
+  if (!computeUsd && !storageUsd) {
+    return { estimatedDailyCostUsd: null, note: 'Neon usage data missing compute/storage metrics.' }
+  }
+
+  return {
+    estimatedDailyCostUsd: computeUsd + storageUsd,
+    computeUsd,
+    storageUsd,
   }
 }

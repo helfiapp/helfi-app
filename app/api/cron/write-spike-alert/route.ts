@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendWriteSpikeAlertEmail } from '@/lib/admin-alerts'
+import { estimateDailyCostUsd, fetchNeonUsageSummary } from '@/lib/neon-usage'
 import { formatNumber, getSpikeCandidates } from '@/lib/usage-report'
 
 export const runtime = 'nodejs'
@@ -53,6 +54,38 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date()
+  const warningUsdRaw = Number(process.env.NEON_DAILY_COST_WARNING_USD || '1')
+  const warningUsd = Number.isFinite(warningUsdRaw) && warningUsdRaw >= 0 ? warningUsdRaw : 1
+  const shouldCheckCost = warningUsd > 0
+
+  if (shouldCheckCost) {
+    const costWindowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const neonUsage = await fetchNeonUsageSummary({
+      from: costWindowStart.toISOString(),
+      to: now.toISOString(),
+      granularity: 'daily',
+      orgId: (process.env.NEON_ORG_ID || '').trim() || undefined,
+    })
+    const costEstimate = estimateDailyCostUsd(neonUsage)
+
+    if (costEstimate.estimatedDailyCostUsd === null) {
+      return NextResponse.json({
+        skipped: true,
+        reason: 'daily_cost_unavailable',
+        note: costEstimate.note || neonUsage?.note || 'Daily cost estimate unavailable.',
+      })
+    }
+
+    if (costEstimate.estimatedDailyCostUsd < warningUsd) {
+      return NextResponse.json({
+        skipped: true,
+        reason: 'daily_cost_below_threshold',
+        estimatedDailyCostUsd: costEstimate.estimatedDailyCostUsd,
+        warningUsd,
+      })
+    }
+  }
+
   const recentMinutes = 10
   const baselineHours = 6
   const baselineWindows = (baselineHours * 60) / recentMinutes
