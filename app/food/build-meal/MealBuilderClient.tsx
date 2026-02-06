@@ -1345,6 +1345,38 @@ const buildItemsSignature = (items: BuilderItem[] | null | undefined) => {
   return parts.filter(Boolean).sort().join('|')
 }
 
+const buildRawItemsSignature = (items: any[] | null | undefined) => {
+  if (!Array.isArray(items) || items.length === 0) return ''
+  const parts = items.map((it) => {
+    const id = typeof it?.id === 'string' ? it.id : ''
+    const name = String(it?.name || it?.label || '').trim().toLowerCase()
+    const amount = Number.isFinite(Number(it?.weightAmount))
+      ? String(round3(Number(it.weightAmount)))
+      : Number.isFinite(Number(it?.amount))
+      ? String(round3(Number(it.amount)))
+      : ''
+    const unit = typeof it?.weightUnit === 'string' ? it.weightUnit : typeof it?.unit === 'string' ? it.unit : ''
+    const serving = String(it?.serving_size || '').trim().toLowerCase()
+    return [id, name, amount, unit, serving].filter(Boolean).join('~')
+  })
+  return parts.filter(Boolean).sort().join('|')
+}
+
+const parseFavoriteItems = (fav: any): any[] | null => {
+  if (!fav) return null
+  const candidate = (fav as any)?.items
+  if (Array.isArray(candidate)) return candidate
+  if (typeof candidate === 'string') {
+    try {
+      const parsed = JSON.parse(candidate)
+      return Array.isArray(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
 const sanitizeMealTitle = (v: string) => v.replace(/\s+/g, ' ').trim()
 
 const buildDefaultMealName = (items: BuilderItem[]) => {
@@ -3081,6 +3113,8 @@ export default function MealBuilderClient() {
           setError('Could not find that saved meal to edit. Please reopen from Favorites → Custom.')
           return
         }
+        const previousDescription = String(existing?.description || existing?.label || '').trim()
+        const previousItemsSignature = buildRawItemsSignature(parseFavoriteItems(existing))
         const existingOrigin = (() => {
           const fromNutrition = (existing as any)?.nutrition?.__origin
           if (typeof fromNutrition === 'string' && fromNutrition.trim().length > 0) return fromNutrition
@@ -3128,6 +3162,8 @@ export default function MealBuilderClient() {
                 nutrition: syncNutrition,
                 total: syncNutrition,
                 items: cleanedItems,
+                previousDescription,
+                previousItemsSignature,
               }),
             })
             if (res.ok) {
@@ -3141,6 +3177,8 @@ export default function MealBuilderClient() {
                     nutrition: syncNutrition,
                     total: syncNutrition,
                     items: cleanedItems,
+                    previousDescription,
+                    previousItemsSignature,
                   }),
                 )
               } catch {}

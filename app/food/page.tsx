@@ -12540,7 +12540,31 @@ Please add nutritional information manually if needed.`);
       if (!parsed || typeof parsed !== 'object') return
       const favoriteId = String(parsed.favoriteId || '').trim()
       const localDate = String(parsed.localDate || '').trim()
+      const previousDescription = String(parsed.previousDescription || '').trim()
+      const previousItemsSignature = String(parsed.previousItemsSignature || '').trim()
       if (!favoriteId || !localDate) return
+
+      const normalizeSyncDescription = (value: any) =>
+        String(value || '')
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .trim()
+      const buildItemsSignature = (items: any[] | null | undefined) => {
+        if (!Array.isArray(items) || items.length === 0) return ''
+        const parts = items.map((it) => {
+          const id = typeof it?.id === 'string' ? it.id : ''
+          const name = String(it?.name || it?.label || '').trim().toLowerCase()
+          const amount = Number.isFinite(Number(it?.weightAmount))
+            ? String(Math.round(Number(it.weightAmount) * 1000) / 1000)
+            : Number.isFinite(Number(it?.amount))
+            ? String(Math.round(Number(it.amount) * 1000) / 1000)
+            : ''
+          const unit = typeof it?.weightUnit === 'string' ? it.weightUnit : typeof it?.unit === 'string' ? it.unit : ''
+          const serving = String(it?.serving_size || '').trim().toLowerCase()
+          return [id, name, amount, unit, serving].filter(Boolean).join('~')
+        })
+        return parts.filter(Boolean).sort().join('|')
+      }
 
       const mergeMeta = (base: any, existing: any) => {
         if (!base || typeof base !== 'object') return base
@@ -12566,12 +12590,24 @@ Please add nutritional information manually if needed.`);
                 (entry?.nutrition && (entry.nutrition as any).__favoriteId) ||
                 (entry?.total && (entry.total as any).__favoriteId) ||
                 ''
-              if (String(entryFav || '').trim() !== favoriteId) return entry
+              const normalizedEntryDescription = normalizeSyncDescription(entry?.description || entry?.name || '')
+              const entryItemsSignature = buildItemsSignature(Array.isArray(entry?.items) ? entry.items : null)
+              const legacyMatch =
+                !entryFav &&
+                normalizeSyncDescription(previousDescription) &&
+                normalizedEntryDescription === normalizeSyncDescription(previousDescription) &&
+                previousItemsSignature &&
+                entryItemsSignature === previousItemsSignature
+              const directMatch = String(entryFav || '').trim() === favoriteId
+              if (!directMatch && !legacyMatch) return entry
               const manualEdit = Boolean(
                 (entry?.nutrition && (entry.nutrition as any).__favoriteManualEdit) ||
                   (entry?.total && (entry.total as any).__favoriteManualEdit),
               )
               if (manualEdit) return entry
+              if (previousItemsSignature && entryItemsSignature && entryItemsSignature !== previousItemsSignature) {
+                return entry
+              }
               const nextNutrition = mergeMeta(parsed.nutrition ?? entry.nutrition, entry.nutrition)
               const nextTotal = mergeMeta(parsed.total ?? entry.total ?? nextNutrition, entry.total || entry.nutrition)
               return {

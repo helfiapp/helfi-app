@@ -40,6 +40,29 @@ const buildEntryName = (description: any, fallback?: string | null) => {
   return name || fallback || 'Food item'
 }
 
+const normalizeDescription = (value: any) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const buildItemsSignature = (items: any[] | null | undefined) => {
+  if (!Array.isArray(items) || items.length === 0) return ''
+  const parts = items.map((it) => {
+    const id = typeof it?.id === 'string' ? it.id : ''
+    const name = String(it?.name || it?.label || '').trim().toLowerCase()
+    const amount = Number.isFinite(Number(it?.weightAmount))
+      ? String(Math.round(Number(it.weightAmount) * 1000) / 1000)
+      : Number.isFinite(Number(it?.amount))
+      ? String(Math.round(Number(it.amount) * 1000) / 1000)
+      : ''
+    const unit = typeof it?.weightUnit === 'string' ? it.weightUnit : typeof it?.unit === 'string' ? it.unit : ''
+    const serving = String(it?.serving_size || '').trim().toLowerCase()
+    return [id, name, amount, unit, serving].filter(Boolean).join('~')
+  })
+  return parts.filter(Boolean).sort().join('|')
+}
+
 const getMetaFavoriteId = (nutrients: any) => {
   if (!nutrients || typeof nutrients !== 'object') return ''
   const raw = (nutrients as any).__favoriteId
@@ -100,6 +123,8 @@ export async function POST(request: NextRequest) {
     const description = typeof body?.description === 'string' ? body.description.trim() : ''
     const nutrition = body?.nutrition ?? body?.total ?? null
     const items = body?.items
+    const previousDescription = typeof body?.previousDescription === 'string' ? body.previousDescription.trim() : ''
+    const previousItemsSignature = typeof body?.previousItemsSignature === 'string' ? body.previousItemsSignature.trim() : ''
 
     if (!favoriteId || !localDate) {
       return NextResponse.json({ error: 'Missing favoriteId or localDate' }, { status: 400 })
@@ -114,11 +139,22 @@ export async function POST(request: NextRequest) {
     })
 
     const updatedIds: string[] = []
+    const normalizedPreviousDescription = normalizeDescription(previousDescription)
     for (const log of logs) {
       const existingNutrition = (log as any)?.nutrients || null
       const existingFavoriteId = getMetaFavoriteId(existingNutrition)
-      if (!existingFavoriteId || existingFavoriteId !== favoriteId) continue
       if (isManualEdited(existingNutrition)) continue
+      const logItemsSignature = buildItemsSignature((log as any)?.items || null)
+      const logDescription = normalizeDescription(log.description || log.name || '')
+      const legacyMatch =
+        !existingFavoriteId &&
+        normalizedPreviousDescription &&
+        logDescription === normalizedPreviousDescription &&
+        previousItemsSignature &&
+        logItemsSignature === previousItemsSignature
+      const directMatch = existingFavoriteId && existingFavoriteId === favoriteId
+      if (!directMatch && !legacyMatch) continue
+      if (previousItemsSignature && logItemsSignature && logItemsSignature !== previousItemsSignature) continue
 
       const resolvedDescription = description || log.description || log.name || ''
       const name = buildEntryName(resolvedDescription, log.name)
