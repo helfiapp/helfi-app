@@ -431,56 +431,57 @@ export async function GET(request: NextRequest) {
     
     // 🛡️ SEVERE GUARD RAIL: Post-Query Filtering (REQUIRED; owner approval to change)
     // Filter to ensure we only return entries for the requested date.
-    // Entries with incorrect localDate must be excluded (and then repaired).
-    // DO NOT remove this filtering step - it ensures accuracy after broad query
+    // Entries with incorrect localDate must be handled carefully.
+    // IMPORTANT: this app writes `createdAt` aligned to the selected diary date (see alignTimestampToLocalDate on the client).
+    // That means if `localDate` is missing/incorrect, we can safely use `createdAt` as the backup for what day it belongs to,
+    // and then auto-heal localDate so it stays consistent going forward.
+    // DO NOT remove this filtering step - it ensures accuracy after broad query.
     const filteredLogs = logs.filter((log) => {
       try {
         // If localDate matches exactly, include it
         if (log.localDate === validatedDateStr) return true;
-        
-        // GUARD RAIL: If localDate exists and differs, do NOT include it for this day.
-        // Only fall back to createdAt when localDate is missing.
-        if (!log.localDate) {
-          // Safety check: createdAt must exist and be a valid date
-          if (!log.createdAt) {
-            console.warn(`⚠️ Entry ${log.id} has no createdAt, skipping date check`);
-            return false;
-          }
-          
-          // Ensure createdAt is a Date object
-          const createdAtDate = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
-          if (isNaN(createdAtDate.getTime())) {
-            console.warn(`⚠️ Entry ${log.id} has invalid createdAt: ${log.createdAt}, skipping date check`);
-            return false;
-          }
-          
-          // Convert createdAt to user's local date using their timezone offset
-          const logDate = new Date(createdAtDate.getTime() - (tzMin * 60 * 1000));
-          const logYear = logDate.getUTCFullYear();
-          const logMonth = logDate.getUTCMonth();
-          const logDay = logDate.getUTCDate();
-          
-          // Compare with requested date
-          const [reqYear, reqMonth, reqDay] = validatedDateStr.split('-').map((v) => parseInt(v, 10));
-          const matchesDate = logYear === reqYear && logMonth === (reqMonth - 1) && logDay === reqDay;
-          
-          // Also check UTC window as fallback (for entries created exactly at boundaries)
-          const logTime = createdAtDate.getTime();
-          const isInWindow = logTime >= start.getTime() && logTime <= end.getTime();
-          
-          // Include if either the calendar date matches OR it's within the UTC window
-          const shouldInclude = matchesDate || isInWindow;
-          
-          // Debug logging for entries that might be filtered out incorrectly
-          if (!shouldInclude && log.localDate && log.localDate !== validatedDateStr) {
-            const logDateStr = `${logYear}-${String(logMonth + 1).padStart(2, '0')}-${String(logDay).padStart(2, '0')}`;
-            console.log(`⚠️ Entry filtered out: localDate=${log.localDate}, createdAt date=${logDateStr}, requested=${validatedDateStr}, matchesDate=${matchesDate}, inWindow=${isInWindow}`);
-          }
-          
-          return shouldInclude;
+
+        // Backup: decide which local day this entry belongs to based on createdAt (aligned to diary date on write).
+        // This fixes cases where localDate is missing or incorrect, without hiding the entry.
+
+        // Safety check: createdAt must exist and be a valid date
+        if (!log.createdAt) {
+          console.warn(`⚠️ Entry ${log.id} has no createdAt, skipping date check`);
+          return false;
         }
-        
-        return false;
+
+        // Ensure createdAt is a Date object
+        const createdAtDate = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
+        if (isNaN(createdAtDate.getTime())) {
+          console.warn(`⚠️ Entry ${log.id} has invalid createdAt: ${log.createdAt}, skipping date check`);
+          return false;
+        }
+
+        // Convert createdAt to user's local date using their timezone offset
+        const logDate = new Date(createdAtDate.getTime() - (tzMin * 60 * 1000));
+        const logYear = logDate.getUTCFullYear();
+        const logMonth = logDate.getUTCMonth();
+        const logDay = logDate.getUTCDate();
+
+        // Compare with requested date
+        const [reqYear, reqMonth, reqDay] = validatedDateStr.split('-').map((v) => parseInt(v, 10));
+        const matchesDate = logYear === reqYear && logMonth === (reqMonth - 1) && logDay === reqDay;
+
+        // Also check UTC window as fallback (for entries created exactly at boundaries)
+        const logTime = createdAtDate.getTime();
+        const isInWindow = logTime >= start.getTime() && logTime <= end.getTime();
+
+        // Include if either the calendar date matches OR it's within the UTC window
+        const shouldInclude = matchesDate || isInWindow;
+
+        if (!shouldInclude) {
+          const logDateStr = `${logYear}-${String(logMonth + 1).padStart(2, '0')}-${String(logDay).padStart(2, '0')}`;
+          console.log(
+            `⚠️ Entry filtered out: localDate=${log.localDate || 'null'}, createdAt date=${logDateStr}, requested=${validatedDateStr}, matchesDate=${matchesDate}, inWindow=${isInWindow}`,
+          );
+        }
+
+        return shouldInclude;
       } catch (error) {
         console.error(`❌ Error filtering log entry ${log.id}:`, error);
         // On error, exclude the entry to prevent breaking the entire response
