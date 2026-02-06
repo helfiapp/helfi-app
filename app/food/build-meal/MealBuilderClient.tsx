@@ -58,6 +58,10 @@ type BuilderUnit =
   | 'piece-small'
   | 'piece-medium'
   | 'piece-large'
+  | 'egg-small'
+  | 'egg-medium'
+  | 'egg-large'
+  | 'egg-extra-large'
   | 'slice'
   | 'serving'
 
@@ -557,6 +561,10 @@ const UNIT_GRAMS: Record<BuilderUnit, number> = {
   'piece-small': 100,
   'piece-medium': 100,
   'piece-large': 100,
+  'egg-small': 38,
+  'egg-medium': 44,
+  'egg-large': 50,
+  'egg-extra-large': 56,
   slice: 30,
   serving: DEFAULT_SERVING_GRAMS,
 }
@@ -604,6 +612,48 @@ const tokenizeFoodValue = (value: string) =>
     .split(' ')
     .map((token) => singularizeToken(token))
     .filter(Boolean)
+
+const EGG_UNITS: BuilderUnit[] = ['egg-small', 'egg-medium', 'egg-large', 'egg-extra-large']
+const EGG_UNIT_GRAMS: FoodUnitGrams = {
+  'egg-small': UNIT_GRAMS['egg-small'],
+  'egg-medium': UNIT_GRAMS['egg-medium'],
+  'egg-large': UNIT_GRAMS['egg-large'],
+  'egg-extra-large': UNIT_GRAMS['egg-extra-large'],
+}
+
+const EGG_BLOCKLIST = new Set([
+  'white',
+  'yolk',
+  'eggplant',
+  'nog',
+  'noodle',
+  'pasta',
+  'salad',
+  'sandwich',
+  'wrap',
+  'burrito',
+  'taco',
+  'pizza',
+  'burger',
+  'muffin',
+  'bagel',
+  'roll',
+  'cake',
+  'cookie',
+  'pancake',
+  'waffle',
+  'rice',
+  'protein',
+  'powder',
+  'substitute',
+  'mix',
+])
+
+const isEggFood = (name: string | null | undefined) => {
+  const tokens = tokenizeFoodValue(String(name || '').trim())
+  if (!tokens.includes('egg')) return false
+  return tokens.every((token) => !EGG_BLOCKLIST.has(token))
+}
 
 const splitFoodOptions = (value: string) =>
   value
@@ -730,7 +780,7 @@ const getProduceUnitGrams = (name: string | null | undefined): FoodUnitGrams | n
   resolveFoodUnitGrams(name, PRODUCE_MEASUREMENTS, PRODUCE_ALIASES, PRODUCE_LOOKUP_CACHE, buildProduceUnitGrams)
 
 const getFoodUnitGrams = (name: string | null | undefined): FoodUnitGrams | null =>
-  getProduceUnitGrams(name) || getDairySemiSolidUnitGrams(name) || getDryFoodUnitGrams(name)
+  (isEggFood(name) ? EGG_UNIT_GRAMS : null) || getProduceUnitGrams(name) || getDairySemiSolidUnitGrams(name) || getDryFoodUnitGrams(name)
 
 const ALL_UNITS: BuilderUnit[] = [
   'g',
@@ -748,6 +798,10 @@ const ALL_UNITS: BuilderUnit[] = [
   'piece-small',
   'piece-medium',
   'piece-large',
+  'egg-small',
+  'egg-medium',
+  'egg-large',
+  'egg-extra-large',
   'slice',
   'serving',
 ]
@@ -1030,6 +1084,25 @@ const convertAmount = (
 
 const allowedUnitsForItem = (item?: BuilderItem) => {
   let units = [...DISPLAY_UNITS]
+  if (isEggFood(item?.name || '')) {
+    const disallowed = new Set<BuilderUnit>([
+      'ml',
+      'tsp',
+      'tbsp',
+      'quarter-cup',
+      'half-cup',
+      'three-quarter-cup',
+      'cup',
+      'pinch',
+      'handful',
+      'piece',
+      'piece-small',
+      'piece-medium',
+      'piece-large',
+    ])
+    units = units.filter((unit) => !disallowed.has(unit) && !EGG_UNITS.includes(unit))
+    return [...units, ...EGG_UNITS]
+  }
   const pieceGrams = item?.__pieceGrams
   const produceUnits = item?.name ? getProduceUnitGrams(item.name) : null
   const isProduce = Boolean(produceUnits)
@@ -1061,6 +1134,22 @@ const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
   if (unit === 'oz') return 'oz'
   if (unit === 'ml') return 'ml'
   if (unit === 'pinch') return `pinch — ${Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? round3(Number(unitValue)) : 0.3}g`
+  if (unit === 'egg-small') {
+    const grams = Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : UNIT_GRAMS['egg-small']
+    return `small egg — ${Math.round(grams * 10) / 10}g`
+  }
+  if (unit === 'egg-medium') {
+    const grams = Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : UNIT_GRAMS['egg-medium']
+    return `medium egg — ${Math.round(grams * 10) / 10}g`
+  }
+  if (unit === 'egg-large') {
+    const grams = Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : UNIT_GRAMS['egg-large']
+    return `large egg — ${Math.round(grams * 10) / 10}g`
+  }
+  if (unit === 'egg-extra-large') {
+    const grams = Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : UNIT_GRAMS['egg-extra-large']
+    return `extra large egg — ${Math.round(grams * 10) / 10}g`
+  }
   if (unit === 'piece') {
     const grams = item?.__pieceGrams
     if (grams && grams > 0) return `piece — ${Math.round(grams * 10) / 10}g`

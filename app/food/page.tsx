@@ -91,6 +91,10 @@ const WEIGHT_UNIT_LABELS: Record<WeightUnit, string> = {
   'piece-small': 'small piece',
   'piece-medium': 'medium piece',
   'piece-large': 'large piece',
+  'egg-small': 'small egg',
+  'egg-medium': 'medium egg',
+  'egg-large': 'large egg',
+  'egg-extra-large': 'extra large egg',
   slice: 'slice',
   serving: 'serving',
 }
@@ -141,6 +145,10 @@ const WEIGHT_UNIT_TO_GRAMS: Record<WeightUnit, number> = {
   'piece-small': DEFAULT_UNIT_GRAMS['piece-small'],
   'piece-medium': DEFAULT_UNIT_GRAMS['piece-medium'],
   'piece-large': DEFAULT_UNIT_GRAMS['piece-large'],
+  'egg-small': DEFAULT_UNIT_GRAMS['egg-small'],
+  'egg-medium': DEFAULT_UNIT_GRAMS['egg-medium'],
+  'egg-large': DEFAULT_UNIT_GRAMS['egg-large'],
+  'egg-extra-large': DEFAULT_UNIT_GRAMS['egg-extra-large'],
   slice: 30,
   serving: DEFAULT_SERVING_GRAMS,
 }
@@ -164,6 +172,7 @@ const getWeightInputStep = (unit: WeightUnit) => {
   if (unit === 'tsp' || unit === 'tbsp') return 0.1
   if (unit === 'quarter-cup' || unit === 'half-cup' || unit === 'three-quarter-cup' || unit === 'cup') return 0.1
   if (unit === 'pinch' || unit === 'handful') return 0.1
+  if (unit === 'egg-small' || unit === 'egg-medium' || unit === 'egg-large' || unit === 'egg-extra-large') return 1
   if (unit === 'piece' || unit === 'piece-small' || unit === 'piece-medium' || unit === 'piece-large') return 1
   return 1
 }
