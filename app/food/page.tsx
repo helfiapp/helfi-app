@@ -19726,7 +19726,7 @@ Please add nutritional information manually if needed.`);
                                           return next
                                         })
                                       }}
-                                      className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
+                                      className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 p-0"
                                       style={{ outline: 'none', boxShadow: 'none' }}
                                     />
                                     <button
@@ -19813,7 +19813,7 @@ Please add nutritional information manually if needed.`);
                                             return next
                                           })
                                         }}
-                                        className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
+                                        className="w-16 bg-transparent border-none text-center font-bold text-lg text-slate-900 outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 p-0"
                                         style={{ outline: 'none', boxShadow: 'none' }}
                                       />
                                       <button
@@ -19892,7 +19892,7 @@ Please add nutritional information manually if needed.`);
                                           ? String(roundWeightValue(baseWeightPerServing * servingsCount, weightUnit))
                                           : 'e.g., 250'
                                       }
-                                      className="w-20 bg-transparent border-none font-bold text-lg text-slate-900 text-right tabular-nums outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
+                                      className="w-20 bg-transparent border-none font-bold text-lg text-slate-900 text-right tabular-nums outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 p-0"
                                       style={{ outline: 'none', boxShadow: 'none' }}
                                     />
                                     <div className="w-px h-6 bg-slate-300 mx-3" />
@@ -19930,7 +19930,7 @@ Please add nutritional information manually if needed.`);
                                           setDrinkAmountInput(v)
                                           updateDrinkMetaDraft(v, drinkUnitInput)
                                         }}
-                                        className="w-16 bg-transparent border-none font-bold text-lg text-slate-900 text-right outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
+                                        className="w-16 bg-transparent border-none font-bold text-lg text-slate-900 text-right outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 p-0"
                                         style={{ outline: 'none', boxShadow: 'none' }}
                                       />
                                       <div className="w-px h-6 bg-slate-300 mx-3" />
@@ -19986,7 +19986,7 @@ Please add nutritional information manually if needed.`);
                                               setSweetenerAmountInput('')
                                             }}
                                             onChange={(e) => setSweetenerAmountInput(e.target.value)}
-                                            className="w-16 bg-transparent border-none font-bold text-lg text-slate-900 text-right outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 appearance-none p-0"
+                                            className="w-16 bg-transparent border-none font-bold text-lg text-slate-900 text-right outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 p-0"
                                             style={{ outline: 'none', boxShadow: 'none' }}
                                           />
                                           <div className="w-px h-6 bg-slate-300" />
