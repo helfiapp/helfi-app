@@ -4752,6 +4752,19 @@ export default function FoodDiary() {
     const pieceScale =
       optionIsDiscrete && piecesPerServing > 1 ? Math.max(piecesPerServing / optionPieces, 1) : 1
     next.serving_size = option?.serving_size || option?.label || next.serving_size
+
+    // Some sources don't provide `grams`/`ml` fields, but the label can still include a weight like "56 g".
+    // If we don't update stored per-serving weight, the UI can show "56 g" while calculations use an older value.
+    const parsedFromLabel = parseServingSizeInfo(next)
+    const labelGrams =
+      parsedFromLabel?.gramsPerServing && Number.isFinite(parsedFromLabel.gramsPerServing)
+        ? Number(parsedFromLabel.gramsPerServing)
+        : null
+    const labelMl =
+      parsedFromLabel?.mlPerServing && Number.isFinite(parsedFromLabel.mlPerServing)
+        ? Number(parsedFromLabel.mlPerServing)
+        : null
+
     if (option?.calories != null) next.calories = option.calories
     if (option?.protein_g != null) next.protein_g = option.protein_g
     if (option?.carbs_g != null) next.carbs_g = option.carbs_g
@@ -4808,6 +4821,14 @@ export default function FoodDiary() {
       next.customMlPerServing = pieceScale > 1 ? optionMl * pieceScale : optionMl
       next.customGramsPerServing = null
       next.weightUnit = 'ml'
+    } else if (labelMl && labelMl > 0) {
+      next.customMlPerServing = pieceScale > 1 ? labelMl * pieceScale : labelMl
+      next.customGramsPerServing = null
+      next.weightUnit = 'ml'
+    } else if (labelGrams && labelGrams > 0) {
+      next.customGramsPerServing = pieceScale > 1 ? labelGrams * pieceScale : labelGrams
+      next.customMlPerServing = null
+      next.weightUnit = 'g'
     }
     next.selectedServingId = option?.id || next.selectedServingId
     const updatedBaseWeight = getBaseWeightPerServing(next)
@@ -6128,6 +6149,16 @@ export default function FoodDiary() {
       if (mlPerServing && mlPerServing > 0 && liquidItem) next.weightUnit = 'ml'
       else if (ozPerServing && ozPerServing > 0) next.weightUnit = 'oz'
       else next.weightUnit = 'g'
+    }
+
+    // If the serving label includes an explicit weight/volume, align stored per-serving weight to it.
+    // This prevents cases where the label shows "56 g" but the weight math still uses an older value.
+    if (mlPerServing && mlPerServing > 0 && liquidItem) {
+      next.customMlPerServing = mlPerServing
+      next.customGramsPerServing = null
+    } else if (gramsPerServing && gramsPerServing > 0) {
+      next.customGramsPerServing = gramsPerServing
+      next.customMlPerServing = null
     }
 
     const hasCustom =
@@ -7467,6 +7498,21 @@ const applyStructuredItems = (
 
       itemsCopy[index].serving_size = nextLabel
       clearLabelReviewFlag()
+
+      // If the serving label includes an explicit weight/volume, keep stored per-serving weight aligned.
+      // This keeps "Serving size" and the "Weight" field in sync.
+      if (newInfo?.mlPerServing && Number.isFinite(newInfo.mlPerServing) && newInfo.mlPerServing > 0) {
+        itemsCopy[index].customMlPerServing = Number(newInfo.mlPerServing)
+        itemsCopy[index].customGramsPerServing = null
+      } else if (
+        newInfo?.gramsPerServing &&
+        Number.isFinite(newInfo.gramsPerServing) &&
+        newInfo.gramsPerServing > 0
+      ) {
+        itemsCopy[index].customGramsPerServing = Number(newInfo.gramsPerServing)
+        itemsCopy[index].customMlPerServing = null
+      }
+
       if (ratio && Number.isFinite(ratio) && ratio > 0) {
         const scaleMacro = (fieldName: string, decimals: number) => {
           const raw = Number((itemsCopy[index] as any)[fieldName])
