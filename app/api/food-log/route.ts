@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client'
 import { put } from '@vercel/blob'
 import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
+import { hashPayload, shouldSkipRepeatedWrite } from '@/lib/write-guard'
 
 const FOOD_PHOTO_PREFIX = 'food-photos'
 const FOOD_PHOTO_SCOPE = 'food-photo'
@@ -30,6 +31,24 @@ const contentTypeToExt = (contentType: string) => {
   if (contentType === 'image/gif') return 'gif'
   return 'jpg'
 }
+
+const buildFoodLogGuardPayload = (input: {
+  name: string
+  description: any
+  nutrition: any
+  items: any
+  localDate: string | null
+  meal: string | null
+  category: string | null
+}) => ({
+  name: input.name || '',
+  description: input.description || '',
+  nutrition: input.nutrition || null,
+  items: Array.isArray(input.items) ? input.items : null,
+  localDate: input.localDate || null,
+  meal: input.meal || null,
+  category: input.category || null,
+})
 
 const withSignedFoodPhoto = <T extends { imageUrl?: any }>(log: T): T => {
   const raw = typeof log?.imageUrl === 'string' ? log.imageUrl : ''
@@ -689,6 +708,36 @@ export async function POST(request: NextRequest) {
       hasItems: Array.isArray(items) && items.length > 0,
       normalizedMeal,
     })
+
+    if (allowDuplicate !== true) {
+      try {
+        const guardPayload = buildFoodLogGuardPayload({
+          name,
+          description,
+          nutrition,
+          items,
+          localDate: normalizedLocalDate,
+          meal: normalizedMeal,
+          category: storedCategory,
+        })
+        const payloadHash = hashPayload(guardPayload)
+        const guardResult = await shouldSkipRepeatedWrite({
+          userId: user.id,
+          scope: 'food-log:create',
+          payloadHash,
+          windowMs: 30 * 1000,
+        })
+        if (guardResult.skip) {
+          console.log('🛑 Write guard: skipped repeat food log save', {
+            userId: user.id,
+            hitCount: guardResult.hitCount,
+          })
+          return NextResponse.json({ success: true, deduped: true, reason: 'repeat_write_guard' })
+        }
+      } catch (guardError) {
+        console.warn('Write guard failed (non-blocking)', guardError)
+      }
+    }
 
     // Guard: prevent near-identical duplicates within a short window
     if (allowDuplicate !== true) {
