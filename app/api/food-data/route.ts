@@ -516,17 +516,29 @@ export async function GET(request: NextRequest) {
           const brand = item.brand || ''
           const brandName = brand ? `${brand} ${name}` : name
           const normalizedBrandName = normalizeForMatch(brandName)
+          const compactBrandName = normalizeForCompact(brandName)
           const normalizedName = normalizeForMatch(name)
+          const compactName = normalizeForCompact(name)
           const normalizedBrand = normalizeForMatch(brand)
+          const compactBrand = normalizeForCompact(brand)
           
-          // For multi-word queries, check if all tokens appear somewhere (more lenient)
+          const tokenMatchesLoose = (token: string) => {
+            if (!token) return false
+            if (normalizedBrandName.includes(token)) return true
+            if (compactBrandName.includes(token)) return true
+            if (normalizedName.includes(token)) return true
+            if (compactName.includes(token)) return true
+            if (brand && normalizedBrand.includes(token)) return true
+            if (brand && compactBrand.includes(token)) return true
+            return false
+          }
+
+          // For multi-word queries, check if all tokens appear somewhere (loose matching, compact-aware).
           if (queryTokens.length > 1) {
-            const allTokensMatch = queryTokens.every((token) => 
-              normalizedBrandName.includes(token) || 
-              normalizedName.includes(token) ||
-              (brand && normalizedBrand.includes(token))
-            )
-            if (allTokensMatch) return true
+            if (queryTokens.every((token) => tokenMatchesLoose(token))) return true
+          } else if (queryTokens.length === 1) {
+            // Single token: allow brand/name compact matching to handle punctuation (e.g. "mcdonalds" vs "McDonald's").
+            if (tokenMatchesLoose(queryTokens[0])) return true
           }
           
           // Check name
@@ -534,7 +546,7 @@ export async function GET(request: NextRequest) {
           // Check brand + name combination
           if (brandName && nameMatchesSearchQuery(brandName, value, { allowTypo })) return true
           // Check brand alone (if query matches brand)
-          if (brand && normalizedBrand.includes(normalizedQuery)) return true
+          if (brand && (normalizedBrand.includes(normalizedQuery) || compactBrand.includes(normalizeForCompact(value)))) return true
           // Check aliases
           const aliases = Array.isArray(item.aliases) ? item.aliases : []
           return aliases.some((alias) => nameMatchesSearchQuery(alias, value, { allowTypo }))

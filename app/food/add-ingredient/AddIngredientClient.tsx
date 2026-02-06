@@ -317,7 +317,22 @@ const itemMatchesSearchQuery = (
   if (kind === 'single')
     return nameMatchesSearchQuery(item?.name || '', searchQuery, { requireFirstWord: false, allowTypo: options?.allowTypo })
   const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-  return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false, allowTypo: options?.allowTypo })
+  const primary = nameMatchesSearchQuery(combined || item?.name || '', searchQuery, {
+    requireFirstWord: false,
+    allowTypo: options?.allowTypo,
+  })
+  if (primary) return true
+
+  // Packaged/fast-food: allow compact token matching so queries like "mcdonalds"
+  // match names like "McDonald's" (which normalizes to "mc donald s").
+  const compactHaystack = normalizeBrandToken(combined || item?.name || '')
+  const tokens = getSearchTokens(searchQuery).filter((t) => t.length >= 2)
+  if (compactHaystack && tokens.length > 0) {
+    const ok = tokens.every((t) => compactHaystack.includes(normalizeBrandToken(t)))
+    if (ok) return true
+  }
+
+  return false
 }
 
 const filterItemsForQuery = (
