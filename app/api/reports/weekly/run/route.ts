@@ -2461,7 +2461,8 @@ export async function POST(request: NextRequest) {
 
   const now = new Date()
   let state = await getWeeklyReportState(userId)
-  if (!state?.reportsEnabled) {
+  const reportsEnabled = Boolean(state?.reportsEnabled || state?.reportsEnabledAt || state?.nextReportDueAt)
+  if (!reportsEnabled) {
     return NextResponse.json({ status: 'disabled', reason: 'reports_disabled' }, { status: 400 })
   }
   if (!state?.nextReportDueAt) {

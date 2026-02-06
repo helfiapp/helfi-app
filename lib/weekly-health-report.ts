@@ -189,7 +189,10 @@ function normalizeStateRow(row: any): WeeklyReportState | null {
   const reportsEnabledAt = readRowValue(row, 'reportsEnabledAt')
   const reportsEnabledRaw = readRowValue(row, 'reportsEnabled')
   const parsed = normalizeBool(reportsEnabledRaw)
-  const reportsEnabled = parsed !== null ? parsed : nextReportDueAt != null
+  // Treat either "enabled flag" OR "schedule exists" as enabled.
+  // This prevents the UI/API from flipping to OFF if one field is temporarily missing.
+  const hasSchedule = Boolean(nextReportDueAt || reportsEnabledAt)
+  const reportsEnabled = parsed !== null ? parsed || hasSchedule : hasSchedule
   return {
     userId: readRowValue(row, 'userId'),
     onboardingCompletedAt: onboardingCompletedAt ? new Date(onboardingCompletedAt).toISOString() : null,
