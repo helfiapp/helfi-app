@@ -15,6 +15,7 @@ import {
   getWeeklyReportByPeriod,
   getWeeklyReportState,
   markWeeklyReportOnboardingComplete,
+  setWeeklyReportsEnabled,
   queueWeeklyReportNotification,
   resolveWeeklyReportTimezone,
   summarizeCoverage,
@@ -2462,7 +2463,20 @@ export async function POST(request: NextRequest) {
 
   const now = new Date()
   let state = await getWeeklyReportState(userId)
-  const reportsEnabled = Boolean(state?.reportsEnabled || state?.reportsEnabledAt || state?.nextReportDueAt)
+  let reportsEnabled = Boolean(state?.reportsEnabled || state?.reportsEnabledAt || state?.nextReportDueAt)
+  if (!reportsEnabled) {
+    // "Create report now" is only shown for the manual test account, so if the
+    // user is allowed to manually run, auto-enable weekly reports for them.
+    if (isManualTrigger) {
+      try {
+        await setWeeklyReportsEnabled(userId, true, { scheduleFrom: now })
+      } catch (error) {
+        console.warn('[weekly-report] Failed to auto-enable weekly reports for manual run', error)
+      }
+      state = await getWeeklyReportState(userId)
+      reportsEnabled = Boolean(state?.reportsEnabled || state?.reportsEnabledAt || state?.nextReportDueAt)
+    }
+  }
   if (!reportsEnabled) {
     const payload: any = { status: 'disabled', reason: 'reports_disabled' }
     if (debugWeekly) {

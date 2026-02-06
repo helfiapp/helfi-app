@@ -251,7 +251,7 @@ export async function upsertWeeklyReportState(
     try {
       await prisma.$executeRawUnsafe(
         `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus, reportsEnabled, reportsEnabledAt)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         VALUES ($1, $2::timestamptz, $3::timestamptz, $4::timestamptz, $5::timestamptz, $6, $7, $8::timestamptz)
          ON CONFLICT (userId)
          DO UPDATE SET onboardingCompletedAt = EXCLUDED.onboardingCompletedAt,
                       nextReportDueAt = EXCLUDED.nextReportDueAt,
@@ -273,7 +273,7 @@ export async function upsertWeeklyReportState(
       console.warn('[weekly-report] Upsert failed with reportsEnabled columns, retrying basic upsert', error)
       await prisma.$executeRawUnsafe(
         `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus)
-         VALUES ($1, $2, $3, $4, $5, $6)
+         VALUES ($1, $2::timestamptz, $3::timestamptz, $4::timestamptz, $5::timestamptz, $6)
          ON CONFLICT (userId)
          DO UPDATE SET onboardingCompletedAt = EXCLUDED.onboardingCompletedAt,
                       nextReportDueAt = EXCLUDED.nextReportDueAt,
@@ -346,7 +346,7 @@ export async function setWeeklyReportsEnabled(
   try {
     await prisma.$executeRawUnsafe(
       `INSERT INTO WeeklyHealthReportState (userId, nextReportDueAt, lastStatus)
-       VALUES ($1, $2, 'scheduled')
+       VALUES ($1, $2::timestamptz, 'scheduled')
        ON CONFLICT (userId)
        DO UPDATE SET nextReportDueAt = EXCLUDED.nextReportDueAt,
                     lastStatus = 'scheduled'`,
