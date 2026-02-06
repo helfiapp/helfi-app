@@ -5,6 +5,7 @@ database-backup-*.sql
 *.sql
 testsprite_tests/
 public/mobile-design-screenshots/
+native/
 
 # This repo contains helper scripts that may embed credentials; they are not required at runtime.
 scripts/add-garmin-env-to-vercel.js
