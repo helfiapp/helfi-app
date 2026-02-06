@@ -30,8 +30,16 @@ This is how you replace the gatekeeper safely if the current agent gets confused
 
 What you do (simple):
 1. Start a new chat with a new agent.
-2. Tell them: “You are the gatekeeper. Read `config.toml`, then `AGENTS.md`, then `PROJECT_STATUS.md`. Do not deploy live unless I say so.”
+2. Copy/paste the message below to make them the gatekeeper.
 3. Tell them: “Before you deploy anything, check what other agents left in `CURRENT_ISSUES_LIVE.md`.”
+
+Copy/paste message (this appoints the gatekeeper):
+```
+You are the gatekeeper for this project.
+Read `config.toml`, then `AGENTS.md`, then `PROJECT_STATUS.md`.
+Do not deploy live unless I say so.
+Before deploying anything, check `CURRENT_ISSUES_LIVE.md`.
+```
 
 What the new gatekeeper must do (agent instructions):
 1. Confirm what is currently deployed by checking the Vercel deployments page.
