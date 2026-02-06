@@ -1393,6 +1393,28 @@ const extractTotalsSignature = (totals: any) => {
   }
 }
 
+const normalizeSyncLabel = (value: any) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const totalsMatch = (left: any, right: any) => {
+  const a = extractTotalsSignature(left)
+  const b = extractTotalsSignature(right)
+  if (!a || !b) return false
+  const within = (x: number | null, y: number | null, tolerance: number) => {
+    if (x === null || y === null) return false
+    return Math.abs(x - y) <= tolerance
+  }
+  return (
+    within(a.calories, b.calories, 2) &&
+    within(a.protein, b.protein, 0.2) &&
+    within(a.carbs, b.carbs, 0.2) &&
+    within(a.fat, b.fat, 0.2)
+  )
+}
+
 const sanitizeMealTitle = (v: string) => v.replace(/\s+/g, ' ').trim()
 
 const buildDefaultMealName = (items: BuilderItem[]) => {
@@ -3132,6 +3154,58 @@ export default function MealBuilderClient() {
         const previousDescription = String(existing?.description || existing?.label || '').trim()
         const previousItemsSignature = buildRawItemsSignature(parseFavoriteItems(existing))
         const previousTotals = extractTotalsSignature(existing?.nutrition || existing?.total || null)
+        let candidateLogId = ''
+        try {
+          const tz = new Date().getTimezoneOffset()
+          const res = await fetch(`/api/food-log?date=${encodeURIComponent(selectedDate)}&tz=${tz}&t=${Date.now()}`, {
+            cache: 'no-store',
+          })
+          if (res.ok) {
+            const data = await res.json().catch(() => ({} as any))
+            const logs = Array.isArray(data?.logs) ? data.logs : []
+            if (logs.length > 0) {
+              const previousLabelNorm = normalizeSyncLabel(previousDescription)
+              const nextLabelNorm = normalizeSyncLabel(description)
+              const byFavorite = logs.filter(
+                (log: any) => String((log?.nutrients as any)?.__favoriteId || '').trim() === editFavoriteId,
+              )
+              if (byFavorite.length > 0 && byFavorite[0]?.id) {
+                candidateLogId = String(byFavorite[0].id)
+              } else {
+                const labelMatches = logs.filter((log: any) => {
+                  const label = normalizeSyncLabel(log?.description || log?.name || '')
+                  return label && (label === previousLabelNorm || label === nextLabelNorm)
+                })
+                const itemMatches =
+                  previousItemsSignature && previousItemsSignature.length > 0
+                    ? labelMatches.filter((log: any) => {
+                        const items = Array.isArray(log?.items)
+                          ? log.items
+                          : Array.isArray((log?.nutrients as any)?.items)
+                          ? (log?.nutrients as any).items
+                          : null
+                        return buildRawItemsSignature(items) === previousItemsSignature
+                      })
+                    : []
+                const totalsMatches =
+                  previousTotals && Object.values(previousTotals).some((v) => v !== null)
+                    ? labelMatches.filter((log: any) => totalsMatch(log?.nutrients, previousTotals))
+                    : []
+                const pool =
+                  itemMatches.length === 1
+                    ? itemMatches
+                    : totalsMatches.length === 1
+                    ? totalsMatches
+                    : labelMatches.length === 1
+                    ? labelMatches
+                    : []
+                if (pool.length === 1 && pool[0]?.id) {
+                  candidateLogId = String(pool[0].id)
+                }
+              }
+            }
+          }
+        } catch {}
         const existingOrigin = (() => {
           const fromNutrition = (existing as any)?.nutrition?.__origin
           if (typeof fromNutrition === 'string' && fromNutrition.trim().length > 0) return fromNutrition
@@ -3165,6 +3239,9 @@ export default function MealBuilderClient() {
         }
         const nextFavorites = prev.map((f: any) => (String(f?.id || '') === editFavoriteId ? updatedFavorite : f))
         persistFavorites(nextFavorites)
+        try {
+          sessionStorage.setItem('foodDiary:favoritesAllForceRefresh', '1')
+        } catch {}
 
         const syncNutrition = normalizedNutrition || payload.nutrition
         try {
@@ -3182,6 +3259,7 @@ export default function MealBuilderClient() {
                 previousDescription,
                 previousItemsSignature,
                 previousTotals,
+                candidateLogId,
               }),
             })
             if (res.ok) {
@@ -3198,6 +3276,7 @@ export default function MealBuilderClient() {
                     previousDescription,
                     previousItemsSignature,
                     previousTotals,
+                    candidateLogId,
                   }),
                 )
               } catch {}

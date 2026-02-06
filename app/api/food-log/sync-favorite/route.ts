@@ -24,6 +24,21 @@ const normalizeDate = (value: any): string | null => {
   return null
 }
 
+const deriveLocalDate = (log: any) => {
+  const raw = typeof log?.localDate === 'string' ? log.localDate.trim() : ''
+  if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+  try {
+    const createdAt = log?.createdAt ? new Date(log.createdAt) : null
+    if (!createdAt || Number.isNaN(createdAt.getTime())) return ''
+    const y = createdAt.getFullYear()
+    const m = String(createdAt.getMonth() + 1).padStart(2, '0')
+    const d = String(createdAt.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  } catch {
+    return ''
+  }
+}
+
 const normalizeFavoriteId = (value: any): string => {
   const raw = typeof value === 'string' ? value.trim() : ''
   return raw
@@ -158,16 +173,21 @@ export async function POST(request: NextRequest) {
     const previousDescription = typeof body?.previousDescription === 'string' ? body.previousDescription.trim() : ''
     const previousItemsSignature = typeof body?.previousItemsSignature === 'string' ? body.previousItemsSignature.trim() : ''
     const previousTotals = body?.previousTotals ?? null
+    const candidateLogId = typeof body?.candidateLogId === 'string' ? body.candidateLogId.trim() : ''
 
     if (!favoriteId || !localDate) {
       return NextResponse.json({ error: 'Missing favoriteId or localDate' }, { status: 400 })
     }
 
+    const logWhere: any = {
+      userId: user.id,
+      OR: [{ localDate }, { localDate: null }],
+    }
+    if (candidateLogId) {
+      logWhere.OR.push({ id: candidateLogId })
+    }
     const logs = await prisma.foodLog.findMany({
-      where: {
-        userId: user.id,
-        localDate,
-      },
+      where: logWhere,
       orderBy: { createdAt: 'asc' },
     })
 
@@ -182,14 +202,16 @@ export async function POST(request: NextRequest) {
       const logDescription = normalizeDescription(log.description || log.name || '')
       const logTotals = existingNutrition || null
       const totalsMatchLegacy = previousTotals ? totalsMatch(logTotals, previousTotals) : false
+      const candidateMatch =
+        candidateLogId && String(log.id) === candidateLogId ? deriveLocalDate(log) === localDate : false
       const legacyMatch =
         !existingFavoriteId &&
         normalizedPreviousDescription &&
         logDescription === normalizedPreviousDescription &&
         ((previousItemsSignature && logItemsSignature === previousItemsSignature) || totalsMatchLegacy)
       const directMatch = existingFavoriteId && existingFavoriteId === favoriteId
-      if (!directMatch && !legacyMatch) continue
-      if (previousItemsSignature && logItemsSignature && logItemsSignature !== previousItemsSignature && !totalsMatchLegacy) continue
+      if (!candidateMatch && !directMatch && !legacyMatch) continue
+      if (!candidateMatch && previousItemsSignature && logItemsSignature && logItemsSignature !== previousItemsSignature && !totalsMatchLegacy) continue
 
       const resolvedDescription = description || log.description || log.name || ''
       const name = buildEntryName(resolvedDescription, log.name)

@@ -12543,6 +12543,7 @@ Please add nutritional information manually if needed.`);
       const previousDescription = String(parsed.previousDescription || '').trim()
       const previousItemsSignature = String(parsed.previousItemsSignature || '').trim()
       const previousTotals = parsed.previousTotals || null
+      const candidateLogId = String(parsed.candidateLogId || '').trim()
       if (!favoriteId || !localDate) return
 
       const normalizeSyncDescription = (value: any) =>
@@ -12616,7 +12617,9 @@ Please add nutritional information manually if needed.`);
         Array.isArray(list)
           ? list.map((entry) => {
               if (!entry) return entry
-              if (String(entry?.localDate || '') !== localDate) return entry
+              const candidateMatch =
+                candidateLogId && String(entry?.dbId || entry?.id || '') === candidateLogId
+              if (!candidateMatch && String(entry?.localDate || '') !== localDate) return entry
               const entryFav =
                 (entry?.nutrition && (entry.nutrition as any).__favoriteId) ||
                 (entry?.total && (entry.total as any).__favoriteId) ||
@@ -12629,13 +12632,19 @@ Please add nutritional information manually if needed.`);
                 normalizedEntryDescription === normalizeSyncDescription(previousDescription) &&
                 ((previousItemsSignature && entryItemsSignature === previousItemsSignature) || totalsMatch(entry?.nutrition, previousTotals))
               const directMatch = String(entryFav || '').trim() === favoriteId
-              if (!directMatch && !legacyMatch) return entry
+              if (!candidateMatch && !directMatch && !legacyMatch) return entry
               const manualEdit = Boolean(
                 (entry?.nutrition && (entry.nutrition as any).__favoriteManualEdit) ||
                   (entry?.total && (entry.total as any).__favoriteManualEdit),
               )
               if (manualEdit) return entry
-              if (previousItemsSignature && entryItemsSignature && entryItemsSignature !== previousItemsSignature && !totalsMatch(entry?.nutrition, previousTotals)) {
+              if (
+                !candidateMatch &&
+                previousItemsSignature &&
+                entryItemsSignature &&
+                entryItemsSignature !== previousItemsSignature &&
+                !totalsMatch(entry?.nutrition, previousTotals)
+              ) {
                 return entry
               }
               const nextNutrition = mergeMeta(parsed.nutrition ?? entry.nutrition, entry.nutrition)
@@ -12785,8 +12794,17 @@ Please add nutritional information manually if needed.`);
       return
     }
     let cancelled = false
-    const cached = readFavoritesAllSnapshot(userCacheKey)
-    const shouldRefresh = shouldRefreshOnResume('favoritesAll')
+    let forceRefresh = false
+    try {
+      const raw = sessionStorage.getItem('foodDiary:favoritesAllForceRefresh')
+      if (raw === '1') {
+        forceRefresh = true
+        sessionStorage.removeItem('foodDiary:favoritesAllForceRefresh')
+        sessionStorage.removeItem(FAVORITES_ALL_SNAPSHOT_KEY)
+      }
+    } catch {}
+    const cached = !forceRefresh ? readFavoritesAllSnapshot(userCacheKey) : null
+    const shouldRefresh = forceRefresh ? true : shouldRefreshOnResume('favoritesAll')
     const hasCached = Boolean(cached && cached.length > 0)
     if (hasCached) {
       setFavoritesAllServerEntries(cached)
