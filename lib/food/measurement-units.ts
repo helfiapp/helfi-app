@@ -18,6 +18,7 @@ export type MeasurementUnit =
   | 'piece-small'
   | 'piece-medium'
   | 'piece-large'
+  | 'piece-extra-large'
   | 'egg-small'
   | 'egg-medium'
   | 'egg-large'
@@ -43,6 +44,7 @@ export const DEFAULT_UNIT_GRAMS: Record<MeasurementUnit, number> = {
   'piece-small': 100,
   'piece-medium': 100,
   'piece-large': 100,
+  'piece-extra-large': 100,
   'egg-small': 38,
   'egg-medium': 44,
   'egg-large': 50,
@@ -66,6 +68,7 @@ export const DISPLAY_MEASUREMENT_UNITS: MeasurementUnit[] = [
   'piece-small',
   'piece-medium',
   'piece-large',
+  'piece-extra-large',
 ]
 
 const EGG_UNITS: MeasurementUnit[] = ['egg-small', 'egg-medium', 'egg-large', 'egg-extra-large']
@@ -257,15 +260,27 @@ const buildDairySemiSolidUnitGrams = (
   cup: entry.cup_g,
 })
 
-const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): FoodUnitGrams => ({
-  'quarter-cup': toUnitValue(entry.quarter_cup_raw_g),
-  'half-cup': toUnitValue(entry.half_cup_raw_g),
-  'three-quarter-cup': toUnitValue(entry.three_quarter_cup_raw_g),
-  cup: toUnitValue(entry.raw_cup_g),
-  'piece-small': toUnitValue(entry.piece_small_g),
-  'piece-medium': toUnitValue(entry.piece_medium_g),
-  'piece-large': toUnitValue(entry.piece_large_g),
-})
+const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): FoodUnitGrams => {
+  const small = toUnitValue(entry.piece_small_g)
+  const medium = toUnitValue(entry.piece_medium_g)
+  const large = toUnitValue(entry.piece_large_g)
+  let extraLarge: number | null = null
+  if (Number.isFinite(Number(large)) && Number.isFinite(Number(medium)) && Number(large) > 0 && Number(medium) > 0) {
+    extraLarge = Number(large) + (Number(large) - Number(medium))
+  } else if (Number.isFinite(Number(large)) && Number.isFinite(Number(small)) && Number(large) > 0 && Number(small) > 0) {
+    extraLarge = Number(large) + (Number(large) - Number(small)) / 2
+  }
+  return {
+    'quarter-cup': toUnitValue(entry.quarter_cup_raw_g),
+    'half-cup': toUnitValue(entry.half_cup_raw_g),
+    'three-quarter-cup': toUnitValue(entry.three_quarter_cup_raw_g),
+    cup: toUnitValue(entry.raw_cup_g),
+    'piece-small': small,
+    'piece-medium': medium,
+    'piece-large': large,
+    'piece-extra-large': toUnitValue(extraLarge),
+  }
+}
 
 const DRY_FOOD_ALIASES = buildFoodAliases(DRY_FOOD_MEASUREMENTS)
 const DRY_FOOD_LOOKUP_CACHE = new Map<string, FoodUnitGrams | null>()
@@ -315,6 +330,7 @@ export const getAllowedUnitsForFood = (
       'piece-small',
       'piece-medium',
       'piece-large',
+      'piece-extra-large',
     ])
     units = units.filter((unit) => !disallowed.has(unit) && !EGG_UNITS.includes(unit))
     return [...units, ...EGG_UNITS]
@@ -325,6 +341,8 @@ export const getAllowedUnitsForFood = (
   const hasPieceSmall = Number.isFinite(Number(produceUnits?.['piece-small'])) && Number(produceUnits?.['piece-small']) > 0
   const hasPieceMedium = Number.isFinite(Number(produceUnits?.['piece-medium'])) && Number(produceUnits?.['piece-medium']) > 0
   const hasPieceLarge = Number.isFinite(Number(produceUnits?.['piece-large'])) && Number(produceUnits?.['piece-large']) > 0
+  const hasPieceExtraLarge =
+    Number.isFinite(Number(produceUnits?.['piece-extra-large'])) && Number(produceUnits?.['piece-extra-large']) > 0
   if (hasPieceSmall || hasPieceMedium || hasPieceLarge) {
     units = units.filter((unit) => unit !== 'piece')
   } else if (!pieceGrams || pieceGrams <= 0) {
@@ -333,11 +351,14 @@ export const getAllowedUnitsForFood = (
   if (!hasPieceSmall) units = units.filter((unit) => unit !== 'piece-small')
   if (!hasPieceMedium) units = units.filter((unit) => unit !== 'piece-medium')
   if (!hasPieceLarge) units = units.filter((unit) => unit !== 'piece-large')
+  if (!hasPieceExtraLarge) units = units.filter((unit) => unit !== 'piece-extra-large')
   return units
 }
 
 export const formatUnitLabel = (unit: MeasurementUnit, name?: string | null, pieceGrams?: number | null) => {
   const foodUnitGrams = name ? getFoodUnitGrams(name) : null
+  const produceUnits = name ? getProduceUnitGrams(name) : null
+  const produceName = produceUnits ? String(name || '').trim().toLowerCase() : ''
   const unitValue = foodUnitGrams?.[unit]
   if (unit === 'g') return 'g'
   if (unit === 'ml') return 'ml'
@@ -372,15 +393,35 @@ export const formatUnitLabel = (unit: MeasurementUnit, name?: string | null, pie
   }
   if (unit === 'piece-small') {
     const grams = Number(unitValue)
-    return Number.isFinite(grams) && grams > 0 ? `small piece — ${Math.round(grams * 10) / 10}g` : 'small piece'
+    if (Number.isFinite(grams) && grams > 0) {
+      if (produceName) return `small ${produceName} — ${Math.round(grams * 10) / 10}g`
+      return `small piece — ${Math.round(grams * 10) / 10}g`
+    }
+    return produceName ? `small ${produceName}` : 'small piece'
   }
   if (unit === 'piece-medium') {
     const grams = Number(unitValue)
-    return Number.isFinite(grams) && grams > 0 ? `medium piece — ${Math.round(grams * 10) / 10}g` : 'medium piece'
+    if (Number.isFinite(grams) && grams > 0) {
+      if (produceName) return `medium ${produceName} — ${Math.round(grams * 10) / 10}g`
+      return `medium piece — ${Math.round(grams * 10) / 10}g`
+    }
+    return produceName ? `medium ${produceName}` : 'medium piece'
   }
   if (unit === 'piece-large') {
     const grams = Number(unitValue)
-    return Number.isFinite(grams) && grams > 0 ? `large piece — ${Math.round(grams * 10) / 10}g` : 'large piece'
+    if (Number.isFinite(grams) && grams > 0) {
+      if (produceName) return `large ${produceName} — ${Math.round(grams * 10) / 10}g`
+      return `large piece — ${Math.round(grams * 10) / 10}g`
+    }
+    return produceName ? `large ${produceName}` : 'large piece'
+  }
+  if (unit === 'piece-extra-large') {
+    const grams = Number(unitValue)
+    if (Number.isFinite(grams) && grams > 0) {
+      if (produceName) return `extra large ${produceName} — ${Math.round(grams * 10) / 10}g`
+      return `extra large piece — ${Math.round(grams * 10) / 10}g`
+    }
+    return produceName ? `extra large ${produceName}` : 'extra large piece'
   }
   return unit
 }
@@ -394,7 +435,13 @@ export const resolveUnitGrams = (
 ) => {
   const foodOverride = foodUnitGrams?.[unit]
   if (Number.isFinite(Number(foodOverride)) && Number(foodOverride) > 0) return Number(foodOverride)
-  if (unit === 'piece' || unit === 'piece-small' || unit === 'piece-medium' || unit === 'piece-large') {
+  if (
+    unit === 'piece' ||
+    unit === 'piece-small' ||
+    unit === 'piece-medium' ||
+    unit === 'piece-large' ||
+    unit === 'piece-extra-large'
+  ) {
     if (pieceGrams && pieceGrams > 0) return pieceGrams
     return DEFAULT_UNIT_GRAMS.piece
   }

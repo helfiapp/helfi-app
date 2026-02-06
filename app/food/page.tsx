@@ -91,6 +91,7 @@ const WEIGHT_UNIT_LABELS: Record<WeightUnit, string> = {
   'piece-small': 'small piece',
   'piece-medium': 'medium piece',
   'piece-large': 'large piece',
+  'piece-extra-large': 'extra large piece',
   'egg-small': 'small egg',
   'egg-medium': 'medium egg',
   'egg-large': 'large egg',
@@ -114,6 +115,7 @@ const WEIGHT_UNIT_OPTIONS: Array<{ value: WeightUnit; label: string }> = [
   { value: 'piece-small', label: WEIGHT_UNIT_LABELS['piece-small'] },
   { value: 'piece-medium', label: WEIGHT_UNIT_LABELS['piece-medium'] },
   { value: 'piece-large', label: WEIGHT_UNIT_LABELS['piece-large'] },
+  { value: 'piece-extra-large', label: WEIGHT_UNIT_LABELS['piece-extra-large'] },
 ]
 
 const getWeightUnitOptions = (item?: any, current?: WeightUnit, pieceGrams?: number | null) => {
@@ -145,6 +147,7 @@ const WEIGHT_UNIT_TO_GRAMS: Record<WeightUnit, number> = {
   'piece-small': DEFAULT_UNIT_GRAMS['piece-small'],
   'piece-medium': DEFAULT_UNIT_GRAMS['piece-medium'],
   'piece-large': DEFAULT_UNIT_GRAMS['piece-large'],
+  'piece-extra-large': DEFAULT_UNIT_GRAMS['piece-extra-large'],
   'egg-small': DEFAULT_UNIT_GRAMS['egg-small'],
   'egg-medium': DEFAULT_UNIT_GRAMS['egg-medium'],
   'egg-large': DEFAULT_UNIT_GRAMS['egg-large'],
@@ -160,6 +163,8 @@ const normalizeWeightUnit = (value: any): WeightUnit => {
   if (raw === 'small piece' || raw === 'piece small') return 'piece-small'
   if (raw === 'medium piece' || raw === 'piece medium') return 'piece-medium'
   if (raw === 'large piece' || raw === 'piece large') return 'piece-large'
+  if (raw === 'extra large piece' || raw === 'piece extra large' || raw === 'extra-large piece' || raw === 'piece extra-large')
+    return 'piece-extra-large'
   if (raw === 'tablespoon' || raw === 'tablespoons') return 'tbsp'
   if (raw === 'teaspoon' || raw === 'teaspoons') return 'tsp'
   if (raw === 'servings') return 'serving'
@@ -173,7 +178,14 @@ const getWeightInputStep = (unit: WeightUnit) => {
   if (unit === 'quarter-cup' || unit === 'half-cup' || unit === 'three-quarter-cup' || unit === 'cup') return 0.1
   if (unit === 'pinch' || unit === 'handful') return 0.1
   if (unit === 'egg-small' || unit === 'egg-medium' || unit === 'egg-large' || unit === 'egg-extra-large') return 1
-  if (unit === 'piece' || unit === 'piece-small' || unit === 'piece-medium' || unit === 'piece-large') return 1
+  if (
+    unit === 'piece' ||
+    unit === 'piece-small' ||
+    unit === 'piece-medium' ||
+    unit === 'piece-large' ||
+    unit === 'piece-extra-large'
+  )
+    return 1
   return 1
 }
 
@@ -9934,7 +9946,14 @@ const applyStructuredItems = (
     if (unit === 'serving') {
       return baseGrams && baseGrams > 0 ? baseGrams : WEIGHT_UNIT_TO_GRAMS.serving
     }
-    if (unit === 'piece' || unit === 'piece-small' || unit === 'piece-medium' || unit === 'piece-large' || unit === 'slice') {
+    if (
+      unit === 'piece' ||
+      unit === 'piece-small' ||
+      unit === 'piece-medium' ||
+      unit === 'piece-large' ||
+      unit === 'piece-extra-large' ||
+      unit === 'slice'
+    ) {
       const pieceGrams = getPieceGramsForItem(item, baseGrams)
       if (pieceGrams && pieceGrams > 0) return pieceGrams
       return null
@@ -11132,10 +11151,23 @@ Please add nutritional information manually if needed.`);
 
     const meta = (() => {
       const n = editingEntry?.nutrition
+      const t = editingEntry?.total
       const clientId = getEntryClientId(editingEntry)
-      if (!n || typeof n !== 'object') return { favoriteId: '', origin: '', clientId, drinkMeta: null }
-      const favoriteId = typeof (n as any).__favoriteId === 'string' ? String((n as any).__favoriteId).trim() : ''
-      const origin = typeof (n as any).__origin === 'string' ? String((n as any).__origin).trim() : ''
+      if ((!n || typeof n !== 'object') && (!t || typeof t !== 'object')) {
+        return { favoriteId: '', origin: '', clientId, drinkMeta: null }
+      }
+      const favoriteId =
+        typeof (n as any)?.__favoriteId === 'string'
+          ? String((n as any).__favoriteId).trim()
+          : typeof (t as any)?.__favoriteId === 'string'
+          ? String((t as any).__favoriteId).trim()
+          : ''
+      const origin =
+        typeof (n as any)?.__origin === 'string'
+          ? String((n as any).__origin).trim()
+          : typeof (t as any)?.__origin === 'string'
+          ? String((t as any).__origin).trim()
+          : ''
       const drinkType = typeof (n as any).__drinkType === 'string' ? String((n as any).__drinkType).trim() : ''
       const drinkUnit = normalizeDrinkUnit((n as any).__drinkUnit) || null
       const drinkAmount = Number((n as any).__drinkAmount)
@@ -11188,6 +11220,7 @@ Please add nutritional information manually if needed.`);
       if (meta.favoriteId) next.__favoriteId = meta.favoriteId
       if (meta.origin) next.__origin = meta.origin
       if (meta.clientId) next.__clientId = meta.clientId
+      if (meta.favoriteId) next.__favoriteManualEdit = true
       if (meta.drinkMeta) {
         Object.assign(next, meta.drinkMeta)
       }
@@ -11201,6 +11234,10 @@ Please add nutritional information manually if needed.`);
       let next: any = removeSweetenerFromTotals(base, baseSweetenerMeta)
       next = applyDrinkMetaToTotals(next, drinkMeta)
       next = applySweetenerMetaToTotals(next, resolvedSweetenerMeta)
+      if (meta.favoriteId) next.__favoriteId = meta.favoriteId
+      if (meta.origin) next.__origin = meta.origin
+      if (meta.clientId) next.__clientId = meta.clientId
+      if (meta.favoriteId) next.__favoriteManualEdit = true
       return next
     })()
 
@@ -12491,6 +12528,66 @@ Please add nutritional information manually if needed.`);
       setTodaysFoods((prev) => applyOverride(prev as any[]))
       setHistoryFoods((prev) => applyOverride(prev as any[]))
       sessionStorage.removeItem('foodDiary:entryOverride')
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    // Sync a saved meal edit into the diary (only for entries that were not manually edited).
+    try {
+      const raw = sessionStorage.getItem('foodDiary:favoriteSync')
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (!parsed || typeof parsed !== 'object') return
+      const favoriteId = String(parsed.favoriteId || '').trim()
+      const localDate = String(parsed.localDate || '').trim()
+      if (!favoriteId || !localDate) return
+
+      const mergeMeta = (base: any, existing: any) => {
+        if (!base || typeof base !== 'object') return base
+        const next: any = { ...(base as any) }
+        if (existing && typeof existing === 'object') {
+          for (const [key, value] of Object.entries(existing)) {
+            if (!key.startsWith('__')) continue
+            if (key === '__favoriteManualEdit') continue
+            if (typeof next[key] === 'undefined') next[key] = value
+          }
+        }
+        next.__favoriteId = favoriteId
+        next.__favoriteManualEdit = false
+        return next
+      }
+
+      const applySync = (list: any[]) =>
+        Array.isArray(list)
+          ? list.map((entry) => {
+              if (!entry) return entry
+              if (String(entry?.localDate || '') !== localDate) return entry
+              const entryFav =
+                (entry?.nutrition && (entry.nutrition as any).__favoriteId) ||
+                (entry?.total && (entry.total as any).__favoriteId) ||
+                ''
+              if (String(entryFav || '').trim() !== favoriteId) return entry
+              const manualEdit = Boolean(
+                (entry?.nutrition && (entry.nutrition as any).__favoriteManualEdit) ||
+                  (entry?.total && (entry.total as any).__favoriteManualEdit),
+              )
+              if (manualEdit) return entry
+              const nextNutrition = mergeMeta(parsed.nutrition ?? entry.nutrition, entry.nutrition)
+              const nextTotal = mergeMeta(parsed.total ?? entry.total ?? nextNutrition, entry.total || entry.nutrition)
+              return {
+                ...entry,
+                description: parsed.description || entry.description,
+                nutrition: nextNutrition,
+                total: nextTotal,
+                items: Array.isArray(parsed.items) ? parsed.items : entry.items,
+              }
+            })
+          : list
+
+      setTodaysFoods((prev) => applySync(prev as any[]))
+      setHistoryFoods((prev) => applySync(prev as any[]))
+      sessionStorage.removeItem('foodDiary:favoriteSync')
+      void refreshEntriesFromServer({ mode: 'manual' })
     } catch {}
   }, [])
 
@@ -14908,10 +15005,13 @@ Please add nutritional information manually if needed.`);
       const m = String(favorite?.method || '').toLowerCase()
       return m === 'meal-builder' || m === 'combined' ? m : ''
     })()
-    const attachMeta = (raw: any) => {
+    const attachMeta = (raw: any, manualEdit?: boolean) => {
       if (!raw || typeof raw !== 'object') return raw
       const next: any = { ...(raw as any) }
-      if (favoriteId) next.__favoriteId = favoriteId
+      if (favoriteId) {
+        next.__favoriteId = favoriteId
+        next.__favoriteManualEdit = manualEdit === true
+      }
       if (origin) next.__origin = origin
       return next
     }
@@ -14921,12 +15021,13 @@ Please add nutritional information manually if needed.`);
     const adjustedTotals = adjusted.used ? adjusted.totals || null : null
     if (adjusted.used) pendingDrinkOverrideRef.current = null
     const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-    const baseTotals = stripWaterLogIdFromTotals(attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null))
-    const totalsWithMeta = applyDrinkMetaToTotals(baseTotals, drinkMeta)
+    const baseTotals = stripWaterLogIdFromTotals(attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null, false))
+    const totalsWithMeta = attachMeta(applyDrinkMetaToTotals(baseTotals, drinkMeta), false)
     const totalWithMeta = applyDrinkMetaToTotals(
       stripWaterLogIdFromTotals(adjustedTotals || favorite.total || favorite.nutrition || null),
       drinkMeta,
     )
+    const totalWithMetaFixed = attachMeta(totalWithMeta, false)
 
     const entry = ensureEntryLoggedAt(
       applyEntryClientId(
@@ -14953,7 +15054,7 @@ Please add nutritional information manually if needed.`);
                 }
               })()
             : null,
-          total: totalWithMeta,
+          total: totalWithMetaFixed,
           meal: category,
           category,
           persistedCategory: category,

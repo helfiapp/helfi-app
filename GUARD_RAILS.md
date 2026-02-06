@@ -2214,6 +2214,23 @@ owner approval.
 
 **Last stable deployment:** `dbe9205a` (2026-01-24)
 
+## 7.5 Favorites → Diary Sync (Feb 2026 – Locked)
+
+**Goal (non‑negotiable):** Editing a saved meal (favorite) must update the diary
+entry for the **same day** only **if that diary entry was not manually edited**.
+
+**Must keep:**
+- Diary entries copied from a favorite include a `__favoriteId`.
+- If the user manually edits that diary entry, set `__favoriteManualEdit = true`.
+- When a favorite is edited, only update diary entries on the **same localDate**
+  where `__favoriteId` matches **and** `__favoriteManualEdit` is not true.
+- Never update entries from other days.
+
+**If this breaks again, restore:**
+1. Manual edits set `__favoriteManualEdit` on the diary entry’s totals.
+2. Favorite edits call the diary sync endpoint and the client applies a same‑day update.
+3. The sync logic always skips entries where `__favoriteManualEdit` is true.
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:

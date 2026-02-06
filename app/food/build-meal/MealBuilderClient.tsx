@@ -58,6 +58,7 @@ type BuilderUnit =
   | 'piece-small'
   | 'piece-medium'
   | 'piece-large'
+  | 'piece-extra-large'
   | 'egg-small'
   | 'egg-medium'
   | 'egg-large'
@@ -561,6 +562,7 @@ const UNIT_GRAMS: Record<BuilderUnit, number> = {
   'piece-small': 100,
   'piece-medium': 100,
   'piece-large': 100,
+  'piece-extra-large': 100,
   'egg-small': 38,
   'egg-medium': 44,
   'egg-large': 50,
@@ -763,15 +765,27 @@ const getDairySemiSolidUnitGrams = (name: string | null | undefined): FoodUnitGr
 
 const toUnitValue = (value: number | null) => (Number.isFinite(Number(value)) ? Number(value) : undefined)
 
-const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): FoodUnitGrams => ({
-  'quarter-cup': toUnitValue(entry.quarter_cup_raw_g),
-  'half-cup': toUnitValue(entry.half_cup_raw_g),
-  'three-quarter-cup': toUnitValue(entry.three_quarter_cup_raw_g),
-  cup: toUnitValue(entry.raw_cup_g),
-  'piece-small': toUnitValue(entry.piece_small_g),
-  'piece-medium': toUnitValue(entry.piece_medium_g),
-  'piece-large': toUnitValue(entry.piece_large_g),
-})
+const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): FoodUnitGrams => {
+  const small = toUnitValue(entry.piece_small_g)
+  const medium = toUnitValue(entry.piece_medium_g)
+  const large = toUnitValue(entry.piece_large_g)
+  let extraLarge: number | null = null
+  if (Number.isFinite(Number(large)) && Number.isFinite(Number(medium)) && Number(large) > 0 && Number(medium) > 0) {
+    extraLarge = Number(large) + (Number(large) - Number(medium))
+  } else if (Number.isFinite(Number(large)) && Number.isFinite(Number(small)) && Number(large) > 0 && Number(small) > 0) {
+    extraLarge = Number(large) + (Number(large) - Number(small)) / 2
+  }
+  return {
+    'quarter-cup': toUnitValue(entry.quarter_cup_raw_g),
+    'half-cup': toUnitValue(entry.half_cup_raw_g),
+    'three-quarter-cup': toUnitValue(entry.three_quarter_cup_raw_g),
+    cup: toUnitValue(entry.raw_cup_g),
+    'piece-small': small,
+    'piece-medium': medium,
+    'piece-large': large,
+    'piece-extra-large': toUnitValue(extraLarge),
+  }
+}
 
 const PRODUCE_ALIASES = buildFoodAliases(PRODUCE_MEASUREMENTS)
 const PRODUCE_LOOKUP_CACHE = new Map<string, FoodUnitGrams | null>()
@@ -798,6 +812,7 @@ const ALL_UNITS: BuilderUnit[] = [
   'piece-small',
   'piece-medium',
   'piece-large',
+  'piece-extra-large',
   'egg-small',
   'egg-medium',
   'egg-large',
@@ -821,6 +836,7 @@ const DISPLAY_UNITS: BuilderUnit[] = [
   'piece-small',
   'piece-medium',
   'piece-large',
+  'piece-extra-large',
 ]
 
 const parseServingBase = (servingSize: any): { amount: number | null; unit: BuilderUnit | null } => {
@@ -1042,7 +1058,13 @@ const resolveUnitGrams = (
 ) => {
   const foodOverride = foodUnitGrams?.[unit]
   if (Number.isFinite(Number(foodOverride)) && Number(foodOverride) > 0) return Number(foodOverride)
-  if (unit === 'piece' || unit === 'piece-small' || unit === 'piece-medium' || unit === 'piece-large') {
+  if (
+    unit === 'piece' ||
+    unit === 'piece-small' ||
+    unit === 'piece-medium' ||
+    unit === 'piece-large' ||
+    unit === 'piece-extra-large'
+  ) {
     if (pieceGrams && pieceGrams > 0) return pieceGrams
     return UNIT_GRAMS.piece
   }
@@ -1099,6 +1121,7 @@ const allowedUnitsForItem = (item?: BuilderItem) => {
       'piece-small',
       'piece-medium',
       'piece-large',
+      'piece-extra-large',
     ])
     units = units.filter((unit) => !disallowed.has(unit) && !EGG_UNITS.includes(unit))
     return [...units, ...EGG_UNITS]
@@ -1110,6 +1133,8 @@ const allowedUnitsForItem = (item?: BuilderItem) => {
   const hasPieceSmall = Number.isFinite(Number(produceUnits?.['piece-small'])) && Number(produceUnits?.['piece-small']) > 0
   const hasPieceMedium = Number.isFinite(Number(produceUnits?.['piece-medium'])) && Number(produceUnits?.['piece-medium']) > 0
   const hasPieceLarge = Number.isFinite(Number(produceUnits?.['piece-large'])) && Number(produceUnits?.['piece-large']) > 0
+  const hasPieceExtraLarge =
+    Number.isFinite(Number(produceUnits?.['piece-extra-large'])) && Number(produceUnits?.['piece-extra-large']) > 0
   if (hasPieceSmall || hasPieceMedium || hasPieceLarge) {
     units = units.filter((u) => u !== 'piece')
   } else if (!pieceGrams || pieceGrams <= 0) {
@@ -1118,11 +1143,14 @@ const allowedUnitsForItem = (item?: BuilderItem) => {
   if (!hasPieceSmall) units = units.filter((u) => u !== 'piece-small')
   if (!hasPieceMedium) units = units.filter((u) => u !== 'piece-medium')
   if (!hasPieceLarge) units = units.filter((u) => u !== 'piece-large')
+  if (!hasPieceExtraLarge) units = units.filter((u) => u !== 'piece-extra-large')
   return units
 }
 
 const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
   const foodUnitGrams = item?.name ? getFoodUnitGrams(item.name) : null
+  const produceUnits = item?.name ? getProduceUnitGrams(item.name) : null
+  const produceName = produceUnits ? String(item?.name || '').trim().toLowerCase() : ''
   const unitValue = foodUnitGrams?.[unit]
   if (unit === 'g') return 'g'
   if (unit === 'tsp') return `tsp — ${Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? round3(Number(unitValue)) : 5}g`
@@ -1157,18 +1185,35 @@ const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
   }
   if (unit === 'piece-small') {
     const grams = Number(unitValue)
-    if (Number.isFinite(grams) && grams > 0) return `small piece — ${Math.round(grams * 10) / 10}g`
-    return 'small piece'
+    if (Number.isFinite(grams) && grams > 0) {
+      if (produceName) return `small ${produceName} — ${Math.round(grams * 10) / 10}g`
+      return `small piece — ${Math.round(grams * 10) / 10}g`
+    }
+    return produceName ? `small ${produceName}` : 'small piece'
   }
   if (unit === 'piece-medium') {
     const grams = Number(unitValue)
-    if (Number.isFinite(grams) && grams > 0) return `medium piece — ${Math.round(grams * 10) / 10}g`
-    return 'medium piece'
+    if (Number.isFinite(grams) && grams > 0) {
+      if (produceName) return `medium ${produceName} — ${Math.round(grams * 10) / 10}g`
+      return `medium piece — ${Math.round(grams * 10) / 10}g`
+    }
+    return produceName ? `medium ${produceName}` : 'medium piece'
   }
   if (unit === 'piece-large') {
     const grams = Number(unitValue)
-    if (Number.isFinite(grams) && grams > 0) return `large piece — ${Math.round(grams * 10) / 10}g`
-    return 'large piece'
+    if (Number.isFinite(grams) && grams > 0) {
+      if (produceName) return `large ${produceName} — ${Math.round(grams * 10) / 10}g`
+      return `large piece — ${Math.round(grams * 10) / 10}g`
+    }
+    return produceName ? `large ${produceName}` : 'large piece'
+  }
+  if (unit === 'piece-extra-large') {
+    const grams = Number(unitValue)
+    if (Number.isFinite(grams) && grams > 0) {
+      if (produceName) return `extra large ${produceName} — ${Math.round(grams * 10) / 10}g`
+      return `extra large piece — ${Math.round(grams * 10) / 10}g`
+    }
+    return produceName ? `extra large ${produceName}` : 'extra large piece'
   }
   return unit
 }
@@ -2960,6 +3005,10 @@ export default function MealBuilderClient() {
     try {
       // Editing a diary entry directly (no favorites template involved).
         if (!editFavoriteId && sourceLogId) {
+          const diaryNutrition =
+            favoriteLinkId && payload.nutrition
+              ? { ...(payload.nutrition as any), __favoriteManualEdit: true }
+              : payload.nutrition
           try {
             await fetch('/api/food-log', {
               method: 'PUT',
@@ -2967,7 +3016,7 @@ export default function MealBuilderClient() {
               body: JSON.stringify({
                 id: sourceLogId,
                 description,
-                nutrition: payload.nutrition,
+                nutrition: diaryNutrition,
                 items: cleanedItems,
                 meal: category,
                 category,
@@ -2981,8 +3030,8 @@ export default function MealBuilderClient() {
                 dbId: sourceLogId,
                 localDate: selectedDate,
                 category,
-                nutrition: payload.nutrition,
-                total: payload.nutrition,
+                nutrition: diaryNutrition,
+                total: diaryNutrition,
                 items: cleanedItems,
               }),
             )
@@ -3065,6 +3114,39 @@ export default function MealBuilderClient() {
         }
         const nextFavorites = prev.map((f: any) => (String(f?.id || '') === editFavoriteId ? updatedFavorite : f))
         persistFavorites(nextFavorites)
+
+        const syncNutrition = normalizedNutrition || payload.nutrition
+        try {
+          if (syncNutrition) {
+            const res = await fetch('/api/food-log/sync-favorite', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                favoriteId: editFavoriteId,
+                localDate: selectedDate,
+                description,
+                nutrition: syncNutrition,
+                total: syncNutrition,
+                items: cleanedItems,
+              }),
+            })
+            if (res.ok) {
+              try {
+                sessionStorage.setItem(
+                  'foodDiary:favoriteSync',
+                  JSON.stringify({
+                    favoriteId: editFavoriteId,
+                    localDate: selectedDate,
+                    description,
+                    nutrition: syncNutrition,
+                    total: syncNutrition,
+                    items: cleanedItems,
+                  }),
+                )
+              } catch {}
+            }
+          }
+        } catch {}
 
         // If we were opened from a diary entry, update that FoodLog row too.
         // Do NOT use favorite.sourceId here: favorites are reusable templates and may point to an older log.
