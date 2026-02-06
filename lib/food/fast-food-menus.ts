@@ -71,7 +71,9 @@ const parseCsv = (filePath: string) => {
 
 const toNumber = (value: string | undefined | null) => {
   if (value == null) return null
-  const num = Number(String(value).trim())
+  const trimmed = String(value).trim()
+  if (!trimmed) return null
+  const num = Number(trimmed)
   return Number.isFinite(num) ? num : null
 }
 

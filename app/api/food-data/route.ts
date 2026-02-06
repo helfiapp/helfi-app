@@ -468,6 +468,11 @@ export async function GET(request: NextRequest) {
         if (!Array.isArray(options) || options.length === 0) return null
         return options[0]
       }
+      const normalizeBrandForDisplay = (value: any) =>
+        String(value || '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '')
+          .trim()
       return rows
         .map((row) => {
           const kindValue = row?.kind ? String(row.kind) : null
@@ -479,10 +484,17 @@ export async function GET(request: NextRequest) {
             (selected?.label || selected?.serving_size || row?.serving_size || '').toString().trim() ||
             '100 g'
           const itemId = row?.id ? String(row.id) : normalizeForCompact(`${row?.brand || ''} ${row?.name || ''}`)
+          const rawName = String(row?.name || '').trim()
+          const rawBrand = String(row?.brand || '').trim()
+          const rowCountry = String(row?.country || '').trim().toUpperCase()
+          const name =
+            isFastFood && rowCountry === 'AU' && normalizeBrandForDisplay(rawBrand) === 'mcdonalds'
+              ? rawName.replace(/\bTwin\s+Twist\s+/gi, '').replace(/\s+/g, ' ').trim()
+              : rawName
           return {
             id: `custom:${itemId}`,
-            name: row?.name || '',
-            brand: row?.brand ?? null,
+            name,
+            brand: rawBrand || null,
             kind: kindValue,
             serving_size: servingLabel,
             servingOptions: options.length > 0 ? options : null,

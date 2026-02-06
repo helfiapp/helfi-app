@@ -273,8 +273,11 @@ export const getCustomPackagedItems = async (country?: string | null): Promise<C
   const fallback = allItems.filter((item) => {
     const itemCountry = String(item.country || '').trim().toUpperCase()
     if (itemCountry && itemCountry !== matchCountry) return false
+    // Anything with an exact country match is already in `exact` above.
+    if (itemCountry === matchCountry) return false
+    // For global items (no country), keep only those that don't duplicate an exact match.
     if (!itemCountry) return !exactKeys.has(buildKey(item))
-    return itemCountry === matchCountry
+    return false
   })
 
   return [...exact, ...fallback]

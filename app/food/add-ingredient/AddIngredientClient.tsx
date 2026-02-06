@@ -1878,7 +1878,14 @@ export default function AddIngredientClient() {
                   selectedServing?.label || selectedServing?.serving_size || adjustItem.serving_size || 'serving'
 
                 let unitOptions = getAllowedUnitsForFood(adjustItem.name, pieceGrams)
-                if (servingOptions.length > 0) unitOptions = Array.from(new Set([...unitOptions, 'serving']))
+                if (servingOptions.length > 0) {
+                  // Fast-food menu items often include produce words (eg "strawberry") in the name,
+                  // which can make the dropdown show "small strawberry", "large strawberry", etc.
+                  // That's correct for the fruit, but wrong for a sundae. Keep the list simple.
+                  const keep = new Set<MeasurementUnit>(['g', 'ml', 'oz'])
+                  unitOptions = unitOptions.filter((unit) => keep.has(unit))
+                  unitOptions = ['serving', ...unitOptions]
+                }
                 const safeUnit = unitOptions.includes(adjustUnit) ? adjustUnit : unitOptions[0] || 'g'
                 const amountNumber = Number(adjustAmountInput)
                 const servings = computeServingsFromAmount(
@@ -1964,13 +1971,14 @@ export default function AddIngredientClient() {
                             )
                               return 0.1
                             if (safeUnit === 'pinch' || safeUnit === 'handful') return 0.1
+                            if (safeUnit === 'serving') return 0.25
                             if (
                               safeUnit === 'piece' ||
                               safeUnit === 'piece-small' ||
                               safeUnit === 'piece-medium' ||
                               safeUnit === 'piece-large' ||
-                              safeUnit === 'slice' ||
-                              safeUnit === 'serving'
+                              safeUnit === 'piece-extra-large' ||
+                              safeUnit === 'slice'
                             )
                               return 1
                             return 1
