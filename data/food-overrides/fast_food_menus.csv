@@ -1866,3 +1866,645 @@ US,Subway,Veggie Patty **,1 serving,404,,540,22,44,33,19,10,https://www.subway.c
 US,Subway,Veggie Patty **,6-inch,263,,470,19,58,19,12,9,https://www.subway.com/en-us/-/media/northamerica/usa/nutrition/nutritiondocuments/2026/us_nutrition_en_1-2026.pdf
 US,Subway,Veggie Patty**,1 serving,85,,170,6,17,9,8,2,https://www.subway.com/en-us/-/media/northamerica/usa/nutrition/nutritiondocuments/2026/us_nutrition_en_1-2026.pdf
 US,Subway,White Chip Macadamia Nut Cookie,1 serving,45,,210,2,28,10,,17,https://www.subway.com/en-us/-/media/northamerica/usa/nutrition/nutritiondocuments/2026/us_nutrition_en_1-2026.pdf
+CA,McDonald's,1% Partly Skimmed Chocolate Milk - 250 ml,1 item,,,150.0,8.0,25.0,2.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,1% Partly Skimmed Milk - 250 ml,1 item,,,110.0,9.0,12.0,2.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,10 Chicken McNuggets,1 item,,,410.0,26.0,26.0,23.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,2 Baked Apple Pies,1 item,,,530.0,5.0,67.0,28.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,20 Chicken McNuggets (Serves 2),1 item,,,830.0,52.0,51.0,46.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,4 Chicken McNuggets,1 item,,,170.0,10.0,10.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,6 Chicken McNuggets,1 item,,,250.0,16.0,15.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Americano,1 item,,,5.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Americano,1 item,,,4.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Americano,1 item,,,3.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Apple Slices,1 item,,,35.0,0.1,9.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Bacon 'N Egg McMuffin,1 item,,,310.0,16.0,28.0,15.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Bacon Deluxe Grilled Chicken Sandwich,1 item,,,470.0,36.0,33.0,22.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Bacon Triple Pickle McCrispy,1 item,,,630.0,31.0,54.0,33.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Bacon ‘N Egg Bagel with Everything Bagel,1 item,,,550.0,26.0,54.0,26.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Bacon ‘N Egg Bagel with Plain Bagel,1 item,,,540.0,25.0,57.0,24.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,"Bacon, Egg & Cheese McGriddles",1 item,,,400.0,16.0,43.0,18.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Baked Apple Pie,1 item,,,270.0,3.0,34.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Baked Salted Caramel Pie,1 item,,,310.0,2.0,36.0,18.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Banana Chocolate Chunk Muffin,1 item,,,440.0,7.0,73.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Barq's Root Beer,1 item,,,110.0,0.0,30.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Barq's Root Beer,1 item,,,310.0,0.0,88.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Barq's Root Beer,1 item,,,210.0,0.0,60.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Barq's Root Beer,1 item,,,150.0,0.0,42.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Berry McPops,1 item,,,90.0,1.0,11.0,4.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Big Mac,1 item,,,570.0,24.0,46.0,32.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Blueberry Muffin,1 item,,,430.0,7.0,66.0,17.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Blueberry Pomegranate Real Fruit Smoothie,1 item,,,390.0,4.0,91.0,1.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Blueberry Pomegranate Real Fruit Smoothie,1 item,,,320.0,3.0,74.0,0.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Blueberry Pomegranate Real Fruit Smoothie,1 item,,,260.0,2.0,61.0,0.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Breakfast Burrito,1 item,,,290.0,13.0,23.0,16.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Brownie RMHC Cookie,1 item,,,150.0,2.0,22.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cappuccino - 2% milk,1 item,,,190.0,12.0,15.0,7.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cappuccino - 2% milk,1 item,,,130.0,9.0,11.0,5.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cappuccino - 2% milk,1 item,,,80.0,6.0,7.0,3.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Cheesecake McFlurry,1 item,,,550.0,8.0,93.0,17.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Cheesecake McFlurry,1 item,,,770.0,11.0,127.0,24.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Cream Cold Brew,1 item,,,160.0,2.0,22.0,7.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Cream Cold Brew,1 item,,,210.0,3.0,30.0,8.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Cream Cold Brew,1 item,,,110.0,1.0,15.0,4.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Iced Coffee,1 item,,,250.0,3.0,29.0,13.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Iced Coffee,1 item,,,120.0,2.0,14.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Iced Coffee,1 item,,,180.0,3.0,22.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Latte - 2% milk,1 item,,,380.0,16.0,51.0,10.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Latte - 2% milk,1 item,,,290.0,12.0,40.0,7.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Caramel Latte - 2% milk,1 item,,,210.0,9.0,29.0,5.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Carrot Muffin,1 item,,,440.0,7.0,70.0,16.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cheeseburger,1 item,,,290.0,14.0,32.0,12.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cheeseburger Deluxe,1 item,,,340.0,15.0,33.0,17.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chicken & Bacon McWrap,1 item,,,480.0,33.0,37.0,22.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chicken & Bacon McWrap,1 item,,,610.0,31.0,49.0,32.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chicken Breakfast Wrap,1 item,,,680.0,17.0,60.0,42.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chicken McGriddles,1 item,,,360.0,10.0,47.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chicken McMuffin,1 item,,,360.0,14.0,35.0,18.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chicken Wrap Happy Meal with Crispy Chicken,Snack,,,290.0,14.0,27.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chicken Wrap Happy Meal with Grilled Chicken,Snack,,,220.0,15.0,21.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chocolate Brownie Muffin,1 item,,,380.0,6.0,57.0,15.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chocolate Cheesecake McFlurry,1 item,,,560.0,9.0,87.0,20.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chocolate Cheesecake McFlurry,1 item,,,780.0,13.0,121.0,27.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chocolate Chunk RMHC Cookie,1 item,,,150.0,2.0,22.0,7.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chocolate Triple Thick Milkshake,1 item,,,1160.0,24.0,207.0,26.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chocolate Triple Thick Milkshake,1 item,,,760.0,15.0,137.0,17.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chocolate Triple Thick Milkshake,1 item,,,560.0,12.0,101.0,13.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Chocolate Triple Thick Milkshake,1 item,,,490.0,10.0,86.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coca-Cola,1 item,,,100.0,0.0,26.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coca-Cola,1 item,,,280.0,0.0,77.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coca-Cola,1 item,,,190.0,0.0,52.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coca-Cola,1 item,,,130.0,0.0,37.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coca-Cola Zero,1 item,,,1.0,0.1,1.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coca-Cola Zero,1 item,,,2.0,0.1,2.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coca-Cola Zero,1 item,,,1.0,0.1,2.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coca-Cola Zero,1 item,,,1.0,0.1,1.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coffee Frappé,1 item,,,640.0,12.0,80.0,30.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coffee Frappé,1 item,,,520.0,9.0,65.0,24.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Coffee Iced Frappé,1 item,,,410.0,7.0,51.0,19.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cold Brew,1 item,,,5.0,0.3,1.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cold Brew,1 item,,,5.0,0.4,1.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cold Brew,1 item,,,10.0,0.5,1.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cold Brew with Sugar-Free Syrup & Cream,1 item,,,45.0,1.0,2.0,3.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cold Brew with Sugar-Free Syrup & Cream,1 item,,,90.0,1.0,4.0,7.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cold Brew with Sugar-Free Syrup & Cream,1 item,,,70.0,1.0,3.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Cranberry Orange Muffin,1 item,,,380.0,5.0,71.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Creamy Chipotle Chicken McWrap - Crispy,1 item,,,680.0,28.0,53.0,39.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Creamy Chipotle Chicken McWrap - Grilled,1 item,,,550.0,31.0,41.0,29.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Dasani Water,1 item,,,0.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Diet Coke,1 item,,,1.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Diet Coke,1 item,,,2.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Diet Coke,1 item,,,1.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Diet Coke,1 item,,,1.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Double Cheeseburger,1 item,,,420.0,24.0,34.0,21.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Double Cheesy Melt,1 item,,,690.0,33.0,44.0,42.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Double Espresso,1 item,,,5.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Double Filet-O-Fish,1 item,,,560.0,23.0,53.0,29.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Double Hamburger,1 item,,,320.0,18.0,32.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Double Quarter Pounder BLT,1 item,,,830.0,49.0,43.0,52.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Double Quarter Pounder with Cheese,1 item,,,750.0,47.0,42.0,44.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Double Quarter Pounder without Cheese,1 item,,,650.0,42.0,40.0,37.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Egg 'N Cheese McGriddles,1 item,,,360.0,14.0,43.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Egg 'N Cheese McMuffin,1 item,,,280.0,14.0,28.0,12.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Egg BLT Bagel with Everything Bagel,1 item,,,560.0,23.0,55.0,29.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Egg BLT Bagel with Plain Bagel,1 item,,,550.0,23.0,57.0,27.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Egg BLT McMuffin,1 item,,,360.0,16.0,29.0,19.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Egg BLT McMuffin with Shredded Lettuce (McDonald's in Walmart),1 item,,,360.0,16.0,30.0,19.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Egg McMuffin,1 item,,,290.0,16.0,28.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,English Muffin with Butter,1 item,,,170.0,5.0,27.0,4.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Espresso,1 item,,,3.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Everything Bagel With Cream Cheese Product,Regular,,,380.0,13.0,55.0,12.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Everything Bagel with Butter,1 item,,,330.0,10.0,52.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Filet-O-Fish,1 item,,,400.0,14.0,40.0,20.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,French Vanilla Cream Cold Brew,1 item,,,160.0,2.0,24.0,13.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,French Vanilla Cream Cold Brew,1 item,,,110.0,1.0,16.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,French Vanilla Cream Cold Brew,1 item,,,210.0,3.0,31.0,17.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,French Vanilla Iced Coffee,1 item,,,250.0,4.0,30.0,21.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,French Vanilla Iced Coffee,1 item,,,200.0,3.0,23.0,17.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,French Vanilla Iced Coffee,1 item,,,130.0,2.0,15.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,French Vanilla Latte - 2% milk,1 item,,,210.0,9.0,31.0,12.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,French Vanilla Latte - 2% milk,1 item,,,290.0,12.0,41.0,16.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,French Vanilla Latte - 2% milk,1 item,,,380.0,16.0,53.0,20.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fruit & Fibre Muffin,1 item,,,380.0,7.0,60.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fruitopia Orange Groove,1 item,,,90.0,0.1,24.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fruitopia Orange Groove,1 item,,,260.0,0.1,70.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fruitopia Orange Groove,1 item,,,170.0,0.1,48.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fruitopia Orange Groove,1 item,,,120.0,0.1,33.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fruitopia Strawberry Passion Awareness,1 item,,,90.0,0.0,24.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fruitopia Strawberry Passion Awareness,1 item,,,260.0,0.0,70.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fruitopia Strawberry Passion Awareness,1 item,,,170.0,0.0,48.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fruitopia Strawberry Passion Awareness,1 item,,,120.0,0.0,33.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fry,Mini,,,120.0,1.0,16.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fuze Iced Tea,1 item,,,80.0,0.0,21.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fuze Iced Tea,1 item,,,110.0,0.0,28.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fuze Iced Tea,1 item,,,150.0,0.0,41.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Fuze Iced Tea,1 item,,,220.0,0.0,60.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Grilled Chicken Sandwich,1 item,,,400.0,31.0,32.0,16.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hamburger,1 item,,,240.0,12.0,32.0,8.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hash Browns,1 item,,,160.0,1.0,16.0,10.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hazelnut & Cocoa McPops,1 item,,,120.0,2.0,12.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Higgins & Burke Hot Chocolate,1 item,,,200.0,4.0,26.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hot Caramel Sundae,1 item,,,340.0,6.0,62.0,8.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hot Chocolate,1 item,,,440.0,18.0,59.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hot Chocolate,1 item,,,240.0,9.0,34.0,8.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hot Chocolate,1 item,,,360.0,15.0,48.0,12.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hot Fudge Sundae,1 item,,,340.0,7.0,55.0,10.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hotcakes,1 item,,,350.0,8.0,60.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Hotcakes with Syrup and Butter,1 item,,,550.0,8.0,93.0,16.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Iced Coffee with Sugar Free Syrup,1 item,,,130.0,2.0,3.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Iced Coffee with Sugar Free Syrup,1 item,,,60.0,1.0,2.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Iced Coffee with Sugar Free syrup,1 item,,,100.0,2.0,3.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Junior Chicken,1 item,,,380.0,12.0,36.0,21.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Latte - 2% milk,1 item,,,240.0,15.0,19.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Latte - 2% milk,1 item,,,170.0,11.0,14.0,7.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Latte - 2% milk,1 item,,,130.0,8.0,10.0,5.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Latte with Sugar Free Syrup - 2% milk,1 item,,,230.0,15.0,19.0,8.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Latte with Sugar Free Syrup - 2% milk,1 item,,,170.0,11.0,14.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Latte with Sugar Free Syrup - 2% milk,1 item,,,120.0,8.0,10.0,4.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Lemon Fruit Splash,1 item,,,110.0,0.2,29.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Lemon Fruit Splash,1 item,,,140.0,0.3,36.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Lemon Fruit Splash,Small,,,90.0,0.2,22.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Mango Pineapple Real Fruit Smoothie,1 item,,,280.0,3.0,66.0,1.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Mango Pineapple Real Fruit Smoothie,1 item,,,350.0,4.0,81.0,1.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Mango Pineapple Real Fruit Smoothie,1 item,,,230.0,2.0,54.0,0.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McCafé Premium Roast Brewed Oat Iced Coffee,1 item,,,170.0,1.0,36.0,2.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McCafé Premium Roast Brewed Oat Iced Coffee,1 item,,,80.0,0.3,18.0,1.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McCafé Premium Roast Brewed Oat Iced Coffee,1 item,,,130.0,0.4,27.0,1.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McCafé Vanilla Chai Frappé,1 item,,,580.0,9.0,81.0,24.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McCafé Vanilla Chai Frappé,1 item,,,460.0,7.0,63.0,19.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McCafé Vanilla Chai Frappé,Large,,,720.0,11.0,100.0,29.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McChicken,1 item,,,480.0,16.0,45.0,27.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McCrispy,1 item,,,520.0,29.0,44.0,26.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McCrispy Bacon Deluxe,1 item,,,590.0,34.0,45.0,32.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McDouble,1 item,,,380.0,21.0,34.0,18.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,McVeggie,1 item,,,470.0,11.0,55.0,22.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Mighty McGriddles,1 item,,,590.0,24.0,43.0,36.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Mighty McMuffin,1 item,,,520.0,26.0,29.0,33.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Minute Maid Apple Juice*,1 item,,,210.0,1.0,51.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Minute Maid Apple Juice*,1 item,,,160.0,1.0,40.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Minute Maid Apple Juice*,1 item,,,110.0,0.3,26.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Minute Maid Orange Juice*,1 item,,,220.0,0.0,52.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Minute Maid Orange Juice*,1 item,,,180.0,0.0,42.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Minute Maid Orange Juice*,1 item,,,110.0,0.0,26.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Mocha,1 item,,,410.0,16.0,56.0,13.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Mocha,1 item,,,340.0,13.0,46.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Mocha,1 item,,,240.0,9.0,33.0,8.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Oreo Cheesecake McFlurry,1 item,,,780.0,12.0,120.0,29.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Oreo Cheesecake McFlurry,1 item,,,520.0,8.0,80.0,19.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Oreo McFlurry,1 item,,,570.0,11.0,90.0,19.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Oreo McFlurry,1 item,,,340.0,7.0,54.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Plain Bagel With Butter,1 item,,,320.0,10.0,54.0,7.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Plain Bagel With Cream Cheese Product,Regular,,,370.0,12.0,58.0,10.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Potato Bites,1 item,,,350.0,3.0,39.0,22.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Poutine,1 item,,,870.0,21.0,113.0,37.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Poutine,1 item,,,1730.0,43.0,225.0,74.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Roast Brewed Coffee,1 item,,,5.0,1.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Roast Brewed Coffee,1 item,,,4.0,1.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Roast Brewed Coffee,1 item,,,3.0,0.4,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Roast Brewed Coffee,1 item,,,5.0,1.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Roast Brewed Iced Coffee,1 item,,,240.0,2.0,32.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Roast Brewed Iced Coffee,1 item,,,170.0,2.0,24.0,8.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Roast Brewed Iced Coffee,1 item,,,120.0,1.0,16.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Tea,1 item,,,0.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Tea,1 item,,,0.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Tea,1 item,,,0.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Premium Tea,1 item,,,0.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Quarter Pounder BLT,1 item,,,610.0,31.0,43.0,35.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Quarter Pounder with Cheese,1 item,,,530.0,29.0,41.0,27.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Quarter Pounder without Cheese,1 item,,,430.0,24.0,40.0,20.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Ranch Chicken Wrap with Crispy Chicken,Snack,,,320.0,17.0,28.0,16.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Ranch Chicken Wrap with Grilled Chicken,Snack,,,260.0,18.0,22.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,SKOR McFlurry,1 item,,,540.0,10.0,81.0,21.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,SKOR McFlurry,1 item,,,380.0,7.0,56.0,15.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Salted Caramel McFlurry,1 item,,,640.0,10.0,124.0,12.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Salted Caramel McFlurry,1 item,,,480.0,7.0,94.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sausage 'N Egg McMuffin,1 item,,,440.0,20.0,29.0,26.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sausage Egg & Cheese McGriddles,1 item,,,520.0,21.0,44.0,29.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sausage McGriddles,1 item,,,410.0,12.0,43.0,21.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sausage McMuffin,1 item,,,370.0,15.0,28.0,22.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sausage ‘N Egg Bagel with Everything Bagel,1 item,,,620.0,27.0,54.0,33.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sausage ‘N Egg Bagel with Plain Bagel,1 item,,,610.0,26.0,56.0,31.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,"Sausage, Bacon & Egg Breakfast Wrap",1 item,,,800.0,26.0,53.0,54.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sesame Bacon ‘N Egg Bagel,1 item,,,550.0,26.0,57.0,25.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sesame Bagel With Cream Cheese Product,Regular,,,380.0,13.0,57.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sesame Bagel with Butter,1 item,,,330.0,10.0,54.0,9.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sesame Egg BLT Bagel,1 item,,,570.0,23.0,57.0,28.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sesame Sausage ‘N Egg Bagel,1 item,,,620.0,26.0,56.0,33.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Smarties McFlurry,1 item,,,390.0,8.0,65.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Smarties McFlurry,1 item,,,600.0,12.0,99.0,17.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy Bacon Deluxe Grilled Chicken Sandwich,1 item,,,450.0,36.0,34.0,20.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy Bacon Deluxe McCrispy Sandwich,1 item,,,580.0,34.0,46.0,30.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy Buffalo Chicken Poutine (Québec),1 item,,,1010.0,31.0,122.0,46.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy Buffalo Chicken Poutine (Québec),1 item,,,2020.0,65.0,239.0,91.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy Buffalo Chicken Wrap with Crispy Chicken,Snack,,,310.0,17.0,27.0,15.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy Buffalo Chicken Wrap with Grilled Chicken,Snack,,,240.0,18.0,21.0,10.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy Egg & Hash Brown Breakfast Wrap,1 item,,,630.0,17.0,54.0,39.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy Grilled Chicken Sandwich,1 item,,,380.0,31.0,32.0,14.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy Habanero McChicken,1 item,,,470.0,16.0,45.0,25.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy McCrispy,1 item,,,510.0,29.0,44.0,24.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Spicy McVeggie,1 item,,,450.0,11.0,56.0,20.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sprite,1 item,,,100.0,0.0,26.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sprite,1 item,,,280.0,0.0,76.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sprite,1 item,,,190.0,0.0,51.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sprite,1 item,,,130.0,0.0,36.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Banana Real Fruit Smoothie,1 item,,,330.0,5.0,77.0,1.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Banana Real Fruit Smoothie,1 item,,,270.0,4.0,63.0,1.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Banana Real Fruit Smoothie,1 item,,,220.0,3.0,51.0,0.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Cheesecake McFlurry,1 item,,,470.0,7.0,78.0,15.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Cheesecake McFlurry,1 item,,,730.0,11.0,123.0,22.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Sundae,1 item,,,310.0,5.0,58.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Triple Thick Milkshake,1 item,,,1130.0,23.0,201.0,26.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Triple Thick Milkshake,1 item,,,740.0,15.0,133.0,16.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Triple Thick Milkshake,1 item,,,550.0,11.0,98.0,12.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Strawberry Triple Thick Milkshake,1 item,,,480.0,10.0,84.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sweet Chili Junior Chicken,1 item,,,410.0,12.0,43.0,21.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sweet Chili McWrap,1 item,,,460.0,30.0,45.0,18.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sweet Chili McWrap,1 item,,,590.0,28.0,56.0,28.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sweetened Cold Brew with Cream,1 item,,,210.0,1.0,33.0,7.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sweetened Cold Brew with Cream,1 item,,,100.0,1.0,17.0,3.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sweetened Cold Brew with Cream,1 item,,,160.0,1.0,25.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sweetened Cold Brew with Oat Beverage,1 item,,,90.0,0.5,19.0,1.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sweetened Cold Brew with Oat Beverage,1 item,,,170.0,1.0,37.0,2.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Sweetened Cold Brew with Oat Beverage,1 item,,,130.0,1.0,28.0,1.5,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,The Benny-Style Bacon 'N Egg Bagel - Everything Bagel,1 item,,,560.0,25.0,54.0,27.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,The Benny-Style Bacon 'N Egg Bagel - Multigrain Bagel (QC ONLY),1 item,,,570.0,26.0,56.0,28.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,The Benny-Style Bacon 'N Egg Bagel - Plain Bagel,1 item,,,550.0,25.0,57.0,25.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,The Benny-Style Bacon 'N Egg Bagel - Sesame Bagel,1 item,,,560.0,25.0,57.0,26.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,The Benny-Style Bacon 'N Egg McMuffin,1 item,,,370.0,17.0,28.0,21.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,The Benny-Style Bacon 'N Egg Wrap,1 item,,,640.0,19.0,53.0,38.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,The Big Mac-David - Double Big Mac,1 item,,,740.0,38.0,48.0,44.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Triple Pickle McCrispy,1 item,,,560.0,27.0,53.0,28.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Vanilla Cone,1 item,,,240.0,6.0,40.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Vanilla Triple Thick Milkshake,1 item,,,1150.0,23.0,207.0,26.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Vanilla Triple Thick Milkshake,1 item,,,750.0,15.0,137.0,16.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Vanilla Triple Thick Milkshake,1 item,,,560.0,11.0,101.0,12.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Vanilla Triple Thick Milkshake,1 item,,,490.0,10.0,87.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Watermelon Lime Fruit Splash,1 item,,,180.0,0.3,45.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Watermelon Lime Fruit Splash,1 item,,,130.0,0.2,34.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Watermelon Lime Fruit Splash,1 item,,,230.0,0.3,58.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,White Chocolate McPops,1 item,,,120.0,2.0,13.0,6.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,World Famous Fries,1 item,,,560.0,6.0,74.0,27.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,World Famous Fries,1 item,,,350.0,4.0,46.0,17.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,World Famous Fries,Small,,,240.0,3.0,31.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,World Famous Fries –,Small,,,240.0,3.0,31.0,11.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+CA,McDonald's,Yogurt Tube,1 item,,,25.0,1.0,4.0,0.0,,,https://www.mcdonalds.com/ca/en-ca/about-our-food/nutrition-calculator.html
+US,McDonald's,1% Low Fat Milk Jug,1 item,,,100.0,8.0,12.0,2.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,10 Piece Chicken McNuggets,1 item,,,410.0,23.0,26.0,24.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,20 Piece Chicken McNuggets,1 item,,,830.0,46.0,51.0,49.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,40 Piece Chicken McNuggets,1 item,,,1650.0,92.0,102.0,98.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,6 Piece Chicken McNuggets,1 item,,,250.0,14.0,15.0,15.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Americano,1 item,,,0.0,0.0,1.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Apple Slices,1 item,,,15.0,0.0,4.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Bacon Hot Honey Mccrispy,1 item,,,770.0,33.0,63.0,43.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,"Bacon, Egg & Cheese Bagel",1 item,,,590.0,25.0,56.0,30.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,"Bacon, Egg & Cheese Biscuit",1 item,,,460.0,17.0,39.0,26.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,"Bacon, Egg & Cheese McGriddles",1 item,,,430.0,17.0,44.0,21.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Bagel Plain,1 item,,,270.0,9.0,51.0,3.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Baked Apple Pie,1 item,,,230.0,2.0,33.0,11.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Big Breakfast,1 item,,,1060.0,26.0,131.0,48.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Big Breakfast with Hotcakes,1 item,,,1340.0,36.0,158.0,63.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Big Mac,1 item,,,580.0,25.0,45.0,34.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Cappuccino,1 item,,,110.0,6.0,10.0,5.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Caramel Cappuccino,1 item,,,210.0,7.0,35.0,4.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Caramel Frappé,1 item,,,420.0,7.0,60.0,17.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Caramel Frappé,1 item,,,650.0,11.0,94.0,26.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Caramel Frappé,1 item,,,490.0,8.0,70.0,20.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Caramel Macchiato,1 item,,,260.0,9.0,41.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Caramel Macchiato,1 item,,,400.0,14.0,62.0,10.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Caramel Macchiato,1 item,,,320.0,11.0,51.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Cheeseburger,1 item,,,300.0,15.0,31.0,13.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Chicken McNuggets,1 item,,,170.0,9.0,10.0,10.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Chocolate Chip Cookie,1 item,,,170.0,2.0,22.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Chocolate Shake,1 item,,,650.0,15.0,107.0,17.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Chocolate Shake,1 item,,,800.0,18.0,134.0,20.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Chocolate Shake,1 item,,,520.0,12.0,85.0,14.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Coca-Cola No Ice,Extra Small,,,150.0,0.0,40.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Coca-Cola No Ice,Large,,,380.0,0.0,100.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Coca-Cola No Ice,Medium,,,270.0,0.0,70.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Coca-Cola No Ice,Small,,,200.0,0.0,53.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,DASANI Water,1 item,,,0.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Daily Double,1 item,,,490.0,22.0,30.0,31.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Deluxe McCrispy,1 item,,,530.0,27.0,48.0,26.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Diet Coke,1 item,,,0.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Diet Coke,1 item,,,0.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Diet Coke,1 item,,,0.0,0.0,1.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Diet Coke,1 item,,,0.0,0.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Double Cheeseburger,1 item,,,440.0,25.0,34.0,24.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Double Quarter Pounder* with Cheese,1 item,,,740.0,48.0,43.0,42.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Dr Pepper No Ice,Extra Small,,,140.0,0.0,39.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Dr Pepper No Ice,Large,,,360.0,0.0,98.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Dr Pepper No Ice,Medium,,,250.0,0.0,68.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Dr Pepper No Ice,Small,,,190.0,0.0,52.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Egg McMuffin,1 item,,,310.0,17.0,30.0,13.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Egg and Cheese Bagel,1 item,,,520.0,21.0,55.0,24.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Fanta Orange No Ice,Large,,,380.0,0.0,101.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Fanta Orange No Ice,Medium,,,270.0,0.0,71.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Fanta Orange No Ice,Small,,,210.0,0.0,54.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Filet-O-Fish,1 item,,,380.0,16.0,38.0,19.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,French Vanilla Cappuccino,1 item,,,340.0,9.0,58.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,French Vanilla Cappuccino,1 item,,,260.0,7.0,47.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,French Vanilla Cappuccino,1 item,,,210.0,5.0,37.0,4.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Frozen Coke,1 item,,,60.0,0.0,16.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Frozen Coke,1 item,,,80.0,0.0,21.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Frozen Coke,1 item,,,110.0,0.0,29.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Frozen Fanta Blue Raspberry,1 item,,,80.0,0.0,20.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Frozen Fanta Blue Raspberry,1 item,,,60.0,0.0,16.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Frozen Fanta Blue Raspberry,1 item,,,110.0,0.0,29.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Fruit & Maple Oatmeal,1 item,,,320.0,6.0,64.0,4.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hamburger,1 item,,,250.0,12.0,30.0,9.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hash Browns,1 item,,,140.0,2.0,18.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hi-C Orange No Ice,Extra Small,,,160.0,0.0,42.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hi-C Orange No Ice,Large,,,410.0,0.0,104.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hi-C Orange No Ice,Medium,,,280.0,0.0,73.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hi-C Orange No Ice,Small,,,220.0,0.0,56.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Honest Appley Ever After Organic Juice Drink,Kids,,,35.0,0.0,8.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Caramel Sundae,1 item,,,330.0,7.0,58.0,7.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Chocolate,medium,,,440.0,14.0,62.0,15.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Chocolate,small,,,360.0,11.0,51.0,12.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Fudge Sundae,1 item,,,330.0,8.0,51.0,10.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Honey Dip Cup,1 item,,,50.0,0.0,13.0,0.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Honey Mccrispy,1 item,,,660.0,27.0,62.0,34.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Honey Sausage Egg Biscuit,1 item,,,550.0,17.0,41.0,35.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Tea,1 item,,,15.0,3.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Tea,1 item,,,10.0,2.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hot Tea,1 item,,,10.0,3.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hotcakes,1 item,,,580.0,9.0,101.0,15.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Hotcakes and Sausage,1 item,,,770.0,15.0,102.0,33.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced Caramel Coffee,large,,,280.0,5.0,46.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced Caramel Coffee,medium,,,200.0,3.0,31.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced Caramel Coffee,small,,,150.0,2.0,23.0,5.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced Caramel Latte,1 item,,,220.0,7.0,36.0,5.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced Caramel Macchiato,1 item,,,200.0,7.0,33.0,5.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced Coffee,Large,,,270.0,2.0,47.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced Coffee,Small,,,150.0,1.0,25.0,5.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced French Vanilla Coffee,large,,,280.0,2.0,49.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced French Vanilla Coffee,medium,,,200.0,2.0,33.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced French Vanilla Coffee,small,,,150.0,1.0,25.0,5.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced French Vanilla Latte,1 item,,,330.0,9.0,57.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced French Vanilla Latte,1 item,,,220.0,6.0,38.0,5.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced French Vanilla Latte,1 item,,,180.0,5.0,30.0,4.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced Mocha,1 item,,,440.0,11.0,67.0,14.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Iced Mocha,1 item,,,320.0,8.0,47.0,11.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte,1 item,,,250.0,13.0,22.0,12.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte,1 item,,,190.0,10.0,17.0,9.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte,small,,,140.0,8.0,13.0,7.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte Caramel,large,,,390.0,14.0,60.0,11.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte Caramel,medium,,,320.0,11.0,49.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte Caramel,small,,,250.0,9.0,39.0,7.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte French Vanilla,large,,,400.0,12.0,63.0,11.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte French Vanilla,medium,,,320.0,10.0,52.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte French Vanilla,small,,,250.0,8.0,41.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte Iced,small,,,80.0,5.0,8.0,4.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte Iced Caramel,large,,,330.0,11.0,54.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Latte Iced Caramel,small,,,180.0,6.0,28.0,4.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mango Pineapple Smoothie,1 item,,,200.0,2.0,45.0,0.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mango Pineapple Smoothie,1 item,,,340.0,4.0,78.0,1.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mango Pineapple Smoothie,1 item,,,250.0,3.0,57.0,1.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Americano,1 item,,,5.0,0.0,1.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Americano,1 item,,,5.0,0.0,1.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Cappuccino,1 item,,,160.0,9.0,14.0,7.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Cappuccino,1 item,,,200.0,11.0,18.0,10.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Caramel Cappuccino,1 item,,,340.0,11.0,55.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Caramel Cappuccino,1 item,,,260.0,8.0,44.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Hot Chocolate,1 item,,,540.0,17.0,73.0,20.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Iced Caramel Macchiato,1 item,,,240.0,8.0,41.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Iced Caramel Macchiato,1 item,,,360.0,12.0,59.0,9.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Iced Coffee,1 item,,,190.0,2.0,32.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Iced Latte,1 item,,,120.0,6.0,11.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Iced Latte,1 item,,,120.0,6.0,11.0,6.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Iced Latte old,1 item,,,170.0,9.0,15.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Iced Mocha,1 item,,,320.0,8.0,48.0,11.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Latte,1 item,,,170.0,9.0,15.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCafé Mocha Latte,1 item,,,470.0,13.0,70.0,16.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McChicken,1 item,,,390.0,14.0,38.0,21.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McCrispy,1 item,,,470.0,26.0,46.0,20.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McDonald's Lemonade (16 Oz.),1 item,,,120.0,0.0,31.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McDonald's Lemonade (22 Oz.),1 item,,,190.0,1.0,48.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McDonald's Lemonade (30 Oz.),1 item,,,270.0,1.0,68.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McDouble,1 item,,,390.0,22.0,32.0,20.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McFlurry with M&M'S Candies,1 item,,,570.0,11.0,85.0,19.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McFlurry with M&M'S Candies,mini,,,340.0,7.0,51.0,12.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McFlurry with OREO cookies,1 item,,,410.0,10.0,64.0,13.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,McFlurry with Oreo Cookies,mini,,,240.0,5.0,38.0,8.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mccrispy Strips (3 Piece),1 item,,,350.0,30.0,18.0,17.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mccrispy Strips (4 Piece),1 item,,,460.0,40.0,24.0,23.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Minute Maid Premium Orange Juice,1 item,,,270.0,4.0,65.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Minute Maid Premium Orange Juice,1 item,,,150.0,2.0,36.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Minute Maid Premium Orange Juice,1 item,,,190.0,3.0,45.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mocha,1 item,,,460.0,14.0,68.0,14.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mocha,medium,,,370.0,10.0,56.0,11.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mocha,small,,,290.0,8.0,45.0,9.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mocha Frappé,1 item,,,430.0,7.0,61.0,17.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mocha Frappé,1 item,,,490.0,8.0,72.0,20.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mocha Frappé,1 item,,,660.0,11.0,97.0,26.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Mocha Iced,small,,,270.0,7.0,39.0,10.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Premium Roast Coffee,1 item,,,5.0,0.0,1.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Premium Roast Coffee,1 item,,,10.0,1.0,2.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Premium Roast Coffee,1 item,,,10.0,1.0,1.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Quarter Pounder* with Cheese,1 item,,,520.0,30.0,42.0,26.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Quarter Pounder* with Cheese Bacon,1 item,,,630.0,36.0,43.0,35.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Quarter Pounder* with Cheese Deluxe,1 item,,,630.0,30.0,44.0,37.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Reduced Sugar* Low Fat Chocolate Milk Jug,1 item,,,130.0,9.0,18.0,2.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sausage Biscuit,1 item,,,460.0,11.0,37.0,30.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sausage Biscuit with Egg,1 item,,,530.0,17.0,38.0,35.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sausage Burrito,1 item,,,310.0,13.0,25.0,17.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sausage Egg and Cheese Bagel,1 item,,,710.0,27.0,56.0,42.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sausage McGriddles,1 item,,,430.0,11.0,41.0,24.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sausage McMuffin,1 item,,,400.0,14.0,29.0,26.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sausage McMuffin with Egg,1 item,,,480.0,20.0,30.0,31.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,"Sausage, Egg & Cheese McGriddles",1 item,,,550.0,19.0,44.0,33.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Spicy Deluxe McCrispy,1 item,,,530.0,27.0,49.0,26.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Spicy McCrispy,1 item,,,530.0,27.0,48.0,26.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sprite No Ice,Extra Small,,,140.0,0.0,36.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sprite No Ice,Medium,,,250.0,0.0,64.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sprite No Ice,Small,,,190.0,0.0,49.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,"Steak, Egg & Cheese Bagel",1 item,,,680.0,34.0,57.0,35.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Strawberry Banana Smoothie,1 item,,,190.0,2.0,44.0,0.5,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Strawberry Banana Smoothie,1 item,,,240.0,3.0,55.0,1.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Strawberry Banana Smoothie,1 item,,,330.0,4.0,76.0,1.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Strawberry Shake,1 item,,,470.0,10.0,77.0,13.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Strawberry Shake,1 item,,,600.0,13.0,99.0,16.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Strawberry Shake,1 item,,,850.0,19.0,143.0,21.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sweet Tea,1 item,,,130.0,1.0,31.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sweet Tea,1 item,,,70.0,0.0,18.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sweet Tea,1 item,,,170.0,1.0,43.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Sweet Tea No Ice,Small,,,170.0,1.0,42.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Unsweetened Iced Tea,1 item,,,0.0,1.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Unsweetened Iced Tea,1 item,,,0.0,1.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Unsweetened Iced Tea,1 item,,,0.0,1.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Unsweetened Iced Tea,1 item,,,0.0,1.0,0.0,0.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Vanilla Cone,1 item,,,200.0,5.0,33.0,5.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Vanilla Shake,1 item,,,480.0,10.0,80.0,13.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Vanilla Shake,1 item,,,570.0,12.0,97.0,15.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Vanilla Shake,1 item,,,780.0,17.0,133.0,19.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,World Famous Fries,1 item,,,230.0,3.0,31.0,11.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,World Famous Fries,1 item,,,480.0,7.0,65.0,23.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,World Famous Fries,1 item,,,110.0,2.0,14.0,5.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,World Famous Fries,1 item,,,320.0,5.0,43.0,15.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Wrap Mccrispy Hot Honey,Snack,,,350.0,17.0,38.0,15.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Wrap Mccrispy Ranch,Snack,,,390.0,17.0,31.0,22.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+US,McDonald's,Wrap Mccrispy Spicy,Snack,,,380.0,17.0,30.0,21.0,,,https://www.mcdonalds.com/us/en-us/about-our-food/nutrition-calculator.html
+UK,McDonald's,20 Chicken McNuggets ShareBox,1 item,,,869.0,50.0,68.0,43.0,4.5,1.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,6 Piece Chicken McNuggets,1 item,,,261.0,15.0,21.0,13.0,1.4,0.6,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,9 Chicken Selects Sharebox,1 item,,,1078.0,75.0,61.0,59.0,0.6,0.8,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,9 Piece Chicken McNuggets,1 item,,,391.0,22.0,31.0,19.0,2.0,0.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Americano,1 item,,,6.0,0.6,0.8,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Americano,Large,,,8.0,0.8,1.1,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Apple Pie,1 item,,,243.0,2.3,27.0,14.0,1.0,9.2,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,BBQ Dip - 25g,1 item,,,49.0,0.3,11.0,0.3,0.4,9.3,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Bacon & Egg McMuffin,1 item,,,336.0,20.0,27.0,16.0,1.8,2.6,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Banana Milkshake,1 item,,,357.0,11.0,62.0,7.0,1.3,58.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Banana Milkshake,Large,,,459.0,13.0,80.0,9.0,1.7,74.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Banana Milkshake,Small,,,188.0,5.5,33.0,3.7,0.7,30.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Big Arch,1 item,,,1057.0,57.0,54.0,67.0,4.0,15.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Big Mac,1 item,,,509.0,27.0,41.0,25.0,3.4,8.1,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Breakfast Wrap with Brown Sauce,1 item,,,666.0,35.0,53.0,34.0,4.8,6.7,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Breakfast Wrap with Ketchup,1 item,,,662.0,35.0,52.0,34.0,5.2,5.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Brownie Pie,1 item,,,299.0,4.1,35.0,16.0,1.6,11.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Canderel Yellow Sweetener Sachet,1 item,,,2.0,0.0,0.4,0.0,0.0,0.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Cappuccino,1 item,,,97.0,6.6,10.0,3.3,0.2,9.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Cappuccino,Large,,,128.0,8.8,13.0,4.4,0.2,13.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Caramel Iced Frappé,1 item,,,319.0,6.4,38.0,16.0,0.7,33.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Caramel Iced Frappé,Large,,,399.0,8.2,48.0,19.0,1.0,42.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Carrot Sticks,1 item,,,34.0,0.5,6.2,0.2,2.4,5.8,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Cheeseburger,1 item,,,303.0,16.0,30.0,13.0,2.1,7.5,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Cheeseburger - Plain,1 item,,,287.0,16.0,27.0,13.0,1.7,5.3,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Cheesy Bacon Flatbread,1 item,,,280.0,14.0,28.0,12.0,1.4,2.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Chicken Big Mac,1 item,,,531.0,25.0,61.0,20.0,3.5,8.3,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Chicken McNuggets (4 pieces),1 item,,,174.0,10.0,14.0,8.7,0.9,0.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Chicken Selects,1 item,,,359.0,25.0,20.0,20.0,0.2,0.3,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Chicken Selects (5 pieces),1 item,,,599.0,42.0,34.0,33.0,0.3,0.5,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Chocolate Brownie,1 item,,,278.0,3.2,29.0,16.0,1.6,24.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Chocolate Milkshake,1 item,,,364.0,11.0,61.0,7.8,2.1,50.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Chocolate Milkshake,Large,,,468.0,14.0,79.0,10.0,2.6,65.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Chocolate Milkshake,Small,,,192.0,5.9,32.0,4.1,1.1,27.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Coca-Cola Classic,1 item,,,170.0,0.0,42.0,0.0,0.0,42.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Coca-Cola Classic,Large,,,212.0,0.0,53.0,0.0,0.0,53.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Coca-Cola Classic,Small,,,106.0,0.0,27.0,0.0,0.0,27.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Coca-Cola Zero Sugar,1 item,,,1.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Coca-Cola Zero Sugar,Large,,,2.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Coca-Cola Zero Sugar,Small,,,1.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Crispy BBQ & Bacon Wrap,1 item,,,448.0,21.0,53.0,16.0,4.1,4.6,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Crispy Chicken Salad,1 item,,,274.0,21.0,21.0,11.0,3.3,3.8,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Crispy Chicken and Bacon Salad,1 item,,,320.0,26.0,21.0,14.0,3.3,3.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Crispy Sweet Chilli Chicken Wrap,1 item,,,424.0,21.0,47.0,16.0,4.1,1.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Deep RiverRock Water - 330ml,1 item,,,0.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Deep RiverRock Water - 500ml,1 item,,,0.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Diet Coke,1 item,,,1.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Diet Coke,Large,,,2.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Diet Coke,Small,,,1.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Donut Latte,Large,,,244.0,10.0,34.0,7.2,0.1,33.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Donut Latte,Regular,,,195.0,8.0,27.0,6.1,0.0,26.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Double Bacon & Egg McMuffin,1 item,,,377.0,24.0,27.0,19.0,1.8,2.7,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Double Cheeseburger,1 item,,,452.0,27.0,31.0,24.0,2.2,8.2,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Double Filet-O-Fish,1 item,,,453.0,24.0,45.0,19.0,2.5,5.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Double Quarter Pounder with Cheese,1 item,,,749.0,50.0,36.0,44.0,2.5,11.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Double Sausage & Egg McMuffin,1 item,,,552.0,36.0,28.0,33.0,2.5,3.7,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Egg & Cheese McMuffin,1 item,,,296.0,15.0,27.0,14.0,1.8,2.6,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Espresso,1 item,,,1.0,0.1,0.2,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Espresso Single,1 item,,,1.0,0.1,0.1,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Fanta Orange Zero,Large,,,5.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Fanta Orange Zero,Regular,,,4.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Fanta Orange Zero,Small,,,3.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Filet-O-Fish,1 item,,,316.0,14.0,36.0,13.0,2.2,5.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Fish Fingers (3 pieces),1 item,,,155.0,11.0,14.0,6.0,0.6,0.2,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Flahavan's Quick Oats,1 item,,,194.0,9.0,28.0,4.3,2.5,8.8,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Flat White,1 item,,,86.0,6.3,8.4,3.1,0.0,8.2,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Fries,Small,,,237.0,2.3,29.0,12.0,2.6,0.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Frozen Strawberry Lemonade,1 item,,,120.0,0.0,29.0,0.1,0.0,25.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Frozen Strawberry Lemonade,Large,,,155.0,0.0,38.0,0.1,0.0,32.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Garlic Mayo Dip,1 item,,,118.0,0.4,3.0,12.0,0.2,0.8,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Glaceau Smartwater (Still) 600ml,1 item,,,0.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Golden Syrup,1 item,,,63.0,0.1,16.0,0.0,0.0,16.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Grilled BBQ & Bacon Wrap,1 item,,,364.0,31.0,40.0,7.6,3.6,6.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Grilled Chicken Salad,1 item,,,139.0,25.0,5.0,1.4,2.1,3.8,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Grilled Chicken and Bacon Salad,1 item,,,185.0,30.0,5.2,4.3,2.1,4.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Grilled Sweet Chilli Chicken Wrap,1 item,,,340.0,29.0,39.0,6.4,3.8,7.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Hamburger,1 item,,,255.0,13.0,29.0,9.2,2.1,6.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Hamburger - Plain,1 item,,,240.0,13.0,25.0,9.2,1.6,4.5,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Hash Brown,1 item,,,127.0,1.1,13.0,7.4,1.2,0.2,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Hot Chocolate,1 item,,,173.0,2.2,30.0,4.3,2.3,27.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Hot Chocolate,Large,,,231.0,3.0,40.0,5.8,3.1,36.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,IRN-BRU,1 item,,,76.0,0.0,18.0,0.0,0.0,18.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,IRN-BRU,Large,,,95.0,0.0,23.0,0.0,0.0,23.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,IRN-BRU,Small,,,48.0,0.0,11.0,0.0,0.0,11.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Iced Latte,Large,,,166.0,7.9,23.0,3.8,1.2,21.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Iced Latte,Regular,,,136.0,6.5,19.0,3.1,1.0,17.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Latte,1 item,,,145.0,11.0,14.0,5.2,0.0,14.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Latte,Large,,,197.0,14.0,19.0,7.1,0.0,19.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Lurpak Spreadable,1 item,,,54.0,0.0,0.0,6.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Mango & Pineapple Smoothie,Large,,,235.0,1.6,56.0,0.7,0.4,52.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Mango & Pineapple Smoothie,Regular,,,179.0,1.2,42.0,0.5,0.3,39.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Mayo Chicken,1 item,,,282.0,12.0,36.0,9.4,2.1,5.1,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,McChicken Sandwich,1 item,,,371.0,17.0,41.0,15.0,2.7,7.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,McCrispy,1 item,,,484.0,26.0,53.0,18.0,3.7,6.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,McDonald's Balsamic Dressing - 25ml,1 item,,,23.0,0.0,4.0,0.7,0.3,2.5,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,McDonald's Fries,1 item,,,337.0,3.3,42.0,17.0,3.6,0.6,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,McDonald's Fries,Large,,,444.0,4.4,55.0,22.0,4.8,0.8,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,McDonald's Fries,Small,,,237.0,2.3,29.0,12.0,2.6,0.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,McPlant,1 item,,,426.0,19.0,40.0,20.0,4.1,11.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,McSpicy,1 item,,,454.0,24.0,49.0,17.0,3.2,6.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Milk Portion,1 item,,,5.0,0.4,0.5,0.2,0.0,0.5,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Milkybar Cookie Crisp McFlurry,1 item,,,341.0,5.8,53.0,11.0,1.5,45.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Milkybar Cookie Crisp McFlurry,Mini,,,170.0,2.9,27.0,5.7,0.7,23.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Mixed Berry Muffin,1 item,,,298.0,5.0,48.0,7.6,5.2,25.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Monica's Marinara Dip,1 item,,,49.0,0.5,12.0,0.2,0.6,9.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Muffin with Jam,1 item,,,214.0,5.5,35.0,5.6,1.9,11.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Munchies Cheesecake Mcflurry,1 item,,,342.0,5.7,54.0,11.0,1.7,42.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Munchies Cheesecake Mcflurry,Mini,,,171.0,2.8,27.0,5.7,0.8,21.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Nestle Pure Life Spring Water (Still) 250ml,1 item,,,0.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Nestle PureLife (Still),1 item,,,0.0,0.0,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Oasis Zero Summer Fruits,Large,,,15.0,0.0,2.5,0.0,0.0,2.5,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Oasis Zero Summer Fruits,Regular,,,12.0,0.0,2.0,0.0,0.0,2.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Oasis Zero Summer Fruits,Small,,,7.0,0.0,1.2,0.0,0.0,1.2,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Oreo McFlurry,1 item,,,260.0,5.2,39.0,9.0,1.8,32.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Oreo McFlurry,Mini,,,130.0,2.6,19.0,4.5,0.9,16.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Organic Milk,1 item,,,125.0,9.0,12.0,4.5,0.0,12.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Pancake Syrup - 40g,1 item,,,132.0,0.0,33.0,0.1,0.0,25.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Pancakes & Sausage with Syrup,1 item,,,592.0,19.0,99.0,12.0,3.2,41.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Pancakes & Syrup,1 item,,,464.0,9.0,98.0,3.2,2.8,41.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Philly Cheese Stack,1 item,,,635.0,39.0,36.0,37.0,2.1,6.3,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Pineapple Stick,1 item,,,37.0,0.3,8.1,0.2,1.0,8.1,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Pizza Mozzarella Dippers,1 item,,,273.0,11.0,24.0,14.0,2.0,1.7,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Pizza Mozzarella Dippers Sharebox,1 item,,,819.0,34.0,73.0,42.0,6.0,5.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Porridge,1 item,,,154.0,7.8,23.0,3.0,1.9,6.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Porridge with Lyle's Golden Syrup,1 item,,,217.0,7.8,39.0,3.0,1.9,22.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Porridge with Strawberry Jam,1 item,,,193.0,7.8,33.0,3.0,2.0,16.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Porridge with Sugar,1 item,,,166.0,7.8,26.0,3.0,1.9,9.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Quarter Pounder with Cheese,1 item,,,514.0,31.0,36.0,27.0,2.3,11.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Robinsons Fruit Shoot,1 item,,,8.0,0.0,1.6,0.0,0.0,1.6,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sausage & Egg McMuffin,1 item,,,424.0,25.0,27.0,23.0,2.1,3.1,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sausage Sandwich with Brown Sauce,1 item,,,330.0,17.0,31.0,15.0,1.9,8.5,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sausage Sandwich with Ketchup,1 item,,,327.0,18.0,30.0,15.0,2.2,8.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Semi Skimmed Milk – 250ml,1 item,,,122.0,8.3,12.0,3.7,0.0,12.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Side Salad,1 item,,,18.0,0.9,2.1,0.5,1.1,1.9,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Smarties McFlurry,1 item,,,273.0,5.2,40.0,10.0,1.5,37.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Smarties McFlurry,Mini,,,137.0,2.6,20.0,5.0,0.7,18.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sprite Zero,1 item,,,4.0,0.1,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sprite Zero,Large,,,5.0,0.1,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sprite Zero,Small,,,3.0,0.1,0.0,0.0,0.0,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Strawberry Jam - 15g,1 item,,,39.0,0.1,9.6,0.0,0.2,9.6,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Strawberry Milkshake,1 item,,,356.0,11.0,62.0,7.0,1.3,57.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Strawberry Milkshake,Large,,,458.0,13.0,80.0,9.0,1.7,74.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Strawberry Milkshake,Small,,,188.0,5.5,33.0,3.7,0.7,30.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sugar Donut,1 item,,,197.0,3.5,21.0,11.0,0.8,5.7,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sugar Stick,1 item,,,12.0,0.0,3.0,0.0,0.0,3.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sweet & Smoky BBQ Dip,1 item,,,60.0,0.4,15.0,0.0,0.0,14.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sweet & Sour Dip - 25ml,1 item,,,44.0,0.1,10.0,0.2,0.4,8.7,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sweet Chilli Dip,1 item,,,71.0,0.1,17.0,0.4,0.3,14.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Sweet Curry Dip - 25g,1 item,,,50.0,0.3,11.0,0.5,0.7,9.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Tea,1 item,,,6.0,0.4,0.8,0.2,0.0,0.5,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Tea,Large,,,12.0,0.7,1.4,0.4,0.0,1.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,The McDonald's Chicken Sharebox,1 item,,,672.0,47.0,44.0,33.0,2.7,0.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,The Tikka Chicken One - Crispy,1 item,,,471.0,22.0,49.0,20.0,4.1,4.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,The Tikka Chicken One - Grilled,1 item,,,342.0,29.0,37.0,7.6,3.9,4.7,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Toffee Latte,1 item,,,186.0,7.9,25.0,6.1,0.0,23.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Toffee Latte,Large,,,231.0,10.0,31.0,7.2,0.0,29.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Tomato Ketchup - 25g,1 item,,,27.0,0.4,5.9,0.1,0.4,4.7,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Tropicana Apple Juice,1 item,,,115.0,0.5,28.0,0.0,1.5,25.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Tropicana Orange Juice,1 item,,,100.0,2.0,23.0,0.0,0.0,22.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Vanilla Milkshake,1 item,,,366.0,11.0,64.0,7.0,1.3,60.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Vanilla Milkshake,Large,,,469.0,13.0,82.0,9.0,1.7,77.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Vanilla Milkshake,Small,,,192.0,5.5,34.0,3.7,0.7,31.0,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,Veggie Dippers (2 pieces),1 item,,,160.0,3.3,20.0,6.6,3.0,1.2,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,White Coffee,1 item,,,54.0,4.1,5.5,1.8,0.0,4.7,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
+UK,McDonald's,White Coffee,Large,,,74.0,5.6,7.6,2.4,0.0,6.4,https://www.mcdonalds.com/gb/en-gb/good-to-know/nutrition-calculator.html
