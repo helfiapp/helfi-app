@@ -25,6 +25,8 @@ type NormalizedFoodItem = {
   brand?: string | null
   serving_size?: string | null
   servings?: number | null
+  servingOptions?: any[] | null
+  selectedServingId?: string | null
   calories?: number | null
   protein_g?: number | null
   carbs_g?: number | null
@@ -766,6 +768,7 @@ export default function AddIngredientClient() {
   const [adjustUnit, setAdjustUnit] = useState<MeasurementUnit>('g')
   const [adjustBase, setAdjustBase] = useState<{ amount: number | null; unit: MeasurementUnit | null } | null>(null)
   const [adjustPieceGrams, setAdjustPieceGrams] = useState<number | null>(null)
+  const [adjustServingId, setAdjustServingId] = useState<string | null>(null)
   const [adjustSaving, setAdjustSaving] = useState(false)
   const prefillAppliedRef = useRef(false)
 
@@ -978,6 +981,53 @@ export default function AddIngredientClient() {
     if (!sameNumber(before.fiber_g, after.fiber_g)) return true
     if (!sameNumber(before.sugar_g, after.sugar_g)) return true
     return false
+  }
+
+  const hasServingOptionMacroData = (opt: ServingOption) => {
+    const calories = opt?.calories
+    const protein = opt?.protein_g
+    const carbs = opt?.carbs_g
+    const fat = opt?.fat_g
+    const hasCalories = calories !== null && calories !== undefined && Number.isFinite(Number(calories))
+    const hasProtein = protein !== null && protein !== undefined && Number.isFinite(Number(protein))
+    const hasCarbs = carbs !== null && carbs !== undefined && Number.isFinite(Number(carbs))
+    const hasFat = fat !== null && fat !== undefined && Number.isFinite(Number(fat))
+    return hasCalories && hasProtein && hasCarbs && hasFat
+  }
+
+  const normalizeServingOptionsForAdjust = (raw: any): ServingOption[] => {
+    if (!Array.isArray(raw)) return []
+    return raw
+      .map((opt) => {
+        const id = String(opt?.id || '').trim()
+        if (!id) return null
+        const label = typeof opt?.label === 'string' ? opt.label.trim() : ''
+        const servingSize = typeof opt?.serving_size === 'string' ? opt.serving_size.trim() : ''
+        const serving_size = (servingSize || label || '').trim()
+        return {
+          id,
+          serving_size,
+          label: label || undefined,
+          grams: safeNumber(opt?.grams),
+          ml: safeNumber(opt?.ml),
+          unit: opt?.unit === 'ml' || opt?.unit === 'g' || opt?.unit === 'oz' ? opt.unit : undefined,
+          calories: safeNumber(opt?.calories),
+          protein_g: safeNumber(opt?.protein_g),
+          carbs_g: safeNumber(opt?.carbs_g),
+          fat_g: safeNumber(opt?.fat_g),
+          fiber_g: safeNumber(opt?.fiber_g),
+          sugar_g: safeNumber(opt?.sugar_g),
+        } as ServingOption
+      })
+      .filter((opt): opt is ServingOption => Boolean(opt && opt.id && (opt.serving_size || opt.label)))
+      .filter((opt) => hasServingOptionMacroData(opt))
+  }
+
+  const pickDefaultServingOptionForAdjust = (options: ServingOption[]) => {
+    if (!Array.isArray(options) || options.length === 0) return null
+    const byPreference = (needle: string) =>
+      options.find((opt) => String(opt?.label || opt?.serving_size || '').toLowerCase().includes(needle))
+    return byPreference('medium') || byPreference('regular') || byPreference('standard') || options[0] || null
   }
 
   const loadServingOverride = async (r: NormalizedFoodItem): Promise<NormalizedFoodItem | null> => {
@@ -1261,23 +1311,33 @@ export default function AddIngredientClient() {
       }
       const upgraded = await loadServingOverride(target)
       const resolvedTarget = upgraded || target
-      if (!hasMacroData(resolvedTarget)) {
+
+      const servingOptions = normalizeServingOptionsForAdjust((resolvedTarget as any)?.servingOptions)
+      const defaultServingOption = pickDefaultServingOptionForAdjust(servingOptions)
+      const resolvedWithServing =
+        defaultServingOption && hasServingOptionMacroData(defaultServingOption)
+          ? applyServingOptionToResult(resolvedTarget, defaultServingOption)
+          : resolvedTarget
+
+      if (!hasMacroData(resolvedWithServing)) {
         setError('This item has no nutrition data. Please choose another result.')
         return
       }
 
       const baseItem: NormalizedFoodItem = {
-        source: resolvedTarget.source,
-        id: resolvedTarget.id,
-        name: String(resolvedTarget.name || 'Food'),
-        brand: resolvedTarget.brand ?? null,
-        serving_size: String(resolvedTarget.serving_size || '1 serving'),
-        calories: safeNumber(resolvedTarget.calories),
-        protein_g: safeNumber(resolvedTarget.protein_g),
-        carbs_g: safeNumber(resolvedTarget.carbs_g),
-        fat_g: safeNumber(resolvedTarget.fat_g),
-        fiber_g: safeNumber(resolvedTarget.fiber_g),
-        sugar_g: safeNumber(resolvedTarget.sugar_g),
+        source: resolvedWithServing.source,
+        id: resolvedWithServing.id,
+        name: String(resolvedWithServing.name || 'Food'),
+        brand: resolvedWithServing.brand ?? null,
+        serving_size: String(resolvedWithServing.serving_size || '1 serving'),
+        servingOptions: servingOptions.length > 0 ? servingOptions : null,
+        selectedServingId: defaultServingOption?.id || null,
+        calories: safeNumber(resolvedWithServing.calories),
+        protein_g: safeNumber(resolvedWithServing.protein_g),
+        carbs_g: safeNumber(resolvedWithServing.carbs_g),
+        fat_g: safeNumber(resolvedWithServing.fat_g),
+        fiber_g: safeNumber(resolvedWithServing.fiber_g),
+        sugar_g: safeNumber(resolvedWithServing.sugar_g),
         servings: 1,
       }
 
@@ -1303,6 +1363,10 @@ export default function AddIngredientClient() {
           nextUnit = 'ml'
           nextAmount = drinkOverride.amount * 1000
         }
+      } else if (servingOptions.length > 0) {
+        // Fast-food menu items: default to "1 serving" so users can pick Small/Medium/Large.
+        nextUnit = 'serving'
+        nextAmount = 1
       }
 
       setAdjustItem(baseItem)
@@ -1310,6 +1374,7 @@ export default function AddIngredientClient() {
       setAdjustPieceGrams(pieceGrams)
       setAdjustUnit(nextUnit)
       setAdjustAmountInput(formatNumber(nextAmount))
+      setAdjustServingId(defaultServingOption?.id || null)
     } finally {
       setAddingId(null)
     }
@@ -1789,7 +1854,16 @@ export default function AddIngredientClient() {
 
               {(() => {
                 const pieceGrams = adjustPieceGrams
-                const unitOptions = getAllowedUnitsForFood(adjustItem.name, pieceGrams)
+                const servingOptions = normalizeServingOptionsForAdjust((adjustItem as any)?.servingOptions)
+                const selectedServing =
+                  servingOptions.length > 0 && adjustServingId
+                    ? servingOptions.find((opt) => opt.id === adjustServingId) || null
+                    : null
+                const selectedServingLabel =
+                  selectedServing?.label || selectedServing?.serving_size || adjustItem.serving_size || 'serving'
+
+                let unitOptions = getAllowedUnitsForFood(adjustItem.name, pieceGrams)
+                if (servingOptions.length > 0) unitOptions = Array.from(new Set([...unitOptions, 'serving']))
                 const safeUnit = unitOptions.includes(adjustUnit) ? adjustUnit : unitOptions[0] || 'g'
                 const amountNumber = Number(adjustAmountInput)
                 const servings = computeServingsFromAmount(
@@ -1808,6 +1882,55 @@ export default function AddIngredientClient() {
 
                 return (
                   <>
+                    {servingOptions.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Serving size</label>
+                        <select
+                          value={adjustServingId || servingOptions[0]?.id || ''}
+                          onChange={(e) => {
+                            const nextId = e.target.value
+                            const nextOpt = servingOptions.find((opt) => opt.id === nextId) || null
+                            if (!nextOpt) return
+
+                            setAdjustServingId(nextOpt.id)
+                            setAdjustItem((prev) => {
+                              if (!prev) return prev
+                              const updated = applyServingOptionToResult(prev, nextOpt)
+                              return {
+                                ...updated,
+                                servingOptions,
+                                selectedServingId: nextOpt.id,
+                              }
+                            })
+
+                            const nextLabel = nextOpt.serving_size || nextOpt.label || '1 serving'
+                            const nextParsed = parseServingBase(nextLabel)
+                            const nextFallbackGrams = parseServingGrams(nextLabel)
+                            const nextBase = normalizeLegacyBaseUnit(
+                              nextParsed.amount && nextParsed.unit ? nextParsed.amount : nextFallbackGrams || 100,
+                              nextParsed.amount && nextParsed.unit ? nextParsed.unit : 'g',
+                            )
+                            setAdjustBase(nextBase)
+                            setAdjustPieceGrams(extractPieceGramsFromLabel(nextLabel || ''))
+
+                            const currentAmount = Number(adjustAmountInput)
+                            const keepAmount =
+                              adjustUnit === 'serving' && Number.isFinite(currentAmount) && currentAmount > 0
+                                ? currentAmount
+                                : 1
+                            setAdjustUnit('serving')
+                            setAdjustAmountInput(formatNumber(keepAmount))
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                          {servingOptions.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label || opt.serving_size}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                       <div className="flex gap-2">
@@ -1865,7 +1988,9 @@ export default function AddIngredientClient() {
                         >
                           {unitOptions.map((unit) => (
                             <option key={unit} value={unit}>
-                              {formatMeasurementUnitLabel(unit, adjustItem.name, pieceGrams)}
+                              {unit === 'serving'
+                                ? selectedServingLabel
+                                : formatMeasurementUnitLabel(unit, adjustItem.name, pieceGrams)}
                             </option>
                           ))}
                         </select>

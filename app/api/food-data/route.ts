@@ -450,6 +450,7 @@ export async function GET(request: NextRequest) {
       brand?: string | null
       kind?: string | null
       serving_size?: string | null
+      servingOptions?: any[] | null
       calories?: number | null
       protein_g?: number | null
       carbs_g?: number | null
@@ -484,6 +485,7 @@ export async function GET(request: NextRequest) {
             brand: row?.brand ?? null,
             kind: kindValue,
             serving_size: servingLabel,
+            servingOptions: options.length > 0 ? options : null,
             calories: selected?.calories ?? row?.calories ?? null,
             protein_g: selected?.protein_g ?? row?.protein_g ?? null,
             carbs_g: selected?.carbs_g ?? row?.carbs_g ?? null,
