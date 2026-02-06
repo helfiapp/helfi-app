@@ -211,12 +211,28 @@ export const searchCustomFoodMacros = async (
   const q = String(query || '').trim()
   if (!q) return []
   const matchCountry = String(options?.country || '').trim().toUpperCase()
-  const items = (await loadCustomFoods()).filter((item) => {
-    if (!(item.kind === 'SINGLE' || !item.kind)) return false
-    if (!matchCountry) return true
-    const itemCountry = String(item.country || '').trim().toUpperCase()
-    return !itemCountry || itemCountry === matchCountry
-  })
+  const allItems = (await loadCustomFoods()).filter((item) => item.kind === 'SINGLE' || !item.kind)
+  const buildKey = (item: CustomFoodMacro) =>
+    `${normalizeText(item.name)}|${normalizeText(item.brand || '')}`
+
+  const items = (() => {
+    if (!matchCountry) return allItems
+    const exact = allItems.filter((item) => String(item.country || '').trim().toUpperCase() === matchCountry)
+    if (exact.length === 0) {
+      return allItems.filter((item) => {
+        const itemCountry = String(item.country || '').trim().toUpperCase()
+        return !itemCountry || itemCountry === matchCountry
+      })
+    }
+    const exactKeys = new Set(exact.map(buildKey))
+    const fallback = allItems.filter((item) => {
+      const itemCountry = String(item.country || '').trim().toUpperCase()
+      if (itemCountry && itemCountry !== matchCountry) return false
+      if (!itemCountry) return !exactKeys.has(buildKey(item))
+      return itemCountry === matchCountry
+    })
+    return [...exact, ...fallback]
+  })()
   if (items.length === 0) return []
 
   const allowTypo = options?.allowTypo ?? true
@@ -237,11 +253,29 @@ export const searchCustomFoodMacros = async (
 
 export const getCustomPackagedItems = async (country?: string | null): Promise<CustomFoodMacro[]> => {
   const matchCountry = String(country || '').trim().toUpperCase()
-  const items = await loadCustomFoods()
-  return items.filter((item) => {
-    if (!(item.kind === 'PACKAGED' || item.kind === 'FAST_FOOD')) return false
-    if (!matchCountry) return true
+  const allItems = (await loadCustomFoods()).filter(
+    (item) => item.kind === 'PACKAGED' || item.kind === 'FAST_FOOD',
+  )
+  const buildKey = (item: CustomFoodMacro) =>
+    `${normalizeText(item.name)}|${normalizeText(item.brand || '')}`
+
+  if (!matchCountry) return allItems
+
+  const exact = allItems.filter((item) => String(item.country || '').trim().toUpperCase() === matchCountry)
+  if (exact.length === 0) {
+    return allItems.filter((item) => {
+      const itemCountry = String(item.country || '').trim().toUpperCase()
+      return !itemCountry || itemCountry === matchCountry
+    })
+  }
+
+  const exactKeys = new Set(exact.map(buildKey))
+  const fallback = allItems.filter((item) => {
     const itemCountry = String(item.country || '').trim().toUpperCase()
-    return !itemCountry || itemCountry === matchCountry
+    if (itemCountry && itemCountry !== matchCountry) return false
+    if (!itemCountry) return !exactKeys.has(buildKey(item))
+    return itemCountry === matchCountry
   })
+
+  return [...exact, ...fallback]
 }

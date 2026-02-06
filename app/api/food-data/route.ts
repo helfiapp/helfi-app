@@ -1012,7 +1012,7 @@ export async function GET(request: NextRequest) {
           return await fetchForQuery(compactQuery)
         }
 
-        const localPackaged = await searchLocalPreferred(query, 'packaged')
+        const localPackaged = isRestaurantQuery ? [] : await searchLocalPreferred(query, 'packaged')
 
         // If we already have custom packaged matches, return them immediately and skip slow external calls.
         if (customPackagedMatches.length > 0) {
@@ -1026,8 +1026,8 @@ export async function GET(request: NextRequest) {
           actualSource = 'auto'
           customPackagedApplied = true
         } else {
-          // For packaged foods, query OpenFoodFacts and FatSecret, then merge with local USDA branded items
-          const externalPool = await fetchExternalPool()
+          const localEnough = localPackaged.length >= 5
+          const externalPool = localEnough ? [] : await fetchExternalPool()
           const allPackaged = [...externalPool, ...localPackaged]
           const filtered = filterItemsByQuery(allPackaged, query, (item) => {
             const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
@@ -1037,9 +1037,12 @@ export async function GET(request: NextRequest) {
           if (filtered.length > 0) {
             items = sortPackagedByAlphabeticalHierarchyAsc(filtered, query).slice(0, limit)
             actualSource = 'auto'
-          } else {
+          } else if (externalPool.length > 0) {
             // If no matches, still try external pool without filtering (might have partial matches)
             items = sortPackagedByAlphabeticalHierarchyAsc(externalPool, query).slice(0, limit)
+            actualSource = 'auto'
+          } else {
+            items = sortPackagedByAlphabeticalHierarchyAsc(localPackaged, query).slice(0, limit)
             actualSource = 'auto'
           }
         }
