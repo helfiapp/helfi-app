@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import { attachWriteGuard } from '@/lib/prisma-write-guard'
+import { attachWriteGuard } from './prisma-write-guard'
 
 // Force the USDA search to use the populated Neon database. If DATABASE_URL is
 // not set or points to an empty instance, fall back to the known populated DB.

@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client'
-import { createWriteGuard, hashPayload } from '@/lib/write-guard'
+import { createWriteGuard, hashPayload } from './write-guard'
 
 const WRITE_GUARD_WINDOW_MS = 30 * 1000
 const WRITE_ACTIONS = new Set(['create', 'createMany', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany'])
