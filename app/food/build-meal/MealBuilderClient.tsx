@@ -1218,6 +1218,17 @@ const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
   return unit
 }
 
+const getAmountInputStepForUnit = (unit: BuilderUnit | null | undefined) => {
+  if (!unit) return 1
+  if (unit === 'oz') return 0.1
+  if (unit === 'tsp' || unit === 'tbsp') return 0.1
+  if (unit === 'quarter-cup' || unit === 'half-cup' || unit === 'three-quarter-cup' || unit === 'cup') return 0.1
+  if (unit === 'pinch' || unit === 'handful') return 0.1
+  if (unit === 'piece' || unit === 'piece-small' || unit === 'piece-medium' || unit === 'piece-large') return 1
+  if (unit === 'slice' || unit === 'serving') return 1
+  return 1
+}
+
 const macroOrZero = (v: any) => {
   const num = typeof v === 'number' && Number.isFinite(v) ? v : 0
   return Math.max(0, num) // Clamp to >= 0 to prevent negative macros
@@ -4090,8 +4101,10 @@ export default function MealBuilderClient() {
                           <div className="space-y-1">
                             <div className="text-xs font-semibold text-gray-700">Amount</div>
                             <input
-                              type="text"
+                              type="number"
                               inputMode="decimal"
+                              min={0}
+                              step={getAmountInputStepForUnit(it.__unit || it.__baseUnit)}
                               value={it.__amountInput}
                               onChange={(e) => setAmount(it.id, e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"

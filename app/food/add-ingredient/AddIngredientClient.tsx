@@ -1815,6 +1815,28 @@ export default function AddIngredientClient() {
                           type="number"
                           inputMode="decimal"
                           min={0}
+                          step={(() => {
+                            if (safeUnit === 'oz') return 0.1
+                            if (safeUnit === 'tsp' || safeUnit === 'tbsp') return 0.1
+                            if (
+                              safeUnit === 'quarter-cup' ||
+                              safeUnit === 'half-cup' ||
+                              safeUnit === 'three-quarter-cup' ||
+                              safeUnit === 'cup'
+                            )
+                              return 0.1
+                            if (safeUnit === 'pinch' || safeUnit === 'handful') return 0.1
+                            if (
+                              safeUnit === 'piece' ||
+                              safeUnit === 'piece-small' ||
+                              safeUnit === 'piece-medium' ||
+                              safeUnit === 'piece-large' ||
+                              safeUnit === 'slice' ||
+                              safeUnit === 'serving'
+                            )
+                              return 1
+                            return 1
+                          })()}
                           value={adjustAmountInput}
                           onChange={(e) => setAdjustAmountInput(e.target.value)}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
