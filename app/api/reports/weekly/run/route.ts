@@ -2430,6 +2430,7 @@ export async function POST(request: NextRequest) {
   const triggerSource = typeof body?.triggerSource === 'string' ? body.triggerSource : ''
   const isManualTrigger = triggerSource === 'manual'
   const hasSchedulerAuth = isAuthorized(request)
+  const debugWeekly = hasSchedulerAuth && request.headers.get('x-debug-weekly-report') === '1'
   let allowManual = false
   let userId = typeof body?.userId === 'string' ? body.userId : ''
   if (isManualTrigger) {
@@ -2463,7 +2464,19 @@ export async function POST(request: NextRequest) {
   let state = await getWeeklyReportState(userId)
   const reportsEnabled = Boolean(state?.reportsEnabled || state?.reportsEnabledAt || state?.nextReportDueAt)
   if (!reportsEnabled) {
-    return NextResponse.json({ status: 'disabled', reason: 'reports_disabled' }, { status: 400 })
+    const payload: any = { status: 'disabled', reason: 'reports_disabled' }
+    if (debugWeekly) {
+      const rawState = await prisma
+        .$queryRawUnsafe('SELECT * FROM WeeklyHealthReportState WHERE userId = $1', userId)
+        .catch((error) => ({ error: String(error?.message || error) }))
+      payload.debug = {
+        userId,
+        state,
+        rawState,
+        reportsEnabledComputed: reportsEnabled,
+      }
+    }
+    return NextResponse.json(payload, { status: 400 })
   }
   if (!state?.nextReportDueAt) {
     if (isManualTrigger) {
