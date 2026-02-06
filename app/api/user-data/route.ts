@@ -10,6 +10,7 @@ import { computeHydrationGoal } from '@/lib/hydration-goal'
 import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
 import { ensureSupplementCatalogSchema } from '@/lib/supplement-catalog-db'
 import { ensureMedicationCatalogSchema } from '@/lib/medication-catalog-db'
+import { hashPayload, shouldSkipRepeatedWrite } from '@/lib/write-guard'
 
 const normalizeTimingList = (timing: any) => {
   if (Array.isArray(timing)) {
@@ -39,6 +40,30 @@ const dedupeItems = (items: any[]) => {
     result.push(item)
   })
   return result
+}
+
+const buildWriteGuardPayload = (raw: any) => {
+  if (!raw || typeof raw !== 'object') return {}
+  const clone = { ...raw }
+  delete (clone as any).manualSync
+  delete (clone as any).syncOverride
+  delete (clone as any).healthSetupUpdatedAt
+
+  const normalizeList = (value: any) =>
+    Array.isArray(value)
+      ? value
+          .map((item) => (typeof item === 'string' ? item.trim() : item))
+          .filter((item) => item !== '' && item !== null && item !== undefined)
+          .sort()
+      : value
+
+  if (Array.isArray(clone.goals)) clone.goals = normalizeList(clone.goals)
+  if (Array.isArray(clone.customGoals)) clone.customGoals = normalizeList(clone.customGoals)
+  if (Array.isArray(clone.dietTypes)) clone.dietTypes = normalizeList(clone.dietTypes)
+  if (Array.isArray(clone.allergies)) clone.allergies = normalizeList(clone.allergies)
+  if (Array.isArray(clone.exerciseTypes)) clone.exerciseTypes = normalizeList(clone.exerciseTypes)
+
+  return clone
 }
 
 const splitSupplementName = (rawName: string) => {
@@ -831,6 +856,32 @@ export async function POST(request: NextRequest) {
     }
     
     console.timeEnd('⏱️ User Lookup/Creation')
+
+    if (touchesHealthSetup && !manualSync) {
+      try {
+        const guardPayload = buildWriteGuardPayload(data)
+        const payloadHash = hashPayload(guardPayload)
+        const guardResult = await shouldSkipRepeatedWrite({
+          userId: user.id,
+          scope: 'user-data:health-setup',
+          payloadHash,
+          windowMs: 90 * 1000,
+        })
+        if (guardResult.skip) {
+          console.log('🛑 Write guard: skipped repeat health setup save', {
+            userId: user.id,
+            hitCount: guardResult.hitCount,
+          })
+          return NextResponse.json({
+            success: true,
+            skipped: true,
+            reason: 'repeat_write_guard',
+          })
+        }
+      } catch (guardError) {
+        console.warn('Write guard failed (non-blocking)', guardError)
+      }
+    }
 
     // Health setup saves always win; we store a server-side timestamp for sync.
     if (touchesHealthSetup) {
