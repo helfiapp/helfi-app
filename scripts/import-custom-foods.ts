@@ -2,6 +2,8 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import fs from 'fs'
 import path from 'path'
+import { buildCustomFoodAliases, buildCustomFoodKey } from '../lib/food/custom-food-import'
+import { loadFastFoodMenuItems } from '../lib/food/fast-food-menus'
 
 type MacroRow = {
   name: string
@@ -29,18 +31,6 @@ type ServingOption = {
 }
 
 const DATA_DIR = path.join(process.cwd(), 'data', 'food-overrides')
-
-const normalizeText = (value: string) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
-
-const buildKey = (name: string, brand: string | null, kind: string) => {
-  const base = `${brand ? `${brand} ` : ''}${name}`.trim()
-  return `${normalizeText(base)}|${kind}`.trim()
-}
 
 const parseCsvLine = (line: string): string[] => {
   const cells: string[] = []
@@ -101,97 +91,6 @@ const toJsonInput = (value: any[] | null | undefined) => {
   return value
 }
 
-const buildAliases = (name: string, brand: string | null) => {
-  const aliases: string[] = []
-  if (brand) {
-    aliases.push(`${name} (${brand})`)
-    aliases.push(`${brand} ${name}`)
-  }
-  if (brand && brand.toLowerCase().includes('&')) {
-    aliases.push(`${brand.replace(/&/g, 'and')} ${name}`)
-    aliases.push(`${name} (${brand.replace(/&/g, 'and')})`)
-  }
-  return Array.from(new Set(aliases.filter(Boolean)))
-}
-
-const getFastFoodServingSize = (itemName: string): { sizeGrams: number; servingLabel: string } => {
-  const lowerName = itemName.toLowerCase()
-
-  if (lowerName.includes('mcsmart meal')) return { sizeGrams: 490, servingLabel: '1 meal' }
-  if (lowerName.includes('fish & chips') || lowerName.includes('fish and chips')) return { sizeGrams: 400, servingLabel: '1 serve' }
-
-  if (lowerName.includes('big mac')) return { sizeGrams: 215, servingLabel: '1 burger' }
-  if (lowerName.includes('quarter pounder')) return { sizeGrams: 200, servingLabel: '1 burger' }
-  if (lowerName.includes('cheeseburger') && !lowerName.includes('double')) return { sizeGrams: 119, servingLabel: '1 burger' }
-  if (lowerName.includes('hamburger') && !lowerName.includes('double')) return { sizeGrams: 105, servingLabel: '1 burger' }
-  if (lowerName.includes('mcdouble')) return { sizeGrams: 155, servingLabel: '1 burger' }
-
-  if (
-    lowerName.includes('battered') &&
-    (lowerName.includes('fish') ||
-      lowerName.includes('flake') ||
-      lowerName.includes('snapper') ||
-      lowerName.includes('cod') ||
-      lowerName.includes('barramundi') ||
-      lowerName.includes('flathead'))
-  ) {
-    return { sizeGrams: 150, servingLabel: '1 piece' }
-  }
-  if (lowerName.includes('filet-o-fish')) return { sizeGrams: 142, servingLabel: '1 burger' }
-
-  if (lowerName.includes('mcnuggets')) return { sizeGrams: 100, servingLabel: '4 pieces' }
-  if (lowerName.includes('mccrispy')) return { sizeGrams: 200, servingLabel: '1 sandwich' }
-  if (lowerName.includes('mcchicken')) return { sizeGrams: 153, servingLabel: '1 sandwich' }
-
-  if (lowerName.includes('french fries') || lowerName.includes('chips')) {
-    if (lowerName.includes('small')) return { sizeGrams: 80, servingLabel: '1 small' }
-    if (lowerName.includes('medium')) return { sizeGrams: 110, servingLabel: '1 medium' }
-    if (lowerName.includes('large')) return { sizeGrams: 150, servingLabel: '1 large' }
-    return { sizeGrams: 100, servingLabel: '1 serve' }
-  }
-  if (lowerName.includes('hash brown')) return { sizeGrams: 52, servingLabel: '1 piece' }
-  if (lowerName.includes('apple pie')) return { sizeGrams: 80, servingLabel: '1 pie' }
-
-  if (lowerName.includes('mcflurry')) return { sizeGrams: 360, servingLabel: '1 regular' }
-
-  if (lowerName.includes('dim sim')) return { sizeGrams: 50, servingLabel: '1 piece' }
-  if (lowerName.includes('potato cake') || lowerName.includes('potato scallop')) return { sizeGrams: 75, servingLabel: '1 piece' }
-  if (lowerName.includes('calamari rings')) return { sizeGrams: 100, servingLabel: '1 serve' }
-  if (lowerName.includes('scallops') && lowerName.includes('battered')) return { sizeGrams: 100, servingLabel: '1 serve' }
-  if (lowerName.includes('prawns') && lowerName.includes('battered')) return { sizeGrams: 100, servingLabel: '1 serve' }
-  if (lowerName.includes('fish cake')) return { sizeGrams: 100, servingLabel: '1 piece' }
-  if (lowerName.includes('chiko roll')) return { sizeGrams: 160, servingLabel: '1 roll' }
-  if (lowerName.includes('spring roll')) return { sizeGrams: 50, servingLabel: '1 roll' }
-  if (lowerName.includes('corn jack')) return { sizeGrams: 100, servingLabel: '1 piece' }
-  if (lowerName.includes('onion rings')) return { sizeGrams: 91, servingLabel: '1 small serve' }
-  if (lowerName.includes('mushy peas')) return { sizeGrams: 100, servingLabel: '1 serve' }
-  if (lowerName.includes('curry sauce') || lowerName.includes('gravy') || lowerName.includes('tartare sauce')) {
-    return { sizeGrams: 50, servingLabel: '1 serve' }
-  }
-
-  return { sizeGrams: 100, servingLabel: '100 g' }
-}
-
-const buildServingOptions = (row: MacroRow, sizeGrams: number, servingLabel: string, unit: 'g' | 'ml' = 'g') => {
-  const multiplier = sizeGrams / 100
-  const label = sizeGrams !== 100 ? `${servingLabel} (${sizeGrams} ${unit})` : servingLabel
-  return [
-    {
-      id: `serving-${normalizeText(label).replace(/\s+/g, '-')}`,
-      label,
-      serving_size: label,
-      grams: unit === 'g' ? sizeGrams : null,
-      ml: unit === 'ml' ? sizeGrams : null,
-      calories: Math.round(row.calories * multiplier),
-      protein_g: Math.round(row.protein_g * multiplier * 10) / 10,
-      carbs_g: Math.round(row.carbs_g * multiplier * 10) / 10,
-      fat_g: Math.round(row.fat_g * multiplier * 10) / 10,
-      fiber_g: row.fiber_g != null ? Math.round(row.fiber_g * multiplier * 10) / 10 : null,
-      sugar_g: row.sugar_g != null ? Math.round(row.sugar_g * multiplier * 10) / 10 : null,
-    },
-  ]
-}
-
 const readMacroFile = (fileName: string): MacroRow[] => {
   const filePath = path.join(DATA_DIR, fileName)
   const parsed = parseCsv(filePath)
@@ -234,38 +133,10 @@ const readMacroFile = (fileName: string): MacroRow[] => {
   return rows
 }
 
-const manualItems = [
-  {
-    name: 'Burger with the lot',
-    brand: 'Fish & Chip Shop',
-    kind: 'FAST_FOOD',
-    group: 'fast_food',
-    calories: null,
-    protein_g: null,
-    carbs_g: null,
-    fat_g: null,
-    fiber_g: null,
-    sugar_g: null,
-    servingOptions: [
-      {
-        id: 'serving-burger-with-the-lot',
-        label: '1 burger',
-        serving_size: '1 burger',
-        calories: 950,
-        protein_g: 44,
-        carbs_g: 72,
-        fat_g: 62,
-        fiber_g: 6.5,
-        sugar_g: 16,
-      },
-    ],
-  },
-]
-
 const importRows = async () => {
   const singleFiles = ['master_foods_macros.csv', 'meat_seafood_protein_macros.csv']
-  const fastFoodRows = readMacroFile('fast_food_macros.csv')
   const beverageRows = readMacroFile('beverages_macros.csv')
+  const fastFoodMenus = loadFastFoodMenuItems()
 
   const singleRows = singleFiles.flatMap((file) => readMacroFile(file))
 
@@ -284,7 +155,12 @@ const importRows = async () => {
     aliases: string[]
     servingOptions?: any[] | null
   }) => {
-    const key = buildKey(payload.name, payload.brand, payload.kind)
+    const key = buildCustomFoodKey({
+      name: payload.name,
+      brand: payload.brand,
+      kind: payload.kind,
+      country: payload.country ?? null,
+    })
     await prisma.customFoodItem.upsert({
       where: { key },
       create: {
@@ -333,7 +209,7 @@ const importRows = async () => {
       fatPer100g: row.fat_g,
       fiberPer100g: row.fiber_g,
       sugarPer100g: row.sugar_g,
-      aliases: buildAliases(row.name, row.brand),
+      aliases: buildCustomFoodAliases(row.name, row.brand),
       servingOptions: null,
     })
   }
@@ -350,48 +226,25 @@ const importRows = async () => {
       fatPer100g: row.fat_g,
       fiberPer100g: row.fiber_g,
       sugarPer100g: row.sugar_g,
-      aliases: buildAliases(row.name, row.brand),
+      aliases: buildCustomFoodAliases(row.name, row.brand),
       servingOptions: null,
     })
   }
 
-  for (const row of fastFoodRows) {
-    const aliases = buildAliases(row.name, row.brand)
-    if (row.name.toLowerCase().includes('flake')) {
-      aliases.push('flake', 'fish and chip shop flake', 'fish & chip shop flake')
-    }
-    if (row.name.toLowerCase().includes('mcsmart')) {
-      aliases.push('mcsmart', 'mc smart')
-    }
-    await upsertItem({
-      name: row.name,
-      brand: row.brand,
-      kind: 'FAST_FOOD',
-      group: 'fast_food',
-      caloriesPer100g: row.calories,
-      proteinPer100g: row.protein_g,
-      carbsPer100g: row.carbs_g,
-      fatPer100g: row.fat_g,
-      fiberPer100g: row.fiber_g,
-      sugarPer100g: row.sugar_g,
-      aliases: Array.from(new Set(aliases)),
-      servingOptions: null,
-    })
-  }
-
-  for (const item of manualItems) {
-    const aliases = buildAliases(item.name, item.brand)
+  for (const item of fastFoodMenus) {
+    const aliases = buildCustomFoodAliases(item.name, item.chain)
     await upsertItem({
       name: item.name,
-      brand: item.brand,
+      brand: item.chain,
+      country: item.country,
       kind: 'FAST_FOOD',
       group: 'fast_food',
-      caloriesPer100g: item.calories,
-      proteinPer100g: item.protein_g,
-      carbsPer100g: item.carbs_g,
-      fatPer100g: item.fat_g,
-      fiberPer100g: item.fiber_g,
-      sugarPer100g: item.sugar_g,
+      caloriesPer100g: null,
+      proteinPer100g: null,
+      carbsPer100g: null,
+      fatPer100g: null,
+      fiberPer100g: null,
+      sugarPer100g: null,
       aliases,
       servingOptions: item.servingOptions,
     })
