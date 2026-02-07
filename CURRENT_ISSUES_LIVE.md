@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE:
+- Date/time: Sun Feb 8 04:02 AEDT 2026
+- What changed: Weekly Health Report: fixed Supplements trust (no medications in Supplements, no duplicate supplement suggestions), added modern charts + mobile-friendly report view, and prevented "sleep consistency" claims unless real wearable sleep data exists.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report
+- What to quickly test: Log in as info@sonicweb.com.au, generate + view a weekly report, then confirm Supplements has no medications (ex: Tadalafil) and Suggestions/Things to avoid do not repeat supplements already taken.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 00:36 AEDT 2026
 - What changed: Added Guzman y Gomez (Australia) fast-food menu items (official nutrition) so they show in search with calories + macros, with size dropdown where available.
 - Where to see it (page/link): https://helfi.ai (Food Diary -> Add ingredient search)
