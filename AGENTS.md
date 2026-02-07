@@ -21,6 +21,7 @@ We have had problems with multiple agents working at the same time and deploying
 To prevent conflicts, every agent MUST coordinate in ONE place:
 
 Linear project name: `Helfi Dev`
+Linear project link: https://linear.app/helfi/project/helfi-dev-565afd449e32
 
 IMPORTANT: On this project, all agents run on the SAME Mac and SAME login, so you should already have access.
 Do NOT ask for emails/invites.
@@ -29,6 +30,21 @@ If Linear does not load inside Codex:
 1. Restart the Codex app.
 2. Try again.
 3. If it still fails, tell the owner “Linear is not connected in Codex on this Mac”.
+
+### IMPORTANT: No More “Authorize” Drama
+
+1. DO NOT log Linear out.
+- Never run commands like `codex mcp logout linear`.
+- Do not “reconnect Linear” unless you are truly blocked.
+
+2. If Linear says “Not logged in”:
+- Restart Codex.
+- Try again.
+- If it still says “Not logged in”, YOU must re-login to Linear from Codex (do not ask the owner unless you are fully stuck).
+
+3. If you only see “welcome” tickets:
+- You are in the wrong Linear workspace.
+- Stop immediately and tell the owner. Do not create a new project.
 
 ### Required Columns (Use These Exact Names)
 

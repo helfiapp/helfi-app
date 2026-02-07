@@ -2,6 +2,13 @@
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-07 16:12 AEDT
+- What changed: Added “no more authorize drama” rules: project link, do NOT log Linear out, and what to do if the wrong Linear workspace shows up.
+- Where to see it (page/link): Repo docs: `AGENTS.md` + `PROJECT_STATUS.md`
+- What to quickly test: New agents should NOT run any Linear logout/reconnect. They should open the “Helfi Dev” project link and see the same tickets (HEL-5, HEL-6, etc).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-07 16:01 AEDT
 - What changed: Linear coordination now supports the default Linear columns (Todo / In Progress / Done) using labels for Blocked + Ready to deploy, so agents stop getting stuck on “wrong column names”.
 - Where to see it (page/link): Repo docs: `AGENTS.md` + `PROJECT_STATUS.md`. Linear labels: `Blocked`, `Ready to deploy`.

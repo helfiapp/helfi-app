@@ -21,6 +21,8 @@ We coordinate work in one shared Linear project named: `Helfi Dev`.
 
 Important: All agents run on the SAME Mac and SAME login, so agents should already have access to Linear in Codex.
 
+Linear project link: https://linear.app/helfi/project/helfi-dev-565afd449e32
+
 Rules:
 1. Every agent must claim ONE ticket and move it to `Doing` before starting.
 2. Only ONE ticket can be `Ready to deploy` at a time. If someone else is already `Ready to deploy`, wait.
@@ -31,6 +33,8 @@ Note: Linear may show default columns like `Todo / In Progress / Done`. That is 
 - `Todo` + label `Blocked` = `Blocked`
 - `Todo` + label `Ready to deploy` = `Ready to deploy`
 - `Done` = `Deployed`
+
+Important: Agents must NOT log Linear out. Logging out causes “Authorize” problems.
 
 ## Deployment Rule (Live-First During Development)
 The owner is the only current user, and prefers simple “ship it” workflows.
