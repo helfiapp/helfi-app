@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-02-07 Notes (Recent Work + Current Concern)
+
+### Staging: Health Setup shows "Updating insights..." even when nothing changed
+**Where**: `https://stg.helfi.ai/onboarding`
+
+**What the owner saw**:
+- Log out, log back in, do not change anything.
+- A toast appears: "Updating insights... You can keep using the app."
+- This is concerning because updates should only happen when something actually changed.
+
+**Likely cause (simple)**:
+- Some parts of Health Setup were saving in the background during page load (even when the user didn't change anything),
+  and that could trigger an "insights update" run.
+
+**Fix prepared (NOT deployed, per owner request)**:
+- Branch: `codex/fix-onboarding-no-background-update`
+- Commit: `593d1f59` "Fix: stop background insights update when nothing changed"
+- Change summary:
+  - Only run background insights updates if the app knows there were real edits.
+  - Ignore "partial saves" that don't actually change any values (prevents false triggers during page load).
+  - Remove auto-save-on-login behavior.
+
+**What needs testing (after gatekeeper deploys)**:
+- Log out/in and confirm NO background "Updating insights..." toast unless you actually edit something.
+- Make a real change (gender/weight/goals etc) and confirm the background update still triggers correctly.
+
+### Staging: Weekly Health Report "Create report now" failures (previously)
+**Where**: `https://stg.helfi.ai/insights`
+
+**Status**:
+- Fixed and deployed earlier so manual "Create report now" no longer throws the generic red error for the test account.
+- Follow-up fix added to prevent duplicate weekly reports for the same 7-day period.
+
 ## **🔥 CRITICAL ISSUES**
 
 ### **1. 📱 ACCORDION DROPDOWN MISALIGNMENT - MOBILE ONLY**
