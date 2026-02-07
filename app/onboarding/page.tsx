@@ -9271,6 +9271,8 @@ export default function Onboarding() {
   const { profileImage: providerProfileImage, updateUserData } = useUserData();
   const router = useRouter();
   const appleLinkPromptCheckedRef = useRef(false);
+  const [appleLinkPromptAttempt, setAppleLinkPromptAttempt] = useState(0);
+  const appleLinkPromptRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // ⚠️ HEALTH SETUP GUARD RAIL
   // This onboarding component is part of a carefully tuned flow:
@@ -9330,7 +9332,6 @@ export default function Onboarding() {
     if (showFirstTimeModal) return; // don't stack modals; wait for the first-time modal to close
     if (showAppleLinkModal) return;
     if (appleLinkPromptCheckedRef.current) return;
-    appleLinkPromptCheckedRef.current = true;
 
     const shouldSkipAppleLinkPrompt = () => {
       try {
@@ -9348,17 +9349,9 @@ export default function Onboarding() {
     };
 
     const run = async () => {
-      if (shouldSkipAppleLinkPrompt()) return;
-
-      // Only prompt before Health Setup is complete.
-      try {
-        const hsRes = await fetch('/api/health-setup-status', { method: 'GET' });
-        if (hsRes.ok) {
-          const hsData = await hsRes.json();
-          if (hsData?.complete === true) return;
-        }
-      } catch {
-        // If this fails, don't block the page.
+      if (shouldSkipAppleLinkPrompt()) {
+        appleLinkPromptCheckedRef.current = true;
+        return;
       }
 
       // Check if Apple provider is enabled on this environment.
@@ -9372,24 +9365,48 @@ export default function Onboarding() {
       } catch {
         hasAppleProvider = false;
       }
-      if (!hasAppleProvider) return;
+      if (!hasAppleProvider) {
+        appleLinkPromptCheckedRef.current = true;
+        return;
+      }
 
       // If not linked yet, show the modal prompt (more reliable than redirects).
       try {
         const linkRes = await fetch('/api/auth/apple/link/status', { method: 'GET' });
-        if (!linkRes.ok) return;
+        if (!linkRes.ok) {
+          // Right after login, the session can take a moment to be recognized by all endpoints.
+          // If we fail here, retry a few times instead of permanently suppressing the prompt.
+          if (appleLinkPromptAttempt < 3) {
+            try {
+              if (appleLinkPromptRetryTimerRef.current) clearTimeout(appleLinkPromptRetryTimerRef.current);
+            } catch {}
+            appleLinkPromptRetryTimerRef.current = setTimeout(() => {
+              setAppleLinkPromptAttempt((v) => v + 1);
+            }, 800);
+            return;
+          }
+          appleLinkPromptCheckedRef.current = true;
+          return;
+        }
         const linkData = await linkRes.json();
         const linked = Boolean(linkData?.linked);
-        if (!linked) {
-          setShowAppleLinkModal(true);
-        }
+        appleLinkPromptCheckedRef.current = true;
+        if (!linked) setShowAppleLinkModal(true);
       } catch {
         // If this fails, don't block the page.
       }
     };
 
     void run();
-  }, [status, showFirstTimeModal, showAppleLinkModal]);
+  }, [status, showFirstTimeModal, showAppleLinkModal, appleLinkPromptAttempt]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        if (appleLinkPromptRetryTimerRef.current) clearTimeout(appleLinkPromptRetryTimerRef.current);
+      } catch {}
+    };
+  }, []);
 
   const handleAppleLinkSkip = () => {
     try {
