@@ -100,6 +100,190 @@ function normalizeReportItem(item: ReportItem | null | undefined): { name: strin
   return { name, reason }
 }
 
+function canonicalizeNameForMatch(input: string): string {
+  const raw = String(input || '').trim().toLowerCase()
+  if (!raw) return ''
+  const cleaned = raw
+    .replace(/[^\da-z]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!cleaned) return ''
+
+  const drop = new Set([
+    'mg',
+    'mcg',
+    'g',
+    'kg',
+    'ml',
+    'iu',
+    'tablet',
+    'tablets',
+    'tab',
+    'tabs',
+    'capsule',
+    'capsules',
+    'cap',
+    'caps',
+    'softgel',
+    'softgels',
+    'drop',
+    'drops',
+    'tsp',
+    'tbsp',
+    'morning',
+    'afternoon',
+    'evening',
+    'night',
+    'daily',
+    'weekly',
+    'once',
+    'twice',
+  ])
+
+  const tokens = cleaned
+    .split(' ')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .filter((t) => !drop.has(t))
+    .filter((t) => !/^\d+(\.\d+)?$/.test(t))
+    .filter((t) => !/^\d+(\.\d+)?(mg|mcg|g|kg|ml|iu)$/.test(t))
+
+  return tokens.join(' ').trim()
+}
+
+function buildKnownNameSet(rows: Array<{ name?: string | null }>) {
+  const out = new Set<string>()
+  for (const row of rows || []) {
+    const key = canonicalizeNameForMatch(String(row?.name || ''))
+    if (key) out.add(key)
+  }
+  return out
+}
+
+function sanitizeSupplementAndMedicationSections(
+  sections: Record<ReportSectionKey, ReportSectionBucket>,
+  reportContext: { supplements: Array<{ name?: string | null }>; medications: Array<{ name?: string | null }> }
+): Record<ReportSectionKey, ReportSectionBucket> {
+  const output = { ...sections }
+
+  const knownSupplements = buildKnownNameSet(reportContext?.supplements || [])
+  const knownMedications = buildKnownNameSet(reportContext?.medications || [])
+
+  const supplements = output.supplements || { working: [], suggested: [], avoid: [] }
+  const medications = output.medications || { working: [], suggested: [], avoid: [] }
+
+  const movedToMedications: Array<{ name: string; reason: string }> = []
+  const movedToSupplements: Array<{ name: string; reason: string }> = []
+
+  const filterBucket = (items: ReportItem[], shouldKeep: (item: { name: string; reason: string }) => boolean) => {
+    const next: Array<{ name: string; reason: string }> = []
+    for (const item of items || []) {
+      const normalized = normalizeReportItem(item)
+      if (!normalized.name) continue
+      if (!shouldKeep(normalized)) continue
+      next.push(normalized)
+    }
+    return next
+  }
+
+  // 1) Move known medications out of Supplements, and known supplements out of Medications.
+  const moveMedsOutOfSupplements = (items: ReportItem[]) =>
+    filterBucket(items, (it) => {
+      const key = canonicalizeNameForMatch(it.name)
+      const isKnownMedication = key && knownMedications.has(key)
+      const isKnownSupplement = key && knownSupplements.has(key)
+      if (isKnownMedication && !isKnownSupplement) {
+        movedToMedications.push(it)
+        return false
+      }
+      return true
+    })
+  const moveSuppsOutOfMedications = (items: ReportItem[]) =>
+    filterBucket(items, (it) => {
+      const key = canonicalizeNameForMatch(it.name)
+      const isKnownMedication = key && knownMedications.has(key)
+      const isKnownSupplement = key && knownSupplements.has(key)
+      if (isKnownSupplement && !isKnownMedication) {
+        movedToSupplements.push(it)
+        return false
+      }
+      return true
+    })
+
+  supplements.working = moveMedsOutOfSupplements(supplements.working || [])
+  supplements.suggested = moveMedsOutOfSupplements(supplements.suggested || [])
+  supplements.avoid = moveMedsOutOfSupplements(supplements.avoid || [])
+
+  medications.working = moveSuppsOutOfMedications(medications.working || [])
+  medications.suggested = moveSuppsOutOfMedications(medications.suggested || [])
+  medications.avoid = moveSuppsOutOfMedications(medications.avoid || [])
+
+  // If it was in the user's known list, it should land in "working".
+  if (movedToMedications.length) {
+    medications.working = [...(medications.working || []), ...movedToMedications]
+  }
+  if (movedToSupplements.length) {
+    supplements.working = [...(supplements.working || []), ...movedToSupplements]
+  }
+
+  // 2) If the user already takes it, it can't be a "suggestion" or "avoid" item.
+  const removeKnownFromSuggestedAndAvoid = (bucket: ReportSectionBucket, known: Set<string>) => {
+    bucket.suggested = filterBucket(bucket.suggested || [], (it) => {
+      const key = canonicalizeNameForMatch(it.name)
+      return !(key && known.has(key))
+    })
+    bucket.avoid = filterBucket(bucket.avoid || [], (it) => {
+      const key = canonicalizeNameForMatch(it.name)
+      return !(key && known.has(key))
+    })
+  }
+  removeKnownFromSuggestedAndAvoid(supplements, knownSupplements)
+  removeKnownFromSuggestedAndAvoid(medications, knownMedications)
+
+  // 3) Deduplicate by name (not by reason), and ensure an item can’t appear in multiple buckets.
+  const enforceUniqueAcrossBuckets = (bucket: ReportSectionBucket) => {
+    const seen = new Set<string>()
+    const dedupeList = (items: ReportItem[]) => {
+      const next: Array<{ name: string; reason: string }> = []
+      for (const item of items || []) {
+        const normalized = normalizeReportItem(item)
+        const key = canonicalizeNameForMatch(normalized.name)
+        if (!key) continue
+        if (seen.has(key)) continue
+        seen.add(key)
+        next.push(normalized)
+      }
+      return next
+    }
+    bucket.working = dedupeList(bucket.working || [])
+    bucket.suggested = dedupeList(bucket.suggested || [])
+    bucket.avoid = dedupeList(bucket.avoid || [])
+  }
+  enforceUniqueAcrossBuckets(supplements)
+  enforceUniqueAcrossBuckets(medications)
+
+  // 4) Last safety pass: if an item still appears in both sections, prefer Medications.
+  const medNames = new Set<string>()
+  for (const item of [...(medications.working || []), ...(medications.suggested || []), ...(medications.avoid || [])]) {
+    const key = canonicalizeNameForMatch(String((item as any)?.name || ''))
+    if (key) medNames.add(key)
+  }
+  const stripIfInMedications = (items: ReportItem[]) =>
+    filterBucket(items, (it) => {
+      const key = canonicalizeNameForMatch(it.name)
+      if (!key) return false
+      if (medNames.has(key) && !knownSupplements.has(key)) return false
+      return true
+    })
+  supplements.working = stripIfInMedications(supplements.working || [])
+  supplements.suggested = stripIfInMedications(supplements.suggested || [])
+  supplements.avoid = stripIfInMedications(supplements.avoid || [])
+
+  output.supplements = supplements
+  output.medications = medications
+  return output
+}
+
 function dedupeReportSections(
   sections: Record<ReportSectionKey, ReportSectionBucket>
 ): Record<ReportSectionKey, ReportSectionBucket> {
@@ -2825,6 +3009,9 @@ Rules:
 - Use real signals from the JSON data. No generic advice.
 - Do not claim you can measure “sleep consistency” unless the JSON includes real sleep tracking data. If sleep data is missing, do not mention sleep consistency at all.
 - Supplements section rules:
+  - Do NOT put medications in the Supplements section. If an item is in medications JSON, it must go in the Medications section (or be omitted if unclear).
+  - Do NOT “suggest” or “avoid” a supplement the user already takes (as listed in the supplements JSON). If they already take it, it can only appear in supplements.working.
+  - Do not repeat the same supplement across working/suggested/avoid. Pick the single best bucket.
   - If the JSON includes 6+ supplements, include at least 6 supplement items across supplements.working + supplements.suggested (unless the JSON is missing supplement names).
   - For each supplement item you include: use the exact supplement name from JSON, mention dosage/timing if provided, and tie it to at least one named goal/issue from JSON when possible.
   - If a supplement name is unclear (brand blend / unknown ingredients), say you can’t connect it confidently yet and avoid guessing ingredients.
@@ -2932,7 +3119,7 @@ ${llmPayloadJson}
     }
   })
 
-  reportPayload.sections = dedupeReportSections(sections)
+  reportPayload.sections = dedupeReportSections(sanitizeSupplementAndMedicationSections(sections, reportContext))
   reportPayload.wins = wins
   reportPayload.gaps = gaps
   if (!summaryText) {
