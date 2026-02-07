@@ -9270,6 +9270,7 @@ export default function Onboarding() {
   const { data: session, status } = useSession();
   const { profileImage: providerProfileImage, updateUserData } = useUserData();
   const router = useRouter();
+  const appleLinkPromptCheckedRef = useRef(false);
   
   // ⚠️ HEALTH SETUP GUARD RAIL
   // This onboarding component is part of a carefully tuned flow:
@@ -9322,6 +9323,75 @@ export default function Onboarding() {
   const goalChoiceTouchedRef = useRef(false);
   const goalIntensityTouchedRef = useRef(false);
   const birthdateTouchedRef = useRef(false);
+
+  // Apple login linking prompt:
+  // If the user is about to start Health Setup (onboarding) and Apple login is available,
+  // we encourage them to link Apple now to avoid accidental "second account" issues later.
+  //
+  // This is intentionally placed on the onboarding page (not only on the sign-in page),
+  // because the post-login redirect may take users straight to /onboarding.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    if (appleLinkPromptCheckedRef.current) return;
+    appleLinkPromptCheckedRef.current = true;
+
+    const shouldSkipAppleLinkPrompt = () => {
+      try {
+        if (localStorage.getItem('helfi:skipAppleLinkPrompt') === '1') return true;
+        const untilRaw = localStorage.getItem('helfi:skipAppleLinkPromptUntil');
+        if (untilRaw) {
+          const until = Number(untilRaw);
+          if (Number.isFinite(until) && until > Date.now()) return true;
+        }
+      } catch {
+        // Ignore storage errors
+      }
+      return false;
+    };
+
+    const run = async () => {
+      if (shouldSkipAppleLinkPrompt()) return;
+
+      // Only prompt before Health Setup is complete.
+      try {
+        const hsRes = await fetch('/api/health-setup-status', { method: 'GET' });
+        if (hsRes.ok) {
+          const hsData = await hsRes.json();
+          if (hsData?.complete === true) return;
+        }
+      } catch {
+        // If this fails, don't block the page.
+      }
+
+      // Check if Apple provider is enabled on this environment.
+      let hasAppleProvider = false;
+      try {
+        const providersRes = await fetch('/api/auth/providers', { method: 'GET' });
+        if (providersRes.ok) {
+          const providers = await providersRes.json();
+          hasAppleProvider = Boolean((providers as any)?.apple);
+        }
+      } catch {
+        hasAppleProvider = false;
+      }
+      if (!hasAppleProvider) return;
+
+      // If not linked yet, redirect to the link prompt page.
+      try {
+        const linkRes = await fetch('/api/auth/apple/link/status', { method: 'GET' });
+        if (!linkRes.ok) return;
+        const linkData = await linkRes.json();
+        const linked = Boolean(linkData?.linked);
+        if (!linked) {
+          window.location.replace('/auth/link-apple?next=/onboarding');
+        }
+      } catch {
+        // If this fails, don't block the page.
+      }
+    };
+
+    void run();
+  }, [status]);
 
   const markUnsavedChanges = useCallback(() => {
     setHasGlobalUnsavedChanges(true);
