@@ -38,6 +38,9 @@ Put this at the TOP of `CURRENT_ISSUES_LIVE.md`:
 ```
 DEPLOYED (STAGING):
 - Date/time:
+- Branch name:
+- Commit id:
+- Vercel deployment link:
 - What changed:
 - Where to see it (page/link):
 - What to quickly test:
@@ -60,6 +63,9 @@ Rules:
 ```
 DEPLOYED (LIVE):
 - Date/time:
+- Branch name:
+- Commit id:
+- Vercel deployment link:
 - What changed:
 - What to quickly test:
 ```

@@ -27,7 +27,7 @@ New rule:
 1. Any agent may deploy to staging (https://stg.helfi.ai).
 2. Live (https://helfi.ai) is stricter: only deploy live if the owner clearly says “deploy live”.
 3. Every staging deploy must be ONE task at a time (do not bundle unrelated changes).
-4. After any deploy, the agent must verify Vercel is READY, then write a short `DEPLOYED` note at the TOP of `CURRENT_ISSUES_LIVE.md`.
+4. After any deploy, the agent must verify Vercel is READY, then write a short `DEPLOYED` note at the TOP of `CURRENT_ISSUES_LIVE.md` including the branch name and commit id.
 
 Why the “one task per deploy” rule matters:
 - If staging has 10 changes and the owner only wants 2 of them live, the only safe way is if those changes were kept separate.
