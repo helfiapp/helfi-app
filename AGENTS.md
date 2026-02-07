@@ -11,10 +11,35 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 1. The owner is not a developer or coder. Always respond in simple, easy-to-understand English and avoid technical language.
 2. Never assume technical knowledge. Explain things as if the reader is computer illiterate.
 
+## Quick Handover File
+
+After reading this file, also read `PROJECT_STATUS.md` for the current state of the project.
+
 ## Deployment Rules
 
-1. Work is never done locally. All changes must be deployed to staging at https://stg.helfi.ai unless the owner explicitly asks for live.
-2. If the owner asks for live, deploy to the live site.
+The owner prefers simple “just ship it” while the app is still being built and only the owner is using it.
+
+1. Default: deploy straight to LIVE (https://helfi.ai).
+2. Staging (https://stg.helfi.ai) is optional. Use it only if the owner asks, or if you believe the change is risky and you want to test safely first.
+
+### One Task Per Deploy (Very Important)
+
+1. Only deploy ONE task at a time.
+2. Do not mix unrelated changes into the same deploy.
+3. If you have other unfinished changes sitting in your folder, do NOT deploy until they are removed from the deploy (so they don’t get shipped by accident).
+
+### Required Note After Any Deploy (copy/paste)
+
+After the deploy is READY, add this at the TOP of `CURRENT_ISSUES_LIVE.md`:
+
+```
+DEPLOYED:
+- LIVE or STAGING:
+- Date/time:
+- What changed:
+- Where to see it (page/link):
+- What to quickly test:
+```
 
 ## Before You Start
 
