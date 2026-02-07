@@ -263,9 +263,32 @@ export default function SignIn() {
               return false
             }
 
-            if (appleEnabled && !shouldSkipAppleLinkPrompt()) {
-              router.replace('/auth/link-apple?next=/onboarding')
-              return
+            // IMPORTANT: don't rely on component state (appleEnabled) here, because it can still be loading.
+            // Instead, check providers + link status directly to avoid race conditions.
+            if (!shouldSkipAppleLinkPrompt()) {
+              let hasAppleProvider = false
+              try {
+                const providers = await getProviders()
+                hasAppleProvider = Boolean((providers as any)?.apple)
+              } catch {
+                hasAppleProvider = false
+              }
+
+              if (hasAppleProvider) {
+                try {
+                  const linkRes = await fetch('/api/auth/apple/link/status', { method: 'GET' })
+                  if (linkRes.ok) {
+                    const linkData = await linkRes.json()
+                    const linked = Boolean(linkData?.linked)
+                    if (!linked) {
+                      router.replace('/auth/link-apple?next=/onboarding')
+                      return
+                    }
+                  }
+                } catch {
+                  // If link check fails, don't block onboarding.
+                }
+              }
             }
 
             router.replace('/onboarding')
@@ -293,7 +316,7 @@ export default function SignIn() {
     }
 
     void resume()
-  }, [status, router, installPromptVisible, session, appleEnabled])
+  }, [status, router, installPromptVisible, session])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
