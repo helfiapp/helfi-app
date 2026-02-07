@@ -46,3 +46,11 @@ npm run ios
 cd native
 npm run android
 ```
+
+## How to test it (non-developer friendly)
+If you don't want to use Terminal/Expo Go, we can provide TestFlight builds.
+
+TestFlight testing looks like:
+1. Install the app from TestFlight
+2. Open it like a normal iPhone app
+3. Test login/onboarding/dashboard
