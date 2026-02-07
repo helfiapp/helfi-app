@@ -7,6 +7,7 @@ import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+import { setSessionToken } from '../auth/session'
 
 const isLikelyEmail = (value: string) => {
   const v = value.trim()
@@ -34,10 +35,21 @@ export function LoginScreen() {
       return
     }
 
-    // First version: we switch the app into “signed in” mode.
-    // Next step (next ticket) is wiring this to real Helfi backend login + saving the session.
     setBusy(true)
     try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/native/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.token) {
+        Alert.alert('Login failed', data?.error || 'Please check your email and password and try again.')
+        return
+      }
+
+      await setSessionToken(String(data.token))
       setUserEmail(normalizedEmail)
       setMode('signedIn')
     } finally {
@@ -132,4 +144,3 @@ export function LoginScreen() {
     </Screen>
   )
 }
-

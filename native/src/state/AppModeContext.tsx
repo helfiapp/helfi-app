@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useMemo, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+
+import { getSessionToken } from '../auth/session'
 
 export type AppMode = 'signedOut' | 'signedIn' | 'demo'
 
@@ -15,6 +17,17 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<AppMode>('signedOut')
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const value = useMemo(() => ({ mode, setMode, userEmail, setUserEmail }), [mode, userEmail])
+
+  useEffect(() => {
+    // On app start, try to restore an existing session token so the user stays logged in.
+    ;(async () => {
+      const token = await getSessionToken()
+      if (token) {
+        setMode('signedIn')
+      }
+    })()
+  }, [])
+
   return <AppModeContext.Provider value={value}>{children}</AppModeContext.Provider>
 }
 

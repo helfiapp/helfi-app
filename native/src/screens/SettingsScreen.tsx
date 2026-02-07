@@ -6,6 +6,7 @@ import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+import { clearSessionToken } from '../auth/session'
 
 export function SettingsScreen() {
   const { mode, setMode, userEmail, setUserEmail } = useAppMode()
@@ -17,6 +18,7 @@ export function SettingsScreen() {
         text: 'Log out',
         style: 'destructive',
         onPress: () => {
+          clearSessionToken().catch(() => {})
           setUserEmail(null)
           setMode('signedOut')
         },
