@@ -232,6 +232,9 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
   const dailyStats = (parsedSummary as any)?.dailyStats as Array<any> | undefined
   const symptomSummary = (parsedSummary as any)?.symptomSummary as any
   const exerciseSummary = (parsedSummary as any)?.exerciseSummary as any
+  const supplementsList = (parsedSummary as any)?.supplements as
+    | Array<{ name?: string; dosage?: string; timing?: string }>
+    | undefined
   const labTrends = (parsedSummary as any)?.labTrends as
     | Array<{
         name?: string
@@ -901,6 +904,31 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             </button>
           ))}
         </div>
+
+        {activeTab === 'supplements' && Array.isArray(supplementsList) && supplementsList.length > 0 ? (
+          <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-emerald-900">Your supplements</h2>
+            <p className="mt-2 text-sm text-emerald-800">
+              This is your current supplement list. The report text below should explain what looks helpful for your goals.
+            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {supplementsList.map((s, idx) => (
+                <div key={`${s?.name || 'supplement'}-${idx}`} className="rounded-xl border border-emerald-100 bg-white p-4">
+                  <div className="font-semibold text-emerald-950">{replaceIsoDates(String(s?.name || 'Supplement'))}</div>
+                  {(s?.dosage || s?.timing) ? (
+                    <div className="mt-1 text-sm text-emerald-900/80">
+                      {s?.dosage ? `Dose: ${s.dosage}` : 'Dose: -'}
+                      {' • '}
+                      {s?.timing ? `Timing: ${s.timing}` : 'Timing: -'}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-sm text-emerald-900/80">Dose/timing not set</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div id="sections" className="mt-6 grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1 space-y-4">

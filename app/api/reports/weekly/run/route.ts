@@ -2824,6 +2824,10 @@ Rules:
 - Each item should be two short lines: line 1 = what happened and why it matters, line 2 = clear next step.
 - Use real signals from the JSON data. No generic advice.
 - Do not claim you can measure “sleep consistency” unless the JSON includes real sleep tracking data. If sleep data is missing, do not mention sleep consistency at all.
+- Supplements section rules:
+  - If the JSON includes 6+ supplements, include at least 6 supplement items across supplements.working + supplements.suggested (unless the JSON is missing supplement names).
+  - For each supplement item you include: use the exact supplement name from JSON, mention dosage/timing if provided, and tie it to at least one named goal/issue from JSON when possible.
+  - If a supplement name is unclear (brand blend / unknown ingredients), say you can’t connect it confidently yet and avoid guessing ingredients.
 - Use insightCandidates, correlationSignals, trendSignals, and riskFlags as your primary signals when available.
 - Use nutritionSummary.topFoods, foodHighlights, and dailyStats.topFoods to name actual foods (not just calories).
 - Do not ask the user what they ate or to log meals. Use the foods already in the data.
@@ -2948,6 +2952,8 @@ ${llmPayloadJson}
       status: 'LOCKED',
       summary: 'Your weekly report is ready to unlock with a subscription or top-up credits.',
       dataSummary: {
+        supplements: reportContext.supplements,
+        medications: reportContext.medications,
         coverage,
         dataWarning,
         talkToAiSummary,
@@ -2984,6 +2990,8 @@ ${llmPayloadJson}
     status: 'READY',
     summary: summaryText,
     dataSummary: {
+      supplements: reportContext.supplements,
+      medications: reportContext.medications,
       coverage,
       dataWarning,
       talkToAiSummary,
