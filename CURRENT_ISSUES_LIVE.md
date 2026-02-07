@@ -3,7 +3,7 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 2026-02-07
-- What changed: Added REQUIRED agent coordination rules (use Linear project "Helfi Dev" to avoid conflicts; only one "Ready to deploy" at a time).
+- What changed: Added REQUIRED agent coordination rules (use Linear project "Helfi Dev" to avoid conflicts; only one "Ready to deploy" at a time). Clarified that on this setup all agents share the same Mac/login so they should not ask for emails/invites.
 - Where to see it (page/link): Repo docs: `AGENTS.md` + `PROJECT_STATUS.md`
 - What to quickly test: Open `AGENTS.md` and confirm the new "Agent Coordination (REQUIRED)" section is present. New agents should follow it before starting work or deploying.
 
