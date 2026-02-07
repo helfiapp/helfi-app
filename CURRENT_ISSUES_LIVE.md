@@ -2,6 +2,13 @@
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-07 19:05 AEDT
+- What changed: Deployed HEL-7 so the “Link your Apple login” pop-up shows reliably on onboarding (and doesn’t silently fail right after login).
+- Where to see it (page/link): https://helfi.ai/onboarding
+- What to quickly test: Log in, go to onboarding: confirm the pop-up appears. Click “Link Apple login” and confirm it starts the Apple link flow. Click “Skip/Not now” and confirm it closes.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-07 18:36 AEDT
 - What changed: Deployed the fix for HEL-5 so Health Setup does NOT run “Updating insights…” in the background unless the user actually changed something (QA PASS).
 - Where to see it (page/link): https://helfi.ai/onboarding
