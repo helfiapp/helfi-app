@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ai.helfi.app"
+      "bundleIdentifier": "ai.helfi.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -31,6 +34,11 @@
     "scheme": "helfi",
     "plugins": [
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2bead564-455e-49bb-b8d9-f6b1edbf197a"
+      }
+    }
   }
 }
