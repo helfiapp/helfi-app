@@ -1167,17 +1167,9 @@ function GenderStep({ onNext, initial, initialAgreed, onPartialSave }: { onNext:
   const handleAgreedChange = (checked: boolean) => {
     setAgreed(checked);
     localStorage.setItem('helfi-terms-agreed', checked.toString());
+    // Only save when the user actually changes something.
+    onPartialSave?.({ termsAccepted: checked });
   };
-
-  // Persist gender/consent selections immediately so navigating away retains them
-  useEffect(() => {
-    if (onPartialSave) {
-      onPartialSave({
-        gender: gender || initial || '',
-        termsAccepted: agreed,
-      });
-    }
-  }, [gender, agreed, initial, onPartialSave]);
   
   return (
     <div className="max-w-md mx-auto">
@@ -1188,13 +1180,21 @@ function GenderStep({ onNext, initial, initialAgreed, onPartialSave }: { onNext:
         <div className="flex gap-4 mb-6">
           <button
             className={`flex-1 p-4 rounded border ${gender === 'male' ? 'bg-green-600 text-white' : 'border-green-600 text-green-600 hover:bg-green-50'}`}
-            onClick={() => setGender('male')}
+            onClick={() => {
+              setGender('male');
+              // Only save when the user actually changes something.
+              onPartialSave?.({ gender: 'male' });
+            }}
           >
             Male
           </button>
           <button
             className={`flex-1 p-4 rounded border ${gender === 'female' ? 'bg-green-600 text-white' : 'border-green-600 text-green-600 hover:bg-green-50'}`}
-            onClick={() => setGender('female')}
+            onClick={() => {
+              setGender('female');
+              // Only save when the user actually changes something.
+              onPartialSave?.({ gender: 'female' });
+            }}
           >
             Female
           </button>
