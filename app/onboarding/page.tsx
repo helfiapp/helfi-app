@@ -10379,6 +10379,32 @@ export default function Onboarding() {
           </div>
         </div>
       )}
+      {showAppleLinkModal && (
+        <div className="fixed inset-0 z-[101] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl p-6">
+            <h2 className="text-lg font-semibold text-gray-900">Link your Apple login</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              This makes iPhone login faster and helps prevent accidentally creating a second Helfi account later.
+            </p>
+            <div className="mt-6 space-y-3">
+              <button
+                type="button"
+                onClick={handleAppleLinkNow}
+                className="w-full inline-flex items-center justify-center rounded-md bg-black text-white px-4 py-2 font-medium hover:opacity-90"
+              >
+                Link Apple login
+              </button>
+              <button
+                type="button"
+                onClick={handleAppleLinkSkip}
+                className="w-full inline-flex items-center justify-center rounded-md border border-gray-300 bg-white text-gray-800 px-4 py-2 font-medium hover:bg-gray-50"
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="min-h-full flex flex-col max-w-full">
         {/* Sophisticated Progress with Numbered Steps */}
         <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-8 py-3 safe-area-inset-top z-50">
