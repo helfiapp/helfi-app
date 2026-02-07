@@ -2,6 +2,13 @@
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-07 18:36 AEDT
+- What changed: Deployed the fix for HEL-5 so Health Setup does NOT run “Updating insights…” in the background unless the user actually changed something (QA PASS).
+- Where to see it (page/link): https://helfi.ai/onboarding
+- What to quickly test: Log out, log back in, do not click anything: the “Updating insights…” message should NOT appear. Then change one field and confirm it DOES appear.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-07 16:12 AEDT
 - What changed: Added “no more authorize drama” rules: project link, do NOT log Linear out, and what to do if the wrong Linear workspace shows up.
 - Where to see it (page/link): Repo docs: `AGENTS.md` + `PROJECT_STATUS.md`
