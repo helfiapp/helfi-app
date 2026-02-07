@@ -15,6 +15,15 @@ Last updated: Feb 7, 2026
 - Vercel deployments page: `https://vercel.com/louie-veleskis-projects/helfi-app/deployments`
 - Deployment status script (must be used after pushes): `./scripts/check-deployment-status.sh`
 
+## Agent Coordination (Required)
+
+We coordinate work in one shared Linear project named: `Helfi Dev`.
+
+Rules:
+1. Every agent must claim ONE ticket and move it to `Doing` before starting.
+2. Only ONE ticket can be `Ready to deploy` at a time. If someone else is already `Ready to deploy`, wait.
+3. After a deploy is confirmed READY in Vercel, the agent must move the ticket to `Deployed` and write the `DEPLOYED:` note at the top of `CURRENT_ISSUES_LIVE.md`.
+
 ## Deployment Rule (Live-First During Development)
 The owner is the only current user, and prefers simple “ship it” workflows.
 
@@ -36,4 +45,3 @@ Before changing sensitive areas, read:
 - `GUARD_RAILS.md`
 - `WAITLIST_EMAIL_PROTECTION.md`
 - `HEALTH_SETUP_PROTECTION.md`
-

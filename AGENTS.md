@@ -15,6 +15,37 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 
 After reading this file, also read `PROJECT_STATUS.md` for the current state of the project.
 
+## Agent Coordination (REQUIRED - To Avoid Conflicts)
+
+We have had problems with multiple agents working at the same time and deploying at random times.
+To prevent conflicts, every agent MUST coordinate in ONE place:
+
+Linear project name: `Helfi Dev`
+
+If you do not have access to Linear yet, do NOT start work. Ask the owner for a Linear invite/link.
+
+### Required Columns (Use These Exact Names)
+
+- `Doing`
+- `Blocked`
+- `Ready to deploy`
+- `Deployed`
+
+### Required Rules (Must Follow)
+
+1. Before you start any work:
+- Pick ONE Linear ticket (or create one) for the ONE task you will do.
+- Move it to `Doing`.
+- Comment what area you will touch (example: “onboarding page”, “food diary”, “admin UI”, “billing/credits”).
+
+2. Before you deploy (very important):
+- Move your ticket to `Ready to deploy`.
+- If ANY other ticket is already in `Ready to deploy`, you MUST NOT deploy yet. Wait and comment that you are waiting.
+
+3. After your deploy is confirmed READY in Vercel:
+- Move your ticket to `Deployed`.
+- Add the required `DEPLOYED:` note at the TOP of `CURRENT_ISSUES_LIVE.md` (template is below in this file).
+
 ## Deployment Rules
 
 The owner prefers simple “just ship it” while the app is still being built and only the owner is using it.
