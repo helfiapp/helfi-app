@@ -9294,6 +9294,7 @@ export default function Onboarding() {
   const formRef = useRef<any>({});
   const [allowAutosave, setAllowAutosave] = useState(false);
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
+  const [showAppleLinkModal, setShowAppleLinkModal] = useState(false);
   const [hasGlobalUnsavedChanges, setHasGlobalUnsavedChanges] = useState(false);
   const hasGlobalUnsavedChangesRef = useRef(false);
   const [showGlobalUpdatePopup, setShowGlobalUpdatePopup] = useState(false);
@@ -9324,19 +9325,16 @@ export default function Onboarding() {
   const goalIntensityTouchedRef = useRef(false);
   const birthdateTouchedRef = useRef(false);
 
-  // Apple login linking prompt:
-  // If the user is about to start Health Setup (onboarding) and Apple login is available,
-  // we encourage them to link Apple now to avoid accidental "second account" issues later.
-  //
-  // This is intentionally placed on the onboarding page (not only on the sign-in page),
-  // because the post-login redirect may take users straight to /onboarding.
   useEffect(() => {
     if (status !== 'authenticated') return;
+    if (showFirstTimeModal) return; // don't stack modals; wait for the first-time modal to close
+    if (showAppleLinkModal) return;
     if (appleLinkPromptCheckedRef.current) return;
     appleLinkPromptCheckedRef.current = true;
 
     const shouldSkipAppleLinkPrompt = () => {
       try {
+        if (sessionStorage.getItem('helfi:appleLinkPromptShownThisSession') === '1') return true;
         if (localStorage.getItem('helfi:skipAppleLinkPrompt') === '1') return true;
         const untilRaw = localStorage.getItem('helfi:skipAppleLinkPromptUntil');
         if (untilRaw) {
@@ -9376,14 +9374,14 @@ export default function Onboarding() {
       }
       if (!hasAppleProvider) return;
 
-      // If not linked yet, redirect to the link prompt page.
+      // If not linked yet, show the modal prompt (more reliable than redirects).
       try {
         const linkRes = await fetch('/api/auth/apple/link/status', { method: 'GET' });
         if (!linkRes.ok) return;
         const linkData = await linkRes.json();
         const linked = Boolean(linkData?.linked);
         if (!linked) {
-          window.location.replace('/auth/link-apple?next=/onboarding');
+          setShowAppleLinkModal(true);
         }
       } catch {
         // If this fails, don't block the page.
@@ -9391,7 +9389,25 @@ export default function Onboarding() {
     };
 
     void run();
-  }, [status]);
+  }, [status, showFirstTimeModal, showAppleLinkModal]);
+
+  const handleAppleLinkSkip = () => {
+    try {
+      sessionStorage.setItem('helfi:appleLinkPromptShownThisSession', '1');
+    } catch {}
+    try {
+      // Don't keep nagging: skip for 30 days.
+      localStorage.setItem('helfi:skipAppleLinkPromptUntil', String(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    } catch {}
+    setShowAppleLinkModal(false);
+  };
+
+  const handleAppleLinkNow = () => {
+    try {
+      sessionStorage.setItem('helfi:appleLinkPromptShownThisSession', '1');
+    } catch {}
+    window.location.assign('/api/auth/apple/link/authorize?next=/onboarding');
+  };
 
   const markUnsavedChanges = useCallback(() => {
     setHasGlobalUnsavedChanges(true);
