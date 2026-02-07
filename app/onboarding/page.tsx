@@ -9481,6 +9481,9 @@ export default function Onboarding() {
   const scheduleBackgroundInsightsRegen = useCallback(
     (sourceForm?: any) => {
       if (!AUTO_UPDATE_INSIGHTS_ON_EXIT) return;
+      // Guard rail: only regenerate insights when the user actually changed something.
+      // This prevents background updates (and AI usage) from running on login/refresh when nothing changed.
+      if (!hasGlobalUnsavedChangesRef.current) return;
       if (backgroundRegenTimerRef.current) {
         clearTimeout(backgroundRegenTimerRef.current);
       }
@@ -9990,16 +9993,40 @@ export default function Onboarding() {
 
   const persistForm = useCallback(
     (partial: any) => {
-      if (typeof partial?.goalChoice === 'string' && partial.goalChoice.trim()) {
-        goalChoiceTouchedRef.current = true;
-      }
-      if (typeof partial?.goalIntensity === 'string' && partial.goalIntensity.trim()) {
-        goalIntensityTouchedRef.current = true;
-      }
-      if (typeof partial?.birthdate === 'string' && partial.birthdate.trim()) {
-        birthdateTouchedRef.current = true;
-      }
+      if (!partial || typeof partial !== 'object') return;
       setForm((prev: any) => {
+        // If this "partial save" doesn't actually change anything, do nothing.
+        // This is critical because some steps call onPartialSave during hydration,
+        // which should NOT trigger saves or insight updates.
+        let changed = false;
+        try {
+          const keys = Object.keys(partial);
+          for (const key of keys) {
+            const before = stableStringify(normalizeForComparison(prev?.[key]));
+            const after = stableStringify(normalizeForComparison(partial?.[key]));
+            if (before !== after) {
+              changed = true;
+              break;
+            }
+          }
+        } catch {
+          changed = true;
+        }
+        if (!changed) {
+          formRef.current = prev;
+          return prev;
+        }
+
+        if (typeof partial?.goalChoice === 'string' && partial.goalChoice.trim()) {
+          goalChoiceTouchedRef.current = true;
+        }
+        if (typeof partial?.goalIntensity === 'string' && partial.goalIntensity.trim()) {
+          goalIntensityTouchedRef.current = true;
+        }
+        if (typeof partial?.birthdate === 'string' && partial.birthdate.trim()) {
+          birthdateTouchedRef.current = true;
+        }
+
         let next = { ...prev, ...partial };
         if (shouldStampHealthSetup(partial)) {
           next = { ...next, healthSetupUpdatedAt: nextHealthSetupUpdateStamp() };
@@ -10050,11 +10077,8 @@ export default function Onboarding() {
     };
   }, [allowAutosave, form, updateUserData]);
 
-  // Once autosave is allowed (after data load), push current form to backend to avoid blanks
-  useEffect(() => {
-    if (!allowAutosave || SAVE_HEALTH_SETUP_ON_LEAVE_ONLY) return;
-    debouncedSave(form);
-  }, [allowAutosave, debouncedSave, form]);
+  // Important: do NOT auto-save on login/refresh unless the user actually changed something.
+  // Autosaves are triggered by persistForm when the user edits fields.
 
   useEffect(() => {
     const scrollToTop = () => {
