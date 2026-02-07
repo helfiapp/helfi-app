@@ -8,12 +8,19 @@ import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 
 export function SettingsScreen() {
-  const { mode, setMode } = useAppMode()
+  const { mode, setMode, userEmail, setUserEmail } = useAppMode()
 
-  const reset = () => {
-    Alert.alert('Reset app mode?', 'This will take you back to the welcome screen.', [
+  const logOut = () => {
+    Alert.alert('Log out?', 'This will take you back to the login screen.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: () => setMode('signedOut') },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: () => {
+          setUserEmail(null)
+          setMode('signedOut')
+        },
+      },
     ])
   }
 
@@ -30,15 +37,19 @@ export function SettingsScreen() {
       >
         <Text style={{ fontSize: 20, fontWeight: '800', color: theme.colors.text }}>Settings</Text>
         <Text style={{ marginTop: theme.spacing.sm, color: theme.colors.muted, fontSize: 14, lineHeight: 20 }}>
-          Mode: {mode === 'demo' ? 'Demo' : 'Signed out'}
+          Mode: {mode === 'demo' ? 'Demo' : mode === 'signedIn' ? 'Signed in' : 'Signed out'}
         </Text>
+        {userEmail ? (
+          <Text style={{ marginTop: theme.spacing.sm, color: theme.colors.muted, fontSize: 14, lineHeight: 20 }}>
+            Logged in as: {userEmail}
+          </Text>
+        ) : null}
         <Text style={{ marginTop: theme.spacing.sm, color: theme.colors.muted, fontSize: 14, lineHeight: 20 }}>
           Connected to: {API_BASE_URL}
         </Text>
 
-        <HelfiButton label="Reset" onPress={reset} variant="secondary" style={{ marginTop: theme.spacing.lg }} />
+        <HelfiButton label="Log out" onPress={logOut} variant="secondary" style={{ marginTop: theme.spacing.lg }} />
       </View>
     </Screen>
   )
 }
-
