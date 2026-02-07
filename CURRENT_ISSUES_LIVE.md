@@ -5,6 +5,20 @@
 
 ---
 
+## DEPLOYED (LIVE) - 2026-02-07
+
+**What changed (simple)**:
+- Health Setup will no longer run “Updating insights…” in the background unless you actually changed something.
+- The Gender + Terms step will no longer auto-save on page load. It only saves when you click Male/Female or tick the checkbox.
+
+**Where to see it**:
+- https://helfi.ai/onboarding
+
+**What to quickly test**:
+- Log out, log back in, do not change anything: you should NOT see “Updating insights…” appear.
+- On step 1 (Gender): clicking Male/Female should still work as normal.
+- Ticking Terms should still work as normal.
+
 ## **🔥 CRITICAL ISSUES**
 
 ### **1. 📱 ACCORDION DROPDOWN MISALIGNMENT - MOBILE ONLY**
