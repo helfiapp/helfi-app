@@ -15,39 +15,54 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 
 After reading this file, also read `PROJECT_STATUS.md` for the current state of the project.
 
-## If You Are The New Gatekeeper
-
-If the owner says you are the gatekeeper:
-1. You are the only agent allowed to deploy.
-2. Check `CURRENT_ISSUES_LIVE.md` for notes from other agents before deploying.
-3. Deploy one change at a time, and verify the deployment is READY before reporting success.
-
 ## Deployment Rules
 
-1. Work is never done locally. All changes must be deployed to staging at https://stg.helfi.ai unless the owner explicitly asks for live.
-2. If the owner asks for live, deploy to the live site.
+1. Default: deploy to staging at https://stg.helfi.ai
+2. Live (https://helfi.ai): only deploy live if the owner clearly says “deploy live”.
 
-## Only One Deployer (Very Important)
+## Staging Deploys (Allowed For Any Agent)
 
-To prevent confusion when multiple agents work at the same time:
+The owner decided “gatekeeper only” is too slow.
 
-1. Only **one** agent is allowed to deploy (push changes that trigger a Vercel deploy).
-2. All other agents must **not deploy**.
-3. If you are not the “deployment owner” agent, you must stop before any deploy step and leave handover notes (see below).
+Any agent may deploy to staging, but you MUST follow these rules so it does not become messy:
 
-**Current rule (as of Feb 6, 2026):**
-- The deployment owner is the agent working directly with the owner in this thread.
-- Other agents must only prepare changes and leave notes.
+1. Deploy only ONE task at a time.
+2. Do not mix unrelated changes into the same deploy.
+3. After you deploy, you MUST verify Vercel shows the deployment state is READY (do not guess).
+4. After it is READY, you MUST write a note at the TOP of `CURRENT_ISSUES_LIVE.md` using the template below.
 
-## Handover Notes (Required For Non‑Deploying Agents)
+### Required Note After Staging Deploy (copy/paste)
 
-If you are not deploying, you must write a short note into `CURRENT_ISSUES_LIVE.md` that includes:
-1. What you changed (simple English).
-2. Which pages/features it affects.
-3. What needs testing.
-4. If you pushed code somewhere, include the branch name or PR link.
+Put this at the TOP of `CURRENT_ISSUES_LIVE.md`:
 
-Then stop. Do not deploy.
+```
+DEPLOYED (STAGING):
+- Date/time:
+- What changed:
+- Where to see it (page/link):
+- What to quickly test:
+- Any risk / rollback note (if relevant):
+```
+
+Then stop.
+
+## Live Deploys (Stricter)
+
+Live is the public site: https://helfi.ai
+
+Rules:
+1. Only deploy live if the owner clearly says “deploy live”.
+2. If there were MANY staging deploys, do NOT push “everything” to live unless the owner wants everything.
+3. If the owner wants only SOME of the staging changes to go live, you must keep changes separated (one task per deploy).
+   - If multiple tasks were bundled together, you cannot safely send only “part of it” to live.
+4. After you deploy live, verify Vercel is READY, then write a note at the TOP of `CURRENT_ISSUES_LIVE.md`:
+
+```
+DEPLOYED (LIVE):
+- Date/time:
+- What changed:
+- What to quickly test:
+```
 
 ## Before You Start
 

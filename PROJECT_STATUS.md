@@ -20,40 +20,18 @@ Last updated: Feb 6, 2026 (AEDT)
 - Vercel deployments page: `https://vercel.com/louie-veleskis-projects/helfi-app/deployments`
 - Deployment status script (must be used after pushes): `./scripts/check-deployment-status.sh`
 
-## Deployment Rule (Stops “Spaghetti”)
-- Only one agent is allowed to deploy.
-- Other agents must not deploy.
-- Non-deploying agents must leave handover notes (see below) and stop.
+## Deployment Rule (Option 1: Fast Staging Deploys)
+The owner decided “one gatekeeper” was too slow.
 
-## If You Need A New “Gatekeeper” Agent Later
-This is how you replace the gatekeeper safely if the current agent gets confused, starts making mistakes, or you just want to swap agents.
+New rule:
+1. Any agent may deploy to staging (https://stg.helfi.ai).
+2. Live (https://helfi.ai) is stricter: only deploy live if the owner clearly says “deploy live”.
+3. Every staging deploy must be ONE task at a time (do not bundle unrelated changes).
+4. After any deploy, the agent must verify Vercel is READY, then write a short `DEPLOYED` note at the TOP of `CURRENT_ISSUES_LIVE.md`.
 
-What you do (simple):
-1. Start a new chat with a new agent.
-2. Copy/paste the message below to make them the gatekeeper.
-3. Tell them: “Before you deploy anything, check what other agents left in `CURRENT_ISSUES_LIVE.md`.”
-
-Copy/paste message (this appoints the gatekeeper):
-```
-You are the gatekeeper for this project.
-Read `config.toml`, then `AGENTS.md`, then `PROJECT_STATUS.md`.
-Do not deploy live unless I say so.
-Before deploying anything, check `CURRENT_ISSUES_LIVE.md`.
-```
-
-What the new gatekeeper must do (agent instructions):
-1. Confirm what is currently deployed by checking the Vercel deployments page.
-2. Before any deploy, check if there are unfinished local changes sitting in the folder.
-3. Deploy only one “bundle” of changes at a time, then verify the deployment is READY.
-
-## Handover Notes (For Any Agent Who Is Not Deploying)
-Write a short note into `CURRENT_ISSUES_LIVE.md`:
-1. What you changed (simple English).
-2. Which pages/features it affects.
-3. What needs testing.
-4. If you pushed code, include where (branch name or PR link).
-
-Then stop. Do not deploy.
+Why the “one task per deploy” rule matters:
+- If staging has 10 changes and the owner only wants 2 of them live, the only safe way is if those changes were kept separate.
+- If changes are bundled together, you cannot reliably send only “part of it” to live without breaking things.
 
 ## Native App (Phone App)
 - Location: `native/`
@@ -65,11 +43,12 @@ Then stop. Do not deploy.
 - On staging it shows an Apple button, but it stays disabled until Apple setup is completed in the Apple Developer account (the required Apple keys and website settings).
 
 ## Important Warning (If Another Agent Pushes To Live)
-If another agent pushes to the live branch without you asking, it breaks the “one deployer” rule.
+If an agent deploys live without you asking, it can accidentally ship unfinished work publicly.
 
 What you do:
-1. Tell that agent: “Stop deploying. Leave notes in `CURRENT_ISSUES_LIVE.md` only.”
-2. Tell the gatekeeper agent to check Vercel and confirm what changed.
+1. Tell that agent: “Stop deploying live.”
+2. Ask them to leave a note in `CURRENT_ISSUES_LIVE.md` explaining what they shipped.
+3. Use the Vercel deployments page to confirm exactly what changed.
 
 ## Protected Areas (Do Not Change Without Explicit Owner Approval)
 Before changing sensitive areas, read:
