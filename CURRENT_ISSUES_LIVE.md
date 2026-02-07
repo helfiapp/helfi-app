@@ -1,3 +1,10 @@
+DEPLOYED:
+- LIVE:
+- Date/time: Sun Feb 8 00:36 AEDT 2026
+- What changed: Added Guzman y Gomez (Australia) fast-food menu items (official nutrition) so they show in search with calories + macros, with size dropdown where available.
+- Where to see it (page/link): https://helfi.ai (Food Diary -> Add ingredient search)
+- What to quickly test: Search "Guzman"; pick an item; confirm calories/protein/carbs/fat show. Search "Fries - Chipotle Seasoning" and confirm Medium/Large/Family dropdown.
+
 # 🚨 CURRENT LIVE ISSUES - HELFI.AI
 
 DEPLOYED:
