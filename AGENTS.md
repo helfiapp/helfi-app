@@ -32,10 +32,17 @@ If Linear does not load inside Codex:
 
 ### Required Columns (Use These Exact Names)
 
+Preferred (ideal) columns:
 - `Doing`
 - `Blocked`
 - `Ready to deploy`
 - `Deployed`
+
+If Linear shows the default columns instead (this is OK):
+- Use `In Progress` as `Doing`
+- Use `Todo` + label `Blocked` as `Blocked`
+- Use `Todo` + label `Ready to deploy` as `Ready to deploy`
+- Use `Done` as `Deployed`
 
 ### Required Rules (Must Follow)
 

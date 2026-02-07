@@ -26,6 +26,12 @@ Rules:
 2. Only ONE ticket can be `Ready to deploy` at a time. If someone else is already `Ready to deploy`, wait.
 3. After a deploy is confirmed READY in Vercel, the agent must move the ticket to `Deployed` and write the `DEPLOYED:` note at the top of `CURRENT_ISSUES_LIVE.md`.
 
+Note: Linear may show default columns like `Todo / In Progress / Done`. That is fine:
+- `In Progress` = `Doing`
+- `Todo` + label `Blocked` = `Blocked`
+- `Todo` + label `Ready to deploy` = `Ready to deploy`
+- `Done` = `Deployed`
+
 ## Deployment Rule (Live-First During Development)
 The owner is the only current user, and prefers simple “ship it” workflows.
 
