@@ -32,11 +32,11 @@ export default function DevicesPage() {
   const [clearingDemo, setClearingDemo] = useState(false)
   const [adminToken, setAdminToken] = useState<string | null>(null)
   const popupRef = useRef<Window | null>(null)
-  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const closedCheckRef = useRef<NodeJS.Timeout | null>(null)
+  const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const closedCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const garminPopupRef = useRef<Window | null>(null)
-  const garminCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const garminClosedCheckRef = useRef<NodeJS.Timeout | null>(null)
+  const garminCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const garminClosedCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     checkFitbitStatus()

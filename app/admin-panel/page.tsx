@@ -56,7 +56,7 @@ export default function AdminPanel() {
   const [qrLoginImage, setQrLoginImage] = useState<string | null>(null)
   const [qrLoginStatus, setQrLoginStatus] = useState<'idle' | 'loading' | 'pending' | 'approved'>('idle')
   const [qrLoginError, setQrLoginError] = useState('')
-  const qrLoginIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const qrLoginIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   
   // Analytics data states
   const [analyticsData, setAnalyticsData] = useState<any[]>([])

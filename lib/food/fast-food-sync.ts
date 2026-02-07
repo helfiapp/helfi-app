@@ -1,6 +1,6 @@
-import { prisma } from '@/lib/prisma'
-import { buildCustomFoodAliases, buildCustomFoodKey, normalizeText } from '@/lib/food/custom-food-import'
-import { loadFastFoodMenuItems } from '@/lib/food/fast-food-menus'
+import { prisma } from '../prisma'
+import { buildCustomFoodAliases, buildCustomFoodKey, normalizeText } from './custom-food-import'
+import { loadFastFoodMenuItems } from './fast-food-menus'
 
 const normalizeChain = (value: string | null | undefined) =>
   normalizeText(String(value || '')).replace(/\s+/g, ' ').trim()
@@ -53,8 +53,23 @@ export type FastFoodSyncResult = {
   addedKeys: string[]
 }
 
-export const syncFastFoodMenus = async (): Promise<FastFoodSyncResult> => {
-  const menuItems = loadFastFoodMenuItems()
+export const syncFastFoodMenus = async (params?: {
+  country?: string | null
+  chain?: string | null
+}): Promise<FastFoodSyncResult> => {
+  const requestedCountry = String(params?.country || '').trim().toUpperCase()
+  const requestedChain = normalizeChain(params?.chain || '')
+
+  const menuItems = loadFastFoodMenuItems().filter((item) => {
+    if (requestedCountry && item.country && String(item.country).toUpperCase() !== requestedCountry) return false
+    if (requestedCountry && !item.country) return false
+    if (requestedChain) {
+      const itemChain = normalizeChain(item.chain)
+      if (!itemChain) return false
+      if (itemChain !== requestedChain) return false
+    }
+    return true
+  })
   let added = 0
   let updated = 0
   let errors = 0

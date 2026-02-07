@@ -2575,7 +2575,10 @@ CRITICAL REQUIREMENTS:
       // Handle image-based food analysis
       console.log('🖼️ Image analysis mode');
       
-      const formData = await req.formData();
+      // NextRequest.formData() returns a standard web FormData, but type
+      // definitions can vary between runtimes and cause build-time TS errors.
+      // Cast to `any` here to preserve runtime behavior without changing logic.
+      const formData: any = await req.formData();
       const imageFile = formData.get('image') as File;
       setAnalysisMode(formData.get('analysisMode'));
       labelScan = String(formData.get('labelScan') || '') === '1';

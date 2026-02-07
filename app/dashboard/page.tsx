@@ -39,7 +39,7 @@ export default function Dashboard() {
   const [garminConnected, setGarminConnected] = useState(false)
   const garminConnectEnabled = process.env.NEXT_PUBLIC_GARMIN_CONNECT_ENABLED === 'true'
   const popupRef = useRef<Window | null>(null)
-  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Profile data - prefer real photos; fall back to professional icon instead of inline SVG
   const hasProfileImage = !!(providerProfileImage || profileImage || session?.user?.image)

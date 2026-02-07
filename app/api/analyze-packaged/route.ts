@@ -86,7 +86,10 @@ export async function POST(req: NextRequest) {
     if (!text) return NextResponse.json({ error: 'No label text provided' }, { status: 400 })
     promptText = text
   } else {
-    const form = await req.formData()
+    // NextRequest.formData() returns a standard web FormData, but type
+    // definitions can vary between runtimes and cause build-time TS errors.
+    // Cast to `any` here to preserve runtime behavior without changing logic.
+    const form: any = await req.formData()
     const image = form.get('image') as File | null
     if (!image) return NextResponse.json({ error: 'No image provided' }, { status: 400 })
     const buf = await image.arrayBuffer()

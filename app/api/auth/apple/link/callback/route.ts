@@ -147,7 +147,10 @@ async function handleCallback(params: CallbackParams, request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const form = await request.formData()
+    // NextRequest.formData() returns a standard web FormData, but type
+    // definitions can vary between runtimes and cause build-time TS errors.
+    // Cast to `any` here to preserve runtime behavior without changing logic.
+    const form: any = await request.formData()
     return handleCallback(
       {
         code: typeof form.get('code') === 'string' ? (form.get('code') as string) : null,

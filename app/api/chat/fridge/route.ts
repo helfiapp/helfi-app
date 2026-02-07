@@ -128,8 +128,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
     }
 
-    const form = await req.formData()
-    const imageFiles = form.getAll('image').filter((file) => file instanceof File) as File[]
+    // NextRequest.formData() returns a standard web FormData, but type
+    // definitions can vary between runtimes and cause build-time TS errors.
+    // Cast to `any` here to preserve runtime behavior without changing logic.
+    const form: any = await req.formData()
+    const imageFiles = (form.getAll('image') as any[]).filter((file: any) => file instanceof File) as File[]
     if (imageFiles.length === 0) {
       return NextResponse.json({ error: 'Image required' }, { status: 400 })
     }

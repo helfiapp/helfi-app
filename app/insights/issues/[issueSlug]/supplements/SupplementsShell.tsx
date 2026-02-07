@@ -13,8 +13,8 @@ function RegenerationProgressBar({ issueSlug, onComplete }: { issueSlug: string;
   const [startTime] = useState(Date.now())
   
   useEffect(() => {
-    let pollInterval: NodeJS.Timeout | null = null
-    let timeoutId: NodeJS.Timeout | null = null
+    let pollInterval: ReturnType<typeof setInterval> | null = null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
     let isComplete = false
     
     const pollStatus = async () => {

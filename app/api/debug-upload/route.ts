@@ -31,7 +31,10 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Parse form data
     console.log('🔍 Step 2: Parsing form data...');
-    let formData;
+    // NextRequest.formData() returns a standard web FormData, but type
+    // definitions can vary between runtimes and cause build-time TS errors.
+    // Cast to `any` here to preserve runtime behavior without changing logic.
+    let formData: any;
     try {
       formData = await request.formData();
       console.log('✅ Form data parsed successfully');

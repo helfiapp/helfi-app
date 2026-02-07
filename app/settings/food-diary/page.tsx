@@ -40,7 +40,7 @@ export default function FoodDiarySettingsPage() {
   const [settings, setSettings] = useState<HealthCheckSettings>(DEFAULT_HEALTH_CHECK_SETTINGS)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sliderHapticRef = useRef<Record<string, number | null>>({})
 
   const dailyTargets = useMemo(() => {

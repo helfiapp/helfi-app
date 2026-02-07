@@ -77,7 +77,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const formData = await req.formData();
+    // NextRequest.formData() returns a standard web FormData, but type
+    // definitions can vary between runtimes and cause build-time TS errors.
+    // Cast to `any` here to preserve runtime behavior without changing logic.
+    const formData: any = await req.formData();
     const imageFile = formData.get('image') as File;
     const saveToHistoryRaw = String(formData.get('saveToHistory') || '').toLowerCase();
     const saveToHistory = saveToHistoryRaw === 'true' || saveToHistoryRaw === '1' || saveToHistoryRaw === 'yes';

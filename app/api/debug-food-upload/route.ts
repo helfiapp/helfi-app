@@ -19,7 +19,10 @@ export async function POST(req: NextRequest) {
     console.log('OpenAI API Key exists:', !!process.env.OPENAI_API_KEY);
     
     if (contentType?.includes('multipart/form-data')) {
-      const formData = await req.formData();
+      // NextRequest.formData() returns a standard web FormData, but type
+      // definitions can vary between runtimes and cause build-time TS errors.
+      // Cast to `any` here to preserve runtime behavior without changing logic.
+      const formData: any = await req.formData();
       const imageFile = formData.get('image') as File;
       
       console.log('Image file received:', !!imageFile);

@@ -19,7 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const formData = await request.formData()
+    // NextRequest.formData() returns a standard web FormData, but type
+    // definitions can vary between runtimes and cause build-time TS errors.
+    // Cast to `any` here to preserve runtime behavior without changing logic.
+    const formData: any = await request.formData()
     const imageFile = formData.get('image')
     const kind = String(formData.get('kind') || '').trim() || 'listing'
 

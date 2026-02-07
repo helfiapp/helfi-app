@@ -31,7 +31,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Upload system not configured' }, { status: 503 })
   }
 
-  const formData = await request.formData().catch(() => null)
+  // NextRequest.formData() returns a standard web FormData, but type
+  // definitions can vary between runtimes and cause build-time TS errors.
+  // Cast to `any` here to preserve runtime behavior without changing logic.
+  const formData: any = await request.formData().catch(() => null)
   if (!formData) {
     return NextResponse.json({ error: 'Invalid upload data' }, { status: 400 })
   }

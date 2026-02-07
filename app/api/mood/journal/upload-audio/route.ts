@@ -34,7 +34,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Audio storage is not configured' }, { status: 503 })
     }
 
-    const formData = await request.formData()
+    // NextRequest.formData() returns a standard web FormData, but type
+    // definitions can vary between runtimes and cause build-time TS errors.
+    // Cast to `any` here to preserve runtime behavior without changing logic.
+    const formData: any = await request.formData()
     const audioFile = formData.get('audio') as File
 
     if (!audioFile) {
