@@ -2,8 +2,9 @@ import { getServerSession } from 'next-auth'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
+import { CreditManager } from '@/lib/credit-system'
 import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
-import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete } from '@/lib/weekly-health-report'
+import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
 import InsightsLandingClient from './InsightLandingClient'
 
 export default async function InsightsPage() {
@@ -57,12 +58,25 @@ export default async function InsightsPage() {
 
   let weeklyState = await getWeeklyReportState(session.user.id)
   if (!weeklyState?.nextReportDueAt) {
-    await markWeeklyReportOnboardingComplete(session.user.id)
+    // If the user is on a paid plan, weekly reports should not silently show as "off".
+    const cm = new CreditManager(session.user.id)
+    const wallet = await cm.getWalletStatus().catch(() => null)
+    const hasPlan = !!wallet?.plan
+    if (hasPlan) {
+      await setWeeklyReportsEnabled(session.user.id, true, { scheduleFrom: new Date() })
+    } else {
+      await markWeeklyReportOnboardingComplete(session.user.id)
+    }
     weeklyState = await getWeeklyReportState(session.user.id)
   }
   const latestReport = await getLatestWeeklyReport(session.user.id)
   const reportReady = latestReport?.status === 'READY'
   const reportLocked = latestReport?.status === 'LOCKED'
+  const reportsEnabled =
+    Boolean(weeklyState?.reportsEnabled) ||
+    Boolean(weeklyState?.reportsEnabledAt) ||
+    Boolean(weeklyState?.nextReportDueAt) ||
+    Boolean(latestReport)
 
   return (
     <InsightsLandingClient
@@ -80,7 +94,7 @@ export default async function InsightsPage() {
         reportLocked,
         status: latestReport?.status ?? null,
         nextReportDueAt: weeklyState?.nextReportDueAt ?? null,
-        reportsEnabled: weeklyState?.reportsEnabled ?? false,
+        reportsEnabled,
         reportsEnabledAt: weeklyState?.reportsEnabledAt ?? null,
       }}
     />

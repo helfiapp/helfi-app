@@ -28,6 +28,12 @@ export default async function WeeklyReportPage({ searchParams }: WeeklyReportPag
     getWeeklyReportState(session.user.id),
   ])
   const canManualReport = String(session.user.email || '').toLowerCase() === 'info@sonicweb.com.au'
+  const reportsEnabled =
+    Boolean(state?.reportsEnabled) ||
+    Boolean(state?.reportsEnabledAt) ||
+    Boolean(state?.nextReportDueAt) ||
+    Boolean(report) ||
+    reports.length > 0
 
   return (
     <WeeklyReportClient
@@ -35,7 +41,7 @@ export default async function WeeklyReportPage({ searchParams }: WeeklyReportPag
       reports={reports}
       nextReportDueAt={state?.nextReportDueAt ?? null}
       canManualReport={canManualReport}
-      reportsEnabled={state?.reportsEnabled ?? false}
+      reportsEnabled={reportsEnabled}
     />
   )
 }
