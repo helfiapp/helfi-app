@@ -57,6 +57,9 @@ logs
 *.tmp
 *.temp
 
+# Playwright saved login sessions (cookies)
+/playwright/.auth/
+
 # Local food data imports
 /data/food-import/
 /public/FOOD DATA/

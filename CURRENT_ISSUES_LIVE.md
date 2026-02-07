@@ -2,6 +2,13 @@
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-07 14:30 AEDT
+- What changed: Added a Playwright “save logged-in session” script so the testing agent can stay logged in and stop asking for logins repeatedly.
+- Where to see it (page/link): Repo file: `scripts/save-playwright-auth.mjs`
+- What to quickly test: Run `node scripts/save-playwright-auth.mjs --mode credentials` (or `--mode google`) and confirm it creates a file under `playwright/.auth/` (this folder is ignored by git).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-07
 - What changed: Added REQUIRED agent coordination rules (use Linear project "Helfi Dev" to avoid conflicts; only one "Ready to deploy" at a time). Clarified that on this setup all agents share the same Mac/login so they should not ask for emails/invites.
 - Where to see it (page/link): Repo docs: `AGENTS.md` + `PROJECT_STATUS.md`
