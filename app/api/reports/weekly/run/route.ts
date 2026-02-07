@@ -786,7 +786,7 @@ function buildRiskFlags(params: {
     const days = mealTimingSummary.lateMealDays.slice(0, 3).join(', ')
     flags.push({
       name: 'Late meals pattern',
-      reason: `Late dinners show up on ${days}. This can affect sleep quality.`,
+      reason: `Late dinners show up on ${days}. This can affect digestion and next-day energy.`,
     })
   }
   if ((dataFlags.symptomHeavyDays || []).length >= 2) {
@@ -1006,7 +1006,7 @@ function buildInsightCandidates(params: {
       bucket: 'avoid',
       title: 'Late meals',
       evidence: `Late meals showed up on ${days}.`,
-      action: 'Move the last meal earlier to see if sleep feels better.',
+      action: 'Move the last meal earlier and see if mornings feel better.',
     })
   }
   if ((mealTimingSummary.lateSnackDays || []).length) {
@@ -2823,6 +2823,7 @@ Rules:
 - When you mention a day or event, include the date or time from the data.
 - Each item should be two short lines: line 1 = what happened and why it matters, line 2 = clear next step.
 - Use real signals from the JSON data. No generic advice.
+- Do not claim you can measure “sleep consistency” unless the JSON includes real sleep tracking data. If sleep data is missing, do not mention sleep consistency at all.
 - Use insightCandidates, correlationSignals, trendSignals, and riskFlags as your primary signals when available.
 - Use nutritionSummary.topFoods, foodHighlights, and dailyStats.topFoods to name actual foods (not just calories).
 - Do not ask the user what they ate or to log meals. Use the foods already in the data.
