@@ -19,6 +19,8 @@ Last updated: Feb 7, 2026
 
 We coordinate work in one shared Linear project named: `Helfi Dev`.
 
+Important: All agents run on the SAME Mac and SAME login, so agents should already have access to Linear in Codex.
+
 Rules:
 1. Every agent must claim ONE ticket and move it to `Doing` before starting.
 2. Only ONE ticket can be `Ready to deploy` at a time. If someone else is already `Ready to deploy`, wait.

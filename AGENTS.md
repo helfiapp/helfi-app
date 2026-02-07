@@ -22,7 +22,13 @@ To prevent conflicts, every agent MUST coordinate in ONE place:
 
 Linear project name: `Helfi Dev`
 
-If you do not have access to Linear yet, do NOT start work. Ask the owner for a Linear invite/link.
+IMPORTANT: On this project, all agents run on the SAME Mac and SAME login, so you should already have access.
+Do NOT ask for emails/invites.
+
+If Linear does not load inside Codex:
+1. Restart the Codex app.
+2. Try again.
+3. If it still fails, tell the owner “Linear is not connected in Codex on this Mac”.
 
 ### Required Columns (Use These Exact Names)
 
