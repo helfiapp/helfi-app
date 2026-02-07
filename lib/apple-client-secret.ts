@@ -46,7 +46,6 @@ export const getAppleClientSecret = () => {
       issuer: env.teamId,
       subject: env.clientId,
       audience: 'https://appleid.apple.com',
-      iat,
       expiresIn: sixMonthsSeconds,
     }
   )
@@ -54,4 +53,3 @@ export const getAppleClientSecret = () => {
   cachedSecret = { value, expiresAtMs: now + sixMonthsSeconds * 1000 }
   return value
 }
-
