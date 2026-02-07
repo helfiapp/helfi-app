@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { WeeklyReportRecord } from '@/lib/weekly-health-report'
+import ReportVisuals from './ReportVisuals'
 
 const SECTIONS = [
   { key: 'overview', label: 'Overview' },
@@ -114,6 +115,16 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
   const [progressActive, setProgressActive] = useState(false)
   const progressTimerRef = useRef<number | null>(null)
 
+  const scrollTo = useCallback((id: string) => {
+    try {
+      const el = document.getElementById(id)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch {
+      // ignore
+    }
+  }, [])
+
   const payload = useMemo(() => {
     if (!report || !report.report) return null
     if (typeof report.report === 'string') {
@@ -205,7 +216,24 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         dailyAverageMl?: number
         daysWithLogs?: number
         topDrinks?: Array<{ label?: string; count?: number }>
+        dailyTotals?: Array<{ date?: string; entries?: number; totalMl?: number }>
       }
+    | undefined
+  const nutritionSummary = (parsedSummary as any)?.nutritionSummary as
+    | {
+        entriesWithNutrients?: number
+        totals?: any
+        dailyAverages?: any
+        daysWithLogs?: number
+        dailyTotals?: Array<{ date?: string; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number }>
+        topFoods?: Array<{ name?: string; count?: number }>
+      }
+    | undefined
+  const dailyStats = (parsedSummary as any)?.dailyStats as Array<any> | undefined
+  const symptomSummary = (parsedSummary as any)?.symptomSummary as any
+  const exerciseSummary = (parsedSummary as any)?.exerciseSummary as any
+  const supplementsList = (parsedSummary as any)?.supplements as
+    | Array<{ name?: string; dosage?: string; timing?: string }>
     | undefined
   const labTrends = (parsedSummary as any)?.labTrends as
     | Array<{
@@ -544,14 +572,38 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
   const periodRangeLabel = formatDateRange(report.periodStart, report.periodEnd)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-10 pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100">
+      {/* Mobile app-style header */}
+      <div className="md:hidden sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <button
+            onClick={() => router.push('/insights')}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700"
+          >
+            <span aria-hidden="true">←</span>
+            Back
+          </button>
+          <div className="text-sm font-semibold text-slate-900">7-day report</div>
+          {pdfHref ? (
+            <a
+              href={pdfHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800"
+            >
+              PDF
+            </a>
+          ) : (
+            <div className="w-[68px]" />
+          )}
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-8 pb-28 md:py-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">7-day health report</h1>
-            <p className="text-sm text-gray-600 mt-1">
-              {periodRangeLabel}
-            </p>
+            <h1 className="text-3xl font-bold text-slate-900">7-day health report</h1>
+            <p className="text-sm text-slate-600 mt-1">{periodRangeLabel}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             {canManualReport && (
@@ -584,14 +636,14 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
               href={pdfHref}
               target="_blank"
               rel="noreferrer"
-                className="inline-flex items-center rounded-lg border border-helfi-green px-4 py-2 text-sm font-medium text-helfi-green hover:bg-helfi-green/10"
+                className="hidden md:inline-flex items-center rounded-lg border border-helfi-green px-4 py-2 text-sm font-medium text-helfi-green hover:bg-helfi-green/10"
               >
                 Download PDF
               </a>
             )}
             <Link
               href="/insights"
-              className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
+              className="hidden md:inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
             >
               Back to Insights
             </Link>
@@ -610,7 +662,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           </div>
         )}
 
-        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div id="data" className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Data used this week</h2>
@@ -671,7 +723,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           )}
         </div>
 
-        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div id="summary" className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Weekly summary</h2>
           {summaryPoints.length > 0 ? (
             <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-gray-600">
@@ -689,8 +741,31 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           )}
         </div>
 
+        <div id="visuals" className="mt-6">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Visual snapshot</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                Simple charts that summarize your last 7 days. They get better as you log more.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <ReportVisuals
+              periodStart={report.periodStart}
+              periodEnd={report.periodEnd}
+              coverage={coverage}
+              nutritionSummary={nutritionSummary as any}
+              hydrationSummary={hydrationSummary as any}
+              dailyStats={dailyStats as any}
+              symptomSummary={symptomSummary as any}
+              exerciseSummary={exerciseSummary as any}
+            />
+          </div>
+        </div>
+
         {keyInsights.length > 0 && (
-          <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div id="insights" className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900">Key insights this week</h2>
             <p className="text-sm text-gray-600 mt-2">
               These are the most important signals from your last 7 days.
@@ -772,7 +847,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         )}
 
         {(wins.length > 0 || gaps.length > 0) && (
-          <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <div id="wins-gaps" className="mt-6 grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-emerald-900">Areas improving</h3>
               <p className="text-xs text-emerald-700 mt-1">What moved in the right direction this week.</p>
@@ -830,7 +905,32 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           ))}
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+        {activeTab === 'supplements' && Array.isArray(supplementsList) && supplementsList.length > 0 ? (
+          <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-emerald-900">Your supplements</h2>
+            <p className="mt-2 text-sm text-emerald-800">
+              This is your current supplement list. The report text below should explain what looks helpful for your goals.
+            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {supplementsList.map((s, idx) => (
+                <div key={`${s?.name || 'supplement'}-${idx}`} className="rounded-xl border border-emerald-100 bg-white p-4">
+                  <div className="font-semibold text-emerald-950">{replaceIsoDates(String(s?.name || 'Supplement'))}</div>
+                  {(s?.dosage || s?.timing) ? (
+                    <div className="mt-1 text-sm text-emerald-900/80">
+                      {s?.dosage ? `Dose: ${s.dosage}` : 'Dose: -'}
+                      {' • '}
+                      {s?.timing ? `Timing: ${s.timing}` : 'Timing: -'}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-sm text-emerald-900/80">Dose/timing not set</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div id="sections" className="mt-6 grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1 space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">What's working</h3>
@@ -852,7 +952,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         </div>
 
         {reports.length > 1 && (
-          <div className="mt-10">
+          <div id="archive" className="mt-10">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Previous reports</h3>
             <div className="grid gap-3 md:grid-cols-2">
               {reports.map((item) => (
@@ -884,6 +984,36 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             </div>
           </div>
         )}
+      </div>
+
+      {/* Mobile app-style bottom nav for the report */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/92 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-3 py-2">
+          <button
+            onClick={() => scrollTo('summary')}
+            className="flex flex-1 flex-col items-center justify-center rounded-xl px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Summary
+          </button>
+          <button
+            onClick={() => scrollTo('visuals')}
+            className="flex flex-1 flex-col items-center justify-center rounded-xl px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Charts
+          </button>
+          <button
+            onClick={() => scrollTo('insights')}
+            className="flex flex-1 flex-col items-center justify-center rounded-xl px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Insights
+          </button>
+          <button
+            onClick={() => scrollTo('sections')}
+            className="flex flex-1 flex-col items-center justify-center rounded-xl px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Details
+          </button>
+        </div>
       </div>
     </div>
   )
