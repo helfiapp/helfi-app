@@ -8,6 +8,7 @@ import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 import { setSessionToken } from '../auth/session'
+import { fetchAuthed } from '../auth/api'
 
 const isLikelyEmail = (value: string) => {
   const v = value.trim()
@@ -50,7 +51,16 @@ export function LoginScreen() {
       }
 
       await setSessionToken(String(data.token))
-      setUserEmail(normalizedEmail)
+
+      // Confirm token works and pull the canonical user email from backend.
+      const meRes = await fetchAuthed('/api/auth/native/me', { method: 'GET' })
+      const meData = await meRes.json().catch(() => ({}))
+      if (!meRes.ok || !meData?.user?.email) {
+        Alert.alert('Login failed', 'Login succeeded but session validation failed. Please try again.')
+        return
+      }
+
+      setUserEmail(String(meData.user.email))
       setMode('signedIn')
     } finally {
       setBusy(false)
