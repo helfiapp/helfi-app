@@ -19,6 +19,7 @@ const mode = getArg('--mode') || 'credentials' // credentials | google
 const email = getArg('--email') || process.env.HELFI_TEST_EMAIL || ''
 const password = getArg('--password') || process.env.HELFI_TEST_PASSWORD || ''
 const keepSignedIn = boolArg('--keep-signed-in', true)
+const checkUrlPath = getArg('--check-url') || '/api/affiliate/me'
 const outPath =
   getArg('--out') ||
   (mode === 'credentials'
@@ -80,9 +81,32 @@ const main = async () => {
     // At this point you may need to complete Google login in the opened browser window.
   }
 
-  // Confirm we are logged in by waiting for the app header profile menu.
-  await page.goto(`${baseUrl}/food`, { waitUntil: 'domcontentloaded' })
-  await page.getByRole('button', { name: 'Open profile menu' }).waitFor({ timeout: 10 * 60 * 1000 })
+  // Confirm we are actually logged in by calling an endpoint that requires a session cookie.
+  // (Some pages render even when logged out, so we cannot rely on URL or UI alone.)
+  const checkUrl = `${baseUrl}${checkUrlPath}`
+  const start = Date.now()
+  const timeoutMs = 10 * 60 * 1000
+  while (Date.now() - start < timeoutMs) {
+    const res = await context.request.get(checkUrl).catch(() => null)
+    const status = res?.status?.() ?? 0
+    if (status === 200) break
+    // If credentials failed, the page shows a readable error we can surface.
+    if (mode === 'credentials') {
+      const errorText = (await page.locator('.text-red-600').first().textContent().catch(() => ''))?.trim()
+      if (errorText) {
+        throw new Error(`Could not sign in: ${errorText}`)
+      }
+    }
+    await page.waitForTimeout(1000)
+  }
+  const finalRes = await context.request.get(checkUrl).catch(() => null)
+  if (!finalRes || finalRes.status() !== 200) {
+    throw new Error(
+      mode === 'google'
+        ? 'Google sign-in was not completed in the Playwright window. Please finish the Google login when the window opens, then try again.'
+        : 'Could not confirm login. Please double-check the email/password and try again.'
+    )
+  }
 
   ensureDir(outPath)
   await context.storageState({ path: outPath })

@@ -10,7 +10,7 @@ DEPLOYED:
 DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 2026-02-07 14:30 AEDT
-- What changed: Added a Playwright “save logged-in session” script so the testing agent can stay logged in and stop asking for logins repeatedly.
+- What changed: Added a Playwright “save logged-in session” script so the testing agent can stay logged in and stop asking for logins repeatedly. Improved it to confirm a real logged-in session (not just “page loaded”).
 - Where to see it (page/link): Repo file: `scripts/save-playwright-auth.mjs`
 - What to quickly test: Run `node scripts/save-playwright-auth.mjs --mode credentials` (or `--mode google`) and confirm it creates a file under `playwright/.auth/` (this folder is ignored by git).
 
