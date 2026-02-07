@@ -2,6 +2,13 @@
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-07 20:48 AEDT
+- What changed: Added the starter phone app code (React Native/Expo) into the repo under `native/` so we can now build the iPhone + Android app.
+- Where to see it (page/link): (No visible change on the website. Code-only change in the repo.)
+- What to quickly test: Log in and use the website normally for 30 seconds to confirm nothing looks broken.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-07 19:05 AEDT
 - What changed: Deployed HEL-7 so the “Link your Apple login” pop-up shows reliably on onboarding (and doesn’t silently fail right after login).
 - Where to see it (page/link): https://helfi.ai/onboarding
