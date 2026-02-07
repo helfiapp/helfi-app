@@ -1,5 +1,12 @@
 # 🚨 CURRENT LIVE ISSUES - HELFI.AI
 
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-07
+- What changed: Added REQUIRED agent coordination rules (use Linear project "Helfi Dev" to avoid conflicts; only one "Ready to deploy" at a time).
+- Where to see it (page/link): Repo docs: `AGENTS.md` + `PROJECT_STATUS.md`
+- What to quickly test: Open `AGENTS.md` and confirm the new "Agent Coordination (REQUIRED)" section is present. New agents should follow it before starting work or deploying.
+
 **Last Updated**: January 10th, 2025 by Agent #46
 **Production URL**: https://helfi-b7kw09kuy-louie-veleskis-projects.vercel.app
 
