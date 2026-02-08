@@ -253,6 +253,8 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         const friendly =
           raw.includes('unauthorized') || raw.includes('auth')
             ? 'Please sign in again and try.'
+            : raw.includes('reports_disabled') || raw.includes('disabled')
+              ? 'Weekly reports are turned off for this account. Turn them on and try again.'
             : 'Sorry, we could not create the report right now. Please try again in a minute.'
         setCreateReportMessage(friendly)
       }

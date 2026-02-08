@@ -17,6 +17,7 @@ import {
   markWeeklyReportOnboardingComplete,
   queueWeeklyReportNotification,
   resolveWeeklyReportTimezone,
+  setWeeklyReportsEnabled,
   summarizeCoverage,
   updateWeeklyReportRecord,
   upsertWeeklyReportState,
@@ -2014,7 +2015,18 @@ export async function POST(request: NextRequest) {
   const now = new Date()
   let state = await getWeeklyReportState(userId)
   if (!state?.reportsEnabled) {
-    return NextResponse.json({ status: 'disabled', reason: 'reports_disabled' }, { status: 400 })
+    // Preview builds can show "Create report now" (because an older report exists),
+    // even if the "enabled" flag wasn't saved properly. For manual runs on preview,
+    // auto-enable so the button works.
+    const vercelEnv = String(process.env.VERCEL_ENV || '').toLowerCase()
+    const canAutoEnable = isManualTrigger && (vercelEnv === 'preview' || vercelEnv === 'development')
+    if (canAutoEnable) {
+      await setWeeklyReportsEnabled(userId, true, { scheduleFrom: now })
+      state = await getWeeklyReportState(userId)
+    }
+    if (!state?.reportsEnabled) {
+      return NextResponse.json({ status: 'disabled', reason: 'reports_disabled' }, { status: 400 })
+    }
   }
   if (!state?.nextReportDueAt) {
     if (isManualTrigger) {
