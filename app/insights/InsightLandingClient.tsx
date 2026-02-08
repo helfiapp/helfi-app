@@ -42,6 +42,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const [progressStage, setProgressStage] = useState('Getting your data')
   const [progressActive, setProgressActive] = useState(false)
   const progressTimerRef = useRef<number | null>(null)
+  const progressStartAtRef = useRef<number | null>(null)
   const [countdown, setCountdown] = useState<{
     days: number
     hours: number
@@ -180,18 +181,28 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
 
   const startProgress = () => {
     setProgressActive(true)
-    setProgressPercent(10)
+    progressStartAtRef.current = Date.now()
+    setProgressPercent(6)
     setProgressStage('Getting your data')
     if (progressTimerRef.current) {
       window.clearInterval(progressTimerRef.current)
     }
     progressTimerRef.current = window.setInterval(() => {
       setProgressPercent((prev) => {
-        const next = Math.min(prev + 4, 95)
-        setProgressStage(updateProgressStage(next))
-        return next
+        const startedAt = progressStartAtRef.current ?? Date.now()
+        const elapsedMs = Math.max(0, Date.now() - startedAt)
+
+        // Avoid the classic "jumps to 95% then freezes" problem.
+        // We intentionally asymptote below 90% and show "Working…" during the final stage.
+        const cap = 88
+        const base = 6
+        const scale = cap - base
+        const next = Math.round(base + scale * (1 - Math.exp(-elapsedMs / 16000)))
+        const clamped = Math.max(base, Math.min(cap, Number.isFinite(next) ? next : prev))
+        setProgressStage(updateProgressStage(clamped))
+        return clamped
       })
-    }, 900)
+    }, 700)
   }
 
   const stopProgress = (success: boolean) => {
@@ -199,6 +210,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       window.clearInterval(progressTimerRef.current)
       progressTimerRef.current = null
     }
+    progressStartAtRef.current = null
     if (success) {
       setProgressPercent(100)
       setProgressStage('Done')
@@ -220,7 +232,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     if (isCreatingReport) return
     setIsCreatingReport(true)
     setCreateReportError(false)
-    setCreateReportMessage('Creating your report now. This can take a minute.')
+    setCreateReportMessage('Creating your report now. This can take 1 to 2 minutes.')
     startProgress()
     try {
       const response = await fetch('/api/reports/weekly/run', {
@@ -542,12 +554,12 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   {progressActive && (
                     <div className="w-full max-w-xs">
                       <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{progressStage}</span>
-                        <span>{progressPercent}%</span>
+                        <span>{progressStage === 'Final checks' ? 'Final checks (still working...)' : progressStage}</span>
+                        <span>{progressStage === 'Final checks' ? 'Working…' : `${progressPercent}%`}</span>
                       </div>
                       <div className="mt-1 h-2 w-full rounded-full bg-gray-200">
                         <div
-                          className="h-2 rounded-full bg-emerald-500"
+                          className={`h-2 rounded-full bg-emerald-500 ${progressStage === 'Final checks' ? 'animate-pulse' : ''}`}
                           style={{ width: `${progressPercent}%` }}
                         />
                       </div>
