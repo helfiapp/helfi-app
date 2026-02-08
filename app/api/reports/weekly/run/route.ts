@@ -2024,7 +2024,9 @@ export async function POST(request: NextRequest) {
       await setWeeklyReportsEnabled(userId, true, { scheduleFrom: now })
       state = await getWeeklyReportState(userId)
     }
-    if (!state?.reportsEnabled) {
+    // IMPORTANT: Never block manual report creation for the owner account.
+    // If state is out of sync, it's better to allow manual creation than to fail and burn retries.
+    if (!state?.reportsEnabled && !isManualTrigger) {
       return NextResponse.json({ status: 'disabled', reason: 'reports_disabled' }, { status: 400 })
     }
   }
