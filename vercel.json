@@ -38,7 +38,7 @@
     },
     {
       "path": "/api/cron/write-spike-alert",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/push/scheduler",
