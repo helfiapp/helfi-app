@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE:
+- Date/time: Sun Feb 8 17:56 AEDT 2026
+- What changed: Made the Runaway Protection button a simple toggle: when Health Setup saving is not paused it shows “Pause”, and after you pause it changes to “Unpause”; after unpausing it goes back to “Pause”.
+- Where to see it (page/link): https://helfi.ai/admin-panel?tab=templates (Test Email System)
+- What to quickly test: Click “Pause (2 min test)”, confirm it changes to “Unpause Now”. Click “Unpause Now”, confirm it changes back to “Pause (2 min test)”.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 17:44 AEDT 2026
 - What changed: Fixed the “Check Status” button for Runaway Protection so it no longer shows a fake error and instead always returns a clear status (Paused / Not paused).
 - Where to see it (page/link): https://helfi.ai/admin-panel?tab=templates (Test Email System)
