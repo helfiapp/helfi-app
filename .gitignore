@@ -63,3 +63,5 @@ logs
 # Local food data imports
 /data/food-import/
 /public/FOOD DATA/
+
+ios-sim-helfi-*.png
