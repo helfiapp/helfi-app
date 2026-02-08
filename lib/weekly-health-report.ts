@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { publishWithQStash, scheduleWeeklyReportNotificationWithQStash } from '@/lib/qstash'
 import { randomUUID } from 'crypto'
+import { sanitizeWeeklyReportPayload, type WeeklyReportSanitizeContext } from '@/lib/weekly-report-sanitize'
 
 const REPORT_PERIOD_DAYS = 7
 
@@ -195,6 +196,42 @@ function normalizeStateRow(row: any): WeeklyReportState | null {
     lastStatus: readRowValue(row, 'lastStatus') ?? null,
     reportsEnabled: enabledFlag || hasSchedule,
     reportsEnabledAt: reportsEnabledAt ? new Date(reportsEnabledAt).toISOString() : null,
+  }
+}
+
+function parseJsonObject(value: any): any | null {
+  if (!value) return null
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' ? parsed : null
+    } catch {
+      return null
+    }
+  }
+  if (typeof value === 'object') return value
+  return null
+}
+
+async function getWeeklyReportSanitizeContext(userId: string): Promise<WeeklyReportSanitizeContext> {
+  const [supplements, medications] = await Promise.all([
+    prisma.supplement.findMany({ where: { userId }, select: { name: true } }),
+    prisma.medication.findMany({ where: { userId }, select: { name: true } }),
+  ])
+  return { supplements, medications }
+}
+
+async function sanitizeWeeklyReportRecordForView(record: WeeklyReportRecord | null) {
+  if (!record) return record
+  const payload = parseJsonObject(record.report)
+  if (!payload) return record
+
+  try {
+    const ctx = await getWeeklyReportSanitizeContext(record.userId)
+    return { ...record, report: sanitizeWeeklyReportPayload(payload, ctx) }
+  } catch (error) {
+    console.warn('[weekly-report] Failed to sanitize report for view', error)
+    return record
   }
 }
 
@@ -415,7 +452,7 @@ export async function getWeeklyReportById(userId: string, reportId: string): Pro
       reportId,
       userId
     )
-    return normalizeReportRow(rows?.[0])
+    return await sanitizeWeeklyReportRecordForView(normalizeReportRow(rows?.[0]))
   } catch (error) {
     console.warn('[weekly-report] Failed to read report by id', error)
     return null
@@ -429,7 +466,7 @@ export async function getLatestWeeklyReport(userId: string): Promise<WeeklyRepor
       'SELECT * FROM WeeklyHealthReports WHERE userId = $1 ORDER BY createdAt DESC LIMIT 1',
       userId
     )
-    return normalizeReportRow(rows?.[0])
+    return await sanitizeWeeklyReportRecordForView(normalizeReportRow(rows?.[0]))
   } catch (error) {
     console.warn('[weekly-report] Failed to read latest report', error)
     return null
