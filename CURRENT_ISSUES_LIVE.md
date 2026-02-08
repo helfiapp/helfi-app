@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE:
+- Date/time: Sun Feb 8 17:17 AEDT 2026
+- What changed: Fixed the Admin Panel “Refresh Token” so it works even if your admin login expired, and the admin panel now auto-refreshes the token on page load so you don’t get logged out and lose the Users list.
+- Where to see it (page/link): https://helfi.ai/main-admin?tab=management
+- What to quickly test: Open the page and confirm users load (not 0). If you ever see “Authentication expired” again, click “Refresh Token” and it should recover.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 17:07 AEDT 2026
 - What changed: Added an “Unpause Now” button in the admin panel so you can instantly turn off the temporary Health Setup save pause if needed.
 - Where to see it (page/link): https://helfi.ai/main-admin (Templates tab -> “Test Email System”)
