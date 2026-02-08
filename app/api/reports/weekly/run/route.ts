@@ -1248,6 +1248,7 @@ function shrinkModelPayload(payload: any, maxChars: number) {
       ? {
           userMessageCount: payload.talkToAi.userMessageCount,
           activeDays: payload.talkToAi.activeDays,
+          contexts: payload.talkToAi.contexts || { general: payload.talkToAi.userMessageCount || 0, food: 0 },
           topics: limit(payload.talkToAi.topics, 2),
           highlights: [],
         }
@@ -1258,8 +1259,12 @@ function shrinkModelPayload(payload: any, maxChars: number) {
   return { payload: slimmed, json: slimJson, size: slimJson.length }
 }
 
+function normalizeTalkToAiContext(value?: string | null): 'general' | 'food' {
+  return value === 'food' ? 'food' : 'general'
+}
+
 function buildTalkToAiSummary(
-  messages: Array<{ role: string; content: string; createdAt: Date }>
+  messages: Array<{ role: string; content: string; createdAt: Date; context?: string | null }>
 ) {
   if (!messages.length) {
     return {
@@ -1268,6 +1273,7 @@ function buildTalkToAiSummary(
       assistantMessageCount: 0,
       activeDays: 0,
       lastMessageAt: null,
+      contexts: { general: 0, food: 0 },
       topics: [],
       highlights: [],
     }
@@ -1278,6 +1284,12 @@ function buildTalkToAiSummary(
   const assistantMessages = sorted.filter((m) => m.role === 'assistant')
   const days = new Set<string>()
   sorted.forEach((m) => days.add(m.createdAt.toISOString().slice(0, 10)))
+
+  const contextCounts = { general: 0, food: 0 }
+  userMessages.forEach((m) => {
+    const ctx = normalizeTalkToAiContext(m.context ?? null)
+    contextCounts[ctx] += 1
+  })
 
   const topicCounts = new Map<string, { topic: string; section: ReportSectionKey; count: number }>()
   userMessages.forEach((m) => {
@@ -1311,6 +1323,7 @@ function buildTalkToAiSummary(
     assistantMessageCount: assistantMessages.length,
     activeDays: days.size,
     lastMessageAt: sorted[0]?.createdAt?.toISOString() || null,
+    contexts: contextCounts,
     topics,
     highlights,
   }
@@ -2420,13 +2433,13 @@ export async function POST(request: NextRequest) {
     console.warn('[weekly-report] Failed to build lab trends', error)
   }
 
-  let talkToAiMessages: Array<{ role: string; content: string; createdAt: Date }> = []
+  let talkToAiMessages: Array<{ role: string; content: string; createdAt: Date; context?: string | null }> = []
   try {
     await ensureTalkToAITables()
     talkToAiMessages = await prisma.$queryRawUnsafe<
-      Array<{ role: string; content: string; createdAt: Date }>
+      Array<{ role: string; content: string; createdAt: Date; context?: string | null }>
     >(
-        `SELECT m."role", m."content", m."createdAt"
+        `SELECT m."role", m."content", m."createdAt", t."context"
          FROM "TalkToAIChatMessage" m
          JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
          WHERE t."userId" = $1 AND m."createdAt" >= $2 AND m."createdAt" <= $3

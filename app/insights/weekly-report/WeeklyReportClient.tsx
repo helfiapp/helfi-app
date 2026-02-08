@@ -200,6 +200,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         userMessageCount?: number
         assistantMessageCount?: number
         activeDays?: number
+        contexts?: { general?: number; food?: number }
         topics?: Array<{ topic?: string; section?: string; count?: number }>
         highlights?: Array<{ content?: string; createdAt?: string }>
       }
@@ -778,18 +779,49 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
             <p className="text-sm text-blue-800 mt-2">
-              {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
-              {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}.
+              {(() => {
+                const generalCount = Number(talkToAiSummary?.contexts?.general ?? 0) || 0
+                const foodCount = Number(talkToAiSummary?.contexts?.food ?? 0) || 0
+                const hasGeneral = generalCount > 0
+                const hasFood = foodCount > 0
+                const contextLabel = hasGeneral && hasFood ? 'General + Food chat' : hasFood ? 'Food chat' : 'General chat'
+                return (
+                  <>
+                    {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
+                    {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}. {contextLabel}.
+                  </>
+                )
+              })()}
             </p>
             <div className="mt-3">
-              <a
-                href="/chat"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100"
-              >
-                Open chat history (new tab)
-              </a>
+              {(() => {
+                const generalCount = Number(talkToAiSummary?.contexts?.general ?? 0) || 0
+                const foodCount = Number(talkToAiSummary?.contexts?.food ?? 0) || 0
+                const hasGeneral = generalCount > 0
+                const hasFood = foodCount > 0
+                const baseClass =
+                  'inline-flex items-center rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100'
+
+                if (hasGeneral && hasFood) {
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      <a href="/chat" target="_blank" rel="noreferrer" className={baseClass}>
+                        Open general chat (new tab)
+                      </a>
+                      <a href="/chat?context=food" target="_blank" rel="noreferrer" className={baseClass}>
+                        Open food chat (new tab)
+                      </a>
+                    </div>
+                  )
+                }
+
+                const href = hasFood ? '/chat?context=food' : '/chat'
+                return (
+                  <a href={href} target="_blank" rel="noreferrer" className={baseClass}>
+                    Open chat history (new tab)
+                  </a>
+                )
+              })()}
             </div>
             {talkToAiSummary.topics && talkToAiSummary.topics.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
