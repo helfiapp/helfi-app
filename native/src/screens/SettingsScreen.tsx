@@ -11,7 +11,7 @@ export function SettingsScreen() {
   const { mode, setMode } = useAppMode()
 
   const reset = () => {
-    Alert.alert('Reset app mode?', 'This will take you back to the welcome screen.', [
+    Alert.alert('Sign out?', 'This will take you back to the login screen.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Reset', style: 'destructive', onPress: () => setMode('signedOut') },
     ])
@@ -30,15 +30,14 @@ export function SettingsScreen() {
       >
         <Text style={{ fontSize: 20, fontWeight: '800', color: theme.colors.text }}>Settings</Text>
         <Text style={{ marginTop: theme.spacing.sm, color: theme.colors.muted, fontSize: 14, lineHeight: 20 }}>
-          Mode: {mode === 'demo' ? 'Demo' : 'Signed out'}
+          Mode: {mode === 'signedIn' ? 'Signed in' : 'Signed out'}
         </Text>
         <Text style={{ marginTop: theme.spacing.sm, color: theme.colors.muted, fontSize: 14, lineHeight: 20 }}>
           Connected to: {API_BASE_URL}
         </Text>
 
-        <HelfiButton label="Reset" onPress={reset} variant="secondary" style={{ marginTop: theme.spacing.lg }} />
+        <HelfiButton label="Sign out" onPress={reset} variant="secondary" style={{ marginTop: theme.spacing.lg }} />
       </View>
     </Screen>
   )
 }
-

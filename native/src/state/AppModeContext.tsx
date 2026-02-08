@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, useState } from 'react'
 
-export type AppMode = 'signedOut' | 'demo'
+export type AppMode = 'signedOut' | 'signedIn'
 
 type AppModeContextValue = {
   mode: AppMode
@@ -22,4 +22,3 @@ export function useAppMode() {
   }
   return ctx
 }
-

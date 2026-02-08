@@ -1,6 +1,4 @@
 export const APP_NAME = 'Helfi'
 
-// For now we point the phone app at your staging website (stg.helfi.ai).
-// Later we can switch this to production when you say so.
+// Staging is the source of truth for auth UI while we build the phone app.
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://stg.helfi.ai'
-

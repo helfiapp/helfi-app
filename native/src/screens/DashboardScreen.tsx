@@ -13,7 +13,7 @@ export function DashboardScreen() {
       <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border }}>
         <Text style={{ fontSize: 20, fontWeight: '800', color: theme.colors.text }}>Dashboard</Text>
         <Text style={{ marginTop: theme.spacing.sm, color: theme.colors.muted, fontSize: 14, lineHeight: 20 }}>
-          Mode: {mode === 'demo' ? 'Demo' : 'Signed out'}
+          Mode: {mode === 'signedIn' ? 'Signed in' : 'Signed out'}
         </Text>
         <Text style={{ marginTop: theme.spacing.md, color: theme.colors.muted, fontSize: 14, lineHeight: 20 }}>
           Next step: connect the app to your Helfi account so this screen can show your real data.
@@ -22,4 +22,3 @@ export function DashboardScreen() {
     </Screen>
   )
 }
-

@@ -3,11 +3,11 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 
 import { useAppMode } from '../state/AppModeContext'
-import { WelcomeScreen } from '../screens/WelcomeScreen'
+import { AuthNavigator } from './AuthNavigator'
 import { MainTabs } from './MainTabs'
 
 export type RootStackParamList = {
-  Welcome: undefined
+  Auth: undefined
   Main: undefined
 }
 
@@ -19,13 +19,8 @@ export function RootNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {mode === 'signedOut' ? (
-          <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        ) : (
-          <Stack.Screen name="Main" component={MainTabs} />
-        )}
+        {mode === 'signedOut' ? <Stack.Screen name="Auth" component={AuthNavigator} /> : <Stack.Screen name="Main" component={MainTabs} />}
       </Stack.Navigator>
     </NavigationContainer>
   )
 }
-
