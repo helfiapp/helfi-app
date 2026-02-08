@@ -615,36 +615,13 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             <p className="text-sm text-slate-600 mt-1">{periodRangeLabel}</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            {canManualReport && (
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={runManualReport}
-                  disabled={manualStatus === 'running'}
-                  className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
-                >
-                  {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
-                </button>
-                {progressActive && (
-                  <div className="w-full max-w-xs">
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>{progressStage}</span>
-                      <span>{progressPercent}%</span>
-                    </div>
-                    <div className="mt-1 h-2 w-full rounded-full bg-gray-200">
-                      <div
-                        className="h-2 rounded-full bg-emerald-500"
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          {pdfHref && (
-            <a
-              href={pdfHref}
-              target="_blank"
-              rel="noreferrer"
+            {/* Intentionally hide "Create report now" on the report page to prevent accidental extra credit spend.
+               Report creation lives on the Insights page. */}
+            {pdfHref && (
+              <a
+                href={pdfHref}
+                target="_blank"
+                rel="noreferrer"
                 className="hidden md:inline-flex items-center rounded-lg border border-helfi-green px-4 py-2 text-sm font-medium text-helfi-green hover:bg-helfi-green/10"
               >
                 Download PDF
@@ -805,12 +782,14 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
               {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}.
             </p>
             <div className="mt-3">
-              <Link
-                href="/chat-log"
+              <a
+                href="/chat"
+                target="_blank"
+                rel="noreferrer"
                 className="inline-flex items-center rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100"
               >
-                Open chat log
-              </Link>
+                Open chat history (new tab)
+              </a>
             </div>
             {talkToAiSummary.topics && talkToAiSummary.topics.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
