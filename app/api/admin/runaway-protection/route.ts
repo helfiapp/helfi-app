@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
 
   const state = await getCircuitState('health-setup-saves')
   return NextResponse.json({
+    ok: true,
+    action: 'status',
     scope: 'health-setup-saves',
     ...state,
     openUntil: state.openUntil?.toISOString() || null,
@@ -84,4 +86,3 @@ export async function POST(request: NextRequest) {
     openUntil: state.openUntil?.toISOString() || null,
   })
 }
-

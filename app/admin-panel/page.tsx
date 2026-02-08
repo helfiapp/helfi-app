@@ -6220,7 +6220,9 @@ The Helfi Team`,
                 )}
 
                 {runawayProtectionResult && (() => {
-                  const ok = !!runawayProtectionResult.ok
+                  const ok = typeof runawayProtectionResult.ok === 'boolean'
+                    ? runawayProtectionResult.ok
+                    : (typeof runawayProtectionResult.open === 'boolean')
                   const isPaused = !!runawayProtectionResult.open
                   const action = runawayProtectionResult.action ? String(runawayProtectionResult.action) : 'status'
                   const openUntil = runawayProtectionResult.openUntil ? String(runawayProtectionResult.openUntil) : null
