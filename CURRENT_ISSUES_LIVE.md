@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE:
+- Date/time: Sun Feb 8 18:27 AEDT 2026
+- What changed: Reduced the database spike checker frequency from every 5 minutes to every 1 hour to lower overhead.
+- Where to see it (page/link): (No UI change. Background safety check schedule only.)
+- What to quickly test: Nothing needed. You’ll still receive the spike email if unusual database activity happens, just checked hourly instead of every 5 minutes.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 17:56 AEDT 2026
 - What changed: Made the Runaway Protection button a simple toggle: when Health Setup saving is not paused it shows “Pause”, and after you pause it changes to “Unpause”; after unpausing it goes back to “Pause”.
 - Where to see it (page/link): https://helfi.ai/admin-panel?tab=templates (Test Email System)
