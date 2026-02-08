@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE:
+- Date/time: Sun Feb 8 17:07 AEDT 2026
+- What changed: Added an “Unpause Now” button in the admin panel so you can instantly turn off the temporary Health Setup save pause if needed.
+- Where to see it (page/link): https://helfi.ai/main-admin (Templates tab -> “Test Email System”)
+- What to quickly test: Click “Unpause Now” (it should succeed even if nothing is paused). Then click “Test Spike Alarm + Pause”, confirm you get the email, and confirm “Unpause Now” removes the pause immediately.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 17:05 AEDT 2026
 - What changed: Added a “runaway protection” alarm + temporary auto-pause for Health Setup saves to help prevent another Neon spike if a bug causes repeated database writes. Also improved the existing write-spike email alert so it checks for spikes even when Neon cost data is unavailable.
 - Where to see it (page/link): https://helfi.ai/main-admin (Templates tab -> “Test Email System” -> “Test Spike Alarm + Pause”)

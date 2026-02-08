@@ -2181,6 +2181,41 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     setIsTestingRunawayProtection(false)
   }
 
+  const handleRunawayProtectionUnpause = async () => {
+    setIsTestingRunawayProtection(true)
+    setRunawayProtectionResult(null)
+
+    try {
+      const response = await fetch('/api/admin/runaway-protection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ action: 'close' }),
+      })
+
+      const result = await response.json()
+      setRunawayProtectionResult(result)
+
+      if (response.ok && result.ok) {
+        alert('Health setup saves unpaused.')
+      } else {
+        alert(`Unpause failed.\n\n${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Runaway protection unpause error:', error)
+      setRunawayProtectionResult({
+        ok: false,
+        error: 'Network error',
+        details: { errorMessage: error instanceof Error ? error.message : 'Unknown error' },
+      })
+      alert('Unpause failed: Network error')
+    }
+
+    setIsTestingRunawayProtection(false)
+  }
+
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'ONBOARDING': return 'bg-green-100 text-green-800'
@@ -6062,6 +6097,13 @@ The Helfi Team`,
                       className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isTestingRunawayProtection ? '🔄 Testing...' : '🚨 Test Spike Alarm + Pause'}
+                    </button>
+                    <button
+                      onClick={handleRunawayProtectionUnpause}
+                      disabled={isTestingRunawayProtection}
+                      className="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      🔓 Unpause Now
                     </button>
                   </div>
                 </div>
