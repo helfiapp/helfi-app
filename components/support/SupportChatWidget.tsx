@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { getCurrentSupportAgent, getSupportAgentForTimestamp } from '@/lib/support-agents'
 
@@ -32,8 +32,10 @@ const STORAGE_KEYS = {
 export default function SupportChatWidget() {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const isHome = pathname === '/'
   const isLoggedIn = Boolean(session?.user?.email)
+  const isOpenedFromNativeApp = searchParams.get('helfiNative') === '1'
   const [isOpen, setIsOpen] = useState(false)
   const [isWidgetHidden, setIsWidgetHidden] = useState(false)
   const [hasReachedAnchor, setHasReachedAnchor] = useState(!isHome)
@@ -69,7 +71,12 @@ export default function SupportChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   const isChatClosed = ticket && ['RESOLVED', 'CLOSED'].includes(ticket.status)
-  const shouldHideWidget = pathname === '/support' || pathname.startsWith('/admin-panel') || pathname.startsWith('/main-admin')
+  const shouldHideWidget =
+    pathname === '/support' ||
+    pathname.startsWith('/admin-panel') ||
+    pathname.startsWith('/main-admin') ||
+    pathname.startsWith('/auth/') ||
+    isOpenedFromNativeApp
   const agent = useMemo(() => {
     if (ticket?.createdAt) {
       return getSupportAgentForTimestamp(new Date(ticket.createdAt))

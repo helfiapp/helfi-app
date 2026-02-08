@@ -52,7 +52,7 @@ export function LoginScreen() {
 
   const openWebLogin = async () => {
     try {
-      await Linking.openURL(`${API_BASE_URL}/auth/signin`)
+      await Linking.openURL(`${API_BASE_URL}/auth/signin?helfiNative=1`)
     } catch {
       Alert.alert('Could not open the login page', 'Please try again.')
     }
@@ -60,7 +60,7 @@ export function LoginScreen() {
 
   const openWebSignup = async () => {
     try {
-      await Linking.openURL(`${API_BASE_URL}/auth/signin?mode=signup`)
+      await Linking.openURL(`${API_BASE_URL}/auth/signin?mode=signup&helfiNative=1`)
     } catch {
       Alert.alert('Could not open the sign-up page', 'Please try again.')
     }
@@ -68,9 +68,25 @@ export function LoginScreen() {
 
   const openForgotPassword = async () => {
     try {
-      await Linking.openURL(`${API_BASE_URL}/auth/forgot-password`)
+      await Linking.openURL(`${API_BASE_URL}/auth/forgot-password?helfiNative=1`)
     } catch {
       Alert.alert('Could not open the password reset page', 'Please try again.')
+    }
+  }
+
+  const openTerms = async () => {
+    try {
+      await Linking.openURL(`${API_BASE_URL}/terms?helfiNative=1`)
+    } catch {
+      Alert.alert('Could not open the terms page', 'Please try again.')
+    }
+  }
+
+  const openPrivacy = async () => {
+    try {
+      await Linking.openURL(`${API_BASE_URL}/privacy?helfiNative=1`)
+    } catch {
+      Alert.alert('Could not open the privacy policy page', 'Please try again.')
     }
   }
 
@@ -256,8 +272,15 @@ export function LoginScreen() {
                   </Pressable>
 
                   <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 15 }}>
-                    By continuing, you agree to our <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>Terms of Service</Text> and{' '}
-                    <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>Privacy Policy</Text>.
+                    By continuing, you agree to our{' '}
+                    <Text onPress={openTerms} style={{ color: theme.colors.primary, fontWeight: '800' }}>
+                      Terms of Service
+                    </Text>{' '}
+                    and{' '}
+                    <Text onPress={openPrivacy} style={{ color: theme.colors.primary, fontWeight: '800' }}>
+                      Privacy Policy
+                    </Text>
+                    .
                   </Text>
                 </View>
               </View>
