@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE:
+- Date/time: Sun Feb 8 17:36 AEDT 2026
+- What changed: The admin “Runaway Protection” box now clearly shows if Health Setup saving is currently Paused or Not paused, and adds a “Check Status” button so you can confirm the current state after clicking Unpause.
+- Where to see it (page/link): https://helfi.ai/admin-panel?tab=templates (Test Email System)
+- What to quickly test: Click “Check Status” and confirm it says “NOT paused”. Click “Test Spike Alarm + Pause” and confirm it says “PAUSED” with a time. Click “Unpause Now” then “Check Status” again and confirm it says “NOT paused”.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 17:17 AEDT 2026
 - What changed: Fixed the Admin Panel “Refresh Token” so it works even if your admin login expired, and the admin panel now auto-refreshes the token on page load so you don’t get logged out and lose the Users list.
 - Where to see it (page/link): https://helfi.ai/main-admin?tab=management
