@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE:
+- Date/time: Sun Feb 8 17:05 AEDT 2026
+- What changed: Added a “runaway protection” alarm + temporary auto-pause for Health Setup saves to help prevent another Neon spike if a bug causes repeated database writes. Also improved the existing write-spike email alert so it checks for spikes even when Neon cost data is unavailable.
+- Where to see it (page/link): https://helfi.ai/main-admin (Templates tab -> “Test Email System” -> “Test Spike Alarm + Pause”)
+- What to quickly test: Click “Test Spike Alarm + Pause” and confirm you receive the email. Then try saving Health Setup right after (it should say it’s temporarily paused). Wait ~2 minutes and it should save normally again.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 04:02 AEDT 2026
 - What changed: Weekly Health Report: fixed Supplements trust (no medications in Supplements, no duplicate supplement suggestions), added modern charts + mobile-friendly report view, and prevented "sleep consistency" claims unless real wearable sleep data exists.
 - Where to see it (page/link): https://helfi.ai/insights/weekly-report
