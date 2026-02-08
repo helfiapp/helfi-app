@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { sendWriteSpikeAlertEmail } from '@/lib/admin-alerts'
 import { estimateDailyCostUsd, fetchNeonUsageSummary } from '@/lib/neon-usage'
 import { formatNumber, getSpikeCandidates } from '@/lib/usage-report'
+import { openCircuit } from '@/lib/safety-circuit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -54,37 +55,6 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date()
-  const warningUsdRaw = Number(process.env.NEON_DAILY_COST_WARNING_USD || '1')
-  const warningUsd = Number.isFinite(warningUsdRaw) && warningUsdRaw >= 0 ? warningUsdRaw : 1
-  const shouldCheckCost = warningUsd > 0
-
-  if (shouldCheckCost) {
-    const costWindowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    const neonUsage = await fetchNeonUsageSummary({
-      from: costWindowStart.toISOString(),
-      to: now.toISOString(),
-      granularity: 'daily',
-      orgId: (process.env.NEON_ORG_ID || '').trim() || undefined,
-    })
-    const costEstimate = estimateDailyCostUsd(neonUsage)
-
-    if (costEstimate.estimatedDailyCostUsd === null) {
-      return NextResponse.json({
-        skipped: true,
-        reason: 'daily_cost_unavailable',
-        note: costEstimate.note || neonUsage?.note || 'Daily cost estimate unavailable.',
-      })
-    }
-
-    if (costEstimate.estimatedDailyCostUsd < warningUsd) {
-      return NextResponse.json({
-        skipped: true,
-        reason: 'daily_cost_below_threshold',
-        estimatedDailyCostUsd: costEstimate.estimatedDailyCostUsd,
-        warningUsd,
-      })
-    }
-  }
 
   const recentMinutes = 10
   const baselineHours = 6
@@ -112,13 +82,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, spikes: 0 })
   }
 
+  // Optional context: include Neon API usage estimate if available.
+  let neonNote: string | null = null
+  let estimatedDailyCostUsd: number | null = null
+  try {
+    const costWindowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const neonUsage = await fetchNeonUsageSummary({
+      from: costWindowStart.toISOString(),
+      to: now.toISOString(),
+      granularity: 'daily',
+      orgId: (process.env.NEON_ORG_ID || '').trim() || undefined,
+    })
+    const costEstimate = estimateDailyCostUsd(neonUsage)
+    estimatedDailyCostUsd = costEstimate.estimatedDailyCostUsd
+    neonNote = costEstimate.note || neonUsage?.note || null
+  } catch {}
+
   const scope = 'write-spike-alert'
   const allowed = await canSendAlert(scope, 60)
   if (!allowed) {
     return NextResponse.json({ ok: true, spikes: spikes.length, suppressed: true })
   }
 
-  const recipientEmail = 'support@helfi.ai'
+  const recipientEmail = ((process.env.OWNER_EMAIL || 'support@helfi.ai') as string).trim() || 'support@helfi.ai'
   const subject = 'Helfi write spike alert'
 
   const listHtml = spikes
@@ -128,11 +114,37 @@ export async function GET(request: NextRequest) {
     )
     .join('')
 
+  // Auto-pause health setup saves if we see an "impossible" HealthGoal spike.
+  try {
+    const healthGoalSpike = spikes.find((row) => row.table === 'HealthGoal')
+    const baseline = healthGoalSpike?.baselinePerWindow || 0
+    const recent = healthGoalSpike?.recentCount || 0
+    const severe = !!healthGoalSpike && (recent >= 200 || (baseline > 0 && recent >= baseline * 10))
+    if (severe) {
+      openCircuit({
+        scope: 'health-setup-saves',
+        minutes: 15,
+        reason: `Health goals write spike detected (${recent} in ${recentMinutes} mins).`,
+      }).catch(() => {})
+    }
+  } catch {}
+
+  const costLine =
+    estimatedDailyCostUsd !== null
+      ? `<p style="margin: 0 0 12px 0;"><strong>Estimated Neon daily cost (approx):</strong> $${estimatedDailyCostUsd.toFixed(2)}</p>`
+      : '<p style="margin: 0 0 12px 0;"><strong>Estimated Neon daily cost (approx):</strong> unavailable.</p>'
+  const noteLine = neonNote ? `<p style="margin: 0 0 12px 0; color:#b91c1c;">Note: ${neonNote}</p>` : ''
+
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
       <h2 style="margin: 0 0 12px 0;">Write spike alert</h2>
       <p style="margin: 0 0 12px 0;">Window: last ${recentMinutes} minutes.</p>
+      ${costLine}
+      ${noteLine}
       <ul>${listHtml}</ul>
+      <p style="margin: 12px 0 0 0; color:#6b7280; font-size:12px;">
+        If the spike looks like a bug, the app may temporarily pause health setup saves to protect the database.
+      </p>
     </div>
   `
 

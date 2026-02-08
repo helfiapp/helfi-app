@@ -11,6 +11,8 @@ import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credi
 import { ensureSupplementCatalogSchema } from '@/lib/supplement-catalog-db'
 import { ensureMedicationCatalogSchema } from '@/lib/medication-catalog-db'
 import { createWriteGuard, hashPayload } from '@/lib/write-guard'
+import { getCircuitState, openCircuit } from '@/lib/safety-circuit'
+import { sendWriteSpikeAlertEmail } from '@/lib/admin-alerts'
 
 const normalizeTimingList = (timing: any) => {
   if (Array.isArray(timing)) {
@@ -855,30 +857,77 @@ export async function POST(request: NextRequest) {
       console.log('✅ Found existing user with ID:', user.id)
     }
     
-    console.timeEnd('⏱️ User Lookup/Creation')
+	    console.timeEnd('⏱️ User Lookup/Creation')
 
-    if (touchesHealthSetup && !manualSync) {
-      try {
-        const writeGuard = createWriteGuard(prisma)
-        const guardPayload = buildWriteGuardPayload(data)
-        const payloadHash = hashPayload(guardPayload)
-        const guardResult = await writeGuard.readGuard({
+	    // Global runaway protection: if we have detected a loop, pause only health-setup saves.
+	    if (touchesHealthSetup && !manualSync) {
+	      const circuit = await getCircuitState('health-setup-saves')
+	      if (circuit.open) {
+	        return NextResponse.json(
+	          {
+	            error:
+	              'Health setup saving is temporarily paused due to unusually high activity. Please try again in a few minutes.',
+	            paused: true,
+	            openUntil: circuit.openUntil?.toISOString() || null,
+	            reason: circuit.reason || null,
+	          },
+	          { status: 503 }
+	        )
+	      }
+	    }
+
+	    if (touchesHealthSetup && !manualSync) {
+	      try {
+	        const writeGuard = createWriteGuard(prisma)
+	        const guardPayload = buildWriteGuardPayload(data)
+	        const payloadHash = hashPayload(guardPayload)
+	        const guardResult = await writeGuard.readGuard({
           ownerKey: user.id,
           scope: 'user-data:health-setup',
           payloadHash,
           windowMs: 90 * 1000,
         })
-        if (guardResult.skip) {
-          console.log('🛑 Write guard: skipped repeat health setup save', {
-            userId: user.id,
-            hitCount: guardResult.hitCount,
-          })
-          return NextResponse.json({
-            success: true,
-            skipped: true,
-            reason: 'repeat_write_guard',
-          })
-        }
+	        if (guardResult.skip) {
+	          console.log('🛑 Write guard: skipped repeat health setup save', {
+	            userId: user.id,
+	            hitCount: guardResult.hitCount,
+	          })
+
+	          // If we see a big burst of identical saves, assume a runaway loop and pause saves globally.
+	          if (guardResult.hitCount === 25) {
+	            const recipientEmail = ((process.env.OWNER_EMAIL || 'support@helfi.ai') as string).trim() || 'support@helfi.ai'
+	            openCircuit({
+	              scope: 'health-setup-saves',
+	              minutes: 10,
+	              reason: `Runaway health setup saves detected (repeat payload x${guardResult.hitCount} within ~90s).`,
+	            }).catch(() => {})
+	            sendWriteSpikeAlertEmail({
+	              recipientEmail,
+	              subject: 'Helfi runaway protection activated',
+	              html: `
+                    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+                      <h2 style="margin: 0 0 12px 0;">Runaway protection activated</h2>
+                      <p style="margin: 0 0 12px 0;">
+                        We detected a burst of repeated health setup saves (same data sent many times quickly).
+                      </p>
+                      <p style="margin: 0 0 12px 0;">
+                        Action taken: health setup saves are paused for ~10 minutes to prevent a database spike.
+                      </p>
+                      <p style="margin: 0 0 12px 0;"><strong>User:</strong> ${userEmail}</p>
+                      <p style="margin: 0 0 12px 0;"><strong>Repeat count:</strong> ${guardResult.hitCount}</p>
+                    </div>
+                  `,
+	            }).catch((error) => {
+	              console.error('[runaway protection] alert email failed', error)
+	            })
+	          }
+
+	          return NextResponse.json({
+	            success: true,
+	            skipped: true,
+	            reason: 'repeat_write_guard',
+	          })
+	        }
       } catch (guardError) {
         console.warn('Write guard failed (non-blocking)', guardError)
       }

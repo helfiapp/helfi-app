@@ -158,6 +158,8 @@ export default function AdminPanel() {
   const [testEmail, setTestEmail] = useState('')
   const [isTestingEmail, setIsTestingEmail] = useState(false)
   const [emailTestResult, setEmailTestResult] = useState<any>(null)
+  const [isTestingRunawayProtection, setIsTestingRunawayProtection] = useState(false)
+  const [runawayProtectionResult, setRunawayProtectionResult] = useState<any>(null)
 
   // Support ticket states
   const [supportTickets, setSupportTickets] = useState<any[]>([])
@@ -2140,6 +2142,43 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     }
 
     setIsTestingEmail(false)
+  }
+
+  const handleRunawayProtectionTest = async () => {
+    setIsTestingRunawayProtection(true)
+    setRunawayProtectionResult(null)
+
+    try {
+      const response = await fetch('/api/admin/runaway-protection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ action: 'test' }),
+      })
+
+      const result = await response.json()
+      setRunawayProtectionResult(result)
+
+      if (response.ok && result.ok) {
+        alert(
+          `Runaway protection test triggered.\n\nPaused until: ${result.openUntil || 'unknown'}\nEmail sent: ${result.emailOk ? 'Yes' : 'No'}`
+        )
+      } else {
+        alert(`Runaway protection test failed.\n\n${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Runaway protection test error:', error)
+      setRunawayProtectionResult({
+        ok: false,
+        error: 'Network error',
+        details: { errorMessage: error instanceof Error ? error.message : 'Unknown error' },
+      })
+      alert('Runaway protection test failed: Network error')
+    }
+
+    setIsTestingRunawayProtection(false)
   }
 
   const getCategoryColor = (category: string) => {
@@ -6001,7 +6040,7 @@ The Helfi Team`,
                   This will send a test email to verify the Resend API configuration.
                 </p>
 
-                <div className="flex space-x-3 mb-4">
+                <div className="flex flex-col md:flex-row md:items-center md:space-x-3 mb-4 space-y-3 md:space-y-0">
                   <input
                     type="email"
                     placeholder="Enter your email address"
@@ -6009,13 +6048,22 @@ The Helfi Team`,
                     onChange={(e) => setTestEmail(e.target.value)}
                     className="flex-1 px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
-                  <button
-                    onClick={handleEmailTest}
-                    disabled={isTestingEmail || !testEmail.trim()}
-                    className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isTestingEmail ? '🔄 Sending...' : '📧 Send Test Email'}
-                  </button>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={handleEmailTest}
+                      disabled={isTestingEmail || !testEmail.trim()}
+                      className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isTestingEmail ? '🔄 Sending...' : '📧 Send Test Email'}
+                    </button>
+                    <button
+                      onClick={handleRunawayProtectionTest}
+                      disabled={isTestingRunawayProtection}
+                      className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isTestingRunawayProtection ? '🔄 Testing...' : '🚨 Test Spike Alarm + Pause'}
+                    </button>
+                  </div>
                 </div>
 
                 {emailTestResult && (
@@ -6042,6 +6090,32 @@ The Helfi Team`,
                         <div><strong>Error:</strong> {emailTestResult.error}</div>
                         <div><strong>Details:</strong> {emailTestResult.details?.errorMessage || 'Unknown error'}</div>
                         <div><strong>Timestamp:</strong> {emailTestResult.details?.timestamp}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {runawayProtectionResult && (
+                  <div className={`p-4 rounded-lg border ${
+                    runawayProtectionResult.ok
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : 'bg-red-50 border-red-200 text-red-800'
+                  }`}>
+                    <div className="font-semibold mb-2">
+                      {runawayProtectionResult.ok ? '✅ Runaway Protection Test Triggered' : '❌ Runaway Protection Test Failed'}
+                    </div>
+                    {runawayProtectionResult.ok ? (
+                      <div className="text-sm space-y-1">
+                        <div><strong>Paused until:</strong> {runawayProtectionResult.openUntil || 'unknown'}</div>
+                        <div><strong>Email sent:</strong> {runawayProtectionResult.emailOk ? 'Yes' : 'No'}</div>
+                        <div className="mt-2 p-2 bg-green-100 rounded">
+                          Try saving health setup right now. If the pause is active, it should show a “temporarily paused” message.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm space-y-1">
+                        <div><strong>Error:</strong> {runawayProtectionResult.error || 'Unknown error'}</div>
+                        <div><strong>Details:</strong> {runawayProtectionResult.details?.errorMessage || ''}</div>
                       </div>
                     )}
                   </div>
