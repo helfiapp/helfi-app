@@ -2827,8 +2827,9 @@ Rules:
 - Do not claim you can measure “sleep consistency” unless the JSON includes real sleep tracking data. If sleep data is missing, do not mention sleep consistency at all.
 - Supplements section rules:
   - Do NOT put medications in the Supplements section. If an item is in medications JSON, it must go in the Medications section (or be omitted if unclear).
-  - Do NOT “suggest” or “avoid” a supplement the user already takes (as listed in the supplements JSON). If they already take it, it can only appear in supplements.working.
+  - If you mention a supplement the user already takes (as listed in the supplements JSON), it MUST go in supplements.working (not suggested/avoid). Use it to explain how their current plan supports their goals.
   - Do not repeat the same supplement across working/suggested/avoid. Pick the single best bucket.
+  - If the JSON includes supplements, prioritize describing the user's CURRENT supplement plan in supplements.working. Aim to include most (ideally all) of their listed supplements by name, with dose/timing if present.
   - If the JSON includes 6+ supplements, include at least 6 supplement items across supplements.working + supplements.suggested (unless the JSON is missing supplement names).
   - For each supplement item you include: use the exact supplement name from JSON, mention dosage/timing if provided, and tie it to at least one named goal/issue from JSON when possible.
   - If a supplement name is unclear (brand blend / unknown ingredients), say you can’t connect it confidently yet and avoid guessing ingredients.

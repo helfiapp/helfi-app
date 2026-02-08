@@ -5,8 +5,8 @@ type ReportSectionBucket = { working: ReportItem[]; suggested: ReportItem[]; avo
 type ReportSections = Record<string, ReportSectionBucket>
 
 export type WeeklyReportSanitizeContext = {
-  supplements: Array<{ name?: string | null }>
-  medications: Array<{ name?: string | null }>
+  supplements: Array<{ name?: string | null; dosage?: string | null; timing?: string[] | null }>
+  medications: Array<{ name?: string | null; dosage?: string | null; timing?: string[] | null }>
 }
 
 const KNOWN_MEDICATION_NAME_BLOCKLIST = new Set<string>([
@@ -171,6 +171,23 @@ function filterBucket(items: ReportItem[], keep: (item: { name: string; reason: 
   return next
 }
 
+function formatTiming(value: any) {
+  if (!value) return ''
+  const arr = Array.isArray(value) ? value : []
+  const cleaned = arr.map((v) => String(v || '').trim()).filter(Boolean)
+  if (!cleaned.length) return ''
+  return cleaned.join(', ')
+}
+
+function buildProfileLine(row: { dosage?: string | null; timing?: string[] | null }) {
+  const dose = String(row?.dosage || '').trim()
+  const timing = formatTiming(row?.timing)
+  if (dose && timing) return `Dose: ${dose} • Timing: ${timing}`
+  if (dose) return `Dose: ${dose}`
+  if (timing) return `Timing: ${timing}`
+  return ''
+}
+
 export function sanitizeWeeklyReportSections<T extends ReportSections>(sections: T, ctx: WeeklyReportSanitizeContext): T {
   const out: ReportSections = { ...(sections || ({} as any)) }
 
@@ -223,13 +240,33 @@ export function sanitizeWeeklyReportSections<T extends ReportSections>(sections:
     supplements.working = [...(supplements.working || []), ...movedToSupplements]
   }
 
-  // 3) Already-taken items cannot appear in "suggested" or "avoid".
-  const stripKnownFromSuggestedAvoid = (bucket: ReportSectionBucket, knownCore: Set<string>) => {
-    bucket.suggested = filterBucket(bucket.suggested || [], (it) => !isKnownByCore(it.name, knownCore))
-    bucket.avoid = filterBucket(bucket.avoid || [], (it) => !isKnownByCore(it.name, knownCore))
+  // 3) If an item is already in the user's list, it should be treated as part of their current plan.
+  //    Move it into "working" rather than leaving "suggested/avoid" empty and confusing.
+  const moveKnownFromSuggestedAvoidIntoWorking = (bucket: ReportSectionBucket, knownCore: Set<string>) => {
+    const move = (items: ReportItem[], prefix: string) => {
+      const kept: Array<{ name: string; reason: string }> = []
+      for (const item of items || []) {
+        const normalized = normalizeReportItem(item)
+        if (!normalized.name) continue
+        if (isKnownByCore(normalized.name, knownCore)) {
+          bucket.working = [
+            ...(bucket.working || []),
+            {
+              name: normalized.name,
+              reason: prefix ? `${prefix}${normalized.reason ? ` ${normalized.reason}` : ''}`.trim() : normalized.reason,
+            },
+          ]
+        } else {
+          kept.push(normalized)
+        }
+      }
+      return kept
+    }
+    bucket.suggested = move(bucket.suggested || [], '')
+    bucket.avoid = move(bucket.avoid || [], 'Review with a clinician:')
   }
-  stripKnownFromSuggestedAvoid(supplements, knownSupplements.core)
-  stripKnownFromSuggestedAvoid(medications, knownMedications.core)
+  moveKnownFromSuggestedAvoidIntoWorking(supplements, knownSupplements.core)
+  moveKnownFromSuggestedAvoidIntoWorking(medications, knownMedications.core)
 
   // 4) Deduplicate within each section bucket (by core name).
   dedupeWithinBucketByCore(supplements)
@@ -252,6 +289,40 @@ export function sanitizeWeeklyReportSections<T extends ReportSections>(sections:
   supplements.working = stripIfInMedications(supplements.working || [])
   supplements.suggested = stripIfInMedications(supplements.suggested || [])
   supplements.avoid = stripIfInMedications(supplements.avoid || [])
+
+  // 6) Doctor-ready: ensure every current supplement/medication appears at least once in the report content.
+  const ensureCoverage = (
+    bucket: ReportSectionBucket,
+    list: Array<{ name?: string | null; dosage?: string | null; timing?: string[] | null }>,
+    label: string
+  ) => {
+    const present = new Set<string>()
+    for (const item of [...(bucket.working || []), ...(bucket.suggested || []), ...(bucket.avoid || [])]) {
+      const key = canonicalizeCore(String((item as any)?.name || ''))
+      if (key) present.add(key)
+    }
+
+    for (const row of list || []) {
+      const name = String(row?.name || '').trim()
+      if (!name) continue
+      const key = canonicalizeCore(name)
+      if (!key) continue
+      if (present.has(key)) continue
+      present.add(key)
+      const profileLine = buildProfileLine(row)
+      bucket.working = [
+        ...(bucket.working || []),
+        {
+          name,
+          reason: profileLine
+            ? `${profileLine}\nNext step: Confirm with your clinician what this is for and whether the dose/timing fits your goals.`
+            : `${label} (in your saved list).\nNext step: Confirm with your clinician what this is for and whether it fits your goals.`,
+        },
+      ]
+    }
+  }
+  ensureCoverage(supplements, ctx?.supplements || [], 'Current supplement')
+  ensureCoverage(medications, ctx?.medications || [], 'Current medication')
 
   out.supplements = supplements
   out.medications = medications

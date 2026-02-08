@@ -9,6 +9,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 type SeriesPoint = { date: string; value: number }
+type ReportItem = { name?: string; reason?: string }
 
 function parseReportPayload(payload: any) {
   if (!payload) return null
@@ -59,6 +60,13 @@ function formatRange(start: string, end: string) {
   return `${start} to ${end}`
 }
 
+function formatTiming(value: any) {
+  const arr = Array.isArray(value) ? value : []
+  const cleaned = arr.map((v) => String(v || '').trim()).filter(Boolean)
+  if (!cleaned.length) return '-'
+  return cleaned.join(', ')
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -90,7 +98,9 @@ export async function GET(request: NextRequest) {
     const periodEnd = report.periodEnd ? new Date(`${report.periodEnd}T23:59:59Z`) : new Date()
     const days = toRangeDates(periodStart, periodEnd)
 
-    const [foodLogs, waterLogs, healthLogs, exerciseLogs, exerciseEntries, moodRows, symptomAnalyses] = await Promise.all([
+    const [supplementRows, medicationRows, foodLogs, waterLogs, healthLogs, exerciseLogs, exerciseEntries, moodRows, symptomAnalyses] = await Promise.all([
+      prisma.supplement.findMany({ where: { userId }, select: { name: true, dosage: true, timing: true } }),
+      prisma.medication.findMany({ where: { userId }, select: { name: true, dosage: true, timing: true } }),
       prisma.foodLog.findMany({
         where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
         select: { createdAt: true, nutrients: true },
@@ -246,6 +256,21 @@ export async function GET(request: NextRequest) {
       cursorY -= 2
     }
 
+    const drawList = (items: Array<{ label: string; body?: string }>) => {
+      items.forEach((item) => {
+        const label = String(item.label || '').trim()
+        const body = String(item.body || '').trim()
+        if (!label && !body) return
+        drawText(`• ${label}`, 11, true, rgb(0.12, 0.14, 0.2))
+        if (body) {
+          drawText(body, 10, false, rgb(0.2, 0.22, 0.28))
+        }
+        cursorY -= 2
+      })
+    }
+
+    const safeItems = (raw: any): ReportItem[] => (Array.isArray(raw) ? raw : [])
+
     const drawCard = (title: string, body: string, accent: { r: number; g: number; b: number }) => {
       const cardHeight = 70
       if (cursorY - cardHeight < margin) newPage()
@@ -340,6 +365,33 @@ export async function GET(request: NextRequest) {
     drawText(`Report period: ${formatRange(report.periodStart, report.periodEnd)}`, 10, false, rgb(0.35, 0.38, 0.42))
     cursorY -= 6
 
+    drawSubheading('Current plan (for your clinician)')
+    if (supplementRows.length) {
+      drawText('Supplements', 11, true, rgb(0.12, 0.14, 0.2))
+      drawList(
+        supplementRows.map((s) => ({
+          label: String(s.name || 'Supplement'),
+          body: `Dose: ${String(s.dosage || '-')} • Timing: ${formatTiming(s.timing)}`,
+        }))
+      )
+    } else {
+      drawText('Supplements: none listed', 10, false, rgb(0.35, 0.38, 0.42))
+    }
+    cursorY -= 4
+    if (medicationRows.length) {
+      drawText('Medications', 11, true, rgb(0.12, 0.14, 0.2))
+      drawList(
+        medicationRows.map((m) => ({
+          label: String(m.name || 'Medication'),
+          body: `Dose: ${String(m.dosage || '-')} • Timing: ${formatTiming(m.timing)}`,
+        }))
+      )
+    } else {
+      drawText('Medications: none listed', 10, false, rgb(0.35, 0.38, 0.42))
+    }
+
+    cursorY -= 10
+
     if (summaryText) {
       drawCard('Weekly summary', summaryText, { r: 0.08, g: 0.72, b: 0.55 })
     }
@@ -419,6 +471,71 @@ export async function GET(request: NextRequest) {
         }
       })
     }
+
+    // Full detail sections (doctor-ready)
+    const fullSectionOrder = [
+      'overview',
+      'supplements',
+      'medications',
+      'nutrition',
+      'hydration',
+      'exercise',
+      'lifestyle',
+      'labs',
+      'mood',
+      'symptoms',
+    ]
+    const fullLabels: Record<string, string> = {
+      overview: 'Overview',
+      supplements: 'Supplements',
+      medications: 'Medications',
+      nutrition: 'Nutrition',
+      hydration: 'Hydration',
+      exercise: 'Exercise',
+      lifestyle: 'Lifestyle',
+      labs: 'Labs',
+      mood: 'Mood',
+      symptoms: 'Symptoms',
+    }
+    drawSubheading('Full report details')
+    fullSectionOrder.forEach((key) => {
+      const data = sections?.[key]
+      if (!data) return
+
+      const working = safeItems(data?.working)
+      const suggested = safeItems(data?.suggested)
+      const avoid = safeItems(data?.avoid)
+      if (!working.length && !suggested.length && !avoid.length) return
+
+      drawText(fullLabels[key] || key, 14, true, rgb(0.02, 0.45, 0.31))
+      cursorY -= 2
+
+      const drawBucket = (title: string, items: ReportItem[]) => {
+        if (!items.length) return
+        drawText(title, 11, true, rgb(0.12, 0.14, 0.2))
+        items.forEach((item) => {
+          const name = String(item?.name || '').trim()
+          const reason = String(item?.reason || '').trim()
+          if (!name && !reason) return
+          if (name) drawText(`• ${name}`, 10, true, rgb(0.2, 0.22, 0.28))
+          if (reason) drawText(reason, 10, false, rgb(0.25, 0.26, 0.3))
+          cursorY -= 1
+        })
+        cursorY -= 4
+      }
+
+      if (key === 'supplements') {
+        drawBucket('Your plan', working)
+        drawBucket('Possible additions (optional)', suggested)
+        drawBucket('Review with doctor', avoid)
+      } else {
+        drawBucket("What's working", working)
+        drawBucket('Suggestions', suggested)
+        drawBucket('Things to avoid', avoid)
+      }
+
+      cursorY -= 6
+    })
 
     if (labTrendSummary && labTrendSummary.length > 0) {
       drawSubheading('Lab result changes')

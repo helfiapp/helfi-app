@@ -215,8 +215,8 @@ function parseJsonObject(value: any): any | null {
 
 async function getWeeklyReportSanitizeContext(userId: string): Promise<WeeklyReportSanitizeContext> {
   const [supplements, medications] = await Promise.all([
-    prisma.supplement.findMany({ where: { userId }, select: { name: true } }),
-    prisma.medication.findMany({ where: { userId }, select: { name: true } }),
+    prisma.supplement.findMany({ where: { userId }, select: { name: true, dosage: true, timing: true } }),
+    prisma.medication.findMany({ where: { userId }, select: { name: true, dosage: true, timing: true } }),
   ])
   return { supplements, medications }
 }

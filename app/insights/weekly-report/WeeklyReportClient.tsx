@@ -33,7 +33,7 @@ function SectionBucket({ title, items }: { title: string; items: Array<{ name?: 
   if (!items?.length) {
     return (
       <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
-        No data yet for this area.
+        No items here yet.
       </div>
     )
   }
@@ -183,6 +183,15 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
     if (typeof report.dataSummary !== 'object') return null
     return report.dataSummary as any
   }, [report])
+
+  const supplementCopy = {
+    workingTitle: 'Your plan',
+    suggestedTitle: 'Possible additions (optional)',
+    avoidTitle: 'Review with doctor',
+    emptySuggested:
+      "No new additions suggested this week. If you're already on a large stack, the next best step is a clinician review for overlap, dose, and timing.",
+    emptyAvoid: 'No review flags detected for supplements in this report.',
+  }
 
   const dataWarning = (parsedSummary as any)?.dataWarning as string | null
   const talkToAiSummary = (parsedSummary as any)?.talkToAiSummary as
@@ -933,20 +942,38 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         <div id="sections" className="mt-6 grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1 space-y-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">What's working</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                {activeTab === 'supplements' ? supplementCopy.workingTitle : "What's working"}
+              </h3>
               <SectionBucket title="working" items={sections?.[activeTab]?.working || []} />
             </div>
           </div>
           <div className="lg:col-span-1 space-y-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Suggestions</h3>
-              <SectionBucket title="suggested" items={sections?.[activeTab]?.suggested || []} />
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                {activeTab === 'supplements' ? supplementCopy.suggestedTitle : 'Suggestions'}
+              </h3>
+              {activeTab === 'supplements' && !(sections?.[activeTab]?.suggested || []).length ? (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                  {supplementCopy.emptySuggested}
+                </div>
+              ) : (
+                <SectionBucket title="suggested" items={sections?.[activeTab]?.suggested || []} />
+              )}
             </div>
           </div>
           <div className="lg:col-span-1 space-y-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Things to avoid</h3>
-              <SectionBucket title="avoid" items={sections?.[activeTab]?.avoid || []} />
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                {activeTab === 'supplements' ? supplementCopy.avoidTitle : 'Things to avoid'}
+              </h3>
+              {activeTab === 'supplements' && !(sections?.[activeTab]?.avoid || []).length ? (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                  {supplementCopy.emptyAvoid}
+                </div>
+              ) : (
+                <SectionBucket title="avoid" items={sections?.[activeTab]?.avoid || []} />
+              )}
             </div>
           </div>
         </div>
