@@ -2260,6 +2260,15 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     setIsTestingRunawayProtection(false)
   }
 
+  const handleRunawayProtectionToggle = async () => {
+    const isPausedNow = !!runawayProtectionResult?.open
+    if (isPausedNow) {
+      await handleRunawayProtectionUnpause()
+      return
+    }
+    await handleRunawayProtectionTest()
+  }
+
   const handleRunawayProtectionCheckStatus = async () => {
     setIsTestingRunawayProtection(true)
     setRunawayProtectionResult(null)
@@ -6089,7 +6098,16 @@ The Helfi Team`,
                     </button>
                   )}
                   <button
-                    onClick={() => setShowEmailTest(!showEmailTest)}
+                    onClick={() => {
+                      const next = !showEmailTest
+                      setShowEmailTest(next)
+                      if (next) {
+                        // Auto-load current pause status so the button label matches reality.
+                        setTimeout(() => {
+                          handleRunawayProtectionCheckStatus()
+                        }, 0)
+                      }
+                    }}
                     className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
                   >
                     🧪 Test Email System
@@ -6167,18 +6185,19 @@ The Helfi Team`,
                       {isTestingEmail ? '🔄 Sending...' : '📧 Send Test Email'}
                     </button>
                     <button
-                      onClick={handleRunawayProtectionTest}
+                      onClick={handleRunawayProtectionToggle}
                       disabled={isTestingRunawayProtection}
-                      className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`text-white px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        runawayProtectionResult?.open
+                          ? 'bg-gray-700 hover:bg-gray-800'
+                          : 'bg-red-600 hover:bg-red-700'
+                      }`}
                     >
-                      {isTestingRunawayProtection ? '🔄 Testing...' : '🚨 Test Spike Alarm + Pause'}
-                    </button>
-                    <button
-                      onClick={handleRunawayProtectionUnpause}
-                      disabled={isTestingRunawayProtection}
-                      className="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      🔓 Unpause Now
+                      {isTestingRunawayProtection
+                        ? '🔄 Working...'
+                        : runawayProtectionResult?.open
+                          ? '🔓 Unpause Now'
+                          : '⏸ Pause (2 min test)'}
                     </button>
                     <button
                       onClick={handleRunawayProtectionCheckStatus}
