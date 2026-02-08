@@ -1,5 +1,5 @@
 import React from 'react'
-import { Text, TextInput, View } from 'react-native'
+import { StyleProp, Text, TextInput, TextStyle, View, ViewStyle } from 'react-native'
 
 import { theme } from './theme'
 
@@ -13,6 +13,8 @@ export function HelfiTextField({
   keyboardType,
   textContentType,
   autoComplete,
+  right,
+  inputStyle,
 }: {
   label: string
   value: string
@@ -23,6 +25,8 @@ export function HelfiTextField({
   keyboardType?: 'default' | 'email-address'
   textContentType?: 'emailAddress' | 'password' | 'username'
   autoComplete?: 'email' | 'password' | 'username'
+  right?: React.ReactNode
+  inputStyle?: StyleProp<TextStyle>
 }) {
   return (
     <View style={{ marginBottom: theme.spacing.md }}>
@@ -35,6 +39,8 @@ export function HelfiTextField({
           borderColor: theme.colors.border,
           paddingHorizontal: 14,
           paddingVertical: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
         }}
       >
         <TextInput
@@ -47,10 +53,10 @@ export function HelfiTextField({
           keyboardType={keyboardType}
           textContentType={textContentType}
           autoComplete={autoComplete}
-          style={{ fontSize: 16, color: theme.colors.text }}
+          style={[{ flex: 1, fontSize: 16, color: theme.colors.text }, inputStyle]}
         />
+        {right ? <View style={{ marginLeft: 10 }}>{right}</View> : null}
       </View>
     </View>
   )
 }
-

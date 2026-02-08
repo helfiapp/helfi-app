@@ -17,10 +17,11 @@ export function LoginScreen() {
   const { setMode } = useAppMode()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const { width: windowWidth } = useWindowDimensions()
-  const contentWidth = Math.min(390, Math.max(280, windowWidth - theme.spacing.lg * 2))
+  const contentWidth = Math.min(390, Math.max(280, windowWidth - theme.spacing.md * 2))
 
   const canSubmit = useMemo(() => email.trim().length > 3 && password.length > 0 && !loading, [email, password, loading])
 
@@ -90,7 +91,14 @@ export function LoginScreen() {
       <LinearGradient colors={['#FFFFFF', '#E9F6F1']} style={{ flex: 1 }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
-            contentContainerStyle={{ flexGrow: 1, padding: theme.spacing.lg, justifyContent: 'center', alignItems: 'center' }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingHorizontal: theme.spacing.md,
+              paddingTop: theme.spacing.xl,
+              paddingBottom: theme.spacing.xl,
+              justifyContent: 'flex-start',
+              alignItems: 'center',
+            }}
             keyboardShouldPersistTaps="handled"
           >
             <View style={{ width: contentWidth }}>
@@ -101,19 +109,8 @@ export function LoginScreen() {
                 <Text style={{ marginTop: 6, fontSize: 14, color: theme.colors.muted, textAlign: 'center', lineHeight: 20 }}>Sign in to your account</Text>
               </View>
 
-              <View
-                style={{
-                  backgroundColor: theme.colors.card,
-                  borderRadius: theme.radius.lg,
-                  padding: theme.spacing.lg,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                  shadowColor: '#000',
-                  shadowOpacity: 0.06,
-                  shadowRadius: 16,
-                  shadowOffset: { width: 0, height: 10 },
-                }}
-              >
+              {/* Flat layout (no big white "card" behind everything) */}
+              <View>
                 <Pressable
                   onPress={onGoogle}
                   disabled={loading}
@@ -193,9 +190,18 @@ export function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Enter your password"
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 textContentType="password"
                 autoComplete="password"
+                right={
+                  <Pressable
+                    onPress={() => setShowPassword((v) => !v)}
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, padding: 2 })}
+                  >
+                    <FontAwesome name={showPassword ? 'eye-slash' : 'eye'} size={18} color={theme.colors.muted} />
+                  </Pressable>
+                }
               />
 
               <View style={{ marginTop: -6, alignItems: 'flex-end' }}>
