@@ -780,11 +780,20 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
             <p className="text-sm text-blue-800 mt-2">
               {(() => {
+                const hasContextBreakdown =
+                  typeof talkToAiSummary?.contexts?.general === 'number' ||
+                  typeof talkToAiSummary?.contexts?.food === 'number'
                 const generalCount = Number(talkToAiSummary?.contexts?.general ?? 0) || 0
                 const foodCount = Number(talkToAiSummary?.contexts?.food ?? 0) || 0
                 const hasGeneral = generalCount > 0
                 const hasFood = foodCount > 0
-                const contextLabel = hasGeneral && hasFood ? 'General + Food chat' : hasFood ? 'Food chat' : 'General chat'
+                const contextLabel = hasContextBreakdown
+                  ? hasGeneral && hasFood
+                    ? 'General + Food chat'
+                    : hasFood
+                      ? 'Food chat'
+                      : 'General chat'
+                  : 'Chat'
                 return (
                   <>
                     {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
@@ -795,6 +804,9 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             </p>
             <div className="mt-3">
               {(() => {
+                const hasContextBreakdown =
+                  typeof talkToAiSummary?.contexts?.general === 'number' ||
+                  typeof talkToAiSummary?.contexts?.food === 'number'
                 const generalCount = Number(talkToAiSummary?.contexts?.general ?? 0) || 0
                 const foodCount = Number(talkToAiSummary?.contexts?.food ?? 0) || 0
                 const hasGeneral = generalCount > 0
@@ -802,7 +814,9 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
                 const baseClass =
                   'inline-flex items-center rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100'
 
-                if (hasGeneral && hasFood) {
+                // If this report doesn't have a breakdown (older reports), show both buttons so
+                // the user can find the saved chat without regenerating a new report.
+                if (!hasContextBreakdown || (hasGeneral && hasFood)) {
                   return (
                     <div className="flex flex-wrap gap-2">
                       <a href="/chat" target="_blank" rel="noreferrer" className={baseClass}>
