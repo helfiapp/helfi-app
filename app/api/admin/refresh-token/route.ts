@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
-import { verifyAdminToken } from '@/lib/admin-auth'
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
 
@@ -21,15 +20,33 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const decoded = verifyAdminToken(token)
+    // Important: admins reported "refresh token" doesn't work once the JWT is expired.
+    // We allow refreshing an expired token if it is still correctly signed, and not too old.
+    let decoded: any = null
+    try {
+      decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true })
+    } catch {
+      decoded = null
+    }
 
     if (!decoded) {
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
     }
 
+    // Safety: don't allow refreshing indefinitely if someone stole an old token.
+    // If the token was originally issued more than 30 days ago, require re-login.
+    const iatSeconds = typeof decoded.iat === 'number' ? decoded.iat : null
+    if (iatSeconds) {
+      const ageMs = Date.now() - iatSeconds * 1000
+      const maxAgeMs = 30 * 24 * 60 * 60 * 1000
+      if (ageMs > maxAgeMs) {
+        return NextResponse.json({ error: 'Token too old. Please log in again.' }, { status: 401 })
+      }
+    }
+
     // Verify admin user still exists and is active
     const adminUser = await prisma.adminUser.findUnique({
-      where: { id: decoded.adminId },
+      where: { id: String(decoded.adminId || '') },
       select: {
         id: true,
         email: true,

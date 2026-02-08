@@ -242,28 +242,73 @@ export default function AdminPanel() {
 
   // Check for URL hash to set active tab and load data
   useEffect(() => {
-    const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
-    const user = sessionStorage.getItem('adminUser') || localStorage.getItem('adminUser')
-    
-    if (token && user) {
-      sessionStorage.setItem('adminToken', token)
-      sessionStorage.setItem('adminUser', user)
-      setAdminToken(token)
-      setAdminUser(JSON.parse(user))
+    let handleHashChange: (() => void) | null = null
+    let handleVisibilityChange: (() => void) | null = null
+    let handleWindowFocus: (() => void) | null = null
+
+    ;(async () => {
+      const storedToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
+      const storedUser = sessionStorage.getItem('adminUser') || localStorage.getItem('adminUser')
+
+      if (!storedToken || !storedUser) return
+
+      let tokenToUse = storedToken
+      let userToUse: any = null
+      try {
+        userToUse = JSON.parse(storedUser)
+      } catch {
+        userToUse = null
+      }
+
+      // Try to refresh token automatically on page load so admins don't get logged out.
+      try {
+        const refreshResponse = await fetch('/api/admin/refresh-token', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+          },
+        })
+
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          if (refreshData?.token) {
+            tokenToUse = refreshData.token
+          }
+          if (refreshData?.admin) {
+            userToUse = refreshData.admin
+          }
+        } else {
+          // If we can't refresh, log out so the page isn't stuck in a broken state.
+          handleLogout()
+          return
+        }
+      } catch (error) {
+        console.error('Auto refresh token failed:', error)
+        // Do not hard-logout on network hiccups; just try using the stored token.
+      }
+
+      sessionStorage.setItem('adminToken', tokenToUse)
+      sessionStorage.setItem('adminUser', JSON.stringify(userToUse))
+      localStorage.setItem('adminToken', tokenToUse)
+      localStorage.setItem('adminUser', JSON.stringify(userToUse))
+
+      setAdminToken(tokenToUse)
+      setAdminUser(userToUse)
       setIsAuthenticated(true)
+
       loadAnalyticsData()
-      loadWaitlistData(token)
-      loadUserStats(token)
-      
+      loadWaitlistData(tokenToUse)
+      loadUserStats(tokenToUse)
+
       // Check for URL hash or query to set active tab
       const checkHashAndLoadData = () => {
         const queryTab = new URLSearchParams(window.location.search).get('tab')
         if (queryTab) {
-          handleTabChange(queryTab, token)
+          handleTabChange(queryTab, tokenToUse)
           return
         }
         if (window.location.hash === '#tickets') {
-          handleTabChange('tickets', token)
+          handleTabChange('tickets', tokenToUse)
           return
         }
         const storedTab = (() => {
@@ -274,42 +319,41 @@ export default function AdminPanel() {
           }
         })()
         if (storedTab) {
-          handleTabChange(storedTab, token)
+          handleTabChange(storedTab, tokenToUse)
         }
       }
-      
+
       checkHashAndLoadData()
-      
+
       // Listen for hash changes (Agent #25's implementation preserved)
-      const handleHashChange = () => {
+      handleHashChange = () => {
         checkHashAndLoadData()
       }
-      
+
       // New: Add visibility change detection for auto-loading
-      const handleVisibilityChange = () => {
+      handleVisibilityChange = () => {
         if (!document.hidden && window.location.hash === '#tickets') {
           // Auto-load tickets when returning to visible tab with tickets hash
-          handleTabChange('tickets', token)
+          handleTabChange('tickets', tokenToUse)
         }
       }
-      
+
       // New: Add focus detection for returning via back button
-      const handleWindowFocus = () => {
+      handleWindowFocus = () => {
         if (window.location.hash === '#tickets') {
-          handleTabChange('tickets', token)
+          handleTabChange('tickets', tokenToUse)
         }
       }
-      
+
       window.addEventListener('hashchange', handleHashChange)
       document.addEventListener('visibilitychange', handleVisibilityChange)
       window.addEventListener('focus', handleWindowFocus)
-      
-      // Cleanup
-      return () => {
-        window.removeEventListener('hashchange', handleHashChange)
-        document.removeEventListener('visibilitychange', handleVisibilityChange)
-        window.removeEventListener('focus', handleWindowFocus)
-      }
+    })()
+
+    return () => {
+      if (handleHashChange) window.removeEventListener('hashchange', handleHashChange)
+      if (handleVisibilityChange) document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (handleWindowFocus) window.removeEventListener('focus', handleWindowFocus)
     }
   }, [])
 
