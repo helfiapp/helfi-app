@@ -2260,6 +2260,37 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     setIsTestingRunawayProtection(false)
   }
 
+  const handleRunawayProtectionCheckStatus = async () => {
+    setIsTestingRunawayProtection(true)
+    setRunawayProtectionResult(null)
+
+    try {
+      const response = await fetch('/api/admin/runaway-protection', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+        },
+      })
+
+      const result = await response.json()
+      setRunawayProtectionResult(result)
+
+      if (!response.ok) {
+        alert(`Check status failed.\n\n${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Runaway protection status error:', error)
+      setRunawayProtectionResult({
+        ok: false,
+        error: 'Network error',
+        details: { errorMessage: error instanceof Error ? error.message : 'Unknown error' },
+      })
+      alert('Check status failed: Network error')
+    }
+
+    setIsTestingRunawayProtection(false)
+  }
+
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'ONBOARDING': return 'bg-green-100 text-green-800'
@@ -6149,6 +6180,13 @@ The Helfi Team`,
                     >
                       🔓 Unpause Now
                     </button>
+                    <button
+                      onClick={handleRunawayProtectionCheckStatus}
+                      disabled={isTestingRunawayProtection}
+                      className="bg-blue-700 text-white px-6 py-2 rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isTestingRunawayProtection ? '🔄 Checking...' : '🔍 Check Status'}
+                    </button>
                   </div>
                 </div>
 
@@ -6181,31 +6219,56 @@ The Helfi Team`,
                   </div>
                 )}
 
-                {runawayProtectionResult && (
-                  <div className={`p-4 rounded-lg border ${
-                    runawayProtectionResult.ok
-                      ? 'bg-green-50 border-green-200 text-green-800'
-                      : 'bg-red-50 border-red-200 text-red-800'
-                  }`}>
-                    <div className="font-semibold mb-2">
-                      {runawayProtectionResult.ok ? '✅ Runaway Protection Test Triggered' : '❌ Runaway Protection Test Failed'}
-                    </div>
-                    {runawayProtectionResult.ok ? (
-                      <div className="text-sm space-y-1">
-                        <div><strong>Paused until:</strong> {runawayProtectionResult.openUntil || 'unknown'}</div>
-                        <div><strong>Email sent:</strong> {runawayProtectionResult.emailOk ? 'Yes' : 'No'}</div>
-                        <div className="mt-2 p-2 bg-green-100 rounded">
-                          Try saving health setup right now. If the pause is active, it should show a “temporarily paused” message.
+                {runawayProtectionResult && (() => {
+                  const ok = !!runawayProtectionResult.ok
+                  const isPaused = !!runawayProtectionResult.open
+                  const action = runawayProtectionResult.action ? String(runawayProtectionResult.action) : 'status'
+                  const openUntil = runawayProtectionResult.openUntil ? String(runawayProtectionResult.openUntil) : null
+                  const reason = runawayProtectionResult.reason ? String(runawayProtectionResult.reason) : null
+                  const emailOk = runawayProtectionResult.emailOk === true
+
+                  return (
+                    <div className={`p-4 rounded-lg border ${
+                      ok
+                        ? isPaused
+                          ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                          : 'bg-green-50 border-green-200 text-green-800'
+                        : 'bg-red-50 border-red-200 text-red-800'
+                    }`}>
+                      <div className="font-semibold mb-2">
+                        {!ok
+                          ? '❌ Runaway Protection Error'
+                          : isPaused
+                            ? '⏸️ Health Setup Saving Is PAUSED'
+                            : '✅ Health Setup Saving Is NOT paused'}
+                      </div>
+
+                      {ok ? (
+                        <div className="text-sm space-y-1">
+                          <div><strong>Last action:</strong> {action}</div>
+                          <div><strong>Status:</strong> {isPaused ? 'Paused' : 'Not paused'}</div>
+                          {isPaused ? (
+                            <div><strong>Paused until:</strong> {openUntil || 'unknown'}</div>
+                          ) : (
+                            <div><strong>Paused until:</strong> Not paused</div>
+                          )}
+                          {reason ? <div><strong>Reason:</strong> {reason}</div> : null}
+                          {'emailOk' in runawayProtectionResult ? (
+                            <div><strong>Email sent:</strong> {emailOk ? 'Yes' : 'No'}</div>
+                          ) : null}
+                          <div className="mt-2 p-2 bg-white/60 rounded">
+                            If it’s paused, Health Setup won’t save for anyone until it unpauses (or you click “Unpause Now”).
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm space-y-1">
-                        <div><strong>Error:</strong> {runawayProtectionResult.error || 'Unknown error'}</div>
-                        <div><strong>Details:</strong> {runawayProtectionResult.details?.errorMessage || ''}</div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      ) : (
+                        <div className="text-sm space-y-1">
+                          <div><strong>Error:</strong> {runawayProtectionResult.error || 'Unknown error'}</div>
+                          <div><strong>Details:</strong> {runawayProtectionResult.details?.errorMessage || ''}</div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
             )}
 
