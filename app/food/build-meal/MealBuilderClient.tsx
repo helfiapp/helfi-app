@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
@@ -1537,6 +1537,20 @@ export default function MealBuilderClient() {
 
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading
   const showPortionSaveCta = portionAmountInput.trim().length > 0
+  const isDiaryEdit = Boolean(sourceLogId) && !editFavoriteId
+
+  // Draft protection + auto-save (owner request):
+  // - Always keep a draft while the user is building a meal (so they don't lose ingredients if they leave).
+  // - If we're editing an existing diary entry (sourceLogId), also auto-update that entry in the background.
+  const draftKey = useMemo(() => {
+    const scope = editFavoriteId ? `fav:${editFavoriteId}` : sourceLogId ? `log:${sourceLogId}` : 'new'
+    return `mealBuilder:draft:${selectedDate}:${category}:${scope}`
+  }, [selectedDate, category, editFavoriteId, sourceLogId])
+  const draftAppliedRef = useRef(false)
+  const draftWriteTimeoutRef = useRef<number | null>(null)
+  const diaryAutosaveTimeoutRef = useRef<number | null>(null)
+  const lastDiaryAutosaveSignatureRef = useRef<string>('')
+  const [autosaveHint, setAutosaveHint] = useState<string>('')
 
   const applySavedPortion = (source: any) => {
     if (!source || typeof source !== 'object') return
@@ -1562,12 +1576,73 @@ export default function MealBuilderClient() {
     }
   }
 
+  const clearDraft = useCallback(() => {
+    try {
+      sessionStorage.removeItem(draftKey)
+    } catch {}
+  }, [draftKey])
+
   const getSavedPortionTotalWeightG = (source: any) => {
     if (!source || typeof source !== 'object') return null
     const raw = (source as any).__portionTotalWeightG
     const value = Number(raw)
     return Number.isFinite(value) && value > 0 ? value : null
   }
+
+  // Restore draft (best-effort). We intentionally let the draft win so users can continue where they left off.
+  useEffect(() => {
+    if (draftAppliedRef.current) return
+    try {
+      const raw = sessionStorage.getItem(draftKey)
+      if (!raw) return
+      const parsed = raw ? JSON.parse(raw) : null
+      const nextItems = parsed && Array.isArray(parsed.items) ? (parsed.items as BuilderItem[]) : null
+      if (!nextItems || nextItems.length === 0) return
+      setItems(nextItems)
+      setExpandedId(null)
+      if (typeof parsed.mealName === 'string') setMealName(parsed.mealName)
+      if (typeof parsed.energyUnit === 'string' && (parsed.energyUnit === 'kcal' || parsed.energyUnit === 'kJ')) {
+        setEnergyUnit(parsed.energyUnit)
+      }
+      if (typeof parsed.portionAmountInput === 'string') setPortionAmountInput(parsed.portionAmountInput)
+      if (typeof parsed.portionUnit === 'string' && (parsed.portionUnit === 'g' || parsed.portionUnit === 'oz')) {
+        setPortionUnit(parsed.portionUnit)
+      }
+      draftAppliedRef.current = true
+      setAutosaveHint('Draft restored')
+      window.setTimeout(() => setAutosaveHint(''), 1200)
+    } catch {
+      // ignore
+    }
+  }, [draftKey])
+
+  // Keep a draft updated while editing, so ingredients aren't lost.
+  useEffect(() => {
+    try {
+      if (draftWriteTimeoutRef.current) window.clearTimeout(draftWriteTimeoutRef.current)
+      draftWriteTimeoutRef.current = window.setTimeout(() => {
+        const itemsForDraft = itemsRef.current?.length ? itemsRef.current : items
+        if (!itemsForDraft || itemsForDraft.length === 0) return
+        const snapshot = {
+          v: 1,
+          updatedAt: Date.now(),
+          mealName,
+          energyUnit,
+          portionAmountInput,
+          portionUnit,
+          items: itemsForDraft,
+        }
+        try {
+          sessionStorage.setItem(draftKey, JSON.stringify(snapshot))
+        } catch {}
+      }, 250)
+    } catch {}
+    return () => {
+      try {
+        if (draftWriteTimeoutRef.current) window.clearTimeout(draftWriteTimeoutRef.current)
+      } catch {}
+    }
+  }, [draftKey, items, mealName, energyUnit, portionAmountInput, portionUnit])
 
   useEffect(() => {
     itemsRef.current = items
@@ -1715,6 +1790,12 @@ export default function MealBuilderClient() {
     const fav = favorites.find((f: any) => String(f?.id || '') === editFavoriteId) || null
     if (!fav) return
 
+    // If we restored a draft, do not overwrite the user's in-progress changes.
+    if (draftAppliedRef.current) {
+      setLoadedFavoriteId(editFavoriteId)
+      return
+    }
+
     const label = normalizeMealLabel(fav?.label || fav?.description || '').trim()
     if (label) setMealName(label)
     const favoriteTotals = (fav as any)?.nutrition || (fav as any)?.total || null
@@ -1782,6 +1863,12 @@ export default function MealBuilderClient() {
           return ''
         })()
         if (!cancelled) setLinkedFavoriteId(linked)
+
+        // If we restored a draft, do not overwrite the user's in-progress changes.
+        if (draftAppliedRef.current) {
+          if (!cancelled) setLoadedFavoriteId(`log:${sourceLogId}`)
+          return
+        }
 
         const label = normalizeMealLabel(log?.description || log?.name || '').trim()
         if (!cancelled && label) setMealName(label)
@@ -2990,6 +3077,159 @@ export default function MealBuilderClient() {
     )
   }
 
+  const buildDiaryAutosaveBundle = useCallback(() => {
+    if (!isDiaryEdit) return null
+    if (!sourceLogId) return null
+    const itemsForSave = itemsRef.current?.length ? itemsRef.current : items
+    if (!itemsForSave || itemsForSave.length === 0) return null
+
+    const title = sanitizeMealTitle(mealName) || buildDefaultMealName(itemsForSave)
+    const description = title
+
+    const totalsForSave = itemsForSave.reduce(
+      (total, it) => {
+        const t = computeItemTotals(it)
+        total.calories += t.calories
+        total.protein += t.protein
+        total.carbs += t.carbs
+        total.fat += t.fat
+        total.fiber += t.fiber
+        total.sugar += t.sugar
+        return total
+      },
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+    )
+
+    const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
+    const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
+    const portionScaleForSave = computePortionScale(portionAmountForSave, portionUnit, totalRecipeWeightForSave)
+
+    const portionWeightForSave = (() => {
+      const raw = parseNumericInput(portionAmountForSave)
+      if (!raw || raw <= 0) return null
+      const grams = unitToGrams(raw, portionUnit === 'oz' ? 'oz' : 'g')
+      return grams && Number.isFinite(grams) ? grams : null
+    })()
+    const portionMeta =
+      portionWeightForSave
+        ? {
+            __portionScale: round3(portionScaleForSave),
+            __portionWeightG: Math.round(portionWeightForSave),
+            __portionUnit: portionUnit,
+            __portionAmount: parseNumericInput(portionAmountForSave),
+            __portionTotalWeightG: Math.round(totalRecipeWeightForSave || 0),
+          }
+        : null
+
+    const cleanedItems = itemsForSave.map((it) => {
+      const {
+        __baseAmount,
+        __baseUnit,
+        __amountInput,
+        __pieceGrams,
+        __servingOptions,
+        __selectedServingId,
+        __source,
+        __sourceId,
+        ...rest
+      } = it
+      return { ...rest, __amount: it.__amount, __unit: it.__unit, servings: computeServingsFromAmount(it) }
+    })
+
+    const shouldScaleTotals = Number.isFinite(portionScaleForSave) && portionScaleForSave !== 1
+    const scaledTotals = shouldScaleTotals
+      ? {
+          calories: totalsForSave.calories * portionScaleForSave,
+          protein: totalsForSave.protein * portionScaleForSave,
+          carbs: totalsForSave.carbs * portionScaleForSave,
+          fat: totalsForSave.fat * portionScaleForSave,
+          fiber: totalsForSave.fiber * portionScaleForSave,
+          sugar: totalsForSave.sugar * portionScaleForSave,
+        }
+      : totalsForSave
+
+    const favoriteId = (linkedFavoriteId || '').trim()
+    const nutritionBase: any = {
+      calories: Math.round(scaledTotals.calories),
+      protein: round3(scaledTotals.protein),
+      carbs: round3(scaledTotals.carbs),
+      fat: round3(scaledTotals.fat),
+      fiber: round3(scaledTotals.fiber),
+      sugar: round3(scaledTotals.sugar),
+      __origin: 'meal-builder',
+      ...(favoriteId ? { __favoriteId: favoriteId } : {}),
+      ...(portionMeta ? portionMeta : {}),
+    }
+    const diaryNutrition = favoriteId ? { ...nutritionBase, __favoriteManualEdit: true } : nutritionBase
+
+    const signature = [
+      title,
+      portionUnit,
+      String(parseNumericInput(portionAmountForSave) || ''),
+      buildItemsSignature(itemsForSave),
+      favoriteId,
+    ].join('|')
+
+    return { title, description, cleanedItems, diaryNutrition, signature }
+  }, [isDiaryEdit, sourceLogId, items, mealName, portionAmountInput, portionUnit, linkedFavoriteId])
+
+  useEffect(() => {
+    if (!isDiaryEdit) return
+    if (!sourceLogId) return
+    if (savingMeal) return
+    const itemsForSave = itemsRef.current?.length ? itemsRef.current : items
+    if (!itemsForSave || itemsForSave.length === 0) return
+
+    try {
+      if (diaryAutosaveTimeoutRef.current) window.clearTimeout(diaryAutosaveTimeoutRef.current)
+      diaryAutosaveTimeoutRef.current = window.setTimeout(async () => {
+        const built = buildDiaryAutosaveBundle()
+        if (!built) return
+        if (built.signature && built.signature === lastDiaryAutosaveSignatureRef.current) return
+        lastDiaryAutosaveSignatureRef.current = built.signature || ''
+        setAutosaveHint('Auto-saving…')
+        try {
+          await fetch('/api/food-log', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: sourceLogId,
+              description: built.description,
+              nutrition: built.diaryNutrition,
+              items: built.cleanedItems,
+              meal: category,
+              category,
+            }),
+          })
+          try {
+            sessionStorage.setItem(
+              'foodDiary:entryOverride',
+              JSON.stringify({
+                dbId: sourceLogId,
+                localDate: selectedDate,
+                category,
+                nutrition: built.diaryNutrition,
+                total: built.diaryNutrition,
+                items: built.cleanedItems,
+              }),
+            )
+          } catch {}
+          setAutosaveHint('Saved')
+          window.setTimeout(() => setAutosaveHint(''), 1200)
+        } catch {
+          setAutosaveHint('Auto-save failed')
+          window.setTimeout(() => setAutosaveHint(''), 1500)
+        }
+      }, 900)
+    } catch {}
+
+    return () => {
+      try {
+        if (diaryAutosaveTimeoutRef.current) window.clearTimeout(diaryAutosaveTimeoutRef.current)
+      } catch {}
+    }
+  }, [isDiaryEdit, sourceLogId, items, mealName, portionAmountInput, portionUnit, linkedFavoriteId, savingMeal, buildDiaryAutosaveBundle, category, selectedDate])
+
   const createMeal = async () => {
     if (items.length === 0) {
       setError('Add at least one ingredient first.')
@@ -3180,6 +3420,7 @@ export default function MealBuilderClient() {
             JSON.stringify({ dbId: sourceLogId, localDate: selectedDate, category }),
           )
         } catch {}
+        clearDraft()
         router.push('/food')
         return
       }
@@ -3351,6 +3592,7 @@ export default function MealBuilderClient() {
           } catch {}
         }
 
+        clearDraft()
         router.push('/food')
         return
       }
@@ -3425,6 +3667,7 @@ export default function MealBuilderClient() {
         }
       } catch {}
 
+      clearDraft()
       router.push('/food')
     } catch {
       setError('Saving failed. Please try again.')
@@ -4259,6 +4502,12 @@ export default function MealBuilderClient() {
             })}
           </div>
         </div>
+
+        {(autosaveHint || isDiaryEdit) && (
+          <div className="text-xs text-gray-500 px-1">
+            {autosaveHint || 'Auto-saving while you edit…'}
+          </div>
+        )}
 
         <button
           type="button"
