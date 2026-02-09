@@ -309,7 +309,7 @@ export default function ReportVisuals(props: {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3 print:grid-cols-2">
         <div className={cardClassName('neutral')}>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -453,7 +453,7 @@ export default function ReportVisuals(props: {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3 print:grid-cols-2">
         <div className={cardClassName('amber')}>
           <div className="text-xs font-semibold uppercase tracking-wide text-amber-700/80">Calories</div>
           <div className="mt-1 text-lg font-semibold text-amber-950">Food energy</div>
@@ -545,7 +545,7 @@ export default function ReportVisuals(props: {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3 print:grid-cols-2">
         <div className={cardClassName('neutral')}>
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Exercise</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">Minutes per day</div>
