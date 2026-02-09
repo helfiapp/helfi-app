@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-09 23:52:00 AEDT
+- What changed: Build-a-meal totals now clearly show when you’re looking at “Your portion totals” (so it doesn’t look like macros are wrong). It also shows a one-line “Whole recipe totals” summary for quick comparison.
+- Where to see it (page/link): Food -> Build a meal (especially when editing an existing meal)
+- What to quickly test: Open a meal where Portion size is set (e.g. “Saving about 20% of the recipe”), confirm totals box says “Your portion totals” and the Whole recipe summary is shown.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-09 23:22:08 AEDT
 - What changed: On Build-a-meal (mobile), tapping into “Search ingredients” or an ingredient “Amount” box now clears the current text so you can type immediately (no backspacing). If you tap in and then tap out without typing, the old value comes back.
 - Where to see it (page/link): Food -> Build a meal
