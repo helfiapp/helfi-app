@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-09 20:47:09 AEDT
+- What changed: Food diary now shows clean food names (not long AI paragraphs). You can edit the food name + optional notes, and the updated name saves properly and updates everywhere.
+- Where to see it (page/link): Food Diary (Food tab)
+- What to quickly test: Scan a barcode -> if missing, add by nutrition photo -> open the entry -> rename it -> save -> go back and confirm the diary list shows the new name.
+
+DEPLOYED:
 - LIVE:
 - Date/time: Mon Feb 9 17:33 AEDT 2026
 - What changed: Food search now always shows Helfi database results first, and uses FatSecret only as a fallback. OpenFoodFacts is no longer used. Results without calories + macros are hidden.
