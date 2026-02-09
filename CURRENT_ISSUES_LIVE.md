@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 03:30 AEDT
+- What changed: Photo analysis now defaults ingredient weights to grams (not ounces), and the Food name/title stays short (no serving-size macros/calories dumped into the title).
+- Where to see it (page/link): Food -> Add by photo results screen
+- What to quickly test: Analyze a meal photo that previously showed oz, confirm Weight shows g by default. Confirm Food name is short like “Grilled salmon, white rice + 3 more”.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 02:58 AEDT
 - What changed: “Add by photo” now uses the food database to fill calories + macros for ingredient cards (for better accuracy), and it will not let you save if any ingredient card is missing Calories/Protein/Carbs/Fat. If a photo can’t be read, it shows a clear “no ingredients found” message instead of a messy paragraph.
 - Where to see it (page/link): Food -> Add by photo (Food Analysis / photo results screen)
