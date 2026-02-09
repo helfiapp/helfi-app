@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE:
+- Date/time: Mon Feb 9 19:59 AEDT 2026
+- What changed: Packaged/Fast-foods search now has OpenFoodFacts as a LAST fallback (after Helfi database, then FatSecret) to find more packaged foods. Results without calories + macros are still hidden.
+- Where to see it (page/link): https://helfi.ai/food/build-meal (Packaged/Fast-foods search) and https://helfi.ai/food/add-ingredient
+- What to quickly test: Search “Wokka rice noodles” (or another AU packaged product) and confirm results appear; confirm each result shows calories + protein + carbs + fat.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 18:27 AEDT 2026
 - What changed: Reduced the database spike checker frequency from every 5 minutes to every 1 hour to lower overhead.
 - Where to see it (page/link): (No UI change. Background safety check schedule only.)
