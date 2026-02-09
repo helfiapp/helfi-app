@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-09 23:22:08 AEDT
+- What changed: On Build-a-meal (mobile), tapping into “Search ingredients” or an ingredient “Amount” box now clears the current text so you can type immediately (no backspacing). If you tap in and then tap out without typing, the old value comes back.
+- Where to see it (page/link): Food -> Build a meal
+- What to quickly test: On mobile, open Build a meal, tap the Search box (it should clear), type a new search, and add an ingredient. Then tap an ingredient Amount (it should clear), type a new amount, and confirm the totals update.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-09 21:13:24 AEDT
 - What changed: Build-a-meal now auto-saves your progress while you add ingredients (draft + background updates when editing a diary entry). You won’t lose ingredients if you leave the page. The Update button still takes you back to the Food Diary.
 - Where to see it (page/link): Food -> Build a meal
