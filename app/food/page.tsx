@@ -3135,6 +3135,8 @@ export default function FoodDiary() {
     totalsOverride: NutritionTotals | null
   } | null>(null)
   const autoDbMatchAbortRef = useRef<AbortController | null>(null)
+  const autoDbMatchSeqRef = useRef<number | null>(null)
+  const [autoDbMatchRunning, setAutoDbMatchRunning] = useState(false)
   const [officialLastRequest, setOfficialLastRequest] = useState<{
     query: string
     mode: 'packaged' | 'single'
@@ -4876,199 +4878,247 @@ export default function FoodDiary() {
     if (!Array.isArray(items) || items.length === 0) return
     if (analysisMode === 'packaged') return
 
+    autoDbMatchSeqRef.current = seq
+    setAutoDbMatchRunning(true)
+
     try {
-      autoDbMatchAbortRef.current?.abort()
-    } catch {}
-    const controller = new AbortController()
-    autoDbMatchAbortRef.current = controller
+      try {
+        autoDbMatchAbortRef.current?.abort()
+      } catch {}
+      const controller = new AbortController()
+      autoDbMatchAbortRef.current = controller
 
-    const updated = [...items]
-    const analysisNormalized = normalizeDbQuery(analysisText || '')
-    const analysisHas = (word: string) => analysisNormalized.includes(word)
-    const eggDishKeywords = ['benedict', 'omelet', 'scrambled', 'burrito', 'salad', 'deviled']
-    for (let idx = 0; idx < items.length; idx += 1) {
-      const item = updated[idx]
-      if (!item || item.dbLocked) continue
-      if (item?.barcode || item?.detectionMethod === 'barcode') continue
-      const baseQuery = normalizeDbQuery(item?.name || '')
-      const itemLabel = `${String(item?.name || '')} ${String(item?.serving_size || '')}`.toLowerCase()
-      const isDiscreteItem =
-        (Number.isFinite(Number(item?.piecesPerServing)) && Number(item.piecesPerServing) > 1) ||
-        (Number.isFinite(Number(item?.pieces)) && Number(item.pieces) > 1) ||
-        isDiscreteUnitLabel(itemLabel)
-      const hasEgg = baseQuery.includes('egg')
-      const analysisHasEggDish = eggDishKeywords.some((kw) => analysisHas(kw))
-      const query =
-        hasEgg && !analysisHasEggDish && (analysisHas('egg') || baseQuery.includes('egg'))
-          ? 'egg whole'
-          : baseQuery
-      if (!query || query.length < 2) continue
+      const updated = [...items]
+      const analysisNormalized = normalizeDbQuery(analysisText || '')
+      const analysisHas = (word: string) => analysisNormalized.includes(word)
+      const eggDishKeywords = ['benedict', 'omelet', 'scrambled', 'burrito', 'salad', 'deviled']
 
-      const candidateQueries = [query]
-      if (hasEgg && !analysisHasEggDish) {
-        candidateQueries.unshift('egg whole raw')
-        candidateQueries.unshift('egg whole')
-      }
-      if (query.includes('whole ')) {
-        candidateQueries.push(query.replace(/\bwhole\s+/g, '').trim())
-      }
-      if (query.includes('roasted')) {
-        candidateQueries.push(query.replace(/\broasted\b/g, 'roast').trim())
-      }
-      candidateQueries.push(query.replace(/\b(roasted|roast|whole|cooked)\b/g, '').trim())
-      const uniqueQueries = Array.from(new Set(candidateQueries.filter((q) => q.length >= 3)))
+      const coreMacrosMissing = (item: any) =>
+        !item ||
+        item?.calories == null ||
+        item?.protein_g == null ||
+        item?.carbs_g == null ||
+        item?.fat_g == null
 
-      let results: any[] = []
-      for (const q of uniqueQueries) {
+      const matchIndex = async (idx: number) => {
+        const item = updated[idx]
+        if (!item || item.dbLocked) return
+        if (item?.barcode || item?.detectionMethod === 'barcode') return
+
+        const baseQuery = normalizeDbQuery(item?.name || '')
+        const itemLabel = `${String(item?.name || '')} ${String(item?.serving_size || '')}`.toLowerCase()
+        const isDiscreteItem =
+          (Number.isFinite(Number(item?.piecesPerServing)) && Number(item.piecesPerServing) > 1) ||
+          (Number.isFinite(Number(item?.pieces)) && Number(item.pieces) > 1) ||
+          isDiscreteUnitLabel(itemLabel)
+        const hasEgg = baseQuery.includes('egg')
+        const analysisHasEggDish = eggDishKeywords.some((kw) => analysisHas(kw))
+        const query =
+          hasEgg && !analysisHasEggDish && (analysisHas('egg') || baseQuery.includes('egg'))
+            ? 'egg whole'
+            : baseQuery
+        if (!query || query.length < 2) return
+
+        const candidateQueries = [query]
+        if (hasEgg && !analysisHasEggDish) {
+          candidateQueries.unshift('egg whole raw')
+          candidateQueries.unshift('egg whole')
+        }
+        if (query.includes('whole ')) {
+          candidateQueries.push(query.replace(/\bwhole\s+/g, '').trim())
+        }
+        if (query.includes('roasted')) {
+          candidateQueries.push(query.replace(/\broasted\b/g, 'roast').trim())
+        }
+        candidateQueries.push(query.replace(/\b(roasted|roast|whole|cooked)\b/g, '').trim())
+        const uniqueQueries = Array.from(new Set(candidateQueries.filter((q) => q.length >= 3))).slice(0, 3)
+
+        let results: any[] = []
+        for (const q of uniqueQueries) {
+          try {
+            const params = applyCountryParam(
+              new URLSearchParams({
+                source: 'auto',
+                q,
+                kind: 'single',
+                limit: '6',
+              }),
+            )
+            const res = await fetch(`/api/food-data?${params.toString()}`, { signal: controller.signal })
+            if (!res.ok) continue
+            const data = await res.json()
+            const items = Array.isArray(data.items) ? data.items : []
+            if (items.length > 0) {
+              results = items
+              break
+            }
+          } catch (err: any) {
+            if (err?.name === 'AbortError') return
+          }
+        }
+
+        if (!results.length) return
+        if (hasEgg && !analysisHasEggDish) {
+          const avoidEggTerms: string[] = []
+          if (!analysisHas('dried') && !analysisHas('powder')) {
+            avoidEggTerms.push('dried', 'powder', 'powdered')
+          }
+          if (!analysisHas('pickled')) avoidEggTerms.push('pickled')
+          if (!analysisHas('white') && !analysisHas('whites')) avoidEggTerms.push('white', 'whites')
+          if (!analysisHas('yolk') && !analysisHas('yolks')) avoidEggTerms.push('yolk', 'yolks')
+          if (!analysisHas('liquid')) avoidEggTerms.push('liquid')
+          const filtered = results.filter((r: any) => {
+            const name = normalizeDbQuery(r?.name || '')
+            if (!name.includes('egg')) return false
+            if (eggDishKeywords.some((kw) => name.includes(kw))) return false
+            if (avoidEggTerms.some((kw) => name.includes(kw))) return false
+            return true
+          })
+          if (filtered.length > 0) {
+            results = filtered
+          }
+        }
+        const ranked = [...results].sort(
+          (a, b) => scoreDbMatch(query, b?.name || '') - scoreDbMatch(query, a?.name || ''),
+        )
+        const best = ranked[0]
+        if (!best) return
+
+        // If the match looks very weak, don't auto-apply it. User can tap "Find a better match".
+        const bestScore = scoreDbMatch(query, best?.name || '')
+        if (bestScore < 25) return
+
+        // If the current item is missing core macros, only accept a DB match that provides them.
+        if (coreMacrosMissing(item) && coreMacrosMissing(best)) return
+
+        const nextItem = { ...item }
+        const currentWeight = getBaseWeightPerServing(nextItem)
+        const candidateServingInfo = parseServingSizeInfo({ serving_size: best.serving_size || '' })
+        const candidateGrams = candidateServingInfo.gramsPerServing
+
+        if (best.name) nextItem.name = best.name
+        if (best.brand) nextItem.brand = best.brand
+        if (best.serving_size) nextItem.serving_size = best.serving_size
+        if (best.calories != null) nextItem.calories = best.calories
+        if (best.protein_g != null) nextItem.protein_g = best.protein_g
+        if (best.carbs_g != null) nextItem.carbs_g = best.carbs_g
+        if (best.fat_g != null) nextItem.fat_g = best.fat_g
+        if (best.fiber_g != null) nextItem.fiber_g = best.fiber_g
+        if (best.sugar_g != null) nextItem.sugar_g = best.sugar_g
+        nextItem.dbSource = best.source
+        nextItem.dbId = best.id
+
+        if (candidateGrams && candidateGrams > 0) {
+          nextItem.customGramsPerServing = candidateGrams
+          nextItem.weightUnit = 'g'
+          if (!isDiscreteItem && currentWeight && currentWeight > 0) {
+            const edibleFactor = getEdibleYieldFactor(query)
+            const effectiveWeight = edibleFactor > 0 ? currentWeight * edibleFactor : currentWeight
+            const servings = Math.max(effectiveWeight / candidateGrams, 0.01)
+            nextItem.servings = Math.round(servings * 100) / 100
+          }
+        }
+        if (isDiscreteItem) {
+          nextItem.servings = 1
+        }
+
+        let options: any[] = []
         try {
-          const params = applyCountryParam(new URLSearchParams({
-            source: 'auto',
-            q,
-            kind: 'single',
-            limit: '10',
-          }))
-          const res = await fetch(`/api/food-data?${params.toString()}`, { signal: controller.signal })
-          if (!res.ok) continue
-          const data = await res.json()
-          const items = Array.isArray(data.items) ? data.items : []
-          if (items.length > 0) {
-            results = items
-            break
+          const optParams = new URLSearchParams({
+            source: best.source,
+            id: best.id,
+          })
+          const optRes = await fetch(`/api/food-data/servings?${optParams.toString()}`, { signal: controller.signal })
+          if (optRes.ok) {
+            const optData = await optRes.json()
+            options = Array.isArray(optData.options) ? optData.options : []
           }
         } catch (err: any) {
           if (err?.name === 'AbortError') return
         }
-      }
 
-      if (!results.length) continue
-      if (hasEgg && !analysisHasEggDish) {
-        const avoidEggTerms: string[] = []
-        if (!analysisHas('dried') && !analysisHas('powder')) {
-          avoidEggTerms.push('dried', 'powder', 'powdered')
-        }
-        if (!analysisHas('pickled')) avoidEggTerms.push('pickled')
-        if (!analysisHas('white') && !analysisHas('whites')) avoidEggTerms.push('white', 'whites')
-        if (!analysisHas('yolk') && !analysisHas('yolks')) avoidEggTerms.push('yolk', 'yolks')
-        if (!analysisHas('liquid')) avoidEggTerms.push('liquid')
-        const filtered = results.filter((r: any) => {
-          const name = normalizeDbQuery(r?.name || '')
-          if (!name.includes('egg')) return false
-          if (eggDishKeywords.some((kw) => name.includes(kw))) return false
-          if (avoidEggTerms.some((kw) => name.includes(kw))) return false
-          return true
-        })
-        if (filtered.length > 0) {
-          results = filtered
-        }
-      }
-      const ranked = [...results].sort((a, b) => scoreDbMatch(query, b?.name || '') - scoreDbMatch(query, a?.name || ''))
-      const best = ranked[0]
-      if (!best) continue
-
-      const nextItem = { ...item }
-      const currentWeight = getBaseWeightPerServing(nextItem)
-      const candidateServingInfo = parseServingSizeInfo({ serving_size: best.serving_size || '' })
-      const candidateGrams = candidateServingInfo.gramsPerServing
-
-      if (best.name) nextItem.name = best.name
-      if (best.brand) nextItem.brand = best.brand
-      if (best.serving_size) nextItem.serving_size = best.serving_size
-      if (best.calories != null) nextItem.calories = best.calories
-      if (best.protein_g != null) nextItem.protein_g = best.protein_g
-      if (best.carbs_g != null) nextItem.carbs_g = best.carbs_g
-      if (best.fat_g != null) nextItem.fat_g = best.fat_g
-      if (best.fiber_g != null) nextItem.fiber_g = best.fiber_g
-      if (best.sugar_g != null) nextItem.sugar_g = best.sugar_g
-      nextItem.dbSource = best.source
-      nextItem.dbId = best.id
-
-      if (candidateGrams && candidateGrams > 0) {
-        nextItem.customGramsPerServing = candidateGrams
-        nextItem.weightUnit = 'g'
-        if (!isDiscreteItem && currentWeight && currentWeight > 0) {
-          const edibleFactor = getEdibleYieldFactor(query)
-          const effectiveWeight = edibleFactor > 0 ? currentWeight * edibleFactor : currentWeight
-          const servings = Math.max(effectiveWeight / candidateGrams, 0.01)
-          nextItem.servings = Math.round(servings * 100) / 100
-        }
-      }
-      if (isDiscreteItem) {
-        nextItem.servings = 1
-      }
-
-      let options: any[] = []
-      try {
-        const optParams = new URLSearchParams({
-          source: best.source,
-          id: best.id,
-        })
-        const optRes = await fetch(`/api/food-data/servings?${optParams.toString()}`, { signal: controller.signal })
-        if (optRes.ok) {
-          const optData = await optRes.json()
-          options = Array.isArray(optData.options) ? optData.options : []
-        }
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return
-      }
-
-      if (options.length > 0) {
-        const finalOptions = normalizeServingOptionsForItem(options, nextItem.name || '')
-        nextItem.servingOptions = finalOptions
-        const isDiscreteItem =
-          (Number.isFinite(Number(nextItem?.piecesPerServing)) && Number(nextItem.piecesPerServing) > 1) ||
-          (Number.isFinite(Number(nextItem?.pieces)) && Number(nextItem.pieces) > 1) ||
-          isDiscreteUnitLabel(
-            `${String(nextItem?.name || '')} ${String(nextItem?.serving_size || '')}`.toLowerCase(),
-          )
-        const discreteOptions = isDiscreteItem
-          ? finalOptions.filter((opt: any) => {
-              const meta = parseServingUnitMetadata(String(opt?.label || opt?.serving_size || ''))
-              return meta && isDiscreteUnitLabel(meta.unitLabel)
-            })
-          : []
-        const singleDiscrete =
-          discreteOptions.length > 0
-            ? discreteOptions.find((opt: any) => {
+        if (options.length > 0) {
+          const finalOptions = normalizeServingOptionsForItem(options, nextItem.name || '')
+          nextItem.servingOptions = finalOptions
+          const isDiscreteItem =
+            (Number.isFinite(Number(nextItem?.piecesPerServing)) && Number(nextItem.piecesPerServing) > 1) ||
+            (Number.isFinite(Number(nextItem?.pieces)) && Number(nextItem.pieces) > 1) ||
+            isDiscreteUnitLabel(
+              `${String(nextItem?.name || '')} ${String(nextItem?.serving_size || '')}`.toLowerCase(),
+            )
+          const discreteOptions = isDiscreteItem
+            ? finalOptions.filter((opt: any) => {
                 const meta = parseServingUnitMetadata(String(opt?.label || opt?.serving_size || ''))
-                return meta && Number(meta.quantity || 0) <= 1
+                return meta && isDiscreteUnitLabel(meta.unitLabel)
               })
+            : []
+          const singleDiscrete =
+            discreteOptions.length > 0
+              ? discreteOptions.find((opt: any) => {
+                  const meta = parseServingUnitMetadata(String(opt?.label || opt?.serving_size || ''))
+                  return meta && Number(meta.quantity || 0) <= 1
+                })
+              : null
+          const queryHasWhole = query.includes('whole')
+          const wholeMatch = queryHasWhole
+            ? finalOptions.find((opt: any) => /\bwhole\b/i.test(opt?.label || opt?.serving_size || ''))
             : null
-        const queryHasWhole = query.includes('whole')
-        const wholeMatch = queryHasWhole
-          ? finalOptions.find((opt: any) => /\bwhole\b/i.test(opt?.label || opt?.serving_size || ''))
-          : null
-        const match = finalOptions.find((opt: any) =>
-          (opt.serving_size || opt.label || '').toLowerCase().includes(String(best.serving_size || '').toLowerCase()),
-        )
-        let selected =
-          singleDiscrete ||
-          (discreteOptions.length > 0 ? discreteOptions[0] : null) ||
-          wholeMatch ||
-          match ||
-          null
-        if (!selected && currentWeight && Number.isFinite(Number(currentWeight))) {
-          const withGrams = finalOptions.filter((opt: any) => Number.isFinite(Number(opt?.grams)) && Number(opt?.grams) > 0)
-          if (withGrams.length > 0) {
-            withGrams.sort((a: any, b: any) => Math.abs(Number(a.grams) - currentWeight) - Math.abs(Number(b.grams) - currentWeight))
-            selected = withGrams[0]
+          const match = finalOptions.find((opt: any) =>
+            (opt.serving_size || opt.label || '')
+              .toLowerCase()
+              .includes(String(best.serving_size || '').toLowerCase()),
+          )
+          let selected =
+            singleDiscrete ||
+            (discreteOptions.length > 0 ? discreteOptions[0] : null) ||
+            wholeMatch ||
+            match ||
+            null
+          if (!selected && currentWeight && Number.isFinite(Number(currentWeight))) {
+            const withGrams = finalOptions.filter(
+              (opt: any) => Number.isFinite(Number(opt?.grams)) && Number(opt?.grams) > 0,
+            )
+            if (withGrams.length > 0) {
+              withGrams.sort(
+                (a: any, b: any) => Math.abs(Number(a.grams) - currentWeight) - Math.abs(Number(b.grams) - currentWeight),
+              )
+              selected = withGrams[0]
+            }
           }
-        }
-        if (!selected) selected = finalOptions[0]
-        nextItem.selectedServingId = selected?.id || null
-        if (selected) {
-          const merged = applyServingOptionToItem(nextItem, selected)
-          updated[idx] = merged
+          if (!selected) selected = finalOptions[0]
+          nextItem.selectedServingId = selected?.id || null
+          if (selected) {
+            const merged = applyServingOptionToItem(nextItem, selected)
+            updated[idx] = merged
+          } else {
+            updated[idx] = nextItem
+          }
         } else {
           updated[idx] = nextItem
         }
-      } else {
-        updated[idx] = nextItem
+      }
+
+      const targetIndexes = updated
+        .map((it, idx) => ({ it, idx }))
+        .filter(({ it }) => it && !it.dbLocked && !(it?.barcode || it?.detectionMethod === 'barcode'))
+        .map(({ idx }) => idx)
+
+      // Fast enough for users: do a few DB lookups in parallel (not one-by-one).
+      const batchSize = 3
+      for (let start = 0; start < targetIndexes.length; start += batchSize) {
+        if (controller.signal.aborted) return
+        const slice = targetIndexes.slice(start, start + batchSize)
+        await Promise.all(slice.map((idx) => matchIndex(idx)))
+      }
+
+      if (analysisSequenceRef.current !== seq) return
+      setAnalyzedItems(updated)
+      applyRecalculatedNutrition(updated)
+    } finally {
+      if (autoDbMatchSeqRef.current === seq) {
+        setAutoDbMatchRunning(false)
       }
     }
-
-    if (analysisSequenceRef.current !== seq) return
-    setAnalyzedItems(updated)
-    applyRecalculatedNutrition(updated)
   }
 
   const buildDeleteKey = (entry: any) => {
@@ -10678,7 +10728,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
           barcodeTag,
           allowTextFallback: false,
           analysisSeq,
-          autoMatchEnabled: false,
+          autoMatchEnabled: true,
           preserveExplicitCountsFrom: previousSnapshot?.items,
         });
         if (isFeedbackRescan && previousSnapshot?.totals && applied?.total) {
@@ -10884,6 +10934,16 @@ Please add nutritional information manually if needed.`);
   const addFoodEntry = async (description: string, method: 'text' | 'photo', nutrition?: any) => {
     if (labelBlocked) {
       showQuickToast('Please fix the label values before saving.')
+      return
+    }
+    if (method === 'photo' && photoSaveBlocked) {
+      if (photoSaveGuard.reason === 'matching') {
+        showQuickToast('Improving accuracy using the food database… please wait a moment.')
+      } else if (photoSaveGuard.reason === 'no_items') {
+        showQuickToast('No ingredients detected. Please try a clearer photo.')
+      } else {
+        showQuickToast('Some ingredients are missing calories/macros. Tap an ingredient and pick a better match.')
+      }
       return
     }
     // Prevent duplicate entries - check if this exact entry already exists
@@ -14248,6 +14308,29 @@ Please add nutritional information manually if needed.`);
     [analyzedItems, barcodeLabelFlow, analysisMode, photoPreview, labelStrictMode],
   )
   const labelBlocked = labelStrictMode && !labelValidation.ok
+
+  const photoSaveGuard = useMemo(() => {
+    const isPhotoContext = Boolean(photoPreview)
+    if (!isPhotoContext) return { blocked: false, reason: null as null | 'matching' | 'no_items' | 'missing_macros' }
+    if (manualMealBuildMode) return { blocked: false, reason: null as null | 'matching' | 'no_items' | 'missing_macros' }
+    if (editingEntry) return { blocked: false, reason: null as null | 'matching' | 'no_items' | 'missing_macros' }
+    if (!showAiResult) return { blocked: false, reason: null as null | 'matching' | 'no_items' | 'missing_macros' }
+    if (autoDbMatchRunning) return { blocked: true, reason: 'matching' as const }
+    const list = Array.isArray(analyzedItems) ? analyzedItems : []
+    if (list.length === 0) return { blocked: true, reason: 'no_items' as const }
+    const missingMacros = list.some(
+      (item: any) =>
+        !item ||
+        item?.calories == null ||
+        item?.protein_g == null ||
+        item?.carbs_g == null ||
+        item?.fat_g == null,
+    )
+    if (missingMacros) return { blocked: true, reason: 'missing_macros' as const }
+    return { blocked: false, reason: null as null | 'matching' | 'no_items' | 'missing_macros' }
+  }, [photoPreview, manualMealBuildMode, editingEntry, showAiResult, autoDbMatchRunning, analyzedItems])
+  const photoSaveBlocked = Boolean(photoSaveGuard.blocked)
+
   const openLabelEdit = () => {
     const list = Array.isArray(analyzedItems) ? analyzedItems : []
     if (list.length === 0) return
@@ -18872,6 +18955,11 @@ Please add nutritional information manually if needed.`);
                   <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
                     ⏱️ <strong>Heads up:</strong> Complex meals can take longer to analyze (sometimes 1+ minute). We prioritize accuracy and will keep working until it finishes.
                   </div>
+                  <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700">
+                    <div className="font-semibold text-gray-900 mb-1">Quick photo tips (faster + more accurate)</div>
+                    <div>• Bright light, whole plate in frame, avoid blur.</div>
+                    <div>• For packaged foods, photo the nutrition label (per-serving numbers).</div>
+                  </div>
                   <button
                     onClick={() => analyzePhoto()}
                     className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold"
@@ -19079,6 +19167,11 @@ Please add nutritional information manually if needed.`);
                 <div className="space-y-3">
                   <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 text-left">
                     ⏱️ <strong>Heads up:</strong> Complex meals can take longer to analyze (sometimes 1+ minute). We prioritize accuracy and will keep working until it finishes.
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 text-left">
+                    <div className="font-semibold text-gray-900 mb-1">Quick photo tips (faster + more accurate)</div>
+                    <div>• Bright light, whole plate in frame, avoid blur.</div>
+                    <div>• For packaged foods, photo the nutrition label (per-serving numbers).</div>
                   </div>
                   <button
                     onClick={() => analyzePhoto()}
@@ -19809,6 +19902,21 @@ Please add nutritional information manually if needed.`);
                       style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
                     >
                       <div className="mb-1 px-4 sm:px-6 flex flex-col items-center gap-2">
+                        {!editingEntry && !manualMealBuildMode && photoPreview && showAiResult && (
+                          <div className="w-full max-w-sm">
+                            {autoDbMatchRunning && (
+                              <div className="mb-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                Improving accuracy using the food database…
+                              </div>
+                            )}
+                            {!autoDbMatchRunning && photoSaveGuard.reason === 'missing_macros' && (
+                              <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                                Some ingredients are missing calories/macros. Tap an ingredient, then “Find a better match”.
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className="flex flex-wrap items-center justify-center gap-3 text-center">
                           <div className="text-sm sm:text-base font-medium text-gray-600">Detected Foods:</div>
                           <div className="flex items-center gap-2 text-sm sm:text-base text-gray-500">
@@ -20601,43 +20709,64 @@ Please add nutritional information manually if needed.`);
                     <div className="mb-6 -mx-4 sm:-mx-6">
                       <div className="px-4 sm:px-6">
                         <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
-                        <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                        {(!editingEntry && !manualMealBuildMode && photoPreview && showAiResult && !isEditingDescription) ? (
+                          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                            <div className="font-semibold mb-1">We couldn’t find ingredients in this photo.</div>
+                            <div className="text-xs text-red-800">
+                              Try a clearer photo so we can generate ingredient cards with calories and macros.
+                            </div>
+                            <div className="mt-3 text-xs text-red-800 space-y-1">
+                              <div>Tips: bright light, full plate in frame, avoid blur.</div>
+                              <div>For packaged foods: photo the nutrition label (not the front of the pack).</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                try { replacePhotoInputRef.current?.click() } catch {}
+                              }}
+                              className="mt-3 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+                            >
+                              Try another photo
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                            {(() => {
+                              // Hide any embedded ITEMS_JSON blocks and any untagged JSON that looks like items[]
+                              const cleanedText = aiDescription
+                                // Remove tagged block (with or without closing tag) - literal and HTML-encoded
+                                .replace(/<ITEMS_JSON>[\s\S]*?(<\/ITEMS_JSON>|$)/gi, '')
+                                .replace(/&lt;ITEMS_JSON&gt;[\s\S]*?(&lt;\/ITEMS_JSON&gt;|$)/gi, '')
+                                // Remove any untagged inline JSON that looks like items[]
+                                .replace(/\{[\s\S]*?"items"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/g, '')
+                                .trim()
+                              const filteredLines = cleanedText
+                                .split('\n')
+                                .map((line) => line.trim())
+                                .filter(line =>
+                                  line.length > 0 &&
+                                  !/^calories?\b/i.test(line) &&
+                                  !/^protein\b/i.test(line) &&
+                                  !/^carb(?:ohydrate)?s?\b/i.test(line) &&
+                                  !/^fat\b/i.test(line) &&
+                                  !/^fiber\b/i.test(line) &&
+                                  !/^sugar\b/i.test(line) &&
+                                  !/insufficient credits/i.test(line) &&
+                                  !/trial limit/i.test(line) &&
+                                  !/^i'?m unable to see/i.test(line) &&
+                                  !/^unable to see/i.test(line)
+                                );
 
-                  {(() => {
-                            // Hide any embedded ITEMS_JSON blocks and any untagged JSON that looks like items[]
-                            const cleanedText = aiDescription
-                              // Remove tagged block (with or without closing tag) - literal and HTML-encoded
-                              .replace(/<ITEMS_JSON>[\s\S]*?(<\/ITEMS_JSON>|$)/gi, '')
-                              .replace(/&lt;ITEMS_JSON&gt;[\s\S]*?(&lt;\/ITEMS_JSON&gt;|$)/gi, '')
-                              // Remove any untagged inline JSON that looks like items[]
-                              .replace(/\{[\s\S]*?"items"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/g, '')
-                              .trim()
-                            const filteredLines = cleanedText
-                              .split('\n')
-                              .map((line) => line.trim())
-                              .filter(line =>
-                                line.length > 0 &&
-                                !/^calories?\b/i.test(line) &&
-                                !/^protein\b/i.test(line) &&
-                                !/^carb(?:ohydrate)?s?\b/i.test(line) &&
-                                !/^fat\b/i.test(line) &&
-                                !/^fiber\b/i.test(line) &&
-                                !/^sugar\b/i.test(line) &&
-                                !/insufficient credits/i.test(line) &&
-                                !/trial limit/i.test(line) &&
-                                !/^i'?m unable to see/i.test(line) &&
-                                !/^unable to see/i.test(line)
-                              );
+                              const cleaned = filteredLines.join('\n\n').trim();
+                              const fallback = aiDescription.replace(/calories\s*:[^\n]+/gi, '').trim();
+                              const merged = (cleaned || fallback || aiDescription || '').trim();
+                              const normalized = sanitizeMealDescription(merged);
+                              const finalText = normalized || 'Description not available yet.';
 
-                            const cleaned = filteredLines.join('\n\n').trim();
-                            const fallback = aiDescription.replace(/calories\s*:[^\n]+/gi, '').trim();
-                            const merged = (cleaned || fallback || aiDescription || '').trim();
-                            const normalized = sanitizeMealDescription(merged);
-                            const finalText = normalized || 'Description not available yet.';
-
-                            return finalText;
-                          })()}
-                        </div>
+                              return finalText;
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -20749,7 +20878,7 @@ Please add nutritional information manually if needed.`);
 	                    onClick={() =>
 	                      editingEntry ? updateFoodEntry() : addFoodEntry(aiDescription, manualMealBuildMode ? 'text' : 'photo')
 	                    }
-	                    disabled={isAnalyzing || isSavingEntry || labelBlocked}
+	                    disabled={isAnalyzing || isSavingEntry || labelBlocked || (!editingEntry && !manualMealBuildMode && photoSaveBlocked)}
 	                    className="w-full py-3 px-4 mx-auto max-w-[95%] bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
 	                  >
                     {isAnalyzing || isSavingEntry ? (
