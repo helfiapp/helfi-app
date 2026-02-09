@@ -333,6 +333,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     pathname === '/practitioners' || pathname.startsWith('/practitioners/')
   const isPractitionerPortalPath =
     pathname === '/practitioner' || pathname.startsWith('/practitioner/')
+  const isWeeklyReportPrintPage = pathname.startsWith('/insights/weekly-report/print')
   const isPublicPage = publicPages.includes(pathname) || isFeaturePath || isPractitionerDirectoryPath
   const isChatPage = pathname === '/chat'
   const isFoodDiaryPage = pathname === '/food'
@@ -347,6 +348,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const isOnboardingPath = pathname.startsWith('/onboarding')
   const themeAllowed =
     status === 'authenticated' &&
+    !isWeeklyReportPrintPage &&
     !isAdminPanelPath &&
     (!isPublicPage || isOnboardingPath)
 
@@ -845,6 +847,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   // 3. Current page is not an admin panel path
   const shouldShowSidebar =
     status === 'authenticated' &&
+    !isWeeklyReportPrintPage &&
     !isAdminPanelPath &&
     !isPractitionerPortalPath &&
     (!isPublicPage || isOnboardingPath)
@@ -1260,8 +1263,8 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
     <div className="min-h-screen overflow-x-hidden">
       {children}
-      <SupportChatWidget />
-      {showBackToTop && <BackToTopButton />}
+      {!isWeeklyReportPrintPage && <SupportChatWidget />}
+      {showBackToTop && !isWeeklyReportPrintPage && <BackToTopButton />}
     </div>
   )
 } 

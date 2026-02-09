@@ -256,7 +256,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
       : null
   const pdfHref = useMemo(() => {
     if (!report?.id) return null
-    return `/api/reports/weekly/pdf?reportId=${encodeURIComponent(report.id)}`
+    return `/insights/weekly-report/print?id=${encodeURIComponent(report.id)}`
   }, [report])
 
   const updateProgressStage = (percent: number) => {
@@ -606,31 +606,6 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             <p className="text-sm text-slate-600 mt-1">{periodRangeLabel}</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            {canManualReport && (
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={runManualReport}
-                  disabled={manualStatus === 'running'}
-                  className="inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90 disabled:opacity-60"
-                >
-                  {manualStatus === 'running' ? 'Creating report...' : 'Create report now'}
-                </button>
-                {progressActive && (
-                  <div className="w-full max-w-xs">
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>{progressStage}</span>
-                      <span>{progressPercent}%</span>
-                    </div>
-                    <div className="mt-1 h-2 w-full rounded-full bg-gray-200">
-                      <div
-                        className="h-2 rounded-full bg-emerald-500"
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           {pdfHref && (
             <a
               href={pdfHref}
@@ -638,7 +613,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
               rel="noreferrer"
                 className="hidden md:inline-flex items-center rounded-lg border border-helfi-green px-4 py-2 text-sm font-medium text-helfi-green hover:bg-helfi-green/10"
               >
-                Download PDF
+                Save as PDF
               </a>
             )}
             <Link
@@ -971,12 +946,12 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
                   </Link>
                   <div className="mt-3 flex items-center gap-3">
                     <a
-                      href={`/api/reports/weekly/pdf?reportId=${encodeURIComponent(item.id)}`}
+                      href={`/insights/weekly-report/print?id=${encodeURIComponent(item.id)}`}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center rounded-lg border border-helfi-green px-3 py-1.5 text-xs font-semibold text-helfi-green hover:bg-helfi-green/10"
                     >
-                      Download PDF
+                      Save as PDF
                     </a>
                   </div>
                 </div>

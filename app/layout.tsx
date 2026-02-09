@@ -81,6 +81,7 @@ export default function RootLayout({
                     path === '/help' ||
                     path === '/faq' ||
                     path.indexOf('/features') === 0 ||
+                    path.indexOf('/insights/weekly-report/print') === 0 ||
                     path.indexOf('/auth/') === 0 ||
                     path.indexOf('/staging-signin') === 0;
 
