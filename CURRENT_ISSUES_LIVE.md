@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE:
+- Date/time: Mon Feb 9 17:33 AEDT 2026
+- What changed: Food search now always shows Helfi database results first, and uses FatSecret only as a fallback. OpenFoodFacts is no longer used. Results without calories + macros are hidden.
+- Where to see it (page/link): https://helfi.ai/food (Add Ingredient + search), and barcode scan in Food Diary.
+- What to quickly test: Search Packaged/Fast-foods for “KFC” or “McDonald’s” and confirm fast-food items show first; search a random branded item and confirm you still get results; confirm every result shows calories + protein + carbs + fat.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 18:27 AEDT 2026
 - What changed: Reduced the database spike checker frequency from every 5 minutes to every 1 hour to lower overhead.
 - Where to see it (page/link): (No UI change. Background safety check schedule only.)
