@@ -8,6 +8,7 @@ import MissingFoodReport from '@/components/food/MissingFoodReport'
 import { DRY_FOOD_MEASUREMENTS } from '@/lib/food/dry-food-measurements'
 import { PRODUCE_MEASUREMENTS } from '@/lib/food/produce-measurements'
 import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '@/lib/food/dairy-semi-solid-measurements'
+import { applyFoodNameOverride, createFoodNameOverrideIndex } from '@/lib/food/food-name-overrides'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 
@@ -1446,6 +1447,27 @@ export default function MealBuilderClient() {
   const searchParams = useSearchParams()
   const { userData, updateUserData } = useUserData()
 
+  const [foodNameOverridesFallback, setFoodNameOverridesFallback] = useState<any[] | null>(null)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('food:nameOverrides')
+      const parsed = raw ? JSON.parse(raw) : null
+      if (Array.isArray(parsed)) setFoodNameOverridesFallback(parsed)
+    } catch {}
+  }, [])
+  const rawFoodNameOverrides = (userData as any)?.foodNameOverrides
+  const foodNameOverrides = useMemo(() => {
+    if (Array.isArray(rawFoodNameOverrides)) return rawFoodNameOverrides
+    return foodNameOverridesFallback || []
+  }, [rawFoodNameOverrides, foodNameOverridesFallback])
+  useEffect(() => {
+    if (!Array.isArray(rawFoodNameOverrides)) return
+    try {
+      localStorage.setItem('food:nameOverrides', JSON.stringify(rawFoodNameOverrides))
+    } catch {}
+  }, [rawFoodNameOverrides])
+  const foodNameOverrideIndex = useMemo(() => createFoodNameOverrideIndex(foodNameOverrides), [foodNameOverrides])
+
   const initialDate = searchParams.get('date') || buildTodayIso()
   const initialCategory = normalizeCategory(searchParams.get('category'))
   const editFavoriteId = (searchParams.get('editFavoriteId') || '').trim()
@@ -2449,7 +2471,9 @@ export default function MealBuilderClient() {
 
   const favoriteDisplayLabel = (fav: any) => {
     const raw = (fav?.label || fav?.description || '').toString()
-    return normalizeMealLabel(raw)
+    const base = normalizeMealLabel(raw)
+    const overridden = applyFoodNameOverride(base, { favorite: fav }, foodNameOverrideIndex) || base
+    return overridden || base
   }
 
   const looksLikeMealBuilderCreatedItemId = (rawId: any) => {
@@ -4057,6 +4081,7 @@ export default function MealBuilderClient() {
                 const expanded = expandedId === it.id
                 const baseUnits = allowedUnitsForItem(it)
                 const hasCustomUnits = Boolean(getFoodUnitGrams(it.name))
+                const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
                 const totals = computeItemTotals(it)
                 return (
                   <div
@@ -4071,7 +4096,7 @@ export default function MealBuilderClient() {
                     >
                       <div className="min-w-0 text-left">
                         <div className="text-sm font-semibold text-gray-900 truncate">
-                          {it.name}
+                          {displayName}
                           {it.brand ? ` – ${it.brand}` : ''}
                         </div>
                         <div className="text-[11px] text-gray-500 truncate">
