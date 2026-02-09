@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
-import { searchOpenFoodFactsByQuery, searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition, searchLocalFoods } from '@/lib/food-data'
+import { searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition, searchLocalFoods } from '@/lib/food-data'
 import { searchCustomFoodMacros, getCustomPackagedItems } from '@/lib/food/custom-foods'
 import { prisma } from '@/lib/prisma'
 
@@ -12,7 +12,7 @@ let usdaHealthCache: { count: number | null; checkedAt: number } = { count: null
 // Food Diary `items[]` structure (name, brand, serving_size, macros).
 //
 // Query parameters:
-// - source: "openfoodfacts" | "usda" | "fatsecret" | "auto" (tries all with fallback)
+// - source: "usda" | "fatsecret" | "auto" (accepted for compatibility)
 // - q: search query (product name, brand, or keywords)
 export async function GET(request: NextRequest) {
   try {
@@ -37,8 +37,18 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const knownSources = new Set(['', 'auto', 'usda', 'fatsecret', 'openfoodfacts'])
+    if (!knownSources.has(source)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid source. Expected "usda", "fatsecret", or "auto".' },
+        { status: 400 },
+      )
+    }
+
     let items: any[] = []
-    let actualSource = source
+    // Owner rule: always start with Helfi database first, then use FatSecret to fill missing results.
+    // We treat all known `source` values as "auto" so the ordering is consistent.
+    let actualSource = 'auto'
 
     const normalizeForMatch = (value: any) =>
       String(value || '')
@@ -579,6 +589,21 @@ export async function GET(request: NextRequest) {
     const customPackagedMatches = kindMode === 'packaged' ? getCustomPackagedMatches(query) : []
     let customPackagedApplied = false
 
+    // Owner rule: never return items with missing calories/macros.
+    // Enforce this early so "fill up to limit" can still work.
+    const hasMacroData = (item: any) => {
+      if (!item) return false
+      const calories = item?.calories
+      const protein = item?.protein_g
+      const carbs = item?.carbs_g
+      const fat = item?.fat_g
+      const hasCalories = calories !== null && calories !== undefined && Number.isFinite(Number(calories))
+      const hasProtein = protein !== null && protein !== undefined && Number.isFinite(Number(protein))
+      const hasCarbs = carbs !== null && carbs !== undefined && Number.isFinite(Number(carbs))
+      const hasFat = fat !== null && fat !== undefined && Number.isFinite(Number(fat))
+      return hasCalories && hasProtein && hasCarbs && hasFat
+    }
+
     const toCustomFoodItems = async (value: string, options?: { allowTypo?: boolean }) => {
       if (kindMode !== 'single') return []
       const matches = await searchCustomFoodMacros(value, limit, { ...options, country: resolvedCountry })
@@ -597,7 +622,7 @@ export async function GET(request: NextRequest) {
         sugar_g: item.sugar_g,
         __custom: true,
       }))
-      return items
+      return items.filter((it) => hasMacroData(it))
     }
 
     const buildSingleFoodResults = async (value: string) => {
@@ -624,14 +649,16 @@ export async function GET(request: NextRequest) {
 
       const mainDeduped = dedupe(combinedMain)
 
-      const mainPrefix = filterItemsByQuery(mainDeduped, value, (item) => item?.name || '', false)
+      const mainWithMacros = mainDeduped.filter((it) => hasMacroData(it))
+
+      const mainPrefix = filterItemsByQuery(mainWithMacros, value, (item) => item?.name || '', false)
 
       const hasPrefixMatches = customPrefix.length > 0 || mainPrefix.length > 0
 
       const customFinal = hasPrefixMatches ? customPrefix : await toCustomFoodItems(value, { allowTypo: true })
       const mainFinal = hasPrefixMatches
         ? mainPrefix
-        : filterItemsByQuery(mainDeduped, value, (item) => item?.name || '', true)
+        : filterItemsByQuery(mainWithMacros, value, (item) => item?.name || '', true)
 
       const sortedCustom = sortByAlphabeticalHierarchyAsc(customFinal, value)
       const sortedMain = sortByAlphabeticalHierarchyAsc(mainFinal, value)
@@ -640,6 +667,7 @@ export async function GET(request: NextRequest) {
       const pushGroup = (group: any[]) => {
         for (const item of group) {
           if (combined.length >= limit) return
+          if (!hasMacroData(item)) continue
           combined.push(item)
         }
       }
@@ -649,20 +677,25 @@ export async function GET(request: NextRequest) {
       pushGroup(sortedCustom)
       pushGroup(sortedMain)
 
-      return combined
-    }
+      // If we still don't have enough results, use FatSecret as a fallback.
+      // (We still return the Helfi database results first.)
+      if (!localOnly && combined.length < limit) {
+        const fat = await searchFatSecretFoods(value, { pageSize: limit })
+        const filteredFat = filterItemsByQuery(fat, value, (item) => item?.name || '').filter((it) => hasMacroData(it))
+        const sortedFat = sortByAlphabeticalHierarchyAsc(filteredFat, value)
+        const seen = new Set(combined.map((it) => `${normalizeForMatch(it?.name)}|${normalizeForMatch(it?.brand)}`))
+        for (const item of sortedFat) {
+          if (combined.length >= limit) break
+          if (!hasMacroData(item)) continue
+          const key = `${normalizeForMatch(item?.name)}|${normalizeForMatch(item?.brand)}`
+          if (!key || key === '|') continue
+          if (seen.has(key)) continue
+          seen.add(key)
+          combined.push(item)
+        }
+      }
 
-    const hasMacroData = (item: any) => {
-      if (!item) return false
-      const calories = item?.calories
-      const protein = item?.protein_g
-      const carbs = item?.carbs_g
-      const fat = item?.fat_g
-      const hasCalories = calories !== null && calories !== undefined && Number.isFinite(Number(calories))
-      const hasProtein = protein !== null && protein !== undefined && Number.isFinite(Number(protein))
-      const hasCarbs = carbs !== null && carbs !== undefined && Number.isFinite(Number(carbs))
-      const hasFat = fat !== null && fat !== undefined && Number.isFinite(Number(fat))
-      return hasCalories && hasProtein && hasCarbs && hasFat
+      return combined
     }
 
     const scoreNameMatch = (name: any) => {
@@ -833,7 +866,7 @@ export async function GET(request: NextRequest) {
       return sortByNameAsc(filtered).slice(0, limit)
     }
 
-    if (source === 'auto' || !source) {
+    if (source === 'auto' || !source || source === 'usda' || source === 'fatsecret' || source === 'openfoodfacts') {
       const resolvedKind = kind === 'packaged' ? 'packaged' : 'single'
 
       const scoredServing = (serving: string | null | undefined, calories?: number | null) => {
@@ -1000,21 +1033,6 @@ export async function GET(request: NextRequest) {
           actualSource = 'usda'
         }
       } else {
-        const perSource = Math.min(Math.max(limit, 10), 25)
-
-        const normalized = (value: any) => String(value || '').trim().toLowerCase()
-        const dedupe = (list: any[]) => {
-          const byNameBrand = new Map<string, any>()
-          list
-            .sort((a, b) => scoreItem(b) - scoreItem(a))
-            .forEach((it) => {
-              const key = `${normalized(it?.name)}|${normalized(it?.brand)}`
-              if (!key || key === '|') return
-              if (!byNameBrand.has(key)) byNameBrand.set(key, it)
-            })
-          return Array.from(byNameBrand.values())
-        }
-
         const buildCompactFoodQuery = (value: string) => {
           const normalized = normalizeForMatch(value)
           if (!normalized) return null
@@ -1022,100 +1040,70 @@ export async function GET(request: NextRequest) {
           return compacted !== normalized ? compacted : null
         }
 
-        const fetchExternalPool = async () => {
-          const fetchForQuery = async (value: string) => {
-            const [off, fat] = await Promise.all([
-              searchOpenFoodFactsByQuery(value, { pageSize: perSource }),
-              searchFatSecretFoods(value, { pageSize: perSource }),
-            ])
-            return dedupe([...off, ...fat])
-          }
-
-          const primary = await fetchForQuery(query)
-          if (primary.length > 0) return primary
-          const compactQuery = buildCompactFoodQuery(query)
-          if (!compactQuery) return primary
-          return await fetchForQuery(compactQuery)
-        }
-
         const localPackaged = isRestaurantQuery ? [] : await searchLocalPreferred(query, 'packaged')
 
-        // If we already have custom packaged matches, return them immediately and skip slow external calls.
-        if (customPackagedMatches.length > 0) {
-          const localFiltered = filterItemsByQuery(localPackaged, query, (item) => {
-            const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-            return combined || item?.name || ''
-          })
-          const sortedCustom = sortPackagedByAlphabeticalHierarchyAsc(customPackagedMatches, query)
-          const sortedOthers = sortPackagedByAlphabeticalHierarchyAsc(localFiltered, query)
-          items = [...sortedCustom, ...sortedOthers].slice(0, limit)
-          actualSource = 'auto'
-          customPackagedApplied = true
-        } else {
-          const localEnough = localPackaged.length >= 5
-          const externalPool = localEnough ? [] : await fetchExternalPool()
-          const allPackaged = [...externalPool, ...localPackaged]
-          const filtered = filterItemsByQuery(allPackaged, query, (item) => {
-            const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-            return combined || item?.name || ''
+        const localFiltered = filterItemsByQuery(localPackaged, query, (item) => {
+          const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+          return combined || item?.name || ''
+        })
+
+        // Owner rule: our database first (custom + local), then FatSecret fills missing results.
+        // Custom FAST_FOOD should appear first in packaged search.
+        const customFastFood = customPackagedMatches.filter((it) => String(it?.kind || '') === 'FAST_FOOD')
+        const customOther = customPackagedMatches.filter((it) => String(it?.kind || '') !== 'FAST_FOOD')
+        const sortedCustom = [
+          ...sortPackagedByAlphabeticalHierarchyAsc(customFastFood, query),
+          ...sortPackagedByAlphabeticalHierarchyAsc(customOther, query),
+        ]
+        const sortedLocal = sortPackagedByAlphabeticalHierarchyAsc(localFiltered, query)
+
+        const normalizeKey = (value: any) => String(value || '').trim().toLowerCase()
+        const seen = new Set<string>()
+        const combined: any[] = []
+        const pushUnique = (it: any) => {
+          if (!hasMacroData(it)) return
+          const key = `${normalizeKey(it?.name)}|${normalizeKey(it?.brand)}`
+          if (!key || key === '|') return
+          if (seen.has(key)) return
+          seen.add(key)
+          combined.push(it)
+        }
+
+        sortedCustom.forEach(pushUnique)
+        sortedLocal.forEach(pushUnique)
+
+        if (!localOnly && combined.length < limit) {
+          const fetchFatSecret = async (value: string) => {
+            const fat = await searchFatSecretFoods(value, { pageSize: Math.min(25, Math.max(limit, 10)) })
+            const filtered = filterItemsByQuery(fat, value, (item) => {
+              const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+              return combined || item?.name || ''
+            })
+            return sortPackagedByAlphabeticalHierarchyAsc(filtered, value)
+          }
+
+          const fatPrimary = await fetchFatSecret(query)
+          fatPrimary.forEach((it) => {
+            if (combined.length >= limit) return
+            pushUnique(it)
           })
 
-          if (filtered.length > 0) {
-            items = sortPackagedByAlphabeticalHierarchyAsc(filtered, query).slice(0, limit)
-            actualSource = 'auto'
-          } else if (externalPool.length > 0) {
-            // If no matches, still try external pool without filtering (might have partial matches)
-            items = sortPackagedByAlphabeticalHierarchyAsc(externalPool, query).slice(0, limit)
-            actualSource = 'auto'
-          } else {
-            items = sortPackagedByAlphabeticalHierarchyAsc(localPackaged, query).slice(0, limit)
-            actualSource = 'auto'
+          if (combined.length < limit) {
+            const compactQuery = buildCompactFoodQuery(query)
+            if (compactQuery) {
+              const fatCompact = await fetchFatSecret(compactQuery)
+              fatCompact.forEach((it) => {
+                if (combined.length >= limit) return
+                pushUnique(it)
+              })
+            }
           }
         }
+
+        items = combined.slice(0, limit)
+        actualSource = 'auto'
+        if (customPackagedMatches.length > 0) customPackagedApplied = true
       }
-    } else if (source === 'openfoodfacts') {
-      items = await searchOpenFoodFactsByQuery(query, { pageSize: limit })
-    } else if (source === 'usda') {
-      const resolvedKind = kind === 'packaged' ? 'packaged' : 'single'
-      if (resolvedKind === 'single') {
-        const combined = await buildSingleFoodResults(query)
-        if (combined.length > 0) {
-          items = combined
-          actualSource = 'usda'
-        } else if (localOnly) {
-          items = []
-          actualSource = 'usda'
-        } else {
-          const usdaItems = await searchUsdaSingleFood(query)
-          items = sortByAlphabeticalHierarchyAsc(usdaItems, query).slice(0, limit)
-          actualSource = 'usda'
-        }
-      } else {
-        const localItems = await searchLocalPreferred(query, resolvedKind)
-        if (customPackagedMatches.length > 0) {
-          items = sortPackagedByAlphabeticalHierarchyAsc(customPackagedMatches, query).slice(0, limit)
-          actualSource = 'usda'
-          customPackagedApplied = true
-        } else if (localItems.length > 0) {
-          items = sortPackagedByAlphabeticalHierarchyAsc(localItems, query).slice(0, limit)
-          actualSource = 'usda'
-        } else if (localOnly) {
-          items = []
-          actualSource = 'usda'
-        } else {
-          const dataType = resolvedKind === 'packaged' ? 'all' : 'generic'
-          const remote = await searchUsdaFoods(query, { pageSize: limit, dataType })
-          items = sortPackagedByAlphabeticalHierarchyAsc(remote, query).slice(0, limit)
-          actualSource = 'usda'
-        }
-      }
-    } else if (source === 'fatsecret') {
-      items = await searchFatSecretFoods(query, { pageSize: limit })
-    } else {
-      return NextResponse.json(
-        { success: false, error: 'Invalid source. Expected "openfoodfacts", "usda", "fatsecret", or "auto".' },
-        { status: 400 },
-      )
     }
 
     if (kindMode === 'packaged' && customPackagedMatches.length > 0 && !customPackagedApplied) {
@@ -1137,7 +1125,8 @@ export async function GET(request: NextRequest) {
 
     if (Array.isArray(items) && items.length > 1) {
       if (kindMode !== 'single') {
-        items = sortPackagedByAlphabeticalHierarchyAsc(items, query).slice(0, limit)
+        // Keep the grouped order: Helfi database first, then FatSecret fallback.
+        items = items.slice(0, limit)
       } else {
         items = items.slice(0, limit)
       }

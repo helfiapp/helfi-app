@@ -16,7 +16,7 @@ import {
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 type SearchKind = 'packaged' | 'single'
-type SearchSource = 'auto' | 'usda' | 'openfoodfacts'
+type SearchSource = 'auto'
 
 type NormalizedFoodItem = {
   source: 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom'
@@ -770,7 +770,7 @@ export default function AddIngredientClient() {
 
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<SearchKind>('packaged')
-  const [sourceChoice, setSourceChoice] = useState<SearchSource>('auto')
+  const sourceChoice: SearchSource = 'auto'
   const [loading, setLoading] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -904,7 +904,7 @@ export default function AddIngredientClient() {
         searchDebounceRef.current = null
       }
     }
-  }, [query, kind, sourceChoice])
+  }, [query, kind])
 
   useEffect(() => {
     const q = String(query || '').trim()
@@ -1132,7 +1132,7 @@ export default function AddIngredientClient() {
     options?: { preserveResults?: boolean },
   ) => {
     const q = String(qOverride ?? query).trim()
-    const source = sourceOverride ?? sourceChoice
+    const source: SearchSource = 'auto'
     const k = kindOverride ?? kind
     const cacheKey = buildSearchCacheKey(k, source)
     const userCountry = String(userData?.country || '').trim()
@@ -1153,10 +1153,9 @@ export default function AddIngredientClient() {
     const seq = ++seqRef.current
 
     try {
-      const sourceParam = source === 'auto' ? 'auto' : source
-      const fetchItems = async (searchQuery: string, options?: { sourceParam?: SearchSource; localOnly?: boolean }) => {
+      const fetchItems = async (searchQuery: string, options?: { localOnly?: boolean }) => {
         const params = new URLSearchParams({
-          source: options?.sourceParam ?? sourceParam,
+          source: 'auto',
           q: searchQuery,
           kind: k,
           limit: '20',
@@ -1169,10 +1168,10 @@ export default function AddIngredientClient() {
       }
 
       const allowBrandSuggestions = k === 'packaged' && shouldShowBrandSuggestions(q)
-      if (k === 'packaged' && sourceParam === 'auto') {
+      if (k === 'packaged') {
         const quickQuery = getQuickPackagedQuery(q)
         if (quickQuery.length >= 1) {
-          const quick = await fetchItems(quickQuery, { sourceParam: 'usda', localOnly: true })
+          const quick = await fetchItems(quickQuery, { localOnly: true })
           if (quick.res.ok && seqRef.current === seq) {
             const quickItems = Array.isArray(quick.data?.items) ? quick.data.items : []
             const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
@@ -1200,9 +1199,10 @@ export default function AddIngredientClient() {
       if (seqRef.current !== seq) return
       let baseResults = Array.isArray(data?.items) ? data.items : []
       if (k === 'single') {
-        // Include USDA foods and custom foods (marked with __custom flag)
-        baseResults = baseResults.filter((item: NormalizedFoodItem) => 
-          item?.source === 'usda' || (item as any)?.__custom === true
+        // Single foods can come from our database, USDA, or FatSecret fallback.
+        baseResults = baseResults.filter(
+          (item: NormalizedFoodItem) =>
+            item?.source === 'usda' || item?.source === 'fatsecret' || (item as any)?.__custom === true,
         )
         if (baseResults.length === 0) {
           const fallback = buildSingleFoodFallback(q)
@@ -1210,8 +1210,9 @@ export default function AddIngredientClient() {
             const retry = await fetchItems(fallback)
             if (retry.res.ok) {
               const retryItems = Array.isArray(retry.data?.items) ? retry.data.items : []
-              baseResults = retryItems.filter((item: NormalizedFoodItem) => 
-                item?.source === 'usda' || (item as any)?.__custom === true
+              baseResults = retryItems.filter(
+                (item: NormalizedFoodItem) =>
+                  item?.source === 'usda' || item?.source === 'fatsecret' || (item as any)?.__custom === true,
               )
             }
           }
@@ -1649,10 +1650,8 @@ export default function AddIngredientClient() {
                 type="button"
                 disabled={loading}
                 onClick={() => {
-                  const nextSource = sourceChoice === 'usda' ? 'auto' : sourceChoice
                   setKind('packaged')
-                  if (nextSource !== sourceChoice) setSourceChoice(nextSource)
-                  if (query.trim().length >= 1) runSearch(query, 'packaged', nextSource)
+                  if (query.trim().length >= 1) runSearch(query, 'packaged', 'auto')
                 }}
                 className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
                   kind === 'packaged' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
@@ -1664,10 +1663,8 @@ export default function AddIngredientClient() {
                 type="button"
                 disabled={loading}
                 onClick={() => {
-                  const nextSource = sourceChoice === 'openfoodfacts' ? 'usda' : sourceChoice
                   setKind('single')
-                  if (nextSource !== sourceChoice) setSourceChoice(nextSource)
-                  if (query.trim().length >= 1) runSearch(query, 'single', nextSource)
+                  if (query.trim().length >= 1) runSearch(query, 'single', 'auto')
                 }}
                 className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
                   kind === 'single' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-gray-700 border-gray-200'
@@ -1677,45 +1674,11 @@ export default function AddIngredientClient() {
               </button>
             </div>
 
-            <div className="space-y-1">
-              <div className="text-xs font-semibold text-gray-600">Source</div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {([
-                  { key: 'auto', label: 'Best match' },
-                  { key: 'usda', label: 'USDA' },
-                  { key: 'openfoodfacts', label: 'OpenFoodFacts' },
-                ] as const).map((opt) => (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => {
-                      const nextKind =
-                        opt.key === 'usda' ? 'single' : opt.key === 'openfoodfacts' ? 'packaged' : kind
-                      setSourceChoice(opt.key)
-                      if (nextKind !== kind) setKind(nextKind)
-                      if (query.trim().length >= 1) runSearch(query, nextKind, opt.key)
-                    }}
-                    className={`px-3 py-2 rounded-lg border text-xs font-semibold ${
-                      sourceChoice === opt.key
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-gray-700 border-gray-200'
-                    } disabled:opacity-60`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <div className="text-[11px] text-gray-500">
-                USDA works with Single food. OpenFoodFacts works with Packaged.
-              </div>
-            </div>
-
             {error && <div className="text-sm text-red-600">{error}</div>}
 
             {!loading && !error && results.length === 0 && query.trim() && (
               <div className="text-sm text-gray-500">
-                No results yet. Try a different search or switch the source above.
+                No results yet. Try a different search.
               </div>
             )}
 
@@ -1757,7 +1720,7 @@ export default function AddIngredientClient() {
                                   ? 'USDA'
                                   : r.source === 'fatsecret'
                                   ? 'FatSecret'
-                                  : 'Open Food Facts'
+                                  : 'Other'
                               }`}
                         </div>
                       </div>

@@ -17753,7 +17753,7 @@ Please add nutritional information manually if needed.`);
                   {/* PROTECTED: ADD_INGREDIENT_MODAL_SEARCH START */}
 	                <div className="space-y-2">
 	                  <label className="block text-sm font-medium text-gray-900">
-	                    Search foods (USDA for single foods, OpenFoodFacts for packaged)
+	                    Search foods (Helfi database first, then FatSecret if needed)
 	                  </label>
                   <div className="flex flex-col gap-2">
                     <div className="relative">
@@ -17893,7 +17893,8 @@ Please add nutritional information manually if needed.`);
                     </div>
                   </div>
 	                  <p className="text-xs text-gray-500">
-	                    Single food searches use USDA. Packaged searches use OpenFoodFacts. Plurals are OK — we auto-try the single word.
+	                    Search always shows Helfi database results first. If we don’t have enough matches, we try FatSecret.
+	                    Results only show when calories + protein + carbs + fat are available.
 	                  </p>
 	                </div>
                 {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
@@ -17944,10 +17945,10 @@ Please add nutritional information manually if needed.`);
                                     ? 'Custom list'
                                     : r.source === 'usda'
                                     ? 'USDA FoodData Central'
-                                    : r.source === 'openfoodfacts'
-                                    ? 'OpenFoodFacts'
                                     : r.source === 'fatsecret'
                                     ? 'FatSecret'
+                                    : r.source === 'openfoodfacts'
+                                    ? 'Other'
                                     : officialResultsSource || 'Unknown'
                                 }`}
                           </div>
@@ -20799,8 +20800,8 @@ Please add nutritional information manually if needed.`);
                       </div>
 
                       <div className="pt-2 border-t border-gray-200">
-                      <div className="text-sm font-medium text-gray-900">
-                          Find a better match (USDA for single foods, OpenFoodFacts for packaged)
+                        <div className="text-sm font-medium text-gray-900">
+                          Find a better match (Helfi database first, then FatSecret if needed)
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
                           Selecting a result replaces the item name, serving size, and macros.
@@ -20995,10 +20996,10 @@ Please add nutritional information manually if needed.`);
                                               ? 'Custom list'
                                               : r.source === 'usda'
                                               ? 'USDA FoodData Central'
-                                              : r.source === 'openfoodfacts'
-                                              ? 'OpenFoodFacts'
                                               : r.source === 'fatsecret'
                                               ? 'FatSecret'
+                                              : r.source === 'openfoodfacts'
+                                              ? 'Other'
                                               : officialResultsSource || 'Unknown'
                                           }`}
                                     </div>

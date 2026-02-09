@@ -1143,15 +1143,13 @@ export async function lookupFoodNutrition(
   if (preferSource === 'usda') {
     sources.push(() => searchUsdaFoods(query, { pageSize: maxResults, dataType: usdaDataType }))
     sources.push(() => searchFatSecretFoods(query, { pageSize: maxResults }))
-    sources.push(() => searchOpenFoodFactsByQuery(query, { pageSize: maxResults }))
   } else if (preferSource === 'fatsecret') {
     sources.push(() => searchFatSecretFoods(query, { pageSize: maxResults }))
     sources.push(() => searchUsdaFoods(query, { pageSize: maxResults, dataType: usdaDataType }))
-    sources.push(() => searchOpenFoodFactsByQuery(query, { pageSize: maxResults }))
   } else {
-    sources.push(() => searchOpenFoodFactsByQuery(query, { pageSize: maxResults }))
-    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults, dataType: usdaDataType }))
+    // "openfoodfacts" is accepted for backwards-compat, but we no longer call OpenFoodFacts.
     sources.push(() => searchFatSecretFoods(query, { pageSize: maxResults }))
+    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults, dataType: usdaDataType }))
   }
 
   // Try each source until we get results

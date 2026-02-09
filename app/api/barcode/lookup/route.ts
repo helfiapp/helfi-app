@@ -7,13 +7,11 @@ import { normalizeBarcodeFood, summarizeDiscreteItemsForLog } from '@/lib/food-n
 
 // Barcode lookup with multiple API fallbacks:
 // 1. FatSecret (primary - has great barcode coverage for packaged foods)
-// 2. OpenFoodFacts (fallback - open database with excellent global coverage)
-// 3. USDA (secondary fallback - search by product name if barcode not found)
+// 2. USDA (fallback - search by product name if barcode not found)
 
 const FATSECRET_CLIENT_ID = process.env.FATSECRET_CLIENT_ID || '5b035e5de0b041ffb0b8522abd75dd0b'
 const FATSECRET_CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET || 'd544f96d19494c9ca8a3dec1bcaf1da3'
 const USDA_API_KEY = process.env.USDA_API_KEY
-const OPENFOODFACTS_USER_AGENT = 'helfi-app/1.0 (support@helfi.ai)'
 const BARCODE_SCAN_COST_CENTS = 3
 
 type FatSecretServing = {
@@ -35,7 +33,7 @@ type FatSecretFood = {
 }
 
 interface NormalizedFood {
-  source: 'helfi' | 'fatsecret' | 'openfoodfacts' | 'usda'
+  source: 'helfi' | 'fatsecret' | 'usda'
   id: string
   name: string
   brand?: string | null
@@ -53,11 +51,6 @@ interface NormalizedFood {
   energyUnit?: 'kcal' | 'kJ' | null
   piecesPerServing?: number | null
   pieces?: number | null
-}
-
-type OpenFoodFactsResult = {
-  food: NormalizedFood | null
-  productName: string | null
 }
 
 const parseNumber = (val?: string | number | null): number | null => {
@@ -349,113 +342,6 @@ async function fetchFoodFromFatSecret(barcode: string): Promise<NormalizedFood |
   }
 }
 
-// ============ OpenFoodFacts API ============
-
-async function fetchFoodFromOpenFoodFacts(barcode: string): Promise<OpenFoodFactsResult> {
-  try {
-    const url = `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`
-    
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': OPENFOODFACTS_USER_AGENT,
-      },
-      cache: 'no-store',
-      next: { revalidate: 0 },
-    })
-
-    if (!res.ok) {
-      console.warn('OpenFoodFacts barcode lookup failed', res.status)
-      return { food: null, productName: null }
-    }
-
-    const data = await res.json()
-    
-    if (data.status !== 1 || !data.product) {
-      console.log('OpenFoodFacts: Product not found for barcode', barcode)
-      return { food: null, productName: null }
-    }
-
-    const product = data.product
-    const nutr = product.nutriments || {}
-
-    const name: string =
-      product.product_name ||
-      product.generic_name ||
-      product.brands ||
-      product.categories ||
-      product.labels ||
-      barcode
-
-    if (!name) return { food: null, productName: null }
-
-    // Prefer per-serving values, fallback to per 100g
-    const kcalServing = parseNumber(nutr['energy-kcal_serving'])
-    const energyServing = parseNumber(nutr['energy_serving'])
-    const proteinServing = parseNumber(nutr['proteins_serving'])
-    const carbsServing = parseNumber(nutr['carbohydrates_serving'])
-    const fatServing = parseNumber(nutr['fat_serving'])
-    const fiberServing = parseNumber(nutr['fiber_serving'])
-    const sugarServing = parseNumber(nutr['sugars_serving'])
-
-    let calories: number | null = null
-    let protein_g: number | null = null
-    let carbs_g: number | null = null
-    let fat_g: number | null = null
-    let fiber_g: number | null = null
-    let sugar_g: number | null = null
-    let serving_size = product.serving_size || '1 serving'
-    let basis: NormalizedFood['basis'] = 'per_serving'
-    let energyUnit: NormalizedFood['energyUnit'] = kcalServing != null ? 'kcal' : energyServing != null ? 'kJ' : null
-    const quantity_g = parseGramsFromLabel(serving_size) || null
-
-    if (kcalServing != null || proteinServing != null || carbsServing != null || fatServing != null) {
-      calories = kcalServing ?? energyServing ?? parseNumber(nutr['energy-kcal_100g'] ?? nutr['energy_100g'])
-      protein_g = proteinServing ?? parseNumber(nutr['proteins_100g'])
-      carbs_g = carbsServing ?? parseNumber(nutr['carbohydrates_100g'])
-      fat_g = fatServing ?? parseNumber(nutr['fat_100g'])
-      fiber_g = fiberServing ?? parseNumber(nutr['fiber_100g'])
-      sugar_g = sugarServing ?? parseNumber(nutr['sugars_100g'])
-      basis = 'per_serving'
-    } else {
-      // Use per 100g values
-      calories = parseNumber(nutr['energy-kcal_100g'] ?? nutr['energy_100g'])
-      protein_g = parseNumber(nutr['proteins_100g'])
-      carbs_g = parseNumber(nutr['carbohydrates_100g'])
-      fat_g = parseNumber(nutr['fat_100g'])
-      fiber_g = parseNumber(nutr['fiber_100g'])
-      sugar_g = parseNumber(nutr['sugars_100g'])
-      serving_size = '100 g'
-      basis = 'per_100g'
-    }
-
-    console.log('✅ OpenFoodFacts found:', name, 'for barcode', barcode)
-
-    return {
-      food: {
-        source: 'openfoodfacts',
-        id: barcode,
-        name,
-        brand: product.brands || null,
-        serving_size,
-        calories,
-        protein_g,
-        carbs_g,
-        fat_g,
-        fiber_g,
-        sugar_g,
-        barcode,
-        basis,
-        quantity_g,
-        energyUnit,
-      },
-      productName: name,
-    }
-  } catch (err) {
-    console.warn('OpenFoodFacts barcode handler error', err)
-    return { food: null, productName: null }
-  }
-}
-
 // ============ USDA API (search by product name) ============
 
 async function searchFoodFromUSDA(productName: string, barcode: string): Promise<NormalizedFood | null> {
@@ -586,7 +472,6 @@ export async function GET(req: NextRequest) {
 
   console.log('🔍 Looking up barcode:', code)
   let food: NormalizedFood | null = null
-  let openFoodFacts: OpenFoodFactsResult | null = null
 
   // Try Helfi cache first (user-labeled nutrition from barcode scans)
   for (const candidate of barcodeCandidates) {
@@ -609,18 +494,9 @@ export async function GET(req: NextRequest) {
     food = await fetchFoodFromFatSecret(code)
   }
 
-  // Try OpenFoodFacts second (great global coverage) if still missing
+  // Try USDA using barcode as a last resort (search by product name)
   if (!food) {
-    openFoodFacts = await fetchFoodFromOpenFoodFacts(code)
-    if (openFoodFacts.food) {
-      food = openFoodFacts.food
-    }
-  }
-
-  // Try USDA using the best available product name (OpenFoodFacts often has a label even when nutrition is missing)
-  if (!food) {
-    const usdaQuery = openFoodFacts?.productName || code
-    const usdaFood = await searchFoodFromUSDA(usdaQuery, code)
+    const usdaFood = await searchFoodFromUSDA(code, code)
     if (usdaFood) {
       food = usdaFood
     }
@@ -721,7 +597,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ found: true, food })
   }
 
-  console.log('⚠️ No barcode match found after FatSecret, OpenFoodFacts, or USDA for:', code)
+  console.log('⚠️ No barcode match found after FatSecret or USDA for:', code)
   
   return NextResponse.json(
     {
