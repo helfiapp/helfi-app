@@ -1229,6 +1229,15 @@ const extractBaseMealDescription = (value: string | null | undefined) => {
   return sanitizeMealDescription(firstLine || value.trim())
 }
 
+const splitTitleAndNote = (value: string | null | undefined) => {
+  const raw = String(value || '').trim()
+  if (!raw) return { title: '', note: '' }
+  const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
+  const title = lines[0] || ''
+  const note = lines.slice(1).join('\n').trim()
+  return { title, note }
+}
+
 type RingProps = {
   label: string
   valueLabel: string
@@ -3005,6 +3014,10 @@ export default function FoodDiary() {
   const [showAiResult, setShowAiResult] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [editedDescription, setEditedDescription] = useState('')
+  // User editable title + optional notes for a saved/new entry.
+  // Title is the "name" shown across the app; notes are optional and shown on the entry screen.
+  const [editedFoodTitle, setEditedFoodTitle] = useState('')
+  const [editedFoodNote, setEditedFoodNote] = useState('')
   const [analyzedNutrition, setAnalyzedNutrition] = useState<any>(null)
   const [analyzedItems, setAnalyzedItems] = useState<any[]>([]) // Structured items array from API
   const [analyzedTotal, setAnalyzedTotal] = useState<any>(null) // Total nutrition from API
@@ -10885,12 +10898,14 @@ Please add nutritional information manually if needed.`);
       return;
     }
 
-    // Prefer a clean natural-language summary from the AI analysis, falling
-    // back to a structured summary from items only when needed.
-    const baseFromAi = extractBaseMealDescription(description);
+    // Prefer the user-edited title (if present), otherwise fall back to AI/item summaries.
+    const baseFromAi = extractBaseMealDescription(description)
     const baseFromItems =
-      analyzedItems && analyzedItems.length > 0 ? buildMealSummaryFromItems(analyzedItems) : '';
-    const finalDescription = (baseFromAi || baseFromItems || description || '').trim();
+      analyzedItems && analyzedItems.length > 0 ? buildMealSummaryFromItems(analyzedItems) : ''
+    const titleInput = (editedFoodTitle || '').trim()
+    const noteInput = (editedFoodNote || '').trim()
+    const resolvedTitle = (titleInput || baseFromAi || baseFromItems || description || '').trim()
+    const finalDescription = noteInput ? `${resolvedTitle}\n${noteInput}` : resolvedTitle
     
     const category = normalizeCategory(selectedAddCategory)
     const opStamp = Date.now()
@@ -10900,9 +10915,15 @@ Please add nutritional information manually if needed.`);
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const drinkOverride = pendingDrinkOverrideRef.current
     const adjusted = applyDrinkOverrideToItems(analyzedItems, drinkOverride)
-    const finalItems = adjusted.items || (analyzedItems && analyzedItems.length > 0 ? analyzedItems : null)
+    let finalItems = adjusted.items || (analyzedItems && analyzedItems.length > 0 ? analyzedItems : null)
     const overrideTotals = adjusted.used ? adjusted.totals || null : null
     if (adjusted.used) pendingDrinkOverrideRef.current = null
+    // If this is a single-item entry and the user gave it a title, use that as the item name too.
+    try {
+      if (titleInput && Array.isArray(finalItems) && finalItems.length === 1) {
+        finalItems = [{ ...(finalItems[0] || {}), name: titleInput }]
+      }
+    } catch {}
     const drinkMeta = consumePendingDrinkMeta(drinkOverride)
     const finalNutritionBase = overrideTotals || nutrition || analyzedNutrition
     const finalTotalBase = overrideTotals ? convertTotalsForStorage(overrideTotals) : analyzedTotal || null
@@ -11210,14 +11231,10 @@ Please add nutritional information manually if needed.`);
       }
     }
 
-    // Never override a user-provided title with an auto-generated ingredient summary.
-    const baseDescription = extractBaseMealDescription(originalEditingEntry?.description || editingEntry?.description || '')
-    const rawManualDescription = (editedDescription?.trim?.() || '').trim()
-    const manualDescription =
-      rawManualDescription && normalizedDescription(rawManualDescription) !== normalizedDescription(baseDescription)
-        ? rawManualDescription
-        : ''
-    const fallbackDescription = (manualDescription || aiDescription || editingEntry.description || '').trim()
+    // Title = what shows everywhere (diary list, favorites, etc). Notes are optional and stay below the title.
+    const baseTitle = extractBaseMealDescription(originalEditingEntry?.description || editingEntry?.description || '')
+    const titleInput = (editedFoodTitle || '').trim()
+    const noteInput = (editedFoodNote || '').trim()
     const generatedSummary = buildMealSummaryFromItems(analyzedItems)
     const singleItemName = (() => {
       const list =
@@ -11230,16 +11247,11 @@ Please add nutritional information manually if needed.`);
       const item = list[0]
       return String(item?.name || item?.label || '').trim()
     })()
-    const finalDescription = (() => {
-      if (!manualDescription && singleItemName) {
-        const base = normalizedDescription(fallbackDescription || '')
-        const next = normalizedDescription(singleItemName)
-        if (next && next !== base) return singleItemName
-      }
-      return fallbackDescription || generatedSummary || ''
-    })()
-    const previousLabel = normalizeMealLabel(baseDescription) || baseDescription
-    const nextLabel = normalizeMealLabel(finalDescription) || finalDescription
+    const fallbackTitle = extractBaseMealDescription(editingEntry?.description || aiDescription || '') || ''
+    const resolvedTitle = (titleInput || singleItemName || fallbackTitle || generatedSummary || '').trim()
+    const finalDescription = noteInput ? `${resolvedTitle}\n${noteInput}` : resolvedTitle
+    const previousLabel = normalizeMealLabel(baseTitle) || baseTitle
+    const nextLabel = normalizeMealLabel(resolvedTitle) || resolvedTitle
     const nameChanged =
       normalizeFoodName(previousLabel || '') && normalizeFoodName(nextLabel || '')
         ? normalizeFoodName(previousLabel || '') !== normalizeFoodName(nextLabel || '')
@@ -11360,9 +11372,57 @@ Please add nutritional information manually if needed.`);
       const found = sources.find(match)
       return found?.dbId || null
     }
-    const resolvedDbId = resolveDbId()
+    let resolvedDbId = resolveDbId()
+    const resolveDbIdFromServer = async () => {
+      const clientId = getEntryClientId(editingEntry)
+      const date = entryLocalDate || selectedDate
+      if (!date) return null
+      try {
+        const tz = new Date().getTimezoneOffset()
+        const url = `/api/food-log?date=${encodeURIComponent(date)}&tz=${tz}&t=${Date.now()}`
+        const res = await fetch(url, { cache: 'no-store' })
+        if (!res.ok) return null
+        const data = await res.json().catch(() => null)
+        const logs = data && Array.isArray(data.logs) ? data.logs : []
+        if (clientId) {
+          const hit = logs.find((log: any) => {
+            const stored =
+              normalizeClientId((log as any)?.nutrients?.__clientId) ||
+              normalizeClientId((log as any)?.nutrients?.__clientID) ||
+              normalizeClientId((log as any)?.nutrients?.__client_id)
+            return stored && stored === clientId
+          })
+          if (hit?.id) return String(hit.id)
+        }
 
-    const updatedItems = (() => {
+        // Fallback: best-effort match by time + category + title (for older entries without clientId).
+        try {
+          const targetTs = new Date(editingEntry?.createdAt || '').getTime()
+          const targetTitle = extractBaseMealDescription(editingEntry?.description || '')
+          const targetCat = normalizeCategory(editingEntry?.meal || editingEntry?.category || '')
+          if (!Number.isFinite(targetTs) || !targetTitle) return null
+          const hit = logs.find((log: any) => {
+            const logTs = new Date(log?.createdAt || '').getTime()
+            if (!Number.isFinite(logTs)) return false
+            if (Math.abs(logTs - targetTs) > 10 * 60 * 1000) return false
+            const logCat = normalizeCategory(log?.meal || log?.category || '')
+            if (targetCat && logCat && targetCat !== logCat) return false
+            const logTitle = extractBaseMealDescription(log?.description || log?.name || '')
+            return normalizeFoodName(logTitle) === normalizeFoodName(targetTitle)
+          })
+          return hit?.id ? String(hit.id) : null
+        } catch {
+          return null
+        }
+      } catch {
+        return null
+      }
+    }
+    if (!resolvedDbId) {
+      resolvedDbId = await resolveDbIdFromServer()
+    }
+
+    let updatedItems = (() => {
       const baseItems =
         analyzedItems && analyzedItems.length > 0 ? analyzedItems : (editingEntry.items || null)
       if (!Array.isArray(baseItems) || baseItems.length !== 1) return baseItems
@@ -11382,6 +11442,12 @@ Please add nutritional information manually if needed.`);
       }
       return [item]
     })()
+    // Keep single-item names in sync with the user-edited title.
+    try {
+      if (resolvedTitle && Array.isArray(updatedItems) && updatedItems.length === 1) {
+        updatedItems = [{ ...(updatedItems[0] || {}), name: resolvedTitle }]
+      }
+    } catch {}
 
     const updatedEntry = {
       ...editingEntry,
@@ -11396,16 +11462,16 @@ Please add nutritional information manually if needed.`);
     };
 
     if (nameChanged && nextLabel) {
-      const resolved = resolveFavoriteForEntry(editingEntry, baseDescription)
+      const resolved = resolveFavoriteForEntry(editingEntry, baseTitle)
       if (resolved.favoriteId) {
         updateFavoriteLabelById(resolved.favoriteId, nextLabel, previousLabel)
         renameEntriesWithFavoriteId(resolved.favoriteId, nextLabel)
       } else {
-        updateFavoriteLabelByMatch(previousLabel || baseDescription, nextLabel)
+        updateFavoriteLabelByMatch(previousLabel || baseTitle, nextLabel)
       }
       try {
         const overrideSource = resolved.favorite || editingEntry
-        saveFoodNameOverride(previousLabel || baseDescription, nextLabel, overrideSource)
+        saveFoodNameOverride(previousLabel || baseTitle, nextLabel, overrideSource)
       } catch {}
     }
 
@@ -11552,6 +11618,8 @@ Please add nutritional information manually if needed.`);
   const resetAnalyzerPanel = () => {
     setIsEditingDescription(false)
     setEditedDescription('')
+    setEditedFoodTitle('')
+    setEditedFoodNote('')
     setPhotoFile(null)
     setPhotoPreview(null)
     setAiDescription('')
@@ -12963,6 +13031,7 @@ Please add nutritional information manually if needed.`);
     const byItemId = new Map<string, string>()
     const byFavoriteId = new Map<string, string>()
     const bySourceId = new Map<string, string>()
+    const byBarcode = new Map<string, string>()
     const list = Array.isArray(foodNameOverrides) ? foodNameOverrides : []
     for (const row of list) {
       const fromRaw = typeof (row as any)?.from === 'string' ? String((row as any).from) : ''
@@ -12970,12 +13039,14 @@ Please add nutritional information manually if needed.`);
       const itemIdRaw = typeof (row as any)?.itemId === 'string' ? String((row as any).itemId).trim() : ''
       const favIdRaw = typeof (row as any)?.favoriteId === 'string' ? String((row as any).favoriteId).trim() : ''
       const srcIdRaw = typeof (row as any)?.sourceId === 'string' ? String((row as any).sourceId).trim() : ''
+      const barcodeRaw = typeof (row as any)?.barcode === 'string' ? String((row as any).barcode).trim() : ''
       const from = normalizeMealLabel(fromRaw || '')
       const to = normalizeMealLabel(toRaw || '').trim()
       if (!from || !to) continue
       if (itemIdRaw) byItemId.set(itemIdRaw, to)
       if (favIdRaw) byFavoriteId.set(favIdRaw, to)
       if (srcIdRaw) bySourceId.set(srcIdRaw, to)
+      if (barcodeRaw) byBarcode.set(barcodeRaw, to)
       const key = normalizeFoodName(from)
       if (key) map.set(key, to)
       try {
@@ -12988,6 +13059,7 @@ Please add nutritional information manually if needed.`);
     ;(map as any).__byItemId = byItemId
     ;(map as any).__byFavoriteId = byFavoriteId
     ;(map as any).__bySourceId = bySourceId
+    ;(map as any).__byBarcode = byBarcode
     return map
   }, [foodNameOverrides])
 
@@ -12999,6 +13071,19 @@ Please add nutritional information manually if needed.`);
       const byItemId = (foodNameOverrideMap as any)?.__byItemId
       if (itemId && byItemId && typeof byItemId.get === 'function') {
         const hit = byItemId.get(itemId)
+        if (hit) return hit
+      }
+      const barcode = (() => {
+        const direct = single && (single?.barcode || single?.gtinUpc || null)
+        if (direct) return String(direct).trim()
+        const list = Array.isArray(items) ? items : []
+        const hit = list.find((it: any) => it?.barcode || it?.detectionMethod === 'barcode')
+        if (hit?.barcode) return String(hit.barcode).trim()
+        return ''
+      })()
+      const byBarcode = (foodNameOverrideMap as any)?.__byBarcode
+      if (barcode && byBarcode && typeof byBarcode.get === 'function') {
+        const hit = byBarcode.get(barcode)
         if (hit) return hit
       }
       const favId =
@@ -13023,7 +13108,8 @@ Please add nutritional information manually if needed.`);
         if (hit) return hit
       }
     } catch {}
-    const base = normalizeMealLabel(raw || '').trim()
+    const rawString = raw === null || raw === undefined ? '' : String(raw || '')
+    const base = normalizeMealLabel(extractBaseMealDescription(rawString) || rawString).trim()
     if (!base) return ''
     const key = normalizeFoodName(base)
     const hit = key ? foodNameOverrideMap.get(key) : ''
@@ -13036,6 +13122,19 @@ Please add nutritional information manually if needed.`);
       if (simpleHit) return simpleHit
     } catch {}
     return base
+  }
+
+  const resolveFoodNameOverrideOnly = (raw: any, entry?: any) => {
+    const rawString = raw === null || raw === undefined ? '' : String(raw || '')
+    const base = normalizeMealLabel(extractBaseMealDescription(rawString) || rawString).trim()
+    if (!base) return ''
+    const applied = normalizeMealLabel(applyFoodNameOverride(rawString, entry) || '').trim()
+    if (!applied) return ''
+    const baseKey = normalizeFoodName(base)
+    const appliedKey = normalizeFoodName(applied)
+    if (baseKey && appliedKey && baseKey !== appliedKey) return applied
+    if (!baseKey && applied !== base && applied.toLowerCase() !== base.toLowerCase()) return applied
+    return ''
   }
 
   const parseFavoriteItems = (fav: any): any[] | null => {
@@ -13856,8 +13955,14 @@ Please add nutritional information manually if needed.`);
     const customMlPerServing = mlValue ? mlValue : null
     const weightUnit = useMl ? 'ml' : 'g'
     const weightAmount = useMl ? mlValue : gramValue
+    const barcodeValue = code || food?.barcode || null
+    const baseName = food?.name || 'Scanned food'
+    const renamedName =
+      applyFoodNameOverride(baseName, { items: [{ barcode: barcodeValue }] }) || baseName
     return {
-      name: food?.name || 'Scanned food',
+      // Stable id so "rename this barcode item" can apply across diary/favorites.
+      ...(barcodeValue ? { id: `barcode:${String(barcodeValue).trim()}` } : {}),
+      name: renamedName,
       brand: food?.brand || null,
       serving_size,
       servings: 1,
@@ -13875,7 +13980,7 @@ Please add nutritional information manually if needed.`);
       piecesPerServing: piecesPerServingRaw,
       pieces: piecesRaw,
       source: food?.source || 'barcode',
-      barcode: code || food?.barcode || null,
+      barcode: barcodeValue,
       barcodeSource: food?.source || null,
       detectionMethod: 'barcode',
     }
@@ -14770,18 +14875,25 @@ Please add nutritional information manually if needed.`);
   }
 
   const saveFoodNameOverride = (fromLabel: any, toLabel: any, entry?: any) => {
-    const from = normalizeMealLabel(fromLabel || '').trim()
-    const to = normalizeMealLabel(toLabel || '').trim()
+    const fromRaw = fromLabel === null || fromLabel === undefined ? '' : String(fromLabel || '')
+    const toRaw = toLabel === null || toLabel === undefined ? '' : String(toLabel || '')
+    const from = normalizeMealLabel(extractBaseMealDescription(fromRaw) || fromRaw).trim()
+    const to = normalizeMealLabel(extractBaseMealDescription(toRaw) || toRaw).trim()
     if (!from || !to || from === to) return
     const fromKey = normalizeFoodName(from)
     if (!fromKey) return
     let itemId = ''
     let favoriteId = ''
     let sourceId = ''
+    let barcode = ''
     try {
       const items = Array.isArray(entry?.items) ? entry.items : null
       const single = Array.isArray(items) && items.length === 1 ? items[0] : null
       itemId = single && typeof single?.id === 'string' ? String(single.id).trim() : ''
+      barcode =
+        single && (single?.barcode || single?.gtinUpc)
+          ? String(single?.barcode || single?.gtinUpc).trim()
+          : ''
       favoriteId =
         (entry?.favorite && entry.favorite.id && String(entry.favorite.id)) ||
         (entry?.nutrition && (entry.nutrition as any).__favoriteId) ||
@@ -14802,9 +14914,11 @@ Please add nutritional information manually if needed.`);
         const rowItemId = typeof row?.itemId === 'string' ? String(row.itemId).trim() : ''
         const rowFavId = typeof row?.favoriteId === 'string' ? String(row.favoriteId).trim() : ''
         const rowSrcId = typeof row?.sourceId === 'string' ? String(row.sourceId).trim() : ''
+        const rowBarcode = typeof row?.barcode === 'string' ? String(row.barcode).trim() : ''
         if (itemId && rowItemId && rowItemId === itemId) return false
         if (favoriteId && rowFavId && rowFavId === favoriteId) return false
         if (sourceId && rowSrcId && rowSrcId === sourceId) return false
+        if (barcode && rowBarcode && rowBarcode === barcode) return false
         return normalizeFoodName(normalizeMealLabel(row?.from || '')) !== fromKey
       })
       next.unshift({
@@ -14813,6 +14927,7 @@ Please add nutritional information manually if needed.`);
         ...(itemId ? { itemId } : {}),
         ...(favoriteId ? { favoriteId } : {}),
         ...(sourceId ? { sourceId } : {}),
+        ...(barcode ? { barcode } : {}),
         createdAt: Date.now(),
       })
       persistFoodNameOverrides(next)
@@ -15674,7 +15789,16 @@ Please add nutritional information manually if needed.`);
       setAnalyzedNutrition(restoredEntry.nutrition || null)
       setAnalyzedTotal(restoredEntry.total || null)
     }
-    setEditedDescription(extractBaseMealDescription(restoredEntry.description || ''))
+    const parsed = splitTitleAndNote(restoredEntry.description)
+    const itemTitle =
+      Array.isArray(originalItems) && originalItems.length === 1
+        ? String(originalItems[0]?.name || originalItems[0]?.label || '').trim()
+        : ''
+    const baseTitle = itemTitle || extractBaseMealDescription(parsed.title || restoredEntry.description) || parsed.title
+    const suggestedTitle = resolveFoodNameOverrideOnly(baseTitle || '', restoredEntry) || baseTitle || ''
+    setEditedFoodTitle(suggestedTitle)
+    setEditedFoodNote(parsed.note || '')
+    setEditedDescription(parsed.note || '')
     setEditingEntry(restoredEntry)
     setTodaysFoods(prev =>
       prev.map(food => (food.id === restoredEntry.id ? restoredEntry : food))
@@ -15699,6 +15823,9 @@ Please add nutritional information manually if needed.`);
       setPhotoFile(null)
       setPhotoPreview(null)
       setAiDescription('')
+      setEditedFoodTitle('')
+      setEditedFoodNote('')
+      setEditedDescription('')
       setAnalyzedItems([])
       setAnalyzedNutrition(null)
       setAnalyzedTotal(null)
@@ -15769,9 +15896,15 @@ Please add nutritional information manually if needed.`);
       return
     }
     if (editingEntry) {
-      setEditedDescription((current) => current || extractBaseMealDescription(editingEntry.description || ''))
+      setEditedDescription((current) => {
+        const next = current || extractBaseMealDescription(editingEntry.description || '')
+        setEditedFoodNote(next)
+        return next
+      })
     } else {
-      setEditedDescription(aiDescription || '')
+      const next = aiDescription || ''
+      setEditedDescription(next)
+      setEditedFoodNote(next)
     }
     setIsEditingDescription(true)
   }
@@ -15955,9 +16088,18 @@ Please add nutritional information manually if needed.`);
         setShowAiResult(true);
         setShowAddFood(true);
         setIsEditingDescription(false);
-        // Prefill description editor with a clean summary
-        const cleanDescription = extractBaseMealDescription(safeFood.description);
-        setEditedDescription(cleanDescription);
+        // Prefill editable title + optional notes from saved description.
+        const parsed = splitTitleAndNote(safeFood.description)
+        const itemTitle =
+          safeFood.items && Array.isArray(safeFood.items) && safeFood.items.length === 1
+            ? String(safeFood.items[0]?.name || safeFood.items[0]?.label || '').trim()
+            : ''
+        const baseTitle = itemTitle || extractBaseMealDescription(parsed.title || safeFood.description) || parsed.title
+        const suggestedTitle = resolveFoodNameOverrideOnly(baseTitle || '', safeFood) || baseTitle || ''
+        setEditedFoodTitle(suggestedTitle)
+        setEditedFoodNote(parsed.note || '')
+        // Keep legacy editor state in sync (notes live here).
+        setEditedDescription(parsed.note || '')
       } else {
         // For manual entries, populate the manual form
         setManualFoodName(safeFood.description);
@@ -16753,6 +16895,21 @@ Please add nutritional information manually if needed.`);
 
   const mealSummary = useMemo(() => buildMealSummaryFromItems(analyzedItems), [analyzedItems])
 
+  useEffect(() => {
+    if (editingEntry) return
+    if (!showAiResult) return
+    if ((editedFoodTitle || '').trim()) return
+    const singleItem =
+      Array.isArray(analyzedItems) && analyzedItems.length === 1
+        ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
+        : ''
+    const suggested =
+      mealSummary || singleItem || extractBaseMealDescription(aiDescription) || ''
+    if (suggested) {
+      setEditedFoodTitle(suggested)
+    }
+  }, [editingEntry, showAiResult, editedFoodTitle, analyzedItems, mealSummary, aiDescription])
+
   // Read-only Food Description content used for both desktop and mobile layouts.
   // IMPORTANT:
   // - `foodTitle` and `foodDescriptionText` MUST stay de-coupled from the raw AI string shape.
@@ -16766,9 +16923,9 @@ Please add nutritional information manually if needed.`);
     const entryDescription = editingEntry?.description || editingEntry?.label || '';
     const resolvedFavorite = editingEntry ? resolveFavoriteForEntry(editingEntry, entryDescription) : null;
     const favoriteTitle = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : '';
+    const overrideOnly = editingEntry ? resolveFoodNameOverrideOnly(entryDescription, editingEntry) : '';
+    if (overrideOnly) return overrideOnly;
     if (favoriteTitle) return favoriteTitle;
-    const overrideTitle = editingEntry ? applyFoodNameOverride(entryDescription, editingEntry) : '';
-    if (overrideTitle) return overrideTitle;
     const singleItemName =
       editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
         ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
@@ -16777,15 +16934,15 @@ Please add nutritional information manually if needed.`);
     if (editingEntry?.description) return extractBaseMealDescription(editingEntry.description || '');
     if (aiDescription) return extractBaseMealDescription(aiDescription);
     return '';
-  }, [mealSummary, analyzedItems, editingEntry, aiDescription, applyFoodNameOverride, favorites]);
+  }, [mealSummary, analyzedItems, editingEntry, aiDescription, resolveFoodNameOverrideOnly, favorites]);
 
   const foodDescriptionText = useMemo(() => {
     const entryDescription = editingEntry?.description || editingEntry?.label || '';
     const resolvedFavorite = editingEntry ? resolveFavoriteForEntry(editingEntry, entryDescription) : null;
     const favoriteTitle = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : '';
+    const overrideOnly = editingEntry ? resolveFoodNameOverrideOnly(entryDescription, editingEntry) : '';
+    if (overrideOnly) return overrideOnly
     if (favoriteTitle) return favoriteTitle
-    const overrideTitle = editingEntry ? applyFoodNameOverride(entryDescription, editingEntry) : '';
-    if (overrideTitle) return overrideTitle
     const singleItemName =
       editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
         ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
@@ -16793,7 +16950,7 @@ Please add nutritional information manually if needed.`);
     if (singleItemName) return singleItemName
     const singleItemOverride =
       editingEntry && Array.isArray(analyzedItems) && analyzedItems.length === 1
-        ? applyFoodNameOverride(editingEntry?.description || editingEntry?.label || '', editingEntry)
+        ? resolveFoodNameOverrideOnly(editingEntry?.description || editingEntry?.label || '', editingEntry)
         : ''
     if (singleItemOverride) return singleItemOverride
     if (aiDescription && aiDescription.trim()) {
@@ -16813,7 +16970,7 @@ Please add nutritional information manually if needed.`);
     }
     if (editingEntry?.description) return editingEntry.description;
     return '';
-  }, [aiDescription, analyzedItems, applyFoodNameOverride, editingEntry, favorites]);
+  }, [aiDescription, analyzedItems, resolveFoodNameOverrideOnly, editingEntry, favorites]);
 
   const aiSavedMealMeta = useMemo(() => {
     const nutrition = editingEntry?.nutrition
@@ -19234,12 +19391,55 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {/* Food Description - read-only summary (desktop & mobile) */}
-                  {(foodTitle || foodDescriptionText) && (
-                    <div className="mb-4 space-y-2">
-                      <div className="block text-lg font-medium text-gray-900">
-                        Food Description
+                  {/* Food title + optional notes (editable while viewing an entry or an analysis result) */}
+                  {(editingEntry || showAiResult) ? (
+                    <div className="mb-4 space-y-3">
+                      <div className="block text-lg font-medium text-gray-900">Food Details</div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Food name</label>
+                        <input
+                          type="text"
+                          value={editedFoodTitle}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            setEditedFoodTitle(v)
+                            // Keep single-item card name aligned with the title.
+                            try {
+                              if (Array.isArray(analyzedItems) && analyzedItems.length === 1) {
+                                const next = [...analyzedItems]
+                                next[0] = { ...(next[0] || {}), name: v }
+                                setAnalyzedItems(next)
+                              }
+                            } catch {}
+                          }}
+                          onBlur={(e) => {
+                            const trimmed = e.target.value.trim()
+                            if (trimmed !== e.target.value) setEditedFoodTitle(trimmed)
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          placeholder="e.g., Granola cookies"
+                        />
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                        <textarea
+                          ref={descriptionTextareaRef}
+                          value={editedFoodNote}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            setEditedFoodNote(v)
+                            // Keep legacy state in sync (some older flows still read this).
+                            setEditedDescription(v)
+                          }}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          placeholder="Anything you want to remember (optional)"
+                        />
+                      </div>
+                    </div>
+                  ) : (foodTitle || foodDescriptionText) && (
+                    <div className="mb-4 space-y-2">
+                      <div className="block text-lg font-medium text-gray-900">Food Description</div>
                       {foodDescriptionText && (
                         <p className="text-sm sm:text-base text-gray-700 leading-relaxed whitespace-pre-wrap">
                           {foodDescriptionText}
@@ -23858,10 +24058,11 @@ Please add nutritional information manually if needed.`);
                       const baseEntryLabel = food?.description || food?.label || 'Meal'
                       const resolvedFavorite = isWaterEntry ? null : resolveFavoriteForEntry(food, baseEntryLabel)
                       const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
-                      const overrideLabel = isWaterEntry ? '' : applyFoodNameOverride(baseEntryLabel, food)
+                      const overrideOnly = isWaterEntry ? '' : resolveFoodNameOverrideOnly(baseEntryLabel, food)
+                      const baseShort = isWaterEntry ? '' : extractBaseMealDescription(String(baseEntryLabel || ''))
                       const entryDisplayLabel = isWaterEntry
                         ? waterLabel || 'Water'
-                        : favoriteLabel || overrideLabel || entryItemName || baseEntryLabel
+                        : overrideOnly || favoriteLabel || entryItemName || baseShort || String(baseEntryLabel || '').trim() || 'Meal'
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
