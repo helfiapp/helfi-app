@@ -1,7 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
-import { searchUsdaFoods, searchFatSecretFoods, lookupFoodNutrition, searchLocalFoods } from '@/lib/food-data'
+import {
+  searchOpenFoodFactsByQuery,
+  searchUsdaFoods,
+  searchFatSecretFoods,
+  lookupFoodNutrition,
+  searchLocalFoods,
+} from '@/lib/food-data'
 import { searchCustomFoodMacros, getCustomPackagedItems } from '@/lib/food/custom-foods'
 import { prisma } from '@/lib/prisma'
 
@@ -1096,6 +1102,36 @@ export async function GET(request: NextRequest) {
                 if (combined.length >= limit) return
                 pushUnique(it)
               })
+            }
+          }
+
+          // Last fallback for packaged foods: OpenFoodFacts (helps AU/UK/CA branded products).
+          // Still enforce "no empty calories/macros" and keep it after Helfi + FatSecret results.
+          if (combined.length < limit) {
+            const fetchOpenFoodFacts = async (value: string) => {
+              const off = await searchOpenFoodFactsByQuery(value, { pageSize: Math.min(25, Math.max(limit, 10)) })
+              const filtered = filterItemsByQuery(off, value, (item) => {
+                const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+                return combined || item?.name || ''
+              })
+              return sortPackagedByAlphabeticalHierarchyAsc(filtered, value)
+            }
+
+            const offPrimary = await fetchOpenFoodFacts(query)
+            offPrimary.forEach((it) => {
+              if (combined.length >= limit) return
+              pushUnique(it)
+            })
+
+            if (combined.length < limit) {
+              const compactQuery = buildCompactFoodQuery(query)
+              if (compactQuery) {
+                const offCompact = await fetchOpenFoodFacts(compactQuery)
+                offCompact.forEach((it) => {
+                  if (combined.length >= limit) return
+                  pushUnique(it)
+                })
+              }
             }
           }
         }
