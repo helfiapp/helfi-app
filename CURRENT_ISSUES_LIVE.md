@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-09 21:13:24 AEDT
+- What changed: Build-a-meal now auto-saves your progress while you add ingredients (draft + background updates when editing a diary entry). You won’t lose ingredients if you leave the page. The Update button still takes you back to the Food Diary.
+- Where to see it (page/link): Food -> Build a meal
+- What to quickly test: Edit a diary meal via Build-a-meal, add/remove an ingredient, wait 1-2 seconds, then go back and confirm the diary entry is updated.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-09 20:47:09 AEDT
 - What changed: Food diary now shows clean food names (not long AI paragraphs). You can edit the food name + optional notes, and the updated name saves properly and updates everywhere.
 - Where to see it (page/link): Food Diary (Food tab)
