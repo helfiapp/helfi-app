@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 02:58 AEDT
+- What changed: “Add by photo” now uses the food database to fill calories + macros for ingredient cards (for better accuracy), and it will not let you save if any ingredient card is missing Calories/Protein/Carbs/Fat. If a photo can’t be read, it shows a clear “no ingredients found” message instead of a messy paragraph.
+- Where to see it (page/link): Food -> Add by photo (Food Analysis / photo results screen)
+- What to quickly test: Add by photo a normal meal (watch the “improving accuracy” message), confirm ingredient cards show calories + macros, and confirm Save is blocked if an ingredient has missing macros. Also test barcode -> missing -> nutrition label photo still saves normally.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-09 23:52:00 AEDT
 - What changed: Build-a-meal totals now clearly show when you’re looking at “Your portion totals” (so it doesn’t look like macros are wrong). It also shows a one-line “Whole recipe totals” summary for quick comparison.
 - Where to see it (page/link): Food -> Build a meal (especially when editing an existing meal)
