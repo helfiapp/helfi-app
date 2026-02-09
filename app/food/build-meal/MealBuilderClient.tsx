@@ -1483,6 +1483,12 @@ export default function MealBuilderClient() {
 
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [query, setQuery] = useState('')
+  const queryBackupRef = useRef<string>('')
+  const queryWasClearedOnFocusRef = useRef(false)
+  const queryEditedAfterClearRef = useRef(false)
+  const amountBackupRef = useRef<Map<string, string>>(new Map())
+  const amountWasClearedOnFocusRef = useRef<Set<string>>(new Set())
+  const amountEditedAfterClearRef = useRef<Set<string>>(new Set())
   const [kind, setKind] = useState<'packaged' | 'single'>('packaged')
   const [searchLoading, setSearchLoading] = useState(false)
   const [savingMeal, setSavingMeal] = useState(false)
@@ -4046,9 +4052,28 @@ export default function MealBuilderClient() {
             <input
               ref={queryInputRef}
               value={query}
+              onFocus={() => {
+                queryBackupRef.current = query
+                queryWasClearedOnFocusRef.current = query.trim().length > 0
+                queryEditedAfterClearRef.current = false
+                if (queryWasClearedOnFocusRef.current) {
+                  setQuery('')
+                  setError(null)
+                  setResults([])
+                }
+              }}
               onChange={(e) => {
+                if (queryWasClearedOnFocusRef.current) queryEditedAfterClearRef.current = true
                 setQuery(e.target.value)
                 setError(null)
+              }}
+              onBlur={(e) => {
+                const current = String((e.target as HTMLInputElement).value || '')
+                if (queryWasClearedOnFocusRef.current && !queryEditedAfterClearRef.current && current.trim().length === 0) {
+                  setQuery(queryBackupRef.current)
+                }
+                queryWasClearedOnFocusRef.current = false
+                queryEditedAfterClearRef.current = false
               }}
               placeholder="e.g. chicken breast"
               autoComplete="off"
@@ -4380,7 +4405,33 @@ export default function MealBuilderClient() {
                               min={0}
                               step={getAmountInputStepForUnit(it.__unit || it.__baseUnit)}
                               value={it.__amountInput}
-                              onChange={(e) => setAmount(it.id, e.target.value)}
+                              onFocus={(e) => {
+                                // Mobile UX: tap-to-clear, but restore if user doesn't type anything.
+                                const current = String((e.target as HTMLInputElement).value || '')
+                                amountBackupRef.current.set(it.id, current)
+                                amountEditedAfterClearRef.current.delete(it.id)
+                                if (!current.trim()) {
+                                  amountWasClearedOnFocusRef.current.delete(it.id)
+                                  return
+                                }
+                                amountWasClearedOnFocusRef.current.add(it.id)
+                                setAmount(it.id, '')
+                              }}
+                              onChange={(e) => {
+                                if (amountWasClearedOnFocusRef.current.has(it.id)) amountEditedAfterClearRef.current.add(it.id)
+                                setAmount(it.id, e.target.value)
+                              }}
+                              onBlur={(e) => {
+                                const cleared = amountWasClearedOnFocusRef.current.has(it.id)
+                                const edited = amountEditedAfterClearRef.current.has(it.id)
+                                const current = String((e.target as HTMLInputElement).value || '')
+                                if (cleared && !edited && current.trim().length === 0) {
+                                  const backup = amountBackupRef.current.get(it.id)
+                                  if (typeof backup === 'string') setAmount(it.id, backup)
+                                }
+                                amountWasClearedOnFocusRef.current.delete(it.id)
+                                amountEditedAfterClearRef.current.delete(it.id)
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                             />
                           </div>
