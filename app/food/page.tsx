@@ -686,13 +686,14 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
       }
       pieces.push(cleanName || 'Food item')
     }
-    if (item?.serving_size) {
-      pieces.push(`(${item.serving_size})`)
-    }
     return pieces.join(' ').replace(/\s+/g, ' ').trim()
   })
 
-  return summaryParts.join(', ')
+  // Keep the title short. Ingredient cards already show portion sizes + macros.
+  const cleaned = summaryParts.filter(Boolean)
+  if (cleaned.length === 0) return ''
+  if (cleaned.length <= 2) return cleaned.join(', ')
+  return `${cleaned.slice(0, 2).join(', ')} + ${cleaned.length - 2} more`
 }
 
 const stripNutritionFromServingSize = (raw: string) => {
@@ -4993,12 +4994,13 @@ export default function FoodDiary() {
 
         const nextItem = { ...item }
         const currentWeight = getBaseWeightPerServing(nextItem)
-        const candidateServingInfo = parseServingSizeInfo({ serving_size: best.serving_size || '' })
+        const bestServingSize = stripNutritionFromServingSize(String(best.serving_size || '').trim())
+        const candidateServingInfo = parseServingSizeInfo({ serving_size: bestServingSize })
         const candidateGrams = candidateServingInfo.gramsPerServing
 
         if (best.name) nextItem.name = best.name
         if (best.brand) nextItem.brand = best.brand
-        if (best.serving_size) nextItem.serving_size = best.serving_size
+        if (bestServingSize) nextItem.serving_size = bestServingSize
         if (best.calories != null) nextItem.calories = best.calories
         if (best.protein_g != null) nextItem.protein_g = best.protein_g
         if (best.carbs_g != null) nextItem.carbs_g = best.carbs_g
@@ -6210,7 +6212,6 @@ export default function FoodDiary() {
     const { gramsPerServing, mlPerServing, ozPerServing } = quickParseServingSize(next?.serving_size)
     if (!next.weightUnit) {
       if (mlPerServing && mlPerServing > 0 && liquidItem) next.weightUnit = 'ml'
-      else if (ozPerServing && ozPerServing > 0) next.weightUnit = 'oz'
       else next.weightUnit = 'g'
     }
 
@@ -6219,6 +6220,10 @@ export default function FoodDiary() {
     if (mlPerServing && mlPerServing > 0 && liquidItem) {
       next.customMlPerServing = mlPerServing
       next.customGramsPerServing = null
+    } else if (ozPerServing && ozPerServing > 0) {
+      // Keep everything in grams by default (owner preference).
+      next.customGramsPerServing = ozPerServing * 28.3495
+      next.customMlPerServing = null
     } else if (gramsPerServing && gramsPerServing > 0) {
       next.customGramsPerServing = gramsPerServing
       next.customMlPerServing = null
@@ -7326,9 +7331,10 @@ const applyStructuredItems = (
       let targetUnit: WeightUnit = currentUnit
       
       // Determine which unit to use based on what's available in serving size
+      // Owner preference: default to grams (not ounces) for foods.
       if (ozPerServing && ozPerServing > 0) {
-        targetUnit = 'oz'
-        initialWeight = ozPerServing * servings
+        targetUnit = 'g'
+        initialWeight = ozPerServing * 28.3495 * servings
       } else if (mlPerServing && mlPerServing > 0) {
         targetUnit = liquidItem ? 'ml' : 'g'
         initialWeight = mlPerServing * servings
