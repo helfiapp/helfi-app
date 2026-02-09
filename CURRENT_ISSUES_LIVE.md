@@ -14,6 +14,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE:
+- Date/time: Mon Feb 9 20:27 AEDT 2026
+- What changed: Barcode scanning now has OpenFoodFacts as a fallback (after Helfi cache + FatSecret). Barcode results must include calories + protein + carbs + fat (otherwise it asks to scan the nutrition label).
+- Where to see it (page/link): Food Diary -> Scan barcode
+- What to quickly test: Scan barcodes 9310560022376 and 9319133337039 and confirm they now return results with calories + macros.
+
+DEPLOYED:
+- LIVE:
 - Date/time: Sun Feb 8 18:27 AEDT 2026
 - What changed: Reduced the database spike checker frequency from every 5 minutes to every 1 hour to lower overhead.
 - Where to see it (page/link): (No UI change. Background safety check schedule only.)
