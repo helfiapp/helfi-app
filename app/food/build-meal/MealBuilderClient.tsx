@@ -4500,7 +4500,9 @@ export default function MealBuilderClient() {
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-semibold text-gray-900">Meal totals</div>
+            <div className="text-sm font-semibold text-gray-900">
+              {portionScale !== 1 ? 'Your portion totals' : 'Meal totals'}
+            </div>
             <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
               <button
                 type="button"
@@ -4522,6 +4524,14 @@ export default function MealBuilderClient() {
               </button>
             </div>
           </div>
+          {portionScale !== 1 && (
+            <div className="mb-2 text-[11px] text-gray-600">
+              Your portion is about {Math.round(portionScale * 100)}% of the recipe.
+              <span className="mx-1">•</span>
+              Whole recipe: {formatEnergyValue(baseMealTotals.calories, energyUnit)} {energyUnit} • {round3(baseMealTotals.carbs)} g
+              carbs • {round3(baseMealTotals.sugar)} g sugar
+            </div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {MEAL_TOTAL_CARDS.map((card) => {
               const value =
