@@ -19,6 +19,16 @@ function makeManualDeviceId() {
   return `manual:${crypto.randomUUID()}`
 }
 
+function formatPrismaCreateError(error: any) {
+  const code = typeof error?.code === 'string' ? error.code : ''
+  const msg = typeof error?.message === 'string' ? error.message : ''
+  return {
+    code: code || null,
+    // Keep this short and safe. The owner can share the debug string with us.
+    debug: code ? `DB error (${code})` : msg ? `DB error (${msg.slice(0, 120)})` : 'DB error',
+  }
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
@@ -127,45 +137,54 @@ export async function POST(request: NextRequest) {
 
   // Use a unique id for manual entries too. This avoids edge-case failures if
   // the database ever treats NULL deviceIds as non-unique.
+  const baseCreateData = {
+    userId: session.user.id,
+    localDate: date,
+    startTime,
+    durationMinutes: inferred.durationMinutes,
+    distanceKm: distanceKm !== null ? distanceKm : null,
+    source: 'MANUAL' as const,
+    exerciseTypeId: type.id,
+    label: inferred.label,
+    met: inferred.met,
+    calories,
+    rawPayload,
+  }
+
   let entry: any
   try {
     entry = await prisma.exerciseEntry.create({
       data: {
-        userId: session.user.id,
-        localDate: date,
-        startTime,
-        durationMinutes: inferred.durationMinutes,
-        distanceKm: distanceKm !== null ? distanceKm : null,
-        source: 'MANUAL',
         deviceId: makeManualDeviceId(),
-        exerciseTypeId: type.id,
-        label: inferred.label,
-        met: inferred.met,
-        calories,
-        rawPayload,
+        ...baseCreateData,
       },
     })
   } catch (error: any) {
-    if (error?.code === 'P2002') {
+    // Retry once with a different manual id.
+    try {
       entry = await prisma.exerciseEntry.create({
         data: {
-          userId: session.user.id,
-          localDate: date,
-          startTime,
-          durationMinutes: inferred.durationMinutes,
-          distanceKm: distanceKm !== null ? distanceKm : null,
-          source: 'MANUAL',
           deviceId: makeManualDeviceId(),
-          exerciseTypeId: type.id,
-          label: inferred.label,
-          met: inferred.met,
-          calories,
-          rawPayload,
+          ...baseCreateData,
         },
       })
-    } else {
-      console.error('Failed to create manual ExerciseEntry:', error)
-      return NextResponse.json({ error: 'Failed to save exercise. Please try again.' }, { status: 500 })
+    } catch (retryError: any) {
+      // Last resort: drop deviceId entirely (lets the DB store NULL if needed).
+      try {
+        entry = await prisma.exerciseEntry.create({
+          data: {
+            deviceId: null,
+            ...baseCreateData,
+          },
+        })
+      } catch (finalError: any) {
+        const info = formatPrismaCreateError(finalError)
+        console.error('Failed to create manual ExerciseEntry:', finalError)
+        return NextResponse.json(
+          { error: `Failed to save exercise. Please try again. (${info.debug})` },
+          { status: 500 },
+        )
+      }
     }
   }
 
