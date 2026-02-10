@@ -428,24 +428,50 @@ export async function GET(request: NextRequest) {
             .filter(Boolean)
         : []
 
-      // Get saved favorites
+      // Get saved favorites.
+      //
+      // IMPORTANT:
+      // Some accounts can end up with multiple `__FOOD_FAVORITES__` rows (historical writes / recovery routes).
+      // `user.healthGoals.find(...)` is not deterministic because Prisma does not guarantee ordering here.
+      // If we pick an older row, the UI can "revert" to an old long USDA title after refresh.
+      // Always pick the newest favorites record.
       try {
-        const storedFavorites = user.healthGoals.find((goal: any) => goal.name === '__FOOD_FAVORITES__');
+        const storedFavorites = (() => {
+          const matches = (user.healthGoals || []).filter((goal: any) => goal?.name === '__FOOD_FAVORITES__')
+          if (matches.length <= 1) return matches[0] || null
+          return matches
+            .slice()
+            .sort((a: any, b: any) => {
+              const aTs = a?.createdAt ? new Date(a.createdAt).getTime() : 0
+              const bTs = b?.createdAt ? new Date(b.createdAt).getTime() : 0
+              return bTs - aTs
+            })[0]
+        })()
         if (storedFavorites && storedFavorites.category) {
-          const parsed = JSON.parse(storedFavorites.category);
+          const parsed = JSON.parse(storedFavorites.category)
           if (Array.isArray(parsed?.favorites)) {
-            favorites = parsed.favorites;
+            favorites = parsed.favorites
           } else if (Array.isArray(parsed)) {
-            favorites = parsed;
+            favorites = parsed
           }
         }
       } catch (e) {
-        console.log('No favorites data found in storage');
+        console.log('No favorites data found in storage')
       }
 
       // Get saved food name overrides (used for user renames without forcing favorites)
       try {
-        const storedOverrides = user.healthGoals.find((goal: any) => goal.name === '__FOOD_NAME_OVERRIDES__')
+        const storedOverrides = (() => {
+          const matches = (user.healthGoals || []).filter((goal: any) => goal?.name === '__FOOD_NAME_OVERRIDES__')
+          if (matches.length <= 1) return matches[0] || null
+          return matches
+            .slice()
+            .sort((a: any, b: any) => {
+              const aTs = a?.createdAt ? new Date(a.createdAt).getTime() : 0
+              const bTs = b?.createdAt ? new Date(b.createdAt).getTime() : 0
+              return bTs - aTs
+            })[0]
+        })()
         if (storedOverrides && storedOverrides.category) {
           const parsed = JSON.parse(storedOverrides.category)
           if (Array.isArray(parsed?.overrides)) {
