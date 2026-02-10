@@ -17814,17 +17814,15 @@ Please add nutritional information manually if needed.`);
           </div>
         </div>
       )}
-      
-      {/* Backdrop to block clicks on entries while dropdown menus are open */}
-	      {(showPhotoOptions || showCategoryPicker) && (
-	        <div
-	          className="fixed inset-0 z-30 bg-transparent pointer-events-none"
-	        />
-	      )}
 
-	      {showAddExerciseModal && (
-	        <div className="fixed inset-0 z-50 bg-white">
-	          <div className="h-[100dvh] flex flex-col">
+      {/* Backdrop to block clicks on entries while dropdown menus are open */}
+      {(showPhotoOptions || showCategoryPicker) && (
+        <div className="fixed inset-0 z-30 bg-transparent pointer-events-none" />
+      )}
+
+      {showAddExerciseModal && (
+        <div className="fixed inset-0 z-[10000] bg-white">
+          <div className="h-[100dvh] flex flex-col">
 	            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
 	              <div className="flex items-center gap-2">
 	                {(exercisePickerCategory || selectedExerciseType) && (
