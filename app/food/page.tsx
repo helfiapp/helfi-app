@@ -13690,6 +13690,20 @@ Please add nutritional information manually if needed.`);
         const ks = simplifyKey(a)
         if (ks) favoriteIdByAlias.set(ks, favId)
       }
+
+      // Also treat ingredient item names as aliases. This helps keep renamed Favorites consistent
+      // even when older entries still have the long database/USDA ingredient name.
+      try {
+        const items = parseFavoriteItems(fav)
+        for (const it of Array.isArray(items) ? items : []) {
+          const n = String((it as any)?.name || '').trim()
+          if (!n) continue
+          const k = normalizeKey(n)
+          if (k) favoriteIdByAlias.set(k, favId)
+          const ks = simplifyKey(n)
+          if (ks) favoriteIdByAlias.set(ks, favId)
+        }
+      } catch {}
     })
 
     // Track favorites by label so "All" can still show edit/delete actions
