@@ -54,12 +54,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  let stage = 'start'
   try {
+    stage = 'session'
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    stage = 'parse_body'
     let body: any
     try {
       body = await request.json()
@@ -67,6 +70,7 @@ export async function POST(request: NextRequest) {
       body = null
     }
 
+  stage = 'validate'
   const exerciseTypeId = Number(body?.exerciseTypeId)
   const durationMinutes = Number(body?.durationMinutes)
   const distanceKmRaw = body?.distanceKm
@@ -101,11 +105,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid startTime' }, { status: 400 })
   }
 
+  stage = 'type_lookup'
   const type = await prisma.exerciseType.findUnique({ where: { id: exerciseTypeId } })
   if (!type) {
     return NextResponse.json({ error: 'Exercise type not found' }, { status: 404 })
   }
 
+  stage = 'infer'
   const inferred = inferMetAndLabel({
     exerciseName: type.name,
     baseMet: type.met,
@@ -113,6 +119,7 @@ export async function POST(request: NextRequest) {
     distanceKm: distanceKm ?? null,
   })
 
+  stage = 'calories'
   const caloriesOverrideRounded = caloriesOverride !== null ? Math.round(caloriesOverride) : null
   let calories: number
 
@@ -122,6 +129,7 @@ export async function POST(request: NextRequest) {
     }
     calories = caloriesOverrideRounded
   } else {
+    stage = 'health_profile'
     const health = await getHealthProfileForUser(session.user.id)
     if (!health.weightKg) {
       return NextResponse.json(
@@ -129,6 +137,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       )
     }
+    stage = 'calorie_calc'
     calories = calculateExerciseCalories({
       met: inferred.met,
       weightKg: health.weightKg,
@@ -157,6 +166,7 @@ export async function POST(request: NextRequest) {
 
   let entry: any
   try {
+    stage = 'create'
     entry = await prisma.exerciseEntry.create({
       data: {
         deviceId: makeManualDeviceId(),
@@ -192,6 +202,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  stage = 'reload_day'
   const entries = await prisma.exerciseEntry.findMany({
     where: { userId: session.user.id, localDate: date },
     orderBy: [{ startTime: 'asc' }, { createdAt: 'asc' }],
@@ -202,8 +213,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ entry, date, exerciseCalories })
   } catch (error) {
     console.error('POST /api/exercise-entries failed:', error)
+    const rawMsg = typeof (error as any)?.message === 'string' ? (error as any).message : ''
+    const hint = rawMsg.replace(/\s+/g, ' ').trim().slice(0, 90)
     return NextResponse.json(
-      { error: 'Failed to save exercise. Please try again. (ref: EX500)' },
+      {
+        error: `Failed to save exercise. Please try again. (ref: EX500/${stage}${hint ? `: ${hint}` : ''})`,
+      },
       { status: 500 },
     )
   }
