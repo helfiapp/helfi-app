@@ -3716,7 +3716,7 @@ export default function FoodDiary() {
     label: string
     servingLabel: string
     totals: NutritionTotals | null
-    mode: 'choose' | 'preview' | 'overall'
+    mode: 'choose' | 'preview'
     overallTargets?: any
     overallUsed?: any
   } | null>(null)
@@ -15511,6 +15511,77 @@ Please add nutritional information manually if needed.`);
     return { item, label, servingLabel, totals }
   }
 
+  const computeOverallMacrosAfterAddingFavorite = (mealTotals: any) => {
+    const dayTotals = (Array.isArray(sourceEntries) ? sourceEntries : []).reduce(
+      (acc: any, entry: any) => {
+        const t = getEntryTotals(entry) as any
+        acc.calories += Number(t?.calories) || 0
+        acc.protein += Number(t?.protein) || 0
+        acc.carbs += Number(t?.carbs) || 0
+        acc.fat += Number(t?.fat) || 0
+        acc.fiber += Number(t?.fiber) || 0
+        acc.sugar += Number(t?.sugar) || 0
+        return acc
+      },
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+    )
+
+    const usedAfter = {
+      calories: (Number(dayTotals.calories) || 0) + (Number((mealTotals as any).calories) || 0),
+      protein_g: (Number(dayTotals.protein) || 0) + (Number((mealTotals as any).protein) || 0),
+      carbs_g: (Number(dayTotals.carbs) || 0) + (Number((mealTotals as any).carbs) || 0),
+      fat_g: (Number(dayTotals.fat) || 0) + (Number((mealTotals as any).fat) || 0),
+      fiber_g: (Number(dayTotals.fiber) || 0) + (Number((mealTotals as any).fiber) || 0),
+      sugar_g: (Number(dayTotals.sugar) || 0) + (Number((mealTotals as any).sugar) || 0),
+    }
+
+    const baseTargets = {
+      calories: dailyTargets?.calories ?? null,
+      protein_g: dailyTargets?.protein ?? null,
+      carbs_g: dailyTargets?.carbs ?? null,
+      fat_g: dailyTargets?.fat ?? null,
+      fiber_g: (dailyTargets as any)?.fiber ?? null,
+      sugar_g: (dailyTargets as any)?.sugarMax ?? null,
+    }
+
+    const exerciseKcal =
+      Number.isFinite(Number(exerciseCaloriesKcal)) && Number(exerciseCaloriesKcal) > 0
+        ? Number(exerciseCaloriesKcal)
+        : 0
+
+    const targetsWithExercise = (() => {
+      const next: any = { ...baseTargets }
+      const calories = Number(next.calories)
+      if (Number.isFinite(calories) && calories > 0 && exerciseKcal > 0) {
+        next.calories = calories + exerciseKcal
+      }
+
+      const protein = Number(next.protein_g)
+      const carbs = Number(next.carbs_g)
+      const fat = Number(next.fat_g)
+      if (!Number.isFinite(protein) || !Number.isFinite(carbs) || !Number.isFinite(fat)) return next
+      if (protein <= 0 || carbs <= 0 || fat <= 0) return next
+      if (!Number.isFinite(exerciseKcal) || exerciseKcal <= 0) return next
+
+      const proteinCals = protein * 4
+      const carbCals = carbs * 4
+      const fatCals = fat * 9
+      const totalMacroCals = proteinCals + carbCals + fatCals
+      if (!Number.isFinite(totalMacroCals) || totalMacroCals <= 0) return next
+
+      const pShare = proteinCals / totalMacroCals
+      const cShare = carbCals / totalMacroCals
+      const fShare = fatCals / totalMacroCals
+
+      next.protein_g = protein + (exerciseKcal * pShare) / 4
+      next.carbs_g = carbs + (exerciseKcal * cShare) / 4
+      next.fat_g = fat + (exerciseKcal * fShare) / 9
+      return next
+    })()
+
+    return { overallTargets: targetsWithExercise, overallUsed: usedAfter }
+  }
+
   const runFavoriteAdd = (item: any) => {
     const source = item.favorite || item.entry || item
     const replaceIndex = favoritesReplaceTargetRef.current
@@ -26727,7 +26798,7 @@ Please add nutritional information manually if needed.`);
         </div>
       )}
 
-      {favoriteActionModal && (
+      {favoriteActionModal && favoriteActionModal.mode === 'choose' && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
           onClick={() => setFavoriteActionModal(null)}
@@ -26736,175 +26807,30 @@ Please add nutritional information manually if needed.`);
             className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >
-            {favoriteActionModal.mode === 'choose' ? (
-              <>
-                <div className="text-base font-semibold text-gray-900">
-                  {favoriteActionModal.label}
-                </div>
-                <div className="text-sm text-gray-600 mt-1">
-                  What would you like to do?
-                </div>
-                <div className="mt-4 flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const item = favoriteActionModal.item
-                      setFavoriteActionModal(null)
-                      runFavoriteAdd(item)
-                    }}
-                    className="w-full px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
-                  >
-                    Add to diary
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFavoriteActionModal((prev) =>
-                        prev ? { ...prev, mode: 'preview' } : prev,
-                      )
-                    }
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
-                  >
-                    Preview
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const dayTotals = (Array.isArray(sourceEntries) ? sourceEntries : []).reduce(
-                        (acc: any, entry: any) => {
-                          const t = getEntryTotals(entry) as any
-                          acc.calories += Number(t?.calories) || 0
-                          acc.protein += Number(t?.protein) || 0
-                          acc.carbs += Number(t?.carbs) || 0
-                          acc.fat += Number(t?.fat) || 0
-                          acc.fiber += Number(t?.fiber) || 0
-                          acc.sugar += Number(t?.sugar) || 0
-                          return acc
-                        },
-                        { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
-                      )
-
-                      const mealTotals = favoriteActionModal.totals || {
-                        calories: 0,
-                        protein: 0,
-                        carbs: 0,
-                        fat: 0,
-                        fiber: 0,
-                        sugar: 0,
-                      }
-
-                      const usedAfter = {
-                        calories: (Number(dayTotals.calories) || 0) + (Number((mealTotals as any).calories) || 0),
-                        protein_g: (Number(dayTotals.protein) || 0) + (Number((mealTotals as any).protein) || 0),
-                        carbs_g: (Number(dayTotals.carbs) || 0) + (Number((mealTotals as any).carbs) || 0),
-                        fat_g: (Number(dayTotals.fat) || 0) + (Number((mealTotals as any).fat) || 0),
-                        fiber_g: (Number(dayTotals.fiber) || 0) + (Number((mealTotals as any).fiber) || 0),
-                        sugar_g: (Number(dayTotals.sugar) || 0) + (Number((mealTotals as any).sugar) || 0),
-                      }
-
-                      const baseTargets = {
-                        calories: dailyTargets?.calories ?? null,
-                        protein_g: dailyTargets?.protein ?? null,
-                        carbs_g: dailyTargets?.carbs ?? null,
-                        fat_g: dailyTargets?.fat ?? null,
-                        fiber_g: (dailyTargets as any)?.fiber ?? null,
-                        sugar_g: (dailyTargets as any)?.sugarMax ?? null,
-                      }
-
-                      const exerciseKcal =
-                        Number.isFinite(Number(exerciseCaloriesKcal)) && Number(exerciseCaloriesKcal) > 0
-                          ? Number(exerciseCaloriesKcal)
-                          : 0
-
-                      const targetsWithExercise = (() => {
-                        const next: any = { ...baseTargets }
-                        const calories = Number(next.calories)
-                        if (Number.isFinite(calories) && calories > 0 && exerciseKcal > 0) {
-                          next.calories = calories + exerciseKcal
-                        }
-
-                        const protein = Number(next.protein_g)
-                        const carbs = Number(next.carbs_g)
-                        const fat = Number(next.fat_g)
-                        if (!Number.isFinite(protein) || !Number.isFinite(carbs) || !Number.isFinite(fat)) return next
-                        if (protein <= 0 || carbs <= 0 || fat <= 0) return next
-                        if (!Number.isFinite(exerciseKcal) || exerciseKcal <= 0) return next
-
-                        const proteinCals = protein * 4
-                        const carbCals = carbs * 4
-                        const fatCals = fat * 9
-                        const totalMacroCals = proteinCals + carbCals + fatCals
-                        if (!Number.isFinite(totalMacroCals) || totalMacroCals <= 0) return next
-
-                        const pShare = proteinCals / totalMacroCals
-                        const cShare = carbCals / totalMacroCals
-                        const fShare = fatCals / totalMacroCals
-
-                        next.protein_g = protein + (exerciseKcal * pShare) / 4
-                        next.carbs_g = carbs + (exerciseKcal * cShare) / 4
-                        next.fat_g = fat + (exerciseKcal * fShare) / 9
-                        return next
-                      })()
-
-                      setFavoriteActionModal((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              mode: 'overall',
-                              overallTargets: targetsWithExercise,
-                              overallUsed: usedAfter,
-                            }
-                          : prev,
-                      )
-                    }}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
-                  >
-                    Preview overall macros
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFavoriteActionModal(null)}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                      {favoriteActionModal.mode === 'overall' ? 'Preview overall macros' : 'Nutritional breakdown'}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {favoriteActionModal.mode === 'overall'
-                        ? 'This is a preview. It does not add the meal yet.'
-                        : `Total for ${favoriteActionModal.servingLabel}`}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFavoriteActionModal(null)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <span aria-hidden>✕</span>
-                  </button>
-                </div>
-                <div className="mt-4">
-                  {favoriteActionModal.mode === 'overall' ? (
-                    <div className="space-y-3">
-                      <div className="text-xs text-gray-600">
-                        If you add <span className="font-semibold text-gray-900">{favoriteActionModal.label}</span>,
-                        your daily totals would look like this:
-                      </div>
-                      <DailyMacroSummary
-                        targets={favoriteActionModal.overallTargets || {}}
-                        used={favoriteActionModal.overallUsed || {}}
-                      />
-                    </div>
-                  ) : (() => {
-                    const totals = favoriteActionModal.totals || {
+            <div className="text-base font-semibold text-gray-900">
+              {favoriteActionModal.label}
+            </div>
+            <div className="text-sm text-gray-600 mt-1">
+              What would you like to do?
+            </div>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const item = favoriteActionModal.item
+                  setFavoriteActionModal(null)
+                  runFavoriteAdd(item)
+                }}
+                className="w-full px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
+              >
+                Add to diary
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setFavoriteActionModal((prev) => {
+                    if (!prev) return prev
+                    const totals = prev.totals || {
                       calories: 0,
                       protein: 0,
                       carbs: 0,
@@ -26912,67 +26838,114 @@ Please add nutritional information manually if needed.`);
                       fiber: 0,
                       sugar: 0,
                     }
-                    return (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {NUTRIENT_DISPLAY_ORDER.map((key) => {
-                          const meta = NUTRIENT_CARD_META[key]
-                          const raw = totals ? (totals as any)[key] : null
-                          const value =
-                            raw === null || raw === undefined
-                              ? null
-                              : Number(raw)
-                          const display =
-                            value === null || !Number.isFinite(value)
-                              ? formatNutrientValue(key, 0)
-                              : formatNutrientValue(key, value)
-                          const label =
-                            key === 'calories'
-                              ? energyUnit === 'kJ'
-                                ? 'Kilojoules'
-                                : 'Calories'
-                              : meta.label
-                          return (
-                            <div
-                              key={key}
-                              className={`rounded-2xl border border-gray-100 bg-gradient-to-br ${meta.gradient} p-4`}
-                            >
-                              <div
-                                className={`text-xl font-bold ${meta.accent}`}
-                              >
-                                {display}
-                              </div>
-                              <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mt-1">
-                                {label}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
-                </div>
-                <div className="mt-5 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFavoriteActionModal((prev) =>
-                        prev ? { ...prev, mode: 'choose' } : prev,
+                    const overall = computeOverallMacrosAfterAddingFavorite(totals)
+                    return { ...prev, ...overall, mode: 'preview' }
+                  })
+                }
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+              >
+                Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => setFavoriteActionModal(null)}
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {favoriteActionModal && favoriteActionModal.mode === 'preview' && (
+        <div className="fixed inset-0 z-[70] bg-white flex flex-col">
+          <div className="shrink-0 border-b border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                setFavoriteActionModal((prev) => (prev ? { ...prev, mode: 'choose' } : prev))
+              }
+              className="text-sm font-semibold text-gray-700 hover:text-gray-900"
+            >
+              Back
+            </button>
+            <div className="min-w-0 text-center">
+              <div className="text-sm font-semibold text-gray-900 truncate">Preview</div>
+              <div className="text-xs text-gray-500 truncate">{favoriteActionModal.servingLabel}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const item = favoriteActionModal.item
+                setFavoriteActionModal(null)
+                runFavoriteAdd(item)
+              }}
+              className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800"
+            >
+              Add
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-5">
+            <div className="text-lg font-semibold text-gray-900">{favoriteActionModal.label}</div>
+            <div className="text-xs text-gray-500 mt-1">This is a preview. It does not add the meal yet.</div>
+
+            <div className="mt-5">
+              {(() => {
+                const totals = favoriteActionModal.totals || {
+                  calories: 0,
+                  protein: 0,
+                  carbs: 0,
+                  fat: 0,
+                  fiber: 0,
+                  sugar: 0,
+                }
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {NUTRIENT_DISPLAY_ORDER.map((key) => {
+                      const meta = NUTRIENT_CARD_META[key]
+                      const raw = totals ? (totals as any)[key] : null
+                      const value = raw === null || raw === undefined ? null : Number(raw)
+                      const display =
+                        value === null || !Number.isFinite(value)
+                          ? formatNutrientValue(key, 0)
+                          : formatNutrientValue(key, value)
+                      const label =
+                        key === 'calories'
+                          ? energyUnit === 'kJ'
+                            ? 'Kilojoules'
+                            : 'Calories'
+                          : meta.label
+                      return (
+                        <div
+                          key={key}
+                          className={`rounded-2xl border border-gray-100 bg-gradient-to-br ${meta.gradient} p-4`}
+                        >
+                          <div className={`text-xl font-bold ${meta.accent}`}>{display}</div>
+                          <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mt-1">
+                            {label}
+                          </div>
+                        </div>
                       )
-                    }
-                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFavoriteActionModal(null)}
-                    className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800"
-                  >
-                    Close
-                  </button>
-                </div>
-              </>
-            )}
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+
+            <div className="mt-7">
+              <div className="text-sm font-semibold text-gray-900">Daily totals after adding</div>
+              <div className="text-xs text-gray-500 mt-1">
+                This shows what your full day would look like if you added this.
+              </div>
+              <div className="mt-3">
+                <DailyMacroSummary
+                  targets={favoriteActionModal.overallTargets || {}}
+                  used={favoriteActionModal.overallUsed || {}}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
