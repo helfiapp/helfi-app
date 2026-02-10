@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 17:57 AEDT
+- What changed: Renaming a Favourite meal now stays consistent in the Add from favorites list (it won’t keep showing the old long USDA/database name after you renamed it).
+- Where to see it (page/link): Food Diary -> Add from favorites
+- What to quickly test: Rename a Favourite to a short name (e.g. “Chicken breast”), reopen Add from favorites, and confirm it shows the short name (not the long old name).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 15:01 AEDT
 - What changed: Fixed the egg "Weight" row on mobile so it no longer stretches off the right side. Egg unit labels are now shorter (example: "extra large egg" instead of "extra large egg — 56g").
 - Where to see it (page/link): Food Diary -> open an entry -> expand an egg ingredient card
