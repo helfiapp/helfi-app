@@ -4433,9 +4433,24 @@ export default function FoodDiary() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const data = await res.json().catch(() => ({}))
+      // Some server errors return HTML (not JSON). Read as text first so we can still show a useful message.
+      const rawText = await res.text()
+      let data: any = {}
+      try {
+        data = rawText ? JSON.parse(rawText) : {}
+      } catch {
+        data = {}
+      }
       if (!res.ok) {
-        throw new Error(data?.error || 'Failed to save exercise')
+        const trimmed = (rawText || '').trim()
+        const looksLikeHtml =
+          trimmed.startsWith('<') || trimmed.toLowerCase().startsWith('<!doctype') || trimmed.toLowerCase().startsWith('<html')
+        const fallback = `Failed to save exercise (${res.status})`
+        const msg =
+          (data && typeof data.error === 'string' && data.error.trim()) ||
+          (!looksLikeHtml && trimmed.length > 0 ? trimmed.slice(0, 160) : '') ||
+          fallback
+        throw new Error(msg)
       }
       setShowAddExerciseModal(false)
       setEditingExerciseEntry(null)

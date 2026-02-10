@@ -7,6 +7,9 @@ import { getHealthProfileForUser } from '@/lib/exercise/health-profile'
 import { inferMetAndLabel } from '@/lib/exercise/met'
 import crypto from 'crypto'
 
+// Prisma requires Node.js runtime (Edge can cause hard-to-debug HTML 500s).
+export const runtime = 'nodejs'
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 function normalizeLocalDate(input: string) {
@@ -51,17 +54,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  let body: any
   try {
-    body = await request.json()
-  } catch {
-    body = null
-  }
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    let body: any
+    try {
+      body = await request.json()
+    } catch {
+      body = null
+    }
 
   const exerciseTypeId = Number(body?.exerciseTypeId)
   const durationMinutes = Number(body?.durationMinutes)
@@ -195,5 +199,12 @@ export async function POST(request: NextRequest) {
   })
   const exerciseCalories = entries.reduce((sum, e) => sum + (Number(e.calories) || 0), 0)
 
-  return NextResponse.json({ entry, date, exerciseCalories })
+    return NextResponse.json({ entry, date, exerciseCalories })
+  } catch (error) {
+    console.error('POST /api/exercise-entries failed:', error)
+    return NextResponse.json(
+      { error: 'Failed to save exercise. Please try again. (ref: EX500)' },
+      { status: 500 },
+    )
+  }
 }
