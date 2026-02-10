@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 15:01 AEDT
+- What changed: Fixed the egg "Weight" row on mobile so it no longer stretches off the right side. Egg unit labels are now shorter (example: "extra large egg" instead of "extra large egg — 56g").
+- Where to see it (page/link): Food Diary -> open an entry -> expand an egg ingredient card
+- What to quickly test: Open an entry with eggs on mobile and check the Weight row fits fully on screen.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 14:31 AEDT
 - What changed: Adding a Favourite meal into the Food Diary now keeps egg amounts consistent (example: 2 eggs won't turn into confusing numbers like 1.12). This only affects the diary copy; it does not change the original Favourite.
 - Where to see it (page/link): Food Diary -> Add from favorites -> pick a Favourite meal that includes eggs
