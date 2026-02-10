@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 20:36 AEDT
+- What changed: Renamed Favorites (like “Chicken breast”) should now stay as the short name in the Food Diary list and in Add from favorites (no more randomly showing the long USDA/database name again after refresh).
+- Where to see it (page/link): Food Diary list + Food Diary -> Add from favorites -> Favorites tab
+- What to quickly test: Rename a Favorite to a short name. Refresh. Confirm it stays short in the Favorites tab and in your Food Diary list after adding it.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 19:23 AEDT
 - What changed: In Food Diary -> Add from favorites (All/Favorites/Custom), the pop-up now has a new option “Preview overall macros”. It shows what your full-day macro bars would look like if you added that meal (before you actually add it).
 - Where to see it (page/link): Food Diary -> Add from favorites -> tap any item -> “Preview overall macros”
