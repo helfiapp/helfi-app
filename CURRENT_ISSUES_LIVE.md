@@ -373,3 +373,9 @@ await prisma.supplement.createMany({ data: data.supplements }); // Missing new s
 - **Mobile Users**: Cannot use Page 8 accordion functionality
 
 **URGENT**: Next agent must succeed where 10+ previous agents failed.
+DEPLOYED:
+- LIVE:
+- Date/time: 2026-02-10 22:07 AEDT
+- What changed: Fixed renamed Favorites sometimes reverting back to long USDA names after refresh (we now always load the newest saved Favorites + name-override record).
+- Where to see it (page/link): Food Diary (`/food`) and “Add from favorites” list.
+- What to quickly test: Rename a Favorite to “Chicken breast”, refresh the page, confirm Favorites + Food Diary lists stay short (no long USDA title).
