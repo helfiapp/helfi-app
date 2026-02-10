@@ -3397,6 +3397,14 @@ export default function MealBuilderClient() {
         // Keep the linked saved meal in sync (if one exists, or create one for future use).
         try {
           if (favoriteLinkId) {
+            const existingIndex = favorites.findIndex((f: any) => String(f?.id || '') === favoriteLinkId)
+            const existing = existingIndex >= 0 ? favorites[existingIndex] : null
+            const existingLabel = String(existing?.label || existing?.description || '').trim()
+            const aliases = Array.isArray((existing as any)?.aliases) ? ([...(existing as any).aliases] as string[]) : []
+            const normalizedExisting = normalizeMealLabel(existingLabel) || existingLabel
+            if (normalizedExisting && normalizedExisting !== title && !aliases.includes(normalizedExisting)) {
+              aliases.push(normalizedExisting)
+            }
             const favoritePayload = {
               id: favoriteLinkId,
               sourceId: sourceLogId,
@@ -3410,8 +3418,8 @@ export default function MealBuilderClient() {
               customMeal: true,
               meal: category,
               createdAt: Date.now(),
+              ...(aliases.length > 0 ? { aliases } : {}),
             }
-            const existingIndex = favorites.findIndex((f: any) => String(f?.id || '') === favoriteLinkId)
             const nextFavorites =
               existingIndex >= 0
                 ? favorites.map((f: any, idx: number) => (idx === existingIndex ? { ...favoritePayload, id: f.id || favoritePayload.id } : f))
@@ -3514,6 +3522,14 @@ export default function MealBuilderClient() {
           }
           return base
         })()
+
+        // Keep the old label as an alias so older diary/library entries can still match this Favorite
+        // after it is renamed (prevents "long USDA name" reappearing in the picker).
+        const aliases = Array.isArray((existing as any)?.aliases) ? ([...(existing as any).aliases] as string[]) : []
+        const normalizedExisting = normalizeMealLabel(previousDescription) || previousDescription
+        if (normalizedExisting && normalizedExisting !== title && !aliases.includes(normalizedExisting)) {
+          aliases.push(normalizedExisting)
+        }
         const updatedFavorite = {
           ...existing,
           label: title,
@@ -3521,6 +3537,7 @@ export default function MealBuilderClient() {
           nutrition: normalizedNutrition,
           total: normalizedNutrition,
           items: cleanedItems,
+          ...(aliases.length > 0 ? { aliases } : {}),
           method: existing?.method || (existing?.customMeal ? 'meal-builder' : 'text'),
           meal: existing?.meal || category,
           createdAt: existing?.createdAt || Date.now(),
