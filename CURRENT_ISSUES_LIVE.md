@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 02:14 AEDT
+- What changed: Fixed the Food Diary “Add exercise” screen header so “Reset” and the close “X” are positioned correctly on desktop (the Add exercise screen now sits above the left menu instead of underneath it).
+- Where to see it (page/link): Food Diary → Exercise → Add exercise
+- What to quickly test: On desktop, open Add exercise and confirm the left menu doesn’t overlap the Add exercise screen, and the header buttons look aligned.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 01:15 AEDT
 - What changed: Made Food Diary manual exercise saving more reliable (aimed to prevent “Failed to save exercise”).
 - Where to see it (page/link): Food Diary → Exercise → Add exercise → Save
