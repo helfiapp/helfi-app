@@ -13183,7 +13183,20 @@ Please add nutritional information manually if needed.`);
 
   const applyFoodNameOverride = (raw: any, entry?: any) => {
     try {
-      const items = Array.isArray(entry?.items) ? entry.items : null
+      // Favorites and some legacy entries can store items as a JSON string.
+      // If we don't parse it, overrides keyed by itemId/barcode won't apply and the UI
+      // can "revert" to long database/USDA names after refresh.
+      const items = (() => {
+        if (Array.isArray(entry?.items)) return entry.items
+        const rawItems = typeof entry?.items === 'string' ? String(entry.items) : ''
+        if (!rawItems) return null
+        try {
+          const parsed = JSON.parse(rawItems)
+          return Array.isArray(parsed) ? parsed : null
+        } catch {
+          return null
+        }
+      })()
       const single = Array.isArray(items) && items.length === 1 ? items[0] : null
       const itemId = single && typeof single?.id === 'string' ? String(single.id).trim() : ''
       const byItemId = (foodNameOverrideMap as any)?.__byItemId
@@ -24469,9 +24482,20 @@ Please add nutritional information manually if needed.`);
                       const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
                       const overrideOnly = isWaterEntry ? '' : resolveFoodNameOverrideOnly(baseEntryLabel, food)
                       const baseShort = isWaterEntry ? '' : extractBaseMealDescription(String(baseEntryLabel || ''))
+                      const preferBaseTitleOverItem =
+                        !isWaterEntry &&
+                        baseShort &&
+                        entryItemName &&
+                        normalizeFoodName(baseShort) !== normalizeFoodName(entryItemName)
                       const entryDisplayLabel = isWaterEntry
                         ? waterLabel || 'Water'
-                        : overrideOnly || favoriteLabel || entryItemName || baseShort || String(baseEntryLabel || '').trim() || 'Meal'
+                        : overrideOnly ||
+                          favoriteLabel ||
+                          (preferBaseTitleOverItem ? baseShort : '') ||
+                          entryItemName ||
+                          baseShort ||
+                          String(baseEntryLabel || '').trim() ||
+                          'Meal'
 
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
