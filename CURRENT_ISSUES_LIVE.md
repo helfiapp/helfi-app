@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 18:13 AEDT
+- What changed: Add from favorites now keeps your short renamed title even when older entries still have the long USDA/database ingredient name.
+- Where to see it (page/link): Food Diary -> Add from favorites
+- What to quickly test: Find the chicken example again in Add from favorites (All tab). It should now show your short name (e.g. “Chicken breast”), not the long USDA name.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 17:57 AEDT
 - What changed: Renaming a Favourite meal now stays consistent in the Add from favorites list (it won’t keep showing the old long USDA/database name after you renamed it).
 - Where to see it (page/link): Food Diary -> Add from favorites
