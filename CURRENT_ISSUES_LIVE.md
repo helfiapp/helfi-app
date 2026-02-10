@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 13:39 AEDT
+- What changed: “Add by photo” now hides extra USDA disclaimer text in ingredient names (keeps them short), and for piece-based foods it clarifies the difference between the database serving size and what you selected (example: “Serving size: 3 pieces (you have 2)”).
+- Where to see it (page/link): Food -> Add by photo results screen
+- What to quickly test: Analyze a meal photo that returns a long USDA name, confirm it’s shortened. Analyze “2 fried shrimp” and confirm the serving size line clarifies “(you have 2)”.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 12:16 AEDT
 - What changed: “Add by photo” now shows “Missing” (not fake 0s) when calories/macros are missing, tries harder to match missing items to the food database automatically, and adds a “Fix missing items (X)” button that walks you through fixing only the broken ingredients.
 - Where to see it (page/link): Food -> Add by photo results screen
