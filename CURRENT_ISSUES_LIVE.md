@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 00:51 AEDT
+- What changed: In Food Diary → Add from favorites (All/Favorites/Custom), the Preview now opens a full-screen page that combines the meal macro cards + the daily progress bars (as-if you add it). The old “Preview overall macros” option was removed.
+- Where to see it (page/link): Food Diary → + → Add from favorites → tap an item → Preview
+- What to quickly test: From All/Favorites/Custom tabs, open Preview (check it is full-screen with Back + Add). Tap Back (returns to the small action pop-up). Tap Add (adds the meal and returns to Food Diary).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 23:37 AEDT
 - What changed: Fixed barcode scanning so it won’t randomly force a 2nd scan, and fixed the “500ml cup size gets stuck onto barcode foods” issue (drink amount no longer overwrites a barcode food’s serving size/macros when the food is measured in grams, like powders).
 - Where to see it (page/link): Food Diary → Scan barcode (also when scanning from the water/liquids flow)
