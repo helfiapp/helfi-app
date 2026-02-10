@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 23:37 AEDT
+- What changed: Fixed barcode scanning so it won’t randomly force a 2nd scan, and fixed the “500ml cup size gets stuck onto barcode foods” issue (drink amount no longer overwrites a barcode food’s serving size/macros when the food is measured in grams, like powders).
+- Where to see it (page/link): Food Diary → Scan barcode (also when scanning from the water/liquids flow)
+- What to quickly test: Scan a normal packaged food once (it should add after 1 scan). Then from the water/liquids flow set a cup size (e.g. 500ml) and scan a powder barcode (hot chocolate) and confirm the serving size stays in grams (not forced to 500) and the scanner doesn’t reopen by itself.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 21:08 AEDT
 - What changed: Added “Import Recipe” under “Build a meal” so you can import a recipe from a URL or a photo (recipe book page), auto-fill Build a meal with ingredient cards (calories/macros + totals), and optionally save the cooking steps.
 - Where to see it (page/link): Food Diary → + → Build a meal → Import Recipe
