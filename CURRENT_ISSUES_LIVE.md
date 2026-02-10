@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 02:51 AEDT
+- What changed: Fixed manual exercise saving in Food Diary → Add exercise (more robust save + clearer error message if something still fails).
+- Where to see it (page/link): Food Diary → Exercise → Add exercise
+- What to quickly test: Add a manual exercise and tap Save. If it fails, confirm the red error message now includes a short “DB error (…)” hint.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 02:27 AEDT
 - What changed: Fixed Food Diary → Add exercise on desktop so it no longer hides the left-hand menu (the Add exercise screen now stays inside the main content area).
 - Where to see it (page/link): Food Diary → Exercise → Add exercise
