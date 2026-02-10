@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 12:16 AEDT
+- What changed: “Add by photo” now shows “Missing” (not fake 0s) when calories/macros are missing, tries harder to match missing items to the food database automatically, and adds a “Fix missing items (X)” button that walks you through fixing only the broken ingredients.
+- Where to see it (page/link): Food -> Add by photo results screen
+- What to quickly test: Analyze a meal photo that previously gave 0s. Confirm the ingredient card shows “Missing”, confirm “Fix missing items” opens the right ingredient with search pre-filled, pick matches until all are fixed, then confirm Save works.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 03:30 AEDT
 - What changed: Photo analysis now defaults ingredient weights to grams (not ounces), and the Food name/title stays short (no serving-size macros/calories dumped into the title).
 - Where to see it (page/link): Food -> Add by photo results screen
