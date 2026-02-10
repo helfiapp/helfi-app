@@ -28,6 +28,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, Component } f
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
+import DailyMacroSummary from '@/components/food/DailyMacroSummary'
 import { usePathname, useRouter } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MissingFoodReport from '@/components/food/MissingFoodReport'
@@ -3709,7 +3710,9 @@ export default function FoodDiary() {
     label: string
     servingLabel: string
     totals: NutritionTotals | null
-    mode: 'choose' | 'preview'
+    mode: 'choose' | 'preview' | 'overall'
+    overallTargets?: any
+    overallUsed?: any
   } | null>(null)
   const [fatDetailState, setFatDetailState] = useState<{
     type: 'good' | 'bad' | 'unclear'
@@ -26640,6 +26643,100 @@ Please add nutritional information manually if needed.`);
                   </button>
                   <button
                     type="button"
+                    onClick={() => {
+                      const dayTotals = (Array.isArray(sourceEntries) ? sourceEntries : []).reduce(
+                        (acc: any, entry: any) => {
+                          const t = getEntryTotals(entry) as any
+                          acc.calories += Number(t?.calories) || 0
+                          acc.protein += Number(t?.protein) || 0
+                          acc.carbs += Number(t?.carbs) || 0
+                          acc.fat += Number(t?.fat) || 0
+                          acc.fiber += Number(t?.fiber) || 0
+                          acc.sugar += Number(t?.sugar) || 0
+                          return acc
+                        },
+                        { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+                      )
+
+                      const mealTotals = favoriteActionModal.totals || {
+                        calories: 0,
+                        protein: 0,
+                        carbs: 0,
+                        fat: 0,
+                        fiber: 0,
+                        sugar: 0,
+                      }
+
+                      const usedAfter = {
+                        calories: (Number(dayTotals.calories) || 0) + (Number((mealTotals as any).calories) || 0),
+                        protein_g: (Number(dayTotals.protein) || 0) + (Number((mealTotals as any).protein) || 0),
+                        carbs_g: (Number(dayTotals.carbs) || 0) + (Number((mealTotals as any).carbs) || 0),
+                        fat_g: (Number(dayTotals.fat) || 0) + (Number((mealTotals as any).fat) || 0),
+                        fiber_g: (Number(dayTotals.fiber) || 0) + (Number((mealTotals as any).fiber) || 0),
+                        sugar_g: (Number(dayTotals.sugar) || 0) + (Number((mealTotals as any).sugar) || 0),
+                      }
+
+                      const baseTargets = {
+                        calories: dailyTargets?.calories ?? null,
+                        protein_g: dailyTargets?.protein ?? null,
+                        carbs_g: dailyTargets?.carbs ?? null,
+                        fat_g: dailyTargets?.fat ?? null,
+                        fiber_g: (dailyTargets as any)?.fiber ?? null,
+                        sugar_g: (dailyTargets as any)?.sugarMax ?? null,
+                      }
+
+                      const exerciseKcal =
+                        Number.isFinite(Number(exerciseCaloriesKcal)) && Number(exerciseCaloriesKcal) > 0
+                          ? Number(exerciseCaloriesKcal)
+                          : 0
+
+                      const targetsWithExercise = (() => {
+                        const next: any = { ...baseTargets }
+                        const calories = Number(next.calories)
+                        if (Number.isFinite(calories) && calories > 0 && exerciseKcal > 0) {
+                          next.calories = calories + exerciseKcal
+                        }
+
+                        const protein = Number(next.protein_g)
+                        const carbs = Number(next.carbs_g)
+                        const fat = Number(next.fat_g)
+                        if (!Number.isFinite(protein) || !Number.isFinite(carbs) || !Number.isFinite(fat)) return next
+                        if (protein <= 0 || carbs <= 0 || fat <= 0) return next
+                        if (!Number.isFinite(exerciseKcal) || exerciseKcal <= 0) return next
+
+                        const proteinCals = protein * 4
+                        const carbCals = carbs * 4
+                        const fatCals = fat * 9
+                        const totalMacroCals = proteinCals + carbCals + fatCals
+                        if (!Number.isFinite(totalMacroCals) || totalMacroCals <= 0) return next
+
+                        const pShare = proteinCals / totalMacroCals
+                        const cShare = carbCals / totalMacroCals
+                        const fShare = fatCals / totalMacroCals
+
+                        next.protein_g = protein + (exerciseKcal * pShare) / 4
+                        next.carbs_g = carbs + (exerciseKcal * cShare) / 4
+                        next.fat_g = fat + (exerciseKcal * fShare) / 9
+                        return next
+                      })()
+
+                      setFavoriteActionModal((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              mode: 'overall',
+                              overallTargets: targetsWithExercise,
+                              overallUsed: usedAfter,
+                            }
+                          : prev,
+                      )
+                    }}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                  >
+                    Preview overall macros
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setFavoriteActionModal(null)}
                     className="w-full px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50"
                   >
@@ -26652,10 +26749,12 @@ Please add nutritional information manually if needed.`);
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                      Nutritional breakdown
+                      {favoriteActionModal.mode === 'overall' ? 'Preview overall macros' : 'Nutritional breakdown'}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      Total for {favoriteActionModal.servingLabel}
+                      {favoriteActionModal.mode === 'overall'
+                        ? 'This is a preview. It does not add the meal yet.'
+                        : `Total for ${favoriteActionModal.servingLabel}`}
                     </div>
                   </div>
                   <button
@@ -26667,7 +26766,18 @@ Please add nutritional information manually if needed.`);
                   </button>
                 </div>
                 <div className="mt-4">
-                  {(() => {
+                  {favoriteActionModal.mode === 'overall' ? (
+                    <div className="space-y-3">
+                      <div className="text-xs text-gray-600">
+                        If you add <span className="font-semibold text-gray-900">{favoriteActionModal.label}</span>,
+                        your daily totals would look like this:
+                      </div>
+                      <DailyMacroSummary
+                        targets={favoriteActionModal.overallTargets || {}}
+                        used={favoriteActionModal.overallUsed || {}}
+                      />
+                    </div>
+                  ) : (() => {
                     const totals = favoriteActionModal.totals || {
                       calories: 0,
                       protein: 0,
