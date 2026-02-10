@@ -20684,13 +20684,13 @@ Please add nutritional information manually if needed.`);
                                 {/* Weight editor: changing weight back-calculates servings (and pieces) when possible */}
                                 <div className="flex items-center justify-between gap-3 mt-2">
                                   <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Weight</span>
-                                  <div className="flex items-center bg-slate-100 rounded-xl px-4 py-2 border border-transparent">
-                                    <input
-                                      type="number"
-                                      inputMode="decimal"
-                                      min={0}
-                                      step={getWeightInputStep(weightUnit) as any}
-                                      data-weight-input-id={`weight-input-${index}`}
+                                <div className="flex items-center bg-slate-100 rounded-xl px-2 sm:px-4 py-2 border border-transparent">
+                                  <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    min={0}
+                                    step={getWeightInputStep(weightUnit) as any}
+                                    data-weight-input-id={`weight-input-${index}`}
                                       value={(() => {
                                         const key = `ai:card:${index}:weightAmount`
                                         if (Object.prototype.hasOwnProperty.call(numericInputDrafts, key)) {
@@ -20742,14 +20742,14 @@ Please add nutritional information manually if needed.`);
                                           ? String(roundWeightValue(baseWeightPerServing * servingsCount, weightUnit))
                                           : 'e.g., 250'
                                       }
-                                      className="w-20 bg-transparent border-none font-bold text-lg text-slate-900 text-right tabular-nums outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 p-0"
+                                      className="w-16 sm:w-20 bg-transparent border-none font-bold text-lg text-slate-900 text-right tabular-nums outline-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 p-0"
                                       style={{ outline: 'none', boxShadow: 'none' }}
                                     />
-                                    <div className="w-px h-6 bg-slate-300 mx-3" />
+                                    <div className="w-px h-6 bg-slate-300 mx-2 sm:mx-3" />
                                     <select
                                       value={weightUnit}
                                       onChange={(e) => updateItemField(index, 'weightUnit', e.target.value)}
-                                      className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none"
+                                      className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none min-w-0 max-w-[10.5rem] sm:max-w-none truncate"
                                       style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
                                     >
                                       {getWeightUnitOptions(item, weightUnit, pieceGrams).map((option) => (

@@ -377,21 +377,18 @@ export const formatUnitLabel = (unit: MeasurementUnit, name?: string | null, pie
   if (unit === 'cup') return `cup — ${Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : 218}g`
   if (unit === 'pinch') return `pinch — ${Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : 0.3}g`
   if (unit === 'egg-small') {
-    const grams = Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : DEFAULT_UNIT_GRAMS['egg-small']
-    return `small egg — ${Math.round(grams * 10) / 10}g`
+    // Keep egg labels short in UI controls; grams-per-egg isn't important here and can confuse users
+    // (e.g. “2 extra large egg — 56g” looks like total weight is 56g instead of per-egg).
+    return 'small egg'
   }
   if (unit === 'egg-medium') {
-    const grams = Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : DEFAULT_UNIT_GRAMS['egg-medium']
-    return `medium egg — ${Math.round(grams * 10) / 10}g`
+    return 'medium egg'
   }
   if (unit === 'egg-large') {
-    const grams = Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : DEFAULT_UNIT_GRAMS['egg-large']
-    return `large egg — ${Math.round(grams * 10) / 10}g`
+    return 'large egg'
   }
   if (unit === 'egg-extra-large') {
-    const grams =
-      Number.isFinite(Number(unitValue)) && Number(unitValue) > 0 ? Number(unitValue) : DEFAULT_UNIT_GRAMS['egg-extra-large']
-    return `extra large egg — ${Math.round(grams * 10) / 10}g`
+    return 'extra large egg'
   }
   if (unit === 'piece') {
     if (pieceGrams && pieceGrams > 0) return `piece — ${Math.round(pieceGrams * 10) / 10}g`
