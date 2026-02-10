@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 19:23 AEDT
+- What changed: In Food Diary -> Add from favorites (All/Favorites/Custom), the pop-up now has a new option “Preview overall macros”. It shows what your full-day macro bars would look like if you added that meal (before you actually add it).
+- Where to see it (page/link): Food Diary -> Add from favorites -> tap any item -> “Preview overall macros”
+- What to quickly test: Pick a meal, tap “Preview overall macros”, confirm the bars change compared to your current day. Then tap Back and Add to diary, and confirm your Food Diary macro bars match what the preview showed.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 18:13 AEDT
 - What changed: Add from favorites now keeps your short renamed title even when older entries still have the long USDA/database ingredient name.
 - Where to see it (page/link): Food Diary -> Add from favorites
