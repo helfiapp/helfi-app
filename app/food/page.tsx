@@ -657,7 +657,7 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
   // protein, 28g carbs, 3g fat)" inside the name field – we never want
   // those repeated in the title area.
   const stripNutritionFromName = (raw: string) =>
-    String(raw || '')
+    sanitizeDatabaseFoodName(String(raw || ''))
       // Remove parenthetical groups that look like nutrition info
       .replace(/\([^)]*(calories?|protein|carbs?|fat|fibre|fiber|sugar)[^)]*\)/gi, '')
       .replace(/\s+/g, ' ')
@@ -702,6 +702,19 @@ const stripNutritionFromServingSize = (raw: string) => {
     .replace(/\b\d+(?:\.\d+)?\s*(kcal|cal|kj)\b[^,)]*(?:protein|carb|fat|fiber|fibre|sugar)[^,)]*/gi, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+// Keep official database names readable for humans.
+// Example: USDA sometimes adds "(Includes foods for USDA's Food Distribution Program)".
+const sanitizeDatabaseFoodName = (raw: string) => {
+  let next = String(raw || '').trim()
+  if (!next) return next
+  // Remove USDA "Food Distribution Program" disclaimer (keep only the food name).
+  next = next.replace(/\s*\([^)]*\busda\b[^)]*\bfood distribution program\b[^)]*\)\s*/gi, ' ').trim()
+  // Clean up any leftover spacing/punctuation.
+  next = next.replace(/\s+,/g, ',').replace(/,\s+/g, ', ').replace(/\s+/g, ' ').trim()
+  next = next.replace(/,\s*$/, '').trim()
+  return next
 }
 
 const buildTodayIso = () => {
@@ -6230,6 +6243,9 @@ export default function FoodDiary() {
 
   const finalizeIngredientItem = (input: any) => {
     let next = normalizeDiscreteItem({ ...input })
+    if (next?.name) {
+      next.name = sanitizeDatabaseFoodName(String(next.name))
+    }
 
     const liquidItem = isLikelyLiquidFood(next?.name, next?.serving_size)
     const normalizedServingSize = normalizeServingSizeForLiquid(next?.serving_size, liquidItem)
@@ -20192,7 +20208,7 @@ Please add nutritional information manually if needed.`);
                           showPiecesControl && pieceCount !== null ? formatPieceDisplay(pieceCount) : ''
 
                         const cleanBaseName = (() => {
-                          const raw = String(item.name || 'Unknown Food')
+                          const raw = sanitizeDatabaseFoodName(String(item.name || 'Unknown Food'))
                           const strippedNumeric = raw.replace(/^\s*\d+(\.\d+)?\s+/, '')
                           const strippedWord = strippedNumeric.replace(
                             /^\s*(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+/i,
@@ -20376,7 +20392,23 @@ Please add nutritional information manually if needed.`);
                                     }
                                   }}
                                 >
-                                  Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item, energyUnit)}
+                                  {(() => {
+                                    const base = formatServingSizeDisplay(servingSizeDisplayLabel || '', item, energyUnit)
+                                    if (!showPiecesControl || !piecesPerServingValue || pieceCount === null) {
+                                      return <>Serving size: {base}</>
+                                    }
+                                    if (Math.abs(pieceCount - piecesPerServingValue) < 0.001) {
+                                      return <>Serving size: {base}</>
+                                    }
+                                    return (
+                                      <>
+                                        Serving size: {base}{' '}
+                                        <span className="text-slate-400">
+                                          (you have {formatPieceDisplay(pieceCount)})
+                                        </span>
+                                      </>
+                                    )
+                                  })()}
                                 </div>
                                 {servingOptions.length > 0 && (
                                   <div className="mt-2">
