@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 01:15 AEDT
+- What changed: Made Food Diary manual exercise saving more reliable (aimed to prevent “Failed to save exercise”).
+- Where to see it (page/link): Food Diary → Exercise → Add exercise → Save
+- What to quickly test: Add a manual exercise (distance + duration + calories) and confirm it saves; then add a second manual exercise and confirm that also saves.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 00:51 AEDT
 - What changed: In Food Diary → Add from favorites (All/Favorites/Custom), the Preview now opens a full-screen page that combines the meal macro cards + the daily progress bars (as-if you add it). The old “Preview overall macros” option was removed.
 - Where to see it (page/link): Food Diary → + → Add from favorites → tap an item → Preview
