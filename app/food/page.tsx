@@ -1163,20 +1163,8 @@ const formatEnergyNumber = (value: number | null | undefined, unit: 'kcal' | 'kJ
 const formatServingSizeDisplay = (label: string, item: any, unit: 'kcal' | 'kJ' = 'kcal') => {
   const base = label && label.trim().length > 0 ? label.trim() : 'Not specified'
   if (item?.labelNeedsReview) return base
-  const macros: string[] = []
-  const kcal = Number(item?.calories)
-  const protein = Number(item?.protein_g)
-  const carbs = Number(item?.carbs_g)
-  const fat = Number(item?.fat_g)
-  if (Number.isFinite(kcal) && kcal > 0) {
-    const energyValue = unit === 'kJ' ? Math.round(kcal * KCAL_TO_KJ) : Math.round(kcal)
-    macros.push(`${energyValue} ${unit}`)
-  }
-  if (Number.isFinite(protein) && protein > 0) macros.push(`${Math.round(protein * 10) / 10}g protein`)
-  if (Number.isFinite(carbs) && carbs > 0) macros.push(`${Math.round(carbs * 10) / 10}g carbs`)
-  if (Number.isFinite(fat) && fat > 0) macros.push(`${Math.round(fat * 10) / 10}g fat`)
-  if (!macros.length) return base
-  return `${base} (${macros.join(', ')})`
+  // Keep this short. Calories/macros are already shown in the ingredient cards below.
+  return base
 }
 
 function convertKcalToUnit(value: number | null | undefined, unit: 'kcal' | 'kJ'): number | null {
@@ -3138,6 +3126,7 @@ export default function FoodDiary() {
   const autoDbMatchAbortRef = useRef<AbortController | null>(null)
   const autoDbMatchSeqRef = useRef<number | null>(null)
   const [autoDbMatchRunning, setAutoDbMatchRunning] = useState(false)
+  const [missingFixMode, setMissingFixMode] = useState(false)
   const [officialLastRequest, setOfficialLastRequest] = useState<{
     query: string
     mode: 'packaged' | 'single'
@@ -4920,6 +4909,8 @@ export default function FoodDiary() {
             : baseQuery
         if (!query || query.length < 2) return
 
+        const itemMissingCoreMacros = coreMacrosMissing(item)
+
         const candidateQueries = [query]
         if (hasEgg && !analysisHasEggDish) {
           candidateQueries.unshift('egg whole raw')
@@ -4932,9 +4923,28 @@ export default function FoodDiary() {
           candidateQueries.push(query.replace(/\broasted\b/g, 'roast').trim())
         }
         candidateQueries.push(query.replace(/\b(roasted|roast|whole|cooked)\b/g, '').trim())
-        const uniqueQueries = Array.from(new Set(candidateQueries.filter((q) => q.length >= 3))).slice(0, 3)
+
+        // If we're missing macros, try a few more "clean" queries (e.g., remove preparation words).
+        if (itemMissingCoreMacros) {
+          const strippedPrep = query
+            .replace(/\b(fried|battered|breaded|crumbed|crispy|tempura|deep|pan|beer|sauteed|sautéed)\b/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+          if (strippedPrep && strippedPrep !== query) candidateQueries.push(strippedPrep)
+          const strippedGeneric = query
+            .replace(/\b(with|and|in|on|of|style)\b/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+          if (strippedGeneric && strippedGeneric !== query) candidateQueries.push(strippedGeneric)
+        }
+
+        const maxQueries = itemMissingCoreMacros ? 6 : 3
+        const uniqueQueries = Array.from(new Set(candidateQueries.filter((q) => q.length >= 3))).slice(0, maxQueries)
 
         let results: any[] = []
+        let matchedQuery: string | null = null
+        let fallbackResults: any[] = []
+        let fallbackQuery: string | null = null
         for (const q of uniqueQueries) {
           try {
             const params = applyCountryParam(
@@ -4942,7 +4952,7 @@ export default function FoodDiary() {
                 source: 'auto',
                 q,
                 kind: 'single',
-                limit: '6',
+                limit: itemMissingCoreMacros ? '10' : '6',
               }),
             )
             const res = await fetch(`/api/food-data?${params.toString()}`, { signal: controller.signal })
@@ -4950,7 +4960,20 @@ export default function FoodDiary() {
             const data = await res.json()
             const items = Array.isArray(data.items) ? data.items : []
             if (items.length > 0) {
+              // When we're missing macros, prefer result sets that actually include macros.
+              if (itemMissingCoreMacros) {
+                const hasCoreMacros = items.some((it: any) => !coreMacrosMissing(it))
+                if (hasCoreMacros) {
+                  results = items
+                  matchedQuery = q
+                  break
+                }
+                fallbackResults = items
+                fallbackQuery = q
+                continue
+              }
               results = items
+              matchedQuery = q
               break
             }
           } catch (err: any) {
@@ -4958,6 +4981,10 @@ export default function FoodDiary() {
           }
         }
 
+        if (!results.length && fallbackResults.length > 0) {
+          results = fallbackResults
+          matchedQuery = fallbackQuery
+        }
         if (!results.length) return
         if (hasEgg && !analysisHasEggDish) {
           const avoidEggTerms: string[] = []
@@ -4979,14 +5006,15 @@ export default function FoodDiary() {
             results = filtered
           }
         }
+        const scoreQuery = matchedQuery || query
         const ranked = [...results].sort(
-          (a, b) => scoreDbMatch(query, b?.name || '') - scoreDbMatch(query, a?.name || ''),
+          (a, b) => scoreDbMatch(scoreQuery, b?.name || '') - scoreDbMatch(scoreQuery, a?.name || ''),
         )
         const best = ranked[0]
         if (!best) return
 
         // If the match looks very weak, don't auto-apply it. User can tap "Find a better match".
-        const bestScore = scoreDbMatch(query, best?.name || '')
+        const bestScore = scoreDbMatch(scoreQuery, best?.name || '')
         if (bestScore < 25) return
 
         // If the current item is missing core macros, only accept a DB match that provides them.
@@ -5014,7 +5042,7 @@ export default function FoodDiary() {
           nextItem.customGramsPerServing = candidateGrams
           nextItem.weightUnit = 'g'
           if (!isDiscreteItem && currentWeight && currentWeight > 0) {
-            const edibleFactor = getEdibleYieldFactor(query)
+            const edibleFactor = getEdibleYieldFactor(scoreQuery)
             const effectiveWeight = edibleFactor > 0 ? currentWeight * edibleFactor : currentWeight
             const servings = Math.max(effectiveWeight / candidateGrams, 0.01)
             nextItem.servings = Math.round(servings * 100) / 100
@@ -5061,7 +5089,7 @@ export default function FoodDiary() {
                   return meta && Number(meta.quantity || 0) <= 1
                 })
               : null
-          const queryHasWhole = query.includes('whole')
+          const queryHasWhole = scoreQuery.includes('whole')
           const wholeMatch = queryHasWhole
             ? finalOptions.find((opt: any) => /\bwhole\b/i.test(opt?.label || opt?.serving_size || ''))
             : null
@@ -6419,14 +6447,17 @@ export default function FoodDiary() {
     }
   }
 
-  const replaceIngredientFromOfficial = async (item: any, index: number) => {
-    if (!item || index === null || index === undefined) return
+  const replaceIngredientFromOfficial = async (
+    item: any,
+    index: number,
+  ): Promise<{ items: any[]; updatedItem: any } | null> => {
+    if (!item || index === null || index === undefined) return null
     let resolved = item
     if ((item as any).__suggestion) {
       const match = await resolveOfficialSuggestionItem(item)
       if (!match) {
         setOfficialError('No match found. Try a longer search.')
-        return
+        return null
       }
       resolved = match
     }
@@ -6435,12 +6466,12 @@ export default function FoodDiary() {
       const fallback = lookup ? await resolveOfficialItemWithMacros(lookup) : null
       if (!fallback) {
         setOfficialError('This item has no nutrition data. Please choose another result.')
-        return
+        return null
       }
       resolved = fallback
     }
     const itemsCopy = [...analyzedItems]
-    if (!itemsCopy[index]) return
+    if (!itemsCopy[index]) return null
     const currentServings =
       Number.isFinite(Number(itemsCopy[index]?.servings)) && Number(itemsCopy[index]?.servings) > 0
         ? Number(itemsCopy[index]?.servings)
@@ -6498,7 +6529,9 @@ export default function FoodDiary() {
         setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
       } catch {}
     }
-    showQuickToast(`Updated to ${nextItem.name}`)
+    const updatedItem = itemsCopy[index]
+    showQuickToast(`Updated to ${updatedItem?.name || nextItem.name}`)
+    return { items: itemsCopy, updatedItem }
   }
 
   const cleanSingleFoodQuery = (value: string) =>
@@ -14337,6 +14370,68 @@ Please add nutritional information manually if needed.`);
   }, [photoPreview, manualMealBuildMode, editingEntry, showAiResult, autoDbMatchRunning, analyzedItems])
   const photoSaveBlocked = Boolean(photoSaveGuard.blocked)
 
+  const isCoreMacrosMissing = (item: any) =>
+    !item ||
+    item?.calories == null ||
+    item?.protein_g == null ||
+    item?.carbs_g == null ||
+    item?.fat_g == null
+
+  const missingMacroIndexes = useMemo(() => {
+    const isPhotoContext = Boolean(photoPreview)
+    if (!isPhotoContext) return [] as number[]
+    if (analysisMode === 'packaged') return [] as number[]
+    if (barcodeLabelFlow?.barcode) return [] as number[]
+    if (manualMealBuildMode) return [] as number[]
+    if (editingEntry) return [] as number[]
+    if (!showAiResult) return [] as number[]
+    const list = Array.isArray(analyzedItems) ? analyzedItems : []
+    const missing: number[] = []
+    for (let i = 0; i < list.length; i += 1) {
+      if (isCoreMacrosMissing(list[i])) missing.push(i)
+    }
+    return missing
+  }, [photoPreview, analysisMode, barcodeLabelFlow?.barcode, manualMealBuildMode, editingEntry, showAiResult, analyzedItems])
+
+  const openFixMissingModalForIndex = (index: number) => {
+    const list = Array.isArray(analyzedItems) ? analyzedItems : []
+    const item = list[index]
+    if (!item) return
+    const query = String(item?.name || '').trim()
+    if (!query) return
+    setMissingFixMode(true)
+    setEditingItemIndex(index)
+    setShowItemEditModal(true)
+    setOfficialSearchQuery(query)
+    // "Packaged/Fast-foods" is usually best for real meals (broader database + FatSecret fallback if needed).
+    handleOfficialSearch('packaged', query)
+  }
+
+  const startFixMissingMacrosFlow = () => {
+    const index = missingMacroIndexes[0]
+    if (index === null || index === undefined) return
+    openFixMissingModalForIndex(index)
+  }
+
+  const advanceFixMissingMacrosFlow = (currentIndex: number, itemsOverride?: any[] | null) => {
+    const list = Array.isArray(itemsOverride) ? itemsOverride : Array.isArray(analyzedItems) ? analyzedItems : []
+    const remaining: number[] = []
+    for (let i = 0; i < list.length; i += 1) {
+      if (isCoreMacrosMissing(list[i])) remaining.push(i)
+    }
+    if (remaining.length === 0) {
+      setMissingFixMode(false)
+      setShowItemEditModal(false)
+      setEditingItemIndex(null)
+      showQuickToast('All missing items fixed. You can now save.')
+      return
+    }
+    const pos = remaining.indexOf(currentIndex)
+    const nextIndex = pos >= 0 ? remaining[pos + 1] : remaining[0]
+    if (nextIndex === null || nextIndex === undefined) return
+    openFixMissingModalForIndex(nextIndex)
+  }
+
   const openLabelEdit = () => {
     const list = Array.isArray(analyzedItems) ? analyzedItems : []
     if (list.length === 0) return
@@ -19916,9 +20011,25 @@ Please add nutritional information manually if needed.`);
                                 Improving accuracy using the food database…
                               </div>
                             )}
-                            {!autoDbMatchRunning && photoSaveGuard.reason === 'missing_macros' && (
+                            {!autoDbMatchRunning &&
+                              photoSaveGuard.reason === 'missing_macros' &&
+                              analysisMode !== 'packaged' &&
+                              !barcodeLabelFlow?.barcode && (
                               <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
-                                Some ingredients are missing calories/macros. Tap an ingredient, then “Find a better match”.
+                                <div>Some ingredients are missing calories/macros.</div>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => startFixMissingMacrosFlow()}
+                                    disabled={missingMacroIndexes.length === 0}
+                                    className="px-3 py-1.5 rounded-lg bg-amber-900 text-amber-50 text-xs font-semibold hover:bg-amber-950 disabled:opacity-60"
+                                  >
+                                    Fix missing items ({missingMacroIndexes.length})
+                                  </button>
+                                  <div className="text-[11px] text-amber-800">
+                                    We’ll open each missing ingredient for you so you can pick a better match.
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -19975,22 +20086,44 @@ Please add nutritional information manually if needed.`);
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
                         const macroMultiplier = macroMultiplierForItem(item)
-                        const baseProtein = Number(item?.protein_g) || 0
-                        const baseCarbs = Number(item?.carbs_g) || 0
-                        const baseFat = Number(item?.fat_g) || 0
+                        const numOrNull = (value: any) => {
+                          const n = Number(value)
+                          return Number.isFinite(n) ? n : null
+                        }
+                        const baseProtein = numOrNull(item?.protein_g)
+                        const baseCarbs = numOrNull(item?.carbs_g)
+                        const baseFat = numOrNull(item?.fat_g)
+                        const baseFiber = numOrNull(item?.fiber_g)
+                        const baseSugar = numOrNull(item?.sugar_g)
+
                         const macroEnergyPerServing =
-                          Math.max(0, baseProtein) * 4 + Math.max(0, baseCarbs) * 4 + Math.max(0, baseFat) * 9
-                        const caloriesBase = Number(item?.calories)
+                          baseProtein !== null && baseCarbs !== null && baseFat !== null
+                            ? Math.max(0, baseProtein) * 4 + Math.max(0, baseCarbs) * 4 + Math.max(0, baseFat) * 9
+                            : null
+                        const caloriesBase = numOrNull(item?.calories)
                         const effectiveCaloriesPerServing =
-                          Number.isFinite(caloriesBase) && caloriesBase > 0 ? caloriesBase : macroEnergyPerServing
-                        const totalCalories = Number.isFinite(effectiveCaloriesPerServing)
-                          ? effectiveCaloriesPerServing * servingsCount * macroMultiplier
-                          : 0
-                        const totalProtein = Math.round((baseProtein * servingsCount * macroMultiplier) * 10) / 10
-                        const totalCarbs = Math.round((baseCarbs * servingsCount * macroMultiplier) * 10) / 10
-                        const totalFat = Math.round((baseFat * servingsCount * macroMultiplier) * 10) / 10
-                        const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount * macroMultiplier) * 10) / 10
-                        const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount * macroMultiplier) * 10) / 10
+                          caloriesBase !== null && caloriesBase > 0 ? caloriesBase : macroEnergyPerServing
+
+                        const totalCalories =
+                          effectiveCaloriesPerServing !== null
+                            ? effectiveCaloriesPerServing * servingsCount * macroMultiplier
+                            : null
+                        const totalProtein =
+                          baseProtein !== null
+                            ? Math.round(baseProtein * servingsCount * macroMultiplier * 10) / 10
+                            : null
+                        const totalCarbs =
+                          baseCarbs !== null ? Math.round(baseCarbs * servingsCount * macroMultiplier * 10) / 10 : null
+                        const totalFat =
+                          baseFat !== null ? Math.round(baseFat * servingsCount * macroMultiplier * 10) / 10 : null
+                        const totalFiber =
+                          baseFiber !== null
+                            ? Math.round(baseFiber * servingsCount * macroMultiplier * 10) / 10
+                            : null
+                        const totalSugar =
+                          baseSugar !== null
+                            ? Math.round(baseSugar * servingsCount * macroMultiplier * 10) / 10
+                            : null
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         const baseWeightPerServing = getBaseWeightPerServing(item)
                         const weightUnit = normalizeWeightUnit(item?.weightUnit)
@@ -20673,8 +20806,13 @@ Please add nutritional information manually if needed.`);
                               <div className="grid grid-cols-3 gap-3">
                                 {ITEM_NUTRIENT_META.map((meta) => {
                                   const totalValue = totalsByField[meta.field as keyof typeof totalsByField]
-                                  const displayValue =
-                                    meta.key === 'calories'
+                                  const isMissing =
+                                    totalValue === null ||
+                                    totalValue === undefined ||
+                                    !Number.isFinite(Number(totalValue))
+                                  const displayValue = isMissing
+                                    ? 'Missing'
+                                    : meta.key === 'calories'
                                       ? formatEnergyNumber(totalValue, energyUnit)
                                       : formatMacroValue(totalValue, 'g')
                                   const labelText =
@@ -20689,7 +20827,11 @@ Please add nutritional information manually if needed.`);
                                       className={`p-3 rounded-2xl border ${meta.bg} ${meta.border} flex flex-col items-start gap-1`}
                                     >
                                       <div className="flex items-center">
-                                        <span className={`text-lg font-bold ${meta.valueClass}`}>{displayValue}</span>
+                                        <span
+                                          className={`text-lg font-bold ${isMissing ? 'text-slate-400' : meta.valueClass}`}
+                                        >
+                                          {displayValue}
+                                        </span>
                                       </div>
                                       <span className={`text-[10px] font-bold uppercase ${meta.labelClass}`}>{labelText}</span>
                                     </div>
@@ -20944,6 +21086,7 @@ Please add nutritional information manually if needed.`);
                       onClick={() => {
                         setShowItemEditModal(false);
                         setEditingItemIndex(null);
+                        setMissingFixMode(false);
                       }}
                       className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
                     >
@@ -21348,7 +21491,18 @@ Please add nutritional information manually if needed.`);
                                         handleOfficialSearch('packaged', nextQuery)
                                         return
                                       }
-                                      replaceIngredientFromOfficial(r, editingItemIndex)
+                                      const idx = editingItemIndex
+                                      if (idx === null || idx === undefined) return
+                                      void (async () => {
+                                        const result = await replaceIngredientFromOfficial(r, idx)
+                                        if (!result) return
+                                        if (missingFixMode) {
+                                          // Give React a moment to render the updated item before moving on.
+                                          setTimeout(() => {
+                                            advanceFixMissingMacrosFlow(idx, result.items)
+                                          }, 80)
+                                        }
+                                      })()
                                     }}
                                     className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
                                   >
@@ -21672,6 +21826,7 @@ Please add nutritional information manually if needed.`);
                             applyRecalculatedNutrition(analyzedItems);
                             setShowItemEditModal(false);
                             setEditingItemIndex(null);
+                            setMissingFixMode(false);
                           }}
                           className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors duration-200"
                         >
