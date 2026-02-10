@@ -17820,13 +17820,13 @@ Please add nutritional information manually if needed.`);
         <div className="fixed inset-0 z-30 bg-transparent pointer-events-none" />
       )}
 
-      {showAddExerciseModal && (
-        <div className="fixed inset-0 z-[10000] bg-white">
-          <div className="h-[100dvh] flex flex-col">
-	            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
-	              <div className="flex items-center gap-2">
-	                {(exercisePickerCategory || selectedExerciseType) && (
-	                  <button
+	      {showAddExerciseModal && (
+	        <div className="fixed inset-0 md:left-64 z-[10000] bg-white">
+	          <div className="h-[100dvh] flex flex-col">
+		            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+		              <div className="flex items-center gap-2">
+		                {(exercisePickerCategory || selectedExerciseType) && (
+		                  <button
 	                    type="button"
 	                    onClick={() => {
 	                      if (selectedExerciseType) {
