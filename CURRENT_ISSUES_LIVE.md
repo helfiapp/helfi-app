@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 02:27 AEDT
+- What changed: Fixed Food Diary → Add exercise on desktop so it no longer hides the left-hand menu (the Add exercise screen now stays inside the main content area).
+- Where to see it (page/link): Food Diary → Exercise → Add exercise
+- What to quickly test: On desktop, open Add exercise and confirm the left menu stays visible. Close the Add exercise screen and confirm you return to the Food Diary as normal.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 02:14 AEDT
 - What changed: Fixed the Food Diary “Add exercise” screen header so “Reset” and the close “X” are positioned correctly on desktop (the Add exercise screen now sits above the left menu instead of underneath it).
 - Where to see it (page/link): Food Diary → Exercise → Add exercise
