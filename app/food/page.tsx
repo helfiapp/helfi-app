@@ -15523,6 +15523,76 @@ Please add nutritional information manually if needed.`);
     const drinkOverride = pendingDrinkOverrideRef.current
     const adjusted = applyDrinkOverrideToItems(clonedItems, drinkOverride)
     const finalItems = adjusted.items || clonedItems
+
+    // Fix for Favorites -> Diary mismatch on discrete items (especially eggs).
+    // Some legacy favorites store servings as a grams-based ratio (e.g., 1.12) even though the
+    // user picked a discrete amount (e.g., 2 extra large eggs). When copying into the diary,
+    // repair the item so it displays consistently (2 eggs) without changing the original Favorite,
+    // and keep nutrition totals stable by scaling per-serving macros accordingly.
+    const repairEggServingFromBuilderAmount = (raw: any) => {
+      try {
+        if (!raw || typeof raw !== 'object') return raw
+        if ((raw as any).__builderEggServingRepaired === true) return raw
+
+        const unitRaw = typeof (raw as any)?.__unit === 'string' ? String((raw as any).__unit).trim() : ''
+        const unit = unitRaw ? normalizeWeightUnit(unitRaw) : null
+        const isEggUnit =
+          unit === 'egg-small' || unit === 'egg-medium' || unit === 'egg-large' || unit === 'egg-extra-large'
+        if (!isEggUnit) return raw
+
+        const amount = Number((raw as any)?.__amount)
+        const servings = Number((raw as any)?.servings)
+        if (!Number.isFinite(amount) || amount <= 0) return raw
+        if (!Number.isFinite(servings) || servings <= 0) return raw
+        if (Math.abs(servings - amount) < 0.02) return raw
+
+        const servingLabel = String((raw as any)?.serving_size || '')
+        const servingMeta = parseServingUnitMetadata(servingLabel)
+        const servingUnit = String(servingMeta?.unitLabelSingular || servingMeta?.unitLabel || '').toLowerCase()
+        if (!servingUnit.includes('egg')) return raw
+
+        const gramsPerEgg = WEIGHT_UNIT_TO_GRAMS[unit as WeightUnit]
+        if (!Number.isFinite(gramsPerEgg) || gramsPerEgg <= 0) return raw
+
+        const totalGrams = gramsPerEgg * amount
+        const inferredBaseGramsPerServing = totalGrams / servings
+        // Only repair the common legacy case where the base got treated like ~100g "servings".
+        if (!Number.isFinite(inferredBaseGramsPerServing) || inferredBaseGramsPerServing < 60 || inferredBaseGramsPerServing > 200)
+          return raw
+
+        const scalePerServing = gramsPerEgg / inferredBaseGramsPerServing
+        if (!Number.isFinite(scalePerServing) || scalePerServing <= 0 || scalePerServing >= 2) return raw
+
+        const round3 = (n: number) => Math.round(n * 1000) / 1000
+        const scaleMacro = (v: any) => {
+          const n = Number(v)
+          if (!Number.isFinite(n)) return v
+          return round3(n * scalePerServing)
+        }
+
+        const next: any = { ...(raw as any) }
+        if (Number.isFinite(Number(next.calories))) next.calories = Math.round(Number(next.calories) * scalePerServing)
+        next.protein_g = scaleMacro(next.protein_g)
+        next.carbs_g = scaleMacro(next.carbs_g)
+        next.fat_g = scaleMacro(next.fat_g)
+        next.fiber_g = scaleMacro(next.fiber_g)
+        next.sugar_g = scaleMacro(next.sugar_g)
+
+        // Show the user's intended discrete amount as servings (e.g., 2 eggs).
+        next.servings = round3(amount)
+        // Seed weight editor to the builder's unit/amount so the UI is consistent.
+        next.weightUnit = unit
+        next.weightAmount = roundWeightValue(amount, unit as WeightUnit)
+        next.customGramsPerServing = gramsPerEgg
+
+        next.__builderEggServingRepaired = true
+        return next
+      } catch {
+        return raw
+      }
+    }
+
+    const repairedFinalItems = Array.isArray(finalItems) ? finalItems.map(repairEggServingFromBuilderAmount) : finalItems
     const adjustedTotals = adjusted.used ? adjusted.totals || null : null
     if (adjusted.used) pendingDrinkOverrideRef.current = null
     const drinkMeta = consumePendingDrinkMeta(drinkOverride)
@@ -15547,8 +15617,8 @@ Please add nutritional information manually if needed.`);
           method: favorite.method || 'text',
           photo: favorite.photo || null,
           nutrition: totalsWithMeta,
-          items: Array.isArray(finalItems)
-            ? finalItems
+          items: Array.isArray(repairedFinalItems)
+            ? repairedFinalItems
             : typeof (favorite as any)?.items === 'string'
             ? (() => {
                 try {
