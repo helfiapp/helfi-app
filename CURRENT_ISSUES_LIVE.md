@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 14:31 AEDT
+- What changed: Adding a Favourite meal into the Food Diary now keeps egg amounts consistent (example: 2 eggs won't turn into confusing numbers like 1.12). This only affects the diary copy; it does not change the original Favourite.
+- Where to see it (page/link): Food Diary -> Add from favorites -> pick a Favourite meal that includes eggs
+- What to quickly test: Add a Favourite with 2 eggs. Open the diary entry and expand the egg ingredient: it should show 2 (not 1 / 1.12). Then change today's entry to 1 egg and confirm the Favourite still shows 2 eggs next time you view Favorites.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 13:39 AEDT
 - What changed: “Add by photo” now hides extra USDA disclaimer text in ingredient names (keeps them short), and for piece-based foods it clarifies the difference between the database serving size and what you selected (example: “Serving size: 3 pieces (you have 2)”).
 - Where to see it (page/link): Food -> Add by photo results screen
