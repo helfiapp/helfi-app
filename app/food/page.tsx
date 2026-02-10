@@ -3465,6 +3465,12 @@ export default function FoodDiary() {
       setShowBarcodeScanner(true)
       setBarcodeError(null)
       setBarcodeValue('')
+      // Prevent accidental re-open loops (e.g. if a page refresh/remount happens after a scan).
+      try {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('open')
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+      } catch {}
     }
     if (open === 'favorites') {
       favoritesReplaceTargetRef.current = null
@@ -10456,7 +10462,6 @@ const applyStructuredItems = (
     const baseItem = items[0]
     if (!baseItem) return { items, totals: null, used: false }
     const info = parseServingSizeInfo(baseItem)
-    const isLiquid = isLikelyLiquidFood(String(baseItem?.name || ''), String(baseItem?.serving_size || ''))
     const customMl =
       Number.isFinite(Number(baseItem?.customMlPerServing)) && Number(baseItem.customMlPerServing) > 0
         ? Number(baseItem.customMlPerServing)
@@ -10469,10 +10474,6 @@ const applyStructuredItems = (
       customMl ||
       info.mlPerServing ||
       (info.ozPerServing ? info.ozPerServing * 29.5735 : null)
-    if (!baseMl && isLiquid) {
-      const grams = customGrams || info.gramsPerServing
-      if (grams && grams > 0) baseMl = grams
-    }
     if (!baseMl || !Number.isFinite(baseMl) || baseMl <= 0) {
       return { items, totals: null, used: false }
     }
@@ -11029,25 +11030,27 @@ Please add nutritional information manually if needed.`);
     const opStamp = Date.now()
     const loggedAtIso = new Date().toISOString()
     const addedOrder = Date.now()
-    const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
-    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    const drinkOverride = pendingDrinkOverrideRef.current
-    const adjusted = applyDrinkOverrideToItems(analyzedItems, drinkOverride)
-    let finalItems = adjusted.items || (analyzedItems && analyzedItems.length > 0 ? analyzedItems : null)
-    const overrideTotals = adjusted.used ? adjusted.totals || null : null
-    if (adjusted.used) pendingDrinkOverrideRef.current = null
-    // If this is a single-item entry and the user gave it a title, use that as the item name too.
-    try {
-      if (titleInput && Array.isArray(finalItems) && finalItems.length === 1) {
-        finalItems = [{ ...(finalItems[0] || {}), name: titleInput }]
-      }
-    } catch {}
-    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-    const finalNutritionBase = overrideTotals || nutrition || analyzedNutrition
-    const finalTotalBase = overrideTotals ? convertTotalsForStorage(overrideTotals) : analyzedTotal || null
-    const finalNutrition = applyDrinkMetaToTotals(finalNutritionBase, drinkMeta)
-    const finalTotal = applyDrinkMetaToTotals(finalTotalBase, drinkMeta)
-    const newEntry = ensureEntryLoggedAt(
+	    const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
+	    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+	    const drinkOverride = pendingDrinkOverrideRef.current
+	    const adjusted = applyDrinkOverrideToItems(analyzedItems, drinkOverride)
+	    let finalItems = adjusted.items || (analyzedItems && analyzedItems.length > 0 ? analyzedItems : null)
+	    const overrideTotals = adjusted.used ? adjusted.totals || null : null
+	    // If this is a single-item entry and the user gave it a title, use that as the item name too.
+	    try {
+	      if (titleInput && Array.isArray(finalItems) && finalItems.length === 1) {
+	        finalItems = [{ ...(finalItems[0] || {}), name: titleInput }]
+	      }
+	    } catch {}
+	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+	    // Avoid "sticky" drink amounts bleeding into later adds/scans.
+	    if (drinkMeta) pendingDrinkOverrideRef.current = null
+	    else if (adjusted.used) pendingDrinkOverrideRef.current = null
+	    const finalNutritionBase = overrideTotals || nutrition || analyzedNutrition
+	    const finalTotalBase = overrideTotals ? convertTotalsForStorage(overrideTotals) : analyzedTotal || null
+	    const finalNutrition = applyDrinkMetaToTotals(finalNutritionBase, drinkMeta)
+	    const finalTotal = applyDrinkMetaToTotals(finalTotalBase, drinkMeta)
+	    const newEntry = ensureEntryLoggedAt(
       applyEntryClientId(
         {
           id: makeUniqueLocalEntryId(
@@ -14156,12 +14159,14 @@ Please add nutritional information manually if needed.`);
     const item = buildBarcodeIngredientItem(food, code)
     const normalizedItems = normalizeDiscreteServingsWithLabel([item])
     const items = normalizedItems.length > 0 ? normalizedItems : [item]
-    const drinkOverride = pendingDrinkOverrideRef.current
-    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
-    const finalItems = adjusted.items || items
-    if (adjusted.used) pendingDrinkOverrideRef.current = null
-    const recalculatedTotals = recalculateNutritionFromItems(finalItems)
+	    const drinkOverride = pendingDrinkOverrideRef.current
+	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+	    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
+	    const finalItems = adjusted.items || items
+	    // Avoid "sticky" drink amounts bleeding into later adds/scans.
+	    if (drinkMeta) pendingDrinkOverrideRef.current = null
+	    else if (adjusted.used) pendingDrinkOverrideRef.current = null
+	    const recalculatedTotals = recalculateNutritionFromItems(finalItems)
     const totals =
       recalculatedTotals ||
       sanitizeNutritionTotals({
@@ -14611,16 +14616,21 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const barcodeDetectLockRef = useRef(false)
+
   const handleBarcodeDetected = (rawCode: string) => {
-    if (!rawCode || barcodeLookupInFlightRef.current) return
+    if (!rawCode || barcodeLookupInFlightRef.current || barcodeDetectLockRef.current) return
     const cleaned = rawCode.replace(/[^0-9A-Za-z]/g, '')
     if (!cleaned) return
+    barcodeDetectLockRef.current = true
     if (hybridBarcodeFrameRef.current) {
       cancelAnimationFrame(hybridBarcodeFrameRef.current)
       hybridBarcodeFrameRef.current = null
     }
     stopBarcodeScanner()
-    lookupBarcodeAndAdd(cleaned)
+    void lookupBarcodeAndAdd(cleaned).finally(() => {
+      barcodeDetectLockRef.current = false
+    })
   }
 
   const toggleTorch = async () => {
@@ -15296,15 +15306,17 @@ Please add nutritional information manually if needed.`);
       }
       return null
     })()
-    const drinkOverride = pendingDrinkOverrideRef.current
-    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
-    const finalItems = adjusted.items || items
-    const finalTotals = adjusted.used ? adjusted.totals || totals : totals
-    if (adjusted.used) pendingDrinkOverrideRef.current = null
-    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-    const totalsWithMeta = applyDrinkMetaToTotals(stripWaterLogIdFromTotals(finalTotals), drinkMeta)
-    const newEntry = ensureEntryLoggedAt(
-      applyEntryClientId(
+	    const drinkOverride = pendingDrinkOverrideRef.current
+	    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
+	    const finalItems = adjusted.items || items
+	    const finalTotals = adjusted.used ? adjusted.totals || totals : totals
+	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+	    // Avoid "sticky" drink amounts bleeding into later adds/scans.
+	    if (drinkMeta) pendingDrinkOverrideRef.current = null
+	    else if (adjusted.used) pendingDrinkOverrideRef.current = null
+	    const totalsWithMeta = applyDrinkMetaToTotals(stripWaterLogIdFromTotals(finalTotals), drinkMeta)
+	    const newEntry = ensureEntryLoggedAt(
+	      applyEntryClientId(
         {
           id: makeUniqueLocalEntryId(
             new Date(createdAtIso).getTime(),
@@ -15631,14 +15643,16 @@ Please add nutritional information manually if needed.`);
       }
     }
 
-    const repairedFinalItems = Array.isArray(finalItems) ? finalItems.map(repairEggServingFromBuilderAmount) : finalItems
-    const adjustedTotals = adjusted.used ? adjusted.totals || null : null
-    if (adjusted.used) pendingDrinkOverrideRef.current = null
-    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-    const baseTotals = stripWaterLogIdFromTotals(attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null, false))
-    const totalsWithMeta = attachMeta(applyDrinkMetaToTotals(baseTotals, drinkMeta), false)
-    const totalWithMeta = applyDrinkMetaToTotals(
-      stripWaterLogIdFromTotals(adjustedTotals || favorite.total || favorite.nutrition || null),
+	    const repairedFinalItems = Array.isArray(finalItems) ? finalItems.map(repairEggServingFromBuilderAmount) : finalItems
+	    const adjustedTotals = adjusted.used ? adjusted.totals || null : null
+	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+	    // Avoid "sticky" drink amounts bleeding into later adds/scans.
+	    if (drinkMeta) pendingDrinkOverrideRef.current = null
+	    else if (adjusted.used) pendingDrinkOverrideRef.current = null
+	    const baseTotals = stripWaterLogIdFromTotals(attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null, false))
+	    const totalsWithMeta = attachMeta(applyDrinkMetaToTotals(baseTotals, drinkMeta), false)
+	    const totalWithMeta = applyDrinkMetaToTotals(
+	      stripWaterLogIdFromTotals(adjustedTotals || favorite.total || favorite.nutrition || null),
       drinkMeta,
     )
     const totalWithMetaFixed = attachMeta(totalWithMeta, false)
