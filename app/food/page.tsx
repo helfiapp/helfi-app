@@ -13550,8 +13550,17 @@ Please add nutritional information manually if needed.`);
     const history = collectHistoryMeals(serverEntries ? { baseEntries: serverEntries } : undefined)
     const resolveFavoriteLabel = (fav: any) => {
       const raw = (fav?.label || fav?.description || 'Favorite meal').toString()
+      const base = favoriteDisplayLabel(fav) || normalizeMealLabel(raw) || raw || 'Favorite meal'
+
+      // IMPORTANT:
+      // Favorites are the user's saved templates. Their saved label/description is the source of truth.
+      // Global "name override" rules exist to rename diary/history entries (and avoid duplicates),
+      // but they must never expand a short favorite label back into a long USDA/database title.
+      const hasExplicitLabel = Boolean(String(fav?.label || fav?.description || '').trim())
+      if (hasExplicitLabel) return base || 'Favorite meal'
+
       const applied = applyFoodNameOverride(raw, fav)
-      return applied || favoriteDisplayLabel(fav) || normalizeMealLabel(raw) || raw || 'Favorite meal'
+      return applied || base || 'Favorite meal'
     }
     const buildFavoriteFallbackId = (fav: any, index?: number) => {
       const labelRaw = resolveFavoriteLabel(fav) || favoriteDisplayLabel(fav) || fav?.label || fav?.description || 'favorite'
