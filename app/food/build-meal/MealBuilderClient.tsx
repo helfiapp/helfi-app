@@ -1472,6 +1472,7 @@ export default function MealBuilderClient() {
   const initialCategory = normalizeCategory(searchParams.get('category'))
   const editFavoriteId = (searchParams.get('editFavoriteId') || '').trim()
   const sourceLogId = (searchParams.get('sourceLogId') || '').trim()
+  const recipeImportFlag = (searchParams.get('recipeImport') || '').trim()
 
   const [selectedDate] = useState<string>(initialDate)
   const [category] = useState<MealCategory>(initialCategory)
@@ -1536,12 +1537,18 @@ export default function MealBuilderClient() {
   const initialItemsSignatureRef = useRef<string>('')
   const initialPortionTotalWeightRef = useRef<number | null>(null)
 
+  const [recipeImportDraft, setRecipeImportDraft] = useState<any | null>(null)
+  const [recipeImportLoading, setRecipeImportLoading] = useState(false)
+  const [recipeImportMissing, setRecipeImportMissing] = useState<string[]>([])
+  const recipeImportAppliedRef = useRef(false)
+  const recipeImportPortionPrefilledRef = useRef(false)
+
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoritesSearch, setFavoritesSearch] = useState('')
   const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>('all')
   const [favoritesToast, setFavoritesToast] = useState<string | null>(null)
 
-  const busy = searchLoading || savingMeal || photoLoading || barcodeLoading
+  const busy = searchLoading || savingMeal || photoLoading || barcodeLoading || recipeImportLoading
   const showPortionSaveCta = portionAmountInput.trim().length > 0
   const isDiaryEdit = Boolean(sourceLogId) && !editFavoriteId
 
@@ -1937,6 +1944,23 @@ export default function MealBuilderClient() {
     return saved
   }, [items, totalRecipeWeightG])
 
+  useEffect(() => {
+    const draft = recipeImportDraft
+    if (!draft) return
+    if (recipeImportPortionPrefilledRef.current) return
+    const servings = Number((draft as any)?.servings)
+    if (!Number.isFinite(servings) || servings <= 0) return
+    if (!totalRecipeWeightG || !Number.isFinite(totalRecipeWeightG) || totalRecipeWeightG <= 0) return
+    if (!items || items.length === 0) return
+    if (portionAmountInput && portionAmountInput.trim().length > 0) return
+
+    const perServingG = totalRecipeWeightG / servings
+    if (!Number.isFinite(perServingG) || perServingG <= 0) return
+    recipeImportPortionPrefilledRef.current = true
+    setPortionUnit('g')
+    setPortionAmountInput(String(Math.max(1, Math.round(perServingG))))
+  }, [recipeImportDraft, totalRecipeWeightG, items.length, portionAmountInput])
+
 
   // Guard rail: portionScale must allow values above 1 to scale larger-than-recipe servings.
   // See GUARD_RAILS.md section "Build a Meal portion scaling".
@@ -2107,6 +2131,155 @@ export default function MealBuilderClient() {
 
     return null
   }
+
+  useEffect(() => {
+    if (!recipeImportFlag) return
+    if (recipeImportAppliedRef.current) return
+    recipeImportAppliedRef.current = true
+
+    let draft: any = null
+    try {
+      const raw = sessionStorage.getItem('food:recipeImportDraft')
+      if (raw) draft = JSON.parse(raw)
+    } catch {
+      draft = null
+    }
+    if (!draft || typeof draft !== 'object') {
+      setError('Recipe import was not found. Please import again.')
+      return
+    }
+
+    const ingredients = Array.isArray((draft as any).ingredients) ? ((draft as any).ingredients as any[]) : []
+    const steps = Array.isArray((draft as any).steps) ? ((draft as any).steps as any[]) : []
+    if (ingredients.length === 0 && steps.length === 0) {
+      setError('Recipe import was empty. Please import again.')
+      return
+    }
+
+    setRecipeImportDraft(draft)
+    setRecipeImportMissing([])
+
+    // Prevent accidental re-import if the user refreshes.
+    try {
+      const qs = new URLSearchParams()
+      qs.set('date', selectedDate)
+      qs.set('category', category)
+      router.replace(`/food/build-meal?${qs.toString()}`)
+    } catch {}
+
+    const title = String((draft as any).title || '').trim()
+    if (title) {
+      setMealName(title)
+      mealNameEditedRef.current = true
+      mealNameBackupRef.current = title
+    }
+
+    const parseFraction = (raw: string) => {
+      const s = String(raw || '').trim()
+      const m = s.match(/^(\d+)\s*\/\s*(\d+)$/)
+      if (!m) return null
+      const a = Number(m[1])
+      const b = Number(m[2])
+      if (!Number.isFinite(a) || !Number.isFinite(b) || b <= 0) return null
+      return a / b
+    }
+
+    const normalizeLookup = (raw: string) => {
+      let s = String(raw || '').trim()
+      s = s.replace(/\(.*?\)/g, ' ')
+      s = s.split(',')[0] || s
+      s = s.replace(/\b(to taste|optional|plus more|for garnish|garnish)\b/gi, ' ')
+      s = s.replace(/\s+/g, ' ').trim()
+      return s
+    }
+
+    const mapUnit = (rawUnit: string): { unit: BuilderUnit | null; scale: number } => {
+      const u = String(rawUnit || '').toLowerCase().replace(/\./g, '').trim()
+      if (u === 'g' || u === 'gram' || u === 'grams') return { unit: 'g', scale: 1 }
+      if (u === 'kg' || u === 'kilogram' || u === 'kilograms') return { unit: 'g', scale: 1000 }
+      if (u === 'ml' || u === 'milliliter' || u === 'milliliters') return { unit: 'ml', scale: 1 }
+      if (u === 'l' || u === 'liter' || u === 'liters') return { unit: 'ml', scale: 1000 }
+      if (u === 'oz' || u === 'ounce' || u === 'ounces') return { unit: 'oz', scale: 1 }
+      if (u === 'tsp' || u === 'teaspoon' || u === 'teaspoons') return { unit: 'tsp', scale: 1 }
+      if (u === 'tbsp' || u === 'tablespoon' || u === 'tablespoons') return { unit: 'tbsp', scale: 1 }
+      if (u === 'cup' || u === 'cups') return { unit: 'cup', scale: 1 }
+      return { unit: null, scale: 1 }
+    }
+
+    const parseLine = (rawLine: string): { lookup: string; amount: number | null; unit: BuilderUnit | null } => {
+      let line = String(rawLine || '').trim()
+      line = line.replace(/^[\s•*\-–—]+/, '').trim()
+      line = line.replace(/^\d+\.\s+/, '').trim()
+      if (!line) return { lookup: '', amount: null, unit: null }
+
+      const mixed = line.match(/^(\d+)\s+(\d+\/\d+)\s+(.*)$/)
+      if (mixed) {
+        const whole = Number(mixed[1])
+        const frac = parseFraction(mixed[2])
+        const rest = String(mixed[3] || '').trim()
+        const amount = Number.isFinite(whole) && frac !== null ? whole + frac : null
+        const parts = rest.split(/\s+/)
+        const unitToken = parts[0] || ''
+        const mapped = mapUnit(unitToken)
+        const lookup = normalizeLookup(parts.slice(1).join(' ') || rest)
+        return { lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit }
+      }
+
+      const fracOnly = line.match(/^(\d+\/\d+)\s+(.*)$/)
+      if (fracOnly) {
+        const amount = parseFraction(fracOnly[1])
+        const rest = String(fracOnly[2] || '').trim()
+        const parts = rest.split(/\s+/)
+        const unitToken = parts[0] || ''
+        const mapped = mapUnit(unitToken)
+        const lookup = normalizeLookup(parts.slice(1).join(' ') || rest)
+        return { lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit }
+      }
+
+      const numOnly = line.match(/^(\d+(?:[.,]\d+)?)\s+(.*)$/)
+      if (numOnly) {
+        const amount = Number(String(numOnly[1]).replace(',', '.'))
+        const rest = String(numOnly[2] || '').trim()
+        const parts = rest.split(/\s+/)
+        const unitToken = parts[0] || ''
+        const mapped = mapUnit(unitToken)
+        if (mapped.unit) {
+          const lookup = normalizeLookup(parts.slice(1).join(' ') || rest)
+          return { lookup, amount: Number.isFinite(amount) ? amount * mapped.scale : null, unit: mapped.unit }
+        }
+        return { lookup: normalizeLookup(rest), amount: null, unit: null }
+      }
+
+      return { lookup: normalizeLookup(line), amount: null, unit: null }
+    }
+
+    const run = async () => {
+      const lines = ingredients.map((l) => String(l || '').trim()).filter(Boolean).slice(0, 60)
+      if (lines.length === 0) return
+      setRecipeImportLoading(true)
+      const missing: string[] = []
+      try {
+        for (const line of lines) {
+          const parsed = parseLine(line)
+          const lookup = String(parsed.lookup || '').trim()
+          if (!lookup) continue
+          const resolved = await resolveItemWithMacros(lookup)
+          if (!resolved) {
+            missing.push(line)
+            continue
+          }
+          addItemDirectWithOverrides(resolved, { amount: parsed.amount, unit: parsed.unit })
+        }
+      } catch {
+      } finally {
+        setRecipeImportMissing(missing)
+        setRecipeImportLoading(false)
+      }
+    }
+
+    run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipeImportFlag])
 
   const fetchBrandSuggestions = async (searchQuery: string) => {
     const prefix = getBrandMatchTokens(searchQuery)[0] || ''
@@ -2371,8 +2544,8 @@ export default function MealBuilderClient() {
     )
   }
 
-  const addItemDirect = (r: NormalizedFoodItem) => {
-    triggerHaptic(10)
+	  const addItemDirect = (r: NormalizedFoodItem) => {
+	    triggerHaptic(10)
     const base = seedBaseServing(parseServingBase(r?.serving_size))
     let baseAmount = base.amount
     let baseUnit = base.unit
@@ -2424,12 +2597,70 @@ export default function MealBuilderClient() {
       next.servings = 1
     }
 
-    addBuilderItem(next)
-  }
+	    addBuilderItem(next)
+	  }
 
-  const addItemWithMacros = async (item: NormalizedFoodItem) => {
-    if (!item) return
-    if (!hasMacroData(item)) {
+	  const addItemDirectWithOverrides = (
+	    r: NormalizedFoodItem,
+	    overrides?: { amount?: number | null; unit?: BuilderUnit | null },
+	  ) => {
+	    const base = seedBaseServing(parseServingBase(r?.serving_size))
+	    let baseAmount = base.amount
+	    let baseUnit = base.unit
+	    const pieceGrams = extractPieceGramsFromLabel(r?.serving_size || '')
+	    const liquidItem = isLikelyLiquidItem(r?.name || '', r?.serving_size)
+	    const foodUnitGrams = getFoodUnitGrams(r?.name || '')
+	    if (!liquidItem && baseAmount && baseUnit && (baseUnit === 'tsp' || baseUnit === 'tbsp' || baseUnit === 'cup')) {
+	      const converted = convertAmount(baseAmount, baseUnit, 'g', undefined, undefined, undefined, foodUnitGrams)
+	      baseAmount = Number.isFinite(converted) ? converted : baseAmount
+	      baseUnit = 'g'
+	    }
+	    const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+	    baseAmount = normalized.amount
+	    baseUnit = normalized.unit
+
+	    const defaultAmount = baseAmount && baseUnit ? baseAmount : 1
+	    const id = `${r.source}:${r.id}:${Date.now()}:${Math.random().toString(16).slice(2)}`
+
+	    const nextUnit = overrides?.unit ?? baseUnit
+	    const nextAmount =
+	      typeof overrides?.amount === 'number' && Number.isFinite(overrides.amount) && overrides.amount > 0
+	        ? overrides.amount
+	        : defaultAmount
+
+	    const next: BuilderItem = {
+	      id,
+	      name: r.name || 'Food',
+	      brand: r.brand ?? null,
+	      serving_size: r.serving_size ?? null,
+	      calories: toNumber(r.calories),
+	      protein_g: toNumber(r.protein_g),
+	      carbs_g: toNumber(r.carbs_g),
+	      fat_g: toNumber(r.fat_g),
+	      fiber_g: toNumber(r.fiber_g),
+	      sugar_g: toNumber(r.sugar_g),
+	      servings: 1,
+	      __baseAmount: baseAmount,
+	      __baseUnit: baseUnit,
+	      __amount: nextAmount,
+	      __amountInput: String(nextAmount),
+	      __unit: nextUnit,
+	      __pieceGrams: pieceGrams,
+	      __source: r?.source ?? null,
+	      __sourceId: r?.id ? String(r.id) : null,
+	      __servingOptions: null,
+	      __selectedServingId: null,
+	    }
+
+	    try {
+	      next.servings = computeServingsFromAmount(next)
+	    } catch {}
+	    addBuilderItem(next)
+	  }
+
+	  const addItemWithMacros = async (item: NormalizedFoodItem) => {
+	    if (!item) return
+	    if (!hasMacroData(item)) {
       setError('This item has no nutrition data. Please choose another result.')
       return
     }
@@ -3249,7 +3480,15 @@ export default function MealBuilderClient() {
     const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
     const existingWithSameTitle =
       favorites.find((f: any) => isCustomMealFavorite(f) && String(f?.label || f?.description || '').trim() === title.trim()) || null
+
+    const shouldAutoSaveFavorite = (() => {
+      if (editFavoriteId) return true
+      if (recipeImportDraft) return Boolean((recipeImportDraft as any).saveRecipe)
+      return true
+    })()
+
     const favoriteLinkId = (() => {
+      if (!shouldAutoSaveFavorite) return ''
       if (editFavoriteId) return editFavoriteId
       if (linkedFavoriteId && linkedFavoriteId.trim().length > 0) return linkedFavoriteId.trim()
       if (existingWithSameTitle?.id) return String(existingWithSameTitle.id)
@@ -3335,6 +3574,25 @@ export default function MealBuilderClient() {
           }
         : null
 
+    const importedRecipeMeta =
+      recipeImportDraft &&
+      Boolean((recipeImportDraft as any).saveRecipe) &&
+      Array.isArray((recipeImportDraft as any).steps) &&
+      (recipeImportDraft as any).steps.length > 0
+        ? {
+            title: String((recipeImportDraft as any).title || title).trim() || title,
+            sourceUrl: (recipeImportDraft as any).sourceUrl || null,
+            servings: Number.isFinite(Number((recipeImportDraft as any).servings)) ? Number((recipeImportDraft as any).servings) : null,
+            prepMinutes: Number.isFinite(Number((recipeImportDraft as any).prepMinutes))
+              ? Number((recipeImportDraft as any).prepMinutes)
+              : null,
+            cookMinutes: Number.isFinite(Number((recipeImportDraft as any).cookMinutes))
+              ? Number((recipeImportDraft as any).cookMinutes)
+              : null,
+            steps: (recipeImportDraft as any).steps.map((s: any) => String(s || '').trim()).filter(Boolean).slice(0, 30),
+          }
+        : null
+
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
 
     const payload = {
@@ -3349,6 +3607,7 @@ export default function MealBuilderClient() {
         __origin: 'meal-builder',
         ...(favoriteLinkId ? { __favoriteId: favoriteLinkId } : {}),
         ...(portionMeta ? portionMeta : {}),
+        ...(importedRecipeMeta ? { __importRecipe: importedRecipeMeta } : {}),
       },
       imageUrl: null,
       items: cleanedItems,
@@ -3648,36 +3907,48 @@ export default function MealBuilderClient() {
       } catch {}
 
       // Auto-save newly created meals into Favorites so they appear under Favorites → Custom.
-      try {
-        const createdId = typeof data?.id === 'string' ? data.id : null
-        const favoritePayload = {
-          id: favoriteLinkId,
-          sourceId: createdId,
-          label: title,
-          description,
-          nutrition: payload.nutrition,
-          total: payload.nutrition,
-          items: cleanedItems,
-          photo: null,
-          method: 'meal-builder',
-          customMeal: true,
-          meal: category,
-          createdAt: Date.now(),
-        }
-        const existingIndex = favorites.findIndex(
-          (fav: any) =>
-            (fav.id && favoritePayload.id && String(fav.id) === String(favoritePayload.id)) ||
-            (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
-            (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
-        )
-        const nextFavorites =
-          existingIndex >= 0
-            ? favorites.map((fav: any, idx: number) =>
-                idx === existingIndex ? { ...favoritePayload, id: fav.id || favoritePayload.id } : fav,
-              )
-            : [...favorites, favoritePayload]
-        persistFavorites(nextFavorites)
-      } catch {}
+      // For recipe-import builds, only do this if the user chose "Continue + Save recipe".
+      if (shouldAutoSaveFavorite && favoriteLinkId) {
+        try {
+          const createdId = typeof data?.id === 'string' ? data.id : null
+          const favoritePayload: any = {
+            id: favoriteLinkId,
+            sourceId: createdId,
+            label: title,
+            description,
+            nutrition: payload.nutrition,
+            total: payload.nutrition,
+            items: cleanedItems,
+            photo: null,
+            method: 'meal-builder',
+            customMeal: true,
+            meal: category,
+            createdAt: Date.now(),
+          }
+          if (importedRecipeMeta) {
+            favoritePayload.recipe = {
+              servings: importedRecipeMeta.servings,
+              prepMinutes: importedRecipeMeta.prepMinutes,
+              cookMinutes: importedRecipeMeta.cookMinutes,
+              steps: importedRecipeMeta.steps,
+            }
+            favoritePayload.sourceUrl = importedRecipeMeta.sourceUrl || null
+          }
+          const existingIndex = favorites.findIndex(
+            (fav: any) =>
+              (fav.id && favoritePayload.id && String(fav.id) === String(favoritePayload.id)) ||
+              (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
+              (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
+          )
+          const nextFavorites =
+            existingIndex >= 0
+              ? favorites.map((fav: any, idx: number) =>
+                  idx === existingIndex ? { ...favoritePayload, id: fav.id || favoritePayload.id } : fav,
+                )
+              : [...favorites, favoritePayload]
+          persistFavorites(nextFavorites)
+        } catch {}
+      }
 
       // Scroll to the saved meal when returning to the diary.
       try {
@@ -4028,12 +4299,54 @@ export default function MealBuilderClient() {
                 </div>
               </div>
             </div>
-          )}
+	          )}
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
-          <div className="text-sm font-semibold text-gray-900">Meal name (optional)</div>
-          <input
-            value={mealName}
+	          {(recipeImportLoading || recipeImportMissing.length > 0 || (recipeImportDraft && Array.isArray((recipeImportDraft as any).steps) && (recipeImportDraft as any).steps.length > 0)) && (
+	            <div className="space-y-3">
+	              {recipeImportLoading && (
+	                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900 flex items-center gap-2">
+	                  <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+	                  Importing recipe ingredients…
+	                </div>
+	              )}
+
+	              {recipeImportDraft && Array.isArray((recipeImportDraft as any).steps) && (recipeImportDraft as any).steps.length > 0 && (
+	                <details className="rounded-2xl border border-gray-200 bg-white p-4">
+	                  <summary className="cursor-pointer text-sm font-semibold text-gray-900">Recipe instructions (from import)</summary>
+	                  <ol className="mt-3 space-y-2 text-sm text-gray-700 list-decimal pl-5">
+	                    {(recipeImportDraft as any).steps.slice(0, 20).map((step: any, i: number) => (
+	                      <li key={i} className="leading-relaxed">
+	                        {String(step || '').trim()}
+	                      </li>
+	                    ))}
+	                  </ol>
+	                  {typeof (recipeImportDraft as any).sourceUrl === 'string' && (recipeImportDraft as any).sourceUrl.trim() ? (
+	                    <div className="mt-3 text-xs text-gray-500">Source: {(recipeImportDraft as any).sourceUrl}</div>
+	                  ) : null}
+	                </details>
+	              )}
+
+	              {recipeImportMissing.length > 0 && (
+	                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+	                  <div className="text-sm font-semibold text-amber-900">Some ingredients need a quick manual match</div>
+	                  <div className="mt-1 text-xs text-amber-800">
+	                    We couldn’t find nutrition data for {recipeImportMissing.length} item{recipeImportMissing.length === 1 ? '' : 's'}. Search and add them manually.
+	                  </div>
+	                  <div className="mt-2 text-xs text-amber-900">
+	                    {recipeImportMissing.slice(0, 6).map((m, idx) => (
+	                      <div key={idx}>• {m}</div>
+	                    ))}
+	                    {recipeImportMissing.length > 6 && <div>• …</div>}
+	                  </div>
+	                </div>
+	              )}
+	            </div>
+	          )}
+
+	        <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
+	          <div className="text-sm font-semibold text-gray-900">Meal name (optional)</div>
+	          <input
+	            value={mealName}
             onFocus={() => {
               mealNameBackupRef.current = mealName
               mealNameEditedRef.current = false

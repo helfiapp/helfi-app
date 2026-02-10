@@ -17371,11 +17371,31 @@ Please add nutritional information manually if needed.`);
     aiMealHistory,
   ])
 
+  const importedRecipeMeta = useMemo(() => {
+    const nutrition = editingEntry?.nutrition
+    if (!nutrition || typeof nutrition !== 'object') return null
+    const recipeRaw = (nutrition as any).__importRecipe
+    if (!recipeRaw || typeof recipeRaw !== 'object') return null
+    const steps = Array.isArray((recipeRaw as any).steps)
+      ? (recipeRaw as any).steps.map((step: any) => String(step || '').trim()).filter(Boolean)
+      : []
+    if (!steps.length) return null
+    return {
+      prepMinutes: Number.isFinite(Number((recipeRaw as any).prepMinutes)) ? Number((recipeRaw as any).prepMinutes) : null,
+      cookMinutes: Number.isFinite(Number((recipeRaw as any).cookMinutes)) ? Number((recipeRaw as any).cookMinutes) : null,
+      servings: Number.isFinite(Number((recipeRaw as any).servings)) ? Number((recipeRaw as any).servings) : null,
+      steps,
+      sourceUrl: typeof (recipeRaw as any).sourceUrl === 'string' ? String((recipeRaw as any).sourceUrl).trim() : '',
+    }
+  }, [editingEntry?.nutrition])
+
   const hasAiSavedMealMeta = Boolean(aiSavedMealMeta)
+  const hasImportedRecipeMeta = Boolean(importedRecipeMeta)
+  const hasAnySavedRecipeMeta = hasAiSavedMealMeta || hasImportedRecipeMeta
 
   useEffect(() => {
     if (!editingEntry) return
-    if (hasAiSavedMealMeta) return
+    if (hasAnySavedRecipeMeta) return
     const cat = normalizeCategory(editingEntry?.meal || editingEntry?.category)
     if (!cat) return
     if (aiMealHistoryCategory === cat && aiMealHistory.length > 0) return
@@ -17395,7 +17415,7 @@ Please add nutritional information manually if needed.`);
     editingEntry?.meal,
     editingEntry?.category,
     selectedDate,
-    hasAiSavedMealMeta,
+    hasAnySavedRecipeMeta,
     aiMealHistoryCategory,
     aiMealHistory.length,
   ])
@@ -20041,14 +20061,20 @@ Please add nutritional information manually if needed.`);
                     )
                   })()}
 
-                  {editingEntry && aiSavedMealMeta && (
+                  {editingEntry && (aiSavedMealMeta || importedRecipeMeta) && (
                     <div className="mb-4">
                       <div className="flex items-center justify-center flex-wrap gap-2">
-                        {[
-                          { key: 'ingredients' as const, label: 'Ingredients' },
-                          { key: 'recipe' as const, label: 'Recipe' },
-                          { key: 'reason' as const, label: 'Reason' },
-                        ].map((tab) => {
+                        {(aiSavedMealMeta
+                          ? [
+                              { key: 'ingredients' as const, label: 'Ingredients' },
+                              { key: 'recipe' as const, label: 'Recipe' },
+                              { key: 'reason' as const, label: 'Reason' },
+                            ]
+                          : [
+                              { key: 'ingredients' as const, label: 'Ingredients' },
+                              { key: 'recipe' as const, label: 'Recipe' },
+                            ]
+                        ).map((tab) => {
                           const isActive = aiEntryTab === tab.key
                           return (
                             <button
@@ -20068,12 +20094,12 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {editingEntry && aiSavedMealMeta && aiEntryTab !== 'ingredients' && (
+                  {editingEntry && (aiSavedMealMeta || importedRecipeMeta) && aiEntryTab !== 'ingredients' && (
                     <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4">
                       {aiEntryTab === 'recipe' ? (
                         <>
                           {(() => {
-                            const recipe = aiSavedMealMeta.recipe
+                            const recipe = aiSavedMealMeta?.recipe || importedRecipeMeta
                             if (!recipe) return null
                             const parts: string[] = []
                             if (typeof recipe.prepMinutes === 'number' && Number.isFinite(recipe.prepMinutes)) {
@@ -20087,9 +20113,9 @@ Please add nutritional information manually if needed.`);
                             }
                             return parts.length > 0 ? <div className="text-xs text-gray-500 mb-2">{parts.join(' • ')}</div> : null
                           })()}
-                          {aiSavedMealMeta.recipe?.steps?.length ? (
+                          {(aiSavedMealMeta?.recipe?.steps?.length || importedRecipeMeta?.steps?.length) ? (
                             <ol className="space-y-2 text-sm text-gray-700 list-decimal pl-5">
-                              {aiSavedMealMeta.recipe.steps.slice(0, 12).map((step: string, i: number) => (
+                              {(aiSavedMealMeta?.recipe?.steps || importedRecipeMeta?.steps || []).slice(0, 12).map((step: string, i: number) => (
                                 <li key={i} className="leading-relaxed">
                                   {step}
                                 </li>
@@ -20098,19 +20124,22 @@ Please add nutritional information manually if needed.`);
                           ) : (
                             <div className="text-sm text-gray-600">No recipe steps saved.</div>
                           )}
+                          {importedRecipeMeta?.sourceUrl ? (
+                            <div className="mt-3 text-xs text-gray-500">Source: {importedRecipeMeta.sourceUrl}</div>
+                          ) : null}
                         </>
                       ) : (
                         <>
                           <div className="text-sm font-semibold text-gray-900">Why this meal was chosen</div>
                           <div className="mt-2 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                            {aiSavedMealMeta.why || 'No reason saved.'}
+                            {aiSavedMealMeta?.why || 'No reason saved.'}
                           </div>
                         </>
                       )}
                     </div>
                   )}
 
-                  {(!editingEntry || !aiSavedMealMeta || aiEntryTab === 'ingredients') && (
+                  {(!editingEntry || (!aiSavedMealMeta && !importedRecipeMeta) || aiEntryTab === 'ingredients') && (
                     <>
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
@@ -25292,15 +25321,15 @@ Please add nutritional information manually if needed.`);
 	                                      </svg>
 	                                    </button>
 
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setShowPhotoOptions(false)
-                                          setPhotoOptionsAnchor(null)
-                                          router.push(`/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`)
-                                        }}
-                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-                                      >
+	                                      <button
+	                                        type="button"
+	                                        onClick={() => {
+	                                          setShowPhotoOptions(false)
+	                                          setPhotoOptionsAnchor(null)
+	                                          router.push(`/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`)
+	                                        }}
+	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+	                                      >
                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mr-3 text-emerald-700">
                                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -25442,6 +25471,56 @@ Please add nutritional information manually if needed.`);
 	                                        <div className="flex-1">
 	                                          <div className="text-base font-semibold text-gray-900">Favorites</div>
 	                                          <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(cat.key)}</div>
+	                                        </div>
+	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+	                                        </svg>
+	                                      </button>
+
+	                                      <button
+	                                        type="button"
+	                                        onClick={() => {
+	                                          setShowPhotoOptions(false)
+	                                          setPhotoOptionsAnchor(null)
+	                                          router.push(
+	                                            `/food/import-recipe?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`,
+	                                          )
+	                                        }}
+	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+	                                      >
+	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-700">
+	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 00-2 2v10a2 2 0 002 2m0-14a2 2 0 012 2v10a2 2 0 01-2 2m0 0v2m-4-6h8" />
+	                                          </svg>
+	                                        </div>
+	                                        <div className="flex-1">
+	                                          <div className="text-base font-semibold text-gray-900">Import Recipe</div>
+	                                          <div className="text-xs text-gray-500">Import by URL or photo and auto-fill Build a meal</div>
+	                                        </div>
+	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+	                                        </svg>
+	                                      </button>
+
+	                                      <button
+	                                        type="button"
+	                                        onClick={() => {
+	                                          setShowPhotoOptions(false)
+	                                          setPhotoOptionsAnchor(null)
+	                                          router.push(
+	                                            `/food/import-recipe?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`,
+	                                          )
+	                                        }}
+	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+	                                      >
+	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-700">
+	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 00-2 2v10a2 2 0 002 2m0-14a2 2 0 012 2v10a2 2 0 01-2 2m0 0v2m-4-6h8" />
+	                                          </svg>
+	                                        </div>
+	                                        <div className="flex-1">
+	                                          <div className="text-base font-semibold text-gray-900">Import Recipe</div>
+	                                          <div className="text-xs text-gray-500">Import by URL or photo and auto-fill Build a meal</div>
 	                                        </div>
 	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
