@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-10 21:08 AEDT
+- What changed: Added “Import Recipe” under “Build a meal” so you can import a recipe from a URL or a photo (recipe book page), auto-fill Build a meal with ingredient cards (calories/macros + totals), and optionally save the cooking steps.
+- Where to see it (page/link): Food Diary → + → Build a meal → Import Recipe
+- What to quickly test: Import by URL; import by photo; confirm ingredients have calories/macros and the totals look right; save to diary; open the entry and confirm the Recipe tab shows steps (only if you chose “Continue + Save recipe”).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-10 20:36 AEDT
 - What changed: Renamed Favorites (like “Chicken breast”) should now stay as the short name in the Food Diary list and in Add from favorites (no more randomly showing the long USDA/database name again after refresh).
 - Where to see it (page/link): Food Diary list + Food Diary -> Add from favorites -> Favorites tab
