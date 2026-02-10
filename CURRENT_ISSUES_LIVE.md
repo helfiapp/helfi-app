@@ -28,6 +28,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 03:35 AEDT
+- What changed: Exercise Save errors now show a more detailed “ref” code so we can identify exactly where the server is failing (example: EX500/health_profile). This helps us fix the root cause quickly.
+- Where to see it (page/link): Food Diary → Exercise → Add exercise
+- What to quickly test: Try Save again and tell us the full red error message (including the new ref code).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 03:15 AEDT
 - What changed: Fixed manual exercise logging so Save no longer fails silently. If saving fails, you should now see a more helpful red error message (instead of just “Failed to save exercise”).
 - Where to see it (page/link): Food Diary → Exercise → Add exercise
