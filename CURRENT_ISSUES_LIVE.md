@@ -28,6 +28,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 12:38 AEDT
+- What changed: Exercise delete button now gives clear visual feedback (turns red and disables briefly) so it’s obvious the delete click worked.
+- Where to see it (page/link): Food Diary → Exercise list → trash/delete icon on a Manual exercise entry
+- What to quickly test: Click the trash icon on a Manual exercise entry and confirm the icon lights red while deleting, then the entry disappears.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 12:21 AEDT
 - What changed: Fixed exercise logging crash caused by Apple Health imported entries. The app can now read exercise entries with source “APPLE_HEALTH”, so saving and loading exercise should work again.
 - Where to see it (page/link): Food Diary → Exercise → Add exercise
