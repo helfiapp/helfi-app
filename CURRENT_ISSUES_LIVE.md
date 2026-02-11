@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 02:17 AEDT
+- What changed: Favorites Preview now has instant Add + new full-page Change amount flow. Users can adjust ingredient/portion amounts before adding, and there is now a Cancel button that exits the whole process back to Food Diary.
+- Where to see it (page/link): Food Diary -> Add from favorites -> select item -> Preview
+- What to quickly test: In Preview, tap Change amount, adjust amounts, confirm macros/daily totals update live, then tap Add. Also verify Cancel exits directly back to Food Diary.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-12 00:03 AEDT
 - What changed: Completed a desktop Food Diary UI sweep and fixed full-screen overlay layout issues so desktop content no longer sits under the left menu. Also reduced oversized desktop preview layout width in Favorites Preview.
 - Where to see it (page/link): Food Diary desktop flows (especially Favorites Preview, Favorites picker, Multi-copy, Barcode scanner, Health-check page, and Build Meal overlays)
