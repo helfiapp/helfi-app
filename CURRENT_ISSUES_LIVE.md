@@ -28,6 +28,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 12:21 AEDT
+- What changed: Fixed exercise logging crash caused by Apple Health imported entries. The app can now read exercise entries with source “APPLE_HEALTH”, so saving and loading exercise should work again.
+- Where to see it (page/link): Food Diary → Exercise → Add exercise
+- What to quickly test: Try saving a manual exercise again. Also open Exercise list for that day and confirm it loads (no red error).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 03:35 AEDT
 - What changed: Exercise Save errors now show a more detailed “ref” code so we can identify exactly where the server is failing (example: EX500/health_profile). This helps us fix the root cause quickly.
 - Where to see it (page/link): Food Diary → Exercise → Add exercise
