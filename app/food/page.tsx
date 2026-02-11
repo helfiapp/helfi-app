@@ -3717,7 +3717,9 @@ export default function FoodDiary() {
     label: string
     servingLabel: string
     totals: NutritionTotals | null
-    mode: 'choose' | 'preview'
+    mode: 'choose' | 'preview' | 'adjust'
+    adjustItems?: any[] | null
+    adjustSource?: any
     overallTargets?: any
     overallUsed?: any
   } | null>(null)
@@ -15529,6 +15531,110 @@ Please add nutritional information manually if needed.`);
     return { item, label, servingLabel, totals }
   }
 
+  const scaleTotalsForFavoriteAdjust = (totals: any, multiplier: number) => {
+    const safe = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1
+    const base = totals || {}
+    return {
+      calories: (Number(base?.calories) || 0) * safe,
+      protein: (Number(base?.protein) || 0) * safe,
+      carbs: (Number(base?.carbs) || 0) * safe,
+      fat: (Number(base?.fat) || 0) * safe,
+      fiber: (Number(base?.fiber) || 0) * safe,
+      sugar: (Number(base?.sugar) || 0) * safe,
+    }
+  }
+
+  const buildFavoriteAdjustItems = (item: any) => {
+    const source = item?.favorite || item?.entry || item
+    const sourceItems = Array.isArray(source?.items)
+      ? source.items
+      : Array.isArray(source?.ingredients)
+      ? source.ingredients
+      : []
+    if (sourceItems.length > 0) {
+      try {
+        const cloned = JSON.parse(JSON.stringify(sourceItems))
+        if (Array.isArray(cloned)) {
+          return cloned.map((entry: any, idx: number) => ({
+            ...entry,
+            __adjustKey:
+              String(entry?.id || '').trim() ||
+              String(entry?.foodId || '').trim() ||
+              `${String(entry?.name || 'Ingredient').trim()}-${idx}`,
+            servings:
+              Number.isFinite(Number(entry?.servings)) && Number(entry.servings) > 0
+                ? Number(entry.servings)
+                : 1,
+          }))
+        }
+      } catch {}
+    }
+
+    const baseTotals = getEntryTotals(source)
+    return [
+      {
+        __adjustVirtual: true,
+        __adjustKey: 'portion',
+        name: String(item?.label || source?.description || source?.label || 'Meal').trim() || 'Meal',
+        servings: 1,
+        __baseTotals: baseTotals,
+      },
+    ]
+  }
+
+  const resolveFavoriteAdjustTotals = (state: any): NutritionTotals | null => {
+    const adjustItems = Array.isArray(state?.adjustItems) ? state.adjustItems : []
+    if (adjustItems.length === 0) {
+      return (state?.totals as NutritionTotals) || null
+    }
+
+    const hasRealItems = adjustItems.some((it: any) => !it?.__adjustVirtual)
+    if (hasRealItems) {
+      try {
+        const totals = sanitizeNutritionTotals(recalculateNutritionFromItems(adjustItems))
+        return (totals as NutritionTotals) || null
+      } catch {
+        return (state?.totals as NutritionTotals) || null
+      }
+    }
+
+    const multiplierRaw = Number(adjustItems[0]?.servings)
+    const multiplier = Number.isFinite(multiplierRaw) && multiplierRaw > 0 ? multiplierRaw : 1
+    const scaled = scaleTotalsForFavoriteAdjust(state?.totals || {}, multiplier)
+    return sanitizeNutritionTotals(scaled) as NutritionTotals
+  }
+
+  const resolveFavoriteAdjustedSource = (state: any) => {
+    const source = state?.adjustSource || state?.item?.favorite || state?.item?.entry || state?.item
+    if (!source) return null
+
+    const adjustItems = Array.isArray(state?.adjustItems) ? state.adjustItems : []
+    const hasRealItems = adjustItems.some((it: any) => !it?.__adjustVirtual)
+    if (hasRealItems) {
+      const cleanItems = adjustItems.map((it: any) => {
+        const next = { ...it }
+        delete (next as any).__adjustKey
+        delete (next as any).__adjustVirtual
+        delete (next as any).__baseTotals
+        return next
+      })
+      const totals = resolveFavoriteAdjustTotals({ ...state, adjustItems: cleanItems })
+      return {
+        ...source,
+        items: cleanItems,
+        nutrition: totals || source?.nutrition || source?.total || null,
+        total: totals || source?.total || source?.nutrition || null,
+      }
+    }
+
+    const totals = resolveFavoriteAdjustTotals(state)
+    return {
+      ...source,
+      nutrition: totals || source?.nutrition || source?.total || null,
+      total: totals || source?.total || source?.nutrition || null,
+    }
+  }
+
   const computeOverallMacrosAfterAddingFavorite = (mealTotals: any) => {
     const dayTotals = (Array.isArray(sourceEntries) ? sourceEntries : []).reduce(
       (acc: any, entry: any) => {
@@ -15600,8 +15706,8 @@ Please add nutritional information manually if needed.`);
     return { overallTargets: targetsWithExercise, overallUsed: usedAfter }
   }
 
-  const runFavoriteAdd = (item: any) => {
-    const source = item.favorite || item.entry || item
+  const runFavoriteAdd = (item: any, opts?: { overrideSource?: any | null }) => {
+    const source = opts?.overrideSource || item.favorite || item.entry || item
     const replaceIndex = favoritesReplaceTargetRef.current
     if (replaceIndex !== null && replaceIndex !== undefined) {
       replaceIngredientFromFavoriteSource(source, replaceIndex)
@@ -15614,11 +15720,11 @@ Please add nutritional information manually if needed.`);
       return
     }
     if (item.favorite) {
-      insertFavoriteIntoDiary(item.favorite, selectedAddCategory)
+      insertFavoriteIntoDiary(source, selectedAddCategory)
     } else if (item.entry) {
-      insertMealIntoDiary(item.entry, selectedAddCategory)
+      insertMealIntoDiary(source, selectedAddCategory)
     } else {
-      insertMealIntoDiary(item, selectedAddCategory)
+      insertMealIntoDiary(source, selectedAddCategory)
     }
   }
 
@@ -26882,7 +26988,7 @@ Please add nutritional information manually if needed.`);
               </button>
               <button
                 type="button"
-                onClick={() => setFavoriteActionModal(null)}
+                onClick={closeFavoritesPicker}
                 className="w-full px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50"
               >
                 Cancel
@@ -26910,19 +27016,57 @@ Please add nutritional information manually if needed.`);
             </div>
             <button
               type="button"
-              onClick={() => {
-                const item = favoriteActionModal.item
-                setFavoriteActionModal(null)
-                runFavoriteAdd(item)
-              }}
-              className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800"
+              onClick={closeFavoritesPicker}
+              className="px-3 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50"
             >
-              Add
+              Cancel
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
             <div className="w-full max-w-6xl mx-auto">
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end mb-4">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFavoriteActionModal((prev) => {
+                      if (!prev) return prev
+                      const adjustItems = prev.adjustItems && prev.adjustItems.length > 0 ? prev.adjustItems : buildFavoriteAdjustItems(prev.item)
+                      const nextTotals = resolveFavoriteAdjustTotals({ ...prev, adjustItems }) || prev.totals
+                      const overall = computeOverallMacrosAfterAddingFavorite(nextTotals || {})
+                      const firstAmount = Number(adjustItems?.[0]?.servings)
+                      const servingLabel =
+                        Number.isFinite(firstAmount) && firstAmount > 0 && Math.abs(firstAmount - 1) > 0.001
+                          ? `${formatServingsDisplay(firstAmount)} serving${Math.abs(firstAmount - 1) < 0.001 ? '' : 's'}`
+                          : prev.servingLabel
+                      return {
+                        ...prev,
+                        mode: 'adjust',
+                        adjustSource: prev.adjustSource || prev.item?.favorite || prev.item?.entry || prev.item,
+                        adjustItems,
+                        totals: nextTotals || prev.totals,
+                        servingLabel,
+                        ...overall,
+                      }
+                    })
+                  }
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                >
+                  Change amount
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = favoriteActionModal.item
+                    setFavoriteActionModal(null)
+                    runFavoriteAdd(item)
+                  }}
+                  className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800"
+                >
+                  Add
+                </button>
+              </div>
+
               <div className="text-lg font-semibold text-gray-900">{favoriteActionModal.label}</div>
               <div className="text-xs text-gray-500 mt-1">This is a preview. It does not add the meal yet.</div>
 
@@ -26981,6 +27125,206 @@ Please add nutritional information manually if needed.`);
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {favoriteActionModal && favoriteActionModal.mode === 'adjust' && (
+        <div className="fixed inset-0 md:left-64 z-[80] bg-white flex flex-col">
+          <div className="shrink-0 border-b border-gray-200 px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                setFavoriteActionModal((prev) => (prev ? { ...prev, mode: 'preview' } : prev))
+              }
+              className="text-sm font-semibold text-gray-700 hover:text-gray-900"
+            >
+              Back
+            </button>
+            <div className="min-w-0 text-center">
+              <div className="text-sm font-semibold text-gray-900 truncate">Change amount</div>
+              <div className="text-xs text-gray-500 truncate">{favoriteActionModal.label}</div>
+            </div>
+            <button
+              type="button"
+              onClick={closeFavoritesPicker}
+              className="px-3 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
+            <div className="w-full max-w-6xl mx-auto">
+              <div className="text-sm text-gray-600 mb-4">
+                Update the amount now, then tap Add.
+              </div>
+
+              <div className="space-y-3">
+                {(favoriteActionModal.adjustItems && favoriteActionModal.adjustItems.length > 0
+                  ? favoriteActionModal.adjustItems
+                  : buildFavoriteAdjustItems(favoriteActionModal.item)
+                ).map((adjustItem: any, idx: number) => (
+                  <div key={adjustItem?.__adjustKey || idx} className="border border-gray-200 rounded-xl p-3">
+                    <div className="text-sm font-semibold text-gray-900 truncate">
+                      {String(adjustItem?.name || `Ingredient ${idx + 1}`)}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+                        onClick={() =>
+                          setFavoriteActionModal((prev) => {
+                            if (!prev) return prev
+                            const currentItems = Array.isArray(prev.adjustItems)
+                              ? [...prev.adjustItems]
+                              : buildFavoriteAdjustItems(prev.item)
+                            const current = Number(currentItems?.[idx]?.servings)
+                            const nextValue = Math.max(0.1, (Number.isFinite(current) ? current : 1) - 0.25)
+                            currentItems[idx] = { ...(currentItems[idx] || {}), servings: Math.round(nextValue * 100) / 100 }
+                            const nextTotals = resolveFavoriteAdjustTotals({ ...prev, adjustItems: currentItems }) || prev.totals
+                            const overall = computeOverallMacrosAfterAddingFavorite(nextTotals || {})
+                            const firstAmount = Number(currentItems?.[0]?.servings)
+                            const servingLabel =
+                              Number.isFinite(firstAmount) && firstAmount > 0
+                                ? `${formatServingsDisplay(firstAmount)} serving${Math.abs(firstAmount - 1) < 0.001 ? '' : 's'}`
+                                : prev.servingLabel
+                            return { ...prev, adjustItems: currentItems, totals: nextTotals || prev.totals, servingLabel, ...overall }
+                          })
+                        }
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min={0.1}
+                        step={0.25}
+                        value={Number.isFinite(Number(adjustItem?.servings)) ? Number(adjustItem.servings) : 1}
+                        onChange={(e) => {
+                          const parsed = Number(e.target.value)
+                          const safe = Number.isFinite(parsed) && parsed > 0 ? parsed : 1
+                          setFavoriteActionModal((prev) => {
+                            if (!prev) return prev
+                            const currentItems = Array.isArray(prev.adjustItems)
+                              ? [...prev.adjustItems]
+                              : buildFavoriteAdjustItems(prev.item)
+                            currentItems[idx] = { ...(currentItems[idx] || {}), servings: Math.round(safe * 100) / 100 }
+                            const nextTotals = resolveFavoriteAdjustTotals({ ...prev, adjustItems: currentItems }) || prev.totals
+                            const overall = computeOverallMacrosAfterAddingFavorite(nextTotals || {})
+                            const firstAmount = Number(currentItems?.[0]?.servings)
+                            const servingLabel =
+                              Number.isFinite(firstAmount) && firstAmount > 0
+                                ? `${formatServingsDisplay(firstAmount)} serving${Math.abs(firstAmount - 1) < 0.001 ? '' : 's'}`
+                                : prev.servingLabel
+                            return { ...prev, adjustItems: currentItems, totals: nextTotals || prev.totals, servingLabel, ...overall }
+                          })
+                        }}
+                        className="w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-900"
+                      />
+                      <button
+                        type="button"
+                        className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+                        onClick={() =>
+                          setFavoriteActionModal((prev) => {
+                            if (!prev) return prev
+                            const currentItems = Array.isArray(prev.adjustItems)
+                              ? [...prev.adjustItems]
+                              : buildFavoriteAdjustItems(prev.item)
+                            const current = Number(currentItems?.[idx]?.servings)
+                            const nextValue = (Number.isFinite(current) ? current : 1) + 0.25
+                            currentItems[idx] = { ...(currentItems[idx] || {}), servings: Math.round(nextValue * 100) / 100 }
+                            const nextTotals = resolveFavoriteAdjustTotals({ ...prev, adjustItems: currentItems }) || prev.totals
+                            const overall = computeOverallMacrosAfterAddingFavorite(nextTotals || {})
+                            const firstAmount = Number(currentItems?.[0]?.servings)
+                            const servingLabel =
+                              Number.isFinite(firstAmount) && firstAmount > 0
+                                ? `${formatServingsDisplay(firstAmount)} serving${Math.abs(firstAmount - 1) < 0.001 ? '' : 's'}`
+                                : prev.servingLabel
+                            return { ...prev, adjustItems: currentItems, totals: nextTotals || prev.totals, servingLabel, ...overall }
+                          })
+                        }
+                      >
+                        +
+                      </button>
+                      <span className="text-sm text-gray-600">servings</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-7">
+                {(() => {
+                  const totals = resolveFavoriteAdjustTotals(favoriteActionModal) || favoriteActionModal.totals || {
+                    calories: 0,
+                    protein: 0,
+                    carbs: 0,
+                    fat: 0,
+                    fiber: 0,
+                    sugar: 0,
+                  }
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {NUTRIENT_DISPLAY_ORDER.map((key) => {
+                        const meta = NUTRIENT_CARD_META[key]
+                        const raw = totals ? (totals as any)[key] : null
+                        const value = raw === null || raw === undefined ? null : Number(raw)
+                        const display =
+                          value === null || !Number.isFinite(value)
+                            ? formatNutrientValue(key, 0)
+                            : formatNutrientValue(key, value)
+                        const label =
+                          key === 'calories'
+                            ? energyUnit === 'kJ'
+                              ? 'Kilojoules'
+                              : 'Calories'
+                            : meta.label
+                        return (
+                          <div
+                            key={key}
+                            className={`rounded-2xl border border-gray-100 bg-gradient-to-br ${meta.gradient} p-4`}
+                          >
+                            <div className={`text-xl font-bold ${meta.accent}`}>{display}</div>
+                            <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mt-1">
+                              {label}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              <div className="mt-7">
+                <div className="text-sm font-semibold text-gray-900">Daily totals after adding</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  This updates live as you change amounts.
+                </div>
+                <div className="mt-3">
+                  <DailyMacroSummary
+                    targets={favoriteActionModal.overallTargets || {}}
+                    used={favoriteActionModal.overallUsed || {}}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="shrink-0 border-t border-gray-200 px-4 md:px-6 py-3 bg-white">
+            <div className="w-full max-w-6xl mx-auto flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  const item = favoriteActionModal.item
+                  const overrideSource = resolveFavoriteAdjustedSource(favoriteActionModal)
+                  setFavoriteActionModal(null)
+                  runFavoriteAdd(item, { overrideSource })
+                }}
+                className="px-5 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800"
+              >
+                Add
+              </button>
             </div>
           </div>
         </div>
