@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 02:42 AEDT
+- What changed: Follow-up fix for Favorites Preview -> Change amount. Replaced the limited servings-only controls with full item amount controls where available (serving dropdowns like small/medium/large, weight/size unit dropdowns, pieces + servings, and weight input), matching normal entry edit behavior.
+- Where to see it (page/link): Food Diary -> Add from favorites -> Preview -> Change amount
+- What to quickly test: Open Change amount for items that have serving options and confirm you can switch serving type (e.g., small/medium/large), adjust grams/pieces/units, and see totals update before Add.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-12 02:17 AEDT
 - What changed: Favorites Preview now has instant Add + new full-page Change amount flow. Users can adjust ingredient/portion amounts before adding, and there is now a Cancel button that exits the whole process back to Food Diary.
 - Where to see it (page/link): Food Diary -> Add from favorites -> select item -> Preview
