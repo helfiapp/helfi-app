@@ -28,6 +28,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 14:01 AEDT
+- What changed: Root-cause fix for desktop/mobile mismatch in Exercise. Food Diary now always refreshes exercise entries from server (not stale local cache), so manual exercise logged on desktop should appear on mobile too. Also fixed weird summary text showing “\\u2019”.
+- Where to see it (page/link): Food Diary (desktop + mobile PWA), same date
+- What to quickly test: Add manual exercise on desktop, refresh mobile PWA on same date, confirm exercise appears and burned calories/remaining match.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 12:52 AEDT
 - What changed: Exercise list now always shows the delete (trash) button for every entry (including Apple Health entries), even when only 1 entry is left. Add (+) exercise button is always available.
 - Where to see it (page/link): Food Diary → Exercise list
