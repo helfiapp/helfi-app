@@ -3671,6 +3671,7 @@ export default function FoodDiary() {
   const [exerciseLoading, setExerciseLoading] = useState<boolean>(false)
   const [exerciseError, setExerciseError] = useState<string | null>(null)
   const [exerciseSyncing, setExerciseSyncing] = useState<boolean>(false)
+  const [exerciseDeletingId, setExerciseDeletingId] = useState<string | null>(null)
   const [fitbitConnected, setFitbitConnected] = useState<boolean>(() => Boolean(initialDeviceStatus?.fitbitConnected))
   const [garminConnected, setGarminConnected] = useState<boolean>(() => Boolean(initialDeviceStatus?.garminConnected))
   const deviceStatusHydratedRef = useRef(false)
@@ -4021,6 +4022,7 @@ export default function FoodDiary() {
     let shouldReload = true
     try {
       setExerciseError(null)
+      setExerciseDeletingId(entryId)
       const res = await fetch(`/api/exercise-entries/${encodeURIComponent(entryId)}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -4029,6 +4031,7 @@ export default function FoodDiary() {
     } catch (err: any) {
       setExerciseError(err?.message || 'Failed to delete exercise')
     } finally {
+      setExerciseDeletingId(null)
       if (shouldReload) {
         await loadExerciseEntriesForDate(selectedDate, { silent: true, force: true })
       }
@@ -24502,6 +24505,7 @@ Please add nutritional information manually if needed.`);
 		                          const calories = convertKcalToUnit(Number(entry?.calories) || 0, energyUnit)
 		                          const duration = Number(entry?.durationMinutes) || 0
 		                          const isManual = String(entry?.source || '').toUpperCase() === 'MANUAL'
+                              const isDeleting = Boolean(entry?.id) && exerciseDeletingId === entry.id
 		                          const distanceKm =
 		                            typeof entry?.distanceKm === 'number' && Number.isFinite(entry.distanceKm) && entry.distanceKm > 0
 		                              ? Number(entry.distanceKm)
@@ -24524,16 +24528,18 @@ Please add nutritional information manually if needed.`);
 		                          return (
 		                            <div
 		                              key={entry.id}
-		                              className={`px-4 py-3 flex items-center justify-between gap-3 ${isManual ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+		                              className={`px-4 py-3 flex items-center justify-between gap-3 ${
+                                    isManual && !isDeleting ? 'cursor-pointer hover:bg-gray-50' : ''
+                                  } ${isDeleting ? 'opacity-60' : ''}`}
 		                              role={isManual ? 'button' : undefined}
 		                              tabIndex={isManual ? 0 : undefined}
-		                              onClick={isManual ? () => openEditExercise(entry) : undefined}
+		                              onClick={isManual && !isDeleting ? () => openEditExercise(entry) : undefined}
 		                              onKeyDown={
 		                                isManual
 		                                  ? (e) => {
 		                                      if (e.key === 'Enter' || e.key === ' ') {
 		                                        e.preventDefault()
-		                                        openEditExercise(entry)
+		                                        if (!isDeleting) openEditExercise(entry)
 		                                      }
 		                                    }
 		                                  : undefined
@@ -24554,15 +24560,25 @@ Please add nutritional information manually if needed.`);
 		                                {isManual && (
 		                                  <button
 		                                    type="button"
+                                        disabled={isDeleting}
 		                                    onClick={(e) => {
 		                                      e.stopPropagation()
-		                                      deleteExerciseEntry(entry.id)
+                                          if (!isDeleting) deleteExerciseEntry(entry.id)
 		                                    }}
-		                                    className="p-2 rounded-xl hover:bg-gray-100 text-gray-500"
+		                                    className={`p-2 rounded-xl focus:outline-none focus:ring-2 ${
+                                          isDeleting
+                                            ? 'bg-red-50 text-red-700 ring-1 ring-red-200 cursor-wait'
+                                            : 'hover:bg-gray-100 text-gray-500 focus:ring-emerald-200'
+                                        }`}
 		                                    title="Delete"
 		                                    aria-label="Delete exercise"
 		                                  >
-		                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+		                                    <svg
+                                          className={`w-4 h-4 ${isDeleting ? 'animate-pulse' : ''}`}
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
 		                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22m-5-3H6a1 1 0 00-1 1v2h14V5a1 1 0 00-1-1z" />
 		                                    </svg>
 		                                  </button>
