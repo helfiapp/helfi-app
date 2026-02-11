@@ -3926,9 +3926,9 @@ export default function FoodDiary() {
       }
       setExerciseError(null)
     }
-    if (!shouldRefresh && cached && Array.isArray(cached.entries)) {
-      return
-    }
+    // Root-cause fix:
+    // Always fetch latest exercise rows from server (even when cache exists),
+    // so desktop and mobile/PWA stay in sync.
     try {
       const res = await fetch(`/api/exercise-entries?date=${encodeURIComponent(dateKey)}`, {
         method: 'GET',
@@ -23789,7 +23789,7 @@ Please add nutritional information manually if needed.`);
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div className="text-sm font-semibold text-gray-800">
-                          {isViewingToday ? 'Today\u2019s energy summary' : 'Energy summary'}
+                          {isViewingToday ? "Today's energy summary" : 'Energy summary'}
                         </div>
                         <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
                           <button
@@ -23817,7 +23817,7 @@ Please add nutritional information manually if needed.`);
                         </div>
                       </div>
                       {!summaryReady ? (
-                        <div className="text-xs text-gray-500 mb-3">Loading this day\u2019s summary\u2026</div>
+                        <div className="text-xs text-gray-500 mb-3">Loading this day's summary...</div>
                       ) : (
                         <>
                           {source.length === 0 && (
