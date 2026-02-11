@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 04:34 AEDT
+- What changed: Fixed blank “Weight / size” values in Favorites -> Preview -> Change amount. The field now auto-fills from the current servings and selected unit when a saved weight is not already present.
+- Where to see it (page/link): Food Diary -> Add from favorites -> Preview -> Change amount
+- What to quickly test: Open Change amount on a favorite meal and confirm each ingredient now shows a corresponding weight value instead of an empty box.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-12 02:42 AEDT
 - What changed: Follow-up fix for Favorites Preview -> Change amount. Replaced the limited servings-only controls with full item amount controls where available (serving dropdowns like small/medium/large, weight/size unit dropdowns, pieces + servings, and weight input), matching normal entry edit behavior.
 - Where to see it (page/link): Food Diary -> Add from favorites -> Preview -> Change amount
