@@ -4020,7 +4020,7 @@ export default function MealBuilderClient() {
           )}
 
           {showFavoritesPicker && (
-            <div className="fixed inset-0 z-50 bg-white flex flex-col">
+            <div className="fixed inset-0 md:left-64 z-50 bg-white flex flex-col">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
                 <button
                   type="button"
@@ -4217,7 +4217,7 @@ export default function MealBuilderClient() {
           )}
 
           {showBarcodeScanner && (
-            <div className="fixed inset-0 z-50 bg-black">
+            <div className="fixed inset-0 md:left-64 z-50 bg-black">
               <div className="absolute inset-0 flex flex-col">
                 <div className="flex items-center justify-between px-4 py-3 bg-black/70 text-white">
                   <div className="text-sm font-semibold">Scan barcode</div>

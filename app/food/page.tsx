@@ -17745,7 +17745,7 @@ Please add nutritional information manually if needed.`);
         )
       })()}
       {healthCheckResult && healthCheckPageOpen && (
-        <div className="fixed inset-0 z-[10001] bg-white flex flex-col">
+        <div className="fixed inset-0 md:left-64 z-[10001] bg-white flex flex-col">
           <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3">
             <button
               type="button"
@@ -25945,7 +25945,7 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <div className="fixed inset-0 z-[50] bg-white">
+        <div className="fixed inset-0 md:left-64 z-[50] bg-white">
           <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-4 h-full">
             <div className="w-full h-full overflow-hidden border border-gray-200 rounded-2xl shadow-xl bg-white flex flex-col min-h-0">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
@@ -26345,7 +26345,7 @@ Please add nutritional information manually if needed.`);
       )}
 
       {showMultiCopyModal && (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
+        <div className="fixed inset-0 md:left-64 z-50 bg-white flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <button
               type="button"
@@ -26576,7 +26576,7 @@ Please add nutritional information manually if needed.`);
       )}
 
       {showBarcodeScanner && (
-      <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      <div className="fixed inset-0 md:left-64 z-50 bg-black flex flex-col">
           {/* Hidden elements for barcode processing */}
           <div id="native-barcode-decoder" style={{ display: 'none' }} aria-hidden="true" />
 
@@ -26893,8 +26893,8 @@ Please add nutritional information manually if needed.`);
       )}
 
       {favoriteActionModal && favoriteActionModal.mode === 'preview' && (
-        <div className="fixed inset-0 z-[70] bg-white flex flex-col">
-          <div className="shrink-0 border-b border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
+        <div className="fixed inset-0 md:left-64 z-[70] bg-white flex flex-col">
+          <div className="shrink-0 border-b border-gray-200 px-4 md:px-6 py-3 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={() =>
@@ -26921,63 +26921,65 @@ Please add nutritional information manually if needed.`);
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-5">
-            <div className="text-lg font-semibold text-gray-900">{favoriteActionModal.label}</div>
-            <div className="text-xs text-gray-500 mt-1">This is a preview. It does not add the meal yet.</div>
+          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
+            <div className="w-full max-w-6xl mx-auto">
+              <div className="text-lg font-semibold text-gray-900">{favoriteActionModal.label}</div>
+              <div className="text-xs text-gray-500 mt-1">This is a preview. It does not add the meal yet.</div>
 
-            <div className="mt-5">
-              {(() => {
-                const totals = favoriteActionModal.totals || {
-                  calories: 0,
-                  protein: 0,
-                  carbs: 0,
-                  fat: 0,
-                  fiber: 0,
-                  sugar: 0,
-                }
-                return (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {NUTRIENT_DISPLAY_ORDER.map((key) => {
-                      const meta = NUTRIENT_CARD_META[key]
-                      const raw = totals ? (totals as any)[key] : null
-                      const value = raw === null || raw === undefined ? null : Number(raw)
-                      const display =
-                        value === null || !Number.isFinite(value)
-                          ? formatNutrientValue(key, 0)
-                          : formatNutrientValue(key, value)
-                      const label =
-                        key === 'calories'
-                          ? energyUnit === 'kJ'
-                            ? 'Kilojoules'
-                            : 'Calories'
-                          : meta.label
-                      return (
-                        <div
-                          key={key}
-                          className={`rounded-2xl border border-gray-100 bg-gradient-to-br ${meta.gradient} p-4`}
-                        >
-                          <div className={`text-xl font-bold ${meta.accent}`}>{display}</div>
-                          <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mt-1">
-                            {label}
+              <div className="mt-5">
+                {(() => {
+                  const totals = favoriteActionModal.totals || {
+                    calories: 0,
+                    protein: 0,
+                    carbs: 0,
+                    fat: 0,
+                    fiber: 0,
+                    sugar: 0,
+                  }
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {NUTRIENT_DISPLAY_ORDER.map((key) => {
+                        const meta = NUTRIENT_CARD_META[key]
+                        const raw = totals ? (totals as any)[key] : null
+                        const value = raw === null || raw === undefined ? null : Number(raw)
+                        const display =
+                          value === null || !Number.isFinite(value)
+                            ? formatNutrientValue(key, 0)
+                            : formatNutrientValue(key, value)
+                        const label =
+                          key === 'calories'
+                            ? energyUnit === 'kJ'
+                              ? 'Kilojoules'
+                              : 'Calories'
+                            : meta.label
+                        return (
+                          <div
+                            key={key}
+                            className={`rounded-2xl border border-gray-100 bg-gradient-to-br ${meta.gradient} p-4`}
+                          >
+                            <div className={`text-xl font-bold ${meta.accent}`}>{display}</div>
+                            <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mt-1">
+                              {label}
+                            </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
-            </div>
-
-            <div className="mt-7">
-              <div className="text-sm font-semibold text-gray-900">Daily totals after adding</div>
-              <div className="text-xs text-gray-500 mt-1">
-                This shows what your full day would look like if you added this.
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
               </div>
-              <div className="mt-3">
-                <DailyMacroSummary
-                  targets={favoriteActionModal.overallTargets || {}}
-                  used={favoriteActionModal.overallUsed || {}}
-                />
+
+              <div className="mt-7">
+                <div className="text-sm font-semibold text-gray-900">Daily totals after adding</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  This shows what your full day would look like if you added this.
+                </div>
+                <div className="mt-3">
+                  <DailyMacroSummary
+                    targets={favoriteActionModal.overallTargets || {}}
+                    used={favoriteActionModal.overallUsed || {}}
+                  />
+                </div>
               </div>
             </div>
           </div>
