@@ -24461,19 +24461,17 @@ Please add nutritional information manually if needed.`);
                         </svg>
                       </button>
                     )}
-                    {exerciseEntries.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={openCreateExercise}
-                        className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                        title="Add exercise"
-                        aria-label="Add exercise"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={openCreateExercise}
+                      className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      title="Add exercise"
+                      aria-label="Add exercise"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </button>
 		                  </div>
 		                </div>
 
@@ -24504,14 +24502,21 @@ Please add nutritional information manually if needed.`);
 		                        exerciseEntries.map((entry: any) => {
 		                          const calories = convertKcalToUnit(Number(entry?.calories) || 0, energyUnit)
 		                          const duration = Number(entry?.durationMinutes) || 0
-		                          const isManual = String(entry?.source || '').toUpperCase() === 'MANUAL'
+		                          const source = String(entry?.source || '').toUpperCase()
+		                          const isManual = source === 'MANUAL'
                               const isDeleting = Boolean(entry?.id) && exerciseDeletingId === entry.id
 		                          const distanceKm =
 		                            typeof entry?.distanceKm === 'number' && Number.isFinite(entry.distanceKm) && entry.distanceKm > 0
 		                              ? Number(entry.distanceKm)
 		                              : null
 		                          const sourceLabel =
-		                            entry?.source === 'FITBIT' ? 'Fitbit' : entry?.source === 'GARMIN' ? 'Garmin Connect' : 'Manual'
+		                            source === 'FITBIT'
+		                              ? 'Fitbit'
+		                              : source === 'GARMIN'
+		                                ? 'Garmin Connect'
+		                                : source === 'APPLE_HEALTH'
+		                                  ? 'Apple Health'
+		                                  : 'Manual'
 		                          const title = (() => {
 		                            const typeName = String(entry?.exerciseType?.name || '').trim()
 		                            const label = String(entry?.label || '').trim()
@@ -24557,7 +24562,7 @@ Please add nutritional information manually if needed.`);
 		                                <div className="text-sm font-semibold text-gray-900">
 		                                  {Math.round(calories || 0)} {energyUnit}
 		                                </div>
-		                                {isManual && (
+		                                {Boolean(entry?.id) && (
 		                                  <button
 		                                    type="button"
                                         disabled={isDeleting}
