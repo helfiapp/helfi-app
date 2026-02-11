@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 00:03 AEDT
+- What changed: Completed a desktop Food Diary UI sweep and fixed full-screen overlay layout issues so desktop content no longer sits under the left menu. Also reduced oversized desktop preview layout width in Favorites Preview.
+- Where to see it (page/link): Food Diary desktop flows (especially Favorites Preview, Favorites picker, Multi-copy, Barcode scanner, Health-check page, and Build Meal overlays)
+- What to quickly test: On desktop, open each Food Diary full-screen flow and confirm the left menu remains visible and content is fully readable (no left-side clipping/cutoff).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 02:51 AEDT
 - What changed: Fixed manual exercise saving in Food Diary → Add exercise (more robust save + clearer error message if something still fails).
 - Where to see it (page/link): Food Diary → Exercise → Add exercise
