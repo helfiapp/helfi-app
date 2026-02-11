@@ -28,6 +28,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 19:04 AEDT
+- What changed: On mobile, “Adjust ingredient” now opens full-screen so the amount/unit (grams) fields are fully visible and not cut off.
+- Where to see it (page/link): Food Diary → Add ingredient → tap Add on an ingredient (Adjust ingredient screen)
+- What to quickly test: On mobile, open Adjust ingredient and confirm the amount input + unit dropdown fit fully on screen.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 14:01 AEDT
 - What changed: Root-cause fix for desktop/mobile mismatch in Exercise. Food Diary now always refreshes exercise entries from server (not stale local cache), so manual exercise logged on desktop should appear on mobile too. Also fixed weird summary text showing “\\u2019”.
 - Where to see it (page/link): Food Diary (desktop + mobile PWA), same date
