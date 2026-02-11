@@ -28,6 +28,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-11 12:52 AEDT
+- What changed: Exercise list now always shows the delete (trash) button for every entry (including Apple Health entries), even when only 1 entry is left. Add (+) exercise button is always available.
+- Where to see it (page/link): Food Diary → Exercise list
+- What to quickly test: When only 1 exercise entry remains, confirm the trash icon is still visible and works.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-11 12:38 AEDT
 - What changed: Exercise delete button now gives clear visual feedback (turns red and disables briefly) so it’s obvious the delete click worked.
 - Where to see it (page/link): Food Diary → Exercise list → trash/delete icon on a Manual exercise entry
