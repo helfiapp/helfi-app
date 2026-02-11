@@ -27382,6 +27382,8 @@ Please add nutritional information manually if needed.`);
                                 }
                                 return Number.isFinite(Number(adjustItem?.weightAmount)) && Number(adjustItem.weightAmount) > 0
                                   ? String(Number(adjustItem.weightAmount))
+                                  : baseWeightPerServing && baseWeightPerServing > 0
+                                  ? String(roundWeightValue(baseWeightPerServing * servingsCount, weightUnit))
                                   : ''
                               })()}
                               onFocus={() => {
