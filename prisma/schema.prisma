@@ -432,6 +432,7 @@ enum ExerciseSource {
   MANUAL
   FITBIT
   GARMIN
+  APPLE_HEALTH
 }
 
 enum CustomFoodKind {
