@@ -1808,8 +1808,8 @@ export default function AddIngredientClient() {
       </div>
 
       {adjustItem && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/30 flex items-end justify-center p-0 sm:items-center sm:p-4">
+          <div className="w-full h-[100dvh] sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div className="text-base font-semibold text-gray-900">Adjust ingredient</div>
               <button
@@ -1824,7 +1824,7 @@ export default function AddIngredientClient() {
                 <span aria-hidden>✕</span>
               </button>
             </div>
-            <div className="px-4 py-4 space-y-4">
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
               <div>
                 <div className="text-sm font-semibold text-gray-900">{adjustItem.name}</div>
                 {adjustItem.brand && <div className="text-xs text-gray-500">{adjustItem.brand}</div>}
@@ -1918,7 +1918,7 @@ export default function AddIngredientClient() {
                     )}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 min-w-0">
                         <input
                           type="number"
                           inputMode="decimal"
@@ -1948,7 +1948,7 @@ export default function AddIngredientClient() {
                           })()}
                           value={adjustAmountInput}
                           onChange={(e) => setAdjustAmountInput(e.target.value)}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         />
                         <select
                           value={safeUnit}
@@ -1970,7 +1970,7 @@ export default function AddIngredientClient() {
                             }
                             setAdjustUnit(nextUnit)
                           }}
-                          className="w-36 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-28 sm:w-36 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         >
                           {unitOptions.map((unit) => (
                             <option key={unit} value={unit}>
