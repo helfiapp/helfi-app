@@ -174,10 +174,11 @@ type FetchedRecipePage = {
   debug: string[]
 }
 
-const fetchRecipeTextViaMirror = async (url: string): Promise<string | null> => {
+const fetchRecipeTextViaMirror = async (url: string): Promise<{ text: string | null; debug: string[] }> => {
+  const debug: string[] = []
   try {
     const normalized = String(url || '').trim().replace(/^https?:\/\//i, '')
-    if (!normalized) return null
+    if (!normalized) return { text: null, debug: ['mirror:empty-url'] }
     const mirrorUrl = `https://r.jina.ai/http://${normalized}`
     const res = await fetch(mirrorUrl, {
       method: 'GET',
@@ -187,12 +188,14 @@ const fetchRecipeTextViaMirror = async (url: string): Promise<string | null> => 
         accept: 'text/plain,text/markdown;q=0.9,*/*;q=0.8',
       },
     })
-    if (!res.ok) return null
+    debug.push(`mirror-status:${res.status}`)
+    if (!res.ok) return { text: null, debug }
     const text = clampText(await res.text(), 1_200_000).trim()
-    if (!text) return null
-    return text
+    debug.push(`mirror-text-len:${text.length}`)
+    if (!text) return { text: null, debug }
+    return { text, debug }
   } catch {
-    return null
+    return { text: null, debug: ['mirror-error'] }
   }
 }
 
@@ -253,7 +256,9 @@ const fetchRecipePage = async (url: string): Promise<FetchedRecipePage> => {
     }
   }
 
-  const fallbackText = await fetchRecipeTextViaMirror(url)
+  const mirror = await fetchRecipeTextViaMirror(url)
+  const fallbackText = mirror.text
+  debug.push(...mirror.debug)
   debug.push(`mirror-len:${fallbackText ? fallbackText.length : 0}`)
   return { html: bestHtml, finalUrl: bestFinalUrl, recipe: null, fallbackText, debug }
 }
