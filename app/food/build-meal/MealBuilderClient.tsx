@@ -1645,6 +1645,19 @@ export default function MealBuilderClient() {
   const [recipeImportDraft, setRecipeImportDraft] = useState<any | null>(null)
   const [recipeImportLoading, setRecipeImportLoading] = useState(false)
   const [recipeImportMissing, setRecipeImportMissing] = useState<string[]>([])
+  const [recipeImportProgress, setRecipeImportProgress] = useState<{
+    total: number
+    processed: number
+    matched: number
+    missing: number
+    current: string
+  }>({
+    total: 0,
+    processed: 0,
+    matched: 0,
+    missing: 0,
+    current: '',
+  })
   const [saveImportedRecipeToFavorites, setSaveImportedRecipeToFavorites] = useState(false)
   const recipeImportAppliedRef = useRef(false)
   const recipeImportPortionPrefilledRef = useRef(false)
@@ -1794,6 +1807,46 @@ export default function MealBuilderClient() {
   useEffect(() => {
     brandSuggestionsRef.current = brandSuggestions
   }, [brandSuggestions])
+
+  useEffect(() => {
+    if (!recipeImportLoading) return
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = 'Recipe import is still running. Please stay on this page until it finishes.'
+      return event.returnValue
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [recipeImportLoading])
+
+  useEffect(() => {
+    if (!recipeImportLoading) return
+    if (!Array.isArray(items) || items.length === 0) return
+    const latest = items[items.length - 1]
+    const latestId = String(latest?.id || '')
+    if (!latestId) return
+    try {
+      const escape = (v: string) => {
+        try {
+          return (window as any).CSS?.escape ? (window as any).CSS.escape(v) : v.replace(/["\\]/g, '\\$&')
+        } catch {
+          return v.replace(/["\\]/g, '\\$&')
+        }
+      }
+      const start = Date.now()
+      const tick = () => {
+        const el = document.querySelector(`[data-builder-item-id="${escape(latestId)}"]`) as HTMLElement | null
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          return
+        }
+        if (Date.now() - start < 1500) window.requestAnimationFrame(tick)
+      }
+      window.requestAnimationFrame(tick)
+    } catch {}
+  }, [recipeImportLoading, items])
 
   useEffect(() => {
     if (!expandedId) return
@@ -2573,16 +2626,46 @@ export default function MealBuilderClient() {
       if (lines.length === 0) return
       importResolveCacheRef.current.clear()
       importSearchCacheRef.current.clear()
+      setRecipeImportProgress({
+        total: lines.length,
+        processed: 0,
+        matched: 0,
+        missing: 0,
+        current: '',
+      })
       setRecipeImportLoading(true)
       const missing: string[] = []
+      let processedCount = 0
+      let matchedCount = 0
+      let missingCount = 0
+
+      const publishProgress = (currentLine: string) => {
+        setRecipeImportProgress({
+          total: lines.length,
+          processed: Math.min(lines.length, processedCount),
+          matched: matchedCount,
+          missing: missingCount,
+          current: currentLine,
+        })
+      }
       try {
         for (const line of lines) {
           const parsed = parseLine(line)
           const lookup = String(parsed.lookup || '').trim()
-          if (!lookup) continue
+          const currentLine = lookup || line
+          if (!lookup) {
+            processedCount += 1
+            missingCount += 1
+            missing.push(line)
+            publishProgress(currentLine)
+            continue
+          }
           const resolved = await resolveItemWithMacros(lookup)
           if (!resolved) {
+            processedCount += 1
+            missingCount += 1
             missing.push(line)
+            publishProgress(currentLine)
             continue
           }
           addItemDirectWithOverrides(
@@ -2590,9 +2673,19 @@ export default function MealBuilderClient() {
             { amount: parsed.amount, unit: parsed.unit },
             { displayName: lookup, matchedName: resolved.name },
           )
+          processedCount += 1
+          matchedCount += 1
+          publishProgress(currentLine)
         }
       } catch {
       } finally {
+        setRecipeImportProgress((prev) => ({
+          ...prev,
+          processed: Math.max(prev.processed, processedCount),
+          matched: Math.max(prev.matched, matchedCount),
+          missing: Math.max(prev.missing, missingCount),
+          current: '',
+        }))
         setRecipeImportMissing(missing)
         setRecipeImportLoading(false)
       }
@@ -4645,9 +4738,17 @@ export default function MealBuilderClient() {
 	          {(recipeImportLoading || recipeImportMissing.length > 0 || (recipeImportDraft && Array.isArray((recipeImportDraft as any).steps) && (recipeImportDraft as any).steps.length > 0)) && (
 	            <div className="space-y-3">
 	              {recipeImportLoading && (
-	                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900 flex items-center gap-2">
-	                  <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
-	                  Importing recipe ingredients…
+	                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+	                  <div className="text-sm font-semibold text-emerald-900 flex items-center gap-2">
+	                    <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+	                    Importing recipe ingredients…
+	                  </div>
+	                  <div className="mt-1 text-xs text-emerald-800">
+	                    {Math.min(recipeImportProgress.processed, recipeImportProgress.total)} of {recipeImportProgress.total || 0} checked • {recipeImportProgress.matched} found
+	                  </div>
+	                  <div className="mt-1 text-xs text-emerald-700">
+	                    This can take a little while. Please stay on this page until it finishes.
+	                  </div>
 	                </div>
 	              )}
 
@@ -4683,6 +4784,42 @@ export default function MealBuilderClient() {
 	              )}
 	            </div>
 	          )}
+
+          {recipeImportLoading && recipeImportProgress.total > 0 && (
+            <div className="fixed bottom-5 right-5 z-[70] w-[min(92vw,360px)] rounded-2xl border border-emerald-200 bg-white shadow-xl p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+                Building your meal…
+              </div>
+              <div className="mt-1 text-xs text-gray-700">
+                {Math.min(recipeImportProgress.processed, recipeImportProgress.total)} of {recipeImportProgress.total} ingredients checked.
+              </div>
+              <div className="mt-1 text-xs text-gray-700">
+                {recipeImportProgress.matched} found • {recipeImportProgress.missing} need manual match
+              </div>
+              {recipeImportProgress.current ? (
+                <div className="mt-1 text-[11px] text-gray-500 truncate">
+                  Checking: {recipeImportProgress.current}
+                </div>
+              ) : null}
+              <div className="mt-2 h-2 w-full rounded-full bg-emerald-100 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-300"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      recipeImportProgress.total > 0
+                        ? (recipeImportProgress.processed / recipeImportProgress.total) * 100
+                        : 0,
+                    )}%`,
+                  }}
+                />
+              </div>
+              <div className="mt-2 text-[11px] text-gray-500">
+                This can take a while. Please do not leave this page.
+              </div>
+            </div>
+          )}
 
 	        <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
 	          <div className="text-sm font-semibold text-gray-900">Meal name (optional)</div>
