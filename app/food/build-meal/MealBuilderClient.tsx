@@ -1701,6 +1701,7 @@ export default function MealBuilderClient() {
 
   // Restore draft (best-effort). We intentionally let the draft win so users can continue where they left off.
   useEffect(() => {
+    if (recipeImportFlag) return
     if (draftAppliedRef.current) return
     try {
       const raw = sessionStorage.getItem(draftKey)
@@ -1729,7 +1730,7 @@ export default function MealBuilderClient() {
     } catch {
       // ignore
     }
-  }, [draftKey])
+  }, [draftKey, recipeImportFlag])
 
   // Keep a draft updated while editing, so ingredients aren't lost.
   useEffect(() => {
@@ -2053,7 +2054,6 @@ export default function MealBuilderClient() {
     if (!draft) return
     if (recipeImportPortionPrefilledRef.current) return
     const servings = Number((draft as any)?.servings)
-    if (portionAmountInput && portionAmountInput.trim().length > 0) return
     if (items.length === 0) return
 
     if (Number.isFinite(servings) && servings > 0) {
