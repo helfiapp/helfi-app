@@ -109,14 +109,21 @@ const normalizeFoodValue = (value: string) => {
 const singularizeToken = (value: string) => {
   const lower = value.toLowerCase()
   if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
+  // Handle plurals like peaches/dishes/watches -> peach/dish/watch.
+  if (
+    (lower.endsWith('ches') ||
+      lower.endsWith('shes') ||
+      lower.endsWith('xes') ||
+      lower.endsWith('zes') ||
+      lower.endsWith('ses')) &&
+    value.length > 4
+  ) {
+    return value.slice(0, -2)
+  }
   if (
     lower.endsWith('es') &&
     value.length > 3 &&
-    !lower.endsWith('ses') &&
-    !lower.endsWith('xes') &&
-    !lower.endsWith('zes') &&
-    !lower.endsWith('ches') &&
-    !lower.endsWith('shes')
+    !lower.endsWith('ss')
   ) {
     return value.slice(0, -2)
   }
@@ -361,6 +368,38 @@ export const formatUnitLabel = (unit: MeasurementUnit, name?: string | null, pie
   const normalizedProduceName = produceUnits ? normalizeFoodValue(String(name || '').trim()) : ''
   const produceName = (() => {
     if (!normalizedProduceName) return ''
+    const descriptorTokens = new Set([
+      'raw',
+      'cooked',
+      'fresh',
+      'frozen',
+      'canned',
+      'ripe',
+      'unripe',
+      'yellow',
+      'green',
+      'red',
+      'orange',
+      'purple',
+      'white',
+      'black',
+      'peeled',
+      'unpeeled',
+      'sliced',
+      'diced',
+      'chopped',
+      'halved',
+      'whole',
+    ])
+    const tokens = normalizedProduceName.split(' ').filter(Boolean)
+    while (tokens.length > 1 && descriptorTokens.has(tokens[tokens.length - 1])) {
+      tokens.pop()
+    }
+    if (tokens.length > 0) {
+      tokens[0] = singularizeToken(tokens[0])
+    }
+    const cleaned = tokens.join(' ').trim()
+    if (cleaned) return cleaned
     // For garlic, "piece" is almost always a clove.
     if (/\bgarlic\b/.test(normalizedProduceName) && !/\b(powder|granules?)\b/.test(normalizedProduceName)) return 'clove'
     return normalizedProduceName
