@@ -666,9 +666,11 @@ Implementation notes (do not remove):
 - Favorites rename flow is handled in `app/food/page.tsx` → `handleRenameFavorite`:
   - Updates the favorite label
   - Calls `renameEntriesWithFavoriteId(...)` to update diary entries
+- Diary row label rendering must prefer the entry's own renamed title/override before favorite fallback labels, so stale favorite text cannot overwrite a freshly edited diary title.
 - Rename helpers must also update the Favorites “All” snapshot cache:
   - `renameEntriesWithFavoriteId(...)` updates `favoritesAllServerEntries` and calls `writeFavoritesAllSnapshot(...)`
   - `renameEntriesWithLabel(...)` does the same for label-based renames
+- `renameEntriesWithFavoriteId(...)` must match linked entries not only by `__favoriteId`, but also by source id/barcode/item id/known aliases so older logs still rename globally.
 - Helper functions that must stay wired:
   - `resolveFavoriteForEntry`, `updateFavoriteLabelById`, `renameEntriesWithFavoriteId`
   - `saveFoodNameOverride` (keeps aliases for older labels)

@@ -11626,7 +11626,11 @@ Please add nutritional information manually if needed.`);
       }
       if (resolved.favoriteId) {
         updateFavoriteLabelById(resolved.favoriteId, nextLabel, previousLabel)
-        renameEntriesWithFavoriteId(resolved.favoriteId, nextLabel, matchBy)
+        renameEntriesWithFavoriteId(resolved.favoriteId, nextLabel, {
+          favorite: resolved.favorite,
+          previousLabel,
+          ...matchBy,
+        })
       } else {
         updateFavoriteLabelByMatch(previousLabel || baseTitle, nextLabel, matchBy)
         renameEntriesWithFavoriteId('', nextLabel, matchBy)
@@ -15041,10 +15045,16 @@ Please add nutritional information manually if needed.`);
       if (!entry) return entry
       const labelKey = normalizeFoodName(normalizeMealLabel(entry?.description || entry?.label || ''))
       if (!labelKey || labelKey !== fromKey) return entry
+      const items = Array.isArray(entry?.items) ? entry.items : null
+      const nextItems =
+        Array.isArray(items) && items.length === 1
+          ? [{ ...(items[0] || {}), name: toLabel }]
+          : items
       return {
         ...entry,
         description: toLabel,
         label: toLabel,
+        ...(nextItems ? { items: nextItems } : {}),
       }
     }
 
@@ -15210,31 +15220,100 @@ Please add nutritional information manually if needed.`);
   const renameEntriesWithFavoriteId = (
     favoriteId: string,
     toLabel: string,
-    match?: { sourceId?: string; barcode?: string },
+    options?: { favorite?: any; previousLabel?: string; sourceId?: string; barcode?: string },
   ) => {
     const favId = String(favoriteId || '').trim()
     const cleaned = normalizeMealLabel(toLabel || '') || (toLabel || '').trim()
     if (!cleaned) return
-    const sourceId = String(match?.sourceId || '').trim()
-    const barcode = String(match?.barcode || '').trim()
-    if (!favId && !sourceId && !barcode) return
+    const sourceIdHint = String(options?.sourceId || '').trim()
+    const barcodeHint = String(options?.barcode || '').trim()
+    if (!favId && !sourceIdHint && !barcodeHint) return
+    const favoriteRef =
+      options?.favorite ||
+      (Array.isArray(favorites) ? favorites.find((fav: any) => String(fav?.id || '').trim() === favId) : null) ||
+      null
+    const aliasKeys = new Set<string>()
+    const pushAliasKey = (raw: any) => {
+      const key = normalizeFoodName(normalizeMealLabel(raw || ''))
+      if (key) aliasKeys.add(key)
+    }
+    pushAliasKey(options?.previousLabel || '')
+    pushAliasKey(favoriteDisplayLabel(favoriteRef) || '')
+    pushAliasKey((favoriteRef as any)?.label || '')
+    pushAliasKey((favoriteRef as any)?.description || '')
+    if (Array.isArray((favoriteRef as any)?.aliases)) {
+      ;((favoriteRef as any).aliases as any[]).forEach((alias) => pushAliasKey(alias))
+    }
+    const favoriteSourceIds = new Set<string>()
+    if (sourceIdHint) favoriteSourceIds.add(sourceIdHint)
+    const favoriteSourceId = String((favoriteRef as any)?.sourceId || '').trim()
+    if (favoriteSourceId) favoriteSourceIds.add(favoriteSourceId)
+    const favoriteItemIds = new Set<string>()
+    const favoriteBarcodes = new Set<string>()
+    if (barcodeHint) favoriteBarcodes.add(barcodeHint)
+    try {
+      const favoriteItems = parseFavoriteItems(favoriteRef)
+      ;(Array.isArray(favoriteItems) ? favoriteItems : []).forEach((item: any) => {
+        const itemId = typeof item?.id === 'string' ? String(item.id).trim() : ''
+        if (itemId) favoriteItemIds.add(itemId)
+        const barcodeRaw = item?.barcode || item?.gtinUpc
+        const barcode = barcodeRaw ? String(barcodeRaw).trim() : ''
+        if (barcode) favoriteBarcodes.add(barcode)
+      })
+    } catch {}
     const updateEntry = (entry: any) => {
       if (!entry) return entry
       const entryFavId = getFavoriteIdForEntry(entry)
       const entrySourceId = getSourceIdForEntry(entry)
-      const entryBarcode = extractBarcodeFromEntry(entry)
-      if (
-        (entryFavId && entryFavId === favId) ||
-        (sourceId && entrySourceId && entrySourceId === sourceId) ||
-        (barcode && entryBarcode && entryBarcode === barcode)
-      ) {
-        return { ...entry, description: cleaned, label: cleaned }
+      let matches = Boolean(favId && entryFavId && entryFavId === favId)
+      if (!matches && entrySourceId && favoriteSourceIds.has(String(entrySourceId).trim())) {
+        matches = true
+      }
+      if (!matches) {
+        try {
+          const items = Array.isArray(entry?.items) ? entry.items : null
+          const single = Array.isArray(items) && items.length === 1 ? items[0] : null
+          const itemId = single && typeof single?.id === 'string' ? String(single.id).trim() : ''
+          const barcodeRaw = single?.barcode || single?.gtinUpc || extractBarcodeFromEntry(entry)
+          const barcode = barcodeRaw ? String(barcodeRaw).trim() : ''
+          if (itemId && favoriteItemIds.has(itemId)) matches = true
+          if (!matches && barcode && favoriteBarcodes.has(barcode)) matches = true
+        } catch {}
+      }
+      if (!matches) {
+        const labelKey = normalizeFoodName(normalizeMealLabel(entry?.description || entry?.label || ''))
+        if (labelKey && aliasKeys.has(labelKey)) matches = true
+      }
+      if (matches) {
+        const items = Array.isArray(entry?.items) ? entry.items : null
+        const nextItems =
+          Array.isArray(items) && items.length === 1
+            ? [{ ...(items[0] || {}), name: cleaned }]
+            : items
+        return {
+          ...entry,
+          description: cleaned,
+          label: cleaned,
+          ...(nextItems ? { items: nextItems } : {}),
+        }
       }
       return entry
     }
     setTodaysFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
     setHistoryFoods((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
-    setFavoritesAllServerEntries((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
+    setFavoritesAllServerEntries((prev) => {
+      const base = Array.isArray(prev) ? prev : []
+      let changed = false
+      const next = base.map((entry) => {
+        const updated = updateEntry(entry)
+        if (updated !== entry) changed = true
+        return updated
+      })
+      if (changed && userCacheKey) {
+        writeFavoritesAllSnapshot(userCacheKey, next)
+      }
+      return changed ? next : prev
+    })
     setFoodLibrary((prev) => (Array.isArray(prev) ? prev.map(updateEntry) : prev))
     renamePersistentDiaryEntries(updateEntry)
   }
@@ -16215,6 +16294,8 @@ Please add nutritional information manually if needed.`);
       renameEntriesWithFavoriteId(favId, cleaned, {
         sourceId: getSourceIdForEntry(existing),
         barcode: extractBarcodeFromEntry(existing),
+        favorite: existing,
+        previousLabel: favoriteDisplayLabel(existing) || current,
       })
       showQuickToast('Renamed')
     })
@@ -24922,7 +25003,10 @@ Please add nutritional information manually if needed.`);
                       const resolvedFavorite = isWaterEntry ? null : resolveFavoriteForEntry(food, baseEntryLabel)
                       const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
                       const overrideOnly = isWaterEntry ? '' : resolveFoodNameOverrideOnly(baseEntryLabel, food)
-                      const baseShort = isWaterEntry ? '' : extractBaseMealDescription(String(baseEntryLabel || ''))
+                      const appliedBaseLabel = isWaterEntry
+                        ? ''
+                        : applyFoodNameOverride(baseEntryLabel, food) || String(baseEntryLabel || '').trim()
+                      const baseShort = isWaterEntry ? '' : extractBaseMealDescription(String(appliedBaseLabel || ''))
                       const preferBaseTitleOverItem =
                         !isWaterEntry &&
                         baseShort &&
@@ -24932,10 +25016,10 @@ Please add nutritional information manually if needed.`);
                         ? waterLabel || 'Water'
                         : overrideOnly ||
                           (preferBaseTitleOverItem ? baseShort : '') ||
+                          baseShort ||
                           favoriteLabel ||
                           entryItemName ||
-                          baseShort ||
-                          String(baseEntryLabel || '').trim() ||
+                          String(appliedBaseLabel || baseEntryLabel || '').trim() ||
                           'Meal'
 
                       const closeSwipeMenus = () => {
