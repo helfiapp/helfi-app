@@ -115,19 +115,16 @@ const singularizeToken = (value: string) => {
       lower.endsWith('shes') ||
       lower.endsWith('xes') ||
       lower.endsWith('zes') ||
-      lower.endsWith('ses')) &&
+      lower.endsWith('ses') ||
+      lower.endsWith('oes')) &&
     value.length > 4
   ) {
     return value.slice(0, -2)
   }
-  if (
-    lower.endsWith('es') &&
-    value.length > 3 &&
-    !lower.endsWith('ss')
-  ) {
-    return value.slice(0, -2)
+  // Keep words like "citrus" intact; only trim trailing "s" for likely plurals.
+  if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss') && !lower.endsWith('us')) {
+    return value.slice(0, -1)
   }
-  if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
   return value
 }
 
