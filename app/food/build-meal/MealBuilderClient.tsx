@@ -67,6 +67,8 @@ type BuilderUnit =
   | 'slice'
   | 'serving'
 
+type PortionUnit = 'serving' | 'g' | 'oz'
+
 type BuilderItem = {
   id: string
   name: string
@@ -599,6 +601,50 @@ const FOOD_VARIANT_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bicing sugar\b/g, 'powdered sugar'],
   [/\bconfectioners? sugar\b/g, 'powdered sugar'],
   [/\bsultanas?\b/g, 'raisins'],
+]
+
+const RECIPE_LOOKUP_DESCRIPTORS = new Set([
+  'fresh',
+  'finely',
+  'roughly',
+  'thinly',
+  'thickly',
+  'chopped',
+  'diced',
+  'minced',
+  'ground',
+  'grated',
+  'sliced',
+  'peeled',
+  'crushed',
+  'boneless',
+  'skinless',
+  'trimmed',
+  'halved',
+  'quartered',
+  'optional',
+  'plus',
+  'more',
+  'to',
+  'or',
+  'garnish',
+  'taste',
+  'parts',
+  'part',
+  'tied',
+  'such',
+  'as',
+  'and',
+])
+
+const RECIPE_LOOKUP_PHRASE_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\byellow onions?\b/gi, 'onion'],
+  [/\bwhite onions?\b/gi, 'onion'],
+  [/\bbrown onions?\b/gi, 'onion'],
+  [/\bgreen onions?\b/gi, 'spring onion'],
+  [/\bscallions?\b/gi, 'spring onion'],
+  [/\bspring onions?\b/gi, 'spring onion'],
+  [/\bcloves of garlic\b/gi, 'garlic'],
 ]
 
 const normalizeFoodValue = (value: string) => {
@@ -1324,9 +1370,40 @@ const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
   return total
 }
 
-const computePortionScale = (amountRaw: any, unit: 'g' | 'oz', totalRecipeWeightG: number | null | undefined) => {
+const computePortionWeightG = (
+  amountRaw: any,
+  unit: PortionUnit,
+  totalRecipeWeightG: number | null | undefined,
+  recipeServings: number | null | undefined,
+) => {
+  const amount = parseNumericInput(amountRaw)
+  if (!amount || amount <= 0) return null
+  if (unit === 'serving') {
+    if (!totalRecipeWeightG || !Number.isFinite(totalRecipeWeightG) || totalRecipeWeightG <= 0) return null
+    const servings = Number(recipeServings)
+    if (!Number.isFinite(servings) || servings <= 0) return null
+    const grams = (totalRecipeWeightG * amount) / servings
+    return Number.isFinite(grams) && grams > 0 ? grams : null
+  }
+  const grams = unitToGrams(amount, unit === 'oz' ? 'oz' : 'g')
+  return grams && Number.isFinite(grams) ? grams : null
+}
+
+const computePortionScale = (
+  amountRaw: any,
+  unit: PortionUnit,
+  totalRecipeWeightG: number | null | undefined,
+  recipeServings: number | null | undefined,
+) => {
   const amount = parseNumericInput(amountRaw)
   if (!amount || amount <= 0) return 1
+  if (unit === 'serving') {
+    const servings = Number(recipeServings)
+    if (!Number.isFinite(servings) || servings <= 0) return 1
+    const raw = amount / servings
+    if (!Number.isFinite(raw) || raw <= 0) return 1
+    return raw
+  }
   if (!totalRecipeWeightG || !Number.isFinite(totalRecipeWeightG) || totalRecipeWeightG <= 0) return 1
   const grams = unitToGrams(amount, unit === 'oz' ? 'oz' : 'g')
   if (!grams || !Number.isFinite(grams) || grams <= 0) return 1
@@ -1510,7 +1587,8 @@ export default function MealBuilderClient() {
   const [lastRemoved, setLastRemoved] = useState<{ item: BuilderItem; index: number } | null>(null)
   const undoRemoveTimeoutRef = useRef<any>(null)
   const [portionAmountInput, setPortionAmountInput] = useState('')
-  const [portionUnit, setPortionUnit] = useState<'g' | 'oz'>('g')
+  const [portionUnit, setPortionUnit] = useState<PortionUnit>('g')
+  const [recipeServingsForPortion, setRecipeServingsForPortion] = useState<number | null>(null)
   const searchDebounceRef = useRef<number | null>(null)
   const brandSearchDebounceRef = useRef<number | null>(null)
   const [brandSuggestions, setBrandSuggestions] = useState<NormalizedFoodItem[]>([])
@@ -1518,6 +1596,8 @@ export default function MealBuilderClient() {
   const searchCacheRef = useRef<Map<string, { items: NormalizedFoodItem[]; at: number }>>(new Map())
   const servingOptionsCacheRef = useRef<Map<string, ServingOption[]>>(new Map())
   const servingOptionsPendingRef = useRef<Set<string>>(new Set())
+  const importResolveCacheRef = useRef<Map<string, NormalizedFoodItem | null>>(new Map())
+  const importSearchCacheRef = useRef<Map<string, NormalizedFoodItem[]>>(new Map())
 
   const seqRef = useRef(0)
   const brandSeqRef = useRef(0)
@@ -1549,7 +1629,7 @@ export default function MealBuilderClient() {
   const [favoritesToast, setFavoritesToast] = useState<string | null>(null)
 
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading || recipeImportLoading
-  const showPortionSaveCta = portionAmountInput.trim().length > 0
+  const showPortionSaveCta = (parseNumericInput(portionAmountInput) || 0) > 0
   const isDiaryEdit = Boolean(sourceLogId) && !editFavoriteId
 
   // Draft protection + auto-save (owner request):
@@ -1570,7 +1650,11 @@ export default function MealBuilderClient() {
     const amountRaw = (source as any).__portionAmount
     const unitRaw = (source as any).__portionUnit
     const weightRaw = (source as any).__portionWeightG
-    const unit = unitRaw === 'oz' ? 'oz' : 'g'
+    const totalWeightRaw = Number((source as any).__portionTotalWeightG)
+    const servingsRaw = Number((source as any).__portionRecipeServings)
+    if (Number.isFinite(servingsRaw) && servingsRaw > 0) setRecipeServingsForPortion(servingsRaw)
+    else setRecipeServingsForPortion(null)
+    const unit: PortionUnit = unitRaw === 'oz' ? 'oz' : unitRaw === 'serving' ? 'serving' : 'g'
     if (amountRaw !== null && amountRaw !== undefined && Number.isFinite(Number(amountRaw))) {
       setPortionUnit(unit)
       setPortionAmountInput(String(amountRaw))
@@ -1578,6 +1662,18 @@ export default function MealBuilderClient() {
     }
     if (weightRaw !== null && weightRaw !== undefined && Number.isFinite(Number(weightRaw))) {
       const grams = Number(weightRaw)
+      if (
+        unit === 'serving' &&
+        Number.isFinite(servingsRaw) &&
+        servingsRaw > 0 &&
+        Number.isFinite(totalWeightRaw) &&
+        totalWeightRaw > 0
+      ) {
+        const servingAmount = (grams / totalWeightRaw) * servingsRaw
+        setPortionUnit('serving')
+        setPortionAmountInput(String(round3(Math.max(0.1, servingAmount))))
+        return
+      }
       if (unit === 'oz') {
         const oz = convertAmount(grams, 'g', 'oz')
         setPortionUnit('oz')
@@ -1618,9 +1714,11 @@ export default function MealBuilderClient() {
         setEnergyUnit(parsed.energyUnit)
       }
       if (typeof parsed.portionAmountInput === 'string') setPortionAmountInput(parsed.portionAmountInput)
-      if (typeof parsed.portionUnit === 'string' && (parsed.portionUnit === 'g' || parsed.portionUnit === 'oz')) {
+      if (typeof parsed.portionUnit === 'string' && (parsed.portionUnit === 'serving' || parsed.portionUnit === 'g' || parsed.portionUnit === 'oz')) {
         setPortionUnit(parsed.portionUnit)
       }
+      const parsedRecipeServings = Number(parsed?.recipeServingsForPortion)
+      if (Number.isFinite(parsedRecipeServings) && parsedRecipeServings > 0) setRecipeServingsForPortion(parsedRecipeServings)
       draftAppliedRef.current = true
       setAutosaveHint('Draft restored')
       window.setTimeout(() => setAutosaveHint(''), 1200)
@@ -1643,6 +1741,7 @@ export default function MealBuilderClient() {
           energyUnit,
           portionAmountInput,
           portionUnit,
+          recipeServingsForPortion,
           items: itemsForDraft,
         }
         try {
@@ -1655,7 +1754,7 @@ export default function MealBuilderClient() {
         if (draftWriteTimeoutRef.current) window.clearTimeout(draftWriteTimeoutRef.current)
       } catch {}
     }
-  }, [draftKey, items, mealName, energyUnit, portionAmountInput, portionUnit])
+  }, [draftKey, items, mealName, energyUnit, portionAmountInput, portionUnit, recipeServingsForPortion])
 
   useEffect(() => {
     itemsRef.current = items
@@ -1949,24 +2048,29 @@ export default function MealBuilderClient() {
     if (!draft) return
     if (recipeImportPortionPrefilledRef.current) return
     const servings = Number((draft as any)?.servings)
-    if (!Number.isFinite(servings) || servings <= 0) return
-    if (!totalRecipeWeightG || !Number.isFinite(totalRecipeWeightG) || totalRecipeWeightG <= 0) return
-    if (!items || items.length === 0) return
     if (portionAmountInput && portionAmountInput.trim().length > 0) return
+    if (items.length === 0) return
 
-    const perServingG = totalRecipeWeightG / servings
-    if (!Number.isFinite(perServingG) || perServingG <= 0) return
+    if (Number.isFinite(servings) && servings > 0) {
+      recipeImportPortionPrefilledRef.current = true
+      setRecipeServingsForPortion(servings)
+      setPortionUnit('serving')
+      setPortionAmountInput('1')
+      return
+    }
+
+    if (!totalRecipeWeightG || !Number.isFinite(totalRecipeWeightG) || totalRecipeWeightG <= 0) return
     recipeImportPortionPrefilledRef.current = true
     setPortionUnit('g')
-    setPortionAmountInput(String(Math.max(1, Math.round(perServingG))))
+    setPortionAmountInput(String(Math.max(1, Math.round(totalRecipeWeightG))))
   }, [recipeImportDraft, totalRecipeWeightG, items.length, portionAmountInput])
 
 
   // Guard rail: portionScale must allow values above 1 to scale larger-than-recipe servings.
   // See GUARD_RAILS.md section "Build a Meal portion scaling".
   const computedPortionScale = useMemo(
-    () => computePortionScale(portionAmountInput, portionUnit, totalRecipeWeightGForScale),
-    [portionAmountInput, portionUnit, totalRecipeWeightGForScale],
+    () => computePortionScale(portionAmountInput, portionUnit, totalRecipeWeightGForScale, recipeServingsForPortion),
+    [portionAmountInput, portionUnit, totalRecipeWeightGForScale, recipeServingsForPortion],
   )
 
   // GUARD RAIL: Calorie consistency between edit page and front page
@@ -2034,6 +2138,26 @@ export default function MealBuilderClient() {
     () => applyPortionScaleToTotals(baseMealTotals, portionScale),
     [baseMealTotals, portionScale],
   )
+
+  useEffect(() => {
+    if (portionUnit !== 'serving') return
+    const amount = parseNumericInput(portionAmountInput)
+    if (amount && amount > 0) return
+    setPortionAmountInput('1')
+  }, [portionUnit, portionAmountInput])
+
+  const adjustServingPortion = (delta: number) => {
+    const current = parseNumericInput(portionAmountInput) ?? 1
+    const next = round3(Math.max(0.1, current + delta))
+    setPortionAmountInput(String(next))
+  }
+
+  const servingLabel = (() => {
+    const amount = parseNumericInput(portionAmountInput) ?? 0
+    if (!Number.isFinite(amount) || amount <= 0) return '0 servings'
+    if (Math.abs(amount - 1) < 0.0001) return '1 serving'
+    return `${round3(amount)} servings`
+  })()
 
   const addBuilderItem = (next: BuilderItem) => {
     setItems((prev) => [...prev, next])
@@ -2111,24 +2235,129 @@ export default function MealBuilderClient() {
     return hasCalories && hasProtein && hasCarbs && hasFat
   }
 
-  const pickBestMacroMatch = (items: NormalizedFoodItem[], lookup: string) => {
+  const normalizeRecipeLookupValue = (value: string) => {
+    let normalized = normalizeFoodValue(value)
+    RECIPE_LOOKUP_PHRASE_REPLACEMENTS.forEach(([pattern, replacement]) => {
+      normalized = normalized.replace(pattern, replacement)
+    })
+    return normalized.replace(/\s+/g, ' ').trim()
+  }
+
+  const buildRecipeLookupCandidates = (lookup: string) => {
+    const out = new Set<string>()
+    const add = (raw: string) => {
+      const next = normalizeRecipeLookupValue(raw)
+      if (!next || next.length < 2) return
+      out.add(next)
+    }
+
+    const base = String(lookup || '').trim()
+    if (!base) return []
+    add(base)
+
+    const tokens = normalizeRecipeLookupValue(base).split(' ').filter(Boolean)
+    if (tokens.length === 0) return Array.from(out)
+
+    const stripped = tokens.filter(
+      (token) => !RECIPE_LOOKUP_DESCRIPTORS.has(token) && !/^\d/.test(token) && !/^\d+\s*\/\s*\d+$/.test(token),
+    )
+    if (stripped.length > 0) add(stripped.join(' '))
+
+    const singularized = stripped.map((token) => singularizeToken(token))
+    if (singularized.length > 0) add(singularized.join(' '))
+    if (singularized.length > 1) add(singularized.slice(-2).join(' '))
+    if (singularized.length > 0) add(singularized[singularized.length - 1])
+
+    return Array.from(out).slice(0, 8)
+  }
+
+  const scoreMacroMatch = (candidate: NormalizedFoodItem, lookup: string, resolvedKind: 'packaged' | 'single') => {
+    const lookupNorm = normalizeRecipeLookupValue(lookup)
+    const lookupTokens = lookupNorm.split(' ').filter(Boolean)
+    const candidateName = normalizeRecipeLookupValue(String(candidate?.name || ''))
+    const candidateCombo = normalizeRecipeLookupValue(`${candidate?.brand || ''} ${candidate?.name || ''}`)
+    const candidateTokens = candidateCombo.split(' ').filter(Boolean)
+
+    let score = 0
+    if (candidateName === lookupNorm) score += 1200
+    if (candidateCombo === lookupNorm) score += 1300
+    if (candidateName.startsWith(lookupNorm)) score += 900
+    if (candidateCombo.startsWith(lookupNorm)) score += 950
+    if (candidateName.includes(lookupNorm)) score += 600
+    if (candidateCombo.includes(lookupNorm)) score += 650
+
+    let tokenHits = 0
+    for (const token of lookupTokens) {
+      if (candidateTokens.includes(token)) {
+        tokenHits += 2
+        continue
+      }
+      if (candidateTokens.some((word) => word.startsWith(token))) tokenHits += 1
+    }
+    score += tokenHits * 140
+
+    if (resolvedKind === 'single') {
+      if (!candidate?.brand) score += 80
+      if (candidateName.includes('raw')) score += 40
+    } else if (candidate?.brand) {
+      score += 20
+    }
+
+    return score
+  }
+
+  const pickBestMacroMatch = (items: NormalizedFoodItem[], lookup: string, resolvedKind: 'packaged' | 'single') => {
     const filtered = items.filter((candidate) => hasMacroData(candidate))
     if (filtered.length === 0) return null
-    return (
-      filtered.find((candidate) => nameMatchesSearchQuery(candidate?.name || '', lookup, { requireFirstWord: false })) ||
-      filtered[0]
-    )
+    const sorted = [...filtered].sort((a, b) => scoreMacroMatch(b, lookup, resolvedKind) - scoreMacroMatch(a, lookup, resolvedKind))
+    return sorted[0] || null
+  }
+
+  const fetchImportSearchItems = async (
+    lookup: string,
+    options: { kindOverride: 'packaged' | 'single'; sourceOverride: string; localOnly?: boolean },
+  ) => {
+    const key = `${options.kindOverride}|${options.sourceOverride}|${options.localOnly ? '1' : '0'}|${lookup}`
+    const cached = importSearchCacheRef.current.get(key)
+    if (cached) return cached
+    const items = (await fetchSearchItems(lookup, options)) as NormalizedFoodItem[]
+    importSearchCacheRef.current.set(key, items)
+    return items
   }
 
   const resolveItemWithMacros = async (lookup: string) => {
-    const usdaItems = await fetchSearchItems(lookup, { kindOverride: 'single', sourceOverride: 'usda', localOnly: true })
-    const usdaMatch = pickBestMacroMatch(usdaItems as NormalizedFoodItem[], lookup)
-    if (usdaMatch) return usdaMatch
+    const cacheKey = normalizeRecipeLookupValue(lookup)
+    if (!cacheKey) return null
+    if (importResolveCacheRef.current.has(cacheKey)) {
+      return importResolveCacheRef.current.get(cacheKey) || null
+    }
 
-    const fallbackItems = await fetchSearchItems(lookup, { kindOverride: 'packaged', sourceOverride: 'auto' })
-    const fallbackMatch = pickBestMacroMatch(fallbackItems as NormalizedFoodItem[], lookup)
-    if (fallbackMatch) return fallbackMatch
+    const candidates = buildRecipeLookupCandidates(lookup)
+    const searchAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean }> = [
+      { kind: 'single', source: 'usda', localOnly: true },
+      { kind: 'single', source: 'auto', localOnly: true },
+      { kind: 'packaged', source: 'usda', localOnly: true },
+      { kind: 'packaged', source: 'auto', localOnly: true },
+      { kind: 'single', source: 'auto' },
+      { kind: 'packaged', source: 'auto' },
+    ]
 
+    for (const candidate of candidates) {
+      for (const attempt of searchAttempts) {
+        const items = await fetchImportSearchItems(candidate, {
+          kindOverride: attempt.kind,
+          sourceOverride: attempt.source,
+          localOnly: attempt.localOnly,
+        })
+        const best = pickBestMacroMatch(items, candidate, attempt.kind)
+        if (best) {
+          importResolveCacheRef.current.set(cacheKey, best)
+          return best
+        }
+      }
+    }
+
+    importResolveCacheRef.current.set(cacheKey, null)
     return null
   }
 
@@ -2158,6 +2387,10 @@ export default function MealBuilderClient() {
 
     setRecipeImportDraft(draft)
     setRecipeImportMissing([])
+    const draftServings = Number((draft as any)?.servings)
+    if (Number.isFinite(draftServings) && draftServings > 0) {
+      setRecipeServingsForPortion(draftServings)
+    }
 
     // Prevent accidental re-import if the user refreshes.
     try {
@@ -2188,7 +2421,12 @@ export default function MealBuilderClient() {
       let s = String(raw || '').trim()
       s = s.replace(/\(.*?\)/g, ' ')
       s = s.split(',')[0] || s
-      s = s.replace(/\b(to taste|optional|plus more|for garnish|garnish)\b/gi, ' ')
+      s = s.replace(/\b(to taste|optional|plus more|for garnish|garnish|divided)\b/gi, ' ')
+      s = s.replace(/\s+-\s+/g, ' ')
+      s = s.replace(/[^a-zA-Z0-9\s/.-]/g, ' ')
+      RECIPE_LOOKUP_PHRASE_REPLACEMENTS.forEach(([pattern, replacement]) => {
+        s = s.replace(pattern, replacement)
+      })
       s = s.replace(/\s+/g, ' ').trim()
       return s
     }
@@ -2197,12 +2435,15 @@ export default function MealBuilderClient() {
       const u = String(rawUnit || '').toLowerCase().replace(/\./g, '').trim()
       if (u === 'g' || u === 'gram' || u === 'grams') return { unit: 'g', scale: 1 }
       if (u === 'kg' || u === 'kilogram' || u === 'kilograms') return { unit: 'g', scale: 1000 }
+      if (u === 'lb' || u === 'lbs' || u === 'pound' || u === 'pounds') return { unit: 'oz', scale: 16 }
       if (u === 'ml' || u === 'milliliter' || u === 'milliliters') return { unit: 'ml', scale: 1 }
       if (u === 'l' || u === 'liter' || u === 'liters') return { unit: 'ml', scale: 1000 }
       if (u === 'oz' || u === 'ounce' || u === 'ounces') return { unit: 'oz', scale: 1 }
       if (u === 'tsp' || u === 'teaspoon' || u === 'teaspoons') return { unit: 'tsp', scale: 1 }
       if (u === 'tbsp' || u === 'tablespoon' || u === 'tablespoons') return { unit: 'tbsp', scale: 1 }
       if (u === 'cup' || u === 'cups') return { unit: 'cup', scale: 1 }
+      if (u === 'clove' || u === 'cloves') return { unit: 'piece', scale: 1 }
+      if (u === 'piece' || u === 'pieces') return { unit: 'piece', scale: 1 }
       return { unit: null, scale: 1 }
     }
 
@@ -2256,6 +2497,8 @@ export default function MealBuilderClient() {
     const run = async () => {
       const lines = ingredients.map((l) => String(l || '').trim()).filter(Boolean).slice(0, 60)
       if (lines.length === 0) return
+      importResolveCacheRef.current.clear()
+      importSearchCacheRef.current.clear()
       setRecipeImportLoading(true)
       const missing: string[] = []
       try {
@@ -3339,14 +3582,19 @@ export default function MealBuilderClient() {
 
     const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
     const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
-    const portionScaleForSave = computePortionScale(portionAmountForSave, portionUnit, totalRecipeWeightForSave)
+    const portionScaleForSave = computePortionScale(
+      portionAmountForSave,
+      portionUnit,
+      totalRecipeWeightForSave,
+      recipeServingsForPortion,
+    )
 
-    const portionWeightForSave = (() => {
-      const raw = parseNumericInput(portionAmountForSave)
-      if (!raw || raw <= 0) return null
-      const grams = unitToGrams(raw, portionUnit === 'oz' ? 'oz' : 'g')
-      return grams && Number.isFinite(grams) ? grams : null
-    })()
+    const portionWeightForSave = computePortionWeightG(
+      portionAmountForSave,
+      portionUnit,
+      totalRecipeWeightForSave,
+      recipeServingsForPortion,
+    )
     const portionMeta =
       portionWeightForSave
         ? {
@@ -3355,6 +3603,10 @@ export default function MealBuilderClient() {
             __portionUnit: portionUnit,
             __portionAmount: parseNumericInput(portionAmountForSave),
             __portionTotalWeightG: Math.round(totalRecipeWeightForSave || 0),
+            __portionRecipeServings:
+              Number.isFinite(Number(recipeServingsForPortion)) && Number(recipeServingsForPortion) > 0
+                ? Number(recipeServingsForPortion)
+                : null,
           }
         : null
 
@@ -3403,12 +3655,13 @@ export default function MealBuilderClient() {
       title,
       portionUnit,
       String(parseNumericInput(portionAmountForSave) || ''),
+      String(Number(recipeServingsForPortion) || ''),
       buildItemsSignature(itemsForSave),
       favoriteId,
     ].join('|')
 
     return { title, description, cleanedItems, diaryNutrition, signature }
-  }, [isDiaryEdit, sourceLogId, items, mealName, portionAmountInput, portionUnit, linkedFavoriteId])
+  }, [isDiaryEdit, sourceLogId, items, mealName, portionAmountInput, portionUnit, recipeServingsForPortion, linkedFavoriteId])
 
   useEffect(() => {
     if (!isDiaryEdit) return
@@ -3511,7 +3764,12 @@ export default function MealBuilderClient() {
     )
     const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
     const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
-    const portionScaleForSave = computePortionScale(portionAmountForSave, portionUnit, totalRecipeWeightForSave)
+    const portionScaleForSave = computePortionScale(
+      portionAmountForSave,
+      portionUnit,
+      totalRecipeWeightForSave,
+      recipeServingsForPortion,
+    )
 
     const shouldStripBuilderIds = Boolean(editFavoriteId) && !editFavoriteIsCustomRef.current
     const sourceItemsForMerge = shouldStripBuilderIds ? editFavoriteSourceItemsRef.current : null
@@ -3557,12 +3815,12 @@ export default function MealBuilderClient() {
           sugar: totalsForSave.sugar * portionScaleForSave,
         }
       : totalsForSave
-    const portionWeightForSave = (() => {
-      const raw = parseNumericInput(portionAmountForSave)
-      if (!raw || raw <= 0) return null
-      const grams = unitToGrams(raw, portionUnit === 'oz' ? 'oz' : 'g')
-      return grams && Number.isFinite(grams) ? grams : null
-    })()
+    const portionWeightForSave = computePortionWeightG(
+      portionAmountForSave,
+      portionUnit,
+      totalRecipeWeightForSave,
+      recipeServingsForPortion,
+    )
     const portionMeta =
       portionWeightForSave
         ? {
@@ -3571,12 +3829,15 @@ export default function MealBuilderClient() {
             __portionUnit: portionUnit,
             __portionAmount: parseNumericInput(portionAmountForSave),
             __portionTotalWeightG: Math.round(totalRecipeWeightForSave || 0),
+            __portionRecipeServings:
+              Number.isFinite(Number(recipeServingsForPortion)) && Number(recipeServingsForPortion) > 0
+                ? Number(recipeServingsForPortion)
+                : null,
           }
         : null
 
     const importedRecipeMeta =
       recipeImportDraft &&
-      Boolean((recipeImportDraft as any).saveRecipe) &&
       Array.isArray((recipeImportDraft as any).steps) &&
       (recipeImportDraft as any).steps.length > 0
         ? {
@@ -4567,26 +4828,56 @@ export default function MealBuilderClient() {
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
             <div className="text-xs font-semibold text-gray-700">Portion size</div>
             <div className="mt-2 flex items-center gap-2">
-              <input
-                ref={portionInputRef}
-                type="number"
-                inputMode="decimal"
-                min={0}
-                value={portionAmountInput}
-                onFocus={() => setPortionAmountInput('')}
-                onChange={(e) => setPortionAmountInput(e.target.value)}
-                placeholder="e.g., 300"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              />
+              {portionUnit === 'serving' ? (
+                <div className="flex-1 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => adjustServingPortion(-1)}
+                    className="h-10 w-10 rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50"
+                    aria-label="Decrease servings"
+                  >
+                    −
+                  </button>
+                  <div className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-900">
+                    {servingLabel}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => adjustServingPortion(1)}
+                    className="h-10 w-10 rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50"
+                    aria-label="Increase servings"
+                  >
+                    +
+                  </button>
+                </div>
+              ) : (
+                <input
+                  ref={portionInputRef}
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  value={portionAmountInput}
+                  onFocus={() => setPortionAmountInput('')}
+                  onChange={(e) => setPortionAmountInput(e.target.value)}
+                  placeholder={portionUnit === 'oz' ? 'e.g., 10' : 'e.g., 300'}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              )}
               <select
                 value={portionUnit}
-                onChange={(e) => setPortionUnit(e.target.value as 'g' | 'oz')}
-                className="w-20 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                onChange={(e) => setPortionUnit(e.target.value as PortionUnit)}
+                className="w-28 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               >
+                <option value="serving">serving</option>
                 <option value="g">g</option>
                 <option value="oz">oz</option>
               </select>
             </div>
+            {portionUnit === 'serving' && Number.isFinite(Number(recipeServingsForPortion)) && Number(recipeServingsForPortion) > 0 ? (
+              <div className="mt-2 text-[11px] text-gray-600">
+                Recipe has about {Math.round(Number(recipeServingsForPortion))} servings.
+              </div>
+            ) : null}
             {totalRecipeWeightG > 0 ? (
               <div className="mt-2 text-[11px] text-gray-600">
                 Full recipe ≈ {Math.round(totalRecipeWeightG)} g
