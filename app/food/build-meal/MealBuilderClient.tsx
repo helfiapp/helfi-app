@@ -606,6 +606,10 @@ const FOOD_VARIANT_REPLACEMENTS: Array<[RegExp, string]> = [
 
 const RECIPE_LOOKUP_DESCRIPTORS = new Set([
   'fresh',
+  'frozen',
+  'store',
+  'bought',
+  'store-bought',
   'finely',
   'roughly',
   'thinly',
@@ -637,6 +641,12 @@ const RECIPE_LOOKUP_DESCRIPTORS = new Set([
   'as',
   'and',
   'good',
+  'free-range',
+  'extra',
+  'virgin',
+  'large',
+  'medium',
+  'small',
 ])
 
 const RECIPE_LOOKUP_STOPWORDS = new Set([
@@ -663,6 +673,8 @@ const RECIPE_LOOKUP_STOPWORDS = new Set([
 ])
 
 const RECIPE_LOOKUP_PHRASE_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bstore[\s-]*bought\b/gi, ' '],
+  [/\bfresh\s+or\s+frozen\b/gi, ' '],
   [/\byellow onions?\b/gi, 'onion'],
   [/\bwhite onions?\b/gi, 'onion'],
   [/\bbrown onions?\b/gi, 'onion'],
@@ -2285,7 +2297,7 @@ export default function MealBuilderClient() {
 
   const fetchSearchItems = async (
     searchQuery: string,
-    options?: { kindOverride?: 'packaged' | 'single'; sourceOverride?: string; localOnly?: boolean },
+    options?: { kindOverride?: 'packaged' | 'single'; sourceOverride?: string; localOnly?: boolean; timeoutMs?: number },
   ) => {
     const q = String(searchQuery || '').trim()
     if (!q) return []
@@ -2300,10 +2312,29 @@ export default function MealBuilderClient() {
     })
     if (userCountry) params.set('country', userCountry)
     if (options?.localOnly) params.set('localOnly', '1')
-    const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
-    if (!res.ok) return []
-    const data = await res.json().catch(() => ({} as any))
-    return Array.isArray(data?.items) ? data.items : []
+    const timeoutMs = Number(options?.timeoutMs)
+    const hasTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0
+    const controller = hasTimeout ? new AbortController() : null
+    const timer = hasTimeout
+      ? window.setTimeout(() => {
+          try {
+            controller?.abort()
+          } catch {}
+        }, timeoutMs)
+      : null
+    try {
+      const res = await fetch(`/api/food-data?${params.toString()}`, {
+        method: 'GET',
+        signal: controller?.signal,
+      })
+      if (!res.ok) return []
+      const data = await res.json().catch(() => ({} as any))
+      return Array.isArray(data?.items) ? data.items : []
+    } catch {
+      return []
+    } finally {
+      if (timer !== null) window.clearTimeout(timer)
+    }
   }
 
   const hasMacroData = (item: NormalizedFoodItem | null | undefined) => {
@@ -2348,10 +2379,18 @@ export default function MealBuilderClient() {
 
     const singularized = stripped.map((token) => singularizeToken(token))
     if (singularized.length > 0) add(singularized.join(' '))
+    if (singularized.length > 1) add(singularized.slice(-1).join(' '))
     if (singularized.length > 1) add(singularized.slice(-2).join(' '))
     if (singularized.length === 1) add(singularized[0])
 
-    return Array.from(out).slice(0, 8)
+    return Array.from(out)
+      .sort((a, b) => {
+        const aWords = a.split(' ').filter(Boolean).length
+        const bWords = b.split(' ').filter(Boolean).length
+        if (aWords !== bWords) return aWords - bWords
+        return a.length - b.length
+      })
+      .slice(0, 5)
   }
 
   const scoreMacroMatch = (candidate: NormalizedFoodItem, lookup: string, resolvedKind: 'packaged' | 'single') => {
@@ -2441,9 +2480,9 @@ export default function MealBuilderClient() {
 
   const fetchImportSearchItems = async (
     lookup: string,
-    options: { kindOverride: 'packaged' | 'single'; sourceOverride: string; localOnly?: boolean },
+    options: { kindOverride: 'packaged' | 'single'; sourceOverride: string; localOnly?: boolean; timeoutMs?: number },
   ) => {
-    const key = `${options.kindOverride}|${options.sourceOverride}|${options.localOnly ? '1' : '0'}|${lookup}`
+    const key = `${options.kindOverride}|${options.sourceOverride}|${options.localOnly ? '1' : '0'}|${options.timeoutMs || 0}|${lookup}`
     const cached = importSearchCacheRef.current.get(key)
     if (cached) return cached
     const items = (await fetchSearchItems(lookup, options)) as NormalizedFoodItem[]
@@ -2459,27 +2498,49 @@ export default function MealBuilderClient() {
     }
 
     const candidates = buildRecipeLookupCandidates(lookup)
-    const searchAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean }> = [
-      { kind: 'single', source: 'usda', localOnly: true },
-      { kind: 'single', source: 'auto', localOnly: true },
-      { kind: 'packaged', source: 'usda', localOnly: true },
-      { kind: 'packaged', source: 'auto', localOnly: true },
-      { kind: 'single', source: 'auto' },
-      { kind: 'packaged', source: 'auto' },
+    const localAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean; timeoutMs: number }> = [
+      { kind: 'single', source: 'usda', localOnly: true, timeoutMs: 1800 },
+      { kind: 'single', source: 'auto', localOnly: true, timeoutMs: 1800 },
+      { kind: 'packaged', source: 'auto', localOnly: true, timeoutMs: 1800 },
+    ]
+    const remoteAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean; timeoutMs: number }> = [
+      { kind: 'single', source: 'auto', timeoutMs: 2600 },
+      { kind: 'packaged', source: 'auto', timeoutMs: 2600 },
     ]
 
+    const findBestAcrossAttempts = async (
+      candidate: string,
+      attempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean; timeoutMs: number }>,
+    ) => {
+      const settled = await Promise.all(
+        attempts.map(async (attempt) => {
+          const items = await fetchImportSearchItems(candidate, {
+            kindOverride: attempt.kind,
+            sourceOverride: attempt.source,
+            localOnly: attempt.localOnly,
+            timeoutMs: attempt.timeoutMs,
+          })
+          const best = pickBestMacroMatch(items, candidate, attempt.kind)
+          if (!best) return null
+          return { best, score: scoreMacroMatch(best, candidate, attempt.kind) }
+        }),
+      )
+      const valid = settled.filter(Boolean) as Array<{ best: NormalizedFoodItem; score: number }>
+      if (valid.length === 0) return null
+      valid.sort((a, b) => b.score - a.score)
+      return valid[0].best
+    }
+
     for (const candidate of candidates) {
-      for (const attempt of searchAttempts) {
-        const items = await fetchImportSearchItems(candidate, {
-          kindOverride: attempt.kind,
-          sourceOverride: attempt.source,
-          localOnly: attempt.localOnly,
-        })
-        const best = pickBestMacroMatch(items, candidate, attempt.kind)
-        if (best) {
-          importResolveCacheRef.current.set(cacheKey, best)
-          return best
-        }
+      const localBest = await findBestAcrossAttempts(candidate, localAttempts)
+      if (localBest) {
+        importResolveCacheRef.current.set(cacheKey, localBest)
+        return localBest
+      }
+      const remoteBest = await findBestAcrossAttempts(candidate, remoteAttempts)
+      if (remoteBest) {
+        importResolveCacheRef.current.set(cacheKey, remoteBest)
+        return remoteBest
       }
     }
 
@@ -2665,6 +2726,7 @@ export default function MealBuilderClient() {
             processedCount += 1
             missingCount += 1
             missing.push(line)
+            setRecipeImportMissing([...missing])
             publishProgress(currentLine)
             continue
           }
