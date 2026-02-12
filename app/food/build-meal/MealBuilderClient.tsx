@@ -2718,9 +2718,34 @@ export default function MealBuilderClient() {
       return { lookup: normalizeLookup(line), amount: null, unit: null }
     }
 
+    const toImportDedupeKey = (lookup: string, amount: number | null, unit: BuilderUnit | null) => {
+      const nameKey = normalizeLookup(lookup)
+      if (!nameKey) return ''
+      const amountKey =
+        typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? String(round3(amount)) : ''
+      const unitKey = String(unit || '').trim().toLowerCase()
+      return `${nameKey}|${amountKey}|${unitKey}`
+    }
+
+    const toImportNameKey = (lookup: string) => normalizeLookup(lookup)
+
     const run = async () => {
       const lines = ingredients.map((l) => String(l || '').trim()).filter(Boolean).slice(0, 60)
       if (lines.length === 0) return
+      const seenImportKeys = new Set<string>()
+      const seenImportNames = new Set<string>()
+      for (const existing of items) {
+        const existingName = String((existing as any).__matchedName || existing.name || '').trim()
+        const existingNameKey = toImportNameKey(existingName)
+        if (existingNameKey) seenImportNames.add(existingNameKey)
+        const existingAmount =
+          typeof existing.__amount === 'number' && Number.isFinite(existing.__amount) && existing.__amount > 0
+            ? existing.__amount
+            : null
+        const existingUnit = (existing.__unit as BuilderUnit | null) ?? null
+        const existingKey = toImportDedupeKey(existingName, existingAmount, existingUnit)
+        if (existingKey) seenImportKeys.add(existingKey)
+      }
       importResolveCacheRef.current.clear()
       importSearchCacheRef.current.clear()
       importAutoFillCacheRef.current.clear()
@@ -2751,10 +2776,27 @@ export default function MealBuilderClient() {
           const parsed = parseLine(line)
           const lookup = String(parsed.lookup || '').trim()
           const currentLine = lookup || line
+          const lineKey = toImportDedupeKey(lookup || line, parsed.amount, parsed.unit)
+          const lineNameKey = toImportNameKey(lookup || line)
           if (!lookup) {
             processedCount += 1
             missingCount += 1
-            missing.push(line)
+            if (lineKey && !seenImportKeys.has(lineKey)) {
+              seenImportKeys.add(lineKey)
+              if (lineNameKey) seenImportNames.add(lineNameKey)
+              missing.push(line)
+            }
+            publishProgress(currentLine)
+            continue
+          }
+          const alreadyAdded =
+            (lineKey && seenImportKeys.has(lineKey)) ||
+            (lineNameKey &&
+              seenImportNames.has(lineNameKey) &&
+              !(typeof parsed.amount === 'number' && Number.isFinite(parsed.amount) && parsed.amount > 0))
+          if (alreadyAdded) {
+            processedCount += 1
+            matchedCount += 1
             publishProgress(currentLine)
             continue
           }
@@ -2771,6 +2813,8 @@ export default function MealBuilderClient() {
                 { amount: parsed.amount, unit: parsed.unit },
                 { displayName: lookup, matchedName: aiResolved.name },
               )
+              if (lineKey) seenImportKeys.add(lineKey)
+              if (lineNameKey) seenImportNames.add(lineNameKey)
               processedCount += 1
               matchedCount += 1
               publishProgress(currentLine)
@@ -2778,7 +2822,11 @@ export default function MealBuilderClient() {
             }
             processedCount += 1
             missingCount += 1
-            missing.push(line)
+            if (lineKey && !seenImportKeys.has(lineKey)) {
+              seenImportKeys.add(lineKey)
+              if (lineNameKey) seenImportNames.add(lineNameKey)
+              missing.push(line)
+            }
             setRecipeImportMissing([...missing])
             publishProgress(currentLine)
             continue
@@ -2788,6 +2836,8 @@ export default function MealBuilderClient() {
             { amount: parsed.amount, unit: parsed.unit },
             { displayName: lookup, matchedName: resolved.name },
           )
+          if (lineKey) seenImportKeys.add(lineKey)
+          if (lineNameKey) seenImportNames.add(lineNameKey)
           processedCount += 1
           matchedCount += 1
           publishProgress(currentLine)
