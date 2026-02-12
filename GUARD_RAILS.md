@@ -2231,6 +2231,24 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 2. Favorite edits call the diary sync endpoint and the client applies a same‑day update.
 3. The sync logic always skips entries where `__favoriteManualEdit` is true.
 
+## 7.6 Drink Icon + Global Rename Sync (Feb 2026 – Locked)
+
+**Goal (non‑negotiable):**
+- Drink entries (hot chocolate / tea / coffee / etc.) must always show drink icon + drink amount in Food Diary.
+- Renaming a food from Diary or Favorites must apply everywhere (Diary + Favorites + future uses of the same saved item).
+
+**Must keep:**
+- Drink metadata can live in either `nutrition` or `total`; read from both with fallback.
+- Do not drop `__drinkType`, `__drinkAmount`, `__drinkUnit`, `__drinkAmountMl`, `__waterLogId` during edit/save/update flows.
+- Favorite rename sync must match by `favoriteId`, and also by stable identifiers (`sourceId` / `barcode`) so older diary rows still update.
+- Food name override save must support entries where `items` can be JSON strings (not only arrays).
+
+**If this breaks again, restore:**
+1. In `app/food/page.tsx`, keep `getDrinkMetaFromEntry(...)` reading metadata from both `nutrition` and `total`.
+2. In edit flow meta merge, preserve existing drink metadata (do not rely on `nutrition` only).
+3. In rename sync, match linked entries by `favoriteId` + `sourceId` + `barcode`.
+4. In override save, parse `items` from string/array so stable keys are stored.
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:

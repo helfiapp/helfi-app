@@ -550,18 +550,28 @@ const stripWaterLogIdFromTotals = (totals: any) => {
 }
 
 const getDrinkMetaFromEntry = (entry: any): DrinkEntryMeta | null => {
-  const source =
-    entry?.nutrition && typeof entry.nutrition === 'object'
-      ? entry.nutrition
-      : entry?.total && typeof entry.total === 'object'
-      ? entry.total
-      : null
-  if (!source) return null
-  const type = typeof source.__drinkType === 'string' ? source.__drinkType.trim() : ''
+  const nutrition =
+    entry?.nutrition && typeof entry.nutrition === 'object' ? entry.nutrition : null
+  const total = entry?.total && typeof entry.total === 'object' ? entry.total : null
+  if (!nutrition && !total) return null
+
+  const pick = (key: string) => {
+    const fromNutrition =
+      nutrition && Object.prototype.hasOwnProperty.call(nutrition, key)
+        ? (nutrition as any)[key]
+        : undefined
+    if (fromNutrition !== undefined && fromNutrition !== null && String(fromNutrition).trim() !== '') return fromNutrition
+    const fromTotal =
+      total && Object.prototype.hasOwnProperty.call(total, key) ? (total as any)[key] : undefined
+    return fromTotal
+  }
+
+  const typeRaw = pick('__drinkType')
+  const type = typeof typeRaw === 'string' ? typeRaw.trim() : ''
   if (!type) return null
-  const unit = normalizeDrinkUnit(source.__drinkUnit) || 'ml'
-  const amount = Number(source.__drinkAmount)
-  const amountMlRaw = Number(source.__drinkAmountMl)
+  const unit = normalizeDrinkUnit(pick('__drinkUnit')) || 'ml'
+  const amount = Number(pick('__drinkAmount'))
+  const amountMlRaw = Number(pick('__drinkAmountMl'))
   const amountMl = Number.isFinite(amountMlRaw)
     ? amountMlRaw
     : Number.isFinite(amount) && amount > 0
@@ -571,7 +581,8 @@ const getDrinkMetaFromEntry = (entry: any): DrinkEntryMeta | null => {
       ? amount * 29.5735
       : amount
     : NaN
-  const waterLogId = source.__waterLogId ? String(source.__waterLogId) : null
+  const waterLogIdRaw = pick('__waterLogId')
+  const waterLogId = waterLogIdRaw ? String(waterLogIdRaw) : null
   return {
     type,
     amount,
@@ -11433,21 +11444,18 @@ Please add nutritional information manually if needed.`);
           : typeof (t as any)?.__origin === 'string'
           ? String((t as any).__origin).trim()
           : ''
-      const drinkType = typeof (n as any).__drinkType === 'string' ? String((n as any).__drinkType).trim() : ''
-      const drinkUnit = normalizeDrinkUnit((n as any).__drinkUnit) || null
-      const drinkAmount = Number((n as any).__drinkAmount)
-      const drinkAmountMl = Number((n as any).__drinkAmountMl)
-      const waterLogId = (n as any).__waterLogId ? String((n as any).__waterLogId).trim() : ''
-      const drinkMeta =
-        drinkType && drinkUnit && Number.isFinite(drinkAmount) && drinkAmount > 0
-          ? {
-              __drinkType: drinkType,
-              __drinkUnit: drinkUnit,
-              __drinkAmount: drinkAmount,
-              __drinkAmountMl: Number.isFinite(drinkAmountMl) ? drinkAmountMl : undefined,
-              ...(waterLogId ? { __waterLogId: waterLogId } : {}),
-            }
-          : null
+      const existingDrinkMeta = getDrinkMetaFromEntry(editingEntry)
+      const drinkMeta = existingDrinkMeta
+        ? {
+            __drinkType: existingDrinkMeta.type,
+            __drinkUnit: existingDrinkMeta.unit,
+            __drinkAmount: existingDrinkMeta.amount,
+            __drinkAmountMl: Number.isFinite(existingDrinkMeta.amountMl)
+              ? existingDrinkMeta.amountMl
+              : undefined,
+            ...(existingDrinkMeta.waterLogId ? { __waterLogId: existingDrinkMeta.waterLogId } : {}),
+          }
+        : null
       return { favoriteId, origin, clientId, drinkMeta }
     })()
 
@@ -11612,7 +11620,10 @@ Please add nutritional information manually if needed.`);
       const resolved = resolveFavoriteForEntry(editingEntry, baseTitle)
       if (resolved.favoriteId) {
         updateFavoriteLabelById(resolved.favoriteId, nextLabel, previousLabel)
-        renameEntriesWithFavoriteId(resolved.favoriteId, nextLabel)
+        renameEntriesWithFavoriteId(resolved.favoriteId, nextLabel, {
+          sourceId: getSourceIdForEntry(resolved.favorite || editingEntry),
+          barcode: extractBarcodeFromEntry(resolved.favorite || editingEntry),
+        })
       } else {
         updateFavoriteLabelByMatch(previousLabel || baseTitle, nextLabel)
       }
@@ -13309,6 +13320,36 @@ Please add nutritional information manually if needed.`);
       }
     }
     return null
+  }
+
+  const parseEntryItemsForMatching = (entry: any): any[] | null => {
+    const direct = entry?.items
+    if (Array.isArray(direct)) return direct
+    if (typeof direct === 'string') {
+      try {
+        const parsed = JSON.parse(direct)
+        return Array.isArray(parsed) ? parsed : null
+      } catch {
+        // ignore parse errors
+      }
+    }
+    return parseFavoriteItems(entry?.favorite || entry)
+  }
+
+  const extractBarcodeFromEntry = (entry: any) => {
+    try {
+      const items = parseEntryItemsForMatching(entry)
+      if (!Array.isArray(items) || items.length === 0) return ''
+      const single = items.length === 1 ? items[0] : null
+      const direct = single && (single?.barcode || single?.gtinUpc)
+      if (direct) return String(direct).trim()
+      const hit = items.find((it: any) => it?.barcode || it?.gtinUpc || it?.detectionMethod === 'barcode')
+      if (hit?.barcode) return String(hit.barcode).trim()
+      if (hit?.gtinUpc) return String(hit.gtinUpc).trim()
+      return ''
+    } catch {
+      return ''
+    }
   }
 
   // Build-a-meal generates ingredient ids that include a trailing timestamp segment.
@@ -15063,6 +15104,15 @@ Please add nutritional information manually if needed.`);
       const match = list.find((fav: any) => String(fav?.sourceId || '') === sourceId) || null
       if (match) return { favorite: match, favoriteId: String(match?.id || '') }
     }
+    const barcode = extractBarcodeFromEntry(entry)
+    if (barcode) {
+      const match =
+        list.find((fav: any) => {
+          const favBarcode = extractBarcodeFromEntry(fav)
+          return favBarcode && favBarcode === barcode
+        }) || null
+      if (match) return { favorite: match, favoriteId: String(match?.id || '') }
+    }
     const baseLabel = normalizeFoodName(normalizeMealLabel(fallbackLabel || entry?.description || entry?.label || ''))
     if (!baseLabel) return { favorite: null, favoriteId: '' }
     const match =
@@ -15142,14 +15192,26 @@ Please add nutritional information manually if needed.`);
     })
   }
 
-  const renameEntriesWithFavoriteId = (favoriteId: string, toLabel: string) => {
+  const renameEntriesWithFavoriteId = (
+    favoriteId: string,
+    toLabel: string,
+    match?: { sourceId?: string; barcode?: string },
+  ) => {
     const favId = String(favoriteId || '').trim()
     const cleaned = normalizeMealLabel(toLabel || '') || (toLabel || '').trim()
     if (!favId || !cleaned) return
+    const sourceId = String(match?.sourceId || '').trim()
+    const barcode = String(match?.barcode || '').trim()
     const updateEntry = (entry: any) => {
       if (!entry) return entry
       const entryFavId = getFavoriteIdForEntry(entry)
-      if (entryFavId && entryFavId === favId) {
+      const entrySourceId = getSourceIdForEntry(entry)
+      const entryBarcode = extractBarcodeFromEntry(entry)
+      if (
+        (entryFavId && entryFavId === favId) ||
+        (sourceId && entrySourceId && entrySourceId === sourceId) ||
+        (barcode && entryBarcode && entryBarcode === barcode)
+      ) {
         return { ...entry, description: cleaned, label: cleaned }
       }
       return entry
@@ -15174,13 +15236,10 @@ Please add nutritional information manually if needed.`);
     let sourceId = ''
     let barcode = ''
     try {
-      const items = Array.isArray(entry?.items) ? entry.items : null
+      const items = parseEntryItemsForMatching(entry)
       const single = Array.isArray(items) && items.length === 1 ? items[0] : null
       itemId = single && typeof single?.id === 'string' ? String(single.id).trim() : ''
-      barcode =
-        single && (single?.barcode || single?.gtinUpc)
-          ? String(single?.barcode || single?.gtinUpc).trim()
-          : ''
+      barcode = extractBarcodeFromEntry(entry)
       favoriteId =
         (entry?.favorite && entry.favorite.id && String(entry.favorite.id)) ||
         (entry?.nutrition && (entry.nutrition as any).__favoriteId) ||
@@ -16137,7 +16196,10 @@ Please add nutritional information manually if needed.`);
         persistFavorites(next)
         return next
       })
-      renameEntriesWithFavoriteId(favId, cleaned)
+      renameEntriesWithFavoriteId(favId, cleaned, {
+        sourceId: getSourceIdForEntry(existing),
+        barcode: extractBarcodeFromEntry(existing),
+      })
       showQuickToast('Renamed')
     })
   }
