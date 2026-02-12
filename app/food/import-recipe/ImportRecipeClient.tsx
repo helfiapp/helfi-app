@@ -106,7 +106,7 @@ export default function ImportRecipeClient() {
     }
   }
 
-  const continueToBuilder = (saveRecipe: boolean) => {
+  const continueToBuilder = () => {
     const current = recipe
     if (!current) return
 
@@ -126,7 +126,7 @@ export default function ImportRecipeClient() {
       ingredients,
       steps,
       sourceUrl: current.sourceUrl ?? null,
-      saveRecipe,
+      saveRecipe: false,
       createdAt: Date.now(),
     }
 
@@ -294,18 +294,14 @@ export default function ImportRecipeClient() {
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
-                onClick={() => continueToBuilder(false)}
-                className="flex-1 rounded-xl px-4 py-2 text-sm font-semibold bg-gray-900 text-white hover:bg-black"
+                onClick={continueToBuilder}
+                className="flex-1 rounded-xl px-4 py-2 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700"
               >
                 Continue to Build a meal
               </button>
-              <button
-                type="button"
-                onClick={() => continueToBuilder(true)}
-                className="flex-1 rounded-xl px-4 py-2 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700"
-              >
-                Continue + Save recipe
-              </button>
+            </div>
+            <div className="text-xs text-gray-500">
+              You can choose “Save to favorites” on the next screen after reviewing the meal.
             </div>
 
             <button
@@ -324,4 +320,3 @@ export default function ImportRecipeClient() {
     </div>
   )
 }
-

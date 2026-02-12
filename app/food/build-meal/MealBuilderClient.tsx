@@ -1620,6 +1620,7 @@ export default function MealBuilderClient() {
   const [recipeImportDraft, setRecipeImportDraft] = useState<any | null>(null)
   const [recipeImportLoading, setRecipeImportLoading] = useState(false)
   const [recipeImportMissing, setRecipeImportMissing] = useState<string[]>([])
+  const [saveImportedRecipeToFavorites, setSaveImportedRecipeToFavorites] = useState(false)
   const recipeImportAppliedRef = useRef(false)
   const recipeImportPortionPrefilledRef = useRef(false)
 
@@ -1717,6 +1718,9 @@ export default function MealBuilderClient() {
       if (typeof parsed.portionUnit === 'string' && (parsed.portionUnit === 'serving' || parsed.portionUnit === 'g' || parsed.portionUnit === 'oz')) {
         setPortionUnit(parsed.portionUnit)
       }
+      if (typeof parsed.saveImportedRecipeToFavorites === 'boolean') {
+        setSaveImportedRecipeToFavorites(parsed.saveImportedRecipeToFavorites)
+      }
       const parsedRecipeServings = Number(parsed?.recipeServingsForPortion)
       if (Number.isFinite(parsedRecipeServings) && parsedRecipeServings > 0) setRecipeServingsForPortion(parsedRecipeServings)
       draftAppliedRef.current = true
@@ -1741,6 +1745,7 @@ export default function MealBuilderClient() {
           energyUnit,
           portionAmountInput,
           portionUnit,
+          saveImportedRecipeToFavorites,
           recipeServingsForPortion,
           items: itemsForDraft,
         }
@@ -1754,7 +1759,7 @@ export default function MealBuilderClient() {
         if (draftWriteTimeoutRef.current) window.clearTimeout(draftWriteTimeoutRef.current)
       } catch {}
     }
-  }, [draftKey, items, mealName, energyUnit, portionAmountInput, portionUnit, recipeServingsForPortion])
+  }, [draftKey, items, mealName, energyUnit, portionAmountInput, portionUnit, saveImportedRecipeToFavorites, recipeServingsForPortion])
 
   useEffect(() => {
     itemsRef.current = items
@@ -2387,6 +2392,7 @@ export default function MealBuilderClient() {
 
     setRecipeImportDraft(draft)
     setRecipeImportMissing([])
+    setSaveImportedRecipeToFavorites(false)
     const draftServings = Number((draft as any)?.servings)
     if (Number.isFinite(draftServings) && draftServings > 0) {
       setRecipeServingsForPortion(draftServings)
@@ -3736,7 +3742,7 @@ export default function MealBuilderClient() {
 
     const shouldAutoSaveFavorite = (() => {
       if (editFavoriteId) return true
-      if (recipeImportDraft) return Boolean((recipeImportDraft as any).saveRecipe)
+      if (recipeImportDraft) return saveImportedRecipeToFavorites
       return true
     })()
 
@@ -4168,7 +4174,7 @@ export default function MealBuilderClient() {
       } catch {}
 
       // Auto-save newly created meals into Favorites so they appear under Favorites → Custom.
-      // For recipe-import builds, only do this if the user chose "Continue + Save recipe".
+      // For recipe-import builds, only do this if the user enabled "Save to favorites".
       if (shouldAutoSaveFavorite && favoriteLinkId) {
         try {
           const createdId = typeof data?.id === 'string' ? data.id : null
@@ -4887,6 +4893,24 @@ export default function MealBuilderClient() {
                 Add weights to ingredients to use portions.
               </div>
             )}
+            {recipeImportDraft && !editFavoriteId ? (
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2">
+                <div className="text-[11px] text-gray-700">
+                  Save to favorites (Custom meals)
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSaveImportedRecipeToFavorites((prev) => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                    saveImportedRecipeToFavorites
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {saveImportedRecipeToFavorites ? 'Yes' : 'No'}
+                </button>
+              </div>
+            ) : null}
             {portionScale < 1 && (
               <div className="mt-1 text-[11px] text-emerald-700">
                 Saving about {Math.round(portionScale * 100)}% of the recipe.
