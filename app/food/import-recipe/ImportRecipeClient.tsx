@@ -55,6 +55,26 @@ export default function ImportRecipeClient() {
   const ingredientsRef = useRef<HTMLTextAreaElement | null>(null)
   const stepsRef = useRef<HTMLTextAreaElement | null>(null)
 
+  const tryBrowserMirrorFallback = async (url: string): Promise<ImportedRecipe | null> => {
+    try {
+      const mirrorRes = await fetch(`https://r.jina.ai/http://${url}`, { method: 'GET' })
+      if (!mirrorRes.ok) return null
+      const mirrorText = String(await mirrorRes.text()).trim()
+      if (!mirrorText) return null
+
+      const parseRes = await fetch('/api/recipe-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, rawText: mirrorText }),
+      })
+      const parseData = await parseRes.json().catch(() => ({} as any))
+      if (!parseRes.ok || !parseData?.recipe) return null
+      return parseData.recipe as ImportedRecipe
+    } catch {
+      return null
+    }
+  }
+
   const doImportFromUrl = async () => {
     const url = urlInput.trim()
     if (!isValidHttpUrl(url)) {
@@ -71,6 +91,13 @@ export default function ImportRecipeClient() {
       })
       const data = await res.json().catch(() => ({} as any))
       if (!res.ok || !data?.recipe) {
+        if (String(data?.error || '').toLowerCase().includes('could not load that link')) {
+          const fallbackRecipe = await tryBrowserMirrorFallback(url)
+          if (fallbackRecipe) {
+            setRecipe(fallbackRecipe)
+            return
+          }
+        }
         setError(data?.error || 'Import failed. Please try a different link or use a photo.')
         return
       }

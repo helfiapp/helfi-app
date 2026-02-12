@@ -281,6 +281,49 @@ const coerceRecipeFromModel = (value: any, sourceUrl: string | null): ImportedRe
   return { title, servings, prepMinutes, cookMinutes, ingredients, steps, sourceUrl }
 }
 
+const extractRecipeFromText = async ({
+  openai,
+  text,
+  sourceUrl,
+  userId,
+  userEmail,
+  callDetail,
+}: {
+  openai: OpenAI
+  text: string
+  sourceUrl: string | null
+  userId: string
+  userEmail: string
+  callDetail: string
+}): Promise<ImportedRecipe | null> => {
+  const completion = await runChatCompletionWithLogging(
+    openai,
+    {
+      model: process.env.OPENAI_RECIPE_IMPORT_MODEL || 'gpt-4o-mini',
+      temperature: 0,
+      max_tokens: 900,
+      response_format: { type: 'json_object' } as any,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Extract ONE recipe from the given page text.\n' +
+            'Return JSON only with keys: title, servings, prepMinutes, cookMinutes, ingredients (array of strings), steps (array of strings).\n' +
+            'Ingredients must include amounts/units when present.\n' +
+            'Steps should be short and actionable.',
+        },
+        { role: 'user', content: text },
+      ],
+    } as any,
+    { feature: 'recipe-import', userId, userLabel: userEmail, endpoint: '/api/recipe-import' },
+    { callDetail },
+  )
+
+  const raw = completion?.choices?.[0]?.message?.content || ''
+  const parsed = safeJsonParse(String(raw || '').trim().replace(/```json/gi, '').replace(/```/g, '').trim())
+  return coerceRecipeFromModel(parsed, sourceUrl)
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Auth (session, with JWT fallback)
@@ -310,6 +353,25 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
       }
 
+      const rawTextFromClient = clampText(String(body?.rawText || ''), 60_000).trim()
+      if (rawTextFromClient) {
+        const openai = getOpenAIClient()
+        if (!openai) return NextResponse.json({ error: 'Recipe import is temporarily unavailable.' }, { status: 503 })
+
+        const recipeFromClientText = await extractRecipeFromText({
+          openai,
+          text: clampText(rawTextFromClient, 22_000),
+          sourceUrl: url,
+          userId: user.id,
+          userEmail,
+          callDetail: 'url-client-mirror-text',
+        })
+        if (!recipeFromClientText) {
+          return NextResponse.json({ error: 'Could not import that recipe. Try a photo instead.' }, { status: 422 })
+        }
+        return NextResponse.json({ recipe: recipeFromClientText }, { status: 200 })
+      }
+
       const fetchedPage = await fetchRecipePage(url)
       if (fetchedPage.recipe) return NextResponse.json({ recipe: fetchedPage.recipe }, { status: 200 })
 
@@ -329,47 +391,17 @@ export async function POST(request: NextRequest) {
           mirrorTextLength: mirrorText.length,
           debug: fetchedPage.debug,
         })
-        return NextResponse.json(
-          {
-            error: 'Could not load that link.',
-            debug: {
-              finalUrl: fetchedPage.finalUrl,
-              htmlLength: html.length,
-              htmlTextLength: htmlText.length,
-              mirrorTextLength: mirrorText.length,
-              trace: fetchedPage.debug,
-            },
-          },
-          { status: 400 },
-        )
+        return NextResponse.json({ error: 'Could not load that link.' }, { status: 400 })
       }
 
-      const completion = await runChatCompletionWithLogging(
+      const recipe = await extractRecipeFromText({
         openai,
-        {
-          model: process.env.OPENAI_RECIPE_IMPORT_MODEL || 'gpt-4o-mini',
-          temperature: 0,
-          max_tokens: 900,
-          response_format: { type: 'json_object' } as any,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'Extract ONE recipe from the given page text.\n' +
-                'Return JSON only with keys: title, servings, prepMinutes, cookMinutes, ingredients (array of strings), steps (array of strings).\n' +
-                'Ingredients must include amounts/units when present.\n' +
-                'Steps should be short and actionable.',
-            },
-            { role: 'user', content: text },
-          ],
-        } as any,
-        { feature: 'recipe-import', userId: user.id, userLabel: userEmail, endpoint: '/api/recipe-import' },
-        { callDetail: 'url-fallback-text' },
-      )
-
-      const raw = completion?.choices?.[0]?.message?.content || ''
-      const parsed = safeJsonParse(String(raw || '').trim().replace(/```json/gi, '').replace(/```/g, '').trim())
-      const recipe = coerceRecipeFromModel(parsed, fetchedPage.finalUrl || url)
+        text,
+        sourceUrl: fetchedPage.finalUrl || url,
+        userId: user.id,
+        userEmail,
+        callDetail: 'url-fallback-text',
+      })
       if (!recipe) return NextResponse.json({ error: 'Could not import that recipe. Try a photo instead.' }, { status: 422 })
       return NextResponse.json({ recipe }, { status: 200 })
     }
