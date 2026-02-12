@@ -38,6 +38,29 @@ const normalizeLines = (value: any) => {
   return []
 }
 
+const toIngredientDedupeKey = (value: string) => {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/^[\s•*\-–—]+/, '')
+    .replace(/^\d+\.\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const dedupeIngredientLines = (lines: string[]) => {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of lines) {
+    const line = String(raw || '').trim()
+    if (!line) continue
+    const key = toIngredientDedupeKey(line)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(line)
+  }
+  return out
+}
+
 const parseNumberOrNull = (value: any) => {
   const n = typeof value === 'number' ? value : Number(String(value || '').trim())
   return Number.isFinite(n) && n > 0 ? n : null
@@ -130,7 +153,7 @@ const parseRecipeFromJsonLd = (obj: any, sourceUrl: string): ImportedRecipe | nu
   if (!looksLikeRecipeType(obj)) return null
 
   const title = String((obj as any).name || (obj as any).headline || 'Recipe').trim() || 'Recipe'
-  const ingredients = normalizeLines((obj as any).recipeIngredient)
+  const ingredients = dedupeIngredientLines(normalizeLines((obj as any).recipeIngredient))
   const steps = normalizeInstructions((obj as any).recipeInstructions)
 
   const yieldRaw = (obj as any).recipeYield
@@ -272,7 +295,9 @@ const getOpenAIClient = () => {
 const coerceRecipeFromModel = (value: any, sourceUrl: string | null): ImportedRecipe | null => {
   if (!value || typeof value !== 'object') return null
   const title = String((value as any).title || (value as any).name || 'Recipe').trim() || 'Recipe'
-  const ingredients = normalizeLines((value as any).ingredients || (value as any).recipeIngredient || (value as any).recipeIngredients)
+  const ingredients = dedupeIngredientLines(
+    normalizeLines((value as any).ingredients || (value as any).recipeIngredient || (value as any).recipeIngredients),
+  )
   const steps = normalizeLines((value as any).steps || (value as any).instructions || (value as any).recipeInstructions)
   const servings = parseNumberOrNull((value as any).servings || (value as any).yield)
   const prepMinutes = parseNumberOrNull((value as any).prepMinutes)

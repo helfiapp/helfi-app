@@ -92,6 +92,7 @@ type BuilderItem = {
   __source?: NormalizedFoodItem['source'] | null
   __sourceId?: string | null
   __matchedName?: string | null
+  __importKey?: string | null
 }
 
 const CATEGORY_LABELS: Record<MealCategory, string> = {
@@ -1980,6 +1981,8 @@ export default function MealBuilderClient() {
           ? normalizeServingOptionsForItem(raw.servingOptions, name)
           : null,
         __selectedServingId: raw?.selectedServingId ?? null,
+        __matchedName: typeof raw?.__matchedName === 'string' ? raw.__matchedName : null,
+        __importKey: typeof raw?.__importKey === 'string' ? raw.__importKey : null,
       })
     }
     return next
@@ -2719,7 +2722,7 @@ export default function MealBuilderClient() {
     }
 
     const toImportDedupeKey = (lookup: string, amount: number | null, unit: BuilderUnit | null) => {
-      const nameKey = normalizeLookup(lookup)
+      const nameKey = normalizeLookup(lookup).toLowerCase()
       if (!nameKey) return ''
       const amountKey =
         typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? String(round3(amount)) : ''
@@ -2727,7 +2730,7 @@ export default function MealBuilderClient() {
       return `${nameKey}|${amountKey}|${unitKey}`
     }
 
-    const toImportNameKey = (lookup: string) => normalizeLookup(lookup)
+    const toImportNameKey = (lookup: string) => normalizeLookup(lookup).toLowerCase()
 
     const run = async () => {
       const lines = ingredients.map((l) => String(l || '').trim()).filter(Boolean).slice(0, 60)
@@ -2735,7 +2738,9 @@ export default function MealBuilderClient() {
       const seenImportKeys = new Set<string>()
       const seenImportNames = new Set<string>()
       for (const existing of items) {
-        const existingName = String((existing as any).__matchedName || existing.name || '').trim()
+        const existingStoredKey = String((existing as any).__importKey || '').trim()
+        if (existingStoredKey) seenImportKeys.add(existingStoredKey)
+        const existingName = String(existing.name || (existing as any).__matchedName || '').trim()
         const existingNameKey = toImportNameKey(existingName)
         if (existingNameKey) seenImportNames.add(existingNameKey)
         const existingAmount =
@@ -2811,7 +2816,7 @@ export default function MealBuilderClient() {
               addItemDirectWithOverrides(
                 aiResolved,
                 { amount: parsed.amount, unit: parsed.unit },
-                { displayName: lookup, matchedName: aiResolved.name },
+                { displayName: lookup, matchedName: aiResolved.name, importKey: lineKey },
               )
               if (lineKey) seenImportKeys.add(lineKey)
               if (lineNameKey) seenImportNames.add(lineNameKey)
@@ -2834,7 +2839,7 @@ export default function MealBuilderClient() {
           addItemDirectWithOverrides(
             resolved,
             { amount: parsed.amount, unit: parsed.unit },
-            { displayName: lookup, matchedName: resolved.name },
+            { displayName: lookup, matchedName: resolved.name, importKey: lineKey },
           )
           if (lineKey) seenImportKeys.add(lineKey)
           if (lineNameKey) seenImportNames.add(lineNameKey)
@@ -3179,11 +3184,11 @@ export default function MealBuilderClient() {
 	    addBuilderItem(next)
 	  }
 
-	  const addItemDirectWithOverrides = (
-	    r: NormalizedFoodItem,
-	    overrides?: { amount?: number | null; unit?: BuilderUnit | null },
-      options?: { displayName?: string | null; matchedName?: string | null },
-	  ) => {
+  const addItemDirectWithOverrides = (
+    r: NormalizedFoodItem,
+    overrides?: { amount?: number | null; unit?: BuilderUnit | null },
+      options?: { displayName?: string | null; matchedName?: string | null; importKey?: string | null },
+  ) => {
 	    const base = seedBaseServing(parseServingBase(r?.serving_size))
 	    let baseAmount = base.amount
 	    let baseUnit = base.unit
@@ -3231,6 +3236,7 @@ export default function MealBuilderClient() {
 	      __servingOptions: null,
 	      __selectedServingId: null,
         __matchedName: String(options?.matchedName || r.name || '').trim() || null,
+        __importKey: String(options?.importKey || '').trim() || null,
 	    }
 
 	    try {
