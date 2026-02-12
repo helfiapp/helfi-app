@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 01:07 AEDT
+- What changed: Fixed Food Diary drink/favorite regressions. Drink entries now keep the correct drink icon + amount label even when drink metadata is split across fields, and renaming from Diary or Favorites now syncs more reliably across Diary/Favorites using favorite ID, source ID, and barcode matching.
+- Where to see it (page/link): Food Diary meal list + Food Diary -> Add from favorites
+- What to quickly test: Add Hot chocolate from Water -> Favorites and confirm it keeps the hot chocolate icon + 500 ml in Food Diary. Rename an entry from Diary and from Favorites and confirm the new name appears across both areas.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 00:13 AEDT
 - What changed: Recipe import now auto-resolves missing ingredients using AI nutrition fallback and saves them as reusable custom foods for future matches. Build a meal portion-size box now shows live calories/macros directly in that section while servings/amount change.
 - Where to see it (page/link): Food Diary -> + menu -> Import Recipe -> Continue to Build a meal
