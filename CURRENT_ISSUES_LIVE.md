@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 01:55 AEDT
+- What changed: Fixed Food Diary hot chocolate icon regression and rename propagation fallback. Hot chocolate now always classifies as a drink in meal rows, and rename updates now sync using sourceId/barcode fallback when favoriteId is missing.
+- Where to see it (page/link): Food Diary meal list and Food Diary item rename flow (Diary + Favorites)
+- What to quickly test: Add hot chocolate from favorites/water flow and confirm drink icon + ml amount shows. Rename a diary item and confirm the new name appears across Diary/Favorites.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 01:07 AEDT
 - What changed: Fixed Food Diary drink/favorite regressions. Drink entries now keep the correct drink icon + amount label even when drink metadata is split across fields, and renaming from Diary or Favorites now syncs more reliably across Diary/Favorites using favorite ID, source ID, and barcode matching.
 - Where to see it (page/link): Food Diary meal list + Food Diary -> Add from favorites
