@@ -25658,6 +25658,31 @@ Please add nutritional information manually if needed.`);
                                         onClick={() => {
                                           setShowPhotoOptions(false)
                                           setPhotoOptionsAnchor(null)
+                                          router.push(
+                                            `/food/import-recipe?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`,
+                                          )
+                                        }}
+                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-700">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 00-2 2v10a2 2 0 002 2m0-14a2 2 0 012 2v10a2 2 0 01-2 2m0 0v2m-4-6h8" />
+                                          </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-base font-semibold text-gray-900">Import Recipe</div>
+                                          <div className="text-xs text-gray-500">Import by URL or photo and auto-fill Build a meal</div>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowPhotoOptions(false)
+                                          setPhotoOptionsAnchor(null)
                                           const qs = new URLSearchParams()
                                           qs.set('date', selectedDate)
                                           qs.set('category', cat.key)
@@ -25780,56 +25805,6 @@ Please add nutritional information manually if needed.`);
 	                                        <div className="flex-1">
 	                                          <div className="text-base font-semibold text-gray-900">Favorites</div>
 	                                          <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(cat.key)}</div>
-	                                        </div>
-	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-	                                        </svg>
-	                                      </button>
-
-	                                      <button
-	                                        type="button"
-	                                        onClick={() => {
-	                                          setShowPhotoOptions(false)
-	                                          setPhotoOptionsAnchor(null)
-	                                          router.push(
-	                                            `/food/import-recipe?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`,
-	                                          )
-	                                        }}
-	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-	                                      >
-	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-700">
-	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 00-2 2v10a2 2 0 002 2m0-14a2 2 0 012 2v10a2 2 0 01-2 2m0 0v2m-4-6h8" />
-	                                          </svg>
-	                                        </div>
-	                                        <div className="flex-1">
-	                                          <div className="text-base font-semibold text-gray-900">Import Recipe</div>
-	                                          <div className="text-xs text-gray-500">Import by URL or photo and auto-fill Build a meal</div>
-	                                        </div>
-	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-	                                        </svg>
-	                                      </button>
-
-	                                      <button
-	                                        type="button"
-	                                        onClick={() => {
-	                                          setShowPhotoOptions(false)
-	                                          setPhotoOptionsAnchor(null)
-	                                          router.push(
-	                                            `/food/import-recipe?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`,
-	                                          )
-	                                        }}
-	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-	                                      >
-	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-700">
-	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 00-2 2v10a2 2 0 002 2m0-14a2 2 0 012 2v10a2 2 0 01-2 2m0 0v2m-4-6h8" />
-	                                          </svg>
-	                                        </div>
-	                                        <div className="flex-1">
-	                                          <div className="text-base font-semibold text-gray-900">Import Recipe</div>
-	                                          <div className="text-xs text-gray-500">Import by URL or photo and auto-fill Build a meal</div>
 	                                        </div>
 	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -26042,6 +26017,32 @@ Please add nutritional information manually if needed.`);
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                         </svg>
                                       </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowPhotoOptions(false)
+                                          setPhotoOptionsAnchor(null)
+                                          router.push(
+                                            `/food/import-recipe?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`,
+                                          )
+                                        }}
+                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-700">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 00-2 2v10a2 2 0 002 2m0-14a2 2 0 012 2v10a2 2 0 01-2 2m0 0v2m-4-6h8" />
+                                          </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-base font-semibold text-gray-900">Import Recipe</div>
+                                          <div className="text-xs text-gray-500">Import by URL or photo and auto-fill Build a meal</div>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
+
 
                                       <button
                                         type="button"
