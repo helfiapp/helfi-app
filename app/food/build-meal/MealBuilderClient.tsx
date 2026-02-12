@@ -1635,6 +1635,7 @@ export default function MealBuilderClient() {
   const servingOptionsPendingRef = useRef<Set<string>>(new Set())
   const importResolveCacheRef = useRef<Map<string, NormalizedFoodItem | null>>(new Map())
   const importSearchCacheRef = useRef<Map<string, NormalizedFoodItem[]>>(new Map())
+  const importAutoFillCacheRef = useRef<Map<string, NormalizedFoodItem | null>>(new Map())
 
   const seqRef = useRef(0)
   const brandSeqRef = useRef(0)
@@ -2548,6 +2549,41 @@ export default function MealBuilderClient() {
     return null
   }
 
+  const resolveMissingIngredientWithAi = async (line: string, lookup: string) => {
+    const cacheKey = normalizeRecipeLookupValue(lookup || line)
+    if (!cacheKey) return null
+    if (importAutoFillCacheRef.current.has(cacheKey)) {
+      return importAutoFillCacheRef.current.get(cacheKey) || null
+    }
+    try {
+      const res = await fetch('/api/recipe-import/resolve-missing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ingredient: line,
+          lookup,
+          country: String((userData as any)?.country || '').trim() || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({} as any))
+      if (!res.ok || !data?.item) {
+        importAutoFillCacheRef.current.set(cacheKey, null)
+        return null
+      }
+      const item = data.item as NormalizedFoodItem
+      if (!hasMacroData(item)) {
+        importAutoFillCacheRef.current.set(cacheKey, null)
+        return null
+      }
+      importAutoFillCacheRef.current.set(cacheKey, item)
+      importResolveCacheRef.current.set(cacheKey, item)
+      return item
+    } catch {
+      importAutoFillCacheRef.current.set(cacheKey, null)
+      return null
+    }
+  }
+
   useEffect(() => {
     if (!recipeImportFlag) return
     if (recipeImportAppliedRef.current) return
@@ -2687,6 +2723,7 @@ export default function MealBuilderClient() {
       if (lines.length === 0) return
       importResolveCacheRef.current.clear()
       importSearchCacheRef.current.clear()
+      importAutoFillCacheRef.current.clear()
       setRecipeImportProgress({
         total: lines.length,
         processed: 0,
@@ -2723,6 +2760,22 @@ export default function MealBuilderClient() {
           }
           const resolved = await resolveItemWithMacros(lookup)
           if (!resolved) {
+            setRecipeImportProgress((prev) => ({
+              ...prev,
+              current: `Auto-filling ${currentLine}…`,
+            }))
+            const aiResolved = await resolveMissingIngredientWithAi(line, lookup)
+            if (aiResolved) {
+              addItemDirectWithOverrides(
+                aiResolved,
+                { amount: parsed.amount, unit: parsed.unit },
+                { displayName: lookup, matchedName: aiResolved.name },
+              )
+              processedCount += 1
+              matchedCount += 1
+              publishProgress(currentLine)
+              continue
+            }
             processedCount += 1
             missingCount += 1
             missing.push(line)
@@ -5152,6 +5205,27 @@ export default function MealBuilderClient() {
                 <option value="oz">oz</option>
               </select>
             </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
+                <span className="font-semibold text-gray-900">{formatEnergyValue(mealTotals.calories, energyUnit)}</span> {energyUnit}
+              </div>
+              <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
+                <span className="font-semibold text-gray-900">{round3(mealTotals.protein)}</span> g protein
+              </div>
+              <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
+                <span className="font-semibold text-gray-900">{round3(mealTotals.carbs)}</span> g carbs
+              </div>
+              <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
+                <span className="font-semibold text-gray-900">{round3(mealTotals.fat)}</span> g fat
+              </div>
+              <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
+                <span className="font-semibold text-gray-900">{round3(mealTotals.fiber)}</span> g fibre
+              </div>
+              <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
+                <span className="font-semibold text-gray-900">{round3(mealTotals.sugar)}</span> g sugar
+              </div>
+            </div>
+            <div className="mt-1 text-[11px] text-gray-600">These update live when you change portion size.</div>
             {portionUnit === 'serving' && Number.isFinite(Number(recipeServingsForPortion)) && Number(recipeServingsForPortion) > 0 ? (
               <div className="mt-2 text-[11px] text-gray-600">
                 Recipe has about {Math.round(Number(recipeServingsForPortion))} servings.
