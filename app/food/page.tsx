@@ -2070,7 +2070,7 @@ const isLikelyLiquidFood = (nameRaw: string, servingSizeRaw: string | null | und
   if (!label) return false
 
   if (label.includes('milk chocolate')) return false
-  const chocolateLiquid = /\bchocolate\s+(milk|shake|drink|smoothie|syrup)\b/.test(label)
+  const chocolateLiquid = /\b(chocolate\s+(milk|shake|drink|smoothie|syrup)|hot\s+chocolate|cocoa)\b/.test(label)
   if (label.includes('chocolate') && !chocolateLiquid) return false
 
   const solidHints = [
@@ -2121,6 +2121,8 @@ const isLikelyLiquidFood = (nameRaw: string, servingSizeRaw: string | null | und
     'shake',
     'milkshake',
     'syrup',
+    'hot chocolate',
+    'cocoa',
   ]
   return liquidKeywords.some((keyword) => label.includes(keyword))
 }
@@ -11618,14 +11620,16 @@ Please add nutritional information manually if needed.`);
 
     if (nameChanged && nextLabel) {
       const resolved = resolveFavoriteForEntry(editingEntry, baseTitle)
+      const matchBy = {
+        sourceId: getSourceIdForEntry(resolved.favorite || editingEntry),
+        barcode: extractBarcodeFromEntry(resolved.favorite || editingEntry),
+      }
       if (resolved.favoriteId) {
         updateFavoriteLabelById(resolved.favoriteId, nextLabel, previousLabel)
-        renameEntriesWithFavoriteId(resolved.favoriteId, nextLabel, {
-          sourceId: getSourceIdForEntry(resolved.favorite || editingEntry),
-          barcode: extractBarcodeFromEntry(resolved.favorite || editingEntry),
-        })
+        renameEntriesWithFavoriteId(resolved.favoriteId, nextLabel, matchBy)
       } else {
-        updateFavoriteLabelByMatch(previousLabel || baseTitle, nextLabel)
+        updateFavoriteLabelByMatch(previousLabel || baseTitle, nextLabel, matchBy)
+        renameEntriesWithFavoriteId('', nextLabel, matchBy)
       }
       try {
         const overrideSource = resolved.favorite || editingEntry
@@ -15157,21 +15161,32 @@ Please add nutritional information manually if needed.`);
     })
   }
 
-  const updateFavoriteLabelByMatch = (previousLabel: string, nextLabel: string) => {
+  const updateFavoriteLabelByMatch = (
+    previousLabel: string,
+    nextLabel: string,
+    match?: { sourceId?: string; barcode?: string },
+  ) => {
     const cleaned = normalizeMealLabel(nextLabel || '') || (nextLabel || '').trim()
     const fromKey = normalizeFoodName(normalizeMealLabel(previousLabel || ''))
-    if (!cleaned || !fromKey) return
+    const sourceId = String(match?.sourceId || '').trim()
+    const barcode = String(match?.barcode || '').trim()
+    if (!cleaned || (!fromKey && !sourceId && !barcode)) return
     setFavorites((prev) => {
       const base = Array.isArray(prev) ? prev : []
       let changed = false
       const next = base.map((fav: any) => {
         const existingLabel = favoriteDisplayLabel(fav) || fav?.label || fav?.description || ''
         const existingKey = normalizeFoodName(normalizeMealLabel(existingLabel))
+        const favSourceId = getSourceIdForEntry(fav)
+        const favBarcode = extractBarcodeFromEntry(fav)
         const aliases = Array.isArray((fav as any)?.aliases) ? ([...(fav as any).aliases] as string[]) : []
         const aliasMatch = aliases.some(
           (alias) => normalizeFoodName(normalizeMealLabel(alias || '')) === fromKey,
         )
-        if (existingKey !== fromKey && !aliasMatch) return fav
+        const sourceMatch = sourceId && favSourceId && favSourceId === sourceId
+        const barcodeMatch = barcode && favBarcode && favBarcode === barcode
+        const labelMatch = fromKey ? existingKey === fromKey || aliasMatch : false
+        if (!labelMatch && !sourceMatch && !barcodeMatch) return fav
         const normalizedExisting = normalizeMealLabel(existingLabel) || existingLabel
         const nextAliases = [...aliases]
         if (normalizedExisting && normalizedExisting !== cleaned && !nextAliases.includes(normalizedExisting)) {
@@ -15199,9 +15214,10 @@ Please add nutritional information manually if needed.`);
   ) => {
     const favId = String(favoriteId || '').trim()
     const cleaned = normalizeMealLabel(toLabel || '') || (toLabel || '').trim()
-    if (!favId || !cleaned) return
+    if (!cleaned) return
     const sourceId = String(match?.sourceId || '').trim()
     const barcode = String(match?.barcode || '').trim()
+    if (!favId && !sourceId && !barcode) return
     const updateEntry = (entry: any) => {
       if (!entry) return entry
       const entryFavId = getFavoriteIdForEntry(entry)
@@ -24915,8 +24931,8 @@ Please add nutritional information manually if needed.`);
                       const entryDisplayLabel = isWaterEntry
                         ? waterLabel || 'Water'
                         : overrideOnly ||
-                          favoriteLabel ||
                           (preferBaseTitleOverItem ? baseShort : '') ||
+                          favoriteLabel ||
                           entryItemName ||
                           baseShort ||
                           String(baseEntryLabel || '').trim() ||
