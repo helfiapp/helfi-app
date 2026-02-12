@@ -26814,8 +26814,8 @@ Please add nutritional information manually if needed.`);
                 <div className="text-white/80 text-sm mt-1 drop-shadow">Place barcode in the frame to scan</div>
               </div>
               
-              <div 
-                className="w-72 h-[220px] rounded-[22px] border-[4px] border-white/95 shadow-[0_0_30px_rgba(0,0,0,0.35)]"
+              <div
+                className="w-72 h-[220px] rounded-[22px] border-[4px] border-white/95 bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.48),0_0_30px_rgba(0,0,0,0.45)]"
               />
 
               {barcodeStatusHint && (
