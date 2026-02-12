@@ -170,6 +170,29 @@ type FetchedRecipePage = {
   html: string | null
   finalUrl: string | null
   recipe: ImportedRecipe | null
+  fallbackText: string | null
+}
+
+const fetchRecipeTextViaMirror = async (url: string): Promise<string | null> => {
+  try {
+    const normalized = String(url || '').trim().replace(/^https?:\/\//i, '')
+    if (!normalized) return null
+    const mirrorUrl = `https://r.jina.ai/http://${normalized}`
+    const res = await fetch(mirrorUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'user-agent': RECIPE_IMPORT_BROWSER_HEADERS['user-agent'],
+        accept: 'text/plain,text/markdown;q=0.9,*/*;q=0.8',
+      },
+    })
+    if (!res.ok) return null
+    const text = clampText(await res.text(), 1_200_000).trim()
+    if (!text) return null
+    return text
+  } catch {
+    return null
+  }
 }
 
 const fetchRecipePage = async (url: string): Promise<FetchedRecipePage> => {
@@ -217,13 +240,14 @@ const fetchRecipePage = async (url: string): Promise<FetchedRecipePage> => {
         const candidates = flattenJsonLdCandidates(parsed)
         for (const c of candidates) {
           const found = parseRecipeFromJsonLd(c, finalUrl)
-          if (found) return { html, finalUrl, recipe: found }
+          if (found) return { html, finalUrl, recipe: found, fallbackText: null }
         }
       }
     } catch {}
   }
 
-  return { html: bestHtml, finalUrl: bestFinalUrl, recipe: null }
+  const fallbackText = await fetchRecipeTextViaMirror(url)
+  return { html: bestHtml, finalUrl: bestFinalUrl, recipe: null, fallbackText }
 }
 
 const getOpenAIClient = () => {
@@ -280,8 +304,10 @@ export async function POST(request: NextRequest) {
       if (!openai) return NextResponse.json({ error: 'Recipe import is temporarily unavailable.' }, { status: 503 })
 
       const html = clampText(String(fetchedPage.html || ''), 1_200_000)
-      if (!html) return NextResponse.json({ error: 'Could not load that link.' }, { status: 400 })
-      const text = clampText(stripHtmlToText(html), 22_000)
+      const htmlText = html ? clampText(stripHtmlToText(html), 22_000) : ''
+      const mirrorText = clampText(String(fetchedPage.fallbackText || ''), 22_000)
+      const text = (mirrorText.length > htmlText.length ? mirrorText : htmlText).trim()
+      if (!text) return NextResponse.json({ error: 'Could not load that link.' }, { status: 400 })
 
       const completion = await runChatCompletionWithLogging(
         openai,
