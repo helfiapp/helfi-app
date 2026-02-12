@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 02:35 AEDT
+- What changed: Fixed rename sync so changing a food name from Diary/Favorites/Custom updates more reliably across Food Diary, Favorites, and All. Also fixed diary row label priority so a fresh rename is not overwritten by an old favorite title.
+- Where to see it (page/link): Food Diary -> Edit Entry, and Food Diary -> Add from favorites (Favorites/Custom/All tabs)
+- What to quickly test: Rename one item in Food Diary and confirm instant update in list + after refresh; rename same item in Favorites (or Custom) and confirm the name updates everywhere.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 02:08 AEDT
 - What changed: Fixed recipe import duplicate ingredient issue. Re-importing the same recipe URL now skips repeated ingredient lines and also skips ingredients already present in the current Build a meal list, so items do not get doubled.
 - Where to see it (page/link): Food Diary -> + menu -> Import Recipe -> Continue to Build a meal
