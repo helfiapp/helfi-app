@@ -171,6 +171,7 @@ type FetchedRecipePage = {
   finalUrl: string | null
   recipe: ImportedRecipe | null
   fallbackText: string | null
+  debug: string[]
 }
 
 const fetchRecipeTextViaMirror = async (url: string): Promise<string | null> => {
@@ -196,6 +197,7 @@ const fetchRecipeTextViaMirror = async (url: string): Promise<string | null> => 
 }
 
 const fetchRecipePage = async (url: string): Promise<FetchedRecipePage> => {
+  const debug: string[] = []
   const attempts: string[] = []
   const seen = new Set<string>()
   const pushAttempt = (candidate: string | null) => {
@@ -225,10 +227,13 @@ const fetchRecipePage = async (url: string): Promise<FetchedRecipePage> => {
         redirect: 'follow',
         headers: RECIPE_IMPORT_BROWSER_HEADERS,
       })
+      debug.push(`direct:${attemptUrl}:status:${res.status}`)
       if (!res.ok) continue
 
       const finalUrl = String(res.url || attemptUrl).trim() || attemptUrl
+      debug.push(`direct-final:${finalUrl}`)
       const html = clampText(await res.text(), 2_000_000)
+      debug.push(`direct-html-len:${html.length}`)
       if (html && (!bestHtml || html.length > bestHtml.length)) {
         bestHtml = html
         bestFinalUrl = finalUrl
@@ -240,14 +245,17 @@ const fetchRecipePage = async (url: string): Promise<FetchedRecipePage> => {
         const candidates = flattenJsonLdCandidates(parsed)
         for (const c of candidates) {
           const found = parseRecipeFromJsonLd(c, finalUrl)
-          if (found) return { html, finalUrl, recipe: found, fallbackText: null }
+          if (found) return { html, finalUrl, recipe: found, fallbackText: null, debug }
         }
       }
-    } catch {}
+    } catch (err: any) {
+      debug.push(`direct:${attemptUrl}:error:${String(err?.message || err || 'unknown')}`)
+    }
   }
 
   const fallbackText = await fetchRecipeTextViaMirror(url)
-  return { html: bestHtml, finalUrl: bestFinalUrl, recipe: null, fallbackText }
+  debug.push(`mirror-len:${fallbackText ? fallbackText.length : 0}`)
+  return { html: bestHtml, finalUrl: bestFinalUrl, recipe: null, fallbackText, debug }
 }
 
 const getOpenAIClient = () => {
@@ -307,7 +315,17 @@ export async function POST(request: NextRequest) {
       const htmlText = html ? clampText(stripHtmlToText(html), 22_000) : ''
       const mirrorText = clampText(String(fetchedPage.fallbackText || ''), 22_000)
       const text = (mirrorText.length > htmlText.length ? mirrorText : htmlText).trim()
-      if (!text) return NextResponse.json({ error: 'Could not load that link.' }, { status: 400 })
+      if (!text) {
+        console.warn('recipe-import:url-load-empty', {
+          url,
+          finalUrl: fetchedPage.finalUrl,
+          htmlLength: html.length,
+          htmlTextLength: htmlText.length,
+          mirrorTextLength: mirrorText.length,
+          debug: fetchedPage.debug,
+        })
+        return NextResponse.json({ error: 'Could not load that link.' }, { status: 400 })
+      }
 
       const completion = await runChatCompletionWithLogging(
         openai,
