@@ -6,6 +6,23 @@ import { prisma } from '@/lib/prisma'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
 
+function isMissingStripeSubscriptionError(error: any) {
+  const code = String(error?.code || '').toLowerCase()
+  const message = String(error?.message || '')
+  return code === 'resource_missing' || /no such subscription/i.test(message)
+}
+
+async function clearStripeSubscriptionIdForUser(userId: string) {
+  try {
+    await prisma.$executeRawUnsafe(
+      `UPDATE "Subscription" SET "stripeSubscriptionId" = NULL WHERE "userId" = $1`,
+      userId,
+    )
+  } catch (error) {
+    console.error('Error clearing stale stripeSubscriptionId:', error)
+  }
+}
+
 // GET /api/billing/subscription - Get current subscription status
 export async function GET(request: NextRequest) {
   try {
@@ -95,14 +112,17 @@ export async function GET(request: NextRequest) {
     // Get Stripe subscription details if available
     let stripeSubscription = null
     // Safely access stripeSubscriptionId field (may not exist in Prisma types yet)
-    const stripeSubscriptionId = (subscription as any).stripeSubscriptionId || null
+    let stripeSubscriptionId = (subscription as any).stripeSubscriptionId || null
     
     if (stripeSubscriptionId) {
       try {
         stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
       } catch (error: any) {
         console.error('Error fetching Stripe subscription:', error?.message || error)
-        // Continue without Stripe data - subscription might have been deleted in Stripe
+        if (isMissingStripeSubscriptionError(error)) {
+          await clearStripeSubscriptionIdForUser(user.id)
+          stripeSubscriptionId = null
+        }
       }
     } else {
       // Try to find Stripe subscription by customer email
@@ -177,11 +197,11 @@ export async function GET(request: NextRequest) {
         monthlyPriceCents: subscription.monthlyPriceCents,
         startDate: subscription.startDate?.toISOString() || subscription.startDate,
         endDate: subscription.endDate?.toISOString() || subscription.endDate || null,
-        stripeSubscriptionId: stripeSubscriptionId,
+        stripeSubscriptionId,
         stripeStatus: stripeSubscription?.status,
         stripeCancelAtPeriodEnd: stripeSubscription?.cancel_at_period_end,
         stripeCurrentPeriodEnd: stripeSubscription?.current_period_end ? new Date(stripeSubscription.current_period_end * 1000).toISOString() : null,
-        isStripeManaged: !!stripeSubscriptionId || !!stripeSubscription
+        isStripeManaged: !!stripeSubscription
       }
     })
   } catch (error: any) {
@@ -308,40 +328,46 @@ export async function POST(request: NextRequest) {
 
     if (action === 'cancel') {
       if (stripeSubscriptionId) {
-        // Cancel Stripe subscription at period end
-        const updatedSubscription = await stripe.subscriptions.update(stripeSubscriptionId, {
-          cancel_at_period_end: true
-        })
-        
-        // Get the actual cancellation date (current_period_end)
-        const cancellationDate = updatedSubscription.current_period_end 
-          ? new Date(updatedSubscription.current_period_end * 1000)
-          : null
-        
-        return NextResponse.json({ 
-          success: true,
-          message: 'Subscription will be canceled at the end of the current billing period',
-          cancellationDate: cancellationDate?.toISOString() || null
-        })
-      } else {
-        // Admin-granted subscription - set endDate to end of current period
-        const startDate = dbSubscription.startDate ? new Date(dbSubscription.startDate) : new Date()
-        const endDate = new Date(startDate)
-        endDate.setMonth(endDate.getMonth() + 1) // Cancel at end of current month
-        
-        // Use raw SQL to update endDate
-        await prisma.$executeRawUnsafe(
-          `UPDATE "Subscription" SET "endDate" = $1 WHERE "userId" = $2`,
-          endDate,
-          user.id
-        )
-        
-        return NextResponse.json({ 
-          success: true,
-          message: 'Subscription will be canceled at the end of the current billing period',
-          cancellationDate: endDate.toISOString()
-        })
+        try {
+          // Cancel Stripe subscription at period end
+          const updatedSubscription = await stripe.subscriptions.update(stripeSubscriptionId, {
+            cancel_at_period_end: true
+          })
+          
+          // Get the actual cancellation date (current_period_end)
+          const cancellationDate = updatedSubscription.current_period_end 
+            ? new Date(updatedSubscription.current_period_end * 1000)
+            : null
+          
+          return NextResponse.json({ 
+            success: true,
+            message: 'Subscription will be canceled at the end of the current billing period',
+            cancellationDate: cancellationDate?.toISOString() || null
+          })
+        } catch (error: any) {
+          if (!isMissingStripeSubscriptionError(error)) throw error
+          await clearStripeSubscriptionIdForUser(user.id)
+          stripeSubscriptionId = null
+        }
       }
+
+      // Admin-granted subscription - set endDate to end of current period
+      const startDate = dbSubscription.startDate ? new Date(dbSubscription.startDate) : new Date()
+      const endDate = new Date(startDate)
+      endDate.setMonth(endDate.getMonth() + 1) // Cancel at end of current month
+      
+      // Use raw SQL to update endDate
+      await prisma.$executeRawUnsafe(
+        `UPDATE "Subscription" SET "endDate" = $1 WHERE "userId" = $2`,
+        endDate,
+        user.id
+      )
+      
+      return NextResponse.json({ 
+        success: true,
+        message: 'Subscription will be canceled at the end of the current billing period',
+        cancellationDate: endDate.toISOString()
+      })
     } else if (action === 'upgrade' || action === 'downgrade') {
       if (!newPlan) {
         return NextResponse.json({ error: 'New plan required for upgrade/downgrade' }, { status: 400 })
@@ -360,61 +386,67 @@ export async function POST(request: NextRequest) {
       }
 
       if (stripeSubscriptionId) {
-        // Update Stripe subscription
-        const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
-        const currentPriceId = stripeSub.items.data[0]?.price?.id
+        try {
+          // Update Stripe subscription
+          const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
+          const currentPriceId = stripeSub.items.data[0]?.price?.id
 
-        if (currentPriceId === newPriceId) {
-          return NextResponse.json({ error: 'You are already on this plan' }, { status: 400 })
+          if (currentPriceId === newPriceId) {
+            return NextResponse.json({ error: 'You are already on this plan' }, { status: 400 })
+          }
+
+          // Update subscription to new price
+          await stripe.subscriptions.update(stripeSubscriptionId, {
+            items: [{
+              id: stripeSub.items.data[0].id,
+              price: newPriceId,
+            }],
+            proration_behavior: 'always_invoice', // Prorate the difference
+          })
+
+          // Determine new tier
+          let newPriceCents = 2000
+          if (newPlan === 'plan_10_monthly') newPriceCents = 1000
+          else if (newPlan === 'plan_20_monthly') newPriceCents = 2000
+          else if (newPlan === 'plan_30_monthly') newPriceCents = 3000
+          else if (newPlan === 'plan_50_monthly') newPriceCents = 5000
+
+          // Update database using raw SQL
+          await prisma.$executeRawUnsafe(
+            `UPDATE "Subscription" SET "monthlyPriceCents" = $1 WHERE "userId" = $2`,
+            newPriceCents,
+            user.id
+          )
+
+          return NextResponse.json({ 
+            success: true,
+            message: `Subscription ${action === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`
+          })
+        } catch (error: any) {
+          if (!isMissingStripeSubscriptionError(error)) throw error
+          await clearStripeSubscriptionIdForUser(user.id)
+          stripeSubscriptionId = null
         }
-
-        // Update subscription to new price
-        await stripe.subscriptions.update(stripeSubscriptionId, {
-          items: [{
-            id: stripeSub.items.data[0].id,
-            price: newPriceId,
-          }],
-          proration_behavior: 'always_invoice', // Prorate the difference
-        })
-
-        // Determine new tier
-        let newPriceCents = 2000
-        if (newPlan === 'plan_10_monthly') newPriceCents = 1000
-        else if (newPlan === 'plan_20_monthly') newPriceCents = 2000
-        else if (newPlan === 'plan_30_monthly') newPriceCents = 3000
-        else if (newPlan === 'plan_50_monthly') newPriceCents = 5000
-
-        // Update database using raw SQL
-        await prisma.$executeRawUnsafe(
-          `UPDATE "Subscription" SET "monthlyPriceCents" = $1 WHERE "userId" = $2`,
-          newPriceCents,
-          user.id
-        )
-
-        return NextResponse.json({ 
-          success: true,
-          message: `Subscription ${action === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`
-        })
-      } else {
-        // Admin-granted subscription - update database only
-        let newPriceCents = 2000
-        if (newPlan === 'plan_10_monthly') newPriceCents = 1000
-        else if (newPlan === 'plan_20_monthly') newPriceCents = 2000
-        else if (newPlan === 'plan_30_monthly') newPriceCents = 3000
-        else if (newPlan === 'plan_50_monthly') newPriceCents = 5000
-
-        // Update database using raw SQL
-        await prisma.$executeRawUnsafe(
-          `UPDATE "Subscription" SET "monthlyPriceCents" = $1 WHERE "userId" = $2`,
-          newPriceCents,
-          user.id
-        )
-
-        return NextResponse.json({ 
-          success: true,
-          message: `Subscription ${action === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`
-        })
       }
+
+      // Admin-granted subscription - update database only
+      let newPriceCents = 2000
+      if (newPlan === 'plan_10_monthly') newPriceCents = 1000
+      else if (newPlan === 'plan_20_monthly') newPriceCents = 2000
+      else if (newPlan === 'plan_30_monthly') newPriceCents = 3000
+      else if (newPlan === 'plan_50_monthly') newPriceCents = 5000
+
+      // Update database using raw SQL
+      await prisma.$executeRawUnsafe(
+        `UPDATE "Subscription" SET "monthlyPriceCents" = $1 WHERE "userId" = $2`,
+        newPriceCents,
+        user.id
+      )
+
+      return NextResponse.json({ 
+        success: true,
+        message: `Subscription ${action === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`
+      })
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
