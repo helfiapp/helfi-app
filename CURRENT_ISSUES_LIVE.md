@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 13:58 AEDT
+- What changed: Favorites “Change amount” now starts with ingredients collapsed, each ingredient shows its own macro values, egg size dropdown labels now include grams, and non-drink meals no longer show drink icons/amount labels from stale drink metadata.
+- Where to see it (page/link): Food Diary -> Add from favorites -> Preview -> Change amount, and Food Diary meal list cards
+- What to quickly test: In Change amount, confirm ingredients are collapsed first, tap to expand controls, see per-ingredient macros, and check egg unit dropdown shows weights. In Meals list, confirm breakfast/custom meals show food icon (not hot chocolate icon) unless it is truly a drink.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-12 04:34 AEDT
 - What changed: Fixed blank “Weight / size” values in Favorites -> Preview -> Change amount. The field now auto-fills from the current servings and selected unit when a saved weight is not already present.
 - Where to see it (page/link): Food Diary -> Add from favorites -> Preview -> Change amount
