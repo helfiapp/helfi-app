@@ -3723,6 +3723,7 @@ export default function FoodDiary() {
     overallTargets?: any
     overallUsed?: any
   } | null>(null)
+  const [favoriteAdjustExpanded, setFavoriteAdjustExpanded] = useState<Record<string, boolean>>({})
   const favoriteAdjustBackupRef = useRef<{
     items: any[]
     nutrition: any
@@ -15523,6 +15524,7 @@ Please add nutritional information manually if needed.`);
     setShowFavoritesPicker(false)
     favoritesReplaceTargetRef.current = null
     favoritesActionRef.current = null
+    setFavoriteAdjustExpanded({})
     setFavoriteActionModal(null)
   }
 
@@ -15671,6 +15673,7 @@ Please add nutritional information manually if needed.`);
       Number.isFinite(firstAmount) && firstAmount > 0 && Math.abs(firstAmount - 1) > 0.001
         ? `${formatServingsDisplay(firstAmount)} serving${Math.abs(firstAmount - 1) < 0.001 ? '' : 's'}`
         : state.servingLabel
+    setFavoriteAdjustExpanded({})
     setFavoriteActionModal((prev) =>
       prev
         ? {
@@ -24801,7 +24804,18 @@ Please add nutritional information manually if needed.`);
                       const isMenuOpen = swipeMenuEntry === entryKey
                       const isWaterEntry = Boolean(food?.__water)
                       const drinkMeta = !isWaterEntry ? getDrinkMetaFromEntry(food) : null
-                      const isDrinkEntry = !isWaterEntry && Boolean(drinkMeta?.type)
+                      const baseEntryLabel = food?.description || food?.label || 'Meal'
+                      const singleItemForDrink =
+                        !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1 ? food.items[0] : null
+                      const isDrinkEntry =
+                        !isWaterEntry &&
+                        Boolean(drinkMeta?.type) &&
+                        (singleItemForDrink
+                          ? isLikelyLiquidFood(
+                              String(singleItemForDrink?.name || drinkMeta?.type || ''),
+                              String(singleItemForDrink?.serving_size || ''),
+                            )
+                          : isLikelyLiquidFood(String(baseEntryLabel || drinkMeta?.type || ''), ''))
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
                       const entryCaloriesValue =
                         !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Number(entryTotals?.calories) : null
@@ -24815,7 +24829,6 @@ Please add nutritional information manually if needed.`);
                         !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1
                           ? String(food.items[0]?.name || food.items[0]?.label || '').trim()
                           : ''
-                      const baseEntryLabel = food?.description || food?.label || 'Meal'
                       const resolvedFavorite = isWaterEntry ? null : resolveFavoriteForEntry(food, baseEntryLabel)
                       const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
                       const overrideOnly = isWaterEntry ? '' : resolveFoodNameOverrideOnly(baseEntryLabel, food)
@@ -27241,6 +27254,8 @@ Please add nutritional information manually if needed.`);
                     const servingsCount = effectiveServings(adjustItem)
                     const servingOptions = Array.isArray(adjustItem?.servingOptions) ? adjustItem.servingOptions : []
                     const selectedServingId = adjustItem?.selectedServingId || servingOptions?.[0]?.id || ''
+                    const adjustKey = String(adjustItem?.__adjustKey || idx)
+                    const isExpanded = Boolean(favoriteAdjustExpanded[adjustKey])
                     const servingSizeLabel = String(adjustItem?.serving_size || '').trim()
                     const servingUnitMeta = parseServingUnitMetadata(servingSizeLabel || adjustItem?.name || '')
                     const piecesPerServing =
@@ -27261,168 +27276,252 @@ Please add nutritional information manually if needed.`);
                     const weightUnit = normalizeWeightUnit(adjustItem?.weightUnit)
                     const pieceGrams = getPieceGramsForItem(adjustItem, baseWeightPerServing)
                     const servingsStep = piecesPerServing && piecesPerServing > 0 ? 1 / piecesPerServing : 0.25
+                    const ingredientTotals = (() => {
+                      try {
+                        const totals = sanitizeNutritionTotals(recalculateNutritionFromItems([adjustItem])) as any
+                        return {
+                          calories: Number(totals?.calories) || 0,
+                          protein: Number(totals?.protein) || 0,
+                          carbs: Number(totals?.carbs) || 0,
+                          fat: Number(totals?.fat) || 0,
+                          fiber: Number(totals?.fiber) || 0,
+                          sugar: Number(totals?.sugar) || 0,
+                        }
+                      } catch {
+                        const multiplier = Number.isFinite(servingsCount) && servingsCount > 0 ? servingsCount : 1
+                        return {
+                          calories: (Number(adjustItem?.calories) || 0) * multiplier,
+                          protein: (Number(adjustItem?.protein_g ?? adjustItem?.protein) || 0) * multiplier,
+                          carbs: (Number(adjustItem?.carbs_g ?? adjustItem?.carbs) || 0) * multiplier,
+                          fat: (Number(adjustItem?.fat_g ?? adjustItem?.fat) || 0) * multiplier,
+                          fiber: (Number(adjustItem?.fiber_g ?? adjustItem?.fiber) || 0) * multiplier,
+                          sugar: (Number(adjustItem?.sugar_g ?? adjustItem?.sugar) || 0) * multiplier,
+                        }
+                      }
+                    })()
+                    const compactMacroSummary = [
+                      `${formatEnergyNumber(ingredientTotals.calories, energyUnit)} ${energyUnit}`,
+                      `${formatNutrientValue('protein', ingredientTotals.protein)} protein`,
+                      `${formatNutrientValue('carbs', ingredientTotals.carbs)} carbs`,
+                      `${formatNutrientValue('fat', ingredientTotals.fat)} fat`,
+                      `${formatNutrientValue('fiber', ingredientTotals.fiber)} fiber`,
+                      `${formatNutrientValue('sugar', ingredientTotals.sugar)} sugar`,
+                    ].join(' • ')
 
                     return (
-                      <div key={adjustItem?.__adjustKey || idx} className="border border-gray-200 rounded-xl p-3 space-y-3">
-                        <div className="text-sm font-semibold text-gray-900 truncate">
-                          {String(adjustItem?.name || `Ingredient ${idx + 1}`)}
-                        </div>
-
-                        {servingOptions.length > 0 && (
-                          <div>
-                            <div className="text-xs font-semibold text-gray-500 mb-1">Serving type</div>
-                            <select
-                              value={selectedServingId}
-                              onChange={(e) => handleServingOptionSelect(idx, e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
-                            >
-                              {servingOptions.map((option: any) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.label || option.serving_size}
-                                </option>
-                              ))}
-                            </select>
+                      <div key={adjustKey} className="border border-gray-200 rounded-xl p-3 space-y-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFavoriteAdjustExpanded((prev) => ({
+                              ...prev,
+                              [adjustKey]: !prev[adjustKey],
+                            }))
+                          }
+                          className="w-full flex items-start justify-between gap-3 text-left"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-gray-900 truncate">
+                              {String(adjustItem?.name || `Ingredient ${idx + 1}`)}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1 break-words">{compactMacroSummary}</div>
                           </div>
-                        )}
+                          <span
+                            className={`material-symbols-outlined text-gray-500 transition-transform ${
+                              isExpanded ? 'rotate-180' : ''
+                            }`}
+                          >
+                            expand_more
+                          </span>
+                        </button>
 
-                        <div>
-                          <div className="text-xs font-semibold text-gray-500 mb-1">Servings</div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
-                              onClick={() => {
-                                const current = analyzedItems[idx]?.servings || 1
-                                const next = Math.max(0, current - Math.max(servingsStep, 0.01))
-                                updateItemField(idx, 'servings', next)
-                              }}
-                            >
-                              -
-                            </button>
-                            <input
-                              type="number"
-                              min={0}
-                              step={servingsStep > 0 ? Math.max(servingsStep, 0.01) : 0.25}
-                              value={Number.isFinite(Number(adjustItem?.servings)) ? Number(adjustItem.servings) : 1}
-                              onChange={(e) => updateItemField(idx, 'servings', e.target.value)}
-                              className="w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-900"
-                            />
-                            <button
-                              type="button"
-                              className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
-                              onClick={() => {
-                                const current = analyzedItems[idx]?.servings || 1
-                                const next = current + Math.max(servingsStep, 0.01)
-                                updateItemField(idx, 'servings', next)
-                              }}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
+                        {isExpanded && (
+                          <div className="pt-3 border-t border-gray-100 space-y-3">
+                            {servingOptions.length > 0 && (
+                              <div>
+                                <div className="text-xs font-semibold text-gray-500 mb-1">Serving type</div>
+                                <select
+                                  value={selectedServingId}
+                                  onChange={(e) => handleServingOptionSelect(idx, e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                                >
+                                  {servingOptions.map((option: any) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label || option.serving_size}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
 
-                        {showPiecesControl && piecesPerServingValue && (
-                          <div>
-                            <div className="text-xs font-semibold text-gray-500 mb-1">Pieces</div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
-                                onClick={() => {
-                                  const current = analyzedItems[idx]?.servings || 1
-                                  const currentPieces = pieceCount ?? current * piecesPerServingValue
-                                  const newPieces = Math.max(0, currentPieces - 1)
-                                  const newServings = newPieces / piecesPerServingValue
-                                  updateItemField(idx, 'servings', newServings)
-                                }}
-                              >
-                                -
-                              </button>
-                              <input
-                                type="number"
-                                min={0}
-                                step={1}
-                                value={pieceCount ?? 0}
-                                onChange={(e) => {
-                                  const parsed = Number(e.target.value)
-                                  if (!Number.isFinite(parsed)) return
-                                  const newServings = Math.max(0, parsed) / piecesPerServingValue
-                                  updateItemField(idx, 'servings', newServings)
-                                }}
-                                className="w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-900"
-                              />
-                              <button
-                                type="button"
-                                className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
-                                onClick={() => {
-                                  const current = analyzedItems[idx]?.servings || 1
-                                  const currentPieces = pieceCount ?? current * piecesPerServingValue
-                                  const newPieces = currentPieces + 1
-                                  const newServings = newPieces / piecesPerServingValue
-                                  updateItemField(idx, 'servings', newServings)
-                                }}
-                              >
-                                +
-                              </button>
+                            <div>
+                              <div className="text-xs font-semibold text-gray-500 mb-1">Servings</div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+                                  onClick={() => {
+                                    const current = analyzedItems[idx]?.servings || 1
+                                    const next = Math.max(0, current - Math.max(servingsStep, 0.01))
+                                    updateItemField(idx, 'servings', next)
+                                  }}
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={servingsStep > 0 ? Math.max(servingsStep, 0.01) : 0.25}
+                                  value={Number.isFinite(Number(adjustItem?.servings)) ? Number(adjustItem.servings) : 1}
+                                  onChange={(e) => updateItemField(idx, 'servings', e.target.value)}
+                                  className="w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-900"
+                                />
+                                <button
+                                  type="button"
+                                  className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+                                  onClick={() => {
+                                    const current = analyzedItems[idx]?.servings || 1
+                                    const next = current + Math.max(servingsStep, 0.01)
+                                    updateItemField(idx, 'servings', next)
+                                  }}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+
+                            {showPiecesControl && piecesPerServingValue && (
+                              <div>
+                                <div className="text-xs font-semibold text-gray-500 mb-1">Pieces</div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+                                    onClick={() => {
+                                      const current = analyzedItems[idx]?.servings || 1
+                                      const currentPieces = pieceCount ?? current * piecesPerServingValue
+                                      const newPieces = Math.max(0, currentPieces - 1)
+                                      const newServings = newPieces / piecesPerServingValue
+                                      updateItemField(idx, 'servings', newServings)
+                                    }}
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={1}
+                                    value={pieceCount ?? 0}
+                                    onChange={(e) => {
+                                      const parsed = Number(e.target.value)
+                                      if (!Number.isFinite(parsed)) return
+                                      const newServings = Math.max(0, parsed) / piecesPerServingValue
+                                      updateItemField(idx, 'servings', newServings)
+                                    }}
+                                    className="w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-900"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="w-9 h-9 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+                                    onClick={() => {
+                                      const current = analyzedItems[idx]?.servings || 1
+                                      const currentPieces = pieceCount ?? current * piecesPerServingValue
+                                      const newPieces = currentPieces + 1
+                                      const newServings = newPieces / piecesPerServingValue
+                                      updateItemField(idx, 'servings', newServings)
+                                    }}
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="text-xs font-semibold text-gray-500 mb-1">Weight / size</div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={0}
+                                  step={getWeightInputStep(weightUnit) as any}
+                                  value={(() => {
+                                    const key = `fav:adjust:${idx}:weightAmount`
+                                    if (Object.prototype.hasOwnProperty.call(numericInputDrafts, key)) {
+                                      return numericInputDrafts[key]
+                                    }
+                                    return Number.isFinite(Number(adjustItem?.weightAmount)) && Number(adjustItem.weightAmount) > 0
+                                      ? String(Number(adjustItem.weightAmount))
+                                      : baseWeightPerServing && baseWeightPerServing > 0
+                                      ? String(roundWeightValue(baseWeightPerServing * servingsCount, weightUnit))
+                                      : ''
+                                  })()}
+                                  onFocus={() => {
+                                    const key = `fav:adjust:${idx}:weightAmount`
+                                    setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                                  }}
+                                  onChange={(e) => {
+                                    const key = `fav:adjust:${idx}:weightAmount`
+                                    const v = e.target.value
+                                    setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                  }}
+                                  onBlur={() => {
+                                    const key = `fav:adjust:${idx}:weightAmount`
+                                    const v = numericInputDrafts[key]
+                                    if (String(v || '').trim() !== '') {
+                                      updateItemField(idx, 'weightAmount', v)
+                                    }
+                                    setNumericInputDrafts((prev) => {
+                                      const next = { ...prev }
+                                      delete next[key]
+                                      return next
+                                    })
+                                  }}
+                                  className="w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-900"
+                                />
+                                <select
+                                  value={weightUnit}
+                                  onChange={(e) => updateItemField(idx, 'weightUnit', e.target.value)}
+                                  className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-700"
+                                >
+                                  {getWeightUnitOptions(adjustItem, weightUnit, pieceGrams).map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {ITEM_NUTRIENT_META.map((meta) => {
+                                const valueByKey: Record<string, number> = {
+                                  calories: ingredientTotals.calories,
+                                  protein: ingredientTotals.protein,
+                                  carbs: ingredientTotals.carbs,
+                                  fat: ingredientTotals.fat,
+                                  fiber: ingredientTotals.fiber,
+                                  sugar: ingredientTotals.sugar,
+                                }
+                                const display = formatNutrientValue(meta.key as any, valueByKey[meta.key] || 0)
+                                const label =
+                                  meta.key === 'calories'
+                                    ? energyUnit === 'kJ'
+                                      ? 'Kilojoules'
+                                      : 'Calories'
+                                    : meta.label
+                                return (
+                                  <div key={meta.key} className="rounded-xl border border-gray-100 bg-gray-50 p-2.5">
+                                    <div className="text-sm font-bold text-gray-900">{display}</div>
+                                    <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mt-0.5">
+                                      {label}
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         )}
-
-                        <div>
-                          <div className="text-xs font-semibold text-gray-500 mb-1">Weight / size</div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              step={getWeightInputStep(weightUnit) as any}
-                              value={(() => {
-                                const key = `fav:adjust:${idx}:weightAmount`
-                                if (Object.prototype.hasOwnProperty.call(numericInputDrafts, key)) {
-                                  return numericInputDrafts[key]
-                                }
-                                return Number.isFinite(Number(adjustItem?.weightAmount)) && Number(adjustItem.weightAmount) > 0
-                                  ? String(Number(adjustItem.weightAmount))
-                                  : baseWeightPerServing && baseWeightPerServing > 0
-                                  ? String(roundWeightValue(baseWeightPerServing * servingsCount, weightUnit))
-                                  : ''
-                              })()}
-                              onFocus={() => {
-                                const key = `fav:adjust:${idx}:weightAmount`
-                                setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
-                              }}
-                              onChange={(e) => {
-                                const key = `fav:adjust:${idx}:weightAmount`
-                                const v = e.target.value
-                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
-                              }}
-                              onBlur={() => {
-                                const key = `fav:adjust:${idx}:weightAmount`
-                                const v = numericInputDrafts[key]
-                                if (String(v || '').trim() !== '') {
-                                  updateItemField(idx, 'weightAmount', v)
-                                }
-                                setNumericInputDrafts((prev) => {
-                                  const next = { ...prev }
-                                  delete next[key]
-                                  return next
-                                })
-                              }}
-                              className="w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-900"
-                            />
-                            <select
-                              value={weightUnit}
-                              onChange={(e) => updateItemField(idx, 'weightUnit', e.target.value)}
-                              className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-700"
-                            >
-                              {getWeightUnitOptions(adjustItem, weightUnit, pieceGrams).map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
                       </div>
                     )
                   })
