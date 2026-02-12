@@ -1,5 +1,68 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 00:13 AEDT
+- What changed: Recipe import now auto-resolves missing ingredients using AI nutrition fallback and saves them as reusable custom foods for future matches. Build a meal portion-size box now shows live calories/macros directly in that section while servings/amount change.
+- Where to see it (page/link): Food Diary -> + menu -> Import Recipe -> Continue to Build a meal
+- What to quickly test: Import a recipe with a previously missing ingredient and confirm it auto-adds instead of manual-only; then change serving amount and confirm calories/protein/carbs/fat/fibre/sugar update live inside the portion-size card.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 23:59 AEDT
+- What changed: Barcode scanner visual tweak only. Darkened the area outside the scan frame again so the barcode target window stands out clearly, while keeping the recent one-scan fix unchanged.
+- Where to see it (page/link): Food Diary -> Add food -> Barcode Scanner
+- What to quickly test: Open scanner and confirm outside area is darker again while barcode still scans and saves on first try.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 22:32 AEDT
+- What changed: Fixed Food Diary barcode scanner so one successful scan is enough. The scanner now closes as soon as a product match is found, then saves the item in the background, and avoids unnecessary camera restarts during lookup retries.
+- Where to see it (page/link): Food Diary -> Add food -> Barcode Scanner
+- What to quickly test: Scan one packaged food barcode once and confirm it closes immediately and adds the item without forcing a second scan.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 22:01 AEDT
+- What changed: Sped up recipe-import meal building. Ingredient matching now runs with faster candidate prioritization, fewer heavy lookups, parallel search attempts, and per-request timeouts to prevent long stalls. Also shows manual-match ingredient list live while building.
+- Where to see it (page/link): Food Diary -> Import Recipe -> Continue to Build a meal
+- What to quickly test: Import the same Delicious recipe and confirm the build counter moves quickly (not stuck on 0/1 for minutes) and ingredients/manual-match updates appear during the build.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 21:35 AEDT
+- What changed: Fixed recipe URL import for anti-bot blocked sites by adding a browser-side fallback. If server fetch is blocked (403), the app now pulls readable page text in-browser and sends it to the importer, so recipe import can still complete.
+- Where to see it (page/link): Food Diary -> + menu -> Import Recipe -> Import by URL
+- What to quickly test: Import this URL and confirm the review form loads instead of red error: https://www.delicious.com.au/recipes/pork-mince-salad-larb-roti-recipe/i6n58sei?r=recipes/collections/1vo4q819
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 20:43 AEDT
+- What changed: Fixed recipe URL import reliability for blocked/tracking-heavy links. Import now uses one strong page fetch path (with browser-style headers), retries a clean URL without tracking query text, and reuses the same loaded page for extraction so it no longer fails on a second weaker fetch.
+- Where to see it (page/link): Food Diary -> + menu -> Import Recipe -> Import by URL
+- What to quickly test: Paste this link and import: https://www.delicious.com.au/recipes/pork-mince-salad-larb-roti-recipe/i6n58sei?r=recipes/collections/1vo4q819
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 18:06 AEDT
+- What changed: Cleaned recipe-import ingredient matching so imported ingredient card names stay aligned to recipe wording, and weak/unrelated auto-matches are now rejected (they go to manual match list instead of adding wrong foods).
+- Where to see it (page/link): Food Diary -> Import Recipe -> Continue to Build a meal
+- What to quickly test: Import a recipe URL, check ingredient cards keep understandable recipe names, and confirm obviously wrong foods are no longer auto-added.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 17:04 AEDT
+- What changed: Fixed recipe-import portion default so Build a meal now reliably starts at 1 serving (not stale values like 4 g). Prevented old draft restore from overriding recipe-import defaults.
+- Where to see it (page/link): Food Diary -> Import Recipe -> Continue to Build a meal
+- What to quickly test: Import a recipe that has servings (for example 8 servings) and confirm Portion size defaults to serving unit with 1 serving, not grams.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 16:54 AEDT
+- What changed: Simplified recipe-import flow. Import Recipe now has one button only (Continue to Build a meal). In Build a meal for imported recipes, users now get a clear Save to favorites (Custom meals) Yes/No toggle before pressing Save meal.
+- Where to see it (page/link): Food Diary -> Import Recipe -> Continue to Build a meal -> Build a meal (portion card)
+- What to quickly test: Import any recipe, confirm only one Continue button exists, then on Build a meal toggle Save to favorites to Yes and press Save meal; confirm the saved meal appears in Favorites -> Custom.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-12 16:47 AEDT
 - What changed: Fixed produce size-unit matching in Food Diary Change amount so plural produce names (for example peaches/apples/oranges/tomatoes) now correctly show small/medium/large/extra large options where that food supports them.
 - Where to see it (page/link): Food Diary -> Add from favorites -> Preview -> Change amount
