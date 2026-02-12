@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 02:47 AEDT
+- What changed: Fixed recipe import duplicate protection so repeated imports now use a stable hidden import key per ingredient line. This blocks re-adding the same ingredient cards when the same recipe URL is imported again. Also added server-side ingredient line dedupe in recipe import API as a safety layer.
+- Where to see it (page/link): Food Diary -> + menu -> Import Recipe -> Continue to Build a meal
+- What to quickly test: Import one recipe URL, continue to Build a meal, then import the same URL again and confirm no ingredient cards are duplicated.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 02:35 AEDT
 - What changed: Fixed rename sync so changing a food name from Diary/Favorites/Custom updates more reliably across Food Diary, Favorites, and All. Also fixed diary row label priority so a fresh rename is not overwritten by an old favorite title.
 - Where to see it (page/link): Food Diary -> Edit Entry, and Food Diary -> Add from favorites (Favorites/Custom/All tabs)
