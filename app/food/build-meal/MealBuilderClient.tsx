@@ -91,6 +91,7 @@ type BuilderItem = {
   __selectedServingId?: string | null
   __source?: NormalizedFoodItem['source'] | null
   __sourceId?: string | null
+  __matchedName?: string | null
 }
 
 const CATEGORY_LABELS: Record<MealCategory, string> = {
@@ -635,6 +636,30 @@ const RECIPE_LOOKUP_DESCRIPTORS = new Set([
   'such',
   'as',
   'and',
+  'good',
+])
+
+const RECIPE_LOOKUP_STOPWORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'or',
+  'the',
+  'of',
+  'to',
+  'for',
+  'with',
+  'in',
+  'on',
+  'as',
+  'from',
+  'into',
+  'about',
+  'around',
+  'fresh',
+  'good',
+  'plus',
+  'more',
 ])
 
 const RECIPE_LOOKUP_PHRASE_REPLACEMENTS: Array<[RegExp, string]> = [
@@ -2271,7 +2296,7 @@ export default function MealBuilderClient() {
     const singularized = stripped.map((token) => singularizeToken(token))
     if (singularized.length > 0) add(singularized.join(' '))
     if (singularized.length > 1) add(singularized.slice(-2).join(' '))
-    if (singularized.length > 0) add(singularized[singularized.length - 1])
+    if (singularized.length === 1) add(singularized[0])
 
     return Array.from(out).slice(0, 8)
   }
@@ -2311,11 +2336,54 @@ export default function MealBuilderClient() {
     return score
   }
 
+  const getRecipeCoreTokens = (value: string) =>
+    normalizeRecipeLookupValue(value)
+      .split(' ')
+      .filter((token) => token.length >= 3 && !RECIPE_LOOKUP_STOPWORDS.has(token) && !/^\d/.test(token))
+
+  const isAcceptableRecipeMacroMatch = (
+    candidate: NormalizedFoodItem,
+    lookup: string,
+    resolvedKind: 'packaged' | 'single',
+    score: number,
+  ) => {
+    if (!candidate) return false
+    const coreTokens = getRecipeCoreTokens(lookup)
+    const candidateTokens = normalizeRecipeLookupValue(`${candidate?.brand || ''} ${candidate?.name || ''}`)
+      .split(' ')
+      .filter(Boolean)
+
+    if (coreTokens.length === 0) {
+      const lookupNorm = normalizeRecipeLookupValue(lookup)
+      const candidateNorm = normalizeRecipeLookupValue(`${candidate?.brand || ''} ${candidate?.name || ''}`)
+      return lookupNorm.length >= 3 && candidateNorm.includes(lookupNorm)
+    }
+
+    let matches = 0
+    for (const token of coreTokens) {
+      if (
+        candidateTokens.includes(token) ||
+        candidateTokens.some((word) => word.startsWith(token) || token.startsWith(word))
+      ) {
+        matches += 1
+      }
+    }
+
+    const minMatches = coreTokens.length <= 2 ? 1 : Math.ceil(coreTokens.length * 0.5)
+    if (matches < minMatches) return false
+    if (resolvedKind === 'packaged' && matches < Math.min(2, coreTokens.length)) return false
+    return score >= 420
+  }
+
   const pickBestMacroMatch = (items: NormalizedFoodItem[], lookup: string, resolvedKind: 'packaged' | 'single') => {
     const filtered = items.filter((candidate) => hasMacroData(candidate))
     if (filtered.length === 0) return null
     const sorted = [...filtered].sort((a, b) => scoreMacroMatch(b, lookup, resolvedKind) - scoreMacroMatch(a, lookup, resolvedKind))
-    return sorted[0] || null
+    for (const candidate of sorted) {
+      const score = scoreMacroMatch(candidate, lookup, resolvedKind)
+      if (isAcceptableRecipeMacroMatch(candidate, lookup, resolvedKind, score)) return candidate
+    }
+    return null
   }
 
   const fetchImportSearchItems = async (
@@ -2517,7 +2585,11 @@ export default function MealBuilderClient() {
             missing.push(line)
             continue
           }
-          addItemDirectWithOverrides(resolved, { amount: parsed.amount, unit: parsed.unit })
+          addItemDirectWithOverrides(
+            resolved,
+            { amount: parsed.amount, unit: parsed.unit },
+            { displayName: lookup, matchedName: resolved.name },
+          )
         }
       } catch {
       } finally {
@@ -2852,6 +2924,7 @@ export default function MealBuilderClient() {
 	  const addItemDirectWithOverrides = (
 	    r: NormalizedFoodItem,
 	    overrides?: { amount?: number | null; unit?: BuilderUnit | null },
+      options?: { displayName?: string | null; matchedName?: string | null },
 	  ) => {
 	    const base = seedBaseServing(parseServingBase(r?.serving_size))
 	    let baseAmount = base.amount
@@ -2879,8 +2952,8 @@ export default function MealBuilderClient() {
 
 	    const next: BuilderItem = {
 	      id,
-	      name: r.name || 'Food',
-	      brand: r.brand ?? null,
+	      name: String(options?.displayName || r.name || 'Food').trim() || 'Food',
+	      brand: options?.displayName ? null : r.brand ?? null,
 	      serving_size: r.serving_size ?? null,
 	      calories: toNumber(r.calories),
 	      protein_g: toNumber(r.protein_g),
@@ -2899,6 +2972,7 @@ export default function MealBuilderClient() {
 	      __sourceId: r?.id ? String(r.id) : null,
 	      __servingOptions: null,
 	      __selectedServingId: null,
+        __matchedName: String(options?.matchedName || r.name || '').trim() || null,
 	    }
 
 	    try {
@@ -5016,6 +5090,12 @@ export default function MealBuilderClient() {
                           {it.serving_size ? `Serving: ${it.serving_size}` : 'Serving: (unknown)'} •{' '}
                           {it.__baseUnit ? `Amount: ${it.__amount} ${it.__unit || it.__baseUnit}` : `Servings: ${it.servings}`}
                         </div>
+                        {it.__matchedName &&
+                        normalizeSearchToken(it.__matchedName) !== normalizeSearchToken(it.name) ? (
+                          <div className="text-[11px] text-gray-400 truncate">
+                            Matched nutrition: {it.__matchedName}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-gray-400">{expanded ? '▾' : '▸'}</span>
