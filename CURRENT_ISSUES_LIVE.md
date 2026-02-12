@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 16:47 AEDT
+- What changed: Fixed produce size-unit matching in Food Diary Change amount so plural produce names (for example peaches/apples/oranges/tomatoes) now correctly show small/medium/large/extra large options where that food supports them.
+- Where to see it (page/link): Food Diary -> Add from favorites -> Preview -> Change amount
+- What to quickly test: Open a produce item like peaches or apples, open Weight/size dropdown, and confirm size options (small/medium/large/extra large) are available with grams.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-12 12:18 AEDT
 - What changed: Fixed Food Diary “Import Recipe” menu placement. It now shows once only and appears directly under “Build a meal” (removed duplicate entries).
 - Where to see it (page/link): Food Diary -> tap + on any meal section menu
