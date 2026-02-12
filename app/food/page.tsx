@@ -14544,13 +14544,24 @@ Please add nutritional information manually if needed.`);
     if (!normalized) {
       setBarcodeError('Enter a valid barcode to search.')
       setBarcodeStatus('scanning')
+      setBarcodeStatusHint('Scanning…')
       return
     }
     if (barcodeLookupInFlightRef.current) return
+    const resumeScannerAfterLookup = () => {
+      if (!showBarcodeScanner) return
+      if ((barcodeScannerRef.current as any)?.videoEl) {
+        setBarcodeStatus('scanning')
+        setBarcodeStatusHint('Scanning…')
+        return
+      }
+      startBarcodeScanner()
+    }
     const replaceIndex = barcodeReplaceTargetRef.current
     const actionMode = barcodeActionRef.current
     barcodeLookupInFlightRef.current = true
     setBarcodeStatus('loading')
+    setBarcodeStatusHint('Looking up barcode…')
     setBarcodeError(null)
     try {
       const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(normalized)}`)
@@ -14560,8 +14571,7 @@ Please add nutritional information manually if needed.`);
         setBarcodeError(null)
         if (replaceIndex !== null && replaceIndex !== undefined) {
           setBarcodeError('No food found for this barcode. Try again or use photo.')
-          setBarcodeStatus('scanning')
-          startBarcodeScanner()
+          resumeScannerAfterLookup()
         } else {
           setShowBarcodeScanner(false)
           setBarcodeLabelFlow({
@@ -14590,8 +14600,7 @@ Please add nutritional information manually if needed.`);
         setBarcodeError(null)
         if (replaceIndex !== null && replaceIndex !== undefined) {
           setBarcodeError('No food found for this barcode. Try again or use photo.')
-          setBarcodeStatus('scanning')
-          startBarcodeScanner()
+          resumeScannerAfterLookup()
         } else {
           setShowBarcodeScanner(false)
           setBarcodeLabelFlow({
@@ -14616,27 +14625,35 @@ Please add nutritional information manually if needed.`);
       const data = await res.json()
       if (!data?.food) {
         setBarcodeError('No food found for this barcode. Try again or enter it manually.')
-        setBarcodeStatus('scanning')
-        startBarcodeScanner()
+        resumeScannerAfterLookup()
         return
       }
+
+      // Close scanner immediately once a product is confirmed so the user is not forced into a second scan.
+      setShowBarcodeScanner(false)
+      setBarcodeStatus('idle')
+      setBarcodeStatusHint('')
+
       if (replaceIndex !== null && replaceIndex !== undefined) {
         replaceIngredientFromBarcodeFood(data.food, normalized, replaceIndex)
         barcodeReplaceTargetRef.current = null
       } else if (actionMode === 'analysis') {
         addBarcodeIngredientToAnalysis(data.food, normalized)
       } else {
-        await insertBarcodeFoodIntoDiary(data.food, normalized)
+        try {
+          await insertBarcodeFoodIntoDiary(data.food, normalized)
+        } catch (insertErr) {
+          console.error('Barcode insert failed', insertErr)
+          showQuickToast('Found item, but could not save it. Please try again.')
+        }
       }
-      setShowBarcodeScanner(false)
       setBarcodeValue('')
       setShowManualBarcodeInput(false)
       barcodeActionRef.current = null
     } catch (err) {
       console.error('Barcode lookup failed', err)
       setBarcodeError('Could not find a match. Please rescan or type the code.')
-      setBarcodeStatus('scanning')
-      startBarcodeScanner()
+      resumeScannerAfterLookup()
     } finally {
       barcodeLookupInFlightRef.current = false
     }
@@ -14649,11 +14666,6 @@ Please add nutritional information manually if needed.`);
     const cleaned = rawCode.replace(/[^0-9A-Za-z]/g, '')
     if (!cleaned) return
     barcodeDetectLockRef.current = true
-    if (hybridBarcodeFrameRef.current) {
-      cancelAnimationFrame(hybridBarcodeFrameRef.current)
-      hybridBarcodeFrameRef.current = null
-    }
-    stopBarcodeScanner()
     void lookupBarcodeAndAdd(cleaned).finally(() => {
       barcodeDetectLockRef.current = false
     })
