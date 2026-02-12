@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 02:08 AEDT
+- What changed: Fixed recipe import duplicate ingredient issue. Re-importing the same recipe URL now skips repeated ingredient lines and also skips ingredients already present in the current Build a meal list, so items do not get doubled.
+- Where to see it (page/link): Food Diary -> + menu -> Import Recipe -> Continue to Build a meal
+- What to quickly test: Import one recipe URL, then import the same URL again and confirm ingredient cards are not duplicated.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 01:55 AEDT
 - What changed: Fixed Food Diary hot chocolate icon regression and rename propagation fallback. Hot chocolate now always classifies as a drink in meal rows, and rename updates now sync using sourceId/barcode fallback when favoriteId is missing.
 - Where to see it (page/link): Food Diary meal list and Food Diary item rename flow (Diary + Favorites)
