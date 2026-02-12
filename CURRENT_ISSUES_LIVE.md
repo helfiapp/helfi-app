@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-12 12:18 AEDT
+- What changed: Fixed Food Diary “Import Recipe” menu placement. It now shows once only and appears directly under “Build a meal” (removed duplicate entries).
+- Where to see it (page/link): Food Diary -> tap + on any meal section menu
+- What to quickly test: Open the + menu and confirm “Import Recipe” is directly under “Build a meal” and appears only once.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-12 04:34 AEDT
 - What changed: Fixed blank “Weight / size” values in Favorites -> Preview -> Change amount. The field now auto-fills from the current servings and selected unit when a saved weight is not already present.
 - Where to see it (page/link): Food Diary -> Add from favorites -> Preview -> Change amount
