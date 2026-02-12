@@ -324,7 +324,19 @@ export async function POST(request: NextRequest) {
           mirrorTextLength: mirrorText.length,
           debug: fetchedPage.debug,
         })
-        return NextResponse.json({ error: 'Could not load that link.' }, { status: 400 })
+        return NextResponse.json(
+          {
+            error: 'Could not load that link.',
+            debug: {
+              finalUrl: fetchedPage.finalUrl,
+              htmlLength: html.length,
+              htmlTextLength: htmlText.length,
+              mirrorTextLength: mirrorText.length,
+              trace: fetchedPage.debug,
+            },
+          },
+          { status: 400 },
+        )
       }
 
       const completion = await runChatCompletionWithLogging(
