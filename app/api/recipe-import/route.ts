@@ -159,28 +159,71 @@ const parseRecipeFromJsonLd = (obj: any, sourceUrl: string): ImportedRecipe | nu
   return { title, servings, prepMinutes, cookMinutes, ingredients, steps, sourceUrl }
 }
 
-const fetchRecipeFromUrl = async (url: string): Promise<ImportedRecipe | null> => {
-  const res = await fetch(url, {
-    method: 'GET',
-    redirect: 'follow',
-    headers: {
-      'user-agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
-      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    },
-  })
-  if (!res.ok) return null
-  const html = clampText(await res.text(), 2_000_000)
-  const blocks = extractJsonLdBlocks(html)
-  for (const block of blocks) {
-    const parsed = safeJsonParse(block)
-    const candidates = flattenJsonLdCandidates(parsed)
-    for (const c of candidates) {
-      const found = parseRecipeFromJsonLd(c, url)
-      if (found) return found
-    }
+const RECIPE_IMPORT_BROWSER_HEADERS = {
+  'user-agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'accept-language': 'en-US,en;q=0.9',
+} as const
+
+type FetchedRecipePage = {
+  html: string | null
+  finalUrl: string | null
+  recipe: ImportedRecipe | null
+}
+
+const fetchRecipePage = async (url: string): Promise<FetchedRecipePage> => {
+  const attempts: string[] = []
+  const seen = new Set<string>()
+  const pushAttempt = (candidate: string | null) => {
+    const c = String(candidate || '').trim()
+    if (!c || seen.has(c)) return
+    seen.add(c)
+    attempts.push(c)
   }
-  return null
+
+  pushAttempt(url)
+  try {
+    const u = new URL(url)
+    if (u.search || u.hash) {
+      u.search = ''
+      u.hash = ''
+      pushAttempt(u.toString())
+    }
+  } catch {}
+
+  let bestHtml: string | null = null
+  let bestFinalUrl: string | null = null
+
+  for (const attemptUrl of attempts) {
+    try {
+      const res = await fetch(attemptUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: RECIPE_IMPORT_BROWSER_HEADERS,
+      })
+      if (!res.ok) continue
+
+      const finalUrl = String(res.url || attemptUrl).trim() || attemptUrl
+      const html = clampText(await res.text(), 2_000_000)
+      if (html && (!bestHtml || html.length > bestHtml.length)) {
+        bestHtml = html
+        bestFinalUrl = finalUrl
+      }
+
+      const blocks = extractJsonLdBlocks(html)
+      for (const block of blocks) {
+        const parsed = safeJsonParse(block)
+        const candidates = flattenJsonLdCandidates(parsed)
+        for (const c of candidates) {
+          const found = parseRecipeFromJsonLd(c, finalUrl)
+          if (found) return { html, finalUrl, recipe: found }
+        }
+      }
+    } catch {}
+  }
+
+  return { html: bestHtml, finalUrl: bestFinalUrl, recipe: null }
 }
 
 const getOpenAIClient = () => {
@@ -230,15 +273,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
       }
 
-      const schemaRecipe = await fetchRecipeFromUrl(url)
-      if (schemaRecipe) return NextResponse.json({ recipe: schemaRecipe }, { status: 200 })
+      const fetchedPage = await fetchRecipePage(url)
+      if (fetchedPage.recipe) return NextResponse.json({ recipe: fetchedPage.recipe }, { status: 200 })
 
       const openai = getOpenAIClient()
       if (!openai) return NextResponse.json({ error: 'Recipe import is temporarily unavailable.' }, { status: 503 })
 
-      const res = await fetch(url, { method: 'GET', redirect: 'follow' })
-      if (!res.ok) return NextResponse.json({ error: 'Could not load that link.' }, { status: 400 })
-      const html = clampText(await res.text(), 1_200_000)
+      const html = clampText(String(fetchedPage.html || ''), 1_200_000)
+      if (!html) return NextResponse.json({ error: 'Could not load that link.' }, { status: 400 })
       const text = clampText(stripHtmlToText(html), 22_000)
 
       const completion = await runChatCompletionWithLogging(
@@ -266,7 +308,7 @@ export async function POST(request: NextRequest) {
 
       const raw = completion?.choices?.[0]?.message?.content || ''
       const parsed = safeJsonParse(String(raw || '').trim().replace(/```json/gi, '').replace(/```/g, '').trim())
-      const recipe = coerceRecipeFromModel(parsed, url)
+      const recipe = coerceRecipeFromModel(parsed, fetchedPage.finalUrl || url)
       if (!recipe) return NextResponse.json({ error: 'Could not import that recipe. Try a photo instead.' }, { status: 422 })
       return NextResponse.json({ recipe }, { status: 200 })
     }
@@ -335,4 +377,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Recipe import failed.' }, { status: 500 })
   }
 }
-
