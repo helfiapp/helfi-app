@@ -1,6 +1,7 @@
 #!/bin/bash
 # Check Vercel deployment status - waits until deployment completes
 # Usage: ./scripts/check-deployment-status.sh
+# Optional rename gate: RUN_RENAME_GUARD=1 ./scripts/check-deployment-status.sh
 
 VERCEL_TOKEN="${VERCEL_TOKEN:-2MLfXoXXv8hIaHIE7lQcdQ39}"
 # Use the active Helfi team ID (see AGENT_START_HERE.md) and query by project slug.
@@ -8,6 +9,7 @@ VERCEL_TOKEN="${VERCEL_TOKEN:-2MLfXoXXv8hIaHIE7lQcdQ39}"
 PROJECT_SLUG="helfi-app"
 TEAM_ID="team_DLxtczVMOZUXhiInxhTSDrCs"
 TARGET="${VERCEL_TARGET:-production}"
+RUN_RENAME_GUARD="${RUN_RENAME_GUARD:-0}"
 MAX_WAIT=300  # Maximum wait time in seconds (5 minutes)
 POLL_INTERVAL=5  # Check every 5 seconds
 
@@ -54,6 +56,11 @@ while true; do
         echo ""
         echo "✅ Deployment successful - changes are live!"
         echo "🌐 URL: https://$URL"
+        if [ "$RUN_RENAME_GUARD" = "1" ]; then
+          echo ""
+          echo "🔒 RUN_RENAME_GUARD=1 set, running rename canary..."
+          ./scripts/check-rename-guard.sh
+        fi
         exit 0
       fi
       ;;

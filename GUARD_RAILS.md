@@ -677,6 +677,15 @@ Implementation notes (do not remove):
   - `resolveFavoriteForEntry`, `updateFavoriteLabelById`, `renameEntriesWithFavoriteId`
   - `saveFoodNameOverride` (keeps aliases for older labels)
 
+Mandatory regression guard (do not skip when rename code is touched):
+- Run: `CANARY_AUTH_COOKIE=\"next-auth.session-token=...\" ./scripts/check-rename-guard.sh`
+  - or: `CANARY_STORAGE_STATE=\"playwright/.auth/<file>.json\" ./scripts/check-rename-guard.sh`
+- Pass criteria:
+  1) Edit Entry rename updates diary immediately and after refresh.
+  2) Favorites/Custom rename updates diary immediately and after refresh.
+  3) API row description + favorite label remain synced to the same final title.
+- If this canary fails, rename work is not complete.
+
 ### 3.5.2 Water entry edit from Food Diary (Jan 2026 – Locked)
 - Water entries listed in **Food Diary** must expose **Edit Entry** in the kebab menu (desktop + mobile).
 - Editing a water entry must open a lightweight modal (amount + unit) and **PATCH** `/api/water-log/:id`.

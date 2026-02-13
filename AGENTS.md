@@ -120,6 +120,10 @@ Before pushing ANY code changes to GitHub, you MUST:
 2. Read Deployment Protocol: Review DEPLOYMENT_PROTOCOL.md for full deployment procedures
 
 3. Test Your Changes: Ensure code compiles and doesn't break existing functionality
+   - If you touched Food Diary rename flows (Diary edit, Favorites rename, Custom meal rename), you MUST run:
+     - `CANARY_AUTH_COOKIE=\"next-auth.session-token=...\" ./scripts/check-rename-guard.sh`
+     - or `CANARY_STORAGE_STATE=\"playwright/.auth/<file>.json\" ./scripts/check-rename-guard.sh`
+   - Do not mark rename work complete unless this canary passes.
 
 4. Check Protected Code Areas:
    - Before modifying email functionality, read WAITLIST_EMAIL_PROTECTION.md.
@@ -157,6 +161,7 @@ Before pushing ANY code changes to GitHub, you MUST:
 - Project Name: helfi-app
 - Team ID: team_DLxtczVMOZUXhiInxhTSDrCs
 - Food Analyzer Canary: run CANARY_AUTH_COOKIE="next-auth.session-token=..." node scripts/canary-food-analyzer.js (optionally set CANARY_BASE_URL) to verify multi-item breakdown still works.
+- Food Rename Guard Canary (for rename-related changes): run `CANARY_AUTH_COOKIE=\"next-auth.session-token=...\" ./scripts/check-rename-guard.sh` (or set `CANARY_STORAGE_STATE=playwright/.auth/<file>.json`).
 
 ## After Pushing Code
 
@@ -168,6 +173,9 @@ git push origin master
 
 # 3. Check deployment status (script waits until completion)
 ./scripts/check-deployment-status.sh
+
+# If your change touched Food Diary/Favorites/Custom rename paths:
+RUN_RENAME_GUARD=1 CANARY_AUTH_COOKIE="next-auth.session-token=..." ./scripts/check-deployment-status.sh
 
 # 4. Script will only exit when deployment is READY or ERROR
 #    DO NOT report "deployment in progress" - wait for script to complete
