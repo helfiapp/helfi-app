@@ -725,6 +725,21 @@ If this breaks again, restore in this order:
    - Dependencies must include `showFavoritesPicker`, `favoritesActiveTab`, `favoritesSearch`, and `favoritesAllServerEntries`.
 3) Confirm the first favorites appear immediately after opening the modal (no manual scroll).
 
+### 3.5.3 Favorites Recency Order (Feb 2026 – Locked)
+Goal: the last favorite/custom meal used in Food Diary must appear at the top of `All`, `Favorites`, and `Custom`.
+
+Must keep (source of truth in `app/food/page.tsx`):
+- Using a favorite/custom meal must stamp that favorite with `lastUsedAt`.
+- `insertFavoriteIntoDiary(...)` must call the recency updater before save flow completes.
+- Picker sorting must use `lastUsedAt` first, then fallback to `createdAt`.
+- Favorites without a `lastUsedAt` must fallback safely to `createdAt`.
+
+If this breaks again, restore in this order:
+1) Ensure `markFavoriteAsRecentlyUsed(...)` writes `lastUsedAt` and persists favorites.
+2) Ensure `insertFavoriteIntoDiary(...)` calls `markFavoriteAsRecentlyUsed(...)` using the current timestamp.
+3) Ensure picker `sortList(...)` compares `lastUsedAt` before `createdAt`.
+4) Re-test by adding a favorite from each tab (`All`/`Favorites`/`Custom`) and confirm it appears at top on reopen.
+
 **Do NOT change or remove:**
 - The sidebar click override in `app/onboarding/page.tsx` that directly listens to left‑menu clicks while on `/onboarding` and forces navigation.
 - The `window.__helfiOnboardingSidebarOverride` flag that prevents `LayoutWrapper` from double‑handling sidebar clicks during Health Setup.

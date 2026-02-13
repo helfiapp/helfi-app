@@ -13818,15 +13818,19 @@ Please add nutritional information manually if needed.`);
       }
       return 0
     }
+    const resolveFavoriteTimestampMs = (value: any) => {
+      const ts =
+        typeof value === 'string' || value instanceof Date
+          ? new Date(value).getTime()
+          : typeof value === 'number'
+          ? value
+          : Number(value)
+      if (Number.isFinite(ts) && ts > 946684800000) return ts
+      return NaN
+    }
     const resolveFavoriteCreatedAtMs = (fav: any) => {
-      const rawCreatedAt = fav?.createdAt
-      const createdAtValue =
-        typeof rawCreatedAt === 'string' || rawCreatedAt instanceof Date
-          ? new Date(rawCreatedAt).getTime()
-          : typeof rawCreatedAt === 'number'
-          ? rawCreatedAt
-          : Number(rawCreatedAt)
-      if (Number.isFinite(createdAtValue) && createdAtValue > 946684800000) return createdAtValue
+      const createdAtValue = resolveFavoriteTimestampMs(fav?.createdAt)
+      if (Number.isFinite(createdAtValue)) return createdAtValue
       const idRaw = fav?.id
       if (typeof idRaw === 'number' && idRaw > 946684800000) return idRaw
       const idStr = typeof idRaw === 'string' ? idRaw : ''
@@ -13838,6 +13842,16 @@ Please add nutritional information manually if needed.`);
         }
       }
       return 0
+    }
+    const resolveFavoriteLastUsedAtMs = (fav: any) => {
+      const direct =
+        resolveFavoriteTimestampMs((fav as any)?.lastUsedAt) ||
+        resolveFavoriteTimestampMs((fav as any)?.lastUsed) ||
+        resolveFavoriteTimestampMs((fav as any)?.recentlyUsedAt)
+      if (Number.isFinite(direct) && direct > 0) return direct
+      const updatedAt = resolveFavoriteTimestampMs((fav as any)?.updatedAt)
+      if (Number.isFinite(updatedAt) && updatedAt > 0) return updatedAt
+      return resolveFavoriteCreatedAtMs(fav)
     }
     const linkedFavoriteIdForEntry = (entry: any) => {
       try {
@@ -14042,6 +14056,7 @@ Please add nutritional information manually if needed.`);
         entry: null,
         favorite: fav,
         createdAt: resolveFavoriteCreatedAtMs(fav),
+        lastUsedAt: resolveFavoriteLastUsedAtMs(fav),
         sortPriority: 1,
         sourceTag: 'Favorite',
         calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
@@ -14054,6 +14069,7 @@ Please add nutritional information manually if needed.`);
       label: resolveFavoriteLabel(fav),
       favorite: fav,
       createdAt: resolveFavoriteCreatedAtMs(fav),
+      lastUsedAt: resolveFavoriteLastUsedAtMs(fav),
       sortPriority: 1,
       sourceTag: 'Favorite',
       calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
@@ -16015,6 +16031,39 @@ Please add nutritional information manually if needed.`);
     return { overallTargets: targetsWithExercise, overallUsed: usedAfter }
   }
 
+  const markFavoriteAsRecentlyUsed = (favorite: any, usedAtMs: number) => {
+    if (!favorite) return
+    const targetId = typeof favorite?.id === 'string' ? String(favorite.id).trim() : ''
+    const sourceId = getSourceIdForEntry(favorite)
+    const labelKey = normalizeFoodName(
+      normalizeMealLabel(favoriteDisplayLabel(favorite) || favorite?.label || favorite?.description || ''),
+    )
+    if (!targetId && !sourceId && !labelKey) return
+
+    setFavorites((prev) => {
+      const base = Array.isArray(prev) ? prev : []
+      let changed = false
+      const next = base.map((fav: any) => {
+        const favId = typeof fav?.id === 'string' ? String(fav.id).trim() : ''
+        const favSourceId = getSourceIdForEntry(fav)
+        const favLabelKey = normalizeFoodName(
+          normalizeMealLabel(favoriteDisplayLabel(fav) || fav?.label || fav?.description || ''),
+        )
+        const idMatch = targetId && favId && favId === targetId
+        const sourceMatch = sourceId && favSourceId && favSourceId === sourceId
+        const labelMatch = labelKey && favLabelKey && favLabelKey === labelKey
+        if (!idMatch && !sourceMatch && !labelMatch) return fav
+        changed = true
+        return { ...fav, lastUsedAt: usedAtMs }
+      })
+      if (changed) {
+        persistFavorites(next)
+        return next
+      }
+      return prev
+    })
+  }
+
   const runFavoriteAdd = (item: any, opts?: { overrideSource?: any | null }) => {
     const source = opts?.overrideSource || item.favorite || item.entry || item
     const replaceIndex = favoritesReplaceTargetRef.current
@@ -16073,6 +16122,7 @@ Please add nutritional information manually if needed.`);
     if (now - last < 1200) return
     favoriteInsertDebounceRef.current[debounceKey] = now
     beginDiaryMutation()
+    markFavoriteAsRecentlyUsed(favorite, now)
 
     const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
     const clonedItems =
@@ -26515,6 +26565,9 @@ Please add nutritional information manually if needed.`);
                       const aPriority = Number(a?.sortPriority) || 0
                       const bPriority = Number(b?.sortPriority) || 0
                       if (aPriority !== bPriority) return bPriority - aPriority
+                      const aRecent = Number(a?.lastUsedAt) || Number(a?.createdAt) || 0
+                      const bRecent = Number(b?.lastUsedAt) || Number(b?.createdAt) || 0
+                      if (aRecent !== bRecent) return bRecent - aRecent
                       return (Number(b?.createdAt) || 0) - (Number(a?.createdAt) || 0)
                     })
                   let data: any[] = []
