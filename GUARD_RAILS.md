@@ -2278,14 +2278,18 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 **Must keep:**
 - Drink metadata can live in either `nutrition` or `total`; read from both with fallback.
 - Do not drop `__drinkType`, `__drinkAmount`, `__drinkUnit`, `__drinkAmountMl`, `__waterLogId` during edit/save/update flows.
+- Drink entries linked to water logging must never be loosely remapped to favorites by label/alias/token matching.
+- In favorites picker add flow, when drink context is active (`drinkAmount`/`drinkType` flow), prefer the selected row entry payload over a loosely linked favorite template.
 - Favorite rename sync must match by `favoriteId`, and also by stable identifiers (`sourceId` / `barcode`) so older diary rows still update.
 - Food name override save must support entries where `items` can be JSON strings (not only arrays).
 
 **If this breaks again, restore:**
 1. In `app/food/page.tsx`, keep `getDrinkMetaFromEntry(...)` reading metadata from both `nutrition` and `total`.
 2. In edit flow meta merge, preserve existing drink metadata (do not rely on `nutrition` only).
-3. In rename sync, match linked entries by `favoriteId` + `sourceId` + `barcode`.
-4. In override save, parse `items` from string/array so stable keys are stored.
+3. Block loose favorite fallback matching for entries carrying drink metadata (`__drinkType` / `__waterLogId`).
+4. In favorites add flow, use row `entry` source in drink context instead of linked favorite template source.
+5. In rename sync, match linked entries by `favoriteId` + `sourceId` + `barcode`.
+6. In override save, parse `items` from string/array so stable keys are stored.
 
 ## 8. Rules for Future Modifications
 

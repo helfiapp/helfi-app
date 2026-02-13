@@ -13970,6 +13970,15 @@ Please add nutritional information manually if needed.`);
           }
         }
       } catch {}
+      const drinkMeta = getDrinkMetaFromEntry(entry)
+      const isDrinkLinkedEntry = Boolean(drinkMeta?.type || drinkMeta?.waterLogId)
+      if (isDrinkLinkedEntry) {
+        // DO NOT TOUCH (owner lock):
+        // Water/drink entries must never be loosely matched by label aliases/tokens.
+        // Loose matching has repeatedly remapped sugar-free drinks to unrelated favorites
+        // (wrong kcal + wrong icon behavior across clients).
+        return ''
+      }
       const labelKey = normalizeKey(entry?.description || entry?.label || '', entry)
       const aliasId =
         (labelKey ? favoriteIdByAlias.get(labelKey) : '') ||
@@ -14092,6 +14101,10 @@ Please add nutritional information manually if needed.`);
       const fallbackId = resolveFavoriteIdFromEntryFallback(entry)
       if (fallbackId && favoritesById.has(fallbackId)) {
         return { favoriteId: fallbackId, favorite: favoritesById.get(fallbackId) }
+      }
+      const drinkMeta = getDrinkMetaFromEntry(entry)
+      if (drinkMeta?.type || drinkMeta?.waterLogId) {
+        return { favoriteId: '', favorite: null }
       }
       const direct = favoritesByKey.get(normalizeKey(entry?.description || entry?.label || '', entry)) || null
       if (direct) {
@@ -16273,7 +16286,16 @@ Please add nutritional information manually if needed.`);
   }
 
   const runFavoriteAdd = (item: any, opts?: { overrideSource?: any | null }) => {
-    const source = opts?.overrideSource || item.favorite || item.entry || item
+    const hasOverrideSource = Boolean(opts?.overrideSource)
+    const hasDrinkContext = Boolean(pendingDrinkOverrideRef.current)
+    // DO NOT TOUCH (owner lock):
+    // In drink flow (coming from Water Intake with drinkAmount/drinkType),
+    // always prefer the selected row entry payload over linked favorite template payload.
+    // Using linked favorites here has repeatedly caused wrong drink kcal/icon regressions.
+    const useEntrySource =
+      !hasOverrideSource && Boolean(item?.entry) && (!item?.favorite || hasDrinkContext)
+    const source =
+      opts?.overrideSource || (useEntrySource ? item.entry : item.favorite || item.entry || item)
     const replaceIndex = favoritesReplaceTargetRef.current
     if (replaceIndex !== null && replaceIndex !== undefined) {
       replaceIngredientFromFavoriteSource(source, replaceIndex)
@@ -16285,7 +16307,12 @@ Please add nutritional information manually if needed.`);
       closeFavoritesPicker()
       return
     }
-    if (item.favorite) {
+    if (useEntrySource) {
+      if (item?.favorite) {
+        markFavoriteAsRecentlyUsed(item.favorite, Date.now())
+      }
+      insertMealIntoDiary(source, selectedAddCategory)
+    } else if (item.favorite) {
       insertFavoriteIntoDiary(source, selectedAddCategory)
     } else if (item.entry) {
       insertMealIntoDiary(source, selectedAddCategory)
@@ -25325,15 +25352,19 @@ Please add nutritional information manually if needed.`);
                       const baseEntryLabel = food?.description || food?.label || 'Meal'
                       const singleItemForDrink =
                         !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1 ? food.items[0] : null
-                      const isDrinkEntry =
-                        !isWaterEntry &&
-                        Boolean(drinkMeta?.type) &&
-                        (singleItemForDrink
+                      const drinkLiquidHint = !isWaterEntry
+                        ? singleItemForDrink
                           ? isLikelyLiquidFood(
                               String(singleItemForDrink?.name || drinkMeta?.type || ''),
                               String(singleItemForDrink?.serving_size || ''),
                             )
-                          : isLikelyLiquidFood(String(baseEntryLabel || drinkMeta?.type || ''), ''))
+                          : isLikelyLiquidFood(String(baseEntryLabel || drinkMeta?.type || ''), '')
+                        : false
+                      // DO NOT TOUCH (owner lock):
+                      // If drink metadata exists, trust it directly for drink rendering.
+                      // Heuristic-only checks are fallback; they must not hide drink icons when meta is present.
+                      const isDrinkEntry =
+                        !isWaterEntry && (Boolean(drinkMeta?.type) || Boolean(drinkLiquidHint))
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
                       const entryCaloriesValue =
                         !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Number(entryTotals?.calories) : null
@@ -25341,7 +25372,7 @@ Please add nutritional information manually if needed.`);
                         entryCaloriesValue === null ? null : `${formatEnergyNumber(entryCaloriesValue, energyUnit)} ${energyUnit}`
                       const waterLabel = isWaterEntry ? String(food?.label || 'Water') : null
                       const waterIconSrc = isWaterEntry ? getWaterIconSrc(waterLabel) : null
-                      const drinkIconSrc = isDrinkEntry ? getWaterIconSrc(drinkMeta?.type) : null
+                      const drinkIconSrc = isDrinkEntry ? getWaterIconSrc(drinkMeta?.type || baseEntryLabel) : null
                       const drinkAmountLabel = isDrinkEntry ? formatDrinkEntryAmount(drinkMeta) : ''
                       const entryItemName =
                         !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1
