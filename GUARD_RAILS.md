@@ -732,6 +732,8 @@ Must keep (source of truth in `app/food/page.tsx`):
 - Using a favorite/custom meal must stamp that favorite with `lastUsedAt`.
 - `insertFavoriteIntoDiary(...)` must call the recency updater before save flow completes.
 - Recency must also backfill from historical diary usage (linked favorite id first, then source/barcode/alias fallback) so older entries still order correctly.
+- Recency must be based on **usage time only** (`lastUsedAt` / history backfill). Do not use `updatedAt` for ordering.
+- In `All`, if a history entry resolves to a saved favorite/custom meal, the row label must use the current saved favorite label (no long old USDA name fallback).
 - Picker sorting must use `lastUsedAt` first, then fallback to `createdAt`.
 - Favorites without a `lastUsedAt` must fallback safely to `createdAt`.
 
@@ -739,8 +741,9 @@ If this breaks again, restore in this order:
 1) Ensure `markFavoriteAsRecentlyUsed(...)` writes `lastUsedAt` and persists favorites.
 2) Ensure `insertFavoriteIntoDiary(...)` calls `markFavoriteAsRecentlyUsed(...)` using the current timestamp.
 3) Ensure favorites recency backfill map is built from history using linked favorite id + fallback matching.
-4) Ensure picker `sortList(...)` compares `lastUsedAt` before `createdAt`.
-5) Re-test by adding a favorite from each tab (`All`/`Favorites`/`Custom`) and confirm it appears at top on reopen.
+4) Ensure `resolveFavoriteLastUsedAtMs(...)` does **not** use `updatedAt`.
+5) Ensure picker `sortList(...)` compares `lastUsedAt` before `createdAt`.
+6) Re-test by adding a favorite from each tab (`All`/`Favorites`/`Custom`) and confirm it appears at top on reopen.
 
 **Do NOT change or remove:**
 - The sidebar click override in `app/onboarding/page.tsx` that directly listens to left‑menu clicks while on `/onboarding` and forces navigation.

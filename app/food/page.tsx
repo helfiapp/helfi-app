@@ -13848,12 +13848,10 @@ Please add nutritional information manually if needed.`);
         resolveFavoriteTimestampMs((fav as any)?.lastUsedAt) ||
         resolveFavoriteTimestampMs((fav as any)?.lastUsed) ||
         resolveFavoriteTimestampMs((fav as any)?.recentlyUsedAt)
-      const updatedAt = resolveFavoriteTimestampMs((fav as any)?.updatedAt)
       const favId = fav?.id ? String(fav.id).trim() : ''
       const backfilledFromHistory = favId ? Number(favoriteLastUsedFromHistory.get(favId) || 0) : 0
       return Math.max(
         Number.isFinite(direct) && direct > 0 ? direct : 0,
-        Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : 0,
         Number.isFinite(backfilledFromHistory) && backfilledFromHistory > 0 ? backfilledFromHistory : 0,
         resolveFavoriteCreatedAtMs(fav),
       )
@@ -13974,7 +13972,128 @@ Please add nutritional information manually if needed.`);
           const s = simplifyKey(entry?.description || entry?.label || '')
           return s ? favoriteIdByAlias.get(s) : ''
         })()
-      return String(aliasId || '')
+      if (aliasId) return String(aliasId || '')
+      const tokenId = resolveFavoriteIdByTokenOverlap(entry)
+      return String(tokenId || '')
+    }
+
+    const tokenizeForFavoriteMatch = (raw: any, entry?: any) => {
+      const normalized = normalizeMealLabel(applyFoodNameOverride(raw || '', entry) || '').trim()
+      if (!normalized) return [] as string[]
+      const ascii = normalized
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+      const stopWords = new Set([
+        'a',
+        'an',
+        'and',
+        'at',
+        'by',
+        'for',
+        'from',
+        'in',
+        'of',
+        'on',
+        'or',
+        'the',
+        'to',
+        'with',
+        'x',
+        'g',
+        'kg',
+        'ml',
+        'l',
+        'oz',
+        'cup',
+        'cups',
+        'serving',
+        'servings',
+        'portion',
+        'portions',
+      ])
+      const tokens = ascii
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2 && !stopWords.has(token))
+      return Array.from(new Set(tokens))
+    }
+
+    const favoriteTokenGroups: Array<{ favoriteId: string; tokens: string[] }> = []
+    ;(favorites || []).forEach((fav: any) => {
+      const favoriteId = fav?.id ? String(fav.id).trim() : ''
+      if (!favoriteId) return
+      const candidates: string[] = []
+      const pushCandidate = (value: any) => {
+        const raw = String(value || '').trim()
+        if (raw) candidates.push(raw)
+      }
+      pushCandidate(fav?.label || fav?.description || '')
+      const aliases = Array.isArray((fav as any)?.aliases) ? (fav as any).aliases : []
+      ;(Array.isArray(aliases) ? aliases : []).forEach((alias) => pushCandidate(alias))
+      try {
+        const items = parseFavoriteItems(fav)
+        ;(Array.isArray(items) ? items : []).forEach((item: any) => {
+          pushCandidate(item?.name || item?.label || '')
+        })
+      } catch {}
+      const seenSignatures = new Set<string>()
+      candidates.forEach((candidate) => {
+        const tokens = tokenizeForFavoriteMatch(candidate, fav)
+        if (tokens.length < 2) return
+        const signature = tokens.join('|')
+        if (!signature || seenSignatures.has(signature)) return
+        seenSignatures.add(signature)
+        favoriteTokenGroups.push({ favoriteId, tokens })
+      })
+    })
+
+    const resolveFavoriteIdByTokenOverlap = (entry: any) => {
+      if (!Array.isArray(favoriteTokenGroups) || favoriteTokenGroups.length === 0) return ''
+      const entryTokenSet = new Set<string>()
+      const pushEntryTokens = (value: any) => {
+        const tokens = tokenizeForFavoriteMatch(value, entry)
+        tokens.forEach((token) => entryTokenSet.add(token))
+      }
+      pushEntryTokens(entry?.description || entry?.label || '')
+      try {
+        const entryItems = parseEntryItemsForMatching(entry)
+        ;(Array.isArray(entryItems) ? entryItems : []).forEach((item: any) => {
+          pushEntryTokens(item?.name || item?.label || '')
+        })
+      } catch {}
+      if (entryTokenSet.size < 2) return ''
+      let bestFavoriteId = ''
+      let bestScore = 0
+      for (const group of favoriteTokenGroups) {
+        if (!group || !Array.isArray(group.tokens) || group.tokens.length < 2) continue
+        const matches = group.tokens.every((token) => entryTokenSet.has(token))
+        if (!matches) continue
+        const score = group.tokens.length
+        if (score > bestScore) {
+          bestScore = score
+          bestFavoriteId = group.favoriteId
+        }
+      }
+      return bestFavoriteId
+    }
+
+    const resolveFavoriteForHistoryEntry = (entry: any) => {
+      const linkedId = linkedFavoriteIdForEntry(entry)
+      if (linkedId && favoritesById.has(linkedId)) {
+        return { favoriteId: linkedId, favorite: favoritesById.get(linkedId) }
+      }
+      const fallbackId = resolveFavoriteIdFromEntryFallback(entry)
+      if (fallbackId && favoritesById.has(fallbackId)) {
+        return { favoriteId: fallbackId, favorite: favoritesById.get(fallbackId) }
+      }
+      const direct = favoritesByKey.get(normalizeKey(entry?.description || entry?.label || '', entry)) || null
+      if (direct) {
+        const directId = String(direct?.id || '').trim()
+        return { favoriteId: directId, favorite: direct }
+      }
+      return { favoriteId: '', favorite: null }
     }
 
     const favoriteLastUsedFromHistory = new Map<string, number>()
@@ -13987,15 +14106,8 @@ Please add nutritional information manually if needed.`);
     ;(Array.isArray(history) ? history : []).forEach((entry: any) => {
       const ts = resolveEntryCreatedAtMs(entry)
       if (!Number.isFinite(ts) || ts <= 0) return
-      const linkedId = linkedFavoriteIdForEntry(entry)
-      if (linkedId && favoritesById.has(linkedId)) {
-        stampFavoriteLastUsed(linkedId, ts)
-        return
-      }
-      const fallbackId = resolveFavoriteIdFromEntryFallback(entry)
-      if (fallbackId && favoritesById.has(fallbackId)) {
-        stampFavoriteLastUsed(fallbackId, ts)
-      }
+      const resolved = resolveFavoriteForHistoryEntry(entry)
+      if (resolved.favoriteId && resolved.favorite) stampFavoriteLastUsed(resolved.favoriteId, ts)
     })
 
     const usedFavoriteIds = new Set<string>()
@@ -14004,9 +14116,9 @@ Please add nutritional information manually if needed.`);
     const pickPreferredAllItem = (existing: any, candidate: any) => {
       if (!existing) return candidate
       if (!candidate) return existing
-      const existingCreated = Number(existing?.createdAt) || 0
-      const candidateCreated = Number(candidate?.createdAt) || 0
-      if (candidateCreated !== existingCreated) return candidateCreated > existingCreated ? candidate : existing
+      const existingRecent = Number(existing?.lastUsedAt) || Number(existing?.createdAt) || 0
+      const candidateRecent = Number(candidate?.lastUsedAt) || Number(candidate?.createdAt) || 0
+      if (candidateRecent !== existingRecent) return candidateRecent > existingRecent ? candidate : existing
       const existingHasFavorite = Boolean(existing?.favorite)
       const candidateHasFavorite = Boolean(candidate?.favorite)
       if (existingHasFavorite !== candidateHasFavorite) return candidateHasFavorite ? candidate : existing
@@ -14025,6 +14137,9 @@ Please add nutritional information manually if needed.`);
       const baseCreated = Number(base?.createdAt) || 0
       const otherCreated = Number(other?.createdAt) || 0
       merged.createdAt = Math.max(baseCreated, otherCreated)
+      const baseUsed = Number(base?.lastUsedAt) || 0
+      const otherUsed = Number(other?.lastUsedAt) || 0
+      merged.lastUsedAt = Math.max(baseUsed, otherUsed, merged.createdAt || 0)
       if (merged.calories == null && other.calories != null) merged.calories = other.calories
       if ((!merged.serving || merged.serving === '') && other.serving) merged.serving = other.serving
       return merged
@@ -14053,47 +14168,20 @@ Please add nutritional information manually if needed.`);
     }
 
     const allMealsRaw = history.map((entry, idx) => {
+      const resolvedFavorite = resolveFavoriteForHistoryEntry(entry)
+      const matchedFavorite = resolvedFavorite.favorite
       const label = (() => {
-        const linkedId = linkedFavoriteIdForEntry(entry)
-        if (linkedId && favoritesById.has(linkedId)) {
-          const fav = favoritesById.get(linkedId)
-          return applyFoodNameOverride(favoriteDisplayLabel(fav) || entry?.description || entry?.label || 'Meal', entry)
+        if (matchedFavorite) {
+          return applyFoodNameOverride(
+            favoriteDisplayLabel(matchedFavorite) || entry?.description || entry?.label || 'Meal',
+            entry,
+          )
         }
-        // If this entry matches a renamed favorite alias, show the latest favorite label.
-        try {
-          const labelKey = normalizeKey(entry?.description || entry?.label || '', entry)
-          const aliasId =
-            (labelKey ? favoriteIdByAlias.get(labelKey) : '') ||
-            (() => {
-              const s = simplifyKey(entry?.description || entry?.label || '')
-              return s ? favoriteIdByAlias.get(s) : ''
-            })()
-          if (aliasId && favoritesById.has(aliasId)) {
-            const fav = favoritesById.get(aliasId)
-            return applyFoodNameOverride(favoriteDisplayLabel(fav) || entry?.description || entry?.label || 'Meal', entry)
-          }
-        } catch {}
         return applyFoodNameOverride(entry?.description || entry?.label || 'Meal', entry)
       })()
 
       const favorite =
-        (entry as any)?.sourceTag === 'Favorite'
-          ? entry
-          : (() => {
-              const linkedId = linkedFavoriteIdForEntry(entry) || ''
-              if (linkedId && favoritesById.has(linkedId)) return favoritesById.get(linkedId)
-              try {
-                const labelKey = normalizeKey(entry?.description || entry?.label || '')
-                const aliasId =
-                  (labelKey ? favoriteIdByAlias.get(labelKey) : '') ||
-                  (() => {
-                    const s = simplifyKey(entry?.description || entry?.label || '')
-                    return s ? favoriteIdByAlias.get(s) : ''
-                  })()
-                if (aliasId && favoritesById.has(aliasId)) return favoritesById.get(aliasId)
-              } catch {}
-              return favoritesByKey.get(normalizeKey(entry?.description || entry?.label || '', entry)) || null
-            })()
+        matchedFavorite || ((entry as any)?.sourceTag === 'Favorite' ? entry : null)
 
       const createdAtValue = resolveEntryCreatedAtMs(entry)
 
@@ -14103,6 +14191,7 @@ Please add nutritional information manually if needed.`);
         entry,
         favorite,
         createdAt: createdAtValue,
+        lastUsedAt: createdAtValue,
         sortPriority: 2,
         sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
         calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
@@ -26645,6 +26734,22 @@ Please add nutritional information manually if needed.`);
                       if (aRecent !== bRecent) return bRecent - aRecent
                       return (Number(b?.createdAt) || 0) - (Number(a?.createdAt) || 0)
                     })
+                  const formatLastUsedLabel = (value: any) => {
+                    const ms = Number(value)
+                    if (!Number.isFinite(ms) || ms <= 0) return ''
+                    try {
+                      const text = new Date(ms).toLocaleString([], {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                      return text ? `Last used ${text}` : ''
+                    } catch {
+                      return ''
+                    }
+                  }
                   let data: any[] = []
                   if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
                   if (favoritesActiveTab === 'favorites')
@@ -26693,6 +26798,7 @@ Please add nutritional information manually if needed.`);
                         const key = normalizeMealLabel(item?.label || '').toLowerCase()
                         const isSaved = Boolean(item.favorite) || (key ? favoriteKeySet.has(key) : false)
                         const canSaveFromAll = favoritesActiveTab === 'all' && !isSaved && Boolean(item.entry)
+                        const recentUsedText = formatLastUsedLabel(Number(item?.lastUsedAt) || Number(item?.createdAt) || 0)
                         return (
                           <div
                             key={item.id}
@@ -26708,6 +26814,7 @@ Please add nutritional information manually if needed.`);
                                 <div className="min-w-0">
                                   <div className="text-sm font-semibold text-gray-900 truncate">{item.label}</div>
                                   <div className="text-xs text-gray-600 truncate">{serving}</div>
+                                  {recentUsedText && <div className="text-[11px] text-gray-500 truncate">{recentUsedText}</div>}
                                 </div>
                                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                   {calories != null && (
