@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 23:05 AEDT
+- What changed: Fixed hot-chocolate drink regression in Food Diary. Drink entries from water flow are now protected from loose favorite remapping (prevents wrong kcal like 319), drink-flow add now prefers the selected row entry payload, and drink icon rendering now trusts saved drink metadata so icons stay correct on mobile/desktop.
+- Where to see it (page/link): Food Diary (`/food`) and Water Intake -> add drink flows (`/food/water`)
+- What to quickly test: Add `Hot chocolate sugar free` from Water Intake favorites flow at 500 ml, then check Food Diary row shows drink icon + amount and correct drink kcal (not remapped to a different favorite’s calories).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 19:26 AEDT
 - What changed: Adjusted Web Dashboard mobile layout to match native app more closely. Daily Tools now renders in 2 columns on phone size, and My Health now uses the same 3 action rows as native (Weekly Health Report, Health Setup, Find a Practitioner) with matching action buttons.
 - Where to see it (page/link): Dashboard (`/dashboard`)
