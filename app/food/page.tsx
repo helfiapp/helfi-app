@@ -13848,10 +13848,15 @@ Please add nutritional information manually if needed.`);
         resolveFavoriteTimestampMs((fav as any)?.lastUsedAt) ||
         resolveFavoriteTimestampMs((fav as any)?.lastUsed) ||
         resolveFavoriteTimestampMs((fav as any)?.recentlyUsedAt)
-      if (Number.isFinite(direct) && direct > 0) return direct
       const updatedAt = resolveFavoriteTimestampMs((fav as any)?.updatedAt)
-      if (Number.isFinite(updatedAt) && updatedAt > 0) return updatedAt
-      return resolveFavoriteCreatedAtMs(fav)
+      const favId = fav?.id ? String(fav.id).trim() : ''
+      const backfilledFromHistory = favId ? Number(favoriteLastUsedFromHistory.get(favId) || 0) : 0
+      return Math.max(
+        Number.isFinite(direct) && direct > 0 ? direct : 0,
+        Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : 0,
+        Number.isFinite(backfilledFromHistory) && backfilledFromHistory > 0 ? backfilledFromHistory : 0,
+        resolveFavoriteCreatedAtMs(fav),
+      )
     }
     const linkedFavoriteIdForEntry = (entry: any) => {
       try {
@@ -13916,11 +13921,81 @@ Please add nutritional information manually if needed.`);
     // even when a matching history entry exists (same name).
     const favoritesByKey = new Map<string, any>()
     const favoritesById = new Map<string, any>()
+    const favoriteIdBySourceId = new Map<string, string>()
+    const favoriteIdByBarcode = new Map<string, string>()
+    const favoriteIdByItemId = new Map<string, string>()
     ;(favorites || []).forEach((fav: any) => {
+      const favId = fav?.id ? String(fav.id).trim() : ''
       const key = normalizeKey(fav?.label || fav?.description || favoriteDisplayLabel(fav) || '', fav)
       if (!key) return
       favoritesByKey.set(key, fav)
-      if (fav?.id) favoritesById.set(String(fav.id), fav)
+      if (favId) favoritesById.set(favId, fav)
+      const favSourceId = getSourceIdForEntry(fav)
+      if (favId && favSourceId && !favoriteIdBySourceId.has(favSourceId)) {
+        favoriteIdBySourceId.set(favSourceId, favId)
+      }
+      const favBarcode = extractBarcodeFromEntry(fav)
+      if (favId && favBarcode && !favoriteIdByBarcode.has(favBarcode)) {
+        favoriteIdByBarcode.set(favBarcode, favId)
+      }
+      try {
+        const favItems = parseFavoriteItems(fav)
+        ;(Array.isArray(favItems) ? favItems : []).forEach((item: any) => {
+          const itemId = typeof item?.id === 'string' ? String(item.id).trim() : ''
+          if (favId && itemId && !favoriteIdByItemId.has(itemId)) {
+            favoriteIdByItemId.set(itemId, favId)
+          }
+        })
+      } catch {}
+    })
+
+    const resolveFavoriteIdFromEntryFallback = (entry: any) => {
+      const entrySourceId = getSourceIdForEntry(entry)
+      if (entrySourceId && favoriteIdBySourceId.has(entrySourceId)) {
+        return String(favoriteIdBySourceId.get(entrySourceId) || '')
+      }
+      const entryBarcode = extractBarcodeFromEntry(entry)
+      if (entryBarcode && favoriteIdByBarcode.has(entryBarcode)) {
+        return String(favoriteIdByBarcode.get(entryBarcode) || '')
+      }
+      try {
+        const items = parseEntryItemsForMatching(entry)
+        for (const item of Array.isArray(items) ? items : []) {
+          const itemId = typeof item?.id === 'string' ? String(item.id).trim() : ''
+          if (itemId && favoriteIdByItemId.has(itemId)) {
+            return String(favoriteIdByItemId.get(itemId) || '')
+          }
+        }
+      } catch {}
+      const labelKey = normalizeKey(entry?.description || entry?.label || '', entry)
+      const aliasId =
+        (labelKey ? favoriteIdByAlias.get(labelKey) : '') ||
+        (() => {
+          const s = simplifyKey(entry?.description || entry?.label || '')
+          return s ? favoriteIdByAlias.get(s) : ''
+        })()
+      return String(aliasId || '')
+    }
+
+    const favoriteLastUsedFromHistory = new Map<string, number>()
+    const stampFavoriteLastUsed = (favoriteId: string, ts: number) => {
+      const favId = String(favoriteId || '').trim()
+      if (!favId || !Number.isFinite(ts) || ts <= 0) return
+      const prevTs = Number(favoriteLastUsedFromHistory.get(favId) || 0)
+      if (ts > prevTs) favoriteLastUsedFromHistory.set(favId, ts)
+    }
+    ;(Array.isArray(history) ? history : []).forEach((entry: any) => {
+      const ts = resolveEntryCreatedAtMs(entry)
+      if (!Number.isFinite(ts) || ts <= 0) return
+      const linkedId = linkedFavoriteIdForEntry(entry)
+      if (linkedId && favoritesById.has(linkedId)) {
+        stampFavoriteLastUsed(linkedId, ts)
+        return
+      }
+      const fallbackId = resolveFavoriteIdFromEntryFallback(entry)
+      if (fallbackId && favoritesById.has(fallbackId)) {
+        stampFavoriteLastUsed(fallbackId, ts)
+      }
     })
 
     const usedFavoriteIds = new Set<string>()
