@@ -22,6 +22,7 @@ export type FeaturePageUseCase = {
 }
 
 export type FeaturePageSegment = {
+  anchorId?: string
   title: string
   description: string
   details?: string[]
@@ -566,6 +567,16 @@ export const featurePages: FeaturePageContent[] = [
         description:
           'Scan barcodes or search branded foods to log packaged items quickly.',
       },
+      {
+        title: 'Recipe import and meal reuse',
+        description:
+          'Import recipes, save favorites, and reuse common meals without rebuilding them from scratch.',
+      },
+      {
+        title: 'Water and drinks tracking',
+        description:
+          'Log water, coffee, tea, and soft drinks so hydration habits stay visible with your food diary.',
+      },
     ],
     useCases: [
       {
@@ -594,6 +605,7 @@ export const featurePages: FeaturePageContent[] = [
     ],
     segments: [
       {
+        anchorId: 'photo-camera-logging',
         title: 'Capture meals in real life',
         description:
           'Log meals wherever you eat so the diary stays accurate without interrupting the moment.',
@@ -625,6 +637,7 @@ export const featurePages: FeaturePageContent[] = [
         ],
       },
       {
+        anchorId: 'ai-photo-scan',
         title: 'AI photo scan and ingredient breakdown',
         description:
           'Upload a meal photo and start with a structured breakdown.',
@@ -656,6 +669,7 @@ export const featurePages: FeaturePageContent[] = [
         ],
       },
       {
+        anchorId: 'build-a-meal',
         title: 'Manual edits and build-a-meal',
         description:
           'Create meals manually when you need more control.',
@@ -687,20 +701,21 @@ export const featurePages: FeaturePageContent[] = [
         ],
       },
       {
-        title: 'Nutrition diary and trends',
+        anchorId: 'meal-categories-nutrition-totals',
+        title: 'Meal categories and nutrition totals',
         description:
-          'Stay consistent with a nutrition diary that feeds into weekly insights.',
+          'Track breakfast, lunch, dinner, snacks, and totals in one clean daily view.',
         details: [
-          'Daily entries build a stronger weekly report and keep goals visible.',
-          'Trend views make it easier to spot changes in macros or calorie balance.',
-          'You can compare weeks to see how changes in diet affect energy or mood.',
+          'Each meal category stays separate so you can quickly see where calories and macros are coming from.',
+          'Daily and weekly totals help you compare your intake against your targets.',
+          'This structure makes your food diary easier to review and easier to improve.',
         ],
         bullets: [
-          'Daily and weekly summaries',
-          'Macro balance at a glance',
-          'Goal alignment built in',
-          'Works with check-ins and mood tracking',
-          'Supports long-term trend review',
+          'Breakfast, lunch, dinner, and snack categories',
+          'Daily calorie and macro totals',
+          'Clear summary cards and trend views',
+          'Built for fast weekly review',
+          'Aligned with your health and nutrition goals',
         ],
         image: foodDiaryPhone(
           '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ENERGY SUMMARY MACROS-portrait.png',
@@ -718,6 +733,7 @@ export const featurePages: FeaturePageContent[] = [
         ],
       },
       {
+        anchorId: 'barcode-scanner',
         title: 'Packaged foods and barcode scanning',
         description:
           'Log packaged foods faster with barcode lookup and branded product entries.',
@@ -742,19 +758,20 @@ export const featurePages: FeaturePageContent[] = [
         alignImageWithHeading: true,
       },
       {
-        title: 'Food recommendations and context',
+        anchorId: 'ai-recommended-meals',
+        title: 'AI recommended meals and context',
         description:
-          'Use the recommendation tools to explore options that match your goals.',
+          'Use AI meal suggestions to plan faster while staying aligned with your goals.',
         details: [
-          'Helfi can explain how different foods align with your targets or recent trends.',
-          'This helps you make informed choices without starting from scratch every meal.',
-          'Recommendations are meant to support decision making, not replace professional advice.',
+          'Helfi can recommend meal ideas based on your current food diary patterns and targets.',
+          'You can review why a meal is suggested before you save it.',
+          'This speeds up meal planning while keeping your choices in your control.',
         ],
         bullets: [
+          'AI recommended meals for daily use',
+          'Reasoning and context before saving',
           'Goal-aligned suggestions',
-          'Explanation views for transparency',
-          'Faster meal planning decisions',
-          'Helps reduce guesswork',
+          'Less meal-planning guesswork',
           'Built around your tracking history',
         ],
         image: foodDiaryPhone(
@@ -772,11 +789,129 @@ export const featurePages: FeaturePageContent[] = [
           ),
         ],
       },
+      {
+        anchorId: 'import-recipe',
+        title: 'Import recipe and review before saving',
+        description:
+          'Import recipes quickly, then check ingredients and portions before adding them to your diary.',
+        details: [
+          'Recipe import helps you avoid manual typing for long ingredient lists.',
+          'You can review and edit the recipe output so the final entry matches what you actually cooked.',
+          'This keeps your nutrition log practical for home meals and meal prep.',
+        ],
+        bullets: [
+          'Import recipes from your recipe workflow',
+          'Review ingredients and quantities before saving',
+          'Edit for your exact serving sizes',
+          'Works well for batch cooking and meal prep',
+          'Saves time compared with manual entry',
+        ],
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ADD MEAL MENU-portrait.png',
+          'Add meal options including recipe import'
+        ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ADD MEAL MENU-portrait.png',
+            'Add meal options including recipe import'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/INGREDIENT CARDS-portrait.png',
+            'Recipe ingredients ready for review'
+          ),
+        ],
+      },
+      {
+        anchorId: 'favorites-reusable-meals',
+        title: 'Favorites and reusable meals',
+        description:
+          'Save meals you use often and add them back in seconds when you need them again.',
+        details: [
+          'Favorites reduce repeat work for common breakfasts, lunches, snacks, and drinks.',
+          'Reusable meals keep your diary consistent even on busy days.',
+          'This is especially useful when you rotate the same food choices each week.',
+        ],
+        bullets: [
+          'Save meals to favorites for quick reuse',
+          'Keep common meals consistent across days',
+          'Faster logging for repeat foods',
+          'Great for routine meal plans',
+          'Reduces daily tracking effort',
+        ],
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
+          'Saved meal entries in the food diary'
+        ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
+            'Saved meal entries in the food diary'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/COPY-DUPLICATE MEALS-portrait.png',
+            'Reusable meal actions'
+          ),
+        ],
+      },
+      {
+        anchorId: 'copy-duplicate-combine-tools',
+        title: 'Copy duplicate and combine tools',
+        description:
+          'Move faster with built-in tools to copy, duplicate, and combine existing meal entries.',
+        details: [
+          'Instead of rebuilding every meal, you can duplicate or copy entries from previous logs.',
+          'Combine tools help you merge foods into cleaner entries when needed.',
+          'These tools are designed to speed up food logging without losing control.',
+        ],
+        bullets: [
+          'Copy entries to today quickly',
+          'Duplicate meals with one action',
+          'Combine existing food items into one entry',
+          'Useful for recurring meal patterns',
+          'Saves time in daily tracking',
+        ],
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/COPY-DUPLICATE MEALS-portrait.png',
+          'Copy and duplicate meal tools'
+        ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/COPY-DUPLICATE MEALS-portrait.png',
+            'Copy and duplicate meal tools'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/EXPANDED INGREDIENT CARD-portrait.png',
+            'Combined ingredient entry details'
+          ),
+        ],
+      },
+      {
+        anchorId: 'water-drinks-logging',
+        title: 'Water and drinks logging',
+        description:
+          'Track water and everyday drinks so hydration habits stay connected to your nutrition data.',
+        details: [
+          'You can log water, tea, coffee, and soft drinks in the same flow as your meals.',
+          'Keeping drinks visible helps with hydration consistency and full daily intake tracking.',
+          'This section is built to keep fluid logging simple during busy days.',
+        ],
+        bullets: [
+          'Water and drinks in one daily log',
+          'Supports common drink types',
+          'Helps with hydration consistency',
+          'Works alongside calorie and macro tracking',
+          'Keeps your food diary complete',
+        ],
+        image: foodDiaryPhone(
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
+          'Food diary entries including drinks'
+        ),
+      },
     ],
     seo: {
       title: 'Food Analysis and Nutrition Logging',
       description:
-        'Log meals with photos or manual edits and track nutrition trends alongside your health goals.',
+        'Food diary app with AI photo scan, barcode scanner, recipe import, meal reuse tools, and water and drinks logging.',
     },
   },
   {

@@ -331,7 +331,8 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
                 return (
                   <div
                     key={segment.title}
-                    className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 shadow-sm"
+                    id={segment.anchorId}
+                    className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 shadow-sm scroll-mt-28"
                   >
                     {!shouldUseSideLayout && isPhotoGallery ? (
                       <div>

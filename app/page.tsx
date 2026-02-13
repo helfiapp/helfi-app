@@ -462,7 +462,10 @@ export default function SplashPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#photo-camera-logging"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400" />
               <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -471,9 +474,12 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Photo Library / Camera logging</h3>
               <p className="text-sm text-gray-600">Capture food photos and turn them into editable meal entries.</p>
-            </div>
+            </Link>
 
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#barcode-scanner"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 to-blue-400" />
               <div className="w-11 h-11 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -482,9 +488,12 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Barcode scanner</h3>
               <p className="text-sm text-gray-600">Scan packaged foods and add them in seconds.</p>
-            </div>
+            </Link>
 
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#build-a-meal"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-green-400 to-emerald-400" />
               <div className="w-11 h-11 rounded-xl bg-green-100 text-green-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -493,9 +502,12 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Add ingredient search</h3>
               <p className="text-sm text-gray-600">Search food databases and add single ingredients with nutrition data.</p>
-            </div>
+            </Link>
 
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#build-a-meal"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-lime-400 to-emerald-400" />
               <div className="w-11 h-11 rounded-xl bg-lime-100 text-lime-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -504,9 +516,12 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Build a meal</h3>
               <p className="text-sm text-gray-600">Combine multiple ingredients into one saved meal entry.</p>
-            </div>
+            </Link>
 
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#import-recipe"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-400" />
               <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -515,9 +530,12 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Import recipe</h3>
               <p className="text-sm text-gray-600">Import by URL or by recipe photos, then review and edit before saving.</p>
-            </div>
+            </Link>
 
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#ai-recommended-meals"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-400 to-fuchsia-400" />
               <div className="w-11 h-11 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -526,9 +544,12 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">AI recommended meals</h3>
               <p className="text-sm text-gray-600">Generate meal suggestions for each meal time and save them directly to your diary.</p>
-            </div>
+            </Link>
 
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#favorites-reusable-meals"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-pink-400 to-rose-400" />
               <div className="w-11 h-11 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -537,9 +558,12 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Favorites and reusable meals</h3>
               <p className="text-sm text-gray-600">Save meals to favorites and quickly add them again.</p>
-            </div>
+            </Link>
 
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#copy-duplicate-combine-tools"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 to-blue-500" />
               <div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -548,9 +572,12 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Copy, duplicate, and combine tools</h3>
               <p className="text-sm text-gray-600">Duplicate meals, copy entries to today, copy multiple items, and combine existing foods.</p>
-            </div>
+            </Link>
 
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#meal-categories-nutrition-totals"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-400 to-emerald-500" />
               <div className="w-11 h-11 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -559,9 +586,12 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Meal categories + nutrition totals</h3>
               <p className="text-sm text-gray-600">Track breakfast, lunch, dinner, and snacks with clear macro totals.</p>
-            </div>
+            </Link>
 
-            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+            <Link
+              href="/features/nutrition-food#water-drinks-logging"
+              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
+            >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-400 to-cyan-500" />
               <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center mb-3">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -570,7 +600,7 @@ export default function SplashPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Water and drinks logging</h3>
               <p className="text-sm text-gray-600">Log water, tea, coffee, and bottle sizes with daily hydration tracking.</p>
-            </div>
+            </Link>
           </div>
 
           <div className="mt-9 text-center">
