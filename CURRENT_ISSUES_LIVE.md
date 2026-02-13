@@ -28,6 +28,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 15:23 AEDT
+- What changed: Restored ingredient amount editing for imported recipes. Imported cards still show clear full recipe amount + portion amount, and now users can again change Amount and Serving size/unit (g, oz, tsp, tbsp, cup, etc.) from the dropdown controls.
+- Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal -> expand an ingredient card
+- What to quickly test: Expand `short pasta` and confirm Amount + Serving size controls are back. Change 250 g to 200 g (or switch to oz) and confirm ingredient macros/totals update.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 14:41 AEDT
 - What changed: Simplified imported recipe ingredient cards to reduce confusion. Cards now show `Full recipe amount` and `Portion amount` clearly, hide serving-size dropdown/amount editing controls in import mode, and show ingredient macros for the full recipe amount.
 - Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal -> Your ingredients
