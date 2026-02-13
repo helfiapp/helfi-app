@@ -646,6 +646,8 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
 - In Add from Favorites, entry-source preference for drink flow is allowed only when there is active drink context **and** the selected entry is truly a drink. Non-drink adds (for example chicken favorites) must keep their normal favorite source so labels/icons do not regress.
 - Old corrupted rows must self-heal on load: if a non-drink entry contains leaked drink metadata (`__drinkType` etc.), strip drink metadata so food rows do not render drink icons.
 - For linked favorites, if a diary row still has a long raw source title (for example USDA-style long chicken text), prefer the short saved favorite label in row display unless the entry was manually renamed.
+- Icon guard: when an entry is linked to a **non-drink favorite label**, do not show a drink icon even if stale drink metadata is present.
+- Add-from-favorites must use one shared tap guard (single action key) before routing to insert paths, so one tap cannot create a duplicate entry through mixed insert flows.
 - Water entries must appear under the **category they were logged in**, not default to Other.
 - Editing/renaming a drink entry must **preserve** `__drinkType` and `__waterLogId` so the linked water log stays hidden in Food Diary.
 

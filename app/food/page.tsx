@@ -3342,6 +3342,7 @@ export default function FoodDiary() {
   } | null>(null)
   const duplicateInFlightRef = useRef(false)
   const duplicateActionDebounceRef = useRef<Record<string, number>>({})
+  const favoriteAddActionDebounceRef = useRef<Record<string, number>>({})
   const favoriteInsertDebounceRef = useRef<Record<string, number>>({})
   const mealInsertDebounceRef = useRef<Record<string, number>>({})
   const pendingServerIdRef = useRef<Map<string, { localId: number; savedAt: number }>>(new Map())
@@ -16554,9 +16555,26 @@ Please add nutritional information manually if needed.`);
       closeFavoritesPicker()
       return
     }
+    const now = Date.now()
+    const category = normalizeCategory(selectedAddCategory)
+    const sourceFavoriteId = getFavoriteIdForEntry(source)
+    const sourceId = getSourceIdForEntry(source)
+    const sourceLabelKey = normalizedDescription(
+      applyFoodNameOverride(source?.description || source?.label || source?.favorite?.label || 'Meal', source),
+    )
+    const addActionKey = [
+      String(item?.favorite?.id || sourceFavoriteId || sourceId || sourceLabelKey || 'favorite'),
+      selectedDate,
+      category,
+    ].join('|')
+    const lastActionAt = favoriteAddActionDebounceRef.current[addActionKey] || 0
+    if (now - lastActionAt < 2500) {
+      return
+    }
+    favoriteAddActionDebounceRef.current[addActionKey] = now
     if (useEntrySource) {
       if (item?.favorite) {
-        markFavoriteAsRecentlyUsed(item.favorite, Date.now())
+        markFavoriteAsRecentlyUsed(item.favorite, now)
       }
       insertMealIntoDiary(source, selectedAddCategory)
     } else if (item.favorite) {
@@ -25597,6 +25615,8 @@ Please add nutritional information manually if needed.`);
                       const isWaterEntry = Boolean(food?.__water)
                       const drinkMeta = !isWaterEntry ? getDrinkMetaFromEntry(food) : null
                       const baseEntryLabel = food?.description || food?.label || 'Meal'
+                      const resolvedFavorite = isWaterEntry ? null : resolveFavoriteForEntry(food, baseEntryLabel)
+                      const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
                       const singleItemForDrink =
                         !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1 ? food.items[0] : null
                       const drinkLiquidHint = !isWaterEntry
@@ -25607,11 +25627,16 @@ Please add nutritional information manually if needed.`);
                             )
                           : isLikelyLiquidFood(String(baseEntryLabel || drinkMeta?.type || ''), '')
                         : false
+                      const favoriteLooksLikeDrink = favoriteLabel
+                        ? isLikelyLiquidFood(String(favoriteLabel), '')
+                        : false
+                      const forceFoodIconForFavorite =
+                        !isWaterEntry && Boolean(favoriteLabel) && !favoriteLooksLikeDrink
                       // DO NOT TOUCH (owner lock):
                       // If drink metadata exists, trust it directly for drink rendering.
                       // Heuristic-only checks are fallback; they must not hide drink icons when meta is present.
                       const isDrinkEntry =
-                        !isWaterEntry && (Boolean(drinkMeta?.type) || Boolean(drinkLiquidHint))
+                        !isWaterEntry && !forceFoodIconForFavorite && (Boolean(drinkMeta?.type) || Boolean(drinkLiquidHint))
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
                       const entryCaloriesValue =
                         !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Number(entryTotals?.calories) : null
@@ -25625,8 +25650,6 @@ Please add nutritional information manually if needed.`);
                         !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1
                           ? String(food.items[0]?.name || food.items[0]?.label || '').trim()
                           : ''
-                      const resolvedFavorite = isWaterEntry ? null : resolveFavoriteForEntry(food, baseEntryLabel)
-                      const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
                       const overrideOnly = isWaterEntry ? '' : resolveFoodNameOverrideOnly(baseEntryLabel, food)
                       const favoriteManualEdit = Boolean(
                         !isWaterEntry &&
