@@ -807,13 +807,13 @@ export const featurePages: FeaturePageContent[] = [
           'Saves time compared with manual entry',
         ],
         image: foodDiaryPhone(
-          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ADD MEAL MENU-portrait.png',
-          'Add meal options including recipe import'
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/RECIPE IMPORT-portrait.png',
+          'Recipe import screen'
         ),
         images: [
           foodDiaryPhone(
-            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/ADD MEAL MENU-portrait.png',
-            'Add meal options including recipe import'
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/RECIPE IMPORT-portrait.png',
+            'Recipe import screen'
           ),
           foodDiaryPhone(
             '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/INGREDIENT CARDS-portrait.png',
@@ -839,13 +839,13 @@ export const featurePages: FeaturePageContent[] = [
           'Reduces daily tracking effort',
         ],
         image: foodDiaryPhone(
-          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
-          'Saved meal entries in the food diary'
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD MENU-portrait.png',
+          'Food menu with favorites and reusable meal options'
         ),
         images: [
           foodDiaryPhone(
-            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
-            'Saved meal entries in the food diary'
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD MENU-portrait.png',
+            'Food menu with favorites and reusable meal options'
           ),
           foodDiaryPhone(
             '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/COPY-DUPLICATE MEALS-portrait.png',
@@ -903,9 +903,19 @@ export const featurePages: FeaturePageContent[] = [
           'Keeps your food diary complete',
         ],
         image: foodDiaryPhone(
-          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/FOOD ENTRIES-portrait.png',
-          'Food diary entries including drinks'
+          '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/WATER LOGGING-portrait.png',
+          'Water logging screen'
         ),
+        images: [
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/WATER LOGGING-portrait.png',
+            'Water logging screen'
+          ),
+          foodDiaryPhone(
+            '/MOBILE MOCKUPS/FOOD DIARY/MOBILE PHONE MOCKUPS/WATER LOGGING 2-portrait.png',
+            'Water logging detail with drink entry'
+          ),
+        ],
       },
     ],
     seo: {
