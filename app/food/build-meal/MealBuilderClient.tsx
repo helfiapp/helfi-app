@@ -3567,6 +3567,91 @@ export default function MealBuilderClient() {
     } catch {}
   }
 
+  const normalizeFoodNameKey = (value: any) =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+
+  const persistFoodNameOverrides = (nextOverrides: any[]) => {
+    updateUserData({ foodNameOverrides: nextOverrides } as any)
+    setFoodNameOverridesFallback(nextOverrides)
+    try {
+      localStorage.setItem('food:nameOverrides', JSON.stringify(nextOverrides))
+    } catch {}
+    try {
+      fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foodNameOverrides: nextOverrides }),
+      }).catch(() => {})
+    } catch {}
+  }
+
+  const saveFoodNameOverride = (fromLabel: any, toLabel: any, entry?: any) => {
+    const from = normalizeMealLabel(fromLabel).trim()
+    const to = normalizeMealLabel(toLabel).trim()
+    if (!from || !to || from === to) return
+    const fromKey = normalizeFoodNameKey(from)
+    if (!fromKey) return
+
+    let itemId = ''
+    let favoriteId = ''
+    let sourceId = ''
+    let barcode = ''
+    try {
+      const items = Array.isArray(entry?.items) ? entry.items : null
+      const single = Array.isArray(items) && items.length === 1 ? items[0] : null
+      itemId = single && typeof single?.id === 'string' ? String(single.id).trim() : ''
+      const barcodeRaw = single?.barcode || single?.gtinUpc
+      barcode = barcodeRaw ? String(barcodeRaw).trim() : ''
+      favoriteId =
+        (entry?.favorite && entry.favorite.id && String(entry.favorite.id)) ||
+        (entry?.nutrition && (entry.nutrition as any).__favoriteId) ||
+        (entry?.total && (entry.total as any).__favoriteId) ||
+        (entry?.id && String(entry.id).startsWith('fav-') ? String(entry.id) : '') ||
+        ''
+      sourceId =
+        (entry?.favorite && entry.favorite.sourceId) ||
+        entry?.sourceId ||
+        (entry?.nutrition && (entry.nutrition as any).__sourceId) ||
+        (entry?.total && (entry.total as any).__sourceId) ||
+        ''
+      favoriteId = String(favoriteId || '').trim()
+      sourceId = String(sourceId || '').trim()
+    } catch {}
+
+    const base = Array.isArray((userData as any)?.foodNameOverrides)
+      ? (((userData as any).foodNameOverrides as any[]) || [])
+      : Array.isArray(foodNameOverridesFallback)
+      ? foodNameOverridesFallback
+      : []
+
+    const next = base.filter((row: any) => {
+      const rowItemId = typeof row?.itemId === 'string' ? String(row.itemId).trim() : ''
+      const rowFavId = typeof row?.favoriteId === 'string' ? String(row.favoriteId).trim() : ''
+      const rowSrcId = typeof row?.sourceId === 'string' ? String(row.sourceId).trim() : ''
+      const rowBarcode = typeof row?.barcode === 'string' ? String(row.barcode).trim() : ''
+      if (itemId && rowItemId && rowItemId === itemId) return false
+      if (favoriteId && rowFavId && rowFavId === favoriteId) return false
+      if (sourceId && rowSrcId && rowSrcId === sourceId) return false
+      if (barcode && rowBarcode && rowBarcode === barcode) return false
+      return normalizeFoodNameKey(normalizeMealLabel(row?.from || '')) !== fromKey
+    })
+
+    next.unshift({
+      from,
+      to,
+      ...(itemId ? { itemId } : {}),
+      ...(favoriteId ? { favoriteId } : {}),
+      ...(sourceId ? { sourceId } : {}),
+      ...(barcode ? { barcode } : {}),
+      createdAt: Date.now(),
+    })
+
+    persistFoodNameOverrides(next)
+  }
+
   const saveToFavorites = (entryLike: any) => {
     const source = entryLike
     if (!source) return
@@ -4414,6 +4499,15 @@ export default function MealBuilderClient() {
           meal: existing?.meal || category,
           createdAt: existing?.createdAt || Date.now(),
         }
+        try {
+          saveFoodNameOverride(previousDescription || existing?.label || '', description, {
+            ...existing,
+            items: cleanedItems,
+            sourceId: existing?.sourceId || candidateLogId || sourceLogId || '',
+            nutrition: normalizedNutrition || payload.nutrition,
+            total: normalizedNutrition || payload.nutrition,
+          })
+        } catch {}
         const nextFavorites = prev.map((f: any) => (String(f?.id || '') === editFavoriteId ? updatedFavorite : f))
         persistFavorites(nextFavorites)
         try {
