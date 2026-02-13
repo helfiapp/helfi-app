@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 19:06 AEDT
+- What changed: Shipped foundational SEO upgrades. Added live sitemap and robots routes, improved global page metadata/social preview tags, added canonical/social metadata on core public pages, and set auth/help/support pages to noindex.
+- Where to see it (page/link): `/sitemap.xml`, `/robots.txt`, `/features`, `/faq`, `/privacy`, `/terms`
+- What to quickly test: Open `/sitemap.xml` and `/robots.txt` and confirm they load. Share `https://helfi.ai/features` in a social preview tool and confirm title/description appears. In Search Console, verify sitemap status starts processing.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 18:59 AEDT
 - What changed: Redesigned the Web App Dashboard to match the native dashboard style. Updated the welcome section plus Daily Tools and My Health card layout, and wired the card links to the correct existing pages.
 - Where to see it (page/link): Dashboard (`/dashboard`)
