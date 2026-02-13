@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 15:46 AEDT
+- What changed: Fixed favorites ordering + naming consistency. Ordering now uses real usage time (not edit/update time), `All` now reuses the saved favorite/custom title when matched, and each row now shows `Last used ...` date/time so order is easy to verify.
+- Where to see it (page/link): Food Diary -> Add from favorites (`/food?open=favorites`)
+- What to quickly test: Add one older favorite and one newer favorite to diary, reopen the picker, and confirm newest is at top in `All`, `Favorites`, and `Custom`. Confirm chicken entry label in `All` matches saved `Chicken Breast` title.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 15:35 AEDT
 - What changed: Rewrote the Smart Health Coach explanation line to be clearer in plain English. It now states we use food, water, activity, and mood logs, and gives clear examples of patterns that can trigger alerts (like low hydration or missed check-ins), including up to 5 alerts/day.
 - Where to see it (page/link): Notifications -> Smart Health Coach (`/notifications/ai-insights`) and Health Tips settings (`/health-tips`)
