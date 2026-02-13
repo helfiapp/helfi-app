@@ -447,11 +447,14 @@ export default function SplashPage() {
       </section>
 
       {/* Food Tracking Capabilities Section */}
-      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-br from-emerald-50/60 to-cyan-50/40">
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-br from-emerald-50/70 via-white to-cyan-50/50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-helfi-black mb-4">
-              Food Tracking: Fully Featured
+            <span className="inline-flex items-center px-4 py-2 rounded-full bg-emerald-100 text-emerald-700 text-sm font-semibold mb-5">
+              One of our strongest modules
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold text-helfi-black mb-4">
+              Fully Featured Food Tracking
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Helfi food tracking is not just basic calorie logging. You can log meals in multiple ways, edit fast, and reuse meals.
@@ -459,52 +462,121 @@ export default function SplashPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400" />
+              <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M7 3h10l2 4H5l2-4zm-2 6h14v11H5V9zm4 3h6m-6 4h4" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Photo Library / Camera logging</h3>
               <p className="text-sm text-gray-600">Capture food photos and turn them into editable meal entries.</p>
             </div>
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 to-blue-400" />
+              <div className="w-11 h-11 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16M7 7v10m10-10v10" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Barcode scanner</h3>
               <p className="text-sm text-gray-600">Scan packaged foods and add them in seconds.</p>
             </div>
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-green-400 to-emerald-400" />
+              <div className="w-11 h-11 rounded-xl bg-green-100 text-green-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.3-4.3m1.3-5.2a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Add ingredient search</h3>
               <p className="text-sm text-gray-600">Search food databases and add single ingredients with nutrition data.</p>
             </div>
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-lime-400 to-emerald-400" />
+              <div className="w-11 h-11 rounded-xl bg-lime-100 text-lime-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4m3-5h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Build a meal</h3>
               <p className="text-sm text-gray-600">Combine multiple ingredients into one saved meal entry.</p>
             </div>
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-400" />
+              <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14L21 3m0 0h-7m7 0v7M3 10v11h11" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Import recipe</h3>
               <p className="text-sm text-gray-600">Import by URL or by recipe photos, then review and edit before saving.</p>
             </div>
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-400 to-fuchsia-400" />
+              <div className="w-11 h-11 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5a2.5 2.5 0 015 0c0 1.5-1.2 2.2-2.1 2.8-.8.5-1.4.9-1.4 1.7m0 3h.01M12 3l2.5 4.5 5 .7-3.6 3.5.8 4.9L12 14l-4.7 2.6.8-4.9L4.5 8.2l5-.7L12 3z" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">AI recommended meals</h3>
               <p className="text-sm text-gray-600">Generate meal suggestions for each meal time and save them directly to your diary.</p>
             </div>
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-pink-400 to-rose-400" />
+              <div className="w-11 h-11 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21s-7-4.7-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.3-7 10-7 10z" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Favorites and reusable meals</h3>
               <p className="text-sm text-gray-600">Save meals to favorites and quickly add them again.</p>
             </div>
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 to-blue-500" />
+              <div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h11M8 12h11M8 17h11M4 7h.01M4 12h.01M4 17h.01" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Copy, duplicate, and combine tools</h3>
               <p className="text-sm text-gray-600">Duplicate meals, copy entries to today, copy multiple items, and combine existing foods.</p>
             </div>
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-400 to-emerald-500" />
+              <div className="w-11 h-11 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19h16M7 16V8m5 8V5m5 11v-6" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Meal categories + nutrition totals</h3>
               <p className="text-sm text-gray-600">Track breakfast, lunch, dinner, and snacks with clear macro totals.</p>
             </div>
-            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+
+            <div className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-400 to-cyan-500" />
+              <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 18a4 4 0 010-8 5 5 0 019.7-1.3A3.5 3.5 0 1118 18H7zm5-6v4m0 0l-2-2m2 2l2-2" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">Water and drinks logging</h3>
               <p className="text-sm text-gray-600">Log water, tea, coffee, and bottle sizes with daily hydration tracking.</p>
             </div>
           </div>
 
-          <div className="mt-8 text-center">
+          <div className="mt-9 text-center">
             <Link
               href="/features/nutrition-food"
-              className="inline-flex items-center px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+              className="inline-flex items-center px-7 py-3 rounded-full bg-helfi-green text-white font-semibold shadow-lg shadow-emerald-200/50 hover:bg-helfi-green/90 transition-colors"
             >
               See Food Diary Feature Page
             </Link>
