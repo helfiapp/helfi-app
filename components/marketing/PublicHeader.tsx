@@ -229,8 +229,8 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
   }
 
   return (
-    <nav className="relative z-50 px-6 py-1">
-      <div className="max-w-6xl mx-auto flex justify-between items-center">
+    <nav className="relative z-50 px-4 sm:px-6 lg:px-8 py-1">
+      <div className="max-w-[1400px] mx-auto flex justify-between items-center">
         <div className="flex items-center gap-3">
           {showMobileBack && (
             <button
@@ -271,7 +271,7 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
           </button>
         </div>
 
-        <div className="hidden md:flex items-center space-x-8">
+        <div className="hidden md:flex items-center space-x-7">
           <Link
             href="/"
             className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
@@ -347,6 +347,12 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
           >
             Pricing
           </button>
+          <Link
+            href="/news"
+            className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
+          >
+            News
+          </Link>
           <button
             type="button"
             onClick={() => scrollToSection('why-helfi')}
@@ -364,7 +370,7 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
           {status === 'authenticated' ? (
             <Link
               href="/dashboard"
-              className="btn-primary text-lg px-6 py-3 bg-helfi-green hover:bg-green-600 text-white"
+              className="btn-primary text-base px-5 py-2 bg-helfi-green hover:bg-green-600 text-white"
             >
               Go to Dashboard
             </Link>
@@ -372,13 +378,13 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
             <div className="flex items-center gap-3">
               <Link
                 href={loginHref}
-                className="btn-secondary text-lg px-6 py-3 text-helfi-green hover:bg-helfi-green hover:text-white transition-colors"
+                className="btn-secondary text-base px-5 py-2 text-helfi-green hover:bg-helfi-green hover:text-white transition-colors"
               >
                 Log in
               </Link>
               <Link
                 href={signupHref}
-                className="btn-primary text-lg px-6 py-3 bg-helfi-green hover:bg-green-600 text-white"
+                className="btn-primary text-base px-5 py-2 bg-helfi-green hover:bg-green-600 text-white"
               >
                 Create account
               </Link>
