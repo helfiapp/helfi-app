@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 02:23 AEDT
+- What changed: Permanent fix for drink-context contamination in Food Diary add flows. Pending drink context is now always cleared after each add path checks/uses it (analysis save, barcode add, meal add, favorite add). Favorites add logic now only prefers entry-source in drink flow when the selected row is actually a drink, preventing non-drink favorites (like Chicken Breast) from inheriting drink behavior.
+- Where to see it (page/link): Food Diary (`/food`) add-from-favorites and water-flow drink add paths
+- What to quickly test: Add `Chicken Breast` from Favorites and confirm basket icon + short label stays after refresh. Then add a water-flow drink (example Coke 500 ml) and confirm calories scale correctly without raw-ml blow-up.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 02:04 AEDT
 - What changed: Improved recipe import quality and missing-item matching. Import now rejects abbreviated instruction output, prefers higher-quality page text when extracting recipes, and retries with stronger matching for obvious single foods (like avocado) before showing manual-match warnings.
 - Where to see it (page/link): Recipe import flow (`/food/import-recipe` -> `/food/build-meal?recipeImport=1`)
