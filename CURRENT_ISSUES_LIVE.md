@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 15:35 AEDT
+- What changed: Rewrote the Smart Health Coach explanation line to be clearer in plain English. It now states we use food, water, activity, and mood logs, and gives clear examples of patterns that can trigger alerts (like low hydration or missed check-ins), including up to 5 alerts/day.
+- Where to see it (page/link): Notifications -> Smart Health Coach (`/notifications/ai-insights`) and Health Tips settings (`/health-tips`)
+- What to quickly test: Open either page and confirm the new explanation text appears under the Smart Health Coach toggle.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 15:13 AEDT
 - What changed: Fixed Favorites ordering backfill so older diary usage now updates recency order too. If a meal was used earlier (for example this morning), it now gets pulled to the top in `All`, `Favorites`, and `Custom` instead of relying only on newly stamped usage.
 - Where to see it (page/link): Food Diary -> Add from favorites (`/food?open=favorites`)
