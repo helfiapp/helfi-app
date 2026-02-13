@@ -15,6 +15,7 @@ import { ensureHealthTipTables } from '@/lib/health-tips'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 import {
   SMART_COACH_ALERT_COST_CREDITS,
+  SMART_COACH_AUTO_CHECK_TIMES,
   SMART_COACH_DAILY_CAP_CREDITS,
   SMART_COACH_DAILY_MAX_ALERTS,
   SMART_COACH_GLOBAL_COOLDOWN_MINUTES,
@@ -179,14 +180,10 @@ export async function POST(req: NextRequest) {
       prisma.$queryRawUnsafe<
         Array<{
           enabled: boolean
-          time1: string
-          time2: string
-          time3: string
           timezone: string
-          frequency: number | null
         }>
       >(
-        `SELECT enabled, time1, time2, time3, timezone, frequency
+        `SELECT enabled, timezone
          FROM HealthTipSettings
          WHERE userId = $1`,
         userId
@@ -210,11 +207,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: 'disabled' })
     }
 
-    const resolvedFrequency = Math.max(1, Math.min(3, settings.frequency ?? 1))
-    const activeTimes: string[] = []
-    if (resolvedFrequency >= 1 && settings.time1) activeTimes.push(settings.time1)
-    if (resolvedFrequency >= 2 && settings.time2) activeTimes.push(settings.time2)
-    if (resolvedFrequency >= 3 && settings.time3) activeTimes.push(settings.time3)
+    const activeTimes: string[] = [...SMART_COACH_AUTO_CHECK_TIMES]
 
     const effectiveTimezone = settings.timezone || fallbackTimezone || 'UTC'
     const reminderStillActive = activeTimes.includes(reminderTime)

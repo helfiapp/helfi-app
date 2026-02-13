@@ -630,66 +630,9 @@ export default function HealthTipsPage() {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Number of checks per day
-                  </label>
-                  <select
-                    value={frequency}
-                    onChange={(e) => setFrequency(parseInt(e.target.value, 10))}
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    disabled={!enabled}
-                  >
-                    <option value={1}>1 check per day</option>
-                    <option value={2}>2 checks per day</option>
-                    <option value={3}>3 checks per day</option>
-                  </select>
-                </div>
-
-                {frequency >= 1 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Tip 1 time
-                    </label>
-                    <input
-                      type="time"
-                      value={time1}
-                      onChange={(e) => setTime1(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      disabled={!enabled}
-                    />
-                  </div>
-                )}
-
-                {frequency >= 2 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Tip 2 time
-                    </label>
-                    <input
-                      type="time"
-                      value={time2}
-                      onChange={(e) => setTime2(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      disabled={!enabled}
-                    />
-                  </div>
-                )}
-
-                {frequency >= 3 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Tip 3 time
-                    </label>
-                    <input
-                      type="time"
-                      value={time3}
-                      onChange={(e) => setTime3(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      disabled={!enabled}
-                    />
-                  </div>
-                )}
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Alerts are sent automatically through the day based on your logging habits and safety limits.
+                </p>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

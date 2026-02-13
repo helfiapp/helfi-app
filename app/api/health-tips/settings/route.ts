@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { scheduleHealthTipWithQStash } from '@/lib/qstash'
+import { SMART_COACH_AUTO_CHECK_TIMES } from '@/lib/smart-health-coach'
 
 const FALLBACK_TIMEZONE = 'UTC'
 
@@ -86,8 +87,7 @@ async function ensureHealthTipSettingsTable() {
  *
  * Lets users control:
  * - enabled: whether Smart Health Coach alerts are active
- * - frequency: 1–3 tips per day
- * - time1, time2, time3: local reminder times (HH:MM, 24h)
+ * - alerts are checked automatically during the day
  * - timezone: IANA timezone string
  * - focus flags stay enabled for all users (legacy columns kept for compatibility)
  */
@@ -181,15 +181,16 @@ export async function GET(req: NextRequest) {
 
   // Default settings when user has never configured health tips
   const defaultTimezone = detectRequestTimezone(req)
+  const autoTimes = [...SMART_COACH_AUTO_CHECK_TIMES]
 
   return NextResponse.json({
     enabled: false,
-    time1: '11:30',
-    time2: '15:30',
-    time3: '20:30',
+    time1: autoTimes[0],
+    time2: autoTimes[1],
+    time3: autoTimes[2],
     timezone: defaultTimezone,
     timezoneManual: false,
-    frequency: 1,
+    frequency: autoTimes.length,
     focusFood: true,
     focusSupplements: true,
     focusLifestyle: true,
@@ -254,16 +255,17 @@ export async function POST(req: NextRequest) {
   }
 
   enabled = !!enabled
-  time1 = normalizeTime(time1, '11:30')
-  time2 = normalizeTime(time2, '15:30')
-  time3 = normalizeTime(time3, '20:30')
+  const autoTimes = [...SMART_COACH_AUTO_CHECK_TIMES]
+  time1 = autoTimes[0]
+  time2 = autoTimes[1]
+  time3 = autoTimes[2]
   const timezoneFromBody = timezone ? String(timezone).trim() : ''
   const timezoneManualEnabled =
     timezoneManual === true || timezoneManual === 'true'
   timezone = isValidTimezone(timezoneFromBody)
     ? timezoneFromBody
     : detectRequestTimezone(req)
-  frequency = Math.max(1, Math.min(3, parseInt(String(frequency || 1), 10)))
+  frequency = autoTimes.length
   // Focus-area checkboxes were removed from UI; coach now evaluates all areas.
   focusFood = true
   focusSupplements = true
@@ -368,12 +370,7 @@ export async function POST(req: NextRequest) {
     // Schedule Smart Health Coach checks only when enabled
     let scheduleResults: any[] = []
     if (enabled && frequency > 0) {
-      const times: string[] = []
-      if (frequency >= 1) times.push(time1)
-      if (frequency >= 2) times.push(time2)
-      if (frequency >= 3) times.push(time3)
-
-      const tasks = times.map((t) =>
+      const tasks = autoTimes.map((t) =>
         scheduleHealthTipWithQStash(user.id, t, timezone).then((result) => ({
           reminderTime: t,
           ...result,

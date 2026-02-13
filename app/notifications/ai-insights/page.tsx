@@ -304,7 +304,7 @@ export default function AiInsightsNotificationsPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 space-y-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Smart Health Coach schedule</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Smart Health Coach settings</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Get proactive guidance based on your daily logs and habits.
               </p>
@@ -342,66 +342,9 @@ export default function AiInsightsNotificationsPage() {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Number of checks per day
-                  </label>
-                  <select
-                    value={frequency}
-                    onChange={(e) => setFrequency(parseInt(e.target.value, 10))}
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    disabled={!enabled}
-                  >
-                    <option value={1}>1 check</option>
-                    <option value={2}>2 checks</option>
-                    <option value={3}>3 checks</option>
-                  </select>
-                </div>
-
-                {frequency >= 1 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Time 1
-                    </label>
-                    <input
-                      type="time"
-                      value={time1}
-                      onChange={(e) => setTime1(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      disabled={!enabled}
-                    />
-                  </div>
-                )}
-
-                {frequency >= 2 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Time 2
-                    </label>
-                    <input
-                      type="time"
-                      value={time2}
-                      onChange={(e) => setTime2(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      disabled={!enabled}
-                    />
-                  </div>
-                )}
-
-                {frequency >= 3 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Time 3
-                    </label>
-                    <input
-                      type="time"
-                      value={time3}
-                      onChange={(e) => setTime3(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      disabled={!enabled}
-                    />
-                  </div>
-                )}
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Alerts are sent automatically through the day based on your logging habits and safety limits.
+                </p>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

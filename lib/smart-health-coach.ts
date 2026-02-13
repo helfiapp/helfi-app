@@ -8,6 +8,7 @@ export const SMART_COACH_DAILY_CAP_CREDITS = 50
 export const SMART_COACH_DAILY_MAX_ALERTS = 5
 export const SMART_COACH_GLOBAL_COOLDOWN_MINUTES = 60
 export const SMART_COACH_RULE_COOLDOWN_MINUTES = 4 * 60
+export const SMART_COACH_AUTO_CHECK_TIMES = ['08:00', '11:00', '14:00', '17:00', '20:00'] as const
 
 export type SmartCoachDecisionResult = 'sent' | 'blocked'
 
