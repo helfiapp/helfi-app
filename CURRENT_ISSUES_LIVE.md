@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 14:45 AEDT
+- What changed: Fixed Smart Health Coach timezone auto-detect so it now uses your current device/browser timezone in auto mode (for example Melbourne), instead of keeping old stale values like Africa/Abidjan. Manual timezone override still works and is saved when you choose it.
+- Where to see it (page/link): Notifications -> Smart Health Coach (`/notifications/ai-insights`) and Health Tips (`/health-tips`)
+- What to quickly test: Open Smart Health Coach settings and confirm timezone now shows Melbourne (if your device is set to Melbourne). Then change timezone manually, save, refresh, and confirm your manual choice stays.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 14:41 AEDT
 - What changed: Simplified imported recipe ingredient cards to reduce confusion. Cards now show `Full recipe amount` and `Portion amount` clearly, hide serving-size dropdown/amount editing controls in import mode, and show ingredient macros for the full recipe amount.
 - Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal -> Your ingredients
