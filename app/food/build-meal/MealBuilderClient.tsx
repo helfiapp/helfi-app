@@ -2659,19 +2659,39 @@ export default function MealBuilderClient() {
     }
 
     const mapUnit = (rawUnit: string): { unit: BuilderUnit | null; scale: number } => {
-      const u = String(rawUnit || '').toLowerCase().replace(/\./g, '').trim()
-      if (u === 'g' || u === 'gram' || u === 'grams') return { unit: 'g', scale: 1 }
-      if (u === 'kg' || u === 'kilogram' || u === 'kilograms') return { unit: 'g', scale: 1000 }
+      const u = String(rawUnit || '')
+        .toLowerCase()
+        .replace(/\./g, '')
+        .replace(/[^a-z]/g, '')
+        .trim()
+      if (u === 'g' || u === 'gm' || u === 'gms' || u === 'gram' || u === 'grams') return { unit: 'g', scale: 1 }
+      if (u === 'kg' || u === 'kgs' || u === 'kilogram' || u === 'kilograms') return { unit: 'g', scale: 1000 }
       if (u === 'lb' || u === 'lbs' || u === 'pound' || u === 'pounds') return { unit: 'oz', scale: 16 }
       if (u === 'ml' || u === 'milliliter' || u === 'milliliters') return { unit: 'ml', scale: 1 }
       if (u === 'l' || u === 'liter' || u === 'liters') return { unit: 'ml', scale: 1000 }
       if (u === 'oz' || u === 'ounce' || u === 'ounces') return { unit: 'oz', scale: 1 }
-      if (u === 'tsp' || u === 'teaspoon' || u === 'teaspoons') return { unit: 'tsp', scale: 1 }
-      if (u === 'tbsp' || u === 'tablespoon' || u === 'tablespoons') return { unit: 'tbsp', scale: 1 }
+      if (u === 'tsp' || u === 'tsps' || u === 'teaspoon' || u === 'teaspoons') return { unit: 'tsp', scale: 1 }
+      if (u === 'tbsp' || u === 'tbs' || u === 'tbsps' || u === 'tablespoon' || u === 'tablespoons')
+        return { unit: 'tbsp', scale: 1 }
       if (u === 'cup' || u === 'cups') return { unit: 'cup', scale: 1 }
       if (u === 'clove' || u === 'cloves') return { unit: 'piece', scale: 1 }
       if (u === 'piece' || u === 'pieces') return { unit: 'piece', scale: 1 }
       return { unit: null, scale: 1 }
+    }
+
+    const parseNumberToken = (rawToken: string) => {
+      const token = String(rawToken || '').trim()
+      if (!token) return null
+      const range = token.match(/^(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)$/)
+      if (range) {
+        const a = Number(String(range[1]).replace(',', '.'))
+        const b = Number(String(range[2]).replace(',', '.'))
+        if (Number.isFinite(a) && Number.isFinite(b) && a > 0 && b > 0) return (a + b) / 2
+      }
+      const fraction = parseFraction(token)
+      if (fraction !== null) return fraction
+      const asNumber = Number(token.replace(',', '.'))
+      return Number.isFinite(asNumber) ? asNumber : null
     }
 
     const parseLine = (rawLine: string): { lookup: string; amount: number | null; unit: BuilderUnit | null } => {
@@ -2679,6 +2699,21 @@ export default function MealBuilderClient() {
       line = line.replace(/^[\s•*\-–—]+/, '').trim()
       line = line.replace(/^\d+\.\s+/, '').trim()
       if (!line) return { lookup: '', amount: null, unit: null }
+      const metricHint = (() => {
+        const m = line.match(/\((\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|oz)\b/i)
+        if (!m) return null
+        const amount = parseNumberToken(m[1])
+        const mapped = mapUnit(m[2] || '')
+        if (amount === null || !mapped.unit) return null
+        return { amount: amount * mapped.scale, unit: mapped.unit }
+      })()
+      const withMetricHint = (result: { lookup: string; amount: number | null; unit: BuilderUnit | null }) => {
+        if (!metricHint) return result
+        if (!result.unit || result.unit === 'cup' || result.unit === 'tbsp' || result.unit === 'tsp' || result.unit === 'piece') {
+          return { ...result, amount: metricHint.amount, unit: metricHint.unit }
+        }
+        return result
+      }
 
       const mixed = line.match(/^(\d+)\s+(\d+\/\d+)\s+(.*)$/)
       if (mixed) {
@@ -2690,7 +2725,7 @@ export default function MealBuilderClient() {
         const unitToken = parts[0] || ''
         const mapped = mapUnit(unitToken)
         const lookup = normalizeLookup(parts.slice(1).join(' ') || rest)
-        return { lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit }
+        return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
       }
 
       const fracOnly = line.match(/^(\d+\/\d+)\s+(.*)$/)
@@ -2701,24 +2736,34 @@ export default function MealBuilderClient() {
         const unitToken = parts[0] || ''
         const mapped = mapUnit(unitToken)
         const lookup = normalizeLookup(parts.slice(1).join(' ') || rest)
-        return { lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit }
+        return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
       }
 
-      const numOnly = line.match(/^(\d+(?:[.,]\d+)?)\s+(.*)$/)
+      const compactUnit = line.match(/^((?:\d+\/\d+)|(?:\d+(?:[.,]\d+)?))([a-zA-Z]+)\s+(.*)$/)
+      if (compactUnit) {
+        const amount = parseNumberToken(compactUnit[1])
+        const unitToken = compactUnit[2] || ''
+        const rest = String(compactUnit[3] || '').trim()
+        const mapped = mapUnit(unitToken)
+        const lookup = normalizeLookup(rest)
+        return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
+      }
+
+      const numOnly = line.match(/^(\d+(?:[.,]\d+)?(?:\s*-\s*\d+(?:[.,]\d+)?)?)\s+(.*)$/)
       if (numOnly) {
-        const amount = Number(String(numOnly[1]).replace(',', '.'))
+        const amount = parseNumberToken(numOnly[1])
         const rest = String(numOnly[2] || '').trim()
         const parts = rest.split(/\s+/)
         const unitToken = parts[0] || ''
         const mapped = mapUnit(unitToken)
         if (mapped.unit) {
           const lookup = normalizeLookup(parts.slice(1).join(' ') || rest)
-          return { lookup, amount: Number.isFinite(amount) ? amount * mapped.scale : null, unit: mapped.unit }
+          return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
         }
-        return { lookup: normalizeLookup(rest), amount: null, unit: null }
+        return withMetricHint({ lookup: normalizeLookup(rest), amount: null, unit: null })
       }
 
-      return { lookup: normalizeLookup(line), amount: null, unit: null }
+      return withMetricHint({ lookup: normalizeLookup(line), amount: null, unit: null })
     }
 
     const toImportDedupeKey = (lookup: string, amount: number | null, unit: BuilderUnit | null) => {
@@ -5493,6 +5538,18 @@ export default function MealBuilderClient() {
                 const hasCustomUnits = Boolean(getFoodUnitGrams(it.name))
                 const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
                 const totals = computeItemTotals(it)
+                const amountUnit = it.__unit || it.__baseUnit
+                const fullAmount = Number.isFinite(Number(it.__amount)) ? round3(Number(it.__amount)) : null
+                const hasPortionScale = Number.isFinite(Number(computedPortionScale)) && Number(computedPortionScale) > 0
+                const showPortionAmount = Boolean(
+                  amountUnit &&
+                    fullAmount !== null &&
+                    hasPortionScale &&
+                    Math.abs(Number(computedPortionScale) - 1) > 0.0001,
+                )
+                const portionAmount = showPortionAmount
+                  ? round3(Math.max(0, Number(fullAmount) * Number(computedPortionScale)))
+                  : null
                 return (
                   <div
                     key={it.id}
@@ -5511,8 +5568,15 @@ export default function MealBuilderClient() {
                         </div>
                         <div className="text-[11px] text-gray-500 truncate">
                           {it.serving_size ? `Serving: ${it.serving_size}` : 'Serving: (unknown)'} •{' '}
-                          {it.__baseUnit ? `Amount: ${it.__amount} ${it.__unit || it.__baseUnit}` : `Servings: ${it.servings}`}
+                          {it.__baseUnit && amountUnit && fullAmount !== null
+                            ? `Amount (full recipe): ${fullAmount} ${amountUnit}`
+                            : `Servings: ${it.servings}`}
                         </div>
+                        {showPortionAmount && amountUnit && portionAmount !== null ? (
+                          <div className="text-[11px] text-gray-500 truncate">
+                            Portion amount: {portionAmount} {amountUnit}
+                          </div>
+                        ) : null}
                         {it.__matchedName &&
                         normalizeSearchToken(it.__matchedName) !== normalizeSearchToken(it.name) ? (
                           <div className="text-[11px] text-gray-400 truncate">
