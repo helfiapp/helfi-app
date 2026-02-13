@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 15:52 AEDT
+- What changed: In imported recipe ingredient cards, removed the confusing `Serving size options` row. Users still keep editable `Amount` + `Serving size` controls, and ingredient macros continue to show for the full recipe amount.
+- Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal -> expand an ingredient card
+- What to quickly test: Import the chicken caesar pasta recipe, expand `short pasta`, and confirm there is no `Serving size options` row. Confirm `Amount` and `Serving size` are still editable and macros update when amount is changed.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 15:46 AEDT
 - What changed: Fixed favorites ordering + naming consistency. Ordering now uses real usage time (not edit/update time), `All` now reuses the saved favorite/custom title when matched, and each row now shows `Last used ...` date/time so order is easy to verify.
 - Where to see it (page/link): Food Diary -> Add from favorites (`/food?open=favorites`)
