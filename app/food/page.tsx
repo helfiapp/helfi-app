@@ -3377,6 +3377,40 @@ export default function FoodDiary() {
   const midnightTimerRef = useRef<number | null>(null)
   const todayIsoRef = useRef<string>(buildTodayIso())
   const openMenuKeyRef = useRef<string | null>(null)
+  const clearPendingDrinkContext = () => {
+    pendingDrinkOverrideRef.current = null
+    pendingDrinkTypeRef.current = null
+    pendingDrinkWaterLogIdRef.current = null
+  }
+  const hasPendingDrinkContext = () =>
+    Boolean(
+      pendingDrinkOverrideRef.current || pendingDrinkTypeRef.current || pendingDrinkWaterLogIdRef.current,
+    )
+  const isDrinkCandidateForPendingContext = (value: any) => {
+    if (!value || typeof value !== 'object') return false
+    if (getDrinkMetaFromEntry(value)?.type) return true
+    const label = String(value?.label || value?.description || value?.name || '')
+    const serving = String(value?.serving_size || '')
+    if (isLikelyLiquidFood(label, serving)) return true
+    let items: any[] | null = null
+    if (Array.isArray(value?.items)) {
+      items = value.items
+    } else if (typeof value?.items === 'string') {
+      try {
+        const parsed = JSON.parse(String(value.items))
+        items = Array.isArray(parsed) ? parsed : null
+      } catch {
+        items = null
+      }
+    }
+    if (!Array.isArray(items) || items.length === 0) return false
+    return items.some((entryItem: any) =>
+      isLikelyLiquidFood(
+        String(entryItem?.name || entryItem?.label || ''),
+        String(entryItem?.serving_size || ''),
+      ),
+    )
+  }
   const consumePendingDrinkMeta = (override: DrinkAmountOverride | null) => {
     const drinkType = pendingDrinkTypeRef.current
     if (!drinkType) return null
@@ -3440,9 +3474,7 @@ export default function FoodDiary() {
     const params = new URLSearchParams(window.location.search)
     const open = params.get('open')
     if (!open) {
-      pendingDrinkOverrideRef.current = null
-      pendingDrinkTypeRef.current = null
-      pendingDrinkWaterLogIdRef.current = null
+      clearPendingDrinkContext()
       return
     }
     const routeDate = params.get('date') || ''
@@ -11235,6 +11267,7 @@ Please add nutritional information manually if needed.`);
 	    const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
 	    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 	    const drinkOverride = pendingDrinkOverrideRef.current
+	    const hadPendingDrinkContext = hasPendingDrinkContext()
 	    const adjusted = applyDrinkOverrideToItems(analyzedItems, drinkOverride)
 	    let finalItems = adjusted.items || (analyzedItems && analyzedItems.length > 0 ? analyzedItems : null)
 	    const overrideTotals = adjusted.used ? adjusted.totals || null : null
@@ -11245,9 +11278,8 @@ Please add nutritional information manually if needed.`);
 	      }
 	    } catch {}
 	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-	    // Avoid "sticky" drink amounts bleeding into later adds/scans.
-	    if (drinkMeta) pendingDrinkOverrideRef.current = null
-	    else if (adjusted.used) pendingDrinkOverrideRef.current = null
+	    // Always clear pending drink context after this add flow has used/checked it.
+	    if (hadPendingDrinkContext) clearPendingDrinkContext()
 	    const finalNutritionBase = overrideTotals || nutrition || analyzedNutrition
 	    const finalTotalBase = overrideTotals ? convertTotalsForStorage(overrideTotals) : analyzedTotal || null
 	    const finalNutrition = applyDrinkMetaToTotals(finalNutritionBase, drinkMeta)
@@ -14686,12 +14718,12 @@ Please add nutritional information manually if needed.`);
     const normalizedItems = normalizeDiscreteServingsWithLabel([item])
     const items = normalizedItems.length > 0 ? normalizedItems : [item]
 	    const drinkOverride = pendingDrinkOverrideRef.current
+	    const hadPendingDrinkContext = hasPendingDrinkContext()
 	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
 	    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
 	    const finalItems = adjusted.items || items
-	    // Avoid "sticky" drink amounts bleeding into later adds/scans.
-	    if (drinkMeta) pendingDrinkOverrideRef.current = null
-	    else if (adjusted.used) pendingDrinkOverrideRef.current = null
+	    // Always clear pending drink context after this add flow has used/checked it.
+	    if (hadPendingDrinkContext) clearPendingDrinkContext()
 	    const recalculatedTotals = recalculateNutritionFromItems(finalItems)
     const totals =
       recalculatedTotals ||
@@ -15986,13 +16018,13 @@ Please add nutritional information manually if needed.`);
       return null
     })()
 	    const drinkOverride = pendingDrinkOverrideRef.current
+	    const hadPendingDrinkContext = hasPendingDrinkContext()
 	    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
 	    const finalItems = adjusted.items || items
 	    const finalTotals = adjusted.used ? adjusted.totals || totals : totals
 	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-	    // Avoid "sticky" drink amounts bleeding into later adds/scans.
-	    if (drinkMeta) pendingDrinkOverrideRef.current = null
-	    else if (adjusted.used) pendingDrinkOverrideRef.current = null
+	    // Always clear pending drink context after this add flow has used/checked it.
+	    if (hadPendingDrinkContext) clearPendingDrinkContext()
 	    const totalsWithMeta = applyDrinkMetaToTotals(stripWaterLogIdFromTotals(finalTotals), drinkMeta)
 	    const newEntry = ensureEntryLoggedAt(
 	      applyEntryClientId(
@@ -16448,13 +16480,14 @@ Please add nutritional information manually if needed.`);
 
   const runFavoriteAdd = (item: any, opts?: { overrideSource?: any | null }) => {
     const hasOverrideSource = Boolean(opts?.overrideSource)
-    const hasDrinkContext = Boolean(pendingDrinkOverrideRef.current)
+    const hasDrinkContext = Boolean(pendingDrinkOverrideRef.current && pendingDrinkTypeRef.current)
+    const entryLooksLikeDrink = isDrinkCandidateForPendingContext(item?.entry)
     // DO NOT TOUCH (owner lock):
-    // In drink flow (coming from Water Intake with drinkAmount/drinkType),
-    // always prefer the selected row entry payload over linked favorite template payload.
+    // In drink flow (coming from Water Intake with drinkAmount/drinkType), prefer the
+    // selected row entry payload only when that selected row is actually a drink item.
     // Using linked favorites here has repeatedly caused wrong drink kcal/icon regressions.
     const useEntrySource =
-      !hasOverrideSource && Boolean(item?.entry) && (!item?.favorite || hasDrinkContext)
+      !hasOverrideSource && Boolean(item?.entry) && (!item?.favorite || (hasDrinkContext && entryLooksLikeDrink))
     const source =
       opts?.overrideSource || (useEntrySource ? item.entry : item.favorite || item.entry || item)
     const replaceIndex = favoritesReplaceTargetRef.current
@@ -16619,10 +16652,10 @@ Please add nutritional information manually if needed.`);
 
 	    const repairedFinalItems = Array.isArray(finalItems) ? finalItems.map(repairEggServingFromBuilderAmount) : finalItems
 	    const adjustedTotals = adjusted.used ? adjusted.totals || null : null
+	    const hadPendingDrinkContext = hasPendingDrinkContext()
 	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-	    // Avoid "sticky" drink amounts bleeding into later adds/scans.
-	    if (drinkMeta) pendingDrinkOverrideRef.current = null
-	    else if (adjusted.used) pendingDrinkOverrideRef.current = null
+	    // Always clear pending drink context after this add flow has used/checked it.
+	    if (hadPendingDrinkContext) clearPendingDrinkContext()
 	    const baseTotals = stripWaterLogIdFromTotals(attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null, false))
 	    const totalsWithMeta = attachMeta(applyDrinkMetaToTotals(baseTotals, drinkMeta), false)
 	    const totalWithMeta = applyDrinkMetaToTotals(

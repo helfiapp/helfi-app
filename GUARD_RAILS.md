@@ -642,6 +642,8 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
 - When a drink is added via Sugar‑free + search/barcode/photo/favorites, the Food Diary entry must **auto‑scale macros** to the drink amount (e.g., 100 ml) instead of the product’s default serving.
 - Sugar‑free drinks logged directly from **Water Intake** must also create a **Food Diary drink entry** (0 kcal),
   linked by `__waterLogId` so the water log stays visible **only** in Water Intake.
+- Pending drink context (`pendingDrinkOverrideRef`, `pendingDrinkTypeRef`, `pendingDrinkWaterLogIdRef`) must be cleared after each add flow uses/checks it (analysis save, barcode add, meal add, favorite add). Do not leave sticky drink context active for the next add.
+- In Add from Favorites, entry-source preference for drink flow is allowed only when there is active drink context **and** the selected entry is truly a drink. Non-drink adds (for example chicken favorites) must keep their normal favorite source so labels/icons do not regress.
 - Water entries must appear under the **category they were logged in**, not default to Other.
 - Editing/renaming a drink entry must **preserve** `__drinkType` and `__waterLogId` so the linked water log stays hidden in Food Diary.
 
