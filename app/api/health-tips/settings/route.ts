@@ -4,6 +4,36 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { scheduleHealthTipWithQStash } from '@/lib/qstash'
 
+const FALLBACK_TIMEZONE = 'UTC'
+
+function isValidTimezone(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const timezone = value.trim()
+  if (!timezone) return false
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date())
+    return true
+  } catch {
+    return false
+  }
+}
+
+function detectRequestTimezone(req?: NextRequest): string {
+  const candidates = [
+    req?.headers.get('x-vercel-ip-timezone'),
+    req?.headers.get('x-timezone'),
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ]
+
+  for (const candidate of candidates) {
+    if (isValidTimezone(candidate)) {
+      return candidate.trim()
+    }
+  }
+
+  return FALLBACK_TIMEZONE
+}
+
 async function ensureHealthTipSettingsTable() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS HealthTipSettings (
@@ -55,10 +85,10 @@ async function ensureHealthTipSettingsTable() {
  * - frequency: 1–3 tips per day
  * - time1, time2, time3: local reminder times (HH:MM, 24h)
  * - timezone: IANA timezone string
- * - focus flags: which categories to prioritise (food, supplements, lifestyle)
+ * - focus flags stay enabled for all users (legacy columns kept for compatibility)
  */
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -144,8 +174,7 @@ export async function GET() {
   }
 
   // Default settings when user has never configured health tips
-  const defaultTimezone =
-    Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Melbourne'
+  const defaultTimezone = detectRequestTimezone(req)
 
   return NextResponse.json({
     enabled: false,
@@ -220,15 +249,15 @@ export async function POST(req: NextRequest) {
   time1 = normalizeTime(time1, '11:30')
   time2 = normalizeTime(time2, '15:30')
   time3 = normalizeTime(time3, '20:30')
-  timezone =
-    (timezone && String(timezone).trim()) ||
-    Intl.DateTimeFormat().resolvedOptions().timeZone ||
-    'Australia/Melbourne'
+  const timezoneFromBody = timezone ? String(timezone).trim() : ''
+  timezone = isValidTimezone(timezoneFromBody)
+    ? timezoneFromBody
+    : detectRequestTimezone(req)
   frequency = Math.max(1, Math.min(3, parseInt(String(frequency || 1), 10)))
-  // Convert to boolean explicitly, handling both string and boolean inputs
-  focusFood = focusFood === false || focusFood === 'false' ? false : Boolean(focusFood ?? true)
-  focusSupplements = focusSupplements === false || focusSupplements === 'false' ? false : Boolean(focusSupplements ?? true)
-  focusLifestyle = focusLifestyle === false || focusLifestyle === 'false' ? false : Boolean(focusLifestyle ?? true)
+  // Focus-area checkboxes were removed from UI; coach now evaluates all areas.
+  focusFood = true
+  focusSupplements = true
+  focusLifestyle = true
   const acceptedPricingTerms =
     acceptPricingTerms === true || acceptPricingTerms === 'true'
 

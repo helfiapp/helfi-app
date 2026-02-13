@@ -14,9 +14,6 @@ type HealthTipSettings = {
   time3: string
   timezone: string
   frequency: number
-  focusFood: boolean
-  focusSupplements: boolean
-  focusLifestyle: boolean
   pricingAcceptedAt?: string | null
 }
 
@@ -59,6 +56,11 @@ const fallbackTimezones = [
 
 const HEALTH_TIPS_CACHE_TTL_MS = 5 * 60_000
 
+const detectBrowserTimezone = () => {
+  if (typeof window === 'undefined') return 'UTC'
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
 export default function AiInsightsNotificationsPage() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(true)
@@ -67,11 +69,8 @@ export default function AiInsightsNotificationsPage() {
   const [time1, setTime1] = useState('11:30')
   const [time2, setTime2] = useState('15:30')
   const [time3, setTime3] = useState('20:30')
-  const [timezone, setTimezone] = useState('UTC')
+  const [timezone, setTimezone] = useState(detectBrowserTimezone)
   const [frequency, setFrequency] = useState(1)
-  const [focusFood, setFocusFood] = useState(true)
-  const [focusSupplements, setFocusSupplements] = useState(true)
-  const [focusLifestyle, setFocusLifestyle] = useState(true)
   const [showEnableModal, setShowEnableModal] = useState(false)
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>(fallbackTimezones)
   const cacheKey = session?.user?.email ? `health-tips-settings:${session.user.email}` : ''
@@ -82,11 +81,8 @@ export default function AiInsightsNotificationsPage() {
     time1: '11:30',
     time2: '15:30',
     time3: '20:30',
-    timezone: 'UTC',
+    timezone: detectBrowserTimezone(),
     frequency: 1,
-    focusFood: true,
-    focusSupplements: true,
-    focusLifestyle: true,
   })
 
   useEffect(() => {
@@ -114,11 +110,8 @@ export default function AiInsightsNotificationsPage() {
       setTime1(data.time1 || '11:30')
       setTime2(data.time2 || '15:30')
       setTime3(data.time3 || '20:30')
-      setTimezone(data.timezone || 'UTC')
+      setTimezone(data.timezone || detectBrowserTimezone())
       setFrequency(Number(data.frequency) || 1)
-      setFocusFood(!!data.focusFood)
-      setFocusSupplements(!!data.focusSupplements)
-      setFocusLifestyle(!!data.focusLifestyle)
       setLoading(false)
     }
     if (cached && isCacheFresh(cached, HEALTH_TIPS_CACHE_TTL_MS)) return
@@ -132,11 +125,8 @@ export default function AiInsightsNotificationsPage() {
           setTime1(data.time1 || '11:30')
           setTime2(data.time2 || '15:30')
           setTime3(data.time3 || '20:30')
-          setTimezone(data.timezone || 'UTC')
+          setTimezone(data.timezone || detectBrowserTimezone())
           setFrequency(Number(data.frequency) || 1)
-          setFocusFood(!!data.focusFood)
-          setFocusSupplements(!!data.focusSupplements)
-          setFocusLifestyle(!!data.focusLifestyle)
           if (cacheKey) {
             writeClientCache(cacheKey, data)
           }
@@ -162,9 +152,6 @@ export default function AiInsightsNotificationsPage() {
       time3,
       timezone,
       frequency,
-      focusFood,
-      focusSupplements,
-      focusLifestyle,
     }
     if (!options?.silent) setSaving(true)
     try {
@@ -198,7 +185,7 @@ export default function AiInsightsNotificationsPage() {
     } finally {
       if (!options?.silent) setSaving(false)
     }
-  }, [cacheKey, enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle])
+  }, [cacheKey, enabled, time1, time2, time3, timezone, frequency])
 
   useEffect(() => {
     if (loading) return
@@ -209,9 +196,6 @@ export default function AiInsightsNotificationsPage() {
       time3,
       timezone,
       frequency,
-      focusFood,
-      focusSupplements,
-      focusLifestyle,
     }
     settingsRef.current = nextSettings
     const snapshot = JSON.stringify(nextSettings)
@@ -221,7 +205,7 @@ export default function AiInsightsNotificationsPage() {
       return
     }
     setHasUnsavedChanges(snapshot !== settingsSnapshotRef.current)
-  }, [enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle, loading])
+  }, [enabled, time1, time2, time3, timezone, frequency, loading])
 
   useSaveOnLeave(() => {
     if (!hasUnsavedChanges) return
@@ -245,9 +229,6 @@ export default function AiInsightsNotificationsPage() {
       time3,
       timezone,
       frequency,
-      focusFood,
-      focusSupplements,
-      focusLifestyle,
     }
     setEnabled(true)
     const saved = await handleSave({
@@ -385,39 +366,9 @@ export default function AiInsightsNotificationsPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white mb-2">Focus areas</h3>
-                <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={focusFood}
-                      onChange={(e) => setFocusFood(e.target.checked)}
-                      disabled={!enabled}
-                    />
-                    Food guidance
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={focusSupplements}
-                      onChange={(e) => setFocusSupplements(e.target.checked)}
-                      disabled={!enabled}
-                    />
-                    Supplement guidance
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={focusLifestyle}
-                      onChange={(e) => setFocusLifestyle(e.target.checked)}
-                      disabled={!enabled}
-                    />
-                    Lifestyle guidance
-                  </label>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Auto-detected from your device. You can change it any time.
+                  </p>
                 </div>
               </div>
 

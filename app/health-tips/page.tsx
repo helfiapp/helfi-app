@@ -27,9 +27,6 @@ type HealthTipSettings = {
   time3: string
   timezone: string
   frequency: number
-  focusFood: boolean
-  focusSupplements: boolean
-  focusLifestyle: boolean
 }
 
 type TipBlock =
@@ -38,6 +35,11 @@ type TipBlock =
   | { type: 'list'; items: string[] }
 const TIPS_CACHE_KEY = 'helfi:health-tips:today'
 const CLEARED_TIPS_KEY = 'helfi:health-tips:cleared'
+
+const detectBrowserTimezone = () => {
+  if (typeof window === 'undefined') return 'UTC'
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
 
 const splitSentences = (value: string) => {
   const matches = value.match(/[^.!?]+[.!?]+|[^.!?]+$/g)
@@ -91,13 +93,10 @@ export default function HealthTipsPage() {
   const [time1, setTime1] = useState('11:30')
   const [time2, setTime2] = useState('15:30')
   const [time3, setTime3] = useState('20:30')
-  const [timezone, setTimezone] = useState('Australia/Melbourne')
+  const [timezone, setTimezone] = useState(detectBrowserTimezone)
   const [frequency, setFrequency] = useState(1)
-  const [focusFood, setFocusFood] = useState(true)
-  const [focusSupplements, setFocusSupplements] = useState(true)
-  const [focusLifestyle, setFocusLifestyle] = useState(true)
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
-  const [timezoneQuery, setTimezoneQuery] = useState('')
+  const [timezoneQuery, setTimezoneQuery] = useState(detectBrowserTimezone)
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showEnableModal, setShowEnableModal] = useState(false)
@@ -110,11 +109,8 @@ export default function HealthTipsPage() {
     time1: '11:30',
     time2: '15:30',
     time3: '20:30',
-    timezone: 'Australia/Melbourne',
+    timezone: detectBrowserTimezone(),
     frequency: 1,
-    focusFood: true,
-    focusSupplements: true,
-    focusLifestyle: true,
   })
 
   const loadTips = useCallback(async (options?: { silent?: boolean }) => {
@@ -195,12 +191,9 @@ export default function HealthTipsPage() {
           setTime1(data.time1)
           setTime2(data.time2)
           setTime3(data.time3)
-          setTimezone(data.timezone)
-          setTimezoneQuery(data.timezone)
+          setTimezone(data.timezone || detectBrowserTimezone())
+          setTimezoneQuery(data.timezone || detectBrowserTimezone())
           setFrequency(data.frequency)
-          setFocusFood(data.focusFood)
-          setFocusSupplements(data.focusSupplements)
-          setFocusLifestyle(data.focusLifestyle)
         }
       } catch {
         // ignore – UI will show fallback defaults
@@ -315,9 +308,6 @@ export default function HealthTipsPage() {
       time3,
       timezone,
       frequency,
-      focusFood,
-      focusSupplements,
-      focusLifestyle,
     }
     if (!options?.silent) setSaving(true)
     try {
@@ -351,7 +341,7 @@ export default function HealthTipsPage() {
     } finally {
       if (!options?.silent) setSaving(false)
     }
-  }, [enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle])
+  }, [enabled, time1, time2, time3, timezone, frequency])
 
   useEffect(() => {
     if (loadingSettings) return
@@ -362,9 +352,6 @@ export default function HealthTipsPage() {
       time3,
       timezone,
       frequency,
-      focusFood,
-      focusSupplements,
-      focusLifestyle,
     }
     settingsRef.current = nextSettings
     const snapshot = JSON.stringify(nextSettings)
@@ -374,7 +361,7 @@ export default function HealthTipsPage() {
       return
     }
     setHasUnsavedChanges(snapshot !== settingsSnapshotRef.current)
-  }, [enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle, loadingSettings])
+  }, [enabled, time1, time2, time3, timezone, frequency, loadingSettings])
 
   useSaveOnLeave(() => {
     if (!hasUnsavedChanges) return
@@ -414,9 +401,6 @@ export default function HealthTipsPage() {
       time3,
       timezone,
       frequency,
-      focusFood,
-      focusSupplements,
-      focusLifestyle,
     }
     setEnabled(true)
     const saved = await handleSaveSettings({
@@ -717,49 +701,10 @@ export default function HealthTipsPage() {
                     )}
                   </div>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Start typing your city or region and pick the closest match (for example:{' '}
+                    Auto-detected from your device. You can still change it here (for example:{' '}
                     <span className="font-mono">Australia/Melbourne</span> or{' '}
                     <span className="font-mono">America/New_York</span>).
                   </p>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
-                <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-                  What would you like tips about?
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  Helfi will always look at your whole health picture, but you can gently steer the
-                  types of tips you receive.
-                </p>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={focusFood}
-                      onChange={(e) => setFocusFood(e.target.checked)}
-                      disabled={!enabled}
-                    />
-                    Food & meals
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={focusSupplements}
-                      onChange={(e) => setFocusSupplements(e.target.checked)}
-                      disabled={!enabled}
-                    />
-                    Supplements (with safety wording)
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={focusLifestyle}
-                      onChange={(e) => setFocusLifestyle(e.target.checked)}
-                      disabled={!enabled}
-                    />
-                    Lifestyle & daily habits
-                  </label>
                 </div>
               </div>
 
