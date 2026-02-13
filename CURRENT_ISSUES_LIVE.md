@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 02:56 AEDT
+- What changed: Follow-up permanent repair for old bad rows already saved in diary. Non-drink rows that had leaked drink metadata now self-heal on load (so they stop showing drink icons). Also, when a linked favorite has a short saved name and the row still has a long raw source title, the row now shows the short favorite name.
+- Where to see it (page/link): Food Diary (`/food`) existing historical rows + Add from Favorites list rows
+- What to quickly test: Refresh Food Diary and check old chicken rows no longer show water icon, and long USDA chicken titles show the saved short favorite name (`Chicken Breast`) when linked.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 02:23 AEDT
 - What changed: Permanent fix for drink-context contamination in Food Diary add flows. Pending drink context is now always cleared after each add path checks/uses it (analysis save, barcode add, meal add, favorite add). Favorites add logic now only prefers entry-source in drink flow when the selected row is actually a drink, preventing non-drink favorites (like Chicken Breast) from inheriting drink behavior.
 - Where to see it (page/link): Food Diary (`/food`) add-from-favorites and water-flow drink add paths
