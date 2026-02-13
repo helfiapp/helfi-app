@@ -1754,6 +1754,7 @@ export default function MealBuilderClient() {
   // Restore draft (best-effort). We intentionally let the draft win so users can continue where they left off.
   useEffect(() => {
     if (recipeImportFlag) return
+    if (recipeImportAppliedRef.current) return
     if (draftAppliedRef.current) return
     try {
       const raw = sessionStorage.getItem(draftKey)
@@ -2614,6 +2615,13 @@ export default function MealBuilderClient() {
     setRecipeImportDraft(draft)
     setRecipeImportMissing([])
     setSaveImportedRecipeToFavorites(false)
+    // Start recipe imports from a clean builder state so stale drafts cannot duplicate cards.
+    setItems([])
+    itemsRef.current = []
+    setExpandedId(null)
+    try {
+      sessionStorage.removeItem(draftKey)
+    } catch {}
     const draftServings = Number((draft as any)?.servings)
     if (Number.isFinite(draftServings) && draftServings > 0) {
       setRecipeServingsForPortion(draftServings)
