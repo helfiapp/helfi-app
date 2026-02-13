@@ -3475,21 +3475,23 @@ export default function FoodDiary() {
     if (open === 'barcode') {
       barcodeReplaceTargetRef.current = null
       barcodeActionRef.current = 'diary'
+      setShowFavoritesPicker(false)
       setShowBarcodeScanner(true)
       setBarcodeError(null)
       setBarcodeValue('')
-      // Prevent accidental re-open loops (e.g. if a page refresh/remount happens after a scan).
-      try {
-        const url = new URL(window.location.href)
-        url.searchParams.delete('open')
-        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
-      } catch {}
     }
     if (open === 'favorites') {
+      setShowBarcodeScanner(false)
       favoritesReplaceTargetRef.current = null
       favoritesActionRef.current = 'diary'
       setShowFavoritesPicker(true)
     }
+    // Prevent accidental re-open loops for all deep-link add menus after refresh/remount.
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('open')
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+    } catch {}
   }, [isAnalysisRoute, pathname])
 
   useEffect(() => {
@@ -14863,8 +14865,9 @@ Please add nutritional information manually if needed.`);
     void saveBarcodeLabelIfNeeded(analyzedItems, { preserveFlow: true, quiet: true })
   }, [barcodeLabelFlow?.barcode, labelValidation.ok, analyzedItems, photoPreview])
 
-  const lookupBarcodeAndAdd = async (code: string) => {
+  const lookupBarcodeAndAdd = async (code: string, options?: { fromCamera?: boolean }) => {
     const normalized = (code || '').replace(/[^0-9A-Za-z]/g, '')
+    const fromCamera = Boolean(options?.fromCamera)
     if (!normalized) {
       setBarcodeError('Enter a valid barcode to search.')
       setBarcodeStatus('scanning')
@@ -14893,7 +14896,7 @@ Please add nutritional information manually if needed.`);
         const data = await res.json().catch(() => null)
         setBarcodeStatus('idle')
         setBarcodeError(null)
-        if (replaceIndex !== null && replaceIndex !== undefined) {
+        if (fromCamera || (replaceIndex !== null && replaceIndex !== undefined)) {
           setBarcodeError('No food found for this barcode. Try again or use photo.')
           resumeScannerAfterLookup()
         } else {
@@ -14922,7 +14925,7 @@ Please add nutritional information manually if needed.`);
         const data = await res.json().catch(() => null)
         setBarcodeStatus('idle')
         setBarcodeError(null)
-        if (replaceIndex !== null && replaceIndex !== undefined) {
+        if (fromCamera || (replaceIndex !== null && replaceIndex !== undefined)) {
           setBarcodeError('No food found for this barcode. Try again or use photo.')
           resumeScannerAfterLookup()
         } else {
@@ -14952,20 +14955,23 @@ Please add nutritional information manually if needed.`);
         resumeScannerAfterLookup()
         return
       }
+      const resolvedBarcode = String((data?.food as any)?.barcode || normalized).replace(/[^0-9A-Za-z]/g, '')
 
       // Close scanner immediately once a product is confirmed so the user is not forced into a second scan.
       setShowBarcodeScanner(false)
       setBarcodeStatus('idle')
       setBarcodeStatusHint('')
+      setShowFavoritesPicker(false)
+      setShowBarcodeLabelPrompt(false)
 
       if (replaceIndex !== null && replaceIndex !== undefined) {
-        replaceIngredientFromBarcodeFood(data.food, normalized, replaceIndex)
+        replaceIngredientFromBarcodeFood(data.food, resolvedBarcode || normalized, replaceIndex)
         barcodeReplaceTargetRef.current = null
       } else if (actionMode === 'analysis') {
-        addBarcodeIngredientToAnalysis(data.food, normalized)
+        addBarcodeIngredientToAnalysis(data.food, resolvedBarcode || normalized)
       } else {
         try {
-          await insertBarcodeFoodIntoDiary(data.food, normalized)
+          await insertBarcodeFoodIntoDiary(data.food, resolvedBarcode || normalized)
         } catch (insertErr) {
           console.error('Barcode insert failed', insertErr)
           showQuickToast('Found item, but could not save it. Please try again.')
@@ -14984,13 +14990,61 @@ Please add nutritional information manually if needed.`);
   }
 
   const barcodeDetectLockRef = useRef(false)
+  const lastRejectedBarcodeRef = useRef<{ code: string; at: number } | null>(null)
+
+  const isValidEan8 = (digits: string) => {
+    if (!/^\d{8}$/.test(digits)) return false
+    const nums = digits.split('').map((d) => Number(d))
+    const check = nums[7]
+    const sum = (nums[0] + nums[2] + nums[4] + nums[6]) * 3 + (nums[1] + nums[3] + nums[5])
+    const expected = (10 - (sum % 10)) % 10
+    return check === expected
+  }
+
+  const isValidUpcA = (digits: string) => {
+    if (!/^\d{12}$/.test(digits)) return false
+    const nums = digits.split('').map((d) => Number(d))
+    const check = nums[11]
+    const odd = nums[0] + nums[2] + nums[4] + nums[6] + nums[8] + nums[10]
+    const even = nums[1] + nums[3] + nums[5] + nums[7] + nums[9]
+    const expected = (10 - (((odd * 3) + even) % 10)) % 10
+    return check === expected
+  }
+
+  const isValidEan13 = (digits: string) => {
+    if (!/^\d{13}$/.test(digits)) return false
+    const nums = digits.split('').map((d) => Number(d))
+    const check = nums[12]
+    const sum = nums
+      .slice(0, 12)
+      .reduce((acc, n, idx) => acc + n * (idx % 2 === 0 ? 1 : 3), 0)
+    const expected = (10 - (sum % 10)) % 10
+    return check === expected
+  }
+
+  const passesBarcodeSanityCheck = (value: string) => {
+    if (!/^\d+$/.test(value)) return true
+    if (value.length === 8) return isValidEan8(value)
+    if (value.length === 12) return isValidUpcA(value)
+    if (value.length === 13) return isValidEan13(value)
+    return true
+  }
 
   const handleBarcodeDetected = (rawCode: string) => {
     if (!rawCode || barcodeLookupInFlightRef.current || barcodeDetectLockRef.current) return
     const cleaned = rawCode.replace(/[^0-9A-Za-z]/g, '')
     if (!cleaned) return
+    if (!passesBarcodeSanityCheck(cleaned)) {
+      const now = Date.now()
+      const recent = lastRejectedBarcodeRef.current
+      if (!recent || recent.code !== cleaned || now - recent.at > 1200) {
+        setBarcodeStatusHint('Hold steady…')
+        lastRejectedBarcodeRef.current = { code: cleaned, at: now }
+      }
+      return
+    }
     barcodeDetectLockRef.current = true
-    void lookupBarcodeAndAdd(cleaned).finally(() => {
+    void lookupBarcodeAndAdd(cleaned, { fromCamera: true }).finally(() => {
       barcodeDetectLockRef.current = false
     })
   }

@@ -614,28 +614,60 @@ export async function GET(req: NextRequest) {
 
   // Try local USDA cache next (branded foods with barcodes)
   if (!food) {
-    food = await fetchFoodFromLocalBarcode(code)
+    for (const candidate of barcodeCandidates) {
+      food = await fetchFoodFromLocalBarcode(candidate)
+      if (food) {
+        if (candidate !== code) {
+          console.log('✅ Local barcode matched via normalized code', candidate)
+        }
+        break
+      }
+    }
   }
 
   // Try FatSecret first (best for packaged foods)
   if (!food) {
-    food = await fetchFoodFromFatSecret(code)
+    for (const candidate of barcodeCandidates) {
+      food = await fetchFoodFromFatSecret(candidate)
+      if (food) {
+        if (candidate !== code) {
+          console.log('✅ FatSecret barcode matched via normalized code', candidate)
+        }
+        break
+      }
+    }
   }
 
   // Try OpenFoodFacts next (often best coverage outside US)
   if (!food) {
-    openFoodFacts = await fetchFoodFromOpenFoodFacts(code)
-    if (openFoodFacts.food) {
-      food = openFoodFacts.food
+    for (const candidate of barcodeCandidates) {
+      const result = await fetchFoodFromOpenFoodFacts(candidate)
+      if (!openFoodFacts?.productName && result.productName) {
+        openFoodFacts = { food: null, productName: result.productName }
+      }
+      if (result.food) {
+        openFoodFacts = result
+        food = result.food
+        if (candidate !== code) {
+          console.log('✅ OpenFoodFacts barcode matched via normalized code', candidate)
+        }
+        break
+      }
     }
   }
 
   // Try USDA using the best available product name
   if (!food) {
     const usdaQuery = openFoodFacts?.productName || code
-    const usdaFood = await searchFoodFromUSDA(usdaQuery, code)
-    if (usdaFood) {
-      food = usdaFood
+    for (const candidate of barcodeCandidates) {
+      const usdaFood = await searchFoodFromUSDA(usdaQuery, candidate)
+      if (usdaFood) {
+        food = usdaFood
+        if (candidate !== code) {
+          console.log('✅ USDA barcode matched via normalized code', candidate)
+        }
+        break
+      }
     }
   }
 
