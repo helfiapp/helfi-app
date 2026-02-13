@@ -693,62 +693,62 @@ export default function Dashboard() {
                 </Link>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
                 <Link href="/check-in" className="group block">
-                  <div className="h-full min-h-[220px] p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
+                  <div className="h-full min-h-[220px] p-4 md:p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
                     <div className="flex items-center space-x-3 mb-3">
                       <span className="material-symbols-outlined text-emerald-500">check_circle</span>
-                      <h3 className="font-bold text-2xl text-helfi-black dark:text-white">Daily Check-In</h3>
+                      <h3 className="font-bold text-xl md:text-2xl text-helfi-black dark:text-white">Daily Check-In</h3>
                     </div>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
                       Rate your health issues and track symptoms for today.
                     </p>
-                    <div className="mt-auto inline-flex items-center justify-center px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 font-bold text-sm">
+                    <div className="mt-auto inline-flex items-center justify-center px-3 py-2 rounded-full border border-emerald-200 text-emerald-700 font-bold text-sm">
                       Start check-in →
                     </div>
                   </div>
                 </Link>
 
                 <Link href="/mood" className="group block">
-                  <div className="h-full min-h-[220px] p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
+                  <div className="h-full min-h-[220px] p-4 md:p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
                     <div className="flex items-center space-x-3 mb-3">
                       <span className="material-symbols-outlined text-amber-500">mood</span>
-                      <h3 className="font-bold text-2xl text-helfi-black dark:text-white">Mood Tracker</h3>
+                      <h3 className="font-bold text-xl md:text-2xl text-helfi-black dark:text-white">Mood Tracker</h3>
                     </div>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
                       Track your mood, stress, and energy.
                     </p>
-                    <div className="mt-auto inline-flex items-center justify-center px-4 py-2 rounded-full border border-amber-200 text-amber-700 font-bold text-sm">
+                    <div className="mt-auto inline-flex items-center justify-center px-3 py-2 rounded-full border border-amber-200 text-amber-700 font-bold text-sm">
                       Log mood →
                     </div>
                   </div>
                 </Link>
 
                 <Link href="/food" className="group block">
-                  <div className="h-full min-h-[220px] p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
+                  <div className="h-full min-h-[220px] p-4 md:p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
                     <div className="flex items-center space-x-3 mb-3">
                       <span className="material-symbols-outlined text-orange-500">nutrition</span>
-                      <h3 className="font-bold text-2xl text-helfi-black dark:text-white">Track Calories</h3>
+                      <h3 className="font-bold text-xl md:text-2xl text-helfi-black dark:text-white">Track Calories</h3>
                     </div>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
                       Log meals and view your daily totals.
                     </p>
-                    <div className="mt-auto inline-flex items-center justify-center px-4 py-2 rounded-full border border-orange-200 text-orange-700 font-bold text-sm">
+                    <div className="mt-auto inline-flex items-center justify-center px-3 py-2 rounded-full border border-orange-200 text-orange-700 font-bold text-sm">
                       Log food →
                     </div>
                   </div>
                 </Link>
 
                 <Link href="/food/water" className="group block">
-                  <div className="h-full min-h-[220px] p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
+                  <div className="h-full min-h-[220px] p-4 md:p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
                     <div className="flex items-center space-x-3 mb-3">
                       <span className="material-symbols-outlined text-blue-500">water_drop</span>
-                      <h3 className="font-bold text-2xl text-helfi-black dark:text-white">Water Intake</h3>
+                      <h3 className="font-bold text-xl md:text-2xl text-helfi-black dark:text-white">Water Intake</h3>
                     </div>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
                       Log water and stay hydrated today.
                     </p>
-                    <div className="mt-auto inline-flex items-center justify-center px-4 py-2 rounded-full border border-blue-200 text-blue-700 font-bold text-sm">
+                    <div className="mt-auto inline-flex items-center justify-center px-3 py-2 rounded-full border border-blue-200 text-blue-700 font-bold text-sm">
                       Add water →
                     </div>
                   </div>
@@ -764,44 +764,49 @@ export default function Dashboard() {
                 </Link>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="mt-4 space-y-3">
                 <Link href="/insights" className="group block">
-                  <div className="h-full p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className="material-symbols-outlined text-indigo-500">insights</span>
-                      <h4 className="font-bold text-xl text-helfi-black dark:text-white">Insights</h4>
+                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-all">
+                    <div className="w-9 h-9 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-base text-helfi-green">bar_chart</span>
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Review your trends and progress.</p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-lg text-helfi-black dark:text-white leading-tight">Weekly Health Report</h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Generated every 7 days after Health Setup.</p>
+                    </div>
+                    <div className="px-3 py-1.5 rounded-full border border-helfi-green/40 text-helfi-green font-bold text-sm">
+                      View report
+                    </div>
                   </div>
                 </Link>
 
-                <Link href="/health-tracking" className="group block">
-                  <div className="h-full p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className="material-symbols-outlined text-rose-500">monitoring</span>
-                      <h4 className="font-bold text-xl text-helfi-black dark:text-white">Health Tracking</h4>
+                <Link href="/onboarding" className="group block">
+                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-all">
+                    <div className="w-9 h-9 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-base text-blue-600">checklist</span>
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Track your key daily health metrics.</p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-lg text-helfi-black dark:text-white leading-tight">Health Setup</h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Required to unlock daily check-ins and reports.</p>
+                    </div>
+                    <div className="px-3 py-1.5 rounded-full border border-blue-300/70 text-blue-600 font-bold text-sm">
+                      Continue
+                    </div>
                   </div>
                 </Link>
 
-                <Link href="/symptoms" className="group block">
-                  <div className="h-full p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className="material-symbols-outlined text-amber-600">neurology</span>
-                      <h4 className="font-bold text-xl text-helfi-black dark:text-white">Symptom Analysis</h4>
+                <Link href="/practitioners" className="group block">
+                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-all">
+                    <div className="w-9 h-9 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-base text-amber-600">search</span>
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Log and review symptom patterns.</p>
-                  </div>
-                </Link>
-
-                <Link href="/medical-images" className="group block">
-                  <div className="h-full p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className="material-symbols-outlined text-emerald-600">image_search</span>
-                      <h4 className="font-bold text-xl text-helfi-black dark:text-white">Medical Image Analyzer</h4>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-lg text-helfi-black dark:text-white leading-tight">Find a Practitioner</h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Browse practitioners based on your needs.</p>
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Analyze scans and image-based reports.</p>
+                    <div className="px-3 py-1.5 rounded-full border border-amber-300/80 text-amber-600 font-bold text-sm">
+                      Browse
+                    </div>
                   </div>
                 </Link>
               </div>
