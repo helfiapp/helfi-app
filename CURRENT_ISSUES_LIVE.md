@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 13:35 AEDT
+- What changed: Added a permanent Food Rename Guard safety system. New live canary now tests rename from Edit Entry and Favorites/Custom, checks instant + refresh behavior, confirms diary/favorite API sync, and auto-restores the original title after test. Added deploy gate so agents can run this automatically after deploy.
+- Where to see it (page/link): Food Diary rename flows on https://helfi.ai/food and scripts `scripts/check-rename-guard.sh` + `scripts/check-deployment-status.sh` (with `RUN_RENAME_GUARD=1`)
+- What to quickly test: Run `CANARY_STORAGE_STATE=\"playwright/.auth/<user>.json\" ./scripts/check-rename-guard.sh` and confirm it passes; then run `RUN_RENAME_GUARD=1 CANARY_STORAGE_STATE=\"playwright/.auth/<user>.json\" ./scripts/check-deployment-status.sh` after a push and confirm both deployment and rename guard pass.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 13:12 AEDT
 - What changed: Fixed recipe import quantity parsing so compact units like `250g`, `500g`, `2 tbs`, `180ml`, and `(20g)` are read correctly instead of falling back to default amounts. Added clear per-ingredient display showing both full recipe amount and portion amount so serving math is visible.
 - Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal
