@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 14:41 AEDT
+- What changed: Simplified imported recipe ingredient cards to reduce confusion. Cards now show `Full recipe amount` and `Portion amount` clearly, hide serving-size dropdown/amount editing controls in import mode, and show ingredient macros for the full recipe amount.
+- Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal -> Your ingredients
+- What to quickly test: Import the chicken caesar pasta recipe and expand `short pasta`. Confirm it shows `Full recipe amount: 250 g`, `Portion amount: 62.5 g`, and full-amount macros (about `928 kcal`) with no serving-size options dropdown.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 14:17 AEDT
 - What changed: Smart Health Coach now auto-detects timezone by default from the user device/location request, while still allowing manual timezone change. Removed old focus-area tick boxes so Smart Health Coach now runs as one unified coach across all alert signals.
 - Where to see it (page/link): Notifications -> Smart Health Coach and Health Tips settings
