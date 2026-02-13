@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 12:06 AEDT
+- What changed: Recipe import now force-clears old Build a meal draft state at import start and blocks draft re-apply after import starts. This prevents stale pre-fix draft cards from being merged in and causing duplicate ingredient cards on repeat import.
+- Where to see it (page/link): Food Diary -> Add to Breakfast/Lunch/Dinner -> Import Recipe -> Continue to Build a meal
+- What to quickly test: Import the same recipe URL twice in a row and confirm Your ingredients count stays the same (no duplicate rows added).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 02:47 AEDT
 - What changed: Fixed recipe import duplicate protection so repeated imports now use a stable hidden import key per ingredient line. This blocks re-adding the same ingredient cards when the same recipe URL is imported again. Also added server-side ingredient line dedupe in recipe import API as a safety layer.
 - Where to see it (page/link): Food Diary -> + menu -> Import Recipe -> Continue to Build a meal
