@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
     for (const log of logs) {
       const existingNutrition = (log as any)?.nutrients || null
       const existingFavoriteId = getMetaFavoriteId(existingNutrition)
-      if (isManualEdited(existingNutrition)) continue
+      const manualEdited = isManualEdited(existingNutrition)
       const rawItems = (log as any)?.items || (existingNutrition as any)?.items || null
       const logItemsSignature = buildItemsSignature(rawItems)
       const logDescription = normalizeDescription(log.description || log.name || '')
@@ -215,14 +215,22 @@ export async function POST(request: NextRequest) {
 
       const resolvedDescription = description || log.description || log.name || ''
       const name = buildEntryName(resolvedDescription, log.name)
-      const nextNutrition = mergeNutritionMeta(nutrition, existingNutrition, favoriteId)
       const data: any = {
         name,
         description: resolvedDescription || null,
-        nutrients: nextNutrition || null,
       }
-      if (Array.isArray(items)) {
-        data.items = items.length > 0 ? items : Prisma.JsonNull
+
+      if (manualEdited) {
+        // Keep user-manual macro edits untouched, but still sync the visible title.
+        if (existingNutrition && typeof existingNutrition === 'object' && favoriteId && !existingFavoriteId) {
+          data.nutrients = { ...(existingNutrition as any), __favoriteId: favoriteId }
+        }
+      } else {
+        const nextNutrition = mergeNutritionMeta(nutrition, existingNutrition, favoriteId)
+        data.nutrients = nextNutrition || null
+        if (Array.isArray(items)) {
+          data.items = items.length > 0 ? items : Prisma.JsonNull
+        }
       }
 
       await prisma.foodLog.update({
