@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 23:29 AEDT
+- What changed: Added a hard lock for sugar-free hot chocolate so stale high calories cannot be saved or shown again. Save/update API now forces sweetener-only nutrition for this drink path, and diary load mapping applies the same guard to old rows so bad values like `319 kcal` no longer reappear.
+- Where to see it (page/link): Food Diary (`/food`) and food-log save path (`/api/food-log`)
+- What to quickly test: Refresh Food Diary and check any `Hot chocolate sugar free` row from water flow. It should no longer show inflated calories. Add a new sugar-free hot chocolate from water flow and confirm calories stay correct after refresh.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 23:05 AEDT
 - What changed: Fixed hot-chocolate drink regression in Food Diary. Drink entries from water flow are now protected from loose favorite remapping (prevents wrong kcal like 319), drink-flow add now prefers the selected row entry payload, and drink icon rendering now trusts saved drink metadata so icons stay correct on mobile/desktop.
 - Where to see it (page/link): Food Diary (`/food`) and Water Intake -> add drink flows (`/food/water`)
