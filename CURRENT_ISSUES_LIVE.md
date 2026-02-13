@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 14:09 AEDT
+- What changed: Updated agent guard rails so Food Diary/Favorites/Custom rename logic is explicitly locked. Agents must get your written approval before touching rename code. Routine rename canary checks were removed; rename canary is now optional troubleshooting only when you request it.
+- Where to see it (page/link): Internal docs only: `GUARD_RAILS.md`, `AGENTS.md`, `DEPLOYMENT_PROTOCOL.md`
+- What to quickly test: Open those files and confirm wording says rename area is locked and rename canary is optional (not mandatory every deploy).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 13:35 AEDT
 - What changed: Added a permanent Food Rename Guard safety system. New live canary now tests rename from Edit Entry and Favorites/Custom, checks instant + refresh behavior, confirms diary/favorite API sync, and auto-restores the original title after test. Added deploy gate so agents can run this automatically after deploy.
 - Where to see it (page/link): Food Diary rename flows on https://helfi.ai/food and scripts `scripts/check-rename-guard.sh` + `scripts/check-deployment-status.sh` (with `RUN_RENAME_GUARD=1`)
