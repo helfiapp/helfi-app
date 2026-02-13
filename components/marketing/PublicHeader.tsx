@@ -272,6 +272,12 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
         </div>
 
         <div className="hidden md:flex items-center space-x-8">
+          <Link
+            href="/"
+            className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
+          >
+            Home
+          </Link>
           <div className="relative group">
             <Link
               href="/features"

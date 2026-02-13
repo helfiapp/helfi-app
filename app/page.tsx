@@ -446,6 +446,124 @@ export default function SplashPage() {
         </div>
       </section>
 
+      {/* Food Tracking Capabilities Section */}
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-br from-emerald-50/60 to-cyan-50/40">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-helfi-black mb-4">
+              Food Tracking: Fully Featured
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Helfi food tracking is not just basic calorie logging. You can log meals in multiple ways, edit fast, and reuse meals.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Photo Library / Camera logging</h3>
+              <p className="text-sm text-gray-600">Capture food photos and turn them into editable meal entries.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Barcode scanner</h3>
+              <p className="text-sm text-gray-600">Scan packaged foods and add them in seconds.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Add ingredient search</h3>
+              <p className="text-sm text-gray-600">Search food databases and add single ingredients with nutrition data.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Build a meal</h3>
+              <p className="text-sm text-gray-600">Combine multiple ingredients into one saved meal entry.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Import recipe</h3>
+              <p className="text-sm text-gray-600">Import by URL or by recipe photos, then review and edit before saving.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">AI recommended meals</h3>
+              <p className="text-sm text-gray-600">Generate meal suggestions for each meal time and save them directly to your diary.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Favorites and reusable meals</h3>
+              <p className="text-sm text-gray-600">Save meals to favorites and quickly add them again.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Copy, duplicate, and combine tools</h3>
+              <p className="text-sm text-gray-600">Duplicate meals, copy entries to today, copy multiple items, and combine existing foods.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Meal categories + nutrition totals</h3>
+              <p className="text-sm text-gray-600">Track breakfast, lunch, dinner, and snacks with clear macro totals.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-emerald-100 p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Water and drinks logging</h3>
+              <p className="text-sm text-gray-600">Log water, tea, coffee, and bottle sizes with daily hydration tracking.</p>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <Link
+              href="/features/nutrition-food"
+              className="inline-flex items-center px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+            >
+              See Food Diary Feature Page
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Mobile Apps Coming Soon Section */}
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="rounded-3xl border border-gray-200 bg-gradient-to-r from-slate-900 to-slate-800 p-8 md:p-10 text-white">
+            <div className="text-center">
+              <p className="text-sm uppercase tracking-[0.2em] text-emerald-200 font-semibold">Coming Soon</p>
+              <h2 className="text-3xl md:text-4xl font-bold mt-3">
+                Native iOS and Android apps are in progress
+              </h2>
+              <p className="text-white/80 mt-3 text-lg max-w-2xl mx-auto">
+                We are currently building the mobile apps so you can use Helfi on the App Store and Google Play.
+              </p>
+            </div>
+
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+              <div className="rounded-2xl border border-white/20 bg-black/25 px-5 py-4 flex items-center gap-3">
+                <svg viewBox="0 0 24 24" className="w-7 h-7 text-white" fill="currentColor" aria-hidden="true">
+                  <path d="M16.8 12.5c0-2.2 1.8-3.2 1.9-3.3-1-1.5-2.6-1.7-3.2-1.8-1.4-.1-2.7.8-3.4.8-.8 0-1.9-.8-3.1-.8-1.6 0-3 .9-3.8 2.4-1.6 2.9-.4 7 1.2 9.2.8 1.1 1.6 2.3 2.8 2.3 1.1 0 1.5-.7 2.8-.7 1.3 0 1.7.7 2.8.7 1.2 0 2-1.1 2.7-2.2.8-1.3 1.2-2.5 1.2-2.6-.1 0-1.9-.7-1.9-4z" />
+                  <path d="M14.7 6c.6-.8 1.1-2 1-3.1-1 .1-2.2.7-2.9 1.6-.6.7-1.2 1.9-1 3 .9.1 2.2-.5 2.9-1.5z" />
+                </svg>
+                <div>
+                  <div className="text-xs text-white/70">Download on the</div>
+                  <div className="text-base font-semibold">App Store (Soon)</div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/20 bg-black/25 px-5 py-4 flex items-center gap-3">
+                <svg viewBox="0 0 24 24" className="w-7 h-7" aria-hidden="true">
+                  <polygon fill="#34A853" points="3,2 13,12 3,22" />
+                  <polygon fill="#FBBC04" points="13,12 18,9 21,11 16,14" />
+                  <polygon fill="#4285F4" points="3,2 13,12 16,10 10,6" />
+                  <polygon fill="#EA4335" points="3,22 13,12 16,14 10,18" />
+                </svg>
+                <div>
+                  <div className="text-xs text-white/70">Get it on</div>
+                  <div className="text-base font-semibold">Google Play (Soon)</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 flex justify-center">
+              <Link
+                href={signupHref}
+                className="inline-flex items-center px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+              >
+                Create account for launch updates
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Why Health Tracking Matters Section */}
       <section id="why-helfi" className="px-6 py-20 bg-gradient-to-br from-green-50 to-blue-50">
         <div className="max-w-6xl mx-auto">
