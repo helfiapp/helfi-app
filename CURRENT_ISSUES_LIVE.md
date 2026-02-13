@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 03:24 AEDT
+- What changed: Permanent Food Diary follow-up for chicken favorite regression. Non-drink favorites now force food icon rendering (so leaked drink metadata cannot show water icon on chicken), and Add from Favorites now has a shared single-tap action guard to prevent duplicate entries from one tap.
+- Where to see it (page/link): Food Diary (`/food`) favorites add flow + existing chicken rows in diary list
+- What to quickly test: Add `Chicken Breast` once from Favorites and confirm only one row is created with food icon (not water). Refresh twice and confirm icon remains food.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 02:56 AEDT
 - What changed: Follow-up permanent repair for old bad rows already saved in diary. Non-drink rows that had leaked drink metadata now self-heal on load (so they stop showing drink icons). Also, when a linked favorite has a short saved name and the row still has a long raw source title, the row now shows the short favorite name.
 - Where to see it (page/link): Food Diary (`/food`) existing historical rows + Add from Favorites list rows
