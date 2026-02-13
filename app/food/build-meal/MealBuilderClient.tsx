@@ -708,6 +708,32 @@ const EGG_UNIT_GRAMS: FoodUnitGrams = {
   'egg-extra-large': UNIT_GRAMS['egg-extra-large'],
 }
 
+type CountSizeHint = 'small' | 'medium' | 'large' | 'extra-large'
+
+const detectCountSizeHint = (raw: string | null | undefined): CountSizeHint | null => {
+  const normalized = normalizeFoodValue(String(raw || ''))
+  if (!normalized) return null
+  if (/\b(extra large|xl|jumbo)\b/.test(normalized)) return 'extra-large'
+  if (/\bsmall\b/.test(normalized)) return 'small'
+  if (/\bmedium\b/.test(normalized)) return 'medium'
+  if (/\blarge\b/.test(normalized)) return 'large'
+  return null
+}
+
+const eggUnitFromSizeHint = (hint: CountSizeHint | null): BuilderUnit => {
+  if (hint === 'small') return 'egg-small'
+  if (hint === 'medium') return 'egg-medium'
+  if (hint === 'extra-large') return 'egg-extra-large'
+  return 'egg-large'
+}
+
+const pieceUnitFromSizeHint = (hint: CountSizeHint | null): BuilderUnit => {
+  if (hint === 'small') return 'piece-small'
+  if (hint === 'large') return 'piece-large'
+  if (hint === 'extra-large') return 'piece-extra-large'
+  return 'piece-medium'
+}
+
 const EGG_BLOCKLIST = new Set([
   'white',
   'yolk',
@@ -2676,7 +2702,87 @@ export default function MealBuilderClient() {
       if (u === 'cup' || u === 'cups') return { unit: 'cup', scale: 1 }
       if (u === 'clove' || u === 'cloves') return { unit: 'piece', scale: 1 }
       if (u === 'piece' || u === 'pieces') return { unit: 'piece', scale: 1 }
+      if (u === 'egg' || u === 'eggs') return { unit: 'egg-large', scale: 1 }
+      if (u === 'smallegg' || u === 'smalleggs') return { unit: 'egg-small', scale: 1 }
+      if (u === 'mediumegg' || u === 'mediumeggs') return { unit: 'egg-medium', scale: 1 }
+      if (u === 'largeegg' || u === 'largeeggs') return { unit: 'egg-large', scale: 1 }
+      if (
+        u === 'extralargeegg' ||
+        u === 'extralargeeggs' ||
+        u === 'jumboegg' ||
+        u === 'jumboeggs' ||
+        u === 'xlegg' ||
+        u === 'xleggs'
+      ) {
+        return { unit: 'egg-extra-large', scale: 1 }
+      }
       return { unit: null, scale: 1 }
+    }
+
+    const hasPositiveProduceUnit = (units: FoodUnitGrams | null, unit: BuilderUnit) => {
+      const grams = Number(units?.[unit])
+      return Number.isFinite(grams) && grams > 0
+    }
+
+    const parseMappedUnitFromParts = (
+      parts: string[],
+    ): { mapped: { unit: BuilderUnit | null; scale: number }; consumed: number; lookupFallback: string } => {
+      const cleanTokens = parts
+        .map((part) =>
+          String(part || '')
+            .toLowerCase()
+            .replace(/\./g, '')
+            .replace(/[^a-z]/g, '')
+            .trim(),
+        )
+        .filter(Boolean)
+      if (cleanTokens.length === 0) return { mapped: { unit: null, scale: 1 }, consumed: 0, lookupFallback: '' }
+
+      const maxJoin = Math.min(3, cleanTokens.length)
+      for (let tokenCount = maxJoin; tokenCount >= 1; tokenCount -= 1) {
+        const joined = cleanTokens.slice(0, tokenCount).join('')
+        const mapped = mapUnit(joined)
+        if (mapped.unit) {
+          return {
+            mapped,
+            consumed: tokenCount,
+            lookupFallback: mapped.unit.startsWith('egg-') ? 'egg' : cleanTokens[tokenCount - 1] || '',
+          }
+        }
+      }
+
+      const looksLikeEggToken = (value: string | undefined) => {
+        const token = String(value || '')
+        return token === 'egg' || token === 'eggs'
+      }
+
+      const first = cleanTokens[0] || ''
+      const second = cleanTokens[1] || ''
+      const third = cleanTokens[2] || ''
+
+      if (first === 'extra' && second === 'large' && third) {
+        if (looksLikeEggToken(third)) {
+          return { mapped: { unit: 'egg-extra-large', scale: 1 }, consumed: 3, lookupFallback: 'egg' }
+        }
+        const produceUnits = getProduceUnitGrams(third)
+        if (hasPositiveProduceUnit(produceUnits, 'piece-extra-large')) {
+          return { mapped: { unit: 'piece-extra-large', scale: 1 }, consumed: 3, lookupFallback: third }
+        }
+      }
+
+      const sizeHint = detectCountSizeHint(first)
+      if (sizeHint && second) {
+        if (looksLikeEggToken(second)) {
+          return { mapped: { unit: eggUnitFromSizeHint(sizeHint), scale: 1 }, consumed: 2, lookupFallback: 'egg' }
+        }
+        const produceUnits = getProduceUnitGrams(second)
+        const candidate = pieceUnitFromSizeHint(sizeHint)
+        if (hasPositiveProduceUnit(produceUnits, candidate)) {
+          return { mapped: { unit: candidate, scale: 1 }, consumed: 2, lookupFallback: second }
+        }
+      }
+
+      return { mapped: { unit: null, scale: 1 }, consumed: 0, lookupFallback: '' }
     }
 
     const parseNumberToken = (rawToken: string) => {
@@ -2722,9 +2828,9 @@ export default function MealBuilderClient() {
         const rest = String(mixed[3] || '').trim()
         const amount = Number.isFinite(whole) && frac !== null ? whole + frac : null
         const parts = rest.split(/\s+/)
-        const unitToken = parts[0] || ''
-        const mapped = mapUnit(unitToken)
-        const lookup = normalizeLookup(parts.slice(1).join(' ') || rest)
+        const parsedUnit = parseMappedUnitFromParts(parts)
+        const mapped = parsedUnit.mapped
+        const lookup = normalizeLookup(parts.slice(parsedUnit.consumed).join(' ') || parsedUnit.lookupFallback || rest)
         return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
       }
 
@@ -2733,9 +2839,9 @@ export default function MealBuilderClient() {
         const amount = parseFraction(fracOnly[1])
         const rest = String(fracOnly[2] || '').trim()
         const parts = rest.split(/\s+/)
-        const unitToken = parts[0] || ''
-        const mapped = mapUnit(unitToken)
-        const lookup = normalizeLookup(parts.slice(1).join(' ') || rest)
+        const parsedUnit = parseMappedUnitFromParts(parts)
+        const mapped = parsedUnit.mapped
+        const lookup = normalizeLookup(parts.slice(parsedUnit.consumed).join(' ') || parsedUnit.lookupFallback || rest)
         return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
       }
 
@@ -2754,13 +2860,13 @@ export default function MealBuilderClient() {
         const amount = parseNumberToken(numOnly[1])
         const rest = String(numOnly[2] || '').trim()
         const parts = rest.split(/\s+/)
-        const unitToken = parts[0] || ''
-        const mapped = mapUnit(unitToken)
+        const parsedUnit = parseMappedUnitFromParts(parts)
+        const mapped = parsedUnit.mapped
         if (mapped.unit) {
-          const lookup = normalizeLookup(parts.slice(1).join(' ') || rest)
+          const lookup = normalizeLookup(parts.slice(parsedUnit.consumed).join(' ') || parsedUnit.lookupFallback || rest)
           return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
         }
-        return withMetricHint({ lookup: normalizeLookup(rest), amount: null, unit: null })
+        return withMetricHint({ lookup: normalizeLookup(rest), amount: amount ?? null, unit: null })
       }
 
       return withMetricHint({ lookup: normalizeLookup(line), amount: null, unit: null })
@@ -3258,7 +3364,44 @@ export default function MealBuilderClient() {
         ? overrides.amount
         : defaultAmount
     const isImportedLine = String(options?.importKey || '').trim().length > 0
+
+    if (isImportedLine && !overrides?.unit && typeof overrides?.amount === 'number' && Number.isFinite(overrides.amount) && overrides.amount > 0) {
+      const sizeHint = detectCountSizeHint(options?.displayName || '')
+      const importedName = String(options?.displayName || r?.name || '').trim()
+      if (isEggFood(importedName) || isEggFood(r?.name || '')) {
+        nextUnit = eggUnitFromSizeHint(sizeHint)
+      } else {
+        const produceUnits = getProduceUnitGrams(r?.name || importedName)
+        const preferred = pieceUnitFromSizeHint(sizeHint)
+        const preferredGrams = Number(produceUnits?.[preferred])
+        if (Number.isFinite(preferredGrams) && preferredGrams > 0) {
+          nextUnit = preferred
+        } else {
+          const fallbackPieceUnits: BuilderUnit[] = ['piece-medium', 'piece-large', 'piece-small', 'piece-extra-large']
+          const fallback = fallbackPieceUnits.find((unit) => {
+            const grams = Number(produceUnits?.[unit])
+            return Number.isFinite(grams) && grams > 0
+          })
+          if (fallback) nextUnit = fallback
+        }
+      }
+    }
+
     if (isImportedLine && nextUnit) {
+      const keepEggUnit =
+        nextUnit === 'egg-small' ||
+        nextUnit === 'egg-medium' ||
+        nextUnit === 'egg-large' ||
+        nextUnit === 'egg-extra-large'
+      const keepPieceUnit =
+        ((nextUnit === 'piece' && Number.isFinite(Number(pieceGrams)) && Number(pieceGrams) > 0) ||
+          ((nextUnit === 'piece-small' ||
+            nextUnit === 'piece-medium' ||
+            nextUnit === 'piece-large' ||
+            nextUnit === 'piece-extra-large') &&
+            Number.isFinite(Number(foodUnitGrams?.[nextUnit])) &&
+            Number(foodUnitGrams?.[nextUnit]) > 0))
+      if (!keepEggUnit && !keepPieceUnit) {
       const fromGrams = resolveUnitGrams(nextUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams)
       const toGrams = resolveUnitGrams('g', baseAmount, baseUnit, pieceGrams, foodUnitGrams)
       if (Number.isFinite(fromGrams) && fromGrams > 0 && Number.isFinite(toGrams) && toGrams > 0) {
@@ -3268,6 +3411,7 @@ export default function MealBuilderClient() {
           nextUnit = 'g'
         }
       }
+    }
     }
 
 	    const next: BuilderItem = {
