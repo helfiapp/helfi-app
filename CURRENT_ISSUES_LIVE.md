@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 18:59 AEDT
+- What changed: Redesigned the Web App Dashboard to match the native dashboard style. Updated the welcome section plus Daily Tools and My Health card layout, and wired the card links to the correct existing pages.
+- Where to see it (page/link): Dashboard (`/dashboard`)
+- What to quickly test: Open Dashboard and click each card/button: Daily Check-In, Mood Tracker, Track Calories, Water Intake, Insights, Health Tracking, Symptom Analysis, Medical Image Analyzer, and both `See all` links.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 18:53 AEDT
 - What changed: Added hard locks so agents do not change favorites ordering and All-tab name mapping by accident. Added explicit guard-rail rules plus `DO NOT TOUCH` code comments in the exact ordering and matched-favorite label sections.
 - Where to see it (page/link): Internal docs/code only: `GUARD_RAILS.md`, `app/food/page.tsx`
