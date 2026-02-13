@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 15:06 AEDT
+- What changed: Smart Health Coach alert timing is now fully automatic. Removed `Number of checks per day` and `Time 1/2/3` controls from settings so users no longer choose alert count or times. Timezone is still shown and can still be changed manually.
+- Where to see it (page/link): Notifications -> Smart Health Coach (`/notifications/ai-insights`) and Health Tips (`/health-tips`)
+- What to quickly test: Open Smart Health Coach settings and confirm there is no checks dropdown and no time inputs. Confirm timezone is still visible and can be changed/saved.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 14:55 AEDT
 - What changed: Fixed Favorites picker ordering so the most recently used saved meal now goes to the top. When you add a favorite/custom meal to Food Diary, it now stamps a `last used` time and `All`, `Favorites`, and `Custom` tabs sort by that first.
 - Where to see it (page/link): Food Diary -> Add from favorites (`/food?open=favorites`)
