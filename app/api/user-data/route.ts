@@ -150,6 +150,50 @@ const buildMedicationCatalogRows = (medications: any[], userId: string) => {
     .filter((row) => row.fullName && !isPlaceholderName(row.fullName))
 }
 
+const normalizeFoodCategory = (raw: any) => {
+  const value = typeof raw === 'string' ? raw.toLowerCase() : ''
+  if (/breakfast/.test(value)) return 'breakfast'
+  if (/lunch/.test(value)) return 'lunch'
+  if (/dinner/.test(value)) return 'dinner'
+  if (/snack/.test(value)) return 'snacks'
+  if (/other/.test(value) || /uncat/.test(value)) return 'uncategorized'
+  return value && value.trim().length > 0 ? value.trim() : 'uncategorized'
+}
+
+const extractFavoriteIdFromNutrition = (nutrients: any) => {
+  if (!nutrients || typeof nutrients !== 'object') return ''
+  const raw = (nutrients as any).__favoriteId
+  return typeof raw === 'string' ? raw.trim() : ''
+}
+
+const extractFavoriteLabelFromLog = (description: any, fallback?: any) => {
+  const raw = String(description || fallback || '').trim()
+  if (!raw) return 'Favorite meal'
+  const firstLine = raw.split('\n')[0] || raw
+  const cleaned = firstLine.split('Calories:')[0].trim()
+  return cleaned || firstLine.trim() || 'Favorite meal'
+}
+
+const normalizeFavoriteLabelKey = (value: any) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const looksLikeMealBuilderCreatedItemId = (rawId: any) => {
+  const id = typeof rawId === 'string' ? rawId : ''
+  if (!id) return false
+  if (/^(openfoodfacts|usda|fatsecret):[^:]+:\d{9,}$/i.test(id)) return true
+  if (/^ai:\d{9,}:[0-9a-f]+$/i.test(id)) return true
+  if (/^edit:\d{9,}:[0-9a-f]+$/i.test(id)) return true
+  return false
+}
+
+const shouldMarkRecoveredFavoriteAsCustom = (items: any[], origin: string) => {
+  if (origin === 'meal-builder' || origin === 'combined') return true
+  return items.some((item) => looksLikeMealBuilderCreatedItemId(item?.id))
+}
+
 export async function GET(request: NextRequest) {
   try {
     console.log('=== GET /api/user-data DEBUG START ===')
@@ -457,6 +501,128 @@ export async function GET(request: NextRequest) {
         }
       } catch (e) {
         console.log('No favorites data found in storage')
+      }
+
+      // Recovery guard:
+      // If diary logs still point to favorite IDs that are missing from the stored favorites list,
+      // rebuild those missing favorites from recent logs so user-saved meals do not disappear.
+      try {
+        const favoriteIds = new Set(
+          (Array.isArray(favorites) ? favorites : [])
+            .map((fav: any) => (typeof fav?.id === 'string' ? String(fav.id).trim() : ''))
+            .filter(Boolean),
+        )
+        const existingById = new Map<string, any>()
+        const existingLabelKeys = new Set<string>()
+        const existingSourceIds = new Set<string>()
+        ;(Array.isArray(favorites) ? favorites : []).forEach((fav: any) => {
+          const id = typeof fav?.id === 'string' ? String(fav.id).trim() : ''
+          if (id) existingById.set(id, fav)
+          const labelKey = normalizeFavoriteLabelKey(fav?.label || fav?.description || '')
+          if (labelKey) existingLabelKeys.add(labelKey)
+          const sourceId = typeof fav?.sourceId === 'string' ? String(fav.sourceId).trim() : ''
+          if (sourceId) existingSourceIds.add(sourceId)
+        })
+        const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
+        const recentLogs = await prisma.foodLog.findMany({
+          where: { userId: user.id, createdAt: { gte: cutoff } },
+          orderBy: { createdAt: 'desc' },
+          take: 1200,
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            imageUrl: true,
+            nutrients: true,
+            items: true,
+            meal: true,
+            category: true,
+            createdAt: true,
+          },
+        })
+        const recovered: any[] = []
+        for (const log of recentLogs) {
+          const nutrients = log?.nutrients && typeof log.nutrients === 'object' ? (log.nutrients as any) : null
+          const favoriteId = extractFavoriteIdFromNutrition(nutrients)
+          if (!favoriteId || favoriteIds.has(favoriteId) || existingById.has(favoriteId)) continue
+          const label = extractFavoriteLabelFromLog(log?.description || log?.name || '', log?.name || 'Favorite meal')
+          const labelKey = normalizeFavoriteLabelKey(label)
+          const sourceId = log?.id ? String(log.id).trim() : ''
+          if (labelKey && existingLabelKeys.has(labelKey)) continue
+          if (sourceId && existingSourceIds.has(sourceId)) continue
+          const items =
+            Array.isArray(log?.items) && log.items.length > 0
+              ? (log.items as any[])
+              : Array.isArray((nutrients as any)?.items)
+              ? ((nutrients as any).items as any[])
+              : []
+          const originRaw =
+            typeof (nutrients as any)?.__origin === 'string'
+              ? (nutrients as any).__origin
+              : typeof (nutrients as any)?.origin === 'string'
+              ? (nutrients as any).origin
+              : ''
+          const origin = String(originRaw || '').toLowerCase().trim()
+          const customMeal = shouldMarkRecoveredFavoriteAsCustom(Array.isArray(items) ? items : [], origin)
+          const createdAtMs = log?.createdAt ? new Date(log.createdAt).getTime() : Date.now()
+          const recoveredFavorite: any = {
+            id: favoriteId,
+            sourceId: sourceId || null,
+            label,
+            description: label,
+            nutrition: nutrients || null,
+            total: nutrients || null,
+            items: Array.isArray(items) && items.length > 0 ? items : null,
+            photo: log?.imageUrl || null,
+            method: customMeal ? (origin === 'combined' ? 'combined' : 'meal-builder') : origin || 'text',
+            ...(customMeal ? { customMeal: true } : {}),
+            meal: normalizeFoodCategory(log?.meal || log?.category || 'uncategorized'),
+            createdAt: createdAtMs,
+            lastUsedAt: createdAtMs,
+          }
+          recovered.push(recoveredFavorite)
+          favoriteIds.add(favoriteId)
+          existingById.set(favoriteId, recoveredFavorite)
+          if (labelKey) existingLabelKeys.add(labelKey)
+          if (sourceId) existingSourceIds.add(sourceId)
+        }
+        if (recovered.length > 0) {
+          favorites = [...favorites, ...recovered]
+          try {
+            const existingGoals = await prisma.healthGoal.findMany({
+              where: { userId: user.id, name: '__FOOD_FAVORITES__' },
+              orderBy: { createdAt: 'desc' },
+              select: { id: true },
+            })
+            const payload = JSON.stringify({ favorites })
+            const primary = existingGoals[0] || null
+            if (primary?.id) {
+              await prisma.healthGoal.update({
+                where: { id: primary.id },
+                data: { category: payload, currentRating: 0 },
+              })
+              if (existingGoals.length > 1) {
+                await prisma.healthGoal.deleteMany({
+                  where: { id: { in: existingGoals.slice(1).map((g) => g.id) } },
+                })
+              }
+            } else {
+              await prisma.healthGoal.create({
+                data: {
+                  userId: user.id,
+                  name: '__FOOD_FAVORITES__',
+                  category: payload,
+                  currentRating: 0,
+                },
+              })
+            }
+          } catch (repairWriteError) {
+            console.warn('Could not persist recovered favorites (non-blocking)', repairWriteError)
+          }
+          console.log('Recovered missing favorites from linked logs:', recovered.length)
+        }
+      } catch (recoveryError) {
+        console.warn('Favorite recovery check failed (non-blocking)', recoveryError)
       }
 
       // Get saved food name overrides (used for user renames without forcing favorites)
@@ -1933,8 +2099,7 @@ export async function POST(request: NextRequest) {
     // 7. Handle favorites data for quick add flow
     try {
       if (data && Array.isArray((data as any).favorites)) {
-        const favoritesArray = (data as any).favorites
-        const favoritesCount = Array.isArray(favoritesArray) ? favoritesArray.length : 0
+        let favoritesArray = Array.isArray((data as any).favorites) ? [...(data as any).favorites] : []
         const referer = (request.headers.get('referer') || '').slice(0, 200)
 
         // Load existing favorites to avoid accidental wipes from empty payloads
@@ -1952,6 +2117,69 @@ export async function POST(request: NextRequest) {
         } catch (favLoadErr) {
           console.warn('AGENT_DEBUG favorites load failed (non-blocking)', favLoadErr)
         }
+
+        // Prevent stale/partial writes from dropping favorites that are still linked to recent diary logs.
+        try {
+          if (favoritesArray.length > 0 && existingFavorites.length > 0) {
+            const incomingIds = new Set(
+              favoritesArray
+                .map((fav: any) => (typeof fav?.id === 'string' ? String(fav.id).trim() : ''))
+                .filter(Boolean),
+            )
+            const incomingLabelKeys = new Set(
+              favoritesArray
+                .map((fav: any) => normalizeFavoriteLabelKey(fav?.label || fav?.description || ''))
+                .filter(Boolean),
+            )
+            const incomingSourceIds = new Set(
+              favoritesArray
+                .map((fav: any) => (typeof fav?.sourceId === 'string' ? String(fav.sourceId).trim() : ''))
+                .filter(Boolean),
+            )
+            const existingById = new Map<string, any>()
+            ;(Array.isArray(existingFavorites) ? existingFavorites : []).forEach((fav: any) => {
+              const id = typeof fav?.id === 'string' ? String(fav.id).trim() : ''
+              if (id) existingById.set(id, fav)
+            })
+            const missingExistingIds = Array.from(existingById.keys()).filter((id) => !incomingIds.has(id))
+            if (missingExistingIds.length > 0) {
+              const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
+              const recentLogs = await prisma.foodLog.findMany({
+                where: { userId: user.id, createdAt: { gte: cutoff } },
+                orderBy: { createdAt: 'desc' },
+                take: 800,
+                select: { nutrients: true },
+              })
+              const linkedFavoriteIds = new Set<string>()
+              recentLogs.forEach((log) => {
+                const favoriteId = extractFavoriteIdFromNutrition(log?.nutrients)
+                if (favoriteId) linkedFavoriteIds.add(favoriteId)
+              })
+              const protectedFavorites = missingExistingIds
+                .filter((id) => linkedFavoriteIds.has(id))
+                .map((id) => existingById.get(id))
+                .filter(Boolean)
+                .filter((fav: any) => {
+                  const labelKey = normalizeFavoriteLabelKey(fav?.label || fav?.description || '')
+                  const sourceId = typeof fav?.sourceId === 'string' ? String(fav.sourceId).trim() : ''
+                  if (labelKey && incomingLabelKeys.has(labelKey)) return false
+                  if (sourceId && incomingSourceIds.has(sourceId)) return false
+                  return true
+                })
+              if (protectedFavorites.length > 0) {
+                favoritesArray = [...favoritesArray, ...protectedFavorites]
+                console.warn('Protected linked favorites from stale overwrite', {
+                  restored: protectedFavorites.length,
+                  referer,
+                })
+              }
+            }
+          }
+        } catch (favoritesGuardError) {
+          console.warn('Favorites stale-write guard failed (non-blocking)', favoritesGuardError)
+        }
+
+        const favoritesCount = Array.isArray(favoritesArray) ? favoritesArray.length : 0
 
         if (favoritesCount === 0 && existingFavorites.length > 0) {
           console.log('AGENT_DEBUG favorites write skipped (empty payload would wipe existing)', {

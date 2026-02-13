@@ -16009,31 +16009,37 @@ Please add nutritional information manually if needed.`);
       createdAt: Date.now(),
     }
 
-    const base = Array.isArray(favorites) ? favorites : []
-    const existingIndex = base.findIndex(
-      (fav: any) =>
-        (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
-        (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
-    )
-    const payloadWithStableId =
-      existingIndex >= 0 ? { ...favoritePayload, id: base[existingIndex]?.id || favoritePayload.id } : favoritePayload
+    let savedResult: { favorite: any; nextFavorites: any[] } | null = null
+    setFavorites((prev) => {
+      const base = Array.isArray(prev) ? prev : []
+      const existingIndex = base.findIndex(
+        (fav: any) =>
+          (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
+          (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
+      )
+      const payloadWithStableId =
+        existingIndex >= 0 ? { ...favoritePayload, id: base[existingIndex]?.id || favoritePayload.id } : favoritePayload
 
-    // If the user saved with a new name, remember the old name as an alias so "All" doesn't show duplicates.
-    const withAliases = (() => {
-      const shouldAlias = sourceLabelForAlias && sourceLabelForAlias !== cleanLabel
-      if (!shouldAlias) return payloadWithStableId
-      const existingAliases = Array.isArray((payloadWithStableId as any)?.aliases) ? (payloadWithStableId as any).aliases : []
-      const aliases = Array.from(new Set([...(Array.isArray(existingAliases) ? existingAliases : []), sourceLabelForAlias]))
-      return { ...(payloadWithStableId as any), aliases }
-    })()
+      // If the user saved with a new name, remember the old name as an alias so "All" doesn't show duplicates.
+      const withAliases = (() => {
+        const shouldAlias = sourceLabelForAlias && sourceLabelForAlias !== cleanLabel
+        if (!shouldAlias) return payloadWithStableId
+        const existingAliases = Array.isArray((payloadWithStableId as any)?.aliases)
+          ? (payloadWithStableId as any).aliases
+          : []
+        const aliases = Array.from(new Set([...(Array.isArray(existingAliases) ? existingAliases : []), sourceLabelForAlias]))
+        return { ...(payloadWithStableId as any), aliases }
+      })()
 
-    const next =
-      existingIndex >= 0
-        ? base.map((fav: any, idx: number) => (idx === existingIndex ? withAliases : fav))
-        : [...base, withAliases]
-    setFavorites(next)
-    persistFavorites(next)
-    return { favorite: withAliases, nextFavorites: next }
+      const next =
+        existingIndex >= 0
+          ? base.map((fav: any, idx: number) => (idx === existingIndex ? withAliases : fav))
+          : [...base, withAliases]
+      savedResult = { favorite: withAliases, nextFavorites: next }
+      persistFavorites(next)
+      return next
+    })
+    return savedResult
   }
 
   const insertMealIntoDiary = async (source: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
