@@ -5614,7 +5614,8 @@ export default function MealBuilderClient() {
 
                     {expanded && (
                       <div className="px-3 pb-3 bg-white space-y-3">
-                        {Array.isArray(it.__servingOptions) &&
+                        {!isImportedRecipeView &&
+                          Array.isArray(it.__servingOptions) &&
                           it.__servingOptions.length > 0 &&
                           !hasCustomUnits && (
                           <div className="space-y-1">
