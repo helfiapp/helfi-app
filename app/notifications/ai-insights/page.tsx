@@ -13,6 +13,7 @@ type HealthTipSettings = {
   time2: string
   time3: string
   timezone: string
+  timezoneManual?: boolean
   frequency: number
   pricingAcceptedAt?: string | null
 }
@@ -70,6 +71,7 @@ export default function AiInsightsNotificationsPage() {
   const [time2, setTime2] = useState('15:30')
   const [time3, setTime3] = useState('20:30')
   const [timezone, setTimezone] = useState(detectBrowserTimezone)
+  const [timezoneManual, setTimezoneManual] = useState(false)
   const [frequency, setFrequency] = useState(1)
   const [showEnableModal, setShowEnableModal] = useState(false)
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>(fallbackTimezones)
@@ -82,6 +84,7 @@ export default function AiInsightsNotificationsPage() {
     time2: '15:30',
     time3: '20:30',
     timezone: detectBrowserTimezone(),
+    timezoneManual: false,
     frequency: 1,
   })
 
@@ -103,15 +106,52 @@ export default function AiInsightsNotificationsPage() {
   }, [])
 
   useEffect(() => {
+    const browserTimezone = detectBrowserTimezone()
+    const syncAutoTimezone = async (data: HealthTipSettings) => {
+      const incomingTimezone = (data.timezone || '').trim()
+      const incomingManual = !!data.timezoneManual
+      if (incomingManual && incomingTimezone) return
+      if (!incomingManual && incomingTimezone === browserTimezone) return
+
+      const syncPayload: HealthTipSettings = {
+        enabled: !!data.enabled,
+        time1: data.time1 || '11:30',
+        time2: data.time2 || '15:30',
+        time3: data.time3 || '20:30',
+        timezone: browserTimezone,
+        timezoneManual: false,
+        frequency: Number(data.frequency) || 1,
+      }
+      try {
+        await fetch('/api/health-tips/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(syncPayload),
+          keepalive: true,
+        })
+        if (cacheKey) {
+          writeClientCache(cacheKey, syncPayload)
+        }
+      } catch {
+        // ignore auto-sync errors
+      }
+    }
+
     const cached = cacheKey ? readClientCache<HealthTipSettings>(cacheKey) : null
     if (cached?.data) {
       const data = cached.data
+      const manual = !!data.timezoneManual
+      const resolvedTimezone = manual
+        ? (data.timezone || browserTimezone)
+        : browserTimezone
       setEnabled(!!data.enabled)
       setTime1(data.time1 || '11:30')
       setTime2(data.time2 || '15:30')
       setTime3(data.time3 || '20:30')
-      setTimezone(data.timezone || detectBrowserTimezone())
+      setTimezone(resolvedTimezone)
+      setTimezoneManual(manual)
       setFrequency(Number(data.frequency) || 1)
+      void syncAutoTimezone(data)
       setLoading(false)
     }
     if (cached && isCacheFresh(cached, HEALTH_TIPS_CACHE_TTL_MS)) return
@@ -121,15 +161,25 @@ export default function AiInsightsNotificationsPage() {
         const res = await fetch('/api/health-tips/settings', { cache: 'no-store' as any })
         if (res.ok) {
           const data = (await res.json()) as HealthTipSettings
+          const manual = !!data.timezoneManual
+          const resolvedTimezone = manual
+            ? (data.timezone || browserTimezone)
+            : browserTimezone
           setEnabled(!!data.enabled)
           setTime1(data.time1 || '11:30')
           setTime2(data.time2 || '15:30')
           setTime3(data.time3 || '20:30')
-          setTimezone(data.timezone || detectBrowserTimezone())
+          setTimezone(resolvedTimezone)
+          setTimezoneManual(manual)
           setFrequency(Number(data.frequency) || 1)
           if (cacheKey) {
-            writeClientCache(cacheKey, data)
+            writeClientCache(cacheKey, {
+              ...data,
+              timezone: resolvedTimezone,
+              timezoneManual: manual,
+            })
           }
+          void syncAutoTimezone(data)
         }
       } catch {
         // ignore, defaults will show
@@ -151,6 +201,7 @@ export default function AiInsightsNotificationsPage() {
       time2,
       time3,
       timezone,
+      timezoneManual,
       frequency,
     }
     if (!options?.silent) setSaving(true)
@@ -185,7 +236,7 @@ export default function AiInsightsNotificationsPage() {
     } finally {
       if (!options?.silent) setSaving(false)
     }
-  }, [cacheKey, enabled, time1, time2, time3, timezone, frequency])
+  }, [cacheKey, enabled, time1, time2, time3, timezone, timezoneManual, frequency])
 
   useEffect(() => {
     if (loading) return
@@ -195,6 +246,7 @@ export default function AiInsightsNotificationsPage() {
       time2,
       time3,
       timezone,
+      timezoneManual,
       frequency,
     }
     settingsRef.current = nextSettings
@@ -205,7 +257,7 @@ export default function AiInsightsNotificationsPage() {
       return
     }
     setHasUnsavedChanges(snapshot !== settingsSnapshotRef.current)
-  }, [enabled, time1, time2, time3, timezone, frequency, loading])
+  }, [enabled, time1, time2, time3, timezone, timezoneManual, frequency, loading])
 
   useSaveOnLeave(() => {
     if (!hasUnsavedChanges) return
@@ -228,6 +280,7 @@ export default function AiInsightsNotificationsPage() {
       time2,
       time3,
       timezone,
+      timezoneManual,
       frequency,
     }
     setEnabled(true)
@@ -356,7 +409,10 @@ export default function AiInsightsNotificationsPage() {
                   </label>
                   <select
                     value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
+                    onChange={(e) => {
+                      setTimezone(e.target.value)
+                      setTimezoneManual(true)
+                    }}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     disabled={!enabled}
                   >

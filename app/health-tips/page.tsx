@@ -26,6 +26,7 @@ type HealthTipSettings = {
   time2: string
   time3: string
   timezone: string
+  timezoneManual?: boolean
   frequency: number
 }
 
@@ -94,6 +95,7 @@ export default function HealthTipsPage() {
   const [time2, setTime2] = useState('15:30')
   const [time3, setTime3] = useState('20:30')
   const [timezone, setTimezone] = useState(detectBrowserTimezone)
+  const [timezoneManual, setTimezoneManual] = useState(false)
   const [frequency, setFrequency] = useState(1)
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
   const [timezoneQuery, setTimezoneQuery] = useState(detectBrowserTimezone)
@@ -110,6 +112,7 @@ export default function HealthTipsPage() {
     time2: '15:30',
     time3: '20:30',
     timezone: detectBrowserTimezone(),
+    timezoneManual: false,
     frequency: 1,
   })
 
@@ -184,16 +187,41 @@ export default function HealthTipsPage() {
   useEffect(() => {
     ;(async () => {
       try {
+        const browserTimezone = detectBrowserTimezone()
         const res = await fetch('/api/health-tips/settings', { cache: 'no-store' as any })
         if (res.ok) {
           const data = (await res.json()) as HealthTipSettings
+          const manual = !!data.timezoneManual
+          const resolvedTimezone = manual
+            ? (data.timezone || browserTimezone)
+            : browserTimezone
+
           setEnabled(data.enabled)
           setTime1(data.time1)
           setTime2(data.time2)
           setTime3(data.time3)
-          setTimezone(data.timezone || detectBrowserTimezone())
-          setTimezoneQuery(data.timezone || detectBrowserTimezone())
+          setTimezone(resolvedTimezone)
+          setTimezoneManual(manual)
+          setTimezoneQuery(resolvedTimezone)
           setFrequency(data.frequency)
+
+          if (!manual && (data.timezone || '').trim() !== browserTimezone) {
+            const syncPayload: HealthTipSettings = {
+              enabled: !!data.enabled,
+              time1: data.time1 || '11:30',
+              time2: data.time2 || '15:30',
+              time3: data.time3 || '20:30',
+              timezone: browserTimezone,
+              timezoneManual: false,
+              frequency: Number(data.frequency) || 1,
+            }
+            void fetch('/api/health-tips/settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(syncPayload),
+              keepalive: true,
+            }).catch(() => {})
+          }
         }
       } catch {
         // ignore – UI will show fallback defaults
@@ -307,6 +335,7 @@ export default function HealthTipsPage() {
       time2,
       time3,
       timezone,
+      timezoneManual,
       frequency,
     }
     if (!options?.silent) setSaving(true)
@@ -341,7 +370,7 @@ export default function HealthTipsPage() {
     } finally {
       if (!options?.silent) setSaving(false)
     }
-  }, [enabled, time1, time2, time3, timezone, frequency])
+  }, [enabled, time1, time2, time3, timezone, timezoneManual, frequency])
 
   useEffect(() => {
     if (loadingSettings) return
@@ -351,6 +380,7 @@ export default function HealthTipsPage() {
       time2,
       time3,
       timezone,
+      timezoneManual,
       frequency,
     }
     settingsRef.current = nextSettings
@@ -361,7 +391,7 @@ export default function HealthTipsPage() {
       return
     }
     setHasUnsavedChanges(snapshot !== settingsSnapshotRef.current)
-  }, [enabled, time1, time2, time3, timezone, frequency, loadingSettings])
+  }, [enabled, time1, time2, time3, timezone, timezoneManual, frequency, loadingSettings])
 
   useSaveOnLeave(() => {
     if (!hasUnsavedChanges) return
@@ -400,6 +430,7 @@ export default function HealthTipsPage() {
       time2,
       time3,
       timezone,
+      timezoneManual,
       frequency,
     }
     setEnabled(true)
@@ -689,6 +720,7 @@ export default function HealthTipsPage() {
                             type="button"
                             onClick={() => {
                               setTimezone(tzValue)
+                              setTimezoneManual(true)
                               setTimezoneQuery(tzValue)
                               setShowTimezoneDropdown(false)
                             }}

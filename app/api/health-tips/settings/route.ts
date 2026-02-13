@@ -43,6 +43,7 @@ async function ensureHealthTipSettingsTable() {
       time2 TEXT NOT NULL,
       time3 TEXT NOT NULL,
       timezone TEXT NOT NULL,
+      timezoneManual BOOLEAN NOT NULL DEFAULT false,
       frequency INTEGER NOT NULL DEFAULT 1,
       focusFood BOOLEAN NOT NULL DEFAULT true,
       focusSupplements BOOLEAN NOT NULL DEFAULT true,
@@ -62,6 +63,9 @@ async function ensureHealthTipSettingsTable() {
   ).catch(() => {})
   await prisma.$executeRawUnsafe(
     `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 1`
+  ).catch(() => {})
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS timezoneManual BOOLEAN NOT NULL DEFAULT false`
   ).catch(() => {})
   await prisma.$executeRawUnsafe(
     `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusFood BOOLEAN NOT NULL DEFAULT true`
@@ -147,6 +151,7 @@ export async function GET(req: NextRequest) {
     time2: string
     time3: string
     timezone: string
+    timezoneManual: boolean
     frequency: number
       focusFood: boolean
       focusSupplements: boolean
@@ -159,6 +164,7 @@ export async function GET(req: NextRequest) {
         time2 AS "time2",
         time3 AS "time3",
         timezone AS "timezone",
+        timezoneManual AS "timezoneManual",
         frequency AS "frequency",
         focusFood AS "focusFood",
         focusSupplements AS "focusSupplements",
@@ -182,6 +188,7 @@ export async function GET(req: NextRequest) {
     time2: '15:30',
     time3: '20:30',
     timezone: defaultTimezone,
+    timezoneManual: false,
     frequency: 1,
     focusFood: true,
     focusSupplements: true,
@@ -207,6 +214,7 @@ export async function POST(req: NextRequest) {
     time2,
     time3,
     timezone,
+    timezoneManual,
     frequency,
     focusFood,
     focusSupplements,
@@ -250,6 +258,8 @@ export async function POST(req: NextRequest) {
   time2 = normalizeTime(time2, '15:30')
   time3 = normalizeTime(time3, '20:30')
   const timezoneFromBody = timezone ? String(timezone).trim() : ''
+  const timezoneManualEnabled =
+    timezoneManual === true || timezoneManual === 'true'
   timezone = isValidTimezone(timezoneFromBody)
     ? timezoneFromBody
     : detectRequestTimezone(req)
@@ -320,14 +330,15 @@ export async function POST(req: NextRequest) {
     // ).catch(() => {})
 
     await prisma.$queryRawUnsafe(
-      `INSERT INTO HealthTipSettings (userId, enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `INSERT INTO HealthTipSettings (userId, enabled, time1, time2, time3, timezone, timezoneManual, frequency, focusFood, focusSupplements, focusLifestyle)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        ON CONFLICT (userId) DO UPDATE SET
          enabled          = EXCLUDED.enabled,
          time1            = EXCLUDED.time1,
          time2            = EXCLUDED.time2,
          time3            = EXCLUDED.time3,
          timezone         = EXCLUDED.timezone,
+         timezoneManual   = EXCLUDED.timezoneManual,
          frequency        = EXCLUDED.frequency,
          focusFood        = EXCLUDED.focusFood,
          focusSupplements = EXCLUDED.focusSupplements,
@@ -338,6 +349,7 @@ export async function POST(req: NextRequest) {
       time2,
       time3,
       timezone,
+      timezoneManualEnabled,
       frequency,
       focusFood,
       focusSupplements,
