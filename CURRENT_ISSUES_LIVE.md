@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 00:10 AEDT
+- What changed: Added a global drink-scaling safety lock for all water-flow drinks. The app now only scales calories/macros when the source serving volume is reliable, and blocks invalid tiny-base scaling that caused calorie blow-ups (like per-serve values being multiplied by raw ml).
+- Where to see it (page/link): Food Diary (`/food`) when adding drinks from Water Intake/Favorites drink flow
+- What to quickly test: Add a 500 ml drink from favorites (for example Coke or hot chocolate) through water logging flow and confirm calories are scaled by the real serving volume, not multiplied by 500 raw ml.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 23:29 AEDT
 - What changed: Added a hard lock for sugar-free hot chocolate so stale high calories cannot be saved or shown again. Save/update API now forces sweetener-only nutrition for this drink path, and diary load mapping applies the same guard to old rows so bad values like `319 kcal` no longer reappear.
 - Where to see it (page/link): Food Diary (`/food`) and food-log save path (`/api/food-log`)
