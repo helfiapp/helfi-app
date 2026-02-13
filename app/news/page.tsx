@@ -2,64 +2,110 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import PublicHeader from '@/components/marketing/PublicHeader'
+import { newsPosts } from '@/data/news-posts'
+import { absoluteUrl } from '@/lib/site-url'
 
 export const metadata: Metadata = {
-  title: 'Helfi News',
-  description: 'Latest Helfi updates, feature releases, and platform improvements.',
+  title: 'Helfi News | Product Updates and Health Tracking Guides',
+  description:
+    'Read the latest Helfi updates, food tracking guides, and health insights articles.',
+  alternates: {
+    canonical: '/news',
+  },
+  openGraph: {
+    title: 'Helfi News',
+    description:
+      'Product updates, feature news, and practical health tracking articles from the Helfi team.',
+    url: absoluteUrl('/news'),
+    type: 'website',
+  },
 }
 
-const updates = [
-  {
-    title: 'Food Tracking Improvements',
-    description:
-      'New food section upgrades, section deep links, and improved feature walkthroughs.',
-    href: '/features/nutrition-food',
-    date: 'Latest update',
-  },
-  {
-    title: 'AI Insights and Weekly Reports',
-    description:
-      'Clearer weekly summaries and easier pathways to turn insights into action.',
-    href: '/features/ai-insights',
-    date: 'Latest update',
-  },
-  {
-    title: 'Health Tracking and Wearables',
-    description:
-      'Better visibility of daily health data and wearable-connected progress views.',
-    href: '/features/health-tracking',
-    date: 'Latest update',
-  },
-]
+const sortedPosts = [...newsPosts].sort(
+  (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+)
+
+const featuredPost = sortedPosts[0]
+const secondaryPosts = sortedPosts.slice(1)
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
 
 export default function NewsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50/50 via-white to-cyan-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50/60 via-white to-sky-50/40">
       <PublicHeader />
 
-      <main className="px-4 sm:px-6 lg:px-8 py-12">
-        <div className="max-w-[1100px] mx-auto">
-          <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">Latest News</p>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Helfi News</h1>
-          <p className="text-lg text-gray-600 max-w-3xl">
-            Stay up to date with the latest Helfi feature releases, improvements, and product updates.
+      <main className="px-4 sm:px-6 lg:px-8 pb-16">
+        <div className="max-w-[1160px] mx-auto pt-10 md:pt-14">
+          <p className="text-xs uppercase tracking-[0.22em] text-emerald-700 font-semibold">News</p>
+          <h1 className="mt-3 text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
+            Latest product updates and health tracking guides
+          </h1>
+          <p className="mt-4 text-lg text-gray-600 max-w-3xl">
+            A better way to follow what is new at Helfi, what we are building next, and practical tips to
+            get more value from your daily tracking.
           </p>
 
-          <div className="mt-10 grid gap-5 md:grid-cols-3">
-            {updates.map((item) => (
-              <article key={item.title} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <p className="text-xs text-helfi-green font-semibold mb-3">{item.date}</p>
-                <h2 className="text-xl font-semibold text-gray-900 mb-3">{item.title}</h2>
-                <p className="text-sm text-gray-600 leading-relaxed mb-5">{item.description}</p>
+          <section className="mt-10">
+            <Link
+              href={`/news/${featuredPost.slug}`}
+              className="group block rounded-3xl border border-emerald-100 bg-white/95 shadow-sm hover:shadow-md transition-all overflow-hidden"
+            >
+              <div className="grid md:grid-cols-[1.2fr_0.8fr]">
+                <div className="p-7 md:p-10">
+                  <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                    <span>{featuredPost.category}</span>
+                    <span className="text-gray-400">•</span>
+                    <span>{formatDate(featuredPost.publishedAt)}</span>
+                    <span className="text-gray-400">•</span>
+                    <span>{featuredPost.readingTime}</span>
+                  </div>
+                  <h2 className="mt-4 text-3xl md:text-4xl font-bold text-gray-900 leading-tight group-hover:text-emerald-700 transition-colors">
+                    {featuredPost.title}
+                  </h2>
+                  <p className="mt-4 text-lg text-gray-600 leading-relaxed">{featuredPost.excerpt}</p>
+                  <span className="inline-flex items-center mt-6 text-sm font-semibold text-emerald-700 group-hover:text-emerald-800">
+                    Read article →
+                  </span>
+                </div>
+                <div className="relative min-h-[240px] bg-gradient-to-br from-emerald-500 via-emerald-400 to-sky-400 p-7 md:p-8 flex flex-col justify-end">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.35),transparent_45%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.24),transparent_40%)]" />
+                  <p className="relative text-white/95 text-sm uppercase tracking-[0.18em] font-semibold">
+                    Featured story
+                  </p>
+                  <p className="relative text-white text-2xl font-bold mt-3">What is next for Helfi</p>
+                </div>
+              </div>
+            </Link>
+          </section>
+
+          <section className="mt-9 grid gap-5 md:grid-cols-3">
+            {secondaryPosts.map((post) => (
+              <article
+                key={post.slug}
+                className="rounded-2xl border border-gray-100 bg-white/95 p-6 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">{post.category}</p>
+                <h2 className="mt-3 text-xl font-semibold text-gray-900 leading-snug">{post.title}</h2>
+                <p className="mt-3 text-sm text-gray-600 leading-6">{post.excerpt}</p>
+                <p className="mt-4 text-xs text-gray-500">
+                  {formatDate(post.publishedAt)} • {post.readingTime}
+                </p>
                 <Link
-                  href={item.href}
-                  className="inline-flex items-center text-sm font-semibold text-helfi-green hover:text-helfi-green/80"
+                  href={`/news/${post.slug}`}
+                  className="inline-flex items-center mt-5 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
                 >
-                  Read update →
+                  Read article →
                 </Link>
               </article>
             ))}
-          </div>
+          </section>
         </div>
       </main>
     </div>

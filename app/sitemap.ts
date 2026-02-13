@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 
 import { featurePages } from '@/data/feature-pages'
+import { newsPosts } from '@/data/news-posts'
 import { getSiteUrl } from '@/lib/site-url'
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -14,6 +15,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }> = [
     { path: '/', changeFrequency: 'weekly', priority: 1 },
     { path: '/features', changeFrequency: 'weekly', priority: 0.9 },
+    { path: '/news', changeFrequency: 'weekly', priority: 0.8 },
     { path: '/faq', changeFrequency: 'monthly', priority: 0.7 },
     { path: '/privacy', changeFrequency: 'yearly', priority: 0.4 },
     { path: '/terms', changeFrequency: 'yearly', priority: 0.4 },
@@ -37,5 +39,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }))
 
-  return [...staticEntries, ...featureEntries]
+  const newsEntries: MetadataRoute.Sitemap = newsPosts.map((post) => ({
+    url: `${siteUrl}/news/${post.slug}`,
+    lastModified: new Date(post.publishedAt),
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  }))
+
+  return [...staticEntries, ...featureEntries, ...newsEntries]
 }

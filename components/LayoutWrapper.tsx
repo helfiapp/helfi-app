@@ -329,12 +329,14 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   ]
 
   const isFeaturePath = pathname.startsWith('/features')
+  const isNewsPath = pathname === '/news' || pathname.startsWith('/news/')
   const isPractitionerDirectoryPath =
     pathname === '/practitioners' || pathname.startsWith('/practitioners/')
   const isPractitionerPortalPath =
     pathname === '/practitioner' || pathname.startsWith('/practitioner/')
   const isWeeklyReportPrintPage = pathname.startsWith('/insights/weekly-report/print')
-  const isPublicPage = publicPages.includes(pathname) || isFeaturePath || isPractitionerDirectoryPath
+  const isPublicPage =
+    publicPages.includes(pathname) || isFeaturePath || isNewsPath || isPractitionerDirectoryPath
   const isChatPage = pathname === '/chat'
   const isFoodDiaryPage = pathname === '/food'
   const isPractitioner = !!session?.user?.isPractitioner
@@ -356,6 +358,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     isPractitionerPortalPath ||
     isPractitionerDirectoryPath ||
     isFeaturePath ||
+    isNewsPath ||
     (publicPages.includes(pathname) && !isOnboardingPath)
 
   useEffect(() => {
