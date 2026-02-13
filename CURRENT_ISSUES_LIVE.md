@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 03:47 AEDT
+- What changed: Fixed disappearing favorites stability. If diary rows still have favorite links but those favorites were dropped, the app now restores the missing linked favorites (including meals like `Mashed potato`) from recent diary data and saves them back. Also added a stale-write safety guard so partial old payloads cannot wipe linked favorites, and changed favorite-save flow to always use the newest in-memory list.
+- Where to see it (page/link): Food Diary favorites picker (`/food` -> Add from Favorites)
+- What to quickly test: Open Favorites and search `Mashed potato` (it should appear again). Add it once and refresh twice. Confirm it stays in Favorites and does not disappear.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 03:36 AEDT
 - What changed: Header polish update. Added `News` to the desktop menu, widened header layout so logo sits further left and action buttons sit further right, reduced desktop `Log in` and `Create account` button height for a cleaner modern look, and added a live News page route (`/news`) with starter update cards.
 - Where to see it (page/link): Global public header + News page (`/news`)
