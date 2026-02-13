@@ -13844,6 +13844,9 @@ Please add nutritional information manually if needed.`);
       return 0
     }
     const resolveFavoriteLastUsedAtMs = (fav: any) => {
+      // DO NOT TOUCH (owner lock):
+      // Recency must be usage-based only. Do not add updatedAt/edit timestamps here,
+      // or the list order will become wrong and older edited items will jump to the top.
       const direct =
         resolveFavoriteTimestampMs((fav as any)?.lastUsedAt) ||
         resolveFavoriteTimestampMs((fav as any)?.lastUsed) ||
@@ -14172,6 +14175,9 @@ Please add nutritional information manually if needed.`);
       const matchedFavorite = resolvedFavorite.favorite
       const label = (() => {
         if (matchedFavorite) {
+          // DO NOT TOUCH (owner lock):
+          // If entry maps to a saved favorite, always show the saved favorite label.
+          // Never remap this through entry override logic, or long legacy names reappear in "All".
           // If this history row maps to a saved favorite, always show the saved favorite label.
           // Do not pass it through entry-based override remapping (can revive old long names).
           return resolveFavoriteLabel(matchedFavorite)
@@ -26726,6 +26732,9 @@ Please add nutritional information manually if needed.`);
                   }
                   const sortList = (list: any[]) =>
                     [...list].sort((a, b) => {
+                      // DO NOT TOUCH (owner lock):
+                      // Ordering contract = sort by lastUsedAt first, then createdAt fallback.
+                      // Changing this order has repeatedly caused wrong favorites ordering in production.
                       const aPriority = Number(a?.sortPriority) || 0
                       const bPriority = Number(b?.sortPriority) || 0
                       if (aPriority !== bPriority) return bPriority - aPriority

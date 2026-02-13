@@ -728,6 +728,10 @@ If this breaks again, restore in this order:
 ### 3.5.3 Favorites Recency Order (Feb 2026 – Locked)
 Goal: the last favorite/custom meal used in Food Diary must appear at the top of `All`, `Favorites`, and `Custom`.
 
+Hard lock (owner instruction):
+- Agents must not edit this ordering + naming block unless the owner explicitly asks for it in the current thread.
+- If an agent believes this block must change for another feature, they must stop and ask for written approval first.
+
 Must keep (source of truth in `app/food/page.tsx`):
 - Using a favorite/custom meal must stamp that favorite with `lastUsedAt`.
 - `insertFavoriteIntoDiary(...)` must call the recency updater before save flow completes.
