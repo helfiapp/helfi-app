@@ -610,7 +610,7 @@ export default function Settings() {
             >
               <div>
                 <h3 className="font-semibold text-gray-900 dark:text-white">Open notification settings</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Delivery, reminders, AI insights, and more.</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Delivery, reminders, Smart Health Coach, and more.</p>
               </div>
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

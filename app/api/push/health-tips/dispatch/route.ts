@@ -1,36 +1,162 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
-import OpenAI from 'openai'
 import crypto from 'crypto'
 import { CreditManager } from '@/lib/credit-system'
-import { chatCompletionWithCost } from '@/lib/metered-openai'
-import { capMaxTokensToBudget } from '@/lib/cost-meter'
 import { scheduleHealthTipWithQStash } from '@/lib/qstash'
-import { logAIUsage } from '@/lib/ai-usage-logger'
-import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
-import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
+import {
+  dedupeSubscriptions,
+  normalizeSubscriptionList,
+  removeSubscriptionsByEndpoint,
+  sendToSubscriptions,
+} from '@/lib/push-subscriptions'
 import { createInboxNotification } from '@/lib/notification-inbox'
-import { buildTipPrompt, buildUserHealthContext, ensureHealthTipTables, extractTipJson } from '@/lib/health-tips'
+import { ensureHealthTipTables } from '@/lib/health-tips'
+import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
+import {
+  SMART_COACH_ALERT_COST_CREDITS,
+  SMART_COACH_DAILY_CAP_CREDITS,
+  SMART_COACH_DAILY_MAX_ALERTS,
+  SMART_COACH_GLOBAL_COOLDOWN_MINUTES,
+  SMART_COACH_RULE_COOLDOWN_MINUTES,
+  ensureSmartCoachTables,
+  evaluateSmartCoachRule,
+  getLocalDateTime,
+  getSmartCoachQuietHours,
+  isWithinQuietHours,
+  logSmartCoachDecision,
+  type SmartCoachBlockReason,
+} from '@/lib/smart-health-coach'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 type DispatchPayload = {
   userId: string
-  reminderTime: string // "HH:MM"
+  reminderTime: string
   timezone: string
 }
 
-function getOpenAIClient() {
-  if (!process.env.OPENAI_API_KEY) return null
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+function getPushKeys() {
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
+  const privateKey = process.env.VAPID_PRIVATE_KEY || ''
+  return { publicKey, privateKey, hasKeys: !!publicKey && !!privateKey }
 }
-// helpers moved to lib/health-tips.ts
+
+async function scheduleNextReminder(userId: string, reminderTime: string, timezone: string) {
+  await scheduleHealthTipWithQStash(userId, reminderTime, timezone).catch((error) => {
+    console.error('[SMART_COACH] Failed to schedule next run', error)
+  })
+}
+
+async function pushIfPossible(
+  subscriptions: any[],
+  payload: string,
+  userId: string,
+  hasKeys: boolean,
+  publicKey: string,
+  privateKey: string
+) {
+  if (!hasKeys || !subscriptions.length) {
+    return {
+      sent: false,
+      subscriptions,
+    }
+  }
+
+  webpush.setVapidDetails('mailto:support@helfi.ai', publicKey, privateKey)
+  const sendResult = await sendToSubscriptions(subscriptions, (sub) =>
+    webpush.sendNotification(sub, payload)
+  )
+  let updated = subscriptions
+
+  if (sendResult.goneEndpoints.length) {
+    updated = removeSubscriptionsByEndpoint(updated, sendResult.goneEndpoints)
+    await prisma.$executeRawUnsafe(
+      `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
+      userId,
+      JSON.stringify(updated)
+    ).catch(() => {})
+  }
+
+  return {
+    sent: !!sendResult.sent,
+    subscriptions: updated,
+  }
+}
+
+async function sendCapReachedNotice(args: {
+  userId: string
+  localDate: string
+  subscriptions: any[]
+  hasKeys: boolean
+  publicKey: string
+  privateKey: string
+}) {
+  const title = 'Smart Health Coach: daily limit reached'
+  const body = 'Daily coach limit reached. New alerts will resume tomorrow.'
+  const url = '/health-tips'
+  const eventKey = `smart_health_coach_cap:${args.localDate}`
+
+  await createInboxNotification({
+    userId: args.userId,
+    title,
+    body,
+    url,
+    type: 'smart_health_coach_info',
+    source: 'push',
+    eventKey,
+    metadata: { kind: 'daily_cap' },
+  }).catch(() => {})
+
+  const payload = JSON.stringify({ title, body, url })
+  await pushIfPossible(
+    args.subscriptions,
+    payload,
+    args.userId,
+    args.hasKeys,
+    args.publicKey,
+    args.privateKey
+  ).catch(() => {})
+}
+
+async function sendLowCreditsNotice(args: {
+  userId: string
+  localDate: string
+  subscriptions: any[]
+  hasKeys: boolean
+  publicKey: string
+  privateKey: string
+}) {
+  const title = 'Smart Health Coach: top up needed'
+  const body = 'You do not have enough credits for Smart Health Coach alerts right now.'
+  const url = '/billing'
+  const eventKey = `smart_health_coach_low_credit:${args.localDate}`
+
+  await createInboxNotification({
+    userId: args.userId,
+    title,
+    body,
+    url,
+    type: 'smart_health_coach_low_credit',
+    source: 'push',
+    eventKey,
+    metadata: { kind: 'low_credit' },
+  }).catch(() => {})
+
+  const payload = JSON.stringify({ title, body, url })
+  await pushIfPossible(
+    args.subscriptions,
+    payload,
+    args.userId,
+    args.hasKeys,
+    args.publicKey,
+    args.privateKey
+  ).catch(() => {})
+}
 
 export async function POST(req: NextRequest) {
-  let claimedDelivery = false
-  let releaseDelivery: (() => Promise<void>) | null = null
+  const now = new Date()
 
   try {
     if (!isSchedulerAuthorized(req)) {
@@ -40,19 +166,16 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as Partial<DispatchPayload>
     const userId = String(body.userId || '')
     const reminderTime = String(body.reminderTime || '')
-    const timezone = String(body.timezone || '')
+    const fallbackTimezone = String(body.timezone || 'UTC')
 
-    if (!userId || !reminderTime || !timezone) {
+    if (!userId || !reminderTime) {
       return NextResponse.json({ error: 'invalid_payload' }, { status: 400 })
     }
 
     await ensureHealthTipTables()
+    await ensureSmartCoachTables()
 
-    const [subscriptionRows, settingsRows] = await Promise.all([
-      prisma.$queryRawUnsafe<Array<{ subscription: any }>>(
-        `SELECT subscription FROM PushSubscriptions WHERE userId = $1`,
-        userId
-      ),
+    const [settingsRows, subscriptionRows] = await Promise.all([
       prisma.$queryRawUnsafe<
         Array<{
           enabled: boolean
@@ -61,32 +184,29 @@ export async function POST(req: NextRequest) {
           time3: string
           timezone: string
           frequency: number | null
-          focusFood: boolean | null
-          focusSupplements: boolean | null
-          focusLifestyle: boolean | null
         }>
       >(
-        `SELECT enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle
+        `SELECT enabled, time1, time2, time3, timezone, frequency
          FROM HealthTipSettings
          WHERE userId = $1`,
         userId
       ),
+      prisma.$queryRawUnsafe<Array<{ subscription: any }>>(
+        `SELECT subscription FROM PushSubscriptions WHERE userId = $1`,
+        userId
+      ),
     ])
-
-    if (!subscriptionRows.length) {
-      // No subscription yet – nothing to deliver, but still attempt to schedule the next one
-      await scheduleHealthTipWithQStash(userId, reminderTime, timezone).catch(() => {})
-      return NextResponse.json({ skipped: 'no_subscription' })
-    }
-    let subscriptions = dedupeSubscriptions(normalizeSubscriptionList(subscriptionRows[0].subscription))
-    if (!subscriptions.length) {
-      await scheduleHealthTipWithQStash(userId, reminderTime, timezone).catch(() => {})
-      return NextResponse.json({ skipped: 'no_subscription' })
-    }
 
     const settings = settingsRows[0]
     if (!settings || !settings.enabled) {
-      // User turned health tips off – do not schedule further jobs
+      await logSmartCoachDecision({
+        userId,
+        ruleId: 'none',
+        triggerResult: 'blocked',
+        blockReason: 'disabled',
+        creditsCharged: 0,
+        metadata: { reminderTime },
+      })
       return NextResponse.json({ skipped: 'disabled' })
     }
 
@@ -96,293 +216,328 @@ export async function POST(req: NextRequest) {
     if (resolvedFrequency >= 2 && settings.time2) activeTimes.push(settings.time2)
     if (resolvedFrequency >= 3 && settings.time3) activeTimes.push(settings.time3)
 
-    const timezoneStillMatches = settings.timezone === timezone
+    const effectiveTimezone = settings.timezone || fallbackTimezone || 'UTC'
     const reminderStillActive = activeTimes.includes(reminderTime)
+    const timezoneStillMatches = effectiveTimezone === fallbackTimezone || !fallbackTimezone
 
     if (!reminderStillActive || !timezoneStillMatches) {
-      // Stale schedule – reschedule based on latest settings and exit
       try {
-        const reschedules = await Promise.all(
-          activeTimes.map((t) =>
-            scheduleHealthTipWithQStash(userId, t, settings.timezone)
-          )
+        await Promise.all(
+          activeTimes.map((time) => scheduleHealthTipWithQStash(userId, time, effectiveTimezone))
         )
-        console.log('[HEALTH_TIPS] Rescheduled after stale payload', {
-          userId,
-          reminderTime,
-          timezone,
-          activeTimes,
-          reschedules,
-        })
-      } catch (err) {
-        console.error('[HEALTH_TIPS] Failed to reschedule after stale payload', err)
+      } catch (error) {
+        console.error('[SMART_COACH] Failed stale schedule resync', error)
       }
+
+      await logSmartCoachDecision({
+        userId,
+        ruleId: 'none',
+        triggerResult: 'blocked',
+        blockReason: 'stale_schedule',
+        creditsCharged: 0,
+        metadata: { reminderTime, timezone: fallbackTimezone, activeTimes, effectiveTimezone },
+      })
       return NextResponse.json({ skipped: 'stale_schedule' })
     }
 
-    const effectiveTimezone = settings.timezone || timezone || 'UTC'
-    const now = new Date()
-    const localDateParts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: effectiveTimezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(now)
-    const localDateString = `${localDateParts.find((p) => p.type === 'year')?.value}-${localDateParts
-      .find((p) => p.type === 'month')
-      ?.value}-${localDateParts.find((p) => p.type === 'day')?.value}`
+    const local = getLocalDateTime(effectiveTimezone, now)
+    const quietHours = await getSmartCoachQuietHours(userId)
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { subscription: true, creditTopUps: true },
-    })
-    if (!user) {
-      return NextResponse.json({ error: 'user_not_found' }, { status: 404 })
+    if (quietHours.enabled) {
+      const localTimeForQuiet = getLocalDateTime(
+        quietHours.timezone || effectiveTimezone,
+        now
+      ).localTime
+      const inQuietHours = isWithinQuietHours(
+        localTimeForQuiet,
+        quietHours.startTime,
+        quietHours.endTime
+      )
+      if (inQuietHours) {
+        await logSmartCoachDecision({
+          userId,
+          ruleId: 'none',
+          triggerResult: 'blocked',
+          blockReason: 'quiet_hours',
+          creditsCharged: 0,
+          metadata: {
+            localTime: localTimeForQuiet,
+            start: quietHours.startTime,
+            end: quietHours.endTime,
+            timezone: quietHours.timezone || effectiveTimezone,
+          },
+        })
+        await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
+        return NextResponse.json({ skipped: 'quiet_hours' })
+      }
     }
 
-    const openai = getOpenAIClient()
-    if (!openai) {
-      return NextResponse.json({ error: 'openai_not_configured' }, { status: 500 })
-    }
-
-    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
-    const privateKey = process.env.VAPID_PRIVATE_KEY || ''
-    if (!publicKey || !privateKey) {
-      return NextResponse.json({ error: 'vapid_not_configured' }, { status: 500 })
-    }
-    webpush.setVapidDetails('mailto:support@helfi.ai', publicKey, privateKey)
-
-    releaseDelivery = async () => {
-      if (!claimedDelivery) return
-      await prisma.$executeRawUnsafe(
-        `DELETE FROM HealthTipDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND tipDate = $3::date`,
-        userId,
-        reminderTime,
-        localDateString
-      ).catch(() => {})
-      claimedDelivery = false
-    }
-
-    const claim: Array<{ userId: string }> = await prisma.$queryRawUnsafe(
-      `INSERT INTO HealthTipDeliveryLog (userId, reminderTime, tipDate, sentAt)
-       VALUES ($1, $2, $3::date, NOW())
-       ON CONFLICT (userId, reminderTime, tipDate) DO NOTHING
-       RETURNING userId`,
+    const evaluation = await evaluateSmartCoachRule({
       userId,
-      reminderTime,
-      localDateString
-    )
-    if (!claim.length) {
-      return NextResponse.json({ skipped: 'already_sent' })
-    }
-    claimedDelivery = true
-
-    // Build health context for this user
-    const context = await buildUserHealthContext(userId)
-
-    // Create a light human description of the local time (morning/afternoon/evening)
-    const [hhStr, mmStr] = reminderTime.split(':')
-    const hh = parseInt(hhStr || '0', 10)
-    const approxSlot =
-      hh < 11 ? 'morning' : hh < 15 ? 'around lunchtime' : hh < 19 ? 'afternoon' : 'evening'
-    const localTimeDescription = `${reminderTime} in their local timezone (${approxSlot})`
-
-    const model = 'gpt-5.2'
-    const prompt = buildTipPrompt({
-      context,
-      localTimeDescription,
-      focusFood: settings.focusFood !== false,
-      focusSupplements: settings.focusSupplements !== false,
-      focusLifestyle: settings.focusLifestyle !== false,
+      timezone: effectiveTimezone,
+      now,
     })
-    const messages = [
-      {
-        role: 'user' as const,
-        content: prompt,
-      },
-    ]
 
-    // Wallet pre-check using a budget-aware max token cap
-    const creditManager = new CreditManager(user.id)
-    const walletStatus = await creditManager.getWalletStatus()
-
-    let maxTokens = 800
-    const cappedMaxTokens = capMaxTokensToBudget(model, prompt, maxTokens, walletStatus.totalAvailableCents)
-    if (cappedMaxTokens <= 0) {
-      // Not enough credits – send a gentle notification that links to billing instead of a tip
-    const payload = JSON.stringify({
-        title: 'Top up credits to keep AI health tips coming',
-        body: 'We could not send today’s health tip because your credits are low. Tap to add more credits or upgrade your plan.',
-        url: '/billing',
+    if (!evaluation.rule) {
+      await logSmartCoachDecision({
+        userId,
+        ruleId: 'none',
+        triggerResult: 'blocked',
+        blockReason: 'no_rule',
+        creditsCharged: 0,
+        metadata: evaluation.metrics,
       })
-      const lowCreditSend = await sendToSubscriptions(subscriptions, (sub) =>
-        webpush.sendNotification(sub, payload)
-      )
-      if (lowCreditSend.goneEndpoints.length) {
-        subscriptions = removeSubscriptionsByEndpoint(subscriptions, lowCreditSend.goneEndpoints)
-        await prisma.$executeRawUnsafe(
-          `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
-          userId,
-          JSON.stringify(subscriptions)
-        )
-      }
-      if (!lowCreditSend.sent) {
-        console.error('[HEALTH_TIPS] Low-credit notification send error', lowCreditSend.errors)
-      }
-      if (lowCreditSend.sent) {
-        await createInboxNotification({
-          userId,
-          title: 'Top up credits to keep AI health tips coming',
-          body: 'We could not send today’s health tip because your credits are low. Tap to add more credits or upgrade your plan.',
-          url: '/billing',
-          type: 'health_tip_low_credit',
-          source: 'push',
-          eventKey: `health_tip_low_credit:${localDateString}:${reminderTime}`,
-        }).catch(() => {})
-      }
+      await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
+      return NextResponse.json({ skipped: 'no_rule' })
+    }
 
-      // Still schedule the next attempt for tomorrow at the same time
-      await scheduleHealthTipWithQStash(userId, reminderTime, effectiveTimezone).catch(
-        (error) => {
-          console.error('[HEALTH_TIPS] Failed to schedule next tip after low credits', error)
-        }
-      )
+    const dailySummaryRows = await prisma.$queryRawUnsafe<
+      Array<{ sentcount: string; chargedcredits: string }>
+    >(
+      `SELECT
+         COUNT(*)::text AS sentCount,
+         COALESCE(SUM(COALESCE(chargeCents, 0)), 0)::text AS chargedCredits
+       FROM HealthTips
+       WHERE userId = $1
+         AND tipDate = $2::date
+         AND category = 'smart_health_coach'`,
+      userId,
+      evaluation.localDate
+    )
+    const sentCount = parseInt(dailySummaryRows[0]?.sentcount || '0', 10) || 0
+    const chargedCredits = parseInt(dailySummaryRows[0]?.chargedcredits || '0', 10) || 0
 
+    const subscriptions = dedupeSubscriptions(
+      normalizeSubscriptionList(subscriptionRows[0]?.subscription)
+    )
+    const { publicKey, privateKey, hasKeys } = getPushKeys()
+
+    if (
+      sentCount >= SMART_COACH_DAILY_MAX_ALERTS ||
+      chargedCredits >= SMART_COACH_DAILY_CAP_CREDITS
+    ) {
+      await sendCapReachedNotice({
+        userId,
+        localDate: evaluation.localDate,
+        subscriptions,
+        hasKeys,
+        publicKey,
+        privateKey,
+      })
+      await logSmartCoachDecision({
+        userId,
+        ruleId: evaluation.rule.ruleId,
+        triggerResult: 'blocked',
+        blockReason: 'daily_cap',
+        creditsCharged: 0,
+        metadata: {
+          sentCount,
+          chargedCredits,
+          limitAlerts: SMART_COACH_DAILY_MAX_ALERTS,
+          limitCredits: SMART_COACH_DAILY_CAP_CREDITS,
+          ...evaluation.metrics,
+        },
+      })
+      await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
+      return NextResponse.json({ skipped: 'daily_cap' })
+    }
+
+    const globalCooldownRows = await prisma.$queryRawUnsafe<Array<{ tipid: string }>>(
+      `SELECT id AS tipId
+       FROM HealthTips
+       WHERE userId = $1
+         AND category = 'smart_health_coach'
+         AND sentAt >= NOW() - ($2 * INTERVAL '1 minute')
+       ORDER BY sentAt DESC
+       LIMIT 1`,
+      userId,
+      SMART_COACH_GLOBAL_COOLDOWN_MINUTES
+    )
+    if (globalCooldownRows.length > 0) {
+      await logSmartCoachDecision({
+        userId,
+        ruleId: evaluation.rule.ruleId,
+        triggerResult: 'blocked',
+        blockReason: 'global_cooldown',
+        creditsCharged: 0,
+        metadata: {
+          cooldownMinutes: SMART_COACH_GLOBAL_COOLDOWN_MINUTES,
+          ...evaluation.metrics,
+        },
+      })
+      await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
+      return NextResponse.json({ skipped: 'global_cooldown' })
+    }
+
+    const ruleCooldownRows = await prisma.$queryRawUnsafe<Array<{ tipid: string }>>(
+      `SELECT id AS tipId
+       FROM HealthTips
+       WHERE userId = $1
+         AND category = 'smart_health_coach'
+         AND metadata->>'ruleId' = $2
+         AND sentAt >= NOW() - ($3 * INTERVAL '1 minute')
+       ORDER BY sentAt DESC
+       LIMIT 1`,
+      userId,
+      evaluation.rule.ruleId,
+      SMART_COACH_RULE_COOLDOWN_MINUTES
+    )
+    if (ruleCooldownRows.length > 0) {
+      await logSmartCoachDecision({
+        userId,
+        ruleId: evaluation.rule.ruleId,
+        triggerResult: 'blocked',
+        blockReason: 'rule_cooldown',
+        creditsCharged: 0,
+        metadata: {
+          cooldownMinutes: SMART_COACH_RULE_COOLDOWN_MINUTES,
+          ...evaluation.metrics,
+        },
+      })
+      await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
+      return NextResponse.json({ skipped: 'rule_cooldown' })
+    }
+
+    const creditManager = new CreditManager(userId)
+    const wallet = await creditManager.getWalletStatus()
+    if ((wallet.totalAvailableCents || 0) < SMART_COACH_ALERT_COST_CREDITS) {
+      await sendLowCreditsNotice({
+        userId,
+        localDate: evaluation.localDate,
+        subscriptions,
+        hasKeys,
+        publicKey,
+        privateKey,
+      })
+      await logSmartCoachDecision({
+        userId,
+        ruleId: evaluation.rule.ruleId,
+        triggerResult: 'blocked',
+        blockReason: 'insufficient_credits',
+        creditsCharged: 0,
+        metadata: { walletTotal: wallet.totalAvailableCents, ...evaluation.metrics },
+      })
+      await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
       return NextResponse.json({ skipped: 'insufficient_credits' })
     }
-    maxTokens = cappedMaxTokens
 
-    // Generate the health tip with OpenAI
-    const wrapped = await chatCompletionWithCost(openai, {
-      model,
-      messages,
-      max_tokens: maxTokens,
-      temperature: 0.4,
-    } as any)
-
-    const rawContent = wrapped.completion.choices?.[0]?.message?.content || ''
-    const parsed = extractTipJson(rawContent)
-
-    if (!parsed || !parsed.title || !parsed.tip) {
-      console.error('[HEALTH_TIPS] Failed to parse tip JSON', rawContent)
-      if (releaseDelivery) {
-        await releaseDelivery()
-      }
-      return NextResponse.json({ error: 'tip_generation_failed' }, { status: 500 })
+    const charged = await creditManager.chargeCents(SMART_COACH_ALERT_COST_CREDITS)
+    if (!charged) {
+      await logSmartCoachDecision({
+        userId,
+        ruleId: evaluation.rule.ruleId,
+        triggerResult: 'blocked',
+        blockReason: 'billing_failed',
+        creditsCharged: 0,
+        metadata: evaluation.metrics,
+      })
+      await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
+      return NextResponse.json({ skipped: 'billing_failed' }, { status: 402 })
     }
 
-    const category =
-      parsed.category === 'supplement' || parsed.category === 'lifestyle'
-        ? parsed.category
-        : 'food'
+    const eventKey = `smart_health_coach:${evaluation.localDate}:${evaluation.rule.ruleId}:${Math.floor(
+      now.getTime() / (60 * 60 * 1000)
+    )}`
 
-    const safeTip = String(parsed.tip).trim()
-    const safetyNote = String(parsed.safetyNote || '').trim()
-
-    // costCents already includes the global markup (default 2x OpenAI cost).
-    // Charge the user exactly that amount—do not double again.
-    const costCents = wrapped.costCents
-    const chargeCents = costCents
-
-    const suggestedQuestions =
-      Array.isArray(parsed.suggestedQuestions) && parsed.suggestedQuestions.length > 0
-        ? parsed.suggestedQuestions
-            .filter((q) => typeof q === 'string' && q.trim().length > 0)
-            .slice(0, 4)
-        : []
-
-    // Charge the user in credits for this tip
-    const chargedOk = await creditManager.chargeCents(chargeCents)
-    if (!chargedOk) {
-      if (releaseDelivery) {
-        await releaseDelivery()
-      }
-      return NextResponse.json({ error: 'billing_failed' }, { status: 402 })
-    }
-
-    const tipId = crypto.randomUUID()
-
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO HealthTips (id, userId, tipDate, sentAt, title, body, category, metadata, costCents, chargeCents)
-       VALUES ($1,$2,$3::date,NOW(),$4,$5,$6,$7::jsonb,$8,$9)`,
-      tipId,
-      userId,
-      localDateString,
-      parsed.title.substring(0, 140),
-      safeTip,
-      category,
-      JSON.stringify({ rawContent, suggestedQuestions, safetyNote }).slice(0, 10000),
-      costCents,
-      chargeCents
-    )
-
-    const compactTip = safeTip.replace(/\s*\n+\s*/g, ' ').trim()
-    const notificationBody = compactTip.length > 120 ? `${compactTip.slice(0, 117)}…` : compactTip
-
-    const payload = JSON.stringify({
-      title: parsed.title.substring(0, 80),
-      body: notificationBody,
-      url: '/health-tips',
+    const notificationPayload = JSON.stringify({
+      title: evaluation.rule.title,
+      body: evaluation.rule.body,
+      url: evaluation.rule.url,
     })
 
-    const tipSend = await sendToSubscriptions(subscriptions, (sub) => webpush.sendNotification(sub, payload))
-    if (tipSend.goneEndpoints.length) {
-      subscriptions = removeSubscriptionsByEndpoint(subscriptions, tipSend.goneEndpoints)
-      await prisma.$executeRawUnsafe(
-        `UPDATE PushSubscriptions SET subscription = $2::jsonb, updatedAt = NOW() WHERE userId = $1`,
-        userId,
-        JSON.stringify(subscriptions)
-      )
-    }
-    if (!tipSend.sent) {
-      console.error('[HEALTH_TIPS] Notification send error', tipSend.errors)
-    }
-    if (tipSend.sent) {
-      await createInboxNotification({
-        userId,
-        title: parsed.title.substring(0, 80),
-        body: notificationBody,
-        url: '/health-tips',
-        type: 'health_tip',
-        source: 'push',
-        eventKey: `health_tip:${localDateString}:${reminderTime}`,
-        metadata: { tipId, category },
-      }).catch(() => {})
-    }
-
-    // Schedule the next tip for this time tomorrow
-    await scheduleHealthTipWithQStash(userId, reminderTime, effectiveTimezone).catch(
-      (error) => {
-        console.error('[HEALTH_TIPS] Failed to schedule next tip via QStash', error)
-      }
+    const pushResult = await pushIfPossible(
+      subscriptions,
+      notificationPayload,
+      userId,
+      hasKeys,
+      publicKey,
+      privateKey
     )
 
-    // Log AI usage for health tip generation (fire-and-forget)
-    try {
-      await logAIUsage({
-        context: { feature: 'health-tips:dispatch', userId },
-        model,
-        promptTokens: wrapped.promptTokens,
-        completionTokens: wrapped.completionTokens,
-        costCents,
-      })
-    } catch {
-      // Logging issues should not affect tip delivery
-    }
+    const notificationId = await createInboxNotification({
+      userId,
+      title: evaluation.rule.title,
+      body: evaluation.rule.body,
+      url: evaluation.rule.url,
+      type: 'smart_health_coach_alert',
+      source: 'push',
+      eventKey,
+      metadata: {
+        ruleId: evaluation.rule.ruleId,
+        category: evaluation.rule.category,
+        localDate: evaluation.localDate,
+        localTime: evaluation.localTime,
+      },
+    }).catch(() => null)
+
+    const tipId = crypto.randomUUID()
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO HealthTips (
+        id, userId, tipDate, sentAt, title, body, category, metadata, costCents, chargeCents
+      )
+      VALUES ($1,$2,$3::date,NOW(),$4,$5,$6,$7::jsonb,$8,$9)`,
+      tipId,
+      userId,
+      evaluation.localDate,
+      evaluation.rule.title.slice(0, 140),
+      evaluation.rule.body,
+      'smart_health_coach',
+      JSON.stringify({
+        ruleId: evaluation.rule.ruleId,
+        category: evaluation.rule.category,
+        why: evaluation.rule.why,
+        notificationId,
+        eventKey,
+        pushDelivered: pushResult.sent,
+        localTime: evaluation.localTime,
+      }).slice(0, 10000),
+      SMART_COACH_ALERT_COST_CREDITS,
+      SMART_COACH_ALERT_COST_CREDITS
+    )
+
+    await logSmartCoachDecision({
+      userId,
+      ruleId: evaluation.rule.ruleId,
+      triggerResult: 'sent',
+      blockReason: 'none',
+      creditsCharged: SMART_COACH_ALERT_COST_CREDITS,
+      notificationId,
+      metadata: {
+        ...evaluation.metrics,
+        localDate: evaluation.localDate,
+        localTime: evaluation.localTime,
+        timezone: evaluation.timezone,
+      },
+    })
+
+    await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
 
     return NextResponse.json({
       ok: true,
+      ruleId: evaluation.rule.ruleId,
       tipId,
-      costCents,
-      chargeCents,
+      creditsCharged: SMART_COACH_ALERT_COST_CREDITS,
+      notificationId,
+      localDate: local.localDate,
+      localTime: local.localTime,
     })
-  } catch (e: any) {
-    if (releaseDelivery) {
-      await releaseDelivery()
+  } catch (error: any) {
+    console.error('[SMART_COACH_DISPATCH] error', error?.stack || error)
+    const blockReason: SmartCoachBlockReason = 'unknown'
+    const body = (await req.json().catch(() => ({}))) as Partial<DispatchPayload>
+    const userId = String(body?.userId || '')
+    if (userId) {
+      await logSmartCoachDecision({
+        userId,
+        ruleId: 'none',
+        triggerResult: 'blocked',
+        blockReason,
+        creditsCharged: 0,
+        metadata: { message: error?.message || String(error) },
+      })
     }
-    console.error('[HEALTH_TIPS_DISPATCH] error', e?.stack || e)
     return NextResponse.json(
-      { error: 'health_tip_dispatch_error', message: e?.message || String(e) },
+      { error: 'smart_coach_dispatch_error', message: error?.message || String(error) },
       { status: 500 }
     )
   }

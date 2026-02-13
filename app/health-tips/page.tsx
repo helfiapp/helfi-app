@@ -83,7 +83,6 @@ export default function HealthTipsPage() {
   const pathname = usePathname()
   const [tips, setTips] = useState<HealthTip[]>([])
   const [loadingTips, setLoadingTips] = useState(true)
-  const [settings, setSettings] = useState<HealthTipSettings | null>(null)
   const [loadingSettings, setLoadingSettings] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -101,8 +100,7 @@ export default function HealthTipsPage() {
   const [timezoneQuery, setTimezoneQuery] = useState('')
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const [generatingTip, setGeneratingTip] = useState(false)
-  const [generateError, setGenerateError] = useState<string | null>(null)
+  const [showEnableModal, setShowEnableModal] = useState(false)
   const [activeChatTip, setActiveChatTip] = useState<HealthTip | null>(null)
   const [clearedTipIds, setClearedTipIds] = useState<Set<string>>(new Set())
   const clearedTipIdsRef = useRef<Set<string>>(new Set())
@@ -193,7 +191,6 @@ export default function HealthTipsPage() {
         const res = await fetch('/api/health-tips/settings', { cache: 'no-store' as any })
         if (res.ok) {
           const data = (await res.json()) as HealthTipSettings
-          setSettings(data)
           setEnabled(data.enabled)
           setTime1(data.time1)
           setTime2(data.time2)
@@ -290,29 +287,6 @@ export default function HealthTipsPage() {
       .slice(0, 50)
   }, [timezoneOptions, timezoneQuery])
 
-  const handleGenerateTip = useCallback(async () => {
-    if (generatingTip) return
-    setGenerateError(null)
-    setGeneratingTip(true)
-    try {
-      const res = await fetch('/api/health-tips/generate', { method: 'POST' })
-      if (res.status === 402) {
-        setGenerateError('You do not have enough credits to generate a tip right now.')
-        return
-      }
-      if (!res.ok) {
-        setGenerateError('We could not generate a tip. Please try again.')
-        return
-      }
-      await res.json().catch(() => ({}))
-      await loadTips({ silent: true })
-    } catch {
-      setGenerateError('We could not generate a tip. Please try again.')
-    } finally {
-      setGeneratingTip(false)
-    }
-  }, [generatingTip, loadTips])
-
   const handleClearTip = useCallback((tipId: string) => {
     if (!tipId) return
     const nextSet = new Set(clearedTipIdsRef.current)
@@ -328,7 +302,12 @@ export default function HealthTipsPage() {
     }
   }, [])
 
-  const handleSaveSettings = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: HealthTipSettings }) => {
+  const handleSaveSettings = useCallback(async (options?: {
+    silent?: boolean
+    keepalive?: boolean
+    payload?: HealthTipSettings
+    acceptPricingTerms?: boolean
+  }) => {
     const payload = options?.payload ?? {
       enabled,
       time1,
@@ -345,25 +324,30 @@ export default function HealthTipsPage() {
       const res = await fetch('/api/health-tips/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          acceptPricingTerms: !!options?.acceptPricingTerms,
+        }),
         keepalive: !!options?.keepalive,
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         const msg = (data && (data.error || data.detail)) || 'Failed to save settings'
         if (!options?.silent) alert(msg)
-        return
+        return false
       }
       const snapshot = JSON.stringify(payload)
       settingsSnapshotRef.current = snapshot
       setHasUnsavedChanges(false)
       if (!options?.silent) {
-        alert('Health tip settings saved. Your next AI tips will follow this schedule.')
+        alert('Smart Health Coach settings saved.')
       }
+      return true
     } catch {
       if (!options?.silent) {
-        alert('Could not save health tip settings. Please try again.')
+        alert('Could not save Smart Health Coach settings. Please try again.')
       }
+      return false
     } finally {
       if (!options?.silent) setSaving(false)
     }
@@ -413,9 +397,43 @@ export default function HealthTipsPage() {
   const visibleTips = filteredTips.slice(0, 2)
   const hasMoreTips = filteredTips.length > 2
 
+  const onToggleEnabled = (next: boolean) => {
+    if (next && !enabled) {
+      setShowEnableModal(true)
+      return
+    }
+    setEnabled(next)
+  }
+
+  const confirmEnableSmartCoach = async () => {
+    setShowEnableModal(false)
+    const nextPayload: HealthTipSettings = {
+      enabled: true,
+      time1,
+      time2,
+      time3,
+      timezone,
+      frequency,
+      focusFood,
+      focusSupplements,
+      focusLifestyle,
+    }
+    setEnabled(true)
+    const saved = await handleSaveSettings({
+      silent: true,
+      payload: nextPayload,
+      acceptPricingTerms: true,
+    })
+    if (saved) {
+      alert('Smart Health Coach enabled.')
+    } else {
+      setEnabled(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <PageHeader title="Health Tips" backHref="/notifications/ai-insights" />
+      <PageHeader title="Smart Health Coach" backHref="/notifications/ai-insights" />
 
       {/* Tabs */}
       <div className="max-w-3xl mx-auto px-4 pt-4">
@@ -449,25 +467,12 @@ export default function HealthTipsPage() {
         {/* Today’s Tips */}
         <section className="bg-white dark:bg-gray-800 rounded-b-2xl shadow-sm p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Today&apos;s AI health tips
+            Today&apos;s Smart Health Coach alerts
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            When you receive a notification and tap it, you&apos;ll land here to see the full tip,
-            plus any others sent today.
+            When you receive a Smart Health Coach alert and tap it, you&apos;ll land here to see
+            the full message and any others sent today.
           </p>
-          <div className="mb-4">
-            <button
-              type="button"
-              onClick={handleGenerateTip}
-              disabled={generatingTip}
-              className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
-            >
-              {generatingTip ? 'Generating…' : 'Generate Health Tip'}
-            </button>
-            {generateError && (
-              <p className="mt-2 text-xs text-red-600">{generateError}</p>
-            )}
-          </div>
 
           {loadingTips ? (
             <div className="flex items-center justify-center py-8">
@@ -476,7 +481,7 @@ export default function HealthTipsPage() {
           ) : filteredTips.length === 0 ? (
             <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-4 text-sm text-gray-600 dark:text-gray-300">
               {tips.length === 0
-                ? "No AI tips have been sent yet today. Once your schedule is set and you have credits, Helfi will send you personalised health tips here."
+                ? "No Smart Health Coach alerts have been sent yet today. Once enabled, alerts that match your logs will show here."
                 : "You cleared today’s tips. They’re still saved in your tip history."}
             </div>
           ) : (
@@ -568,22 +573,21 @@ export default function HealthTipsPage() {
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
           <div className="mb-4">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              Health tip schedule
+              Smart Health Coach settings
             </h2>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Choose how many AI health tips you&apos;d like each day and when you&apos;d like to
-            receive them. Each tip uses your Helfi credits (we always charge more credits than the
-            raw AI cost so things stay in line with your subscription and top-ups).
+            Smart Health Coach checks your logs and can send proactive alerts.
+            Charges only apply when an alert is actually sent.
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Cost: 2 credits per tip dispatch.
+            Cost: 10 credits per alert. Daily cap: 50 credits (max 5 charged alerts).
           </p>
 
-          {/* Credits usage for Health Tips */}
+          {/* Credits usage for Smart Health Coach */}
           <div className="mb-4">
             <UsageMeter inline={true} feature="healthTips" />
-            <FeatureUsageDisplay featureName="healthTips" featureLabel="Health Tips" />
+            <FeatureUsageDisplay featureName="healthTips" featureLabel="Smart Health Coach" />
           </div>
 
           {loadingSettings ? (
@@ -594,9 +598,9 @@ export default function HealthTipsPage() {
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">AI Health Tips</h3>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Enable Smart Health Coach</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Turn daily AI health tips on or off for this account.
+                    Get proactive guidance based on your daily logs and habits.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -604,7 +608,7 @@ export default function HealthTipsPage() {
                     type="checkbox"
                     className="sr-only peer"
                     checked={enabled}
-                    onChange={(e) => setEnabled(e.target.checked)}
+                    onChange={(e) => onToggleEnabled(e.target.checked)}
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green" />
                 </label>
@@ -613,7 +617,7 @@ export default function HealthTipsPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Number of tips per day
+                    Number of checks per day
                   </label>
                   <select
                     value={frequency}
@@ -621,9 +625,9 @@ export default function HealthTipsPage() {
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     disabled={!enabled}
                   >
-                    <option value={1}>1 tip per day</option>
-                    <option value={2}>2 tips per day</option>
-                    <option value={3}>3 tips per day</option>
+                    <option value={1}>1 check per day</option>
+                    <option value={2}>2 checks per day</option>
+                    <option value={3}>3 checks per day</option>
                   </select>
                 </div>
 
@@ -764,7 +768,7 @@ export default function HealthTipsPage() {
                 disabled={saving}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium mt-2"
               >
-                {saving ? 'Saving…' : 'Save health tip settings'}
+                {saving ? 'Saving…' : 'Save Smart Health Coach settings'}
               </button>
               {hasUnsavedChanges && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -773,14 +777,44 @@ export default function HealthTipsPage() {
               )}
 
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                These AI tips are educational and do not replace medical advice. Always consider
-                your medications, allergies, and personal circumstances, and talk to your clinician
-                before making big changes or starting new supplements.
+                Smart Health Coach alerts are educational and do not replace medical advice.
+                Always consider your medications, allergies, and personal circumstances, and talk
+                to your clinician before making big changes or starting new supplements.
               </p>
             </div>
           )}
         </section>
       </main>
+
+      {showEnableModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 p-6 shadow-xl space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Enable Smart Health Coach?
+            </h3>
+            <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+              <p>Get proactive health guidance based on your daily logs and habits.</p>
+              <p>10 credits per alert.</p>
+              <p>Up to 50 credits per day.</p>
+              <p>Charges only apply when an alert is actually sent.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <button
+                onClick={() => setShowEnableModal(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmEnableSmartCoach()}
+                className="px-4 py-2 rounded-lg bg-helfi-green text-white hover:bg-helfi-green/90"
+              >
+                Enable Smart Coach
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeChatTip && (
         <VoiceChat

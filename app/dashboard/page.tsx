@@ -782,7 +782,7 @@ export default function Dashboard() {
               </Link>
               <Link href="/health-tips" className="block">
                 <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-[#4DAF50] text-white hover:bg-[#439A45] transition-colors">
-                  Health Tips
+                  Smart Health Coach
                 </div>
               </Link>
             </div>

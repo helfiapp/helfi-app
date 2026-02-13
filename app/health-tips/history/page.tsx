@@ -123,7 +123,7 @@ export default function HealthTipHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <PageHeader title="Health Tips" backHref="/more" />
+      <PageHeader title="Smart Health Coach" backHref="/more" />
 
       {/* Tabs */}
       <div className="max-w-3xl mx-auto px-4 pt-4">
@@ -157,11 +157,10 @@ export default function HealthTipHistoryPage() {
         <section className="bg-white dark:bg-gray-800 rounded-b-2xl shadow-sm p-6">
           <div className="mb-4">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-              Past AI health tips
+              Past Smart Health Coach alerts
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Scroll back through previous days to revisit useful suggestions you&apos;ve already
-              received.
+              Scroll back through previous days to revisit useful Smart Health Coach alerts.
             </p>
           </div>
 
@@ -171,8 +170,8 @@ export default function HealthTipHistoryPage() {
             </div>
           ) : sortedTips.length === 0 ? (
             <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-4 text-sm text-gray-600 dark:text-gray-300">
-              No health tips have been recorded yet. Once Helfi has sent you some daily tips,
-              they&apos;ll appear here.
+              No Smart Health Coach alerts have been recorded yet. Once alerts are sent, they will
+              appear here.
             </div>
           ) : (
             <div className="space-y-6">

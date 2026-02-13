@@ -17,6 +17,7 @@ type HealthTipSettings = {
   focusFood: boolean
   focusSupplements: boolean
   focusLifestyle: boolean
+  pricingAcceptedAt?: string | null
 }
 
 const fallbackTimezones = [
@@ -71,6 +72,7 @@ export default function AiInsightsNotificationsPage() {
   const [focusFood, setFocusFood] = useState(true)
   const [focusSupplements, setFocusSupplements] = useState(true)
   const [focusLifestyle, setFocusLifestyle] = useState(true)
+  const [showEnableModal, setShowEnableModal] = useState(false)
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>(fallbackTimezones)
   const cacheKey = session?.user?.email ? `health-tips-settings:${session.user.email}` : ''
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -147,7 +149,12 @@ export default function AiInsightsNotificationsPage() {
     })()
   }, [cacheKey])
 
-  const handleSave = useCallback(async (options?: { silent?: boolean; keepalive?: boolean; payload?: HealthTipSettings }) => {
+  const handleSave = useCallback(async (options?: {
+    silent?: boolean
+    keepalive?: boolean
+    payload?: HealthTipSettings
+    acceptPricingTerms?: boolean
+  }) => {
     const payload = options?.payload ?? {
       enabled,
       time1,
@@ -164,7 +171,10 @@ export default function AiInsightsNotificationsPage() {
       const res = await fetch('/api/health-tips/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          acceptPricingTerms: !!options?.acceptPricingTerms,
+        }),
         keepalive: !!options?.keepalive,
       })
       const data = await res.json().catch(() => ({}))
@@ -172,7 +182,7 @@ export default function AiInsightsNotificationsPage() {
         if (!options?.silent) {
           alert(data?.error || data?.detail || 'Failed to save settings')
         }
-        return
+        return false
       }
       const snapshot = JSON.stringify(payload)
       settingsSnapshotRef.current = snapshot
@@ -180,9 +190,11 @@ export default function AiInsightsNotificationsPage() {
       if (cacheKey) {
         writeClientCache(cacheKey, payload)
       }
-      if (!options?.silent) alert('AI insights schedule saved.')
+      if (!options?.silent) alert('Smart Health Coach settings saved.')
+      return true
     } catch {
       if (!options?.silent) alert('Could not save settings. Please try again.')
+      return false
     } finally {
       if (!options?.silent) setSaving(false)
     }
@@ -216,24 +228,58 @@ export default function AiInsightsNotificationsPage() {
     void handleSave({ silent: true, keepalive: true, payload: settingsRef.current })
   })
 
+  const onToggleEnabled = (next: boolean) => {
+    if (next && !enabled) {
+      setShowEnableModal(true)
+      return
+    }
+    setEnabled(next)
+  }
+
+  const confirmEnableSmartCoach = async () => {
+    setShowEnableModal(false)
+    const nextPayload: HealthTipSettings = {
+      enabled: true,
+      time1,
+      time2,
+      time3,
+      timezone,
+      frequency,
+      focusFood,
+      focusSupplements,
+      focusLifestyle,
+    }
+    setEnabled(true)
+    const saved = await handleSave({
+      silent: true,
+      payload: nextPayload,
+      acceptPricingTerms: true,
+    })
+    if (saved) {
+      alert('Smart Health Coach enabled.')
+    } else {
+      setEnabled(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <PageHeader title="AI insights" backHref="/notifications" />
+      <PageHeader title="Smart Health Coach" backHref="/notifications" />
 
       <main className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 space-y-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">AI insights schedule</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Smart Health Coach schedule</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Set when you want AI health tips and insights to arrive.
+                Get proactive guidance based on your daily logs and habits.
               </p>
             </div>
             <Link
               href="/health-tips"
               className="text-sm font-semibold text-helfi-green hover:underline"
             >
-              View tips
+              Open Smart Health Coach
             </Link>
           </div>
 
@@ -245,9 +291,9 @@ export default function AiInsightsNotificationsPage() {
             <>
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">Enable AI insights</h3>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Enable Smart Health Coach</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Turn AI insights on or off.
+                    10 credits per alert. Up to 50 credits per day. Charges only apply when an alert is sent.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -255,7 +301,7 @@ export default function AiInsightsNotificationsPage() {
                     type="checkbox"
                     className="sr-only peer"
                     checked={enabled}
-                    onChange={(e) => setEnabled(e.target.checked)}
+                    onChange={(e) => onToggleEnabled(e.target.checked)}
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
                 </label>
@@ -264,7 +310,7 @@ export default function AiInsightsNotificationsPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Number of insights per day
+                    Number of checks per day
                   </label>
                   <select
                     value={frequency}
@@ -272,9 +318,9 @@ export default function AiInsightsNotificationsPage() {
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     disabled={!enabled}
                   >
-                    <option value={1}>1 insight</option>
-                    <option value={2}>2 insights</option>
-                    <option value={3}>3 insights</option>
+                    <option value={1}>1 check</option>
+                    <option value={2}>2 checks</option>
+                    <option value={3}>3 checks</option>
                   </select>
                 </div>
 
@@ -352,7 +398,7 @@ export default function AiInsightsNotificationsPage() {
                       onChange={(e) => setFocusFood(e.target.checked)}
                       disabled={!enabled}
                     />
-                    Food insights
+                    Food guidance
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -361,7 +407,7 @@ export default function AiInsightsNotificationsPage() {
                       onChange={(e) => setFocusSupplements(e.target.checked)}
                       disabled={!enabled}
                     />
-                    Supplement insights
+                    Supplement guidance
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -370,7 +416,7 @@ export default function AiInsightsNotificationsPage() {
                       onChange={(e) => setFocusLifestyle(e.target.checked)}
                       disabled={!enabled}
                     />
-                    Lifestyle insights
+                    Lifestyle guidance
                   </label>
                 </div>
               </div>
@@ -380,7 +426,7 @@ export default function AiInsightsNotificationsPage() {
                 disabled={saving}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
               >
-                {saving ? 'Saving...' : 'Save AI insight schedule'}
+                {saving ? 'Saving...' : 'Save Smart Health Coach settings'}
               </button>
               {hasUnsavedChanges && (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -391,6 +437,36 @@ export default function AiInsightsNotificationsPage() {
           )}
         </div>
       </main>
+
+      {showEnableModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 p-6 shadow-xl space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Enable Smart Health Coach?
+            </h3>
+            <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+              <p>Get proactive health guidance based on your daily logs and habits.</p>
+              <p>10 credits per alert.</p>
+              <p>Up to 50 credits per day.</p>
+              <p>Charges only apply when an alert is actually sent.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <button
+                onClick={() => setShowEnableModal(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmEnableSmartCoach()}
+                className="px-4 py-2 rounded-lg bg-helfi-green text-white hover:bg-helfi-green/90"
+              >
+                Enable Smart Coach
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

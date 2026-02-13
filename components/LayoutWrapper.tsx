@@ -144,7 +144,7 @@ function DesktopSidebar({
             <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7H7m0 0V5a2 2 0 012-2h6m-8 4v6m0 0h6m-6 0H5a2 2 0 01-2-2V7m10-4h2a2 2 0 012 2v8a2 2 0 01-2 2h-2m0 0H9m4 0v2a2 2 0 01-2 2H9" />
             </svg>
-            Health Tips
+            Smart Health Coach
           </a>
           
           <a

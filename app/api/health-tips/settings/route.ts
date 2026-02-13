@@ -42,13 +42,16 @@ async function ensureHealthTipSettingsTable() {
   await prisma.$executeRawUnsafe(
     `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusLifestyle BOOLEAN NOT NULL DEFAULT true`
   ).catch(() => {})
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS pricingAcceptedAt TIMESTAMPTZ`
+  ).catch(() => {})
 }
 
 /**
- * Health Tip Settings
+ * Smart Health Coach Settings
  *
  * Lets users control:
- * - enabled: whether AI health tips are active
+ * - enabled: whether Smart Health Coach alerts are active
  * - frequency: 1–3 tips per day
  * - time1, time2, time3: local reminder times (HH:MM, 24h)
  * - timezone: IANA timezone string
@@ -115,9 +118,10 @@ export async function GET() {
     time3: string
     timezone: string
     frequency: number
-    focusFood: boolean
-    focusSupplements: boolean
-    focusLifestyle: boolean
+      focusFood: boolean
+      focusSupplements: boolean
+      focusLifestyle: boolean
+      pricingAcceptedAt: string | null
   }> = await prisma.$queryRawUnsafe(
     `SELECT
         enabled AS "enabled",
@@ -128,7 +132,8 @@ export async function GET() {
         frequency AS "frequency",
         focusFood AS "focusFood",
         focusSupplements AS "focusSupplements",
-        focusLifestyle AS "focusLifestyle"
+        focusLifestyle AS "focusLifestyle",
+        pricingAcceptedAt AS "pricingAcceptedAt"
      FROM HealthTipSettings
      WHERE userId = $1`,
     user.id
@@ -152,6 +157,7 @@ export async function GET() {
     focusFood: true,
     focusSupplements: true,
     focusLifestyle: true,
+    pricingAcceptedAt: null,
   })
 }
 
@@ -176,6 +182,7 @@ export async function POST(req: NextRequest) {
     focusFood,
     focusSupplements,
     focusLifestyle,
+    acceptPricingTerms,
   } = body as any
 
   const normalizeTime = (input?: string, defaultValue = '11:30'): string => {
@@ -222,9 +229,28 @@ export async function POST(req: NextRequest) {
   focusFood = focusFood === false || focusFood === 'false' ? false : Boolean(focusFood ?? true)
   focusSupplements = focusSupplements === false || focusSupplements === 'false' ? false : Boolean(focusSupplements ?? true)
   focusLifestyle = focusLifestyle === false || focusLifestyle === 'false' ? false : Boolean(focusLifestyle ?? true)
+  const acceptedPricingTerms =
+    acceptPricingTerms === true || acceptPricingTerms === 'true'
 
   try {
     await ensureHealthTipSettingsTable()
+
+    const currentRows = await prisma
+      .$queryRawUnsafe<Array<{ enabled: boolean }>>(
+        `SELECT enabled FROM HealthTipSettings WHERE userId = $1`,
+        user.id
+      )
+      .catch(() => [] as Array<{ enabled: boolean }>)
+    const wasEnabled = !!currentRows[0]?.enabled
+    if (enabled && !wasEnabled && !acceptedPricingTerms) {
+      return NextResponse.json(
+        {
+          error:
+            'Please confirm Smart Health Coach pricing before enabling (10 credits per alert, up to 50 credits per day).',
+        },
+        { status: 400 }
+      )
+    }
 
     // await prisma.$executeRawUnsafe(`
     //   CREATE TABLE IF NOT EXISTS HealthTipSettings (
@@ -289,7 +315,16 @@ export async function POST(req: NextRequest) {
       focusLifestyle
     )
 
-    // Schedule AI health tip notifications only when enabled
+    if (enabled && acceptedPricingTerms) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE HealthTipSettings
+         SET pricingAcceptedAt = COALESCE(pricingAcceptedAt, NOW())
+         WHERE userId = $1`,
+        user.id
+      ).catch(() => {})
+    }
+
+    // Schedule Smart Health Coach checks only when enabled
     let scheduleResults: any[] = []
     if (enabled && frequency > 0) {
       const times: string[] = []
