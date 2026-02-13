@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 02:04 AEDT
+- What changed: Improved recipe import quality and missing-item matching. Import now rejects abbreviated instruction output, prefers higher-quality page text when extracting recipes, and retries with stronger matching for obvious single foods (like avocado) before showing manual-match warnings.
+- Where to see it (page/link): Recipe import flow (`/food/import-recipe` -> `/food/build-meal?recipeImport=1`)
+- What to quickly test: Import the same recipe again and confirm instructions are full (not `ABBREVIATED RECIPE`). Confirm `1 large avocado` auto-matches without showing manual-match warning.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 01:48 AEDT
 - What changed: Fixed iPhone horizontal overflow in the Import Recipe module. The URL field + Import button now stack safely on small screens, and mobile-safe width guards were added across all import form inputs/review fields.
 - Where to see it (page/link): Import Recipe screen (`/food/import-recipe`)
