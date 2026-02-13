@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 00:30 AEDT
+- What changed: Refreshed the homepage food tracking section design. Updated heading to `Fully Featured Food Tracking` (no colon), added icons to each feature card, added modern card styling (top accent bars, soft shadows, hover lift), and polished spacing/background for a cleaner look.
+- Where to see it (page/link): Homepage (`/`)
+- What to quickly test: Open homepage, scroll to the food tracking section, confirm the new heading text, confirm each card shows an icon and hover effect, and confirm layout still looks clean on mobile.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 23:49 AEDT
 - What changed: Homepage update. Added `Home` to the top menu, added a full Food Tracking capabilities section (photo/camera, barcode, ingredient search, build meal, recipe import, AI recommended meals, favorites, copy/duplicate/combine tools, meal totals, water/drinks), and added a "native iOS + Android coming soon" section with App Store and Google Play badges.
 - Where to see it (page/link): Homepage (`/`)
