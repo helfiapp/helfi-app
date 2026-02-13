@@ -11533,6 +11533,8 @@ Please add nutritional information manually if needed.`);
     const resolveDbIdFromServer = async () => {
       const clientId = getEntryClientId(editingEntry)
       const date = entryLocalDate || selectedDate
+      const sourceId = getSourceIdForEntry(editingEntry)
+      const barcode = extractBarcodeFromEntry(editingEntry)
       if (!date) return null
       try {
         const tz = new Date().getTimezoneOffset()
@@ -11548,6 +11550,27 @@ Please add nutritional information manually if needed.`);
               normalizeClientId((log as any)?.nutrients?.__clientID) ||
               normalizeClientId((log as any)?.nutrients?.__client_id)
             return stored && stored === clientId
+          })
+          if (hit?.id) return String(hit.id)
+        }
+
+        // Fallback: match by source id or barcode for entries without a stable client id.
+        if (sourceId || barcode) {
+          const hit = logs.find((log: any) => {
+            const logSourceId =
+              typeof (log as any)?.nutrients?.__sourceId === 'string'
+                ? String((log as any).nutrients.__sourceId).trim()
+                : ''
+            if (sourceId && logSourceId && logSourceId === sourceId) return true
+            if (barcode) {
+              const items = Array.isArray((log as any)?.items) ? (log as any).items : []
+              const itemHit = items.find((item: any) => {
+                const code = item?.barcode || item?.gtinUpc
+                return code && String(code).trim() === barcode
+              })
+              if (itemHit) return true
+            }
+            return false
           })
           if (hit?.id) return String(hit.id)
         }
@@ -11642,9 +11665,75 @@ Please add nutritional information manually if needed.`);
     }
 
     const sourceFoods = isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || [])
-    const updatedFoods = sourceFoods.map(food => 
-      food.id === editingEntry.id ? updatedEntry : food
-    );
+    const editingIdentity = entryIdentityKey(editingEntry)
+    const editingClientId = getEntryClientId(editingEntry)
+    const editingDbId = String((editingEntry as any)?.dbId || '').trim()
+    const editingSourceId = getSourceIdForEntry(editingEntry)
+    const editingBarcode = extractBarcodeFromEntry(editingEntry)
+    const editingDescKey = normalizedDescription(editingEntry?.description || editingEntry?.label || '')
+    const editingTs = extractEntryTimestampMs(editingEntry)
+    const editingCategory = normalizeCategory(editingEntry?.meal || editingEntry?.category || '')
+    const matchesEditingEntry = (candidate: any) => {
+      if (!candidate) return false
+      if (candidate === editingEntry) return true
+      if (editingIdentity && entryIdentityKey(candidate) === editingIdentity) return true
+      if (String(candidate?.id ?? '') && String(editingEntry?.id ?? '') && String(candidate.id) === String(editingEntry.id)) {
+        return true
+      }
+      const candidateDbId = String((candidate as any)?.dbId || '').trim()
+      if (editingDbId && candidateDbId && editingDbId === candidateDbId) return true
+      const candidateClientId = getEntryClientId(candidate)
+      if (editingClientId && candidateClientId && editingClientId === candidateClientId) return true
+      const candidateSourceId = getSourceIdForEntry(candidate)
+      if (editingSourceId && candidateSourceId && editingSourceId === candidateSourceId) return true
+      const candidateBarcode = extractBarcodeFromEntry(candidate)
+      if (editingBarcode && candidateBarcode && editingBarcode === candidateBarcode) return true
+      const candidateDescKey = normalizedDescription(candidate?.description || candidate?.label || '')
+      const candidateTs = extractEntryTimestampMs(candidate)
+      const candidateCategory = normalizeCategory(candidate?.meal || candidate?.category || '')
+      if (
+        editingDescKey &&
+        candidateDescKey &&
+        editingDescKey === candidateDescKey &&
+        editingCategory &&
+        candidateCategory &&
+        editingCategory === candidateCategory &&
+        Number.isFinite(editingTs) &&
+        Number.isFinite(candidateTs) &&
+        Math.abs(candidateTs - editingTs) <= 10 * 60 * 1000
+      ) {
+        return true
+      }
+      return false
+    }
+    const applyEntryUpdate = (list: any[]) => {
+      const base = Array.isArray(list) ? list : []
+      let matched = false
+      const next = base.map((food: any) => {
+        if (!matchesEditingEntry(food)) return food
+        matched = true
+        const keptId = food?.id ?? updatedEntry.id
+        const keptDbId = (food as any)?.dbId || (updatedEntry as any)?.dbId
+        const keptClientId = getEntryClientId(food) || getEntryClientId(updatedEntry)
+        return {
+          ...food,
+          ...updatedEntry,
+          id: keptId,
+          ...(keptDbId ? { dbId: keptDbId } : {}),
+          ...(keptClientId ? { clientId: keptClientId } : {}),
+        }
+      })
+      return { next, matched }
+    }
+    const sourceUpdate = applyEntryUpdate(sourceFoods)
+    const visibleUpdate = applyEntryUpdate(sourceEntries)
+    const updatedFoods = (() => {
+      if (sourceUpdate.matched) return sourceUpdate.next
+      if (visibleUpdate.matched) return visibleUpdate.next
+      return dedupeEntries([updatedEntry, ...(Array.isArray(sourceFoods) ? sourceFoods : [])], {
+        fallbackDate: selectedDate,
+      })
+    })()
     
     setIsSavingEntry(true)
     let releasedSaveState = false
@@ -11655,9 +11744,9 @@ Please add nutritional information manually if needed.`);
     }
     try {
       if (isViewingToday) {
-        setTodaysFoods(updatedFoods);
+        updateTodaysFoodsForDate(updatedFoods, selectedDate)
       } else {
-        setHistoryFoods(updatedFoods);
+        setHistoryFoods(updatedFoods)
       }
       updateUserSnapshotForDate(updatedFoods, selectedDate)
 
