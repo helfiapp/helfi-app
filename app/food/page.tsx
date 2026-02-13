@@ -10625,15 +10625,62 @@ const applyStructuredItems = (
       Number.isFinite(Number(baseItem?.customGramsPerServing)) && Number(baseItem.customGramsPerServing) > 0
         ? Number(baseItem.customGramsPerServing)
         : null
-    let baseMl =
-      customMl ||
-      info.mlPerServing ||
-      (info.ozPerServing ? info.ozPerServing * 29.5735 : null)
-    if (!baseMl || !Number.isFinite(baseMl) || baseMl <= 0) {
+    const servingLabel = String(baseItem?.serving_size || '')
+    const explicitMlMatch = servingLabel.match(/(\d+(?:\.\d+)?)\s*ml\b/i)
+    const explicitLMatch = servingLabel.match(/(\d+(?:\.\d+)?)\s*(?:l|liter|liters|litre|litres)\b/i)
+    const explicitMlFromLabel = Number.isFinite(Number(explicitMlMatch?.[1]))
+      ? Number(explicitMlMatch?.[1])
+      : Number.isFinite(Number(explicitLMatch?.[1]))
+      ? Number(explicitLMatch?.[1]) * 1000
+      : NaN
+    const hasExplicitVolumeInLabel = /(\d+(?:\.\d+)?)\s*(ml|l|oz|ounce|ounces)\b/i.test(servingLabel)
+    const servings =
+      Number.isFinite(Number(baseItem?.servings)) && Number(baseItem.servings) > 0
+        ? Number(baseItem.servings)
+        : 1
+    const weightUnit = normalizeWeightUnit(baseItem?.weightUnit)
+    const weightAmount = Number.isFinite(Number(baseItem?.weightAmount)) ? Number(baseItem.weightAmount) : NaN
+    const inferredMlFromWeight =
+      weightUnit === 'ml' && Number.isFinite(weightAmount) && weightAmount > 0
+        ? weightAmount / Math.max(servings, 0.0001)
+        : NaN
+    const liquidItem = isLikelyLiquidFood(baseItem?.name, servingLabel)
+    const fallbackMlFromGrams =
+      liquidItem &&
+      Number.isFinite(Number(customGrams || info.gramsPerServing)) &&
+      Number(customGrams || info.gramsPerServing) >= 20
+        ? Number(customGrams || info.gramsPerServing)
+        : NaN
+    const baseMlCandidates = [
+      explicitMlFromLabel,
+      Number.isFinite(info.mlPerServing as number) ? Number(info.mlPerServing) : NaN,
+      Number.isFinite(info.ozPerServing as number) ? Number(info.ozPerServing) * 29.5735 : NaN,
+      Number.isFinite(customMl as number) ? Number(customMl) : NaN,
+      inferredMlFromWeight,
+      fallbackMlFromGrams,
+    ].filter((value) => Number.isFinite(value) && value > 0)
+    const baseMl = baseMlCandidates.length > 0 ? Number(baseMlCandidates[0]) : NaN
+    if (!Number.isFinite(baseMl) || baseMl <= 0) {
+      return { items, totals: null, used: false }
+    }
+    const hasReliableBaseVolume =
+      hasExplicitVolumeInLabel ||
+      (Number.isFinite(info.mlPerServing as number) && Number(info.mlPerServing) >= 20) ||
+      (Number.isFinite(info.ozPerServing as number) && Number(info.ozPerServing) >= 1) ||
+      (Number.isFinite(customMl as number) && Number(customMl) >= 20) ||
+      (Number.isFinite(inferredMlFromWeight) && inferredMlFromWeight >= 20) ||
+      (Number.isFinite(fallbackMlFromGrams) && fallbackMlFromGrams >= 20)
+    if (!hasReliableBaseVolume) {
       return { items, totals: null, used: false }
     }
     const factor = override.amountMl / baseMl
     if (!Number.isFinite(factor) || factor <= 0) {
+      return { items, totals: null, used: false }
+    }
+    // DO NOT TOUCH (owner lock):
+    // Never scale drinks using tiny/invalid base volumes (e.g. 1 ml),
+    // otherwise kcal can explode by raw millilitre multiplication (500x bug).
+    if (baseMl < 20 || factor > 100) {
       return { items, totals: null, used: false }
     }
 
