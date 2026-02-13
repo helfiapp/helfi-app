@@ -343,7 +343,7 @@ export default function AiInsightsNotificationsPage() {
 
               <div className="space-y-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Alerts are sent automatically through the day based on your logging habits and safety limits.
+                  We check your food, water, activity, and mood logs. If we spot patterns like low hydration, poor food balance, low activity, or missed check-ins, we may send up to 5 alerts in your local timezone.
                 </p>
 
                 <div>
