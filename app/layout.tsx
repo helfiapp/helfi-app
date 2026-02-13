@@ -4,6 +4,7 @@ import { AuthProvider } from '@/components/providers/AuthProvider'
 import { UserDataProvider } from '@/components/providers/UserDataProvider'
 import LayoutWrapper from '@/components/LayoutWrapper'
 import type { Metadata } from 'next'
+import { absoluteUrl, getSiteUrl } from '@/lib/site-url'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -11,11 +12,51 @@ const inter = Inter({
   variable: '--font-inter',
 })
 
+const siteUrl = getSiteUrl()
+const defaultTitle = 'Helfi - AI Health Intelligence Platform'
+const defaultDescription =
+  'Track food, symptoms, and daily health habits in one place with AI-powered weekly insights.'
+
 export const metadata: Metadata = {
-  title: 'Helfi - Your AI Health Intelligence Platform',
-  description: 'Transform your health with personalized AI insights, comprehensive tracking, and intelligent recommendations.',
+  metadataBase: new URL(siteUrl),
+  title: defaultTitle,
+  description: defaultDescription,
   viewport: 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, user-scalable=yes',
+  applicationName: 'Helfi',
   manifest: '/manifest.json',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: siteUrl,
+    siteName: 'Helfi',
+    title: defaultTitle,
+    description: defaultDescription,
+    images: [
+      {
+        url: absoluteUrl('/icons/app-1024.png'),
+        width: 1024,
+        height: 1024,
+        alt: 'Helfi app',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: defaultTitle,
+    description: defaultDescription,
+    images: [absoluteUrl('/icons/app-1024.png')],
+  },
   icons: {
     icon: [
       {

@@ -2,11 +2,26 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 import PublicHeader from '@/components/marketing/PublicHeader'
+import { absoluteUrl } from '@/lib/site-url'
 import { featurePages } from '@/data/feature-pages'
 
 export const metadata: Metadata = {
   title: 'Features | Helfi',
   description: 'Explore the Helfi health platform and dive into each core feature.',
+  alternates: {
+    canonical: absoluteUrl('/features'),
+  },
+  openGraph: {
+    title: 'Features | Helfi',
+    description: 'Explore the Helfi health platform and dive into each core feature.',
+    url: absoluteUrl('/features'),
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Features | Helfi',
+    description: 'Explore the Helfi health platform and dive into each core feature.',
+  },
 }
 
 export default function FeaturesIndexPage() {

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 
 import FeaturePage from '@/components/marketing/FeaturePage'
 import { featurePages, getFeaturePage } from '@/data/feature-pages'
+import { absoluteUrl } from '@/lib/site-url'
 
 type FeaturePageParams = {
   params: { slug: string }
@@ -23,8 +24,18 @@ export function generateMetadata({ params }: FeaturePageParams): Metadata {
   return {
     title: `${page.seo.title} | Helfi`,
     description: page.seo.description,
+    alternates: {
+      canonical: absoluteUrl(`/features/${params.slug}`),
+    },
     openGraph: {
       title: page.seo.title,
+      description: page.seo.description,
+      url: absoluteUrl(`/features/${params.slug}`),
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title: `${page.seo.title} | Helfi`,
       description: page.seo.description,
     },
   }
