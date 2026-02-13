@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 18:53 AEDT
+- What changed: Added hard locks so agents do not change favorites ordering and All-tab name mapping by accident. Added explicit guard-rail rules plus `DO NOT TOUCH` code comments in the exact ordering and matched-favorite label sections.
+- Where to see it (page/link): Internal docs/code only: `GUARD_RAILS.md`, `app/food/page.tsx`
+- What to quickly test: Open those files and confirm lock wording is present around favorites recency sort and All-tab matched-favorite label logic.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 18:19 AEDT
 - What changed: Imported recipe ingredients now default to count-based size units when available (for example eggs now use egg size units instead of defaulting to grams). This makes entries like `2 eggs` appear as count + egg size, while still letting users edit amount and unit.
 - Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal -> expand ingredient cards
