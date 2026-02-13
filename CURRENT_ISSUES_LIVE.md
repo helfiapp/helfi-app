@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 23:49 AEDT
+- What changed: Homepage update. Added `Home` to the top menu, added a full Food Tracking capabilities section (photo/camera, barcode, ingredient search, build meal, recipe import, AI recommended meals, favorites, copy/duplicate/combine tools, meal totals, water/drinks), and added a "native iOS + Android coming soon" section with App Store and Google Play badges.
+- Where to see it (page/link): Homepage (`/`)
+- What to quickly test: Open homepage desktop and confirm `Home` appears in top menu. Scroll down and confirm both new sections appear and look correct on desktop/mobile.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 23:29 AEDT
 - What changed: Added a hard lock for sugar-free hot chocolate so stale high calories cannot be saved or shown again. Save/update API now forces sweetener-only nutrition for this drink path, and diary load mapping applies the same guard to old rows so bad values like `319 kcal` no longer reappear.
 - Where to see it (page/link): Food Diary (`/food`) and food-log save path (`/api/food-log`)
