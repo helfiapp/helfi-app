@@ -3252,11 +3252,23 @@ export default function MealBuilderClient() {
 	    const defaultAmount = baseAmount && baseUnit ? baseAmount : 1
 	    const id = `${r.source}:${r.id}:${Date.now()}:${Math.random().toString(16).slice(2)}`
 
-	    const nextUnit = overrides?.unit ?? baseUnit
-	    const nextAmount =
-	      typeof overrides?.amount === 'number' && Number.isFinite(overrides.amount) && overrides.amount > 0
-	        ? overrides.amount
-	        : defaultAmount
+    let nextUnit = overrides?.unit ?? baseUnit
+    let nextAmount =
+      typeof overrides?.amount === 'number' && Number.isFinite(overrides.amount) && overrides.amount > 0
+        ? overrides.amount
+        : defaultAmount
+    const isImportedLine = String(options?.importKey || '').trim().length > 0
+    if (isImportedLine && nextUnit) {
+      const fromGrams = resolveUnitGrams(nextUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams)
+      const toGrams = resolveUnitGrams('g', baseAmount, baseUnit, pieceGrams, foodUnitGrams)
+      if (Number.isFinite(fromGrams) && fromGrams > 0 && Number.isFinite(toGrams) && toGrams > 0) {
+        const converted = convertAmount(nextAmount, nextUnit, 'g', baseAmount, baseUnit, pieceGrams, foodUnitGrams)
+        if (Number.isFinite(converted) && converted > 0) {
+          nextAmount = round3(converted)
+          nextUnit = 'g'
+        }
+      }
+    }
 
 	    const next: BuilderItem = {
 	      id,
@@ -5602,8 +5614,7 @@ export default function MealBuilderClient() {
 
                     {expanded && (
                       <div className="px-3 pb-3 bg-white space-y-3">
-                        {!isImportedRecipeView &&
-                          Array.isArray(it.__servingOptions) &&
+                        {Array.isArray(it.__servingOptions) &&
                           it.__servingOptions.length > 0 &&
                           !hasCustomUnits && (
                           <div className="space-y-1">
@@ -5622,68 +5633,66 @@ export default function MealBuilderClient() {
                             </select>
                           </div>
                           )}
-                        {!isImportedRecipeView ? (
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <div className="text-xs font-semibold text-gray-700">Amount</div>
-                              <input
-                                type="number"
-                                inputMode="decimal"
-                                min={0}
-                                step={getAmountInputStepForUnit(it.__unit || it.__baseUnit)}
-                                value={it.__amountInput}
-                                onFocus={(e) => {
-                                  // Mobile UX: tap-to-clear, but restore if user doesn't type anything.
-                                  const current = String((e.target as HTMLInputElement).value || '')
-                                  amountBackupRef.current.set(it.id, current)
-                                  amountEditedAfterClearRef.current.delete(it.id)
-                                  if (!current.trim()) {
-                                    amountWasClearedOnFocusRef.current.delete(it.id)
-                                    return
-                                  }
-                                  amountWasClearedOnFocusRef.current.add(it.id)
-                                  setAmount(it.id, '')
-                                }}
-                                onChange={(e) => {
-                                  if (amountWasClearedOnFocusRef.current.has(it.id)) amountEditedAfterClearRef.current.add(it.id)
-                                  setAmount(it.id, e.target.value)
-                                }}
-                                onBlur={(e) => {
-                                  const cleared = amountWasClearedOnFocusRef.current.has(it.id)
-                                  const edited = amountEditedAfterClearRef.current.has(it.id)
-                                  const current = String((e.target as HTMLInputElement).value || '')
-                                  if (cleared && !edited && current.trim().length === 0) {
-                                    const backup = amountBackupRef.current.get(it.id)
-                                    if (typeof backup === 'string') setAmount(it.id, backup)
-                                  }
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <div className="text-xs font-semibold text-gray-700">Amount</div>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min={0}
+                              step={getAmountInputStepForUnit(it.__unit || it.__baseUnit)}
+                              value={it.__amountInput}
+                              onFocus={(e) => {
+                                // Mobile UX: tap-to-clear, but restore if user doesn't type anything.
+                                const current = String((e.target as HTMLInputElement).value || '')
+                                amountBackupRef.current.set(it.id, current)
+                                amountEditedAfterClearRef.current.delete(it.id)
+                                if (!current.trim()) {
                                   amountWasClearedOnFocusRef.current.delete(it.id)
-                                  amountEditedAfterClearRef.current.delete(it.id)
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <div className="text-xs font-semibold text-gray-700">Serving size</div>
-                              {baseUnits.length > 0 ? (
-                                <select
-                                  value={it.__unit || it.__baseUnit || baseUnits[0]}
-                                  onChange={(e) => setUnit(it.id, e.target.value as BuilderUnit)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                >
-                                  {baseUnits.map((u) => (
-                                    <option key={u} value={u}>
-                                      {formatUnitLabel(u, it)}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-600">
-                                  servings
-                                </div>
-                              )}
-                            </div>
+                                  return
+                                }
+                                amountWasClearedOnFocusRef.current.add(it.id)
+                                setAmount(it.id, '')
+                              }}
+                              onChange={(e) => {
+                                if (amountWasClearedOnFocusRef.current.has(it.id)) amountEditedAfterClearRef.current.add(it.id)
+                                setAmount(it.id, e.target.value)
+                              }}
+                              onBlur={(e) => {
+                                const cleared = amountWasClearedOnFocusRef.current.has(it.id)
+                                const edited = amountEditedAfterClearRef.current.has(it.id)
+                                const current = String((e.target as HTMLInputElement).value || '')
+                                if (cleared && !edited && current.trim().length === 0) {
+                                  const backup = amountBackupRef.current.get(it.id)
+                                  if (typeof backup === 'string') setAmount(it.id, backup)
+                                }
+                                amountWasClearedOnFocusRef.current.delete(it.id)
+                                amountEditedAfterClearRef.current.delete(it.id)
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            />
                           </div>
-                        ) : null}
+                          <div className="space-y-1">
+                            <div className="text-xs font-semibold text-gray-700">Serving size</div>
+                            {baseUnits.length > 0 ? (
+                              <select
+                                value={it.__unit || it.__baseUnit || baseUnits[0]}
+                                onChange={(e) => setUnit(it.id, e.target.value as BuilderUnit)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              >
+                                {baseUnits.map((u) => (
+                                  <option key={u} value={u}>
+                                    {formatUnitLabel(u, it)}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-600">
+                                servings
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
                         <div className="flex flex-wrap gap-2">
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
