@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 03:36 AEDT
+- What changed: Header polish update. Added `News` to the desktop menu, widened header layout so logo sits further left and action buttons sit further right, reduced desktop `Log in` and `Create account` button height for a cleaner modern look, and added a live News page route (`/news`) with starter update cards.
+- Where to see it (page/link): Global public header + News page (`/news`)
+- What to quickly test: Open homepage and feature pages, confirm `News` appears in top menu, confirm header spacing is wider, confirm login/create buttons are shorter, and open `/news` to verify page loads.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 03:24 AEDT
 - What changed: Permanent Food Diary follow-up for chicken favorite regression. Non-drink favorites now force food icon rendering (so leaked drink metadata cannot show water icon on chicken), and Add from Favorites now has a shared single-tap action guard to prevent duplicate entries from one tap.
 - Where to see it (page/link): Food Diary (`/food`) favorites add flow + existing chicken rows in diary list
