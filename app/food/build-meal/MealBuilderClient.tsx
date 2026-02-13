@@ -5537,8 +5537,10 @@ export default function MealBuilderClient() {
                 const baseUnits = allowedUnitsForItem(it)
                 const hasCustomUnits = Boolean(getFoodUnitGrams(it.name))
                 const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
+                const isImportedRecipeView = Boolean(recipeImportDraft || recipeImportFlag)
                 const totals = computeItemTotals(it)
                 const displayTotals = applyPortionScaleToTotals(totals, portionScale)
+                const macroTotals = isImportedRecipeView ? totals : displayTotals
                 const amountUnit = it.__unit || it.__baseUnit
                 const fullAmount = Number.isFinite(Number(it.__amount)) ? round3(Number(it.__amount)) : null
                 const hasPortionScale = Number.isFinite(Number(portionScale)) && Number(portionScale) > 0
@@ -5567,12 +5569,20 @@ export default function MealBuilderClient() {
                           {displayName}
                           {it.brand ? ` – ${it.brand}` : ''}
                         </div>
-                        <div className="text-[11px] text-gray-500 truncate">
-                          {it.serving_size ? `Serving: ${it.serving_size}` : 'Serving: (unknown)'} •{' '}
-                          {it.__baseUnit && amountUnit && fullAmount !== null
-                            ? `Amount (full recipe): ${fullAmount} ${amountUnit}`
-                            : `Servings: ${it.servings}`}
-                        </div>
+                        {isImportedRecipeView ? (
+                          <div className="text-[11px] text-gray-500 truncate">
+                            {it.__baseUnit && amountUnit && fullAmount !== null
+                              ? `Full recipe amount: ${fullAmount} ${amountUnit}`
+                              : `Full recipe servings: ${it.servings}`}
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-gray-500 truncate">
+                            {it.serving_size ? `Serving: ${it.serving_size}` : 'Serving: (unknown)'} •{' '}
+                            {it.__baseUnit && amountUnit && fullAmount !== null
+                              ? `Amount (full recipe): ${fullAmount} ${amountUnit}`
+                              : `Servings: ${it.servings}`}
+                          </div>
+                        )}
                         {showPortionAmount && amountUnit && portionAmount !== null ? (
                           <div className="text-[11px] text-gray-500 truncate">
                             Portion amount: {portionAmount} {amountUnit}
@@ -5592,7 +5602,10 @@ export default function MealBuilderClient() {
 
                     {expanded && (
                       <div className="px-3 pb-3 bg-white space-y-3">
-                        {Array.isArray(it.__servingOptions) && it.__servingOptions.length > 0 && !hasCustomUnits && (
+                        {!isImportedRecipeView &&
+                          Array.isArray(it.__servingOptions) &&
+                          it.__servingOptions.length > 0 &&
+                          !hasCustomUnits && (
                           <div className="space-y-1">
                             <div className="text-xs font-semibold text-gray-700">Serving size options</div>
                             <select
@@ -5608,86 +5621,88 @@ export default function MealBuilderClient() {
                               ))}
                             </select>
                           </div>
-                        )}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <div className="text-xs font-semibold text-gray-700">Amount</div>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              step={getAmountInputStepForUnit(it.__unit || it.__baseUnit)}
-                              value={it.__amountInput}
-                              onFocus={(e) => {
-                                // Mobile UX: tap-to-clear, but restore if user doesn't type anything.
-                                const current = String((e.target as HTMLInputElement).value || '')
-                                amountBackupRef.current.set(it.id, current)
-                                amountEditedAfterClearRef.current.delete(it.id)
-                                if (!current.trim()) {
+                          )}
+                        {!isImportedRecipeView ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <div className="text-xs font-semibold text-gray-700">Amount</div>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min={0}
+                                step={getAmountInputStepForUnit(it.__unit || it.__baseUnit)}
+                                value={it.__amountInput}
+                                onFocus={(e) => {
+                                  // Mobile UX: tap-to-clear, but restore if user doesn't type anything.
+                                  const current = String((e.target as HTMLInputElement).value || '')
+                                  amountBackupRef.current.set(it.id, current)
+                                  amountEditedAfterClearRef.current.delete(it.id)
+                                  if (!current.trim()) {
+                                    amountWasClearedOnFocusRef.current.delete(it.id)
+                                    return
+                                  }
+                                  amountWasClearedOnFocusRef.current.add(it.id)
+                                  setAmount(it.id, '')
+                                }}
+                                onChange={(e) => {
+                                  if (amountWasClearedOnFocusRef.current.has(it.id)) amountEditedAfterClearRef.current.add(it.id)
+                                  setAmount(it.id, e.target.value)
+                                }}
+                                onBlur={(e) => {
+                                  const cleared = amountWasClearedOnFocusRef.current.has(it.id)
+                                  const edited = amountEditedAfterClearRef.current.has(it.id)
+                                  const current = String((e.target as HTMLInputElement).value || '')
+                                  if (cleared && !edited && current.trim().length === 0) {
+                                    const backup = amountBackupRef.current.get(it.id)
+                                    if (typeof backup === 'string') setAmount(it.id, backup)
+                                  }
                                   amountWasClearedOnFocusRef.current.delete(it.id)
-                                  return
-                                }
-                                amountWasClearedOnFocusRef.current.add(it.id)
-                                setAmount(it.id, '')
-                              }}
-                              onChange={(e) => {
-                                if (amountWasClearedOnFocusRef.current.has(it.id)) amountEditedAfterClearRef.current.add(it.id)
-                                setAmount(it.id, e.target.value)
-                              }}
-                              onBlur={(e) => {
-                                const cleared = amountWasClearedOnFocusRef.current.has(it.id)
-                                const edited = amountEditedAfterClearRef.current.has(it.id)
-                                const current = String((e.target as HTMLInputElement).value || '')
-                                if (cleared && !edited && current.trim().length === 0) {
-                                  const backup = amountBackupRef.current.get(it.id)
-                                  if (typeof backup === 'string') setAmount(it.id, backup)
-                                }
-                                amountWasClearedOnFocusRef.current.delete(it.id)
-                                amountEditedAfterClearRef.current.delete(it.id)
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            />
+                                  amountEditedAfterClearRef.current.delete(it.id)
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-xs font-semibold text-gray-700">Serving size</div>
+                              {baseUnits.length > 0 ? (
+                                <select
+                                  value={it.__unit || it.__baseUnit || baseUnits[0]}
+                                  onChange={(e) => setUnit(it.id, e.target.value as BuilderUnit)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                >
+                                  {baseUnits.map((u) => (
+                                    <option key={u} value={u}>
+                                      {formatUnitLabel(u, it)}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-600">
+                                  servings
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <div className="text-xs font-semibold text-gray-700">Serving size</div>
-                            {baseUnits.length > 0 ? (
-                              <select
-                                value={it.__unit || it.__baseUnit || baseUnits[0]}
-                                onChange={(e) => setUnit(it.id, e.target.value as BuilderUnit)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              >
-                                {baseUnits.map((u) => (
-                                  <option key={u} value={u}>
-                                    {formatUnitLabel(u, it)}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-600">
-                                servings
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        ) : null}
 
                         <div className="flex flex-wrap gap-2">
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{formatEnergyValue(displayTotals.calories, energyUnit)}</span> {energyUnit}
+                            <span className="font-semibold text-gray-900">{formatEnergyValue(macroTotals.calories, energyUnit)}</span> {energyUnit}
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(displayTotals.protein)}</span> g protein
+                            <span className="font-semibold text-gray-900">{round3(macroTotals.protein)}</span> g protein
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(displayTotals.carbs)}</span> g carbs
+                            <span className="font-semibold text-gray-900">{round3(macroTotals.carbs)}</span> g carbs
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(displayTotals.fat)}</span> g fat
+                            <span className="font-semibold text-gray-900">{round3(macroTotals.fat)}</span> g fat
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(displayTotals.fiber)}</span> g fibre
+                            <span className="font-semibold text-gray-900">{round3(macroTotals.fiber)}</span> g fibre
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(displayTotals.sugar)}</span> g sugar
+                            <span className="font-semibold text-gray-900">{round3(macroTotals.sugar)}</span> g sugar
                           </div>
                         </div>
 
