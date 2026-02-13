@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 17:09 AEDT
+- What changed: Fixed the remaining `All` tab name mismatch for matched favorites (Chicken Breast case). When an `All` row is linked to a saved favorite/custom meal, the row now always shows the saved title and no longer gets remapped back to a long legacy name.
+- Where to see it (page/link): Food Diary -> Add from favorites (`/food?open=favorites`)
+- What to quickly test: Open `All` and `Favorites` tabs and compare the chicken row. Both should now show `Chicken Breast` (not the long old title).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 15:52 AEDT
 - What changed: In imported recipe ingredient cards, removed the confusing `Serving size options` row. Users still keep editable `Amount` + `Serving size` controls, and ingredient macros continue to show for the full recipe amount.
 - Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal -> expand an ingredient card
