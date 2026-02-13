@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 19:21 AEDT
+- What changed: Restored old barcode miss behavior. If a scanned product is not found, the app now immediately opens the “Take label photo” step so nutrition details can be captured and saved.
+- Where to see it (page/link): Food Diary barcode scanner (`/food`)
+- What to quickly test: Scan a barcode that is not found. Confirm the nutrition label photo prompt appears right away (no repeated scan loop first).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 19:10 AEDT
 - What changed: Full barcode scanner stability fix. Improved first-scan reliability, stopped random jump to Favorites/blank screen, kept scanner active on not-found camera reads, and restored the darker scanner background overlay.
 - Where to see it (page/link): Food Diary barcode scanner (`/food`)
