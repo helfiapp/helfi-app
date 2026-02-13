@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 14:17 AEDT
+- What changed: Smart Health Coach now auto-detects timezone by default from the user device/location request, while still allowing manual timezone change. Removed old focus-area tick boxes so Smart Health Coach now runs as one unified coach across all alert signals.
+- Where to see it (page/link): Notifications -> Smart Health Coach and Health Tips settings
+- What to quickly test: Open Smart Health Coach settings and confirm timezone is pre-filled automatically. Confirm there are no focus-area tick boxes. Change timezone manually and save to verify override still works.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 14:09 AEDT
 - What changed: Updated agent guard rails so Food Diary/Favorites/Custom rename logic is explicitly locked. Agents must get your written approval before touching rename code. Routine rename canary checks were removed; rename canary is now optional troubleshooting only when you request it.
 - Where to see it (page/link): Internal docs only: `GUARD_RAILS.md`, `AGENTS.md`, `DEPLOYMENT_PROTOCOL.md`
