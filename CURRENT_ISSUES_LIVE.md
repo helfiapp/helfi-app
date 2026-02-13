@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 15:13 AEDT
+- What changed: Fixed Favorites ordering backfill so older diary usage now updates recency order too. If a meal was used earlier (for example this morning), it now gets pulled to the top in `All`, `Favorites`, and `Custom` instead of relying only on newly stamped usage.
+- Where to see it (page/link): Food Diary -> Add from favorites (`/food?open=favorites`)
+- What to quickly test: Add an older favorite/custom meal that was already used earlier today, reopen Add from favorites, and confirm it appears at/near the top in all three tabs. Refresh and confirm order stays.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 15:06 AEDT
 - What changed: Smart Health Coach alert timing is now fully automatic. Removed `Number of checks per day` and `Time 1/2/3` controls from settings so users no longer choose alert count or times. Timezone is still shown and can still be changed manually.
 - Where to see it (page/link): Notifications -> Smart Health Coach (`/notifications/ai-insights`) and Health Tips (`/health-tips`)
