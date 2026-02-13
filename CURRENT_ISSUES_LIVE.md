@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 14:03 AEDT
+- What changed: Fixed portion math display inside ingredient cards. Ingredient macro chips now scale to the selected portion (for example 1 serving of 4), so per-item calories/macros no longer show full-recipe values while portion amount shows scaled values.
+- Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal -> expand an ingredient card
+- What to quickly test: Import the chicken caesar pasta recipe, keep portion at 1 serving, expand `short pasta`, and confirm it shows `Amount (full recipe): 250 g`, `Portion amount: 62.5 g`, and about `232 kcal` (not ~928 kcal). Re-import same link and confirm count stays at 15 items.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 13:12 AEDT
 - What changed: Fixed recipe import quantity parsing so compact units like `250g`, `500g`, `2 tbs`, `180ml`, and `(20g)` are read correctly instead of falling back to default amounts. Added clear per-ingredient display showing both full recipe amount and portion amount so serving math is visible.
 - Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal
