@@ -14865,9 +14865,8 @@ Please add nutritional information manually if needed.`);
     void saveBarcodeLabelIfNeeded(analyzedItems, { preserveFlow: true, quiet: true })
   }, [barcodeLabelFlow?.barcode, labelValidation.ok, analyzedItems, photoPreview])
 
-  const lookupBarcodeAndAdd = async (code: string, options?: { fromCamera?: boolean }) => {
+  const lookupBarcodeAndAdd = async (code: string) => {
     const normalized = (code || '').replace(/[^0-9A-Za-z]/g, '')
-    const fromCamera = Boolean(options?.fromCamera)
     if (!normalized) {
       setBarcodeError('Enter a valid barcode to search.')
       setBarcodeStatus('scanning')
@@ -14886,6 +14885,20 @@ Please add nutritional information manually if needed.`);
     }
     const replaceIndex = barcodeReplaceTargetRef.current
     const actionMode = barcodeActionRef.current
+    const openBarcodeLabelPrompt = (code: string, data?: any) => {
+      setShowBarcodeScanner(false)
+      setBarcodeStatus('idle')
+      setBarcodeStatusHint('')
+      setBarcodeError(null)
+      setShowFavoritesPicker(false)
+      setBarcodeLabelFlow({
+        barcode: code,
+        reason: 'missing',
+        productName: data?.product?.name || null,
+        brand: data?.product?.brand || null,
+      })
+      setShowBarcodeLabelPrompt(true)
+    }
     barcodeLookupInFlightRef.current = true
     setBarcodeStatus('loading')
     setBarcodeStatusHint('Looking up barcode…')
@@ -14894,21 +14907,7 @@ Please add nutritional information manually if needed.`);
       const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(normalized)}`)
       if (res.status === 404) {
         const data = await res.json().catch(() => null)
-        setBarcodeStatus('idle')
-        setBarcodeError(null)
-        if (fromCamera || (replaceIndex !== null && replaceIndex !== undefined)) {
-          setBarcodeError('No food found for this barcode. Try again or use photo.')
-          resumeScannerAfterLookup()
-        } else {
-          setShowBarcodeScanner(false)
-          setBarcodeLabelFlow({
-            barcode: normalized,
-            reason: 'missing',
-            productName: data?.product?.name || null,
-            brand: data?.product?.brand || null,
-          })
-          setShowBarcodeLabelPrompt(true)
-        }
+        openBarcodeLabelPrompt(normalized, data)
         return
       }
       if (res.status === 402) {
@@ -14923,21 +14922,7 @@ Please add nutritional information manually if needed.`);
       }
       if (res.status === 422) {
         const data = await res.json().catch(() => null)
-        setBarcodeStatus('idle')
-        setBarcodeError(null)
-        if (fromCamera || (replaceIndex !== null && replaceIndex !== undefined)) {
-          setBarcodeError('No food found for this barcode. Try again or use photo.')
-          resumeScannerAfterLookup()
-        } else {
-          setShowBarcodeScanner(false)
-          setBarcodeLabelFlow({
-            barcode: normalized,
-            reason: 'missing',
-            productName: data?.product?.name || null,
-            brand: data?.product?.brand || null,
-          })
-          setShowBarcodeLabelPrompt(true)
-        }
+        openBarcodeLabelPrompt(normalized, data)
         return
       }
       if (res.status === 401) {
@@ -14951,8 +14936,7 @@ Please add nutritional information manually if needed.`);
       }
       const data = await res.json()
       if (!data?.food) {
-        setBarcodeError('No food found for this barcode. Try again or enter it manually.')
-        resumeScannerAfterLookup()
+        openBarcodeLabelPrompt(normalized, data)
         return
       }
       const resolvedBarcode = String((data?.food as any)?.barcode || normalized).replace(/[^0-9A-Za-z]/g, '')
@@ -15044,7 +15028,7 @@ Please add nutritional information manually if needed.`);
       return
     }
     barcodeDetectLockRef.current = true
-    void lookupBarcodeAndAdd(cleaned, { fromCamera: true }).finally(() => {
+    void lookupBarcodeAndAdd(cleaned).finally(() => {
       barcodeDetectLockRef.current = false
     })
   }
