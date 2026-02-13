@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 14:55 AEDT
+- What changed: Fixed Favorites picker ordering so the most recently used saved meal now goes to the top. When you add a favorite/custom meal to Food Diary, it now stamps a `last used` time and `All`, `Favorites`, and `Custom` tabs sort by that first.
+- Where to see it (page/link): Food Diary -> Add from favorites (`/food?open=favorites`)
+- What to quickly test: In `Custom` (or `Favorites`) pick an item that is not first, add it to diary, reopen Add from favorites, and confirm that item is now first in `All`, `Favorites`, and `Custom`.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 14:45 AEDT
 - What changed: Fixed Smart Health Coach timezone auto-detect so it now uses your current device/browser timezone in auto mode (for example Melbourne), instead of keeping old stale values like Africa/Abidjan. Manual timezone override still works and is saved when you choose it.
 - Where to see it (page/link): Notifications -> Smart Health Coach (`/notifications/ai-insights`) and Health Tips (`/health-tips`)
