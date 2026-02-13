@@ -16,6 +16,100 @@ const FOOD_PHOTO_URL_TTL_SECONDS = 60 * 60
 
 const isDataUrl = (value: string) => /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(value)
 const isRemoteUrl = (value: string) => /^https?:\/\//i.test(value)
+const HOT_CHOCOLATE_KEY = 'hot chocolate'
+
+const normalizeDrinkTypeLabel = (value: any) => {
+  const raw = String(value || '').toLowerCase()
+  return raw
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\bsugar[-\s]?free\b/g, '')
+    .replace(/\bno\s+sugar\b/g, '')
+    .replace(/\bwith\s+no\s+sugar\b/g, '')
+    .replace(/\bwith\s+sugar\b/g, '')
+    .replace(/\bcontains\s+sugar\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const isSugarFreeLabel = (value: any) => {
+  const text = String(value || '').toLowerCase()
+  if (!text) return false
+  return (
+    /\bsugar[-\s]?free\b/.test(text) ||
+    /\bno\s+sugar\b/.test(text) ||
+    /\bwith\s+no\s+sugar\b/.test(text)
+  )
+}
+
+const readFiniteNumber = (source: any, key: string): number | null => {
+  if (!source || typeof source !== 'object') return null
+  const raw = (source as any)[key]
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const normalizeSugarFreeHotChocolatePayload = (input: {
+  description: any
+  nutrition: any
+  items: any
+}) => {
+  const baseNutrition =
+    input.nutrition && typeof input.nutrition === 'object' ? { ...(input.nutrition as any) } : null
+  if (!baseNutrition) {
+    return { nutrition: input.nutrition, items: input.items, changed: false }
+  }
+
+  const drinkType = normalizeDrinkTypeLabel((baseNutrition as any).__drinkType)
+  if (drinkType !== HOT_CHOCOLATE_KEY) {
+    return { nutrition: input.nutrition, items: input.items, changed: false }
+  }
+
+  const itemList = Array.isArray(input.items) ? input.items : []
+  const looksSugarFree =
+    isSugarFreeLabel((baseNutrition as any).__drinkType) ||
+    isSugarFreeLabel(input.description) ||
+    itemList.some((item) => isSugarFreeLabel((item as any)?.name || (item as any)?.label || ''))
+  if (!looksSugarFree) {
+    return { nutrition: input.nutrition, items: input.items, changed: false }
+  }
+
+  const sweetenerCalories = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerCalories') || 0)
+  const sweetenerCarbs = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerCarbs') || 0)
+  const sweetenerSugar = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerSugar') || 0)
+  const round1 = (value: number) => Math.round(value * 10) / 10
+
+  // DO NOT TOUCH (owner lock):
+  // Sugar-free hot chocolate logged via water flow must never persist stale favorite calories.
+  // Only sweetener metadata can contribute kcal/carbs/sugar for this specific drink path.
+  const normalizedNutrition = {
+    ...baseNutrition,
+    calories: Math.round(sweetenerCalories),
+    protein: 0,
+    carbs: round1(sweetenerCarbs),
+    fat: 0,
+    fiber: 0,
+    sugar: round1(sweetenerSugar),
+    protein_g: 0,
+    carbs_g: round1(sweetenerCarbs),
+    fat_g: 0,
+    fiber_g: 0,
+    sugar_g: round1(sweetenerSugar),
+  }
+
+  let normalizedItems = input.items
+  if (itemList.length === 1 && itemList[0] && typeof itemList[0] === 'object') {
+    const single = { ...(itemList[0] as any) }
+    single.calories = Math.round(sweetenerCalories)
+    single.protein_g = 0
+    single.carbs_g = round1(sweetenerCarbs)
+    single.fat_g = 0
+    single.fiber_g = 0
+    single.sugar_g = round1(sweetenerSugar)
+    normalizedItems = [single]
+  }
+
+  return { nutrition: normalizedNutrition, items: normalizedItems, changed: true }
+}
 
 const dataUrlToBuffer = (value: string) => {
   const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(value)
@@ -615,6 +709,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { description, nutrition, imageUrl, items, localDate, meal, category, createdAt, allowDuplicate } = body || {}
+    const normalizedDrinkPayload = normalizeSugarFreeHotChocolatePayload({ description, nutrition, items })
+    const safeNutrition = normalizedDrinkPayload.nutrition
+    const safeItems = normalizedDrinkPayload.items
 
     const normalizedMeal = normalizeMealCategory(meal ?? category)
     const storedCategory = normalizedMeal ?? (typeof category === 'string' ? category.trim() : null)
@@ -675,10 +772,10 @@ export async function POST(request: NextRequest) {
       hasDescription: !!description,
       descriptionLength: description?.toString().length || 0,
       descriptionPreview: description?.toString().substring(0, 100) || '',
-      hasNutrition: !!nutrition,
+      hasNutrition: !!safeNutrition,
       hasImageUrl: !!imageUrl,
-      hasItems: Array.isArray(items) && items.length > 0,
-      itemCount: Array.isArray(items) ? items.length : 0,
+      hasItems: Array.isArray(safeItems) && safeItems.length > 0,
+      itemCount: Array.isArray(safeItems) ? safeItems.length : 0,
       providedLocalDate: localDate || 'MISSING',
       normalizedLocalDate: normalizedLocalDate || 'NULL',
       localDateType: typeof localDate,
@@ -704,9 +801,9 @@ export async function POST(request: NextRequest) {
       name,
       localDate: normalizedLocalDate,
       hasDescription: !!description,
-      hasNutrition: !!nutrition,
+      hasNutrition: !!safeNutrition,
       hasImageUrl: !!imageUrl,
-      hasItems: Array.isArray(items) && items.length > 0,
+      hasItems: Array.isArray(safeItems) && safeItems.length > 0,
       normalizedMeal,
     })
 
@@ -716,8 +813,8 @@ export async function POST(request: NextRequest) {
         const guardPayload = buildFoodLogGuardPayload({
           name,
           description,
-          nutrition,
-          items,
+          nutrition: safeNutrition,
+          items: safeItems,
           localDate: normalizedLocalDate,
           meal: normalizedMeal,
           category: storedCategory,
@@ -793,8 +890,8 @@ export async function POST(request: NextRequest) {
         name,
         description: description || null,
         imageUrl: storedImageUrl || null,
-        nutrients: nutrition || null,
-        items: Array.isArray(items) && items.length > 0 ? items : Prisma.JsonNull,
+        nutrients: safeNutrition || null,
+        items: Array.isArray(safeItems) && safeItems.length > 0 ? safeItems : Prisma.JsonNull,
         localDate: normalizedLocalDate,
         meal: normalizedMeal,
         category: storedCategory,
@@ -811,7 +908,7 @@ export async function POST(request: NextRequest) {
       durationMs: duration,
     })
 
-    await maybeUpsertBarcodeFromItems(user.id, items || created.items)
+    await maybeUpsertBarcodeFromItems(user.id, safeItems || created.items)
 
     // Trigger background regeneration of nutrition insights
     // This happens asynchronously - user doesn't wait
@@ -889,6 +986,9 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json()
     const { id, description, nutrition, imageUrl, items, localDate, meal, category, createdAt } = body || {}
+    const normalizedDrinkPayload = normalizeSugarFreeHotChocolatePayload({ description, nutrition, items })
+    const safeNutrition = normalizedDrinkPayload.nutrition
+    const safeItems = normalizedDrinkPayload.items
 
     const logId = typeof id === 'string' && id.trim().length > 0 ? id.trim() : null
     if (!logId) {
@@ -960,8 +1060,8 @@ export async function PUT(request: NextRequest) {
         name,
         description: description || null,
         imageUrl: storedImageUrl || null,
-        nutrients: nutrition || null,
-        items: Array.isArray(items) && items.length > 0 ? items : Prisma.JsonNull,
+        nutrients: safeNutrition || null,
+        items: Array.isArray(safeItems) && safeItems.length > 0 ? safeItems : Prisma.JsonNull,
         localDate: normalizedLocalDate,
         meal: normalizedMeal,
         category: storedCategory,
@@ -969,7 +1069,7 @@ export async function PUT(request: NextRequest) {
       },
     })
 
-    await maybeUpsertBarcodeFromItems(user.id, items || updated.items)
+    await maybeUpsertBarcodeFromItems(user.id, safeItems || updated.items)
 
     triggerBackgroundRegeneration({
       userId: user.id,

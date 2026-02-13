@@ -2280,6 +2280,8 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 - Do not drop `__drinkType`, `__drinkAmount`, `__drinkUnit`, `__drinkAmountMl`, `__waterLogId` during edit/save/update flows.
 - Drink entries linked to water logging must never be loosely remapped to favorites by label/alias/token matching.
 - In favorites picker add flow, when drink context is active (`drinkAmount`/`drinkType` flow), prefer the selected row entry payload over a loosely linked favorite template.
+- API lock: when saving/updating a **sugar-free hot chocolate** drink entry, force nutrition to sweetener-only values (no stale favorite kcal allowed).
+- UI lock: when loading history/diary, apply the same sugar-free hot chocolate guard so old bad rows cannot reappear with high kcal.
 - Favorite rename sync must match by `favoriteId`, and also by stable identifiers (`sourceId` / `barcode`) so older diary rows still update.
 - Food name override save must support entries where `items` can be JSON strings (not only arrays).
 
@@ -2290,6 +2292,8 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 4. In favorites add flow, use row `entry` source in drink context instead of linked favorite template source.
 5. In rename sync, match linked entries by `favoriteId` + `sourceId` + `barcode`.
 6. In override save, parse `items` from string/array so stable keys are stored.
+7. In `app/api/food-log/route.ts`, keep the sugar-free hot chocolate save guard (sweetener-only totals).
+8. In `app/food/page.tsx`, keep the sugar-free hot chocolate load guard so stale rows are corrected on display.
 
 ## 8. Rules for Future Modifications
 

@@ -5846,6 +5846,112 @@ export default function FoodDiary() {
     return Object.values(totals).some((value) => Number.isFinite(Number(value)) && Number(value) > 0)
   }
 
+  const isSugarFreeDrinkText = (value: any) => {
+    const text = String(value || '').toLowerCase()
+    if (!text) return false
+    return (
+      /\bsugar[-\s]?free\b/.test(text) ||
+      /\bno\s+sugar\b/.test(text) ||
+      /\bwith\s+no\s+sugar\b/.test(text)
+    )
+  }
+
+  const readDrinkMetaNumber = (entry: any, key: string) => {
+    const fromNutrition =
+      entry?.nutrition && typeof entry.nutrition === 'object' ? Number((entry.nutrition as any)[key]) : NaN
+    if (Number.isFinite(fromNutrition)) return fromNutrition
+    const fromTotal = entry?.total && typeof entry.total === 'object' ? Number((entry.total as any)[key]) : NaN
+    return Number.isFinite(fromTotal) ? fromTotal : NaN
+  }
+
+  const shouldLockSugarFreeHotChocolateDrink = (entry: any) => {
+    const meta = getDrinkMetaFromEntry(entry)
+    if (!meta?.type) return false
+    if (normalizeWaterLabel(meta.type) !== 'hot chocolate') return false
+    const texts: string[] = []
+    texts.push(String(entry?.description || ''))
+    texts.push(String(entry?.label || ''))
+    texts.push(String(entry?.name || ''))
+    texts.push(String(entry?.nutrition?.__drinkType || ''))
+    texts.push(String(entry?.total?.__drinkType || ''))
+    if (Array.isArray(entry?.items)) {
+      entry.items.forEach((item: any) => {
+        texts.push(String(item?.name || item?.label || ''))
+      })
+    }
+    return texts.some((text) => isSugarFreeDrinkText(text))
+  }
+
+  const buildSugarFreeHotChocolateLockedTotals = (entry: any): NutritionTotals => {
+    const sweetenerCalories = Math.max(0, readDrinkMetaNumber(entry, '__sweetenerCalories') || 0)
+    const sweetenerCarbs = Math.max(0, readDrinkMetaNumber(entry, '__sweetenerCarbs') || 0)
+    const sweetenerSugar = Math.max(0, readDrinkMetaNumber(entry, '__sweetenerSugar') || 0)
+    const round1 = (value: number) => Math.round(value * 10) / 10
+    return {
+      calories: Math.round(sweetenerCalories),
+      protein: 0,
+      carbs: round1(sweetenerCarbs),
+      fat: 0,
+      fiber: 0,
+      sugar: round1(sweetenerSugar),
+    }
+  }
+
+  const applySugarFreeHotChocolateGuard = (entry: any): { entry: any; changed: boolean; totals: NutritionTotals | null } => {
+    if (!entry || typeof entry !== 'object') return { entry, changed: false, totals: null }
+    if (!shouldLockSugarFreeHotChocolateDrink(entry)) return { entry, changed: false, totals: null }
+    const lockedTotals = buildSugarFreeHotChocolateLockedTotals(entry)
+    const drinkMeta = getDrinkMetaFromEntry(entry)
+    const toStorageShape = (totals: NutritionTotals) => ({
+      calories: totals.calories ?? 0,
+      protein_g: totals.protein ?? 0,
+      carbs_g: totals.carbs ?? 0,
+      fat_g: totals.fat ?? 0,
+      fiber_g: totals.fiber ?? 0,
+      sugar_g: totals.sugar ?? 0,
+    })
+    const normalizeWithLockedTotals = (raw: any, storageShape = false) => {
+      const base = raw && typeof raw === 'object' ? { ...(raw as any) } : {}
+      const next = {
+        ...base,
+        calories: lockedTotals.calories ?? 0,
+        protein: lockedTotals.protein ?? 0,
+        carbs: lockedTotals.carbs ?? 0,
+        fat: lockedTotals.fat ?? 0,
+        fiber: lockedTotals.fiber ?? 0,
+        sugar: lockedTotals.sugar ?? 0,
+        ...(storageShape ? toStorageShape(lockedTotals) : {}),
+      }
+      return applyDrinkMetaToTotals(next, drinkMeta)
+    }
+
+    let nextItems = entry?.items
+    if (Array.isArray(nextItems) && nextItems.length === 1 && nextItems[0] && typeof nextItems[0] === 'object') {
+      const single = { ...(nextItems[0] as any) }
+      single.calories = lockedTotals.calories ?? 0
+      single.protein_g = lockedTotals.protein ?? 0
+      single.carbs_g = lockedTotals.carbs ?? 0
+      single.fat_g = lockedTotals.fat ?? 0
+      single.fiber_g = lockedTotals.fiber ?? 0
+      single.sugar_g = lockedTotals.sugar ?? 0
+      nextItems = [single]
+    }
+
+    // DO NOT TOUCH (owner lock):
+    // Sugar-free hot chocolate entries coming from water flow must never show stale high kcal.
+    // For this specific drink, only sweetener metadata can contribute nutrition.
+    return {
+      entry: {
+        ...entry,
+        nutrition: normalizeWithLockedTotals(entry?.nutrition || entry?.total || null, false),
+        total: normalizeWithLockedTotals(entry?.total || entry?.nutrition || null, true),
+        items: nextItems,
+      },
+      changed: true,
+      totals: lockedTotals,
+    }
+  }
+
   const normalizeSuspiciousKjItems = (items: any[] | null | undefined) => {
     if (!Array.isArray(items) || items.length === 0) return { items, changed: false }
     let changed = false
@@ -5890,6 +5996,12 @@ export default function FoodDiary() {
   const getEntryTotals = (entry: any) => {
     try {
       const portionScale = getEntryPortionScale(entry)
+      const sugarFreeGuard = applySugarFreeHotChocolateGuard(entry)
+      if (sugarFreeGuard.changed && sugarFreeGuard.totals) {
+        return portionScale
+          ? applyPortionScaleToTotals(sugarFreeGuard.totals, portionScale)
+          : sugarFreeGuard.totals
+      }
       if (Array.isArray(entry?.items) && entry.items.length > 0) {
         const normalized = normalizeSuspiciousKjItems(entry.items)
         const recalculated = recalculateNutritionFromItems(normalized.items || [])
@@ -9111,7 +9223,7 @@ const applyStructuredItems = (
         ? mergeNutritionTotals(baseNutrition, recalculatedTotals)
         : baseNutrition
 
-      return {
+      const mappedEntry = {
         id: new Date(createdAtIso).getTime(), // UI key and sorting by timestamp
         dbId: l.id, // actual database id for delete operations
         clientId: storedClientId || undefined,
@@ -9123,6 +9235,7 @@ const applyStructuredItems = (
         method,
         photo: l.imageUrl || null,
         nutrition: normalizedNutrition,
+        total: normalizedNutrition,
         items: normalizedItems,
         meal: category,
         category,
@@ -9132,6 +9245,7 @@ const applyStructuredItems = (
         __addedOrder: Number.isFinite(addedOrder) ? addedOrder : undefined,
         localDate: resolvedLocalDate,
       }
+      return applySugarFreeHotChocolateGuard(mappedEntry).entry
     })
 
   const PENDING_SERVER_ID_TTL_MS = 2 * 60 * 1000
