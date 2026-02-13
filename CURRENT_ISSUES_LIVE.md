@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 18:19 AEDT
+- What changed: Imported recipe ingredients now default to count-based size units when available (for example eggs now use egg size units instead of defaulting to grams). This makes entries like `2 eggs` appear as count + egg size, while still letting users edit amount and unit.
+- Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal -> expand ingredient cards
+- What to quickly test: Import a recipe with eggs. Confirm the egg line defaults to a count unit (such as large egg) rather than `g`, and confirm amount/unit can still be changed manually.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 17:09 AEDT
 - What changed: Fixed the remaining `All` tab name mismatch for matched favorites (Chicken Breast case). When an `All` row is linked to a saved favorite/custom meal, the row now always shows the saved title and no longer gets remapped back to a long legacy name.
 - Where to see it (page/link): Food Diary -> Add from favorites (`/food?open=favorites`)
