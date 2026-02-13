@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 02:05 AEDT
+- What changed: Added newly provided food mockups to the nutrition feature page. Updated section images for food menu (favorites/reuse), recipe import, and water logging (including 2 water screens) so those sections now show your latest phone visuals.
+- Where to see it (page/link): Food feature page (`/features/nutrition-food`)
+- What to quickly test: Open `/features/nutrition-food` and check the sections for Recipe Import, Favorites and Reusable Meals, and Water and Drinks Logging now show the new mockups.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 01:48 AEDT
 - What changed: Fixed iPhone horizontal overflow in the Import Recipe module. The URL field + Import button now stack safely on small screens, and mobile-safe width guards were added across all import form inputs/review fields.
 - Where to see it (page/link): Import Recipe screen (`/food/import-recipe`)
