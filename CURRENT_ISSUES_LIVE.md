@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 13:12 AEDT
+- What changed: Fixed recipe import quantity parsing so compact units like `250g`, `500g`, `2 tbs`, `180ml`, and `(20g)` are read correctly instead of falling back to default amounts. Added clear per-ingredient display showing both full recipe amount and portion amount so serving math is visible.
+- Where to see it (page/link): Food Diary -> Add meal -> Import Recipe -> Continue to Build a meal
+- What to quickly test: Import the chicken caesar pasta recipe, keep portion at 1 serving (recipe has 4 servings), and confirm first ingredient shows full recipe amount `250 g` and portion amount `62.5 g`. Re-import same link and confirm ingredient count stays at 15 (no duplicates).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 12:19 AEDT
 - What changed: Renamed AI insights to Smart Health Coach across menu/settings/notification pages, added mandatory pricing warning before enable, and launched paid Smart Coach alert rules with strict caps (10 credits per sent alert, max 50 credits/day) plus cooldown and logging safeguards.
 - Where to see it (page/link): Notifications -> Smart Health Coach and Health Tips pages
