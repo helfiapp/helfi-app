@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 19:26 AEDT
+- What changed: Adjusted Web Dashboard mobile layout to match native app more closely. Daily Tools now renders in 2 columns on phone size, and My Health now uses the same 3 action rows as native (Weekly Health Report, Health Setup, Find a Practitioner) with matching action buttons.
+- Where to see it (page/link): Dashboard (`/dashboard`)
+- What to quickly test: On mobile width, confirm Daily Tools shows 2 cards per row. Confirm My Health shows 3 row cards with `View report`, `Continue`, and `Browse`, and each opens the correct page.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 19:21 AEDT
 - What changed: Restored old barcode miss behavior. If a scanned product is not found, the app now immediately opens the “Take label photo” step so nutrition details can be captured and saved.
 - Where to see it (page/link): Food Diary barcode scanner (`/food`)
