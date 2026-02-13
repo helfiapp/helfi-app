@@ -734,6 +734,7 @@ Must keep (source of truth in `app/food/page.tsx`):
 - Recency must also backfill from historical diary usage (linked favorite id first, then source/barcode/alias fallback) so older entries still order correctly.
 - Recency must be based on **usage time only** (`lastUsedAt` / history backfill). Do not use `updatedAt` for ordering.
 - In `All`, if a history entry resolves to a saved favorite/custom meal, the row label must use the current saved favorite label (no long old USDA name fallback).
+- In `All`, once a row resolves to a saved favorite/custom meal, do **not** run entry-based name override remapping on that favorite label.
 - Picker sorting must use `lastUsedAt` first, then fallback to `createdAt`.
 - Favorites without a `lastUsedAt` must fallback safely to `createdAt`.
 

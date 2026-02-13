@@ -14172,10 +14172,9 @@ Please add nutritional information manually if needed.`);
       const matchedFavorite = resolvedFavorite.favorite
       const label = (() => {
         if (matchedFavorite) {
-          return applyFoodNameOverride(
-            favoriteDisplayLabel(matchedFavorite) || entry?.description || entry?.label || 'Meal',
-            entry,
-          )
+          // If this history row maps to a saved favorite, always show the saved favorite label.
+          // Do not pass it through entry-based override remapping (can revive old long names).
+          return resolveFavoriteLabel(matchedFavorite)
         }
         return applyFoodNameOverride(entry?.description || entry?.label || 'Meal', entry)
       })()
@@ -14193,7 +14192,8 @@ Please add nutritional information manually if needed.`);
         createdAt: createdAtValue,
         lastUsedAt: createdAtValue,
         sortPriority: 2,
-        sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
+        sourceTag:
+          matchedFavorite || (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
         calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
         serving: entry?.items?.[0]?.serving_size || entry?.serving || entry?.items?.[0]?.servings || '',
       }
