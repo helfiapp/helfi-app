@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 11:53 AEDT
+- What changed: Follow-up fix for rename not sticking. Edit Entry rename now updates the correct diary row using stronger matching (not id-only), and server-save now finds the row by source/barcode fallback so renamed titles persist after refresh.
+- Where to see it (page/link): Food Diary -> entry menu -> Edit Entry (also check Favorites/All/Custom sync)
+- What to quickly test: Rename “Green’s gluten free chocolate cake mix” to a new name, tap Update Entry, confirm it changes immediately in diary list, then refresh page and confirm it stays renamed.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 02:35 AEDT
 - What changed: Fixed rename sync so changing a food name from Diary/Favorites/Custom updates more reliably across Food Diary, Favorites, and All. Also fixed diary row label priority so a fresh rename is not overwritten by an old favorite title.
 - Where to see it (page/link): Food Diary -> Edit Entry, and Food Diary -> Add from favorites (Favorites/Custom/All tabs)
