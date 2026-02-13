@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 01:48 AEDT
+- What changed: Fixed iPhone horizontal overflow in the Import Recipe module. The URL field + Import button now stack safely on small screens, and mobile-safe width guards were added across all import form inputs/review fields.
+- Where to see it (page/link): Import Recipe screen (`/food/import-recipe`)
+- What to quickly test: On iPhone, open Import Recipe, focus URL input, and confirm no horizontal overflow. Also test photo mode and review inputs to confirm nothing pushes off-screen.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 01:09 AEDT
 - What changed: Homepage food cards now click directly to section anchors on the food feature page. Added missing detailed sections on `/features/nutrition-food` for import recipe, favorites/reusable meals, copy-duplicate-combine tools, and water/drinks logging. Also added SEO wording updates for this page.
 - Where to see it (page/link): Homepage food section (`/`) and Food feature page (`/features/nutrition-food`)
