@@ -592,6 +592,57 @@ const getDrinkMetaFromEntry = (entry: any): DrinkEntryMeta | null => {
   }
 }
 
+const stripDrinkMetaFromTotals = (totals: any) => {
+  if (!totals || typeof totals !== 'object') return totals
+  const next: any = { ...(totals as any) }
+  delete next.__drinkType
+  delete next.__drinkAmount
+  delete next.__drinkUnit
+  delete next.__drinkAmountMl
+  delete next.__waterLogId
+  return next
+}
+
+const isEntryLikelyDrinkFromContent = (entry: any) => {
+  if (!entry || typeof entry !== 'object') return false
+  const textSamples: string[] = [
+    String(entry?.description || ''),
+    String(entry?.label || ''),
+    String(entry?.name || ''),
+  ]
+  if (textSamples.some((text) => isLikelyLiquidFood(text, text) || /\b\d+(?:\.\d+)?\s*(ml|l|oz)\b/i.test(text))) {
+    return true
+  }
+  const items = Array.isArray(entry?.items) ? entry.items : []
+  if (!Array.isArray(items) || items.length === 0) return false
+  return items.some((item: any) =>
+    isLikelyLiquidFood(
+      String(item?.name || item?.label || ''),
+      String(item?.serving_size || ''),
+    ),
+  )
+}
+
+const removeInvalidDrinkMetaFromEntry = (entry: any): { entry: any; changed: boolean } => {
+  if (!entry || typeof entry !== 'object') return { entry, changed: false }
+  if (Boolean((entry as any)?.__water)) return { entry, changed: false }
+  const drinkMeta = getDrinkMetaFromEntry(entry)
+  if (!drinkMeta?.type) return { entry, changed: false }
+  const likelyDrink = isEntryLikelyDrinkFromContent(entry)
+  if (likelyDrink) return { entry, changed: false }
+  const nextNutrition = stripDrinkMetaFromTotals(entry?.nutrition || null)
+  const nextTotal = stripDrinkMetaFromTotals(entry?.total || null)
+  return {
+    entry: {
+      ...entry,
+      nutrition: nextNutrition,
+      total: nextTotal,
+      __invalidDrinkMetaCleaned: true,
+    },
+    changed: true,
+  }
+}
+
 const formatDrinkEntryAmount = (meta: DrinkEntryMeta | null) => {
   if (!meta) return ''
   if (Number.isFinite(meta.amount) && meta.amount > 0) {
@@ -8185,7 +8236,7 @@ const applyStructuredItems = (
     const localDate = explicitLocalDate || derivedDate || fallbackDate
     const createdAtIso = alignTimestampToLocalDate(rawCreatedAtIso, localDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    return {
+    const normalizedEntry = {
       ...entry,
       meal: normalizedCategory,
       category: normalizedCategory,
@@ -8194,6 +8245,7 @@ const applyStructuredItems = (
       localDate,
       time: displayTime,
     }
+    return removeInvalidDrinkMetaFromEntry(normalizedEntry).entry
   }
 
   const normalizeDiaryList = (list: any[], fallbackDate: string) =>
@@ -9277,7 +9329,8 @@ const applyStructuredItems = (
         __addedOrder: Number.isFinite(addedOrder) ? addedOrder : undefined,
         localDate: resolvedLocalDate,
       }
-      return applySugarFreeHotChocolateGuard(mappedEntry).entry
+      const sugarGuardEntry = applySugarFreeHotChocolateGuard(mappedEntry).entry
+      return removeInvalidDrinkMetaFromEntry(sugarGuardEntry).entry
     })
 
   const PENDING_SERVER_ID_TTL_MS = 2 * 60 * 1000
@@ -25575,10 +25628,28 @@ Please add nutritional information manually if needed.`);
                       const resolvedFavorite = isWaterEntry ? null : resolveFavoriteForEntry(food, baseEntryLabel)
                       const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
                       const overrideOnly = isWaterEntry ? '' : resolveFoodNameOverrideOnly(baseEntryLabel, food)
+                      const favoriteManualEdit = Boolean(
+                        !isWaterEntry &&
+                          ((food?.nutrition && (food.nutrition as any).__favoriteManualEdit) ||
+                            (food?.total && (food.total as any).__favoriteManualEdit)),
+                      )
                       const appliedBaseLabel = isWaterEntry
                         ? ''
                         : applyFoodNameOverride(baseEntryLabel, food) || String(baseEntryLabel || '').trim()
                       const baseShort = isWaterEntry ? '' : extractBaseMealDescription(String(appliedBaseLabel || ''))
+                      const looksLikeRawSourceLabel =
+                        !isWaterEntry &&
+                        baseShort &&
+                        (baseShort.length >= 45 ||
+                          /,\s*(broiler|fryers|skinless|boneless|meat only|cooked|braised)\b/i.test(baseShort))
+                      const shouldPreferFavoriteShortLabel =
+                        !isWaterEntry &&
+                        !overrideOnly &&
+                        !favoriteManualEdit &&
+                        Boolean(favoriteLabel) &&
+                        Boolean(baseShort) &&
+                        looksLikeRawSourceLabel &&
+                        normalizeFoodName(baseShort) !== normalizeFoodName(favoriteLabel)
                       const preferBaseTitleOverItem =
                         !isWaterEntry &&
                         baseShort &&
@@ -25587,6 +25658,7 @@ Please add nutritional information manually if needed.`);
                       const entryDisplayLabel = isWaterEntry
                         ? waterLabel || 'Water'
                         : overrideOnly ||
+                          (shouldPreferFavoriteShortLabel ? favoriteLabel : '') ||
                           (preferBaseTitleOverItem ? baseShort : '') ||
                           baseShort ||
                           favoriteLabel ||

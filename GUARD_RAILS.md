@@ -644,6 +644,8 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
   linked by `__waterLogId` so the water log stays visible **only** in Water Intake.
 - Pending drink context (`pendingDrinkOverrideRef`, `pendingDrinkTypeRef`, `pendingDrinkWaterLogIdRef`) must be cleared after each add flow uses/checks it (analysis save, barcode add, meal add, favorite add). Do not leave sticky drink context active for the next add.
 - In Add from Favorites, entry-source preference for drink flow is allowed only when there is active drink context **and** the selected entry is truly a drink. Non-drink adds (for example chicken favorites) must keep their normal favorite source so labels/icons do not regress.
+- Old corrupted rows must self-heal on load: if a non-drink entry contains leaked drink metadata (`__drinkType` etc.), strip drink metadata so food rows do not render drink icons.
+- For linked favorites, if a diary row still has a long raw source title (for example USDA-style long chicken text), prefer the short saved favorite label in row display unless the entry was manually renamed.
 - Water entries must appear under the **category they were logged in**, not default to Other.
 - Editing/renaming a drink entry must **preserve** `__drinkType` and `__waterLogId` so the linked water log stays hidden in Food Diary.
 
