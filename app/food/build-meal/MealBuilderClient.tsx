@@ -2575,6 +2575,24 @@ export default function MealBuilderClient() {
       }
     }
 
+    // Last-chance retry for obvious single foods on slow/unstable connections.
+    const resilientAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean; timeoutMs: number }> = [
+      { kind: 'single', source: 'usda', localOnly: true, timeoutMs: 4500 },
+      { kind: 'single', source: 'auto', localOnly: true, timeoutMs: 4500 },
+      { kind: 'single', source: 'auto', timeoutMs: 5500 },
+    ]
+    const resilientCandidates = Array.from(
+      new Set([cacheKey, ...getRecipeCoreTokens(cacheKey).map((token) => singularizeToken(token)).filter(Boolean)]),
+    ).slice(0, 4)
+    for (const candidate of resilientCandidates) {
+      if (!candidate || candidate.length < 2) continue
+      const resilientBest = await findBestAcrossAttempts(candidate, resilientAttempts)
+      if (resilientBest) {
+        importResolveCacheRef.current.set(cacheKey, resilientBest)
+        return resilientBest
+      }
+    }
+
     importResolveCacheRef.current.set(cacheKey, null)
     return null
   }
@@ -2672,11 +2690,14 @@ export default function MealBuilderClient() {
 
     const normalizeLookup = (raw: string) => {
       let s = String(raw || '').trim()
+      s = s.replace(/\(\s*,\s*([^)]*?)\)/g, '($1)')
       s = s.replace(/\(.*?\)/g, ' ')
       s = s.split(',')[0] || s
+      s = s.replace(/\s+,/g, ' ')
       s = s.replace(/\b(to taste|optional|plus more|for garnish|garnish|divided)\b/gi, ' ')
       s = s.replace(/\s+-\s+/g, ' ')
       s = s.replace(/[^a-zA-Z0-9\s/.-]/g, ' ')
+      s = s.replace(/^(extra\s+large|large|medium|small)\s+/i, '')
       RECIPE_LOOKUP_PHRASE_REPLACEMENTS.forEach(([pattern, replacement]) => {
         s = s.replace(pattern, replacement)
       })

@@ -38,6 +38,19 @@ const normalizeLines = (value: any) => {
   return []
 }
 
+const normalizeIngredientLine = (raw: string) => {
+  let line = String(raw || '').trim()
+  if (!line) return ''
+  line = line.replace(/\(\s*,\s*([^)]*?)\)/g, '($1)')
+  line = line.replace(/\(\s*,\s*\)/g, '')
+  line = line.replace(/\s+,/g, ',')
+  line = line.replace(/,\s*,+/g, ', ')
+  line = line.replace(/\s+/g, ' ').trim()
+  return line
+}
+
+const normalizeIngredientLines = (value: any) => normalizeLines(value).map((line) => normalizeIngredientLine(line)).filter(Boolean)
+
 const toIngredientDedupeKey = (value: string) => {
   return String(value || '')
     .toLowerCase()
@@ -120,32 +133,90 @@ const looksLikeRecipeType = (obj: any) => {
   return false
 }
 
-const normalizeInstructions = (raw: any): string[] => {
-  if (!raw) return []
+const normalizeInstructionText = (value: string) =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const pushInstruction = (out: string[], value: string) => {
+  const next = normalizeInstructionText(value)
+  if (!next) return
+  if (out[out.length - 1] === next) return
+  out.push(next)
+}
+
+const collectInstructions = (raw: any, out: string[]) => {
+  if (!raw) return
   if (typeof raw === 'string') {
-    return raw
+    raw
       .split(/\n+/)
-      .map((s) => s.trim())
+      .map((line) => line.trim())
       .filter(Boolean)
+      .forEach((line) => pushInstruction(out, line))
+    return
   }
   if (Array.isArray(raw)) {
-    const out: string[] = []
-    for (const step of raw) {
-      if (typeof step === 'string') {
-        const t = step.trim()
-        if (t) out.push(t)
-      } else if (step && typeof step === 'object') {
-        const text = String((step as any).text || (step as any).name || '').trim()
-        if (text) out.push(text)
-      }
-    }
-    return out
+    raw.forEach((step) => collectInstructions(step, out))
+    return
   }
   if (raw && typeof raw === 'object') {
-    const text = String((raw as any).text || '').trim()
-    return text ? [text] : []
+    const itemList = (raw as any).itemListElement
+    if (Array.isArray(itemList) && itemList.length > 0) {
+      itemList.forEach((step: any) => collectInstructions(step, out))
+    }
+    const nested = (raw as any).steps || (raw as any).recipeInstructions
+    if (Array.isArray(nested) && nested.length > 0) {
+      nested.forEach((step: any) => collectInstructions(step, out))
+    }
+    const text = String((raw as any).text || (raw as any).name || '').trim()
+    if (text) pushInstruction(out, text)
   }
-  return []
+}
+
+const normalizeInstructions = (raw: any): string[] => {
+  const out: string[] = []
+  collectInstructions(raw, out)
+  return out
+}
+
+const isAbbreviatedRecipeText = (value: string) => {
+  const text = normalizeInstructionText(value).toLowerCase()
+  if (!text) return false
+  return (
+    text.includes('abbreviated recipe') ||
+    text.includes('abbreviated method') ||
+    text.includes('quick version') ||
+    text.includes('short method')
+  )
+}
+
+const scoreRecipeCompleteness = (recipe: ImportedRecipe | null | undefined) => {
+  if (!recipe) return -1
+  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0
+  const steps = Array.isArray(recipe.steps) ? recipe.steps.length : 0
+  const stepWords = Array.isArray(recipe.steps)
+    ? recipe.steps.reduce((sum, line) => sum + normalizeInstructionText(String(line || '')).split(/\s+/).filter(Boolean).length, 0)
+    : 0
+  const title = String(recipe.title || '')
+  let score = ingredients * 3 + steps * 4 + Math.min(40, Math.floor(stepWords / 6))
+  if (isAbbreviatedRecipeText(title)) score -= 20
+  if (Array.isArray(recipe.steps) && recipe.steps.some((line) => isAbbreviatedRecipeText(String(line || '')))) score -= 20
+  return score
+}
+
+const isRecipeAbbreviated = (recipe: ImportedRecipe | null | undefined) => {
+  if (!recipe) return true
+  const steps = Array.isArray(recipe.steps) ? recipe.steps : []
+  if (steps.length === 0) return true
+  if (steps.some((line) => isAbbreviatedRecipeText(String(line || '')))) return true
+  if (steps.length <= 2 && steps.every((line) => normalizeInstructionText(String(line || '')).endsWith(':'))) return true
+  return false
+}
+
+const hasRecipeSignals = (value: string) => {
+  const text = String(value || '').toLowerCase()
+  if (!text) return false
+  return text.includes('ingredient') || text.includes('method') || text.includes('instruction') || text.includes('directions')
 }
 
 const parseRecipeFromJsonLd = (obj: any, sourceUrl: string): ImportedRecipe | null => {
@@ -153,7 +224,7 @@ const parseRecipeFromJsonLd = (obj: any, sourceUrl: string): ImportedRecipe | nu
   if (!looksLikeRecipeType(obj)) return null
 
   const title = String((obj as any).name || (obj as any).headline || 'Recipe').trim() || 'Recipe'
-  const ingredients = dedupeIngredientLines(normalizeLines((obj as any).recipeIngredient))
+  const ingredients = dedupeIngredientLines(normalizeIngredientLines((obj as any).recipeIngredient))
   const steps = normalizeInstructions((obj as any).recipeInstructions)
 
   const yieldRaw = (obj as any).recipeYield
@@ -286,6 +357,63 @@ const fetchRecipePage = async (url: string): Promise<FetchedRecipePage> => {
   return { html: bestHtml, finalUrl: bestFinalUrl, recipe: null, fallbackText, debug }
 }
 
+type ImportTextChoice = {
+  preferredText: string
+  preferredSource: 'html' | 'mirror'
+  alternateText: string
+  alternateSource: 'html' | 'mirror' | null
+}
+
+const chooseImportText = (htmlTextRaw: string, mirrorTextRaw: string): ImportTextChoice => {
+  const htmlText = String(htmlTextRaw || '').trim()
+  const mirrorText = String(mirrorTextRaw || '').trim()
+
+  if (!htmlText && !mirrorText) {
+    return { preferredText: '', preferredSource: 'html', alternateText: '', alternateSource: null }
+  }
+  if (htmlText && !mirrorText) {
+    return { preferredText: htmlText, preferredSource: 'html', alternateText: '', alternateSource: null }
+  }
+  if (!htmlText && mirrorText) {
+    return { preferredText: mirrorText, preferredSource: 'mirror', alternateText: '', alternateSource: null }
+  }
+
+  const htmlLooksRecipe = hasRecipeSignals(htmlText)
+  const mirrorLooksRecipe = hasRecipeSignals(mirrorText)
+  if (htmlLooksRecipe && !mirrorLooksRecipe) {
+    return {
+      preferredText: htmlText,
+      preferredSource: 'html',
+      alternateText: mirrorText,
+      alternateSource: 'mirror',
+    }
+  }
+  if (!htmlLooksRecipe && mirrorLooksRecipe) {
+    return {
+      preferredText: mirrorText,
+      preferredSource: 'mirror',
+      alternateText: htmlText,
+      alternateSource: 'html',
+    }
+  }
+
+  if (htmlText.length >= 1400 || htmlText.length >= mirrorText.length * 0.75) {
+    return {
+      preferredText: htmlText,
+      preferredSource: 'html',
+      alternateText: mirrorText,
+      alternateSource: 'mirror',
+    }
+  }
+
+  return {
+    preferredText: mirrorText,
+    preferredSource: 'mirror',
+    alternateText: htmlText,
+    alternateSource: 'html',
+  }
+}
+
 const getOpenAIClient = () => {
   const key = process.env.OPENAI_API_KEY
   if (!key) return null
@@ -296,7 +424,7 @@ const coerceRecipeFromModel = (value: any, sourceUrl: string | null): ImportedRe
   if (!value || typeof value !== 'object') return null
   const title = String((value as any).title || (value as any).name || 'Recipe').trim() || 'Recipe'
   const ingredients = dedupeIngredientLines(
-    normalizeLines((value as any).ingredients || (value as any).recipeIngredient || (value as any).recipeIngredients),
+    normalizeIngredientLines((value as any).ingredients || (value as any).recipeIngredient || (value as any).recipeIngredients),
   )
   const steps = normalizeLines((value as any).steps || (value as any).instructions || (value as any).recipeInstructions)
   const servings = parseNumberOrNull((value as any).servings || (value as any).yield)
@@ -391,7 +519,7 @@ export async function POST(request: NextRequest) {
           userEmail,
           callDetail: 'url-client-mirror-text',
         })
-        if (!recipeFromClientText) {
+        if (!recipeFromClientText || isRecipeAbbreviated(recipeFromClientText)) {
           return NextResponse.json({ error: 'Could not import that recipe. Try a photo instead.' }, { status: 422 })
         }
         return NextResponse.json({ recipe: recipeFromClientText }, { status: 200 })
@@ -406,7 +534,8 @@ export async function POST(request: NextRequest) {
       const html = clampText(String(fetchedPage.html || ''), 1_200_000)
       const htmlText = html ? clampText(stripHtmlToText(html), 22_000) : ''
       const mirrorText = clampText(String(fetchedPage.fallbackText || ''), 22_000)
-      const text = (mirrorText.length > htmlText.length ? mirrorText : htmlText).trim()
+      const textChoice = chooseImportText(htmlText, mirrorText)
+      const text = textChoice.preferredText.trim()
       if (!text) {
         console.warn('recipe-import:url-load-empty', {
           url,
@@ -419,15 +548,46 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Could not load that link.' }, { status: 400 })
       }
 
-      const recipe = await extractRecipeFromText({
+      const firstRecipe = await extractRecipeFromText({
         openai,
         text,
         sourceUrl: fetchedPage.finalUrl || url,
         userId: user.id,
         userEmail,
-        callDetail: 'url-fallback-text',
+        callDetail: `url-fallback-text:${textChoice.preferredSource}`,
       })
-      if (!recipe) return NextResponse.json({ error: 'Could not import that recipe. Try a photo instead.' }, { status: 422 })
+      let recipe = firstRecipe
+      const shouldTryAlternate =
+        !!textChoice.alternateText &&
+        (!recipe || isRecipeAbbreviated(recipe) || scoreRecipeCompleteness(recipe) < 18)
+
+      if (shouldTryAlternate && textChoice.alternateSource) {
+        const alternateRecipe = await extractRecipeFromText({
+          openai,
+          text: textChoice.alternateText,
+          sourceUrl: fetchedPage.finalUrl || url,
+          userId: user.id,
+          userEmail,
+          callDetail: `url-fallback-text:${textChoice.alternateSource}`,
+        })
+        if (alternateRecipe) {
+          if (!recipe) {
+            recipe = alternateRecipe
+          } else {
+            const primaryScore = scoreRecipeCompleteness(recipe)
+            const alternateScore = scoreRecipeCompleteness(alternateRecipe)
+            const primaryAbbreviated = isRecipeAbbreviated(recipe)
+            const alternateAbbreviated = isRecipeAbbreviated(alternateRecipe)
+            if ((primaryAbbreviated && !alternateAbbreviated) || alternateScore > primaryScore + 2) {
+              recipe = alternateRecipe
+            }
+          }
+        }
+      }
+
+      if (!recipe || isRecipeAbbreviated(recipe)) {
+        return NextResponse.json({ error: 'Could not import full recipe details from that page. Try photo import.' }, { status: 422 })
+      }
       return NextResponse.json({ recipe }, { status: 200 })
     }
 
