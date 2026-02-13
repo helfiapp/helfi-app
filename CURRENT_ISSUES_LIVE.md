@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 19:10 AEDT
+- What changed: Full barcode scanner stability fix. Improved first-scan reliability, stopped random jump to Favorites/blank screen, kept scanner active on not-found camera reads, and restored the darker scanner background overlay.
+- Where to see it (page/link): Food Diary barcode scanner (`/food`)
+- What to quickly test: Scan Twinings Buttermint Tea once; it should add without jumping to Favorites. If a barcode is truly not found, scanner should stay open so you can scan again immediately.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 19:06 AEDT
 - What changed: Shipped foundational SEO upgrades. Added live sitemap and robots routes, improved global page metadata/social preview tags, added canonical/social metadata on core public pages, and set auth/help/support pages to noindex.
 - Where to see it (page/link): `/sitemap.xml`, `/robots.txt`, `/features`, `/faq`, `/privacy`, `/terms`
