@@ -673,119 +673,139 @@ export default function Dashboard() {
       <main className="flex-1 pb-24 md:pb-8">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 md:py-8">
           <div className="bg-transparent md:bg-white rounded-none md:rounded-lg shadow-none md:shadow-sm p-0 md:p-8">
-            <div className="text-center mb-8 space-y-3 py-4">
-              <h1 className="text-3xl md:text-5xl font-extrabold text-helfi-black dark:text-white tracking-tight">
-                Welcome to Your <span className="text-helfi-green">Health Dashboard</span>
+            <div className="text-center mb-8 space-y-2 py-4">
+              <h1 className="text-4xl md:text-5xl font-extrabold text-helfi-black dark:text-white tracking-tight leading-tight">
+                Welcome to Your
               </h1>
+              <h2 className="text-4xl md:text-5xl font-extrabold text-helfi-green tracking-tight leading-tight">
+                Health Dashboard
+              </h2>
               <p className="text-gray-600 text-base md:text-lg max-w-2xl mx-auto mt-2 px-4 md:px-0 font-semibold">
                 Decisions Today Define Tomorrow!
               </p>
             </div>
 
-            <div className="md:hidden flex items-center justify-between mb-4 px-2 py-1">
-              <h3 className="font-bold text-lg text-helfi-black dark:text-white">Daily Tools</h3>
-              <span className="text-[10px] font-bold text-helfi-green uppercase tracking-wider">Slide to view</span>
-            </div>
+            <section className="mb-10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-2xl text-helfi-black dark:text-white">Daily Tools</h3>
+                <Link href="/more" className="text-sm font-bold text-helfi-green hover:text-helfi-green/80">
+                  See all
+                </Link>
+              </div>
 
-            <div className="flex overflow-x-auto gap-4 pb-2 mb-8 md:grid md:grid-cols-5 md:gap-4 md:overflow-visible md:pb-0 scrollbar-none">
-              <Link href="/check-in" className="group block min-w-[260px] md:min-w-0">
-                <div className="h-full min-h-[220px] p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer flex flex-col">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <span className="material-symbols-outlined text-emerald-500">check_circle</span>
-                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">Daily Check-In</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Link href="/check-in" className="group block">
+                  <div className="h-full min-h-[220px] p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="material-symbols-outlined text-emerald-500">check_circle</span>
+                      <h3 className="font-bold text-2xl text-helfi-black dark:text-white">Daily Check-In</h3>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                      Rate your health issues and track symptoms for today.
+                    </p>
+                    <div className="mt-auto inline-flex items-center justify-center px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 font-bold text-sm">
+                      Start check-in →
+                    </div>
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                    Rate your health issues and track symptoms for today.
-                  </p>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50 mt-auto">
-                    Active
-                  </span>
-                </div>
-              </Link>
+                </Link>
 
-              <Link href="/mood" className="group block min-w-[260px] md:min-w-0">
-                <div className="h-full min-h-[220px] p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer flex flex-col">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <span className="material-symbols-outlined text-amber-500">mood</span>
-                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">Mood Tracker</h3>
+                <Link href="/mood" className="group block">
+                  <div className="h-full min-h-[220px] p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="material-symbols-outlined text-amber-500">mood</span>
+                      <h3 className="font-bold text-2xl text-helfi-black dark:text-white">Mood Tracker</h3>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                      Track your mood, stress, and energy.
+                    </p>
+                    <div className="mt-auto inline-flex items-center justify-center px-4 py-2 rounded-full border border-amber-200 text-amber-700 font-bold text-sm">
+                      Log mood →
+                    </div>
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                    Track your daily mood patterns and emotional health.
-                  </p>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50 mt-auto">
-                    Active
-                  </span>
-                </div>
-              </Link>
+                </Link>
 
-              <Link href="/health-tracking" className="group block min-w-[260px] md:min-w-0">
-                <div className="h-full min-h-[220px] p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer flex flex-col">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <span className="material-symbols-outlined text-rose-500">track_changes</span>
-                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">Health Tracking</h3>
+                <Link href="/food" className="group block">
+                  <div className="h-full min-h-[220px] p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="material-symbols-outlined text-orange-500">nutrition</span>
+                      <h3 className="font-bold text-2xl text-helfi-black dark:text-white">Track Calories</h3>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                      Log meals and view your daily totals.
+                    </p>
+                    <div className="mt-auto inline-flex items-center justify-center px-4 py-2 rounded-full border border-orange-200 text-orange-700 font-bold text-sm">
+                      Log food →
+                    </div>
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                    Monitor daily biometric metrics and fitness progress.
-                  </p>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-100 dark:border-rose-900/50 mt-auto">
-                    Active
-                  </span>
-                </div>
-              </Link>
+                </Link>
 
-              <Link href="/insights" className="group block min-w-[260px] md:min-w-0">
-                <div className="h-full min-h-[220px] p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer flex flex-col">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <span className="material-symbols-outlined text-indigo-500">auto_awesome</span>
-                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">AI Insights</h3>
+                <Link href="/food/water" className="group block">
+                  <div className="h-full min-h-[220px] p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all flex flex-col">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="material-symbols-outlined text-blue-500">water_drop</span>
+                      <h3 className="font-bold text-2xl text-helfi-black dark:text-white">Water Intake</h3>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                      Log water and stay hydrated today.
+                    </p>
+                    <div className="mt-auto inline-flex items-center justify-center px-4 py-2 rounded-full border border-blue-200 text-blue-700 font-bold text-sm">
+                      Add water →
+                    </div>
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                    Personalized, data-driven health recommendations.
-                  </p>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 mt-auto">
-                    Active
-                  </span>
-                </div>
-              </Link>
+                </Link>
+              </div>
+            </section>
 
-              <Link href="/practitioners" className="group block min-w-[260px] md:min-w-0">
-                <div className="h-full min-h-[220px] p-5 md:p-6 rounded-3xl md:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all cursor-pointer flex flex-col">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <span className="material-symbols-outlined text-emerald-600">medical_services</span>
-                    <h3 className="font-bold text-lg text-helfi-black dark:text-white">Find a Practitioner</h3>
+            <section className="mb-10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-2xl text-helfi-black dark:text-white">My Health</h3>
+                <Link href="/more" className="text-sm font-bold text-helfi-green hover:text-helfi-green/80">
+                  See all
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Link href="/insights" className="group block">
+                  <div className="h-full p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <span className="material-symbols-outlined text-indigo-500">insights</span>
+                      <h4 className="font-bold text-xl text-helfi-black dark:text-white">Insights</h4>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Review your trends and progress.</p>
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                    Browse trusted practitioners by category and location.
-                  </p>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50 mt-auto">
-                    Browse
-                  </span>
-                </div>
-              </Link>
-            </div>
+                </Link>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
-              <Link href="/food" className="block">
-                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-[#FF803E] text-white hover:bg-[#E67237] transition-colors">
-                  Track Calories
-                </div>
-              </Link>
-              <Link href="/food/water" className="block">
-                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-[#0099FF] text-white hover:bg-[#0086E6] transition-colors">
-                  Log Water Intake
-                </div>
-              </Link>
-              <Link href="/chat" className="block">
-                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
-                  Talk to Helfi
-                </div>
-              </Link>
-              <Link href="/health-tips" className="block">
-                <div className="w-full text-center px-4 py-3 rounded-2xl font-semibold text-sm bg-[#4DAF50] text-white hover:bg-[#439A45] transition-colors">
-                  Smart Health Coach
-                </div>
-              </Link>
-            </div>
+                <Link href="/health-tracking" className="group block">
+                  <div className="h-full p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <span className="material-symbols-outlined text-rose-500">monitoring</span>
+                      <h4 className="font-bold text-xl text-helfi-black dark:text-white">Health Tracking</h4>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Track your key daily health metrics.</p>
+                  </div>
+                </Link>
+
+                <Link href="/symptoms" className="group block">
+                  <div className="h-full p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <span className="material-symbols-outlined text-amber-600">neurology</span>
+                      <h4 className="font-bold text-xl text-helfi-black dark:text-white">Symptom Analysis</h4>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Log and review symptom patterns.</p>
+                  </div>
+                </Link>
+
+                <Link href="/medical-images" className="group block">
+                  <div className="h-full p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:shadow-lg transition-all">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <span className="material-symbols-outlined text-emerald-600">image_search</span>
+                      <h4 className="font-bold text-xl text-helfi-black dark:text-white">Medical Image Analyzer</h4>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Analyze scans and image-based reports.</p>
+                  </div>
+                </Link>
+              </div>
+            </section>
 
             {/* Fitbit Mini Summary */}
             {fitbitConnected && (
