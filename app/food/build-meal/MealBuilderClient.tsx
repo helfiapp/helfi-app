@@ -5538,17 +5538,18 @@ export default function MealBuilderClient() {
                 const hasCustomUnits = Boolean(getFoodUnitGrams(it.name))
                 const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
                 const totals = computeItemTotals(it)
+                const displayTotals = applyPortionScaleToTotals(totals, portionScale)
                 const amountUnit = it.__unit || it.__baseUnit
                 const fullAmount = Number.isFinite(Number(it.__amount)) ? round3(Number(it.__amount)) : null
-                const hasPortionScale = Number.isFinite(Number(computedPortionScale)) && Number(computedPortionScale) > 0
+                const hasPortionScale = Number.isFinite(Number(portionScale)) && Number(portionScale) > 0
                 const showPortionAmount = Boolean(
                   amountUnit &&
                     fullAmount !== null &&
                     hasPortionScale &&
-                    Math.abs(Number(computedPortionScale) - 1) > 0.0001,
+                    Math.abs(Number(portionScale) - 1) > 0.0001,
                 )
                 const portionAmount = showPortionAmount
-                  ? round3(Math.max(0, Number(fullAmount) * Number(computedPortionScale)))
+                  ? round3(Math.max(0, Number(fullAmount) * Number(portionScale)))
                   : null
                 return (
                   <div
@@ -5671,22 +5672,22 @@ export default function MealBuilderClient() {
 
                         <div className="flex flex-wrap gap-2">
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{formatEnergyValue(totals.calories, energyUnit)}</span> {energyUnit}
+                            <span className="font-semibold text-gray-900">{formatEnergyValue(displayTotals.calories, energyUnit)}</span> {energyUnit}
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(totals.protein)}</span> g protein
+                            <span className="font-semibold text-gray-900">{round3(displayTotals.protein)}</span> g protein
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(totals.carbs)}</span> g carbs
+                            <span className="font-semibold text-gray-900">{round3(displayTotals.carbs)}</span> g carbs
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(totals.fat)}</span> g fat
+                            <span className="font-semibold text-gray-900">{round3(displayTotals.fat)}</span> g fat
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(totals.fiber)}</span> g fibre
+                            <span className="font-semibold text-gray-900">{round3(displayTotals.fiber)}</span> g fibre
                           </div>
                           <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(totals.sugar)}</span> g sugar
+                            <span className="font-semibold text-gray-900">{round3(displayTotals.sugar)}</span> g sugar
                           </div>
                         </div>
 
