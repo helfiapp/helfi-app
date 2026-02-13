@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-13 12:19 AEDT
+- What changed: Renamed AI insights to Smart Health Coach across menu/settings/notification pages, added mandatory pricing warning before enable, and launched paid Smart Coach alert rules with strict caps (10 credits per sent alert, max 50 credits/day) plus cooldown and logging safeguards.
+- Where to see it (page/link): Notifications -> Smart Health Coach and Health Tips pages
+- What to quickly test: Turn Smart Health Coach on and confirm the warning popup shows pricing/cap details before enabling. Send/trigger one coach alert and confirm credits only deduct when an alert is actually sent.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-13 12:06 AEDT
 - What changed: Recipe import now force-clears old Build a meal draft state at import start and blocks draft re-apply after import starts. This prevents stale pre-fix draft cards from being merged in and causing duplicate ingredient cards on repeat import.
 - Where to see it (page/link): Food Diary -> Add to Breakfast/Lunch/Dinner -> Import Recipe -> Continue to Build a meal
