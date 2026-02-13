@@ -69,7 +69,7 @@ After pushing to GitHub, you MUST check the deployment status using the Vercel A
    ./scripts/check-deployment-status.sh
    ```
    **IMPORTANT**: This script will wait until deployment is READY or ERROR. Do NOT report "deployment in progress" - wait for completion.
-   - For rename-related food changes, run:
+   - Optional only (run only if owner asks for rename diagnostics):
    ```bash
    RUN_RENAME_GUARD=1 CANARY_AUTH_COOKIE="next-auth.session-token=..." ./scripts/check-deployment-status.sh
    ```
@@ -138,16 +138,13 @@ If you only changed documentation or configuration, this same flow applies.
 - Update CURRENT_ISSUES_LIVE.md, AGENT_TRACKING_SYSTEM.md, and the
   EXIT_VERIFICATION_CHECKLIST.md as required by the broader protocol.
 
-## 5.1 Mandatory Food Rename Guard (When Rename Paths Were Touched)
-- If your changes touched any rename path in Food Diary / Favorites / Custom meal,
-  you must run the rename canary before reporting success:
+## 5.1 Food Rename Area Is Locked (No Routine Canary)
+- Food Diary / Favorites / Custom rename paths are treated as locked and stable.
+- Agents must not change rename code unless the owner gives explicit written approval first.
+- Do not run rename canary on every deploy.
+- Rename canary is optional troubleshooting only, and should run only when owner asks to diagnose rename behavior:
   - `CANARY_AUTH_COOKIE=\"next-auth.session-token=...\" ./scripts/check-rename-guard.sh`
   - or `CANARY_STORAGE_STATE=\"playwright/.auth/<file>.json\" ./scripts/check-rename-guard.sh`
-- The canary must pass all of these checks:
-  1) Rename from Edit Entry updates immediately and survives refresh.
-  2) Rename from Favorites/Custom updates immediately and survives refresh.
-  3) Diary row + favorite label + API row stay in sync.
-- If the canary fails, do not report deployed success. Fix and re-run until green.
 
 ---
 

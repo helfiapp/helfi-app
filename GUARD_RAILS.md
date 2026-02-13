@@ -677,14 +677,13 @@ Implementation notes (do not remove):
   - `resolveFavoriteForEntry`, `updateFavoriteLabelById`, `renameEntriesWithFavoriteId`
   - `saveFoodNameOverride` (keeps aliases for older labels)
 
-Mandatory regression guard (do not skip when rename code is touched):
-- Run: `CANARY_AUTH_COOKIE=\"next-auth.session-token=...\" ./scripts/check-rename-guard.sh`
+Owner policy for this area (non-negotiable):
+- This rename area is now treated as stable and locked.
+- Agents must not modify rename logic unless owner gives explicit written approval first.
+- Do not run rename canary routinely on every deploy.
+- Rename canary is optional troubleshooting only, used when owner asks to diagnose rename behavior:
+  - `CANARY_AUTH_COOKIE=\"next-auth.session-token=...\" ./scripts/check-rename-guard.sh`
   - or: `CANARY_STORAGE_STATE=\"playwright/.auth/<file>.json\" ./scripts/check-rename-guard.sh`
-- Pass criteria:
-  1) Edit Entry rename updates diary immediately and after refresh.
-  2) Favorites/Custom rename updates diary immediately and after refresh.
-  3) API row description + favorite label remain synced to the same final title.
-- If this canary fails, rename work is not complete.
 
 ### 3.5.2 Water entry edit from Food Diary (Jan 2026 – Locked)
 - Water entries listed in **Food Diary** must expose **Edit Entry** in the kebab menu (desktop + mobile).
@@ -2249,6 +2248,7 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 **Goal (non‑negotiable):**
 - Drink entries (hot chocolate / tea / coffee / etc.) must always show drink icon + drink amount in Food Diary.
 - Renaming a food from Diary or Favorites must apply everywhere (Diary + Favorites + future uses of the same saved item).
+- Rename logic in this section is locked: no agent may change it without the owner’s explicit written approval.
 
 **Must keep:**
 - Drink metadata can live in either `nutrition` or `total`; read from both with fallback.
