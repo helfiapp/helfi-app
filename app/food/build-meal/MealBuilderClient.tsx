@@ -2627,14 +2627,6 @@ export default function MealBuilderClient() {
       setRecipeServingsForPortion(draftServings)
     }
 
-    // Prevent accidental re-import if the user refreshes.
-    try {
-      const qs = new URLSearchParams()
-      qs.set('date', selectedDate)
-      qs.set('category', category)
-      router.replace(`/food/build-meal?${qs.toString()}`)
-    } catch {}
-
     const title = String((draft as any).title || '').trim()
     if (title) {
       setMealName(title)
