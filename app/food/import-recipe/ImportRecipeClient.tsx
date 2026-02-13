@@ -170,7 +170,7 @@ export default function ImportRecipeClient() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white overflow-x-clip">
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="px-4 py-3 flex items-center gap-3">
           <button
@@ -185,7 +185,7 @@ export default function ImportRecipeClient() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="w-full max-w-2xl mx-auto px-4 py-6">
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -214,22 +214,22 @@ export default function ImportRecipeClient() {
         </div>
 
         {!recipe && (
-          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="mt-4 max-w-full rounded-2xl border border-gray-200 bg-white p-4">
             {mode === 'url' ? (
               <>
                 <div className="text-sm font-semibold text-gray-900">Recipe link</div>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                   <input
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     placeholder="Paste a recipe URL"
-                    className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                    className="w-full min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 text-base sm:text-sm"
                   />
                   <button
                     type="button"
                     onClick={doImportFromUrl}
                     disabled={loading}
-                    className={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                    className={`w-full shrink-0 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold sm:w-auto ${
                       loading ? 'bg-gray-200 text-gray-500' : 'bg-emerald-600 text-white hover:bg-emerald-700'
                     }`}
                   >
@@ -248,6 +248,7 @@ export default function ImportRecipeClient() {
                     accept="image/*"
                     multiple
                     capture="environment"
+                    className="w-full text-base sm:text-sm"
                     onChange={(e) => {
                       const list = Array.from(e.target.files || [])
                       setFiles(list)
@@ -268,13 +269,13 @@ export default function ImportRecipeClient() {
               </>
             )}
 
-            {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
+            {error && <div className="mt-3 break-words text-sm text-red-600">{error}</div>}
           </div>
         )}
 
         {recipe && (
           <div className="mt-4 space-y-4">
-            <div className="rounded-2xl border border-gray-200 bg-white p-4">
+            <div className="max-w-full rounded-2xl border border-gray-200 bg-white p-4">
               <div className="text-sm font-semibold text-gray-900">Review (you can edit)</div>
 
               <div className="mt-3 grid gap-3">
@@ -283,7 +284,7 @@ export default function ImportRecipeClient() {
                   <input
                     ref={titleRef}
                     defaultValue={recipe.title}
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full min-w-0 rounded-xl border border-gray-300 px-3 py-2 text-base sm:text-sm"
                   />
                 </label>
 
@@ -293,7 +294,7 @@ export default function ImportRecipeClient() {
                     ref={servingsRef}
                     defaultValue={recipe.servings ?? ''}
                     inputMode="numeric"
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full min-w-0 rounded-xl border border-gray-300 px-3 py-2 text-base sm:text-sm"
                     placeholder="Example: 4"
                   />
                 </label>
@@ -303,7 +304,7 @@ export default function ImportRecipeClient() {
                   <textarea
                     ref={ingredientsRef}
                     defaultValue={ingredientsText}
-                    className="mt-1 w-full min-h-[160px] rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full min-w-0 min-h-[160px] rounded-xl border border-gray-300 px-3 py-2 text-base sm:text-sm"
                   />
                 </label>
 
@@ -312,7 +313,7 @@ export default function ImportRecipeClient() {
                   <textarea
                     ref={stepsRef}
                     defaultValue={stepsText}
-                    className="mt-1 w-full min-h-[160px] rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full min-w-0 min-h-[160px] rounded-xl border border-gray-300 px-3 py-2 text-base sm:text-sm"
                   />
                 </label>
               </div>
