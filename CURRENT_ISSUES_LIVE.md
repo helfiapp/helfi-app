@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 01:09 AEDT
+- What changed: Homepage food cards now click directly to section anchors on the food feature page. Added missing detailed sections on `/features/nutrition-food` for import recipe, favorites/reusable meals, copy-duplicate-combine tools, and water/drinks logging. Also added SEO wording updates for this page.
+- Where to see it (page/link): Homepage food section (`/`) and Food feature page (`/features/nutrition-food`)
+- What to quickly test: On homepage, click each food card and confirm it jumps to the correct section anchor on `/features/nutrition-food`. Check new sections exist with detailed copy and mockup images.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 00:30 AEDT
 - What changed: Refreshed the homepage food tracking section design. Updated heading to `Fully Featured Food Tracking` (no colon), added icons to each feature card, added modern card styling (top accent bars, soft shadows, hover lift), and polished spacing/background for a cleaner look.
 - Where to see it (page/link): Homepage (`/`)
