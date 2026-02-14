@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 23:47 AEDT
+- What changed: Added a visible date-range helper under Check-in History time period controls so users can immediately see the actual data window being shown (example: “Showing data from Feb 4 to Feb 13”). Added on web and native parity screen.
+- Where to see it (page/link): `/check-in/history` and native Daily Check-In -> Rating History
+- What to quickly test: On `/check-in/history`, switch time period (30 Days vs 12 Weeks) and confirm the “Showing data …” line updates and explains why chart may look the same when data range is small.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 23:30 AEDT
 - What changed: Fixed AI Recommended Meal Generate 500 error by correcting the server logging payload and keeping model fallback/retry behavior active. Also applied safe binary-response typing compatibility in existing PDF/image API routes so production builds no longer fail before deploy.
 - Where to see it (page/link): /food/recommended
