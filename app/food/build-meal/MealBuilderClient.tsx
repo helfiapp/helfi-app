@@ -1701,6 +1701,7 @@ export default function MealBuilderClient() {
   const [saveImportedRecipeToFavorites, setSaveImportedRecipeToFavorites] = useState(false)
   const recipeImportAppliedRef = useRef(false)
   const recipeImportPortionPrefilledRef = useRef(false)
+  const editCollapseAppliedScopeRef = useRef<string | null>(null)
 
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoritesSearch, setFavoritesSearch] = useState('')
@@ -1710,6 +1711,7 @@ export default function MealBuilderClient() {
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading || recipeImportLoading
   const showPortionSaveCta = (parseNumericInput(portionAmountInput) || 0) > 0
   const isDiaryEdit = Boolean(sourceLogId) && !editFavoriteId
+  const editScopeKey = editFavoriteId ? `fav:${editFavoriteId}` : sourceLogId ? `log:${sourceLogId}` : ''
 
   // Draft protection + auto-save (owner request):
   // - Always keep a draft while the user is building a meal (so they don't lose ingredients if they leave).
@@ -2134,6 +2136,21 @@ export default function MealBuilderClient() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceLogId, editFavoriteId, loadedFavoriteId])
+
+  useEffect(() => {
+    // UX rule: when reopening an already-saved meal, start with all ingredient cards collapsed.
+    // This should not affect first-time recipe building before save.
+    if (!editScopeKey) {
+      editCollapseAppliedScopeRef.current = null
+      return
+    }
+    const expectedLoadedId = editFavoriteId ? editFavoriteId : `log:${sourceLogId}`
+    if (!expectedLoadedId) return
+    if (loadedFavoriteId !== expectedLoadedId) return
+    if (editCollapseAppliedScopeRef.current === editScopeKey) return
+    setExpandedId(null)
+    editCollapseAppliedScopeRef.current = editScopeKey
+  }, [editScopeKey, editFavoriteId, sourceLogId, loadedFavoriteId])
 
   useEffect(() => {
     // Keep /food on the same date when the user returns.

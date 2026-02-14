@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 
 type ImportedRecipe = {
   title: string
@@ -49,6 +50,15 @@ export default function ImportRecipeClient() {
 
   const ingredientsText = useMemo(() => (recipe ? recipe.ingredients.join('\n') : ''), [recipe])
   const stepsText = useMemo(() => (recipe ? recipe.steps.join('\n') : ''), [recipe])
+  const photoPreviews = useMemo(
+    () =>
+      files.map((file) => ({
+        key: `${file.name}:${file.size}:${file.lastModified}`,
+        name: file.name,
+        url: URL.createObjectURL(file),
+      })),
+    [files],
+  )
 
   const titleRef = useRef<HTMLInputElement | null>(null)
   const servingsRef = useRef<HTMLInputElement | null>(null)
@@ -69,6 +79,16 @@ export default function ImportRecipeClient() {
       return out.slice(0, 6)
     })
   }
+
+  useEffect(() => {
+    return () => {
+      for (const preview of photoPreviews) {
+        try {
+          URL.revokeObjectURL(preview.url)
+        } catch {}
+      }
+    }
+  }, [photoPreviews])
 
   const tryBrowserMirrorFallback = async (url: string): Promise<ImportedRecipe | null> => {
     try {
@@ -141,6 +161,7 @@ export default function ImportRecipeClient() {
         return
       }
       setRecipe(data.recipe as ImportedRecipe)
+      setFiles([])
     } catch {
       setError('Import failed. Please try again.')
     } finally {
@@ -298,15 +319,31 @@ export default function ImportRecipeClient() {
                   }}
                 />
                 {files.length > 0 && (
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <div className="text-xs text-gray-600">{files.length} photo(s) selected</div>
-                    <button
-                      type="button"
-                      onClick={() => setFiles([])}
-                      className="text-xs font-semibold text-gray-600 underline"
-                    >
-                      Clear
-                    </button>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-gray-600">{files.length} photo(s) selected</div>
+                      <button
+                        type="button"
+                        onClick={() => setFiles([])}
+                        className="text-xs font-semibold text-gray-600 underline"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {photoPreviews.map((preview) => (
+                        <div key={preview.key} className="relative h-20 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                          <Image
+                            src={preview.url}
+                            alt={preview.name || 'Recipe photo'}
+                            fill
+                            unoptimized
+                            sizes="120px"
+                            className="object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
                 <button
