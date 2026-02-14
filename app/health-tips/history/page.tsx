@@ -123,7 +123,7 @@ export default function HealthTipHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <PageHeader title="Smart Health Coach" backHref="/more" />
+      <PageHeader title="Smart Health Coach" backHref="/health-tips" />
 
       {/* Tabs */}
       <div className="max-w-3xl mx-auto px-4 pt-4">
@@ -162,6 +162,20 @@ export default function HealthTipHistoryPage() {
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Scroll back through previous days to revisit useful Smart Health Coach alerts.
             </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                href="/health-tips"
+                className="inline-flex items-center rounded-lg border border-helfi-green/40 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-helfi-green hover:bg-emerald-100"
+              >
+                Back to Smart Coach
+              </Link>
+              <Link
+                href="/more"
+                className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Main menu
+              </Link>
+            </div>
           </div>
 
           {loading ? (

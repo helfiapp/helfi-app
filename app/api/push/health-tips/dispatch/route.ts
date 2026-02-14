@@ -16,9 +16,11 @@ import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 import {
   SMART_COACH_ALERT_COST_CREDITS,
   SMART_COACH_AUTO_CHECK_TIMES,
+  SMART_COACH_CATEGORY_COOLDOWN_MINUTES,
   SMART_COACH_DAILY_CAP_CREDITS,
   SMART_COACH_DAILY_MAX_ALERTS,
   SMART_COACH_GLOBAL_COOLDOWN_MINUTES,
+  SMART_COACH_MESSAGE_COOLDOWN_MINUTES,
   SMART_COACH_RULE_COOLDOWN_MINUTES,
   ensureSmartCoachTables,
   evaluateSmartCoachRule,
@@ -48,6 +50,29 @@ async function scheduleNextReminder(userId: string, reminderTime: string, timezo
   await scheduleHealthTipWithQStash(userId, reminderTime, timezone).catch((error) => {
     console.error('[SMART_COACH] Failed to schedule next run', error)
   })
+}
+
+async function claimDispatchWindow(params: {
+  userId: string
+  localDate: string
+  reminderTime: string
+}) {
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM HealthCoachDispatchLock WHERE createdAt < NOW() - INTERVAL '3 days'`
+  ).catch(() => {})
+
+  const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+    `INSERT INTO HealthCoachDispatchLock (id, userId, localDate, reminderTime)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (userId, localDate, reminderTime) DO NOTHING
+     RETURNING id`,
+    crypto.randomUUID(),
+    params.userId,
+    params.localDate,
+    params.reminderTime
+  )
+
+  return rows.length > 0
 }
 
 async function pushIfPossible(
@@ -210,6 +235,29 @@ export async function POST(req: NextRequest) {
     const activeTimes: string[] = [...SMART_COACH_AUTO_CHECK_TIMES]
 
     const effectiveTimezone = settings.timezone || fallbackTimezone || 'UTC'
+    const local = getLocalDateTime(effectiveTimezone, now)
+    const claimedDispatchWindow = await claimDispatchWindow({
+      userId,
+      localDate: local.localDate,
+      reminderTime,
+    })
+    if (!claimedDispatchWindow) {
+      await logSmartCoachDecision({
+        userId,
+        ruleId: 'none',
+        triggerResult: 'blocked',
+        blockReason: 'already_sent',
+        creditsCharged: 0,
+        metadata: {
+          reason: 'duplicate_dispatch_window',
+          localDate: local.localDate,
+          reminderTime,
+          timezone: effectiveTimezone,
+        },
+      })
+      return NextResponse.json({ skipped: 'already_sent' })
+    }
+
     const reminderStillActive = activeTimes.includes(reminderTime)
     const timezoneStillMatches = effectiveTimezone === fallbackTimezone || !fallbackTimezone
 
@@ -233,7 +281,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: 'stale_schedule' })
     }
 
-    const local = getLocalDateTime(effectiveTimezone, now)
     const quietHours = await getSmartCoachQuietHours(userId)
 
     if (quietHours.enabled) {
@@ -389,6 +436,67 @@ export async function POST(req: NextRequest) {
       })
       await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
       return NextResponse.json({ skipped: 'rule_cooldown' })
+    }
+
+    const categoryCooldownRows = await prisma.$queryRawUnsafe<Array<{ tipid: string }>>(
+      `SELECT id AS tipId
+       FROM HealthTips
+       WHERE userId = $1
+         AND category = 'smart_health_coach'
+         AND metadata->>'category' = $2
+         AND sentAt >= NOW() - ($3 * INTERVAL '1 minute')
+       ORDER BY sentAt DESC
+       LIMIT 1`,
+      userId,
+      evaluation.rule.category,
+      SMART_COACH_CATEGORY_COOLDOWN_MINUTES
+    )
+    if (categoryCooldownRows.length > 0) {
+      await logSmartCoachDecision({
+        userId,
+        ruleId: evaluation.rule.ruleId,
+        triggerResult: 'blocked',
+        blockReason: 'category_cooldown',
+        creditsCharged: 0,
+        metadata: {
+          category: evaluation.rule.category,
+          cooldownMinutes: SMART_COACH_CATEGORY_COOLDOWN_MINUTES,
+          ...evaluation.metrics,
+        },
+      })
+      await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
+      return NextResponse.json({ skipped: 'category_cooldown' })
+    }
+
+    const messageCooldownRows = await prisma.$queryRawUnsafe<Array<{ tipid: string }>>(
+      `SELECT id AS tipId
+       FROM HealthTips
+       WHERE userId = $1
+         AND category = 'smart_health_coach'
+         AND title = $2
+         AND body = $3
+         AND sentAt >= NOW() - ($4 * INTERVAL '1 minute')
+       ORDER BY sentAt DESC
+       LIMIT 1`,
+      userId,
+      evaluation.rule.title,
+      evaluation.rule.body,
+      SMART_COACH_MESSAGE_COOLDOWN_MINUTES
+    )
+    if (messageCooldownRows.length > 0) {
+      await logSmartCoachDecision({
+        userId,
+        ruleId: evaluation.rule.ruleId,
+        triggerResult: 'blocked',
+        blockReason: 'message_cooldown',
+        creditsCharged: 0,
+        metadata: {
+          cooldownMinutes: SMART_COACH_MESSAGE_COOLDOWN_MINUTES,
+          ...evaluation.metrics,
+        },
+      })
+      await scheduleNextReminder(userId, reminderTime, effectiveTimezone)
+      return NextResponse.json({ skipped: 'message_cooldown' })
     }
 
     const creditManager = new CreditManager(userId)

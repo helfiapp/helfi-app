@@ -2347,6 +2347,30 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 8. In `app/food/page.tsx`, keep the sugar-free hot chocolate load guard so stale rows are corrected on display.
 9. In `applyDrinkOverrideToItems(...)`, keep the reliable-base-volume checks and tiny-base block (`baseMl < 20`).
 
+## 7.7 Smart Health Coach Anti-Spam Guard (Feb 2026 – Locked)
+
+**Goal (non-negotiable):**
+- Smart Health Coach must not send duplicate alerts in a short burst for the same reminder window.
+- Users must not be charged multiple times because duplicate scheduler jobs fired at once.
+
+**Must keep:**
+- `app/api/push/health-tips/dispatch/route.ts` must claim a per-user dispatch window lock (`userId + localDate + reminderTime`) before evaluation/charging.
+- If lock claim fails, dispatch must exit with `already_sent` and must not charge.
+- Keep cooldown layers:
+  - global cooldown
+  - same-rule cooldown
+  - same-category cooldown
+  - same-message cooldown
+- Tip history page must provide one-tap navigation back to Smart Coach and Main menu.
+
+**If this breaks again, restore:**
+1. Re-add dispatch window claim before any credit charge call.
+2. Re-add category and message cooldown checks before charging.
+3. Confirm duplicate scheduler hits on the same minute result in only one sent alert.
+4. Keep direct links on history page for `Back to Smart Coach` and `Main menu`.
+
+Last stable deployment: `TBD` (set commit/date right after deploy)
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:

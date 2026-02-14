@@ -8,6 +8,8 @@ export const SMART_COACH_DAILY_CAP_CREDITS = 50
 export const SMART_COACH_DAILY_MAX_ALERTS = 5
 export const SMART_COACH_GLOBAL_COOLDOWN_MINUTES = 60
 export const SMART_COACH_RULE_COOLDOWN_MINUTES = 4 * 60
+export const SMART_COACH_CATEGORY_COOLDOWN_MINUTES = 3 * 60
+export const SMART_COACH_MESSAGE_COOLDOWN_MINUTES = 6 * 60
 export const SMART_COACH_AUTO_CHECK_TIMES = ['08:00', '11:00', '14:00', '17:00', '20:00'] as const
 
 export type SmartCoachDecisionResult = 'sent' | 'blocked'
@@ -19,6 +21,8 @@ export type SmartCoachBlockReason =
   | 'quiet_hours'
   | 'global_cooldown'
   | 'rule_cooldown'
+  | 'category_cooldown'
+  | 'message_cooldown'
   | 'daily_cap'
   | 'insufficient_credits'
   | 'no_subscription'
@@ -92,6 +96,20 @@ export async function ensureSmartCoachTables() {
   await prisma.$executeRawUnsafe(
     `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS pricingAcceptedAt TIMESTAMPTZ`
   ).catch(() => {})
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS HealthCoachDispatchLock (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      localDate TEXT NOT NULL,
+      reminderTime TEXT NOT NULL,
+      createdAt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(userId, localDate, reminderTime)
+    )
+  `).catch(() => {})
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS idx_healthcoach_dispatchlock_user_time
+    ON HealthCoachDispatchLock(userId, createdAt DESC)
+  `).catch(() => {})
 }
 
 export async function getSmartCoachQuietHours(userId: string): Promise<SmartCoachQuietHours> {
