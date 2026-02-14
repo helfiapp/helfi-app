@@ -536,17 +536,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
 
     const handleWheel = (event: WheelEvent) => {
       if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
-      const pointerTarget =
-        document.elementFromPoint(event.clientX, event.clientY) ||
-        (event.target instanceof Element ? event.target : null)
+      const pointerTarget = event.target instanceof Element ? event.target : null
       if (!pointerTarget) return
-      const zone = pointerTarget.closest('[data-scroll-zone]')
+      const zone = pointerTarget.closest('[data-scroll-zone="sidebar"]')
       if (!zone) return
-      const zoneType = zone.getAttribute('data-scroll-zone')
-
-      // Only override wheel behavior for the fixed sidebar.
-      // For main content, let the browser handle native scrolling to avoid scroll lock.
-      if (zoneType !== 'sidebar') return
 
       const innerScrollable = getScrollableChild(pointerTarget, zone)
       if (innerScrollable && innerScrollable !== zone) return
