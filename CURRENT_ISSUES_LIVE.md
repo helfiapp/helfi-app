@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 16:03 AEDT
+- What changed: SEO pass on News pages. Added article index schema (JSON-LD) on `/news`, added related internal links on each article page, and added clear published + updated metadata on every news article (also reflected in article schema/OpenGraph modified time).
+- Where to see it (page/link): `/news`, `/news/mobile-apps-coming-soon`, `/news/complete-food-tracking-workflow`, `/news/weekly-health-insights-you-can-use`, `/news/meal-water-sleep-consistency`
+- What to quickly test: Open `/news` and confirm cards still work normally; open each article and confirm the metadata line shows both Published and Updated dates; scroll to “Related Helfi links” and confirm each link opens correctly.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 15:19 AEDT
 - What changed: Applied a deeper scroll fix in shared layout so main page scrolling uses native browser behavior (prevents wheel/trackpad lock on content pages like Check-in History).
 - Where to see it (page/link): `/check-in/history`
