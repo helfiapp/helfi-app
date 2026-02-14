@@ -72,16 +72,18 @@ export const newsPosts: NewsPost[] = [
   },
   {
     slug: 'complete-food-tracking-workflow',
-    title: 'A Better Food Tracking Workflow From Photo to Final Log',
+    title: 'A Better Food Tracking Workflow for Everyday Life',
     excerpt:
       'Helfi combines photo logging, barcode scanning, ingredient search, and fast edits so food tracking stays accurate without slowing you down.',
     category: 'Food Tracking',
     publishedAt: '2026-02-13',
     readingTime: '6 min read',
     author: 'Helfi Team',
-    seoTitle: 'Food Tracking App Workflow: Photo, Barcode, Ingredient Search, and Meal Builder',
+    seoTitle: 'A Better Food Tracking Workflow for Everyday Life | Photo, Barcode, Ingredients',
     seoDescription:
       'Learn how Helfi food tracking works with photo logging, barcode scan, ingredient search, meal builder, and reusable meal tools for faster daily logging.',
+    heroImage: '/news-images/a-better-food-tracking-workflow-banner.png',
+    heroImageAlt: 'A better food tracking workflow banner',
     sections: [
       {
         heading: 'Food tracking should fit real life',
