@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 16:21 AEDT
+- What changed: Import Recipe photo flow now has clear mobile actions: `Take photo` (camera) and `Choose from library` (phone photos), with multi-photo support and a clear/reset option.
+- Where to see it (page/link): `/food/import-recipe` (Import by photo tab)
+- What to quickly test: On iPhone, tap `Import by photo`, then tap `Take photo` to open camera and `Choose from library` to select existing images. Confirm selected count updates and Import from photo works.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 16:03 AEDT
 - What changed: SEO pass on News pages. Added article index schema (JSON-LD) on `/news`, added related internal links on each article page, and added clear published + updated metadata on every news article (also reflected in article schema/OpenGraph modified time).
 - Where to see it (page/link): `/news`, `/news/mobile-apps-coming-soon`, `/news/complete-food-tracking-workflow`, `/news/weekly-health-insights-you-can-use`, `/news/meal-water-sleep-consistency`
