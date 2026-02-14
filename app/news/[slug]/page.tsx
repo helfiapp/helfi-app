@@ -54,6 +54,12 @@ function formatDate(value: string) {
   })
 }
 
+function formatReadingTime(value: string) {
+  const match = value.match(/\d+/)
+  if (!match) return value
+  return `About ${match[0]} minutes`
+}
+
 export default function NewsArticlePage({ params }: NewsArticlePageProps) {
   const post = newsPostBySlug.get(params.slug)
 
@@ -99,7 +105,7 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
             <h1 className="mt-3 text-4xl md:text-5xl font-bold text-gray-900 leading-tight">{post.title}</h1>
 
             <p className="mt-4 text-sm text-gray-500">
-              Published {formatDate(post.publishedAt)} • Updated {formatDate(post.updatedAt)} • {post.readingTime} • By {post.author}
+              Published {formatDate(post.publishedAt)} • Updated {formatDate(post.updatedAt)} • Reading time: {formatReadingTime(post.readingTime)} • By {post.author}
             </p>
 
             {post.heroImage ? (
@@ -167,10 +173,25 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
                 <Link
                   key={item.slug}
                   href={`/news/${item.slug}`}
-                  className="rounded-xl border border-gray-100 p-4 hover:border-emerald-200 hover:bg-emerald-50/40 transition-colors"
+                  className="overflow-hidden rounded-xl border border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/40 transition-colors"
                 >
-                  <p className="text-xs uppercase tracking-[0.12em] text-emerald-700 font-semibold">{item.category}</p>
-                  <p className="mt-2 text-sm font-semibold text-gray-900 leading-6">{item.title}</p>
+                  {item.heroImage ? (
+                    <div className="relative aspect-[16/9] w-full">
+                      <Image
+                        src={item.heroImage}
+                        alt={item.heroImageAlt || item.title}
+                        fill
+                        className="object-cover"
+                        sizes="(min-width: 768px) 30vw, 100vw"
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-[16/9] w-full bg-gradient-to-br from-emerald-500 via-emerald-400 to-sky-400" />
+                  )}
+                  <div className="p-4">
+                    <p className="text-xs uppercase tracking-[0.12em] text-emerald-700 font-semibold">{item.category}</p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900 leading-6">{item.title}</p>
+                  </div>
                 </Link>
               ))}
             </div>

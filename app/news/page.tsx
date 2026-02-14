@@ -39,6 +39,12 @@ function formatDate(value: string) {
   })
 }
 
+function formatReadingTime(value: string) {
+  const match = value.match(/\d+/)
+  if (!match) return value
+  return `About ${match[0]} minutes`
+}
+
 export default function NewsPage() {
   const newsListingSchema = {
     '@context': 'https://schema.org',
@@ -113,7 +119,7 @@ export default function NewsPage() {
                     <span className="text-gray-400">•</span>
                     <span>{formatDate(featuredPost.publishedAt)}</span>
                     <span className="text-gray-400">•</span>
-                    <span>{featuredPost.readingTime}</span>
+                    <span>Reading time: {formatReadingTime(featuredPost.readingTime)}</span>
                   </div>
                   <h2 className="mt-4 text-3xl md:text-4xl font-bold text-gray-900 leading-tight group-hover:text-emerald-700 transition-colors">
                     {featuredPost.title}
@@ -151,7 +157,7 @@ export default function NewsPage() {
                 <h2 className="mt-3 text-xl font-semibold text-gray-900 leading-snug">{post.title}</h2>
                 <p className="mt-3 text-sm text-gray-600 leading-6">{post.excerpt}</p>
                 <p className="mt-4 text-xs text-gray-500">
-                  {formatDate(post.publishedAt)} • {post.readingTime}
+                  {formatDate(post.publishedAt)} • Reading time: {formatReadingTime(post.readingTime)}
                 </p>
                 <Link
                   href={`/news/${post.slug}`}
