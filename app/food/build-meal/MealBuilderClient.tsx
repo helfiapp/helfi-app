@@ -5709,21 +5709,33 @@ export default function MealBuilderClient() {
               </div>
             )}
             {recipeImportDraft && !editFavoriteId ? (
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2">
-                <div className="text-[11px] text-gray-700">
-                  Save to favorites (Custom meals)
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-white px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] text-gray-700">
+                    Would you like to save this as a custom meal?
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={saveImportedRecipeToFavorites}
+                    aria-label="Save as custom meal"
+                    onClick={() => setSaveImportedRecipeToFavorites((prev) => !prev)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      saveImportedRecipeToFavorites ? 'bg-emerald-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        saveImportedRecipeToFavorites ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSaveImportedRecipeToFavorites((prev) => !prev)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                    saveImportedRecipeToFavorites
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  {saveImportedRecipeToFavorites ? 'Yes' : 'No'}
-                </button>
+                <div className="mt-1 text-[11px] text-gray-500">
+                  {saveImportedRecipeToFavorites
+                    ? 'Toggle is on: this meal will be saved to Custom meals.'
+                    : 'Toggle is off: this meal will not be saved to Custom meals.'}
+                </div>
               </div>
             ) : null}
             {showPortionSaveCta && (
