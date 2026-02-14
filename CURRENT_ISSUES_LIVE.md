@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 13:24 AEDT
+- What changed: Updated the food tracking news article title from `A Better Food Tracking Workflow From Photo to Final Log` to `A Better Food Tracking Workflow for Everyday Life`. Added the supplied hero banner image `A BETTER FOOD TRACKING WORKFLOW.png` to `/news/complete-food-tracking-workflow`.
+- Where to see it (page/link): `/news/complete-food-tracking-workflow`
+- What to quickly test: Open the article page and confirm the new title is shown and the new banner appears in the hero image area.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 12:46 AEDT
 - What changed: Fixed favorite-name stickiness regression (example `Peach`). Diary save now keeps the current visible title unless the user explicitly types a new one, favorites add now always uses the explicit favorite label, reverse override rules that expand a favorite label back to a raw single-item database name are ignored, and diary rows linked to favorites now prefer the saved favorite label when names differ.
 - Where to see it (page/link): Food Diary (`/food`) add from favorites + diary entry edit + favorites rename flows
