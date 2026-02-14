@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 23:30 AEDT
+- What changed: Fixed AI Recommended Meal Generate 500 error by correcting the server logging payload and keeping model fallback/retry behavior active. Also applied safe binary-response typing compatibility in existing PDF/image API routes so production builds no longer fail before deploy.
+- Where to see it (page/link): /food/recommended
+- What to quickly test: Open AI Recommended Meals, tap Generate (6 credits), confirm a meal is returned (no red Generate failed 500 banner).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 22:21 AEDT
 - What changed: Added `Build this meal` to AI Recommended Meals and wired it into the same Build-a-meal import flow used by Recipe Import. Selecting it now passes an import draft and opens Build a meal with ingredient-by-ingredient matching/progress UI while ingredients are found and added.
 - Where to see it (page/link): `/food/recommended` -> `Build this meal` -> `/food/build-meal?recipeImport=1`
