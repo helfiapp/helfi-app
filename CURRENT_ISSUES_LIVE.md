@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 19:43 AEDT
+- What changed: Fixed the check-in history page scroll lock on desktop by tightening sidebar wheel handling in the shared layout. Wheel handling now only runs when scrolling starts inside the left sidebar, so `/check-in/history` scrolls normally again.
+- Where to see it (page/link): `https://helfi.ai/check-in/history`
+- What to quickly test: Open `/check-in/history` on desktop and scroll up/down with mouse wheel or trackpad while cursor is over the main page area. Confirm page moves normally.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 19:38 AEDT
 - What changed: Locked down the recipe section to prevent regressions. Added a strict recipe lock section to `GUARD_RAILS.md` and added in-code `RECIPE LOCK (owner request)` comments in recipe import and build meal files so agents must not change this area without explicit written owner approval.
 - Where to see it (page/link): `GUARD_RAILS.md`, `/app/food/import-recipe/ImportRecipeClient.tsx`, `/app/api/recipe-import/route.ts`, `/app/food/build-meal/MealBuilderClient.tsx`
