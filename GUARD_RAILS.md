@@ -1396,6 +1396,7 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 ### 3.12 AI Recommended Meals (Jan 2026 – Locked)
 - **Files:** `app/food/recommended/RecommendedMealClient.tsx`, `app/food/page.tsx`, `app/api/ai-meal-recommendation/route.ts`.
 - The Recommended Meal screen must always open on the **Generate** button (no auto-show of the last meal). The Food Diary “Recommended” action passes a `fresh=<timestamp>` query to force a reset. Do not remove this.
+- The `Build this meal` action in `RecommendedMealClient` must keep using the same Recipe Import pipeline (`sessionStorage` draft key `food:recipeImportDraft` + `recipeImport=1` route to `/food/build-meal`) so ingredient-by-ingredient matching/progress remains consistent with Import Recipe.
 - Saved AI meals must show **Recipe** and **Reason** tabs in the Food Diary:
   - On save, the meal stores metadata in `nutrition`: `__origin: 'ai-recommended'`, `__aiRecipe`, `__aiWhy`, and `__aiMealId`.
   - For older saves with no metadata, the diary fetches AI history from `/api/ai-meal-recommendation?date&category` (stored under `AI_MEAL_RECOMMENDATION_GOAL_NAME`) and matches by id/name/items.

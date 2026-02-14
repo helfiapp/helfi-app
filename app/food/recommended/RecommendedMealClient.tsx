@@ -53,6 +53,18 @@ type RecommendedMealRecord = {
   totals: MacroTotals
 }
 
+type RecipeImportDraft = {
+  title: string
+  servings: number | null
+  prepMinutes: number | null
+  cookMinutes: number | null
+  ingredients: string[]
+  steps: string[]
+  sourceUrl: string | null
+  saveRecipe: boolean
+  createdAt: number
+}
+
 type RecommendationContext = {
   targets: MacroTotals
   used: MacroTotals
@@ -129,6 +141,130 @@ const normalizeTotalsForFoodLog = (totals: MacroTotals) => ({
   fiber: typeof totals.fiber_g === 'number' ? round3(totals.fiber_g) : 0,
   sugar: typeof totals.sugar_g === 'number' ? round3(totals.sugar_g) : 0,
 })
+
+const parseFractionToken = (value: string) => {
+  const raw = String(value || '').trim()
+  const m = raw.match(/^(\d+)\s*\/\s*(\d+)$/)
+  if (!m) return null
+  const top = Number(m[1])
+  const bottom = Number(m[2])
+  if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= 0) return null
+  return top / bottom
+}
+
+const parseLeadingAmount = (servingSize: string): { amount: number | null; rest: string } => {
+  const s = String(servingSize || '').trim()
+  if (!s) return { amount: null, rest: '' }
+  const mixed = s.match(/^(\d+)\s+(\d+\/\d+)\s+(.*)$/)
+  if (mixed) {
+    const whole = Number(mixed[1])
+    const frac = parseFractionToken(mixed[2])
+    if (Number.isFinite(whole) && frac !== null) return { amount: whole + frac, rest: String(mixed[3] || '').trim() }
+  }
+  const frac = s.match(/^(\d+\/\d+)\s+(.*)$/)
+  if (frac) {
+    const parsed = parseFractionToken(frac[1])
+    if (parsed !== null) return { amount: parsed, rest: String(frac[2] || '').trim() }
+  }
+  const plain = s.match(/^(\d+(?:[.,]\d+)?)\s+(.*)$/)
+  if (plain) {
+    const parsed = Number(String(plain[1]).replace(',', '.'))
+    if (Number.isFinite(parsed)) return { amount: parsed, rest: String(plain[2] || '').trim() }
+  }
+  const compact = s.match(/^(\d+(?:[.,]\d+)?)([a-zA-Z]+)\s*(.*)$/)
+  if (compact) {
+    const parsed = Number(String(compact[1]).replace(',', '.'))
+    if (Number.isFinite(parsed)) {
+      const tail = String(compact[3] || '').trim()
+      return { amount: parsed, rest: `${String(compact[2] || '').trim()} ${tail}`.trim() }
+    }
+  }
+  return { amount: null, rest: s }
+}
+
+const formatImportAmount = (value: number) => {
+  const n = round3(value)
+  if (!Number.isFinite(n)) return ''
+  if (Math.abs(n - Math.round(n)) < 0.0001) return String(Math.round(n))
+  return String(n)
+}
+
+const buildImportLineFromRecommendedItem = (item: RecommendedItem) => {
+  const name = String(item?.name || '').trim()
+  if (!name) return ''
+  const servings = Number(item?.servings)
+  if (!Number.isFinite(servings) || servings <= 0) return ''
+
+  const serving = String(item?.serving_size || '').trim().toLowerCase()
+  const parsed = parseLeadingAmount(serving)
+  const baseAmount = parsed.amount ?? 1
+  const rest = String(parsed.rest || '').trim().toLowerCase()
+
+  const startsWith = (value: string) => rest.startsWith(value)
+  const has = (value: string) => rest.includes(value)
+
+  let unit: string | null = null
+  if (startsWith('kg') || startsWith('kilogram')) unit = 'kg'
+  else if (startsWith('g ') || rest === 'g' || startsWith('gram')) unit = 'g'
+  else if (startsWith('ml') || startsWith('milliliter')) unit = 'ml'
+  else if (rest === 'l' || startsWith('liter')) unit = 'l'
+  else if (startsWith('oz') || startsWith('ounce')) unit = 'oz'
+  else if (startsWith('tsp') || startsWith('teaspoon')) unit = 'tsp'
+  else if (startsWith('tbsp') || startsWith('tablespoon')) unit = 'tbsp'
+  else if (startsWith('cup')) unit = 'cup'
+  else if (startsWith('clove')) unit = 'clove'
+  else if (startsWith('slice') || startsWith('piece') || startsWith('pc')) unit = 'piece'
+  else if (has('egg')) {
+    if (has('extra large')) unit = 'extra large egg'
+    else if (has('large')) unit = 'large egg'
+    else if (has('medium')) unit = 'medium egg'
+    else if (has('small')) unit = 'small egg'
+    else unit = 'egg'
+  }
+
+  if (unit) {
+    const amount = formatImportAmount(Math.max(0, servings * Math.max(0.0001, baseAmount)))
+    if (amount) return `${amount} ${unit} ${name}`.trim()
+  }
+
+  if (Math.abs(servings - 1) < 0.0001) return name
+  return `${formatImportAmount(servings)} ${name}`.trim()
+}
+
+const buildRecipeImportDraftFromRecommendation = (
+  rec: RecommendedMealRecord,
+  items: RecommendedItem[],
+  categoryLabel: string,
+): RecipeImportDraft => {
+  const ingredients = (Array.isArray(items) ? items : [])
+    .map((it) => buildImportLineFromRecommendedItem(it))
+    .filter(Boolean)
+    .slice(0, 60)
+
+  const recipe = rec?.recipe || null
+  const steps = Array.isArray(recipe?.steps)
+    ? recipe.steps.map((step) => String(step || '').trim()).filter(Boolean).slice(0, 30)
+    : []
+
+  const servingsRaw = Number(recipe?.servings)
+  const servings = Number.isFinite(servingsRaw) && servingsRaw > 0 ? servingsRaw : null
+  const prepRaw = Number(recipe?.prepMinutes)
+  const prepMinutes = Number.isFinite(prepRaw) && prepRaw >= 0 ? prepRaw : null
+  const cookRaw = Number(recipe?.cookMinutes)
+  const cookMinutes = Number.isFinite(cookRaw) && cookRaw >= 0 ? cookRaw : null
+
+  return {
+    title: String(rec?.mealName || '').trim() || `AI Recommended ${categoryLabel}`,
+    servings,
+    prepMinutes,
+    cookMinutes,
+    ingredients,
+    steps,
+    sourceUrl: null,
+    saveRecipe: false,
+    createdAt: Date.now(),
+  }
+}
 
 const formatNumber = (value: number | null | undefined, decimals = 0) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
@@ -234,6 +370,7 @@ export default function RecommendedMealClient() {
   const [active, setActive] = useState<RecommendedMealRecord | null>(() => cachedLastView?.active || null)
   const [itemsDraft, setItemsDraft] = useState<RecommendedItem[] | null>(() => cachedLastView?.itemsDraft || null)
   const [savingDiary, setSavingDiary] = useState(false)
+  const [openingBuilder, setOpeningBuilder] = useState(false)
   const [seenExplain, setSeenExplain] = useState<boolean | null>(() =>
     typeof cachedLastView?.seenExplain === 'boolean' ? cachedLastView.seenExplain : null,
   )
@@ -620,6 +757,30 @@ export default function RecommendedMealClient() {
     }
   }
 
+  const openInMealBuilder = () => {
+    if (!active) return
+    const draft = buildRecipeImportDraftFromRecommendation(active, currentItems, categoryLabel)
+    if (draft.ingredients.length === 0 && draft.steps.length === 0) {
+      setError('This recommendation has no importable ingredients yet. Please generate another meal.')
+      return
+    }
+    setError(null)
+    try {
+      // Reuse the existing Recipe Import pipeline so Build a meal shows live matching progress.
+      sessionStorage.setItem('food:recipeImportDraft', JSON.stringify(draft))
+    } catch {
+      setError('Could not open Build a meal right now. Please try again.')
+      return
+    }
+    setOpeningBuilder(true)
+    const qs = new URLSearchParams()
+    qs.set('date', date)
+    qs.set('category', category)
+    qs.set('recipeImport', '1')
+    qs.set('t', String(Date.now()))
+    router.push(`/food/build-meal?${qs.toString()}`)
+  }
+
   const pageTitle = `AI Recommended ${categoryLabel}`
 
   const recipeMeta = useMemo(() => {
@@ -633,23 +794,33 @@ export default function RecommendedMealClient() {
   }, [active?.recipe])
 
   const ActionButtons = ({ className }: { className?: string }) => (
-    <div className={`flex items-center gap-2 w-full flex-nowrap ${className || ''}`}>
+    <div className={`space-y-2 w-full ${className || ''}`}>
+      <button
+        type="button"
+        onClick={openInMealBuilder}
+        disabled={openingBuilder || generating || commitSaving}
+        className="w-full px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-semibold whitespace-nowrap disabled:opacity-60"
+      >
+        {openingBuilder ? 'Opening builder…' : 'Build this meal'}
+      </button>
+      <div className="flex items-center gap-2 w-full flex-nowrap">
       <button
         type="button"
         onClick={addToDiary}
-        disabled={savingDiary || generating || commitSaving}
-        className="flex-1 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-semibold whitespace-nowrap disabled:opacity-60"
+        disabled={savingDiary || openingBuilder || generating || commitSaving}
+        className="flex-1 px-3 py-2 rounded-xl bg-gray-100 text-gray-900 text-xs sm:text-sm font-semibold hover:bg-gray-200 whitespace-nowrap disabled:opacity-60"
       >
-        {savingDiary ? 'Saving…' : 'Save this meal'}
+        {savingDiary ? 'Saving…' : 'Quick save'}
       </button>
       <button
         type="button"
         onClick={saveToFavorites}
-        disabled={generating || commitSaving}
+        disabled={openingBuilder || generating || commitSaving}
         className="flex-1 px-3 py-2 rounded-xl bg-gray-100 text-gray-900 text-xs sm:text-sm font-semibold hover:bg-gray-200 whitespace-nowrap disabled:opacity-60"
       >
         Save to favorites
       </button>
+      </div>
     </div>
   )
 
