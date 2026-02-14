@@ -103,6 +103,8 @@ const CATEGORY_LABELS: Record<MealCategory, string> = {
   uncategorized: 'Other',
 }
 
+const FAVORITE_PORTION_SEED_KEY = 'foodDiary:favoritePortionSeed'
+
 const normalizeCategory = (raw: any): MealCategory => {
   const v = typeof raw === 'string' ? raw.toLowerCase() : ''
   if (v.includes('breakfast')) return 'breakfast'
@@ -1614,6 +1616,7 @@ export default function MealBuilderClient() {
   const editFavoriteId = (searchParams.get('editFavoriteId') || '').trim()
   const sourceLogId = (searchParams.get('sourceLogId') || '').trim()
   const recipeImportFlag = (searchParams.get('recipeImport') || '').trim()
+  const fromFavoriteAdjust = (searchParams.get('fromFavoriteAdjust') || '').trim() === '1'
 
   const [selectedDate] = useState<string>(initialDate)
   const [category] = useState<MealCategory>(initialCategory)
@@ -1716,6 +1719,7 @@ export default function MealBuilderClient() {
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading || recipeImportLoading
   const showPortionSaveCta = (parseNumericInput(portionAmountInput) || 0) > 0
   const isDiaryEdit = Boolean(sourceLogId) && !editFavoriteId
+  const isFavoriteAdjustBuild = fromFavoriteAdjust && !editFavoriteId && !sourceLogId
   const editScopeKey = editFavoriteId ? `fav:${editFavoriteId}` : sourceLogId ? `log:${sourceLogId}` : ''
 
   // Draft protection + auto-save (owner request):
@@ -1954,6 +1958,70 @@ export default function MealBuilderClient() {
     }
     return null
   }
+
+  useEffect(() => {
+    // Seeded from Food Diary "Change portion" flow: open full editor with source meal as a NEW add flow.
+    if (!isFavoriteAdjustBuild) return
+
+    let seeded = false
+    try {
+      const raw = sessionStorage.getItem(FAVORITE_PORTION_SEED_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      const source = parsed?.source && typeof parsed.source === 'object' ? parsed.source : null
+      if (!source) return
+
+      const label = sanitizeMealTitle(String(parsed?.label || source?.description || source?.label || 'Meal'))
+      if (label) setMealName(label)
+      setLinkedFavoriteId('')
+
+      const totals = (source as any)?.nutrition || (source as any)?.total || null
+      applySavedPortion(totals)
+      initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(totals)
+
+      const sourceItems = Array.isArray((source as any)?.items)
+        ? (source as any).items
+        : Array.isArray((source as any)?.ingredients)
+        ? (source as any).ingredients
+        : null
+
+      if (sourceItems && sourceItems.length > 0) {
+        const converted = convertToBuilderItems(sourceItems)
+        setItems(converted)
+        setExpandedId(null)
+        initialItemsSignatureRef.current = buildItemsSignature(converted)
+      } else {
+        const fallbackItem = {
+          name: label || 'Meal',
+          serving_size: '1 serving',
+          servings: 1,
+          calories: totals?.calories ?? null,
+          protein_g: totals?.protein ?? totals?.protein_g ?? null,
+          carbs_g: totals?.carbs ?? totals?.carbs_g ?? null,
+          fat_g: totals?.fat ?? totals?.fat_g ?? null,
+          fiber_g: totals?.fiber ?? totals?.fiber_g ?? null,
+          sugar_g: totals?.sugar ?? totals?.sugar_g ?? null,
+        }
+        const converted = convertToBuilderItems([fallbackItem])
+        setItems(converted)
+        setExpandedId(null)
+        initialItemsSignatureRef.current = buildItemsSignature(converted)
+      }
+
+      setLoadedFavoriteId(`seed:${Date.now()}`)
+      draftAppliedRef.current = true
+      seeded = true
+    } catch {
+      // non-blocking
+    } finally {
+      if (seeded) {
+        try {
+          sessionStorage.removeItem(FAVORITE_PORTION_SEED_KEY)
+        } catch {}
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFavoriteAdjustBuild])
 
   const convertToBuilderItems = (rawItems: any[]): BuilderItem[] => {
     const next: BuilderItem[] = []
@@ -4473,6 +4541,7 @@ export default function MealBuilderClient() {
       favorites.find((f: any) => isCustomMealFavorite(f) && String(f?.label || f?.description || '').trim() === title.trim()) || null
 
     const shouldAutoSaveFavorite = (() => {
+      if (isFavoriteAdjustBuild) return false
       if (editFavoriteId) return true
       if (recipeImportDraft) return saveImportedRecipeToFavorites
       return true
@@ -5747,7 +5816,7 @@ export default function MealBuilderClient() {
                   disabled={busy || favoriteSaving}
                   className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:opacity-60"
                 >
-                  Save meal
+                  {isFavoriteAdjustBuild ? 'Add' : 'Save meal'}
                 </button>
               </div>
             )}
@@ -6109,7 +6178,7 @@ export default function MealBuilderClient() {
           disabled={busy}
           className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold rounded-2xl"
         >
-          {savingMeal ? 'Saving…' : editFavoriteId || sourceLogId ? 'Update' : 'Save meal'}
+          {savingMeal ? (isFavoriteAdjustBuild ? 'Adding…' : 'Saving…') : editFavoriteId || sourceLogId ? 'Update' : isFavoriteAdjustBuild ? 'Add' : 'Save meal'}
         </button>
 
         <div className="pb-10" />

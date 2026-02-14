@@ -16519,6 +16519,57 @@ Please add nutritional information manually if needed.`);
     return { item, label, servingLabel, totals }
   }
 
+  const openFavoritePortionEditor = (state: any) => {
+    if (!state) return
+    const item = state?.item || state
+    const source = item?.favorite || item?.entry || item
+    if (!source) return
+
+    const sourceItems = (() => {
+      if (Array.isArray(source?.items)) return source.items
+      if (typeof source?.items === 'string') {
+        try {
+          const parsed = JSON.parse(source.items)
+          return Array.isArray(parsed) ? parsed : null
+        } catch {
+          return null
+        }
+      }
+      if (Array.isArray(source?.ingredients)) return source.ingredients
+      return null
+    })()
+
+    const totals = source?.nutrition || source?.total || null
+    const label =
+      String(state?.label || item?.label || source?.description || source?.label || 'Meal').trim() || 'Meal'
+    const category = normalizeCategory(selectedAddCategory)
+    const seedPayload = {
+      v: 1,
+      createdAt: Date.now(),
+      date: selectedDate,
+      category,
+      label,
+      source: {
+        description: source?.description || source?.label || label,
+        label: source?.label || source?.description || label,
+        items: sourceItems,
+        nutrition: totals,
+        total: totals,
+      },
+    }
+
+    try {
+      sessionStorage.setItem('foodDiary:favoritePortionSeed', JSON.stringify(seedPayload))
+    } catch {}
+
+    closeFavoritesPicker()
+    const qs = new URLSearchParams()
+    qs.set('date', selectedDate)
+    qs.set('category', category)
+    qs.set('fromFavoriteAdjust', '1')
+    router.push(`/food/build-meal?${qs.toString()}`)
+  }
+
   const scaleTotalsForFavoriteAdjust = (totals: any, multiplier: number) => {
     const safe = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1
     const base = totals || {}
@@ -28181,6 +28232,13 @@ Please add nutritional information manually if needed.`);
               </button>
               <button
                 type="button"
+                onClick={() => openFavoritePortionEditor(favoriteActionModal)}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+              >
+                Change portion
+              </button>
+              <button
+                type="button"
                 onClick={closeFavoritesPicker}
                 className="w-full px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50"
               >
@@ -28221,10 +28279,10 @@ Please add nutritional information manually if needed.`);
               <div className="flex flex-col sm:flex-row gap-2 sm:justify-end mb-4">
                 <button
                   type="button"
-                  onClick={() => openFavoriteAdjustFlow(favoriteActionModal)}
+                  onClick={() => openFavoritePortionEditor(favoriteActionModal)}
                   className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
                 >
-                  Change amount
+                  Change portion
                 </button>
                 <button
                   type="button"
@@ -28327,7 +28385,7 @@ Please add nutritional information manually if needed.`);
               Back
             </button>
             <div className="min-w-0 text-center">
-              <div className="text-sm font-semibold text-gray-900 truncate">Change amount</div>
+              <div className="text-sm font-semibold text-gray-900 truncate">Change portion</div>
               <div className="text-xs text-gray-500 truncate">{favoriteActionModal.label}</div>
             </div>
             <button

@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 01:49 AEDT
+- What changed: Updated Favorites add flow to support full portion editing. The first popup now includes `Change portion` (goes straight to full editor). In Preview, `Change amount` is renamed to `Change portion` and also opens full editor. The full editor route now uses Add mode for this flow, so users can still add the meal/item to diary after editing portion and ingredients.
+- Where to see it (page/link): `/food` -> `Add from favorites` (All/Favorites/Custom) -> select meal -> action popup/Preview -> `Change portion`
+- What to quickly test: In the action popup confirm buttons are `Add to diary`, `Preview`, `Change portion`, `Cancel`. Click `Change portion` and confirm full editor opens with ingredient add/remove + portion controls, and bottom button says `Add`. Save and confirm entry is added to diary.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 01:02 AEDT
 - What changed: Added strict lock-down guard rails and in-code warning for the Food Diary drink-row flip regression (HEL-156). Future agents now have explicit "do not override explicit drink metadata" rules plus a clear Playwright recovery checklist if the issue ever returns.
 - Where to see it (page/link): `GUARD_RAILS.md` section `7.6.1 Delayed Drink->Food Flip Lock (HEL-156)` and `app/food/page.tsx` (`renderEntryCard` drink icon logic comment).
